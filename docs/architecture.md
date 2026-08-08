@@ -162,7 +162,9 @@ That derivation has a concrete prerequisite under Prisma 7: the client is no lon
 
 `Notification` is **not** in the Phase 1 schema. It is added in [roadmap Phase 8](roadmap.md#phase-8--activity-log-and-notifications) when the activity feed and in-app alerts land. Until then the `notification` Nest module folder exists as a stub only.
 
-Invitations are not a Kurultay Prisma model either: Better Auth's organization plugin owns invite persistence. Product language and REST paths use **Workspace** — see [ADR 0004](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
+Invitations persist as `WorkspaceInvitation`, mapped from Better Auth's organization
+plugin tables (Kurultay names, plugin `schema` config). Product language and REST
+paths use **Workspace** — see [ADR 0004](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
 
 ### Critical field rules
 

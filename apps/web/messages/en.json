@@ -2,17 +2,48 @@
   "auth": {
     "login": {
       "title": "Sign in to Kurultay",
-      "subtitle": "Placeholder login — auth lands in Phase 2.",
-      "submit": "Continue"
+      "subtitle": "Use your email and password to continue.",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "noAccount": "Need an account?",
+      "registerLink": "Create one",
+      "error": "Could not sign in. Check your email and password."
     },
     "register": {
       "title": "Create an account",
-      "subtitle": "Registration will be wired with Better Auth."
+      "subtitle": "Start with a name, email, and password.",
+      "name": "Name",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Create account",
+      "hasAccount": "Already have an account?",
+      "loginLink": "Sign in",
+      "error": "Could not create your account."
+    },
+    "invite": {
+      "title": "Accept invitation",
+      "subtitle": "Join the workspace you were invited to.",
+      "submit": "Accept invite",
+      "signInFirst": "Sign in with the invited email to accept.",
+      "error": "Could not accept this invitation."
     }
   },
   "app": {
     "shell": {
-      "title": "Kurultay"
+      "title": "Kurultay",
+      "workspaces": "Workspaces",
+      "createWorkspace": "New workspace",
+      "signOut": "Sign out",
+      "loading": "Loading…"
+    },
+    "workspace": {
+      "createTitle": "Create a workspace",
+      "createSubtitle": "Workspaces isolate boards and members.",
+      "name": "Name",
+      "slug": "Slug",
+      "submit": "Create workspace",
+      "error": "Could not create workspace."
     },
     "dashboard": {
       "title": "Dashboard",

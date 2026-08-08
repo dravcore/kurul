@@ -188,7 +188,9 @@ Bu türetmenin Prisma 7 altında somut bir ön koşulu var: client artık `node_
 
 `Notification` Phase 1 şemasında **yok**. [Roadmap Faz 8](roadmap.md#faz-8--aktivite-logu-ve-bildirimler) ile activity feed ve uygulama içi bildirimler gelince eklenir. O zamana kadar `notification` Nest modül klasörü yalnızca stub'dır.
 
-Davetler de Kurultay Prisma modeli değildir: persistence Better Auth organization plugin'ine aittir. Ürün dili ve REST path'leri **Workspace** kullanır — bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
+Davetler `WorkspaceInvitation` olarak saklanır; Better Auth organization plugin
+tablolarından Kurultay adlarına map edilir. Ürün dili ve REST path'leri
+**Workspace** kullanır — bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
 
 ### Kritik alan kuralları
 

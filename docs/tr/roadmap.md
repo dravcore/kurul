@@ -4,7 +4,7 @@ Kurultay için dokümantasyondan MVP'ye ve ötesine uzanan, fazlara ayrılmış 
 
 > 🌐 [English (canonical)](../roadmap.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
-**Son güncelleme:** 2026-08-08
+**Son güncelleme:** 2026-08-09
 
 ## İçindekiler
 
@@ -166,19 +166,19 @@ pnpm lint && pnpm test && pnpm build   # hata yok
 
 **Hedef:** bir kullanıcı kayıt olabilir, giriş yapabilir ve bir workspace'e sahip
 olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
-**Durum:** başlanmadı
+**Durum:** tamamlandı
 
-- [ ] Better Auth entegrasyonu (organization plugin), session yönetimi
-- [ ] Kayıt / giriş / çıkış / session yenileme
-- [ ] `GET /me`
-- [ ] Tüm korunan route'larda auth guard'ı
-- [ ] **Workspace scoping guard'ı** — her request `workspaceId`'yi çözümler ve doğrular
-- [ ] Workspace CRUD, slug benzersizliği
-- [ ] Üyelik + rol'ler: `OWNER`, `ADMIN`, `MEMBER`, `GUEST`; role guard'ı
-- [ ] Davetler: oluşturma, kabul etme, iptal etme
-- [ ] Web: login/register sayfaları, session provider, workspace switcher, app shell
+- [x] Better Auth entegrasyonu (organization plugin), session yönetimi
+- [x] Kayıt / giriş / çıkış / session yenileme
+- [x] `GET /me`
+- [x] Tüm korunan route'larda auth guard'ı
+- [x] **Workspace scoping guard'ı** — her request `workspaceId`'yi çözümler ve doğrular
+- [x] Workspace CRUD, slug benzersizliği
+- [x] Üyelik + rol'ler: `OWNER`, `ADMIN`, `MEMBER`, `GUEST`; role guard'ı
+- [x] Davetler: oluşturma, kabul etme, iptal etme
+- [x] Web: login/register sayfaları, session provider, workspace switcher, app shell
       layout'u
-- [ ] Testler: auth akışları, workspace izolasyonu, rol matrisi
+- [x] Testler: auth akışları, workspace izolasyonu, rol matrisi
       ([testing.md](testing.md#neler-test-edilmeli))
 
 ---
