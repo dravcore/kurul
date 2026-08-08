@@ -3,6 +3,11 @@ RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 
 FROM base AS build
+# Next.js inlines NEXT_PUBLIC_* into the client bundle at build time, so it must be
+# available before `next build` runs — setting it only at container runtime (as compose
+# does for the API) would bake in the fallback below instead of the real value.
+ARG NEXT_PUBLIC_API_URL=http://localhost:4000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml prisma.config.ts ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/

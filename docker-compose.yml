@@ -23,17 +23,36 @@ services:
       timeout: 5s
       retries: 10
 
+  # One-shot: applies pending Prisma migrations, then exits. `api` waits for it to finish
+  # successfully before starting, so the schema is never missing on first boot.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    environment:
+      # postgres:5432 (not localhost) — this is the in-network address, unrelated to
+      # whatever DATABASE_URL a developer has in their host .env for the dev loop.
+      DATABASE_URL: postgresql://kurultay:kurultay@postgres:5432/kurultay
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
+      # postgres:5432 / redis:6379 are the in-network addresses; they're intentionally not
+      # sourced from the host .env, whose DATABASE_URL/REDIS_URL point at localhost for the
+      # dev-loop run mode (docs/development.md#run-modes) and would not resolve in-container.
       DATABASE_URL: postgresql://kurultay:kurultay@postgres:5432/kurultay
       REDIS_URL: redis://redis:6379
       API_PORT: 4000
-      WEB_URL: http://localhost:3000
-      BETTER_AUTH_SECRET: change-me-in-production
-      BETTER_AUTH_URL: http://localhost:3000
+      WEB_URL: ${WEB_URL:-http://localhost:3000}
+      # No baked-in default: compose fails loudly instead of booting with a known secret.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env — see docs/development.md#environment-variables}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
     ports:
       - '4000:4000'
     depends_on:
@@ -41,13 +60,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:4000
+      args:
+        # Next.js inlines NEXT_PUBLIC_* at build time, so it must be a build arg, not just a
+        # runtime environment variable — see apps/web/Dockerfile.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     ports:
       - '3000:3000'
     depends_on:
