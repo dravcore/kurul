@@ -9,14 +9,14 @@ Open-source Kanban-focused project management tool. `dravcore/kurultay` — AGPL
 > [docs/roadmap.md](docs/roadmap.md) Phase 1 and [docs/project-skeleton.md](docs/project-skeleton.md).
 
 - Monorepo (pnpm workspace) + **modular monolith** — no microservices
-- `apps/api` (NestJS + Prisma + PostgreSQL + Redis + Socket.io)
-- `apps/web` (Next.js App Router + Tailwind + shadcn/ui + @dnd-kit + Recharts)
+- `apps/api` (NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io)
+- `apps/web` (Next.js 16 App Router + Tailwind + shadcn/ui + @dnd-kit + Recharts)
 - `packages/shared-types` (TS types shared between frontend/backend — DTOs, enums, socket events)
-- Auth: Better Auth (organization plugin) · Deploy: Docker Compose
+- Auth: Better Auth (organization plugin; product domain = Workspace) · Deploy: Docker Compose
 
 ## Critical rules
 
-- `Task.position` is **Float** (fractional indexing) — never use Int
+- `Task.position` and `Column.position` are **Float** (fractional indexing) — never use Int
 - `dueDate` and `estimatedMinutes` are separate fields — do not merge them
 - `priority` is kept separate from labels
 - Multi-tenant isolation: every query is scoped by `workspaceId`, enforced at guard/interceptor level

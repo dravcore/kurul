@@ -14,7 +14,7 @@ lightweight enough for a solo/small-team codebase to maintain.
 
 ## Decision
 
-**Next.js (App Router)** + **Tailwind CSS** + **shadcn/ui** + **@dnd-kit** +
+**Next.js 16 (App Router)** + **Tailwind CSS** + **shadcn/ui** + **@dnd-kit** +
 **Recharts**.
 
 ## Rationale

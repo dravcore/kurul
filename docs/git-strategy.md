@@ -137,7 +137,7 @@ Closes #142
 
 docs: document the release process in git-strategy
 
-chore(deps): bump prisma to 6.2.1
+chore(deps): bump prisma to 7.2.1
 
 feat(api)!: scope board endpoints under /workspaces/:workspaceId
 

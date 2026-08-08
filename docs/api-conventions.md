@@ -72,6 +72,10 @@ GET    /workspaces/:workspaceId/tasks/:taskId/comments
 POST   /workspaces/:workspaceId/tasks/:taskId/comments
 ```
 
+Invitations are workspace-scoped in the public API. Persistence is owned by Better Auth's
+organization plugin (no Phase 1 Prisma `Invitation` model). Product names map
+organization → Workspace — see [ADR 0004](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
+
 Note the shape: a **collection** is nested under the parent that owns it, because that is
 what scopes the list. A **single resource** is addressed by its own id directly under the
 workspace, because nothing further is needed to find it.

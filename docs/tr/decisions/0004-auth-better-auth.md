@@ -23,6 +23,26 @@ Auth.js/NextAuth ve Clerk yerine, **organization plugin**'ini kullanan **Better 
 
 **Not:** Better Auth yalnızca backend logic sağlıyor, UI değil. Login, register ve davet-kabul ekranlarını tasarlamak ve inşa etmek bize düşüyor.
 
+## Alan eşlemesi: organization → Workspace
+
+Better Auth organization plugin'i *organization*, *member* ve *invitation* dilini
+konuşur. Kurultay'ın ürün dili ve REST API'si **Workspace**, **WorkspaceMember**
+ve workspace-scoped davet route'larını kullanır
+(`POST /workspaces/:workspaceId/invitations`, …). Eşleme 1:1 kabul edilir:
+
+| Better Auth (plugin) | Kurultay (ürün / API) |
+|---|---|
+| Organization | Workspace |
+| Member | WorkspaceMember |
+| Invitation | Invitation (Faz 1'de ayrı Prisma modeli yok) |
+
+Davet persistence'ı Better Auth'un organization tablolarında yaşar. Faz 1 bir
+Kurultay `Invitation` modeli **eklemez**; Faz 2 Nest `workspace` modülünü
+plugin'e bağlar ve `Workspace` / `WorkspaceMember` satırlarının aynı tablolar mı
+(Better Auth ile hizalı Prisma modelleri) yoksa üstünde ince bir sync katmanı mı
+olduğuna karar verir. Her iki durumda da public API yanıtları "organization"
+kelimesini asla göstermez.
+
 ## Entegrasyon riski
 
 Kütüphane seçimi iyi desteklenmiş; *eşleştirme* Better Auth'un sunduğu en az geçilmiş yol, ve bu keşfedilmek yerine baştan bütçelenmeye değer.

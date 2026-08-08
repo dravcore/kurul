@@ -14,7 +14,7 @@ share types cleanly with the Next.js frontend.
 
 ## Decision
 
-**NestJS + TypeScript**, **Prisma 7** as ORM, **PostgreSQL 18**, and **Redis 8**.
+**NestJS 11 + TypeScript**, **Prisma 7** as ORM, **PostgreSQL 18**, and **Redis 8**.
 
 ## Rationale
 

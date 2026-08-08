@@ -160,6 +160,10 @@ That derivation has a concrete prerequisite under Prisma 7: the client is no lon
 | `Comment` | `id`, `taskId`, `userId`, `body`, `createdAt` | |
 | `Activity` | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt` | Append-only log. `workspaceId` is required and `taskId` is optional so that workspace-level events with no task — "board renamed", "member joined" — are representable, which is what the Phase 8 feed promises |
 
+`Notification` is **not** in the Phase 1 schema. It is added in [roadmap Phase 8](roadmap.md#phase-8--activity-log-and-notifications) when the activity feed and in-app alerts land. Until then the `notification` Nest module folder exists as a stub only.
+
+Invitations are not a Kurultay Prisma model either: Better Auth's organization plugin owns invite persistence. Product language and REST paths use **Workspace** — see [ADR 0004](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
+
 ### Critical field rules
 
 These are non-negotiable; they are also recorded in `CLAUDE.md`.
@@ -167,7 +171,7 @@ These are non-negotiable; they are also recorded in `CLAUDE.md`.
 | Rule | Reason |
 |---|---|
 | Every `id` is **UUIDv7** (`@default(uuid(7))`) | Time-ordered, so keys stay index-local on insert-heavy tables and serve as a stable pagination cursor. See [api-conventions.md](api-conventions.md#data-types) |
-| `Task.position` is **Float**, never Int | Fractional indexing. Inserting between positions `1` and `2` writes `1.5` — one row updated instead of renumbering the whole list. See [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
+| `Task.position` and `Column.position` are **Float**, never Int | Fractional indexing. Inserting between positions `1` and `2` writes `1.5` — one row updated instead of renumbering the whole list. Applies to both cards and columns. See [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
 | `dueDate` and `estimatedMinutes` are **separate fields** | "By when" and "how long" are different concepts; a future Gantt view needs both |
 | `priority` is **separate from labels** | Keeps filtering and dashboard aggregation clean — priority is an ordered scalar, labels are an unordered set |
 | `Activity.payload` is **Json** | New activity types can be added without a schema migration |
@@ -229,9 +233,9 @@ The reasoning behind each of these choices is recorded as an ADR:
 | ADR | Topic |
 |---|---|
 | [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modular monolith |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS + Prisma + PostgreSQL + Redis |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js + Tailwind + shadcn/ui + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Better Auth with the organization plugin |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Better Auth with the organization plugin (→ Workspace) |
 | [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md) | Socket.io + Redis adapter |
 | [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) | Float positions for ordering |
 | [`0007-license-agpl.md`](decisions/0007-license-agpl.md) | AGPL-3.0 |

@@ -54,9 +54,9 @@ pre-skeleton contract in [docs/development.md](docs/development.md).
 
 | Layer | Choice |
 |---|---|
-| Backend | NestJS + Prisma + PostgreSQL + Redis + Socket.io |
-| Frontend | Next.js (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts |
-| Auth | Better Auth (organization plugin) |
+| Backend | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io |
+| Frontend | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts |
+| Auth | Better Auth (organization plugin → Workspace) |
 | Shared types | `packages/shared-types` (TS types shared between frontend/backend) |
 | Deployment | Docker Compose |
 | Architecture | Monorepo, modular monolith — no microservices |

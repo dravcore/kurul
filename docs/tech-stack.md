@@ -18,13 +18,13 @@ The technology chosen for each layer of Kurultay, with a short rationale and the
 
 | Layer | Choice | Alternative considered |
 |---|---|---|
-| Backend | NestJS + TypeScript | Fastify (lighter), Django |
+| Backend | NestJS 11 + TypeScript | Fastify (lighter), Django |
 | Database | PostgreSQL 18 | — |
 | Cache / PubSub / Queue | Redis 8 (AGPLv3) | Valkey (BSD-3, Linux Foundation fork) |
-| ORM | Prisma | Drizzle ORM |
+| ORM | Prisma 7 | Drizzle ORM |
 | API | REST (initially) | GraphQL (later) |
 | Realtime | Socket.io + `@socket.io/redis-adapter` | `ws` (lighter, no features) |
-| Frontend | Next.js + React + TypeScript | — |
+| Frontend | Next.js 16 + React + TypeScript | — |
 | Styling | Tailwind CSS | — |
 | UI kit | shadcn/ui | Radix UI (raw) |
 | Drag & drop | @dnd-kit | pragmatic-drag-and-drop |
@@ -38,9 +38,9 @@ Architecture (monorepo + modular monolith) is covered separately in [architectur
 
 ## 2. Rationale by layer
 
-### Backend — NestJS + TypeScript
+### Backend — NestJS 11 + TypeScript
 
-Both commercial reference points run this way: ClickUp on TypeScript/Node.js/NestJS/PostgreSQL, Linear fully on Node.js + TypeScript with PostgreSQL and Redis. NestJS's module system keeps a many-module product (auth, workspace, board, task, dashboard, notification) orderly when a single developer or a small team is building it. Sharing a language with the frontend is what makes `packages/shared-types` possible, which pays off on every data model change. Most open-source alternatives (Plane, Taiga) chose Django for fast CRUD plus a free admin panel — a good trade when realtime sync is not the priority, and the wrong one here.
+Both commercial reference points run this way: ClickUp on TypeScript/Node.js/NestJS/PostgreSQL, Linear fully on Node.js + TypeScript with PostgreSQL and Redis. **NestJS 11** is the pinned major (latest stable as of Phase 0; NestJS 12's ESM migration was still in draft). NestJS's module system keeps a many-module product (auth, workspace, board, task, dashboard, notification) orderly when a single developer or a small team is building it. Sharing a language with the frontend is what makes `packages/shared-types` possible, which pays off on every data model change. Most open-source alternatives (Plane, Taiga) chose Django for fast CRUD plus a free admin panel — a good trade when realtime sync is not the priority, and the wrong one here.
 
 ### Database — PostgreSQL + Redis
 
@@ -66,7 +66,11 @@ The safest default for a React dashboard: broad ecosystem adoption, a comprehens
 
 ### Auth — Better Auth
 
-Multi-tenant workspaces are the heart of this product, so auth is a load-bearing choice. Better Auth is the strongest self-hosted option for new projects in 2026 — more capable than NextAuth, free, actively maintained — and Auth.js/NextAuth is in maintenance mode with Better Auth positioned as its successor. The decisive factor is the **organization plugin**: multi-tenant organizations, invitations, member roles, and permissions out of the box, which would take weeks to build. Self-hosting keeps data sovereignty in-house with no dependency on a managed service like Clerk. Note that Better Auth ships backend logic only — login and register UI is ours to write.
+Multi-tenant workspaces are the heart of this product, so auth is a load-bearing choice. Better Auth is the strongest self-hosted option for new projects in 2026 — more capable than NextAuth, free, actively maintained — and Auth.js/NextAuth is in maintenance mode with Better Auth positioned as its successor. The decisive factor is the **organization plugin**: multi-tenant organizations, invitations, member roles, and permissions out of the box, which would take weeks to build. In product language those map 1:1 to **Workspace** / **WorkspaceMember** / invitations — see [`decisions/0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace). Self-hosting keeps data sovereignty in-house with no dependency on a managed service like Clerk. Note that Better Auth ships backend logic only — login and register UI is ours to write.
+
+### Frontend — Next.js 16
+
+**Next.js 16** (App Router) is the pinned major for `apps/web`. Tailwind, shadcn/ui, classic `@dnd-kit`, and Recharts sit on top; details and trade-offs are in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md).
 
 ### Deployment — Docker Compose
 
@@ -108,9 +112,9 @@ Full arguments and consequences live in [`decisions/`](decisions/) rather than b
 | ADR | Topic |
 |---|---|
 | [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modular monolith |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS + Prisma + PostgreSQL + Redis |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js + Tailwind + shadcn/ui + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Better Auth with the organization plugin |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Better Auth with the organization plugin (→ Workspace) |
 | [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md) | Socket.io + Redis adapter |
 | [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) | Float positions for ordering |
 | [`0007-license-agpl.md`](decisions/0007-license-agpl.md) | AGPL-3.0 |

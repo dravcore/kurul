@@ -74,6 +74,10 @@ GET    /workspaces/:workspaceId/tasks/:taskId/comments
 POST   /workspaces/:workspaceId/tasks/:taskId/comments
 ```
 
+Davetler public API'de workspace-scoped'dır. Persistence Better Auth organization
+plugin'ine aittir (Faz 1'de Prisma `Invitation` modeli yok). Ürün isimleri
+organization → Workspace eşlemesini kullanır — bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
+
 Şekle dikkat edin: bir **koleksiyon**, listeyi scope'layan şey olduğu için onu sahiplenen
 ebeveynin altına iç içe yerleştirilir. Bir **tekil kaynak**, kendisini bulmak için
 başka hiçbir şeye ihtiyaç olmadığı için kendi id'siyle doğrudan workspace'in altında

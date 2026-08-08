@@ -117,7 +117,7 @@ her yarısı diğeri olmadan build edilemiyor. Bundan sonraki her faz olağan bo
 takip ediyor.
 
 - [ ] pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, `pnpm-workspace.yaml`
-- [ ] Kök `package.json` script'leri: `dev`, `build`, `lint`, `db:migrate`, `db:seed`,
+- [ ] Kök `package.json` script'leri: `dev`, `build`, `lint`, `test`, `db:migrate`, `db:seed`,
       `db:studio`
 - [ ] Paylaşılan tooling: TypeScript strict base config, ESLint, Prettier
 - [ ] `.env.example` ve `.gitignore`
@@ -132,11 +132,12 @@ takip ediyor.
 - [ ] Repository kökünde `prisma.config.ts` (Prisma 7: şema yolu, seed girişi, env yükleme)
 - [ ] Prisma şeması — `User`, `Workspace`, `WorkspaceMember`, `Board`, `Column`, `Task`,
       `TaskAssignee`, `Label`, `TaskLabel`, `Comment`, `Activity`
-- [ ] Id'ler `@default(uuid(7))`; `Task.position` `Float`'tır; `dueDate` ve
-      `estimatedMinutes` ayrı alanlardır
+- [ ] Id'ler `@default(uuid(7))`; `Task.position` ve `Column.position` `Float`'tır;
+      `dueDate` ve `estimatedMinutes` ayrı alanlardır
 - [ ] Join-tablosu unique kısıtları, `Column @@unique([boardId, id])` composite FK'i, ve
       açık `onDelete` aksiyonları ([project-skeleton.md](project-skeleton.md#prisma-şeması--ilk-tablolar))
-- [ ] İlk migration commit edildi
+- [ ] İlk migration commit edildi — yalnızca Faz 1 tabloları; `Notification`
+      [Faz 8](#faz-8--aktivite-logu-ve-bildirimler)'e ertelenmiştir
 - [ ] `db:seed` — bir demo workspace, board, varsayılan column'lar, birkaç task
 - [ ] 200 dönen `GET /health`
 - [ ] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
@@ -268,7 +269,8 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 - [ ] Task oluşturma/taşıma/güncelleme/yorum/atama üzerinde `Activity` yazımı (yeni
       aktivite tiplerinin migration gerektirmemesi için `payload` JSON olarak)
 - [ ] Aktivite feed endpoint'i (task seviyesi ve workspace seviyesi), cursor-paginated
-- [ ] Bildirim modeli: mention, atama, yaklaşan due date
+- [ ] `Notification` modeli (yeni migration): mention, atama, yaklaşan due date —
+      Faz 1 şemasında yok
 - [ ] Okundu işaretle / tümünü okundu işaretle
 - [ ] Web: task panelinde aktivite zaman çizelgesi, bildirim merkezi
 - [ ] `[-]` E-posta gönderimi — MVP ötesine ertelendi

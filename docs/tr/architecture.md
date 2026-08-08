@@ -186,6 +186,10 @@ Bu türetmenin Prisma 7 altında somut bir ön koşulu var: client artık `node_
 | `Comment` | `id`, `taskId`, `userId`, `body`, `createdAt` | |
 | `Activity` | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt` | Yalnızca-ekleme log. `workspaceId` zorunlu ve `taskId` opsiyonel, böylece task'ı olmayan workspace seviyesi olaylar — "board yeniden adlandırıldı", "üye katıldı" — temsil edilebilir; Faz 8 feed'inin vaat ettiği de bu |
 
+`Notification` Phase 1 şemasında **yok**. [Roadmap Faz 8](roadmap.md#faz-8--aktivite-logu-ve-bildirimler) ile activity feed ve uygulama içi bildirimler gelince eklenir. O zamana kadar `notification` Nest modül klasörü yalnızca stub'dır.
+
+Davetler de Kurultay Prisma modeli değildir: persistence Better Auth organization plugin'ine aittir. Ürün dili ve REST path'leri **Workspace** kullanır — bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
+
 ### Kritik alan kuralları
 
 Bunlar pazarlığa açık değildir; ayrıca `CLAUDE.md` içinde de kayıtlıdır.
@@ -193,7 +197,7 @@ Bunlar pazarlığa açık değildir; ayrıca `CLAUDE.md` içinde de kayıtlıdı
 | Kural | Sebep |
 |---|---|
 | Her `id` **UUIDv7**'dir (`@default(uuid(7))`) | Zaman-sıralı, dolayısıyla ekleme-yoğun tablolarda key'ler index-local kalır ve kararlı bir pagination cursor'ı olarak hizmet eder. Bkz. [api-conventions.md](api-conventions.md#veri-tipleri) |
-| `Task.position` **Float**'tır, asla Int değil | Fractional indexing. `1` ve `2` position'ları arasına eklemek `1.5` yazar — tüm listeyi yeniden numaralamak yerine tek satır güncellenir. Bkz. [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
+| `Task.position` ve `Column.position` **Float**'tır, asla Int değil | Fractional indexing. `1` ve `2` position'ları arasına eklemek `1.5` yazar — tüm listeyi yeniden numaralamak yerine tek satır güncellenir. Hem kartlar hem column'lar için geçerlidir. Bkz. [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
 | `dueDate` ve `estimatedMinutes` **ayrı alanlardır** | "Ne zamana kadar" ve "ne kadar sürer" farklı kavramlardır; ileride bir Gantt görünümü ikisine de ihtiyaç duyar |
 | `priority` label'lardan **ayrı tutulur** | Filtreleme ve dashboard agregasyonunu temiz tutar — priority sıralı bir skaler, label'lar ise sırasız bir küme |
 | `Activity.payload` **Json**'dır | Şema migration'ı gerektirmeden yeni aktivite tipleri eklenebilir |
@@ -266,9 +270,9 @@ Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 | ADR | Konu |
 |---|---|
 | [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modüler monolit |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS + Prisma + PostgreSQL + Redis |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js + Tailwind + shadcn/ui + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Organization plugin'i ile Better Auth |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Organization plugin'i ile Better Auth (→ Workspace) |
 | [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md) | Socket.io + Redis adapter |
 | [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) | Sıralama için Float position'lar |
 | [`0007-license-agpl.md`](decisions/0007-license-agpl.md) | AGPL-3.0 |

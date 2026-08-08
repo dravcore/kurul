@@ -160,7 +160,7 @@ Kurallar:
   düzenlemeyin — yeni bir tane yazın.
 - Pratikte mümkün olduğunda, şema değişiklikleri onları kullanan logic'ten ayrı kendi
   PR'ında olur.
-- `Task.position` `Float`'tır (fractional indexing) — özensizce değiştirilmemesi gereken
+- `Task.position` ve `Column.position` `Float`'tır (fractional indexing) — özensizce değiştirilmemesi gereken
   model seviyesi kurallar için [project-skeleton.md](project-skeleton.md)'ye bakın.
 
 Yerel bir veritabanını sıfırdan sıfırlamak:

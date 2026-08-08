@@ -28,8 +28,8 @@ that won't be accepted. Trivial fixes (typos, broken links) can skip straight to
 
 ## Development setup
 
-Kurultay is pre-skeleton: `apps/api` and `apps/web` don't exist yet. Once the skeleton
-lands, full environment setup, commands, and daily workflow will live in
+Kurultay is pre-skeleton: `apps/api` and `apps/web` don't exist yet. The environment,
+commands, and daily workflow contract for when the skeleton lands is already documented in
 [docs/development.md](docs/development.md) — start there.
 
 ## Branching and commits

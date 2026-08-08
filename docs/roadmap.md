@@ -112,7 +112,7 @@ independently mergeable units; each half is unbuildable without the other. Every
 this one follows the usual size rule.
 
 - [ ] pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, `pnpm-workspace.yaml`
-- [ ] Root `package.json` scripts: `dev`, `build`, `lint`, `db:migrate`, `db:seed`,
+- [ ] Root `package.json` scripts: `dev`, `build`, `lint`, `test`, `db:migrate`, `db:seed`,
       `db:studio`
 - [ ] Shared tooling: TypeScript strict base config, ESLint, Prettier
 - [ ] `.env.example` and `.gitignore`
@@ -125,11 +125,12 @@ this one follows the usual size rule.
 - [ ] `prisma.config.ts` at the repo root (Prisma 7: schema path, seed entry, env loading)
 - [ ] Prisma schema — `User`, `Workspace`, `WorkspaceMember`, `Board`, `Column`, `Task`,
       `TaskAssignee`, `Label`, `TaskLabel`, `Comment`, `Activity`
-- [ ] Ids are `@default(uuid(7))`; `Task.position` is `Float`; `dueDate` and
-      `estimatedMinutes` are separate fields
+- [ ] Ids are `@default(uuid(7))`; `Task.position` and `Column.position` are `Float`;
+      `dueDate` and `estimatedMinutes` are separate fields
 - [ ] Join-table unique constraints, the `Column @@unique([boardId, id])` composite FK, and
       explicit `onDelete` actions ([project-skeleton.md](project-skeleton.md#prisma-schema--initial-tables))
-- [ ] First migration committed
+- [ ] First migration committed — Phase 1 tables only; `Notification` is deferred to
+      [Phase 8](#phase-8--activity-log-and-notifications)
 - [ ] `db:seed` — one demo workspace, board, default columns, a handful of tasks
 - [ ] `GET /health` returning 200
 - [ ] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
@@ -255,7 +256,8 @@ tenant-safely until this exists.
 - [ ] `Activity` writes on task create/move/update/comment/assign (`payload` as JSON so new
       activity types need no migration)
 - [ ] Activity feed endpoint (task-level and workspace-level), cursor-paginated
-- [ ] Notification model: mention, assignment, due-soon
+- [ ] `Notification` model (new migration): mention, assignment, due-soon — not present in
+      the Phase 1 schema
 - [ ] Mark read / mark all read
 - [ ] Web: activity timeline in the task panel, notification centre
 - [ ] `[-]` Email delivery — deferred beyond MVP

@@ -12,7 +12,7 @@ Backend'in; solo/küçük ekip tarafından geliştirilen, realtime'a eğilimli, 
 
 ## Karar
 
-**NestJS + TypeScript**, ORM olarak **Prisma 7**, **PostgreSQL 18** ve **Redis 8**.
+**NestJS 11 + TypeScript**, ORM olarak **Prisma 7**, **PostgreSQL 18** ve **Redis 8**.
 
 ## Gerekçe
 
@@ -22,7 +22,7 @@ Backend'in; solo/küçük ekip tarafından geliştirilen, realtime'a eğilimli, 
 - OSS PM alternatiflerinin çoğu (Plane, Taiga) hızlı CRUD ve ücretsiz bir admin paneli için Django kullanıyor; realtime senkronizasyon öncelik haline geldiğinde — ki burada durum bu — uçtan uca TypeScript daha güçlü seçim haline geliyor.
 - **Drizzle yerine Prisma:** ikisi de 2026'da üretime hazır. Drizzle SQL'e yakın kontrol ve en küçük footprint'i (~7.4kb) sunuyor; Prisma ise şema-öncelikli bir akış, olgun bir ekosistem ve zengin tooling (Prisma Studio) sunuyor. Prisma 7, Rust engine bağımlılığını kaldırarak tarihsel bundle boyutu şikayetini büyük ölçüde çözdü. Prisma'nın rehberli migration'ları ve kapsamlı dokümantasyonu solo çalışırken hata ayıklama süresinden tasarruf sağlıyor — Drizzle'ın performans avantajı ORM katmanında yaşıyor ve pratikte DB round-trip'i (5–50ms) bu farkı gölgede bırakıyor.
 - **Postgres + Redis** neredeyse tartışmasız bir tercih: hem ticari emsaller (ClickUp, Linear) hem de OSS emsaller (Plane, Taiga, Focalboard) Postgres kullanıyor — JSON alanları esnek metadata'yı (custom field'lar) karşılıyor, ilişkisel bütünlük task/board ilişkilerini karşılıyor. Redis, dört ihtiyacı karşılayan tek bir araç: bildirim kuyruğu, session store, rate limiting ve Socket.io pub/sub adapter'ı.
-- **PostgreSQL 18, mevcut major sürüm.** Bir önceki major'ı sabitlemek yıllarca desteklenebilir olurdu, ama sessizce: greenfield bir projenin bir sürüm geride başlamak için hiçbir nedeni yok. Burada mesele deadline değil — resmi `postgres` imajı, farklı bir major tarafından initialize edilmiş bir `PGDATA` volume'üne karşı başlamayı reddediyor, yani v0.1 çıktıktan sonraki her major atlama her self-hoster için bir `pg_dump`/restore işi demek. Şimdi yapılırsa hiçbir maliyeti yok. PostgreSQL 19 beta aşamasında ve kasıtlı olarak atlanıyor.
+- **PostgreSQL 18, mevcut major sürüm.** Bir önceki major'ı sabitlemek yıllarca desteklenebilir olurdu, ama sessizce: greenfield bir projenin bir sürüm geride başlamak için hiçbir nedeni yok. Burada asıl mesele deadline — resmi `postgres` imajı, farklı bir major tarafından initialize edilmiş bir `PGDATA` volume'üne karşı başlamayı reddediyor, yani v0.1 çıktıktan sonraki her major atlama her self-hoster için bir `pg_dump`/restore işi demek. Şimdi yapılırsa hiçbir maliyeti yok. PostgreSQL 19 beta aşamasında ve kasıtlı olarak atlanıyor.
 - **Redis 8, lisans için.** Redis 7.4–7.8 yalnızca RSALv2/SSPLv1 — source-available, OSI açık kaynak değil. Redis 8, OSI onaylı bir seçeneği geri getirdi: **AGPLv3** — Kurultay'ın kendisinin de altında dağıtıldığı lisans (bkz. [0007](0007-license-agpl.md)) — böylece self-hoster'ın çektiği stack uçtan uca lisans-uyumlu oluyor. Valkey (BSD-3-Clause, Linux Foundation'ın Redis 7.2.4 fork'u) protokol uyumlu ve aşağı akışta izinli bir lisans gerekirse tek satırlık bir imaj değişikliği olarak duruyor. Postgres pininin aksine, Redis 7 → 8 geçişi yerinde, RDB/AOF uyumlu bir upgrade ve deadline taşımıyor.
 
 ## Sonuçlar

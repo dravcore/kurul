@@ -11,8 +11,8 @@ A step-by-step reference for building the Kurultay monorepo skeleton: workspace,
 - [0. Preflight](#0-preflight)
 - [1. Monorepo setup](#1-monorepo-setup)
 - [2. packages/shared-types](#2-packagesshared-types)
-- [3. apps/api — NestJS](#3-appsapi--nestjs)
-- [4. apps/web — Next.js](#4-appsweb--nextjs)
+- [3. apps/api — NestJS 11](#3-appsapi--nestjs-11)
+- [4. apps/web — Next.js 16](#4-appsweb--nextjs-16)
 - [5. Docker Compose](#5-docker-compose)
 - [6. .env.example](#6-envexample)
 - [7. Repository files](#7-repository-files)
@@ -94,7 +94,9 @@ TypeScript types shared between frontend and backend — DTOs and enums derived 
 
 ---
 
-## 3. apps/api — NestJS
+## 3. apps/api — NestJS 11
+
+Bootstrap target: **NestJS 11** (pinned major; NestJS 12 ESM migration was still in draft at Phase 0).
 
 ```
 apps/api/
@@ -142,12 +144,14 @@ Comment         id, taskId, userId, body, createdAt
 Activity        id, workspaceId, taskId?, userId, type, payload(Json), createdAt
 ```
 
+`Notification` is deferred to [roadmap Phase 8](roadmap.md#phase-8--activity-log-and-notifications) — not created in the first migration. Invitations are owned by Better Auth (organization plugin), not a Prisma model here; see [ADR 0004](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
+
 **Critical details**
 
 | Rule | Why |
 |---|---|
 | Every `id` is `@id @default(uuid(7))` | UUIDv7 (Prisma ≥ 5.18) — time-ordered, so primary keys stay index-local on the insert-heavy task/comment/activity tables *and* are usable as a stable pagination cursor. See [api-conventions.md](api-conventions.md#pagination) |
-| `position` is **Float**, not Int | Fractional indexing — a card dropped between `1` and `2` becomes `1.5`, so only the moved row is written instead of renumbering the list. See [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
+| `Task.position` and `Column.position` are **Float**, not Int | Fractional indexing — a card or column dropped between `1` and `2` becomes `1.5`, so only the moved row is written instead of renumbering the list. See [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
 | `dueDate` and `estimatedMinutes` are **separate fields** | "By when" and "how long" are different concepts; a later Gantt view needs both |
 | `priority` stays **separate from labels** | Clean filtering and dashboard aggregation |
 | Multi-tenant isolation | Every query is scoped by `workspaceId`, enforced at guard/interceptor level — never re-implemented per service |
@@ -205,7 +209,9 @@ Minimum versions that follow from this: Node ≥ 20.19.0 (the project's floor is
 
 ---
 
-## 4. apps/web — Next.js
+## 4. apps/web — Next.js 16
+
+Bootstrap target: **Next.js 16** (App Router).
 
 ```
 apps/web/

@@ -12,8 +12,8 @@ Kurultay monorepo iskeletini kurmak için adım adım bir referans: workspace, u
 - [0. Ön kontroller](#0-ön-kontroller)
 - [1. Monorepo kurulumu](#1-monorepo-kurulumu)
 - [2. packages/shared-types](#2-packagesshared-types)
-- [3. apps/api — NestJS](#3-appsapi--nestjs)
-- [4. apps/web — Next.js](#4-appsweb--nextjs)
+- [3. apps/api — NestJS 11](#3-appsapi--nestjs-11)
+- [4. apps/web — Next.js 16](#4-appsweb--nextjs-16)
 - [5. Docker Compose](#5-docker-compose)
 - [6. .env.example](#6-envexample)
 - [7. Repository dosyaları](#7-repository-dosyaları)
@@ -101,7 +101,9 @@ modellerden türetilen DTO'lar ve enum'lar, artı socket kontratı.
 
 ---
 
-## 3. apps/api — NestJS
+## 3. apps/api — NestJS 11
+
+Bootstrap hedefi: **NestJS 11** (pinlenen major; NestJS 12 ESM migration'ı Faz 0'da hâlâ draft'tı).
 
 ```
 apps/api/
@@ -151,12 +153,14 @@ Comment         id, taskId, userId, body, createdAt
 Activity        id, workspaceId, taskId?, userId, type, payload(Json), createdAt
 ```
 
+`Notification` [roadmap Faz 8](roadmap.md#faz-8--aktivite-logu-ve-bildirimler)'e ertelenmiştir — ilk migration'da oluşturulmaz. Davetler Better Auth'a (organization plugin) aittir, burada Prisma modeli değildir; bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
+
 **Kritik detaylar**
 
 | Kural | Neden |
 |---|---|
 | Her `id` `@id @default(uuid(7))` | UUIDv7 (Prisma ≥ 5.18) — zaman-sıralı, dolayısıyla ekleme-yoğun task/comment/activity tablolarında primary key'ler index-local kalır *ve* kararlı bir pagination cursor'ı olarak kullanılabilir. Bkz. [api-conventions.md](api-conventions.md#pagination) |
-| `position` **Float**'tır, Int değil | Fractional indexing — `1` ile `2` arasına bırakılan bir kart `1.5` olur, böylece listeyi yeniden numaralamak yerine yalnızca taşınan satır yazılır. Bkz. [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
+| `Task.position` ve `Column.position` **Float**'tır, Int değil | Fractional indexing — `1` ile `2` arasına bırakılan bir kart veya column `1.5` olur, böylece listeyi yeniden numaralamak yerine yalnızca taşınan satır yazılır. Bkz. [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
 | `dueDate` ve `estimatedMinutes` **ayrı alanlardır** | "Ne zamana kadar" ve "ne kadar sürer" farklı kavramlardır; ileride bir Gantt görünümü ikisine de ihtiyaç duyar |
 | `priority` label'lardan **ayrı tutulur** | Temiz filtreleme ve dashboard agregasyonu |
 | Multi-tenant izolasyonu | Her sorgu `workspaceId` ile scope'lanır, guard/interceptor seviyesinde zorlanır — asla her serviste yeniden uygulanmaz |
@@ -218,7 +222,9 @@ Bundan doğan asgari sürümler: Node ≥ 20.19.0 (projenin taban çizgisi daha 
 
 ---
 
-## 4. apps/web — Next.js
+## 4. apps/web — Next.js 16
+
+Bootstrap hedefi: **Next.js 16** (App Router).
 
 ```
 apps/web/

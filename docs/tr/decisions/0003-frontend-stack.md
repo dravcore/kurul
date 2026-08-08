@@ -12,7 +12,7 @@ Frontend; interaktif bir kanban board'u (drag-and-drop ile yeniden sıralama), s
 
 ## Karar
 
-**Next.js (App Router)** + **Tailwind CSS** + **shadcn/ui** + **@dnd-kit** + **Recharts**.
+**Next.js 16 (App Router)** + **Tailwind CSS** + **shadcn/ui** + **@dnd-kit** + **Recharts**.
 
 ## Gerekçe
 

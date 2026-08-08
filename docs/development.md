@@ -160,7 +160,7 @@ Rules:
   new one.
 - Schema changes go in their own PR, separate from the logic that uses them, whenever that
   split is practical.
-- `Task.position` is `Float` (fractional indexing) — see
+- `Task.position` and `Column.position` are `Float` (fractional indexing) — see
   [project-skeleton.md](project-skeleton.md) for the model-level rules that must not be
   changed casually.
 

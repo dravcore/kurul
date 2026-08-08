@@ -33,6 +33,26 @@ over Clerk.
 **Note:** Better Auth provides backend logic only, not UI. Login, register, and
 invite-acceptance screens are ours to design and build.
 
+## Domain mapping: organization → Workspace
+
+Better Auth's organization plugin speaks *organization*, *member*, and
+*invitation*. Kurultay's product language and REST API use **Workspace**,
+**WorkspaceMember**, and workspace-scoped invitation routes
+(`POST /workspaces/:workspaceId/invitations`, …). Treat the mapping as 1:1:
+
+| Better Auth (plugin) | Kurultay (product / API) |
+|---|---|
+| Organization | Workspace |
+| Member | WorkspaceMember |
+| Invitation | Invitation (no separate Prisma model in Phase 1) |
+
+Invite persistence lives in Better Auth's organization tables. Phase 1 does
+**not** add a Kurultay `Invitation` model; Phase 2 wires the Nest `workspace`
+module to the plugin and decides whether our `Workspace` / `WorkspaceMember`
+rows are the same tables (via Prisma models aligned to Better Auth) or a thin
+sync layer on top. Either way, public API responses never expose the word
+"organization".
+
 ## Integration risk
 
 The library choice is well-supported; the *pairing* is the least-travelled path

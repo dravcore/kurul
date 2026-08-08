@@ -19,13 +19,13 @@ alternatif.
 
 | Katman | Seçim | Değerlendirilen alternatif |
 |---|---|---|
-| Backend | NestJS + TypeScript | Fastify (daha hafif), Django |
+| Backend | NestJS 11 + TypeScript | Fastify (daha hafif), Django |
 | Veritabanı | PostgreSQL 18 | — |
 | Cache / PubSub / Queue | Redis 8 (AGPLv3) | Valkey (BSD-3, Linux Foundation fork'u) |
-| ORM | Prisma | Drizzle ORM |
+| ORM | Prisma 7 | Drizzle ORM |
 | API | REST (başlangıçta) | GraphQL (sonradan) |
 | Realtime | Socket.io + `@socket.io/redis-adapter` | `ws` (daha hafif, özellik yok) |
-| Frontend | Next.js + React + TypeScript | — |
+| Frontend | Next.js 16 + React + TypeScript | — |
 | Stil | Tailwind CSS | — |
 | UI kit | shadcn/ui | Radix UI (ham) |
 | Drag & drop | @dnd-kit | pragmatic-drag-and-drop |
@@ -40,11 +40,12 @@ alınıyor.
 
 ## 2. Katman bazlı gerekçeler
 
-### Backend — NestJS + TypeScript
+### Backend — NestJS 11 + TypeScript
 
 İki ticari referans noktası da bu yolda ilerliyor: ClickUp TypeScript/Node.js/NestJS/
 PostgreSQL üzerinde, Linear ise tamamen Node.js + TypeScript üzerinde, PostgreSQL ve Redis
-ile. NestJS'in modül sistemi, tek bir geliştirici veya küçük bir ekip tarafından
+ile. **NestJS 11** pinlenen major'dır (Faz 0 itibarıyla son kararlı; NestJS 12 ESM
+migration'ı hâlâ draft'tı). NestJS'in modül sistemi, tek bir geliştirici veya küçük bir ekip tarafından
 geliştirilirken çok modüllü bir ürünü (auth, workspace, board, task, dashboard,
 notification) düzenli tutuyor. Frontend ile aynı dili paylaşmak `packages/shared-types`'ı
 mümkün kılan şey — ki bu her veri modeli değişikliğinde karşılığını veriyor. Açık kaynak
@@ -126,9 +127,17 @@ Better Auth, 2026'da yeni projeler için en güçlü self-hosted seçenek — Ne
 yetenekli, ücretsiz, aktif bakımda — ve Auth.js/NextAuth bakım modunda, Better Auth ise
 onun halefi konumunda. Belirleyici faktör **organization plugin**: kutudan çıkar çıkmaz
 multi-tenant organizasyonlar, davetler, üye rolleri ve izinler — bunu sıfırdan yazmak
-haftalar sürerdi. Self-hosting, Clerk gibi yönetilen bir servise bağımlılık olmadan veri
+haftalar sürerdi. Ürün dilinde bunlar 1:1 olarak **Workspace** / **WorkspaceMember** /
+davetlere eşlenir — bkz. [`decisions/0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
+Self-hosting, Clerk gibi yönetilen bir servise bağımlılık olmadan veri
 egemenliğini içeride tutuyor. Better Auth'un yalnızca backend logic sağladığını, login ve
 register UI'ının bizim yazmamız gerektiğini unutma.
+
+### Frontend — Next.js 16
+
+`apps/web` için pinlenen major **Next.js 16** (App Router). Tailwind, shadcn/ui, klasik
+`@dnd-kit` ve Recharts bunun üstünde oturur; ayrıntılar ve trade-off'lar
+[`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)'de.
 
 ### Deployment — Docker Compose
 
@@ -174,9 +183,9 @@ yaşıyor:
 | ADR | Konu |
 |---|---|
 | [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modüler monolit |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS + Prisma + PostgreSQL + Redis |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js + Tailwind + shadcn/ui + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Organization plugin'i ile Better Auth |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Organization plugin'i ile Better Auth (→ Workspace) |
 | [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md) | Socket.io + Redis adapter |
 | [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) | Sıralama için Float position'lar |
 | [`0007-license-agpl.md`](decisions/0007-license-agpl.md) | AGPL-3.0 |

@@ -57,9 +57,9 @@ olarak [docs/tr/development.md](docs/tr/development.md) içinde belgelenmiştir.
 
 | Katman | Seçim |
 |---|---|
-| Backend | NestJS + Prisma + PostgreSQL + Redis + Socket.io |
-| Frontend | Next.js (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts |
-| Auth | Better Auth (organization plugin) |
+| Backend | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io |
+| Frontend | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts |
+| Auth | Better Auth (organization plugin → Workspace) |
 | Paylaşılan tipler | `packages/shared-types` (frontend/backend arasında paylaşılan TS tipleri) |
 | Deployment | Docker Compose |
 | Mimari | Monorepo, modüler monolit — mikroservis yok |
