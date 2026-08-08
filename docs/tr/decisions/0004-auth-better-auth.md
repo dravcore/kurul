@@ -2,6 +2,7 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-08
+**Güncellendi:** 2026-08-08 — topluluk bakımlı NestJS entegrasyonunun ve Better Auth'un 2.0 öncesi sürüm temposunun taşıdığı entegrasyon riskini ekler.
 
 > 🌐 [English (canonical)](../../decisions/0004-auth-better-auth.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
@@ -21,6 +22,14 @@ Auth.js/NextAuth ve Clerk yerine, **organization plugin**'ini kullanan **Better 
 - Self-hosted olması veri egemenliğini bizde tutuyor, Clerk gibi yönetilen bir servise bağımlılık yok — bu, projenin self-hosted, AGPL konumlandırmasıyla tutarlı (bkz. [0007](0007-license-agpl.md)).
 
 **Not:** Better Auth yalnızca backend logic sağlıyor, UI değil. Login, register ve davet-kabul ekranlarını tasarlamak ve inşa etmek bize düşüyor.
+
+## Entegrasyon riski
+
+Kütüphane seçimi iyi desteklenmiş; *eşleştirme* Better Auth'un sunduğu en az geçilmiş yol, ve bu keşfedilmek yerine baştan bütçelenmeye değer.
+
+- **NestJS entegrasyonu topluluk bakımlı**, birinci taraf değil. Better Auth'un kendi birinci sınıf hedefleri Next.js, Hono ve Elysia; NestJS üçüncü taraf bir modül olan `@thallesp/nestjs-better-auth` tarafından karşılanıyor. Gereksinimleri dışa sızıyor: auth route'ları için NestJS'in **uygulama seviyesi bodyParser'ının devre dışı bırakılmasını** istiyor, bu da her controller'ın body'sini nasıl aldığını etkileyen global bir değişiklik. Bu sürtünme ısırırsa, çıkış yolu Better Auth'un framework-agnostik Node handler'ını doğrudan Express instance'ına monte edip wrapper modülü tamamen atlamak.
+- **Better Auth, 1.x içinde kırıcı değişiklikler yapıyor.** 2.0 öncesi ve minor'lar hızlı ilerliyor. Organization plugin, teams şemasını bir kez zaten yeniden yapılandırdı — `member.teamId` kaldırıldı ve yerine bir `teamMembers` tablosu geldi, mevcut kullanıcılar için bir migration gerektirdi. `workspaceId` izolasyon modelimiz ([architecture.md §7](../architecture.md#7-multi-tenant-izolasyonu)) bu tabloların üzerinde oturuyor, dolayısıyla bu çalkantı auth modülünün içinde kalmıyor.
+- **Bu yüzden: minor sürümü pinle** (`package.json`'da `^` yok), her bump öncesi release notlarını oku ve bir auth upgrade'ini rutin bağımlılık bakımı değil migration işi olarak ele al.
 
 ## Sonuçlar
 

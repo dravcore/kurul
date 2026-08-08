@@ -182,7 +182,8 @@ export class CreateTaskDto {
 - A global `ValidationPipe` runs with `whitelist: true`, `forbidNonWhitelisted: true`, and
   `transform: true`. Unknown properties are rejected, not silently dropped.
 - `UpdateXDto` is derived: `export class UpdateTaskDto extends PartialType(CreateTaskDto) {}`.
-- Ids in the path are validated too (`@IsString()` / a cuid check), never trusted raw.
+- Ids in the path are validated too (`@IsUUID('7')` — every id is a UUIDv7, see
+  [api-conventions.md](api-conventions.md#data-types)), never trusted raw.
 - Response DTOs are explicit — never return a Prisma entity straight from a controller.
   Password hashes, internal flags, and soft-delete columns do not leak by accident when the
   response shape is declared.

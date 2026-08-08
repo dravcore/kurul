@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-08
+**Updated:** 2026-08-08 — adds the integration risk of the community-maintained NestJS path and Better Auth's pre-2.0 release cadence.
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0004-auth-better-auth.md)
 
@@ -31,6 +32,29 @@ over Clerk.
 
 **Note:** Better Auth provides backend logic only, not UI. Login, register, and
 invite-acceptance screens are ours to design and build.
+
+## Integration risk
+
+The library choice is well-supported; the *pairing* is the least-travelled path
+Better Auth offers, and that is worth budgeting for rather than discovering.
+
+- **The NestJS integration is community-maintained**, not first-party.
+  Better Auth's own first-class targets are Next.js, Hono, and Elysia; NestJS
+  is served by a third-party module, `@thallesp/nestjs-better-auth`. Its
+  requirements leak outward: it needs NestJS's **application-level bodyParser
+  disabled** for the auth routes, which is a global change affecting how every
+  controller receives its body. If that friction bites, the escape hatch is to
+  mount Better Auth's framework-agnostic Node handler directly on the Express
+  instance and skip the wrapper module entirely.
+- **Better Auth ships breaking changes inside 1.x.** It is pre-2.0 and minors
+  move fast. The organization plugin has already restructured its teams
+  schema once — `member.teamId` was removed in favour of a `teamMembers`
+  table, a migration for existing adopters. Our `workspaceId` isolation model
+  ([architecture.md §7](../architecture.md#7-multi-tenant-isolation)) sits on
+  top of these tables, so that churn is not contained inside the auth module.
+- **Therefore: pin the minor version** in `package.json` (no `^`), read the
+  release notes before every bump, and treat an auth upgrade as migration work
+  rather than routine dependency maintenance.
 
 ## Consequences
 

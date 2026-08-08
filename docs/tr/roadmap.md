@@ -109,11 +109,19 @@ doldurmak" oluyor.
 **Referans:** [project-skeleton.md](project-skeleton.md)
 **Durum:** başlanmadı
 
+**Bu faz tek büyük bir maintainer-authored PR olarak iniyor** —
+[CONTRIBUTING.md](../../CONTRIBUTING.md)'deki <500 satır kılavuzunun belgelenmiş bir
+istisnası. Bir pnpm workspace, bir NestJS uygulaması, bir Next.js uygulaması, Prisma şeması
+ve Docker Compose'u iskeletlemek, bağımsız olarak merge edilebilir birimlere ayrılmıyor;
+her yarısı diğeri olmadan build edilemiyor. Bundan sonraki her faz olağan boyut kuralını
+takip ediyor.
+
 - [ ] pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, `pnpm-workspace.yaml`
-- [ ] Kök `package.json` script'leri: `dev`, `build`, `lint`, `db:migrate`, `db:studio`
+- [ ] Kök `package.json` script'leri: `dev`, `build`, `lint`, `db:migrate`, `db:seed`,
+      `db:studio`
 - [ ] Paylaşılan tooling: TypeScript strict base config, ESLint, Prettier
 - [ ] `.env.example` ve `.gitignore`
-- [ ] `docker-compose.yml` — postgres 17, redis 7, api, web (healthcheck'ler +
+- [ ] `docker-compose.yml` — postgres 18, redis 8, api, web (healthcheck'ler +
       `depends_on`)
 - [ ] `docker-compose.dev.yml` — yalnızca postgres + redis
 - [ ] `apps/api` — NestJS bootstrap, `app.module.ts`, global `ValidationPipe`, exception
@@ -121,10 +129,15 @@ doldurmak" oluyor.
 - [ ] `apps/api` — boş modül klasörleri: `common/`, `prisma/`, `auth/`, `workspace/`,
       `board/`, `task/`, `label/`, `comment/`, `activity/`, `dashboard/`, `notification/`,
       `realtime/`
+- [ ] Repository kökünde `prisma.config.ts` (Prisma 7: şema yolu, seed girişi, env yükleme)
 - [ ] Prisma şeması — `User`, `Workspace`, `WorkspaceMember`, `Board`, `Column`, `Task`,
       `TaskAssignee`, `Label`, `TaskLabel`, `Comment`, `Activity`
-- [ ] `Task.position` `Float`'tır; `dueDate` ve `estimatedMinutes` ayrı alanlardır
+- [ ] Id'ler `@default(uuid(7))`; `Task.position` `Float`'tır; `dueDate` ve
+      `estimatedMinutes` ayrı alanlardır
+- [ ] Join-tablosu unique kısıtları, `Column @@unique([boardId, id])` composite FK'i, ve
+      açık `onDelete` aksiyonları ([project-skeleton.md](project-skeleton.md#prisma-şeması--ilk-tablolar))
 - [ ] İlk migration commit edildi
+- [ ] `db:seed` — bir demo workspace, board, varsayılan column'lar, birkaç task
 - [ ] 200 dönen `GET /health`
 - [ ] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
       `socket.io-client`
@@ -137,6 +150,7 @@ doldurmak" oluyor.
 ```bash
 docker compose up            # tüm servisler sağlıklı ayağa kalkıyor
 pnpm db:migrate               # migration başarılı
+pnpm db:seed                  # demo veri yüklenir
 curl localhost:4000/health   # 200
 # localhost:3000 login sayfasını render ediyor
 pnpm lint && pnpm test && pnpm build   # hata yok
@@ -188,11 +202,17 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 - [ ] `Task.position` için **fractional indexing** — arasına ekleme, üste, alta, boş
       column'a ekleme
 - [ ] `PATCH .../tasks/:taskId/position` — column içinde ve column'lar arası taşıma
-- [ ] Komşular arası boşluk çok küçüldüğünde yeniden dengeleme
+- [ ] Talep üzerine yeniden dengeleme: komşular arası boşluk hassasiyet eşiğinin altına
+      düştüğünde bir column'u taşımayla aynı transaction içinde yeniden akıtma (zamanlanmış
+      job yok — bkz.
+      [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md))
 - [ ] Eşzamanlı taşıma (concurrent-move) yönetimi (yinelenen position yok)
 - [ ] Web: `@dnd-kit` board'u, başarısızlıkta geri alınan (rollback) optimistic yeniden
       sıralama
 - [ ] Web: task detay paneli
+- [ ] **`@dnd-kit`'i yeniden değerlendir**, artık board etkileşimi gerçekten var: klasik hat
+      donmuş ve ADR'nin fallback'i `pragmatic-drag-and-drop`. Sonucu her hâlükârda
+      [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)'e kaydet
 - [ ] Testler: [testing.md](testing.md#1-fractional-indexing-taskposition)'deki tam
       positioning matrisi
 

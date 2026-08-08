@@ -162,6 +162,12 @@ En kritik olan socket kontratıdır: event isimlerinin tek bir yerde tanımlanma
 Faydalı olduğu yerde tipler Prisma'nın ürettiği model tiplerinden türetilir, ancak paket
 Prisma'ya runtime bağımlılığından bağımsız kalır.
 
+Bu türetmenin Prisma 7 altında somut bir ön koşulu var: client artık `node_modules`'a
+üretilmiyor ve generator'ın `output` yolu zorunlu. Bu bir repo yolu — `apps/api/src/generated/prisma`
+— ve pnpm workspace içinde hem `apps/api`'den hem de `packages/shared-types`'tan
+çözümlenebilmesi gerekiyor. Prisma 7'nin gerektirdiği geri kalan her şey için bkz.
+[`decisions/0002-backend-stack.md`](decisions/0002-backend-stack.md).
+
 ---
 
 ## 6. Veri modeli
@@ -178,7 +184,7 @@ Prisma'ya runtime bağımlılığından bağımsız kalır.
 | `Label` | `id`, `boardId`, `name`, `color` | Board-scoped |
 | `TaskLabel` | `id`, `taskId`, `labelId` | Join tablosu |
 | `Comment` | `id`, `taskId`, `userId`, `body`, `createdAt` | |
-| `Activity` | `id`, `taskId`, `userId`, `type`, `payload` (Json), `createdAt` | Yalnızca-ekleme log |
+| `Activity` | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt` | Yalnızca-ekleme log. `workspaceId` zorunlu ve `taskId` opsiyonel, böylece task'ı olmayan workspace seviyesi olaylar — "board yeniden adlandırıldı", "üye katıldı" — temsil edilebilir; Faz 8 feed'inin vaat ettiği de bu |
 
 ### Kritik alan kuralları
 
@@ -186,10 +192,32 @@ Bunlar pazarlığa açık değildir; ayrıca `CLAUDE.md` içinde de kayıtlıdı
 
 | Kural | Sebep |
 |---|---|
+| Her `id` **UUIDv7**'dir (`@default(uuid(7))`) | Zaman-sıralı, dolayısıyla ekleme-yoğun tablolarda key'ler index-local kalır ve kararlı bir pagination cursor'ı olarak hizmet eder. Bkz. [api-conventions.md](api-conventions.md#veri-tipleri) |
 | `Task.position` **Float**'tır, asla Int değil | Fractional indexing. `1` ve `2` position'ları arasına eklemek `1.5` yazar — tüm listeyi yeniden numaralamak yerine tek satır güncellenir. Bkz. [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
 | `dueDate` ve `estimatedMinutes` **ayrı alanlardır** | "Ne zamana kadar" ve "ne kadar sürer" farklı kavramlardır; ileride bir Gantt görünümü ikisine de ihtiyaç duyar |
 | `priority` label'lardan **ayrı tutulur** | Filtreleme ve dashboard agregasyonunu temiz tutar — priority sıralı bir skaler, label'lar ise sırasız bir küme |
 | `Activity.payload` **Json**'dır | Şema migration'ı gerektirmeden yeni aktivite tipleri eklenebilir |
+
+### Kısıtlar ve referans aksiyonları
+
+Join tabloları kullanım kolaylığı için bir surrogate `id` taşır, ama veritabanının
+zorladığı şey doğal anahtardır:
+
+| Kısıt | Neyi önler |
+|---|---|
+| `WorkspaceMember @@unique([workspaceId, userId])` | Bir kullanıcının aynı workspace'te iki rol taşıması |
+| `TaskAssignee @@unique([taskId, userId])` | Aynı atananın listelerde, bildirimlerde ve activity payload'larında iki kez sayılması |
+| `TaskLabel @@unique([taskId, labelId])` | Aynı label'ın iki kez eklenmesi |
+| `Column @@unique([boardId, id])` | Yalnızca `Task`'ın bir composite foreign key `(boardId, columnId) → Column(boardId, id)` deklare edebilmesi için var — "bir task'ın column'u kendi board'undadır" kuralını uygulama-seviyesi bir kontrol yerine bir veritabanı garantisi yapar |
+
+**Silmeler kasıtlı olarak cascade eder.** Prisma'nın zorunlu bir ilişki üzerindeki
+varsayılan aksiyonu `Restrict`'tir, dolayısıyla burayı belirtmeden bırakmak board
+silmenin *başarısız olması* anlamına gelir — iki varsayılandan daha şaşırtıcı olanı.
+Sahiplenilen çocuklar cascade eder
+(`Workspace → Board → Column, Task → Comment, Activity, TaskAssignee, TaskLabel`).
+`User`'a referanslar cascade etmez: yazarından daha uzun yaşayan bir yorum veya
+activity satırı doğrudur, ve bir kullanıcıyı silmek sessiz bir silinme değil,
+kasıtlı bir operasyon olmalıdır.
 
 ---
 

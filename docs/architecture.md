@@ -140,6 +140,8 @@ The single source of truth for anything that crosses the wire. Backend and front
 
 The socket contract matters most: event names defined in one place remove the classic failure where the server emits `task:moved` and the client listens for `taskMoved`. Types are derived from the Prisma-generated model types where that is useful, but the package stays free of runtime dependencies on Prisma.
 
+That derivation has a concrete prerequisite under Prisma 7: the client is no longer emitted into `node_modules`, and the generator's `output` path is mandatory. It is a repo path — `apps/api/src/generated/prisma` — which must resolve from both `apps/api` and `packages/shared-types` in the pnpm workspace. See [`decisions/0002-backend-stack.md`](decisions/0002-backend-stack.md) for the rest of what Prisma 7 requires.
+
 ---
 
 ## 6. Data model
@@ -156,7 +158,7 @@ The socket contract matters most: event names defined in one place remove the cl
 | `Label` | `id`, `boardId`, `name`, `color` | Board-scoped |
 | `TaskLabel` | `id`, `taskId`, `labelId` | Join table |
 | `Comment` | `id`, `taskId`, `userId`, `body`, `createdAt` | |
-| `Activity` | `id`, `taskId`, `userId`, `type`, `payload` (Json), `createdAt` | Append-only log |
+| `Activity` | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt` | Append-only log. `workspaceId` is required and `taskId` is optional so that workspace-level events with no task — "board renamed", "member joined" — are representable, which is what the Phase 8 feed promises |
 
 ### Critical field rules
 
@@ -164,10 +166,30 @@ These are non-negotiable; they are also recorded in `CLAUDE.md`.
 
 | Rule | Reason |
 |---|---|
+| Every `id` is **UUIDv7** (`@default(uuid(7))`) | Time-ordered, so keys stay index-local on insert-heavy tables and serve as a stable pagination cursor. See [api-conventions.md](api-conventions.md#data-types) |
 | `Task.position` is **Float**, never Int | Fractional indexing. Inserting between positions `1` and `2` writes `1.5` — one row updated instead of renumbering the whole list. See [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
 | `dueDate` and `estimatedMinutes` are **separate fields** | "By when" and "how long" are different concepts; a future Gantt view needs both |
 | `priority` is **separate from labels** | Keeps filtering and dashboard aggregation clean — priority is an ordered scalar, labels are an unordered set |
 | `Activity.payload` is **Json** | New activity types can be added without a schema migration |
+
+### Constraints and referential actions
+
+The join tables carry a surrogate `id` for convenience, but the natural key is what the
+database enforces:
+
+| Constraint | Prevents |
+|---|---|
+| `WorkspaceMember @@unique([workspaceId, userId])` | One user holding two roles in the same workspace |
+| `TaskAssignee @@unique([taskId, userId])` | The same assignee counted twice in lists, notifications, and activity payloads |
+| `TaskLabel @@unique([taskId, labelId])` | The same label attached twice |
+| `Column @@unique([boardId, id])` | Exists solely so `Task` can declare a composite foreign key `(boardId, columnId) → Column(boardId, id)`, making "a task's column is on the task's board" a database guarantee rather than an application-only check |
+
+**Deletes cascade deliberately.** Prisma's default action on a required relation is
+`Restrict`, so leaving this unstated would mean board deletion *fails* — the more surprising
+of the two defaults. Owned children cascade
+(`Workspace → Board → Column, Task → Comment, Activity, TaskAssignee, TaskLabel`).
+References to `User` do not: a comment or activity row outliving its author is correct, and
+deleting a user has to be a deliberate operation rather than a silent erasure.
 
 ---
 

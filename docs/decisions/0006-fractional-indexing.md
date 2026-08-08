@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-08
+**Updated:** 2026-08-08 — rebalancing is on-demand, not a periodic job, matching testing.md and roadmap.md.
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0006-fractional-indexing.md)
 
@@ -29,16 +30,21 @@ move into an O(n) write and a source of lock contention as boards grow.
 
 ## Consequences
 
-- Moving a card is a single-row database write, independent of column size —
-  no O(n) renumbering, no lock contention across the moved list.
+- On the common path, moving a card is a single-row database write,
+  independent of column size — no O(n) renumbering, no lock contention across
+  the moved list. The exception is rebalancing, below.
 - Repeated insertions between the same two neighbors (e.g., always dropping a
   new card at the very top of a busy column) can drive position values to
   increasingly fine decimal precision over time.
-- Floating-point precision is finite: at extreme insertion depth, a periodic
-  rebalancing job may eventually be needed to reflow a column's positions back
-  to round, well-spaced numbers. This is an accepted, deferred trade-off, not
-  a design gap — it only matters at depths ordinary usage is unlikely to reach
-  quickly.
+- Floating-point precision is finite, so **rebalancing is on-demand, not a
+  scheduled job**: when a move would place a card in a gap narrower than the
+  precision threshold, that column's positions are reflowed to round,
+  well-spaced numbers in the same transaction as the move, and only then is
+  the move applied. A scheduled job was rejected — it needs a scheduler and
+  can still let a write fail *between* runs if the gap is already exhausted,
+  whereas the reactive check cannot. Rebalancing is the one O(n) write in the
+  model, bounded to a single column and rare enough at ordinary insertion
+  depths that it is an accepted trade-off rather than a design gap.
 - Equality/ordering comparisons on `position` must account for float
   comparison edge cases in queries and in the ORM layer.
 

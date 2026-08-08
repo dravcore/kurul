@@ -13,6 +13,7 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 - [Çalışma modları](#çalışma-modları)
 - [pnpm script'leri](#pnpm-scriptleri)
 - [Veritabanı iş akışı](#veritabanı-iş-akışı)
+- [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme)
 - [Günlük döngü](#günlük-döngü)
 - [Sorun giderme](#sorun-giderme)
 
@@ -35,8 +36,8 @@ ikisinden biri buglıdır ve aynı PR'da düzeltilir.
 
 | Araç | Sürüm | Kontrol | Notlar |
 |---|---|---|---|
-| Node.js | 20 LTS veya üzeri | `node -v` | 20+ gerekli; 22 LTS önerilir |
-| pnpm | 9 veya üzeri | `pnpm -v` | `corepack enable && corepack prepare pnpm@latest --activate` |
+| Node.js | 22 veya üzeri | `node -v` | 22 taban çizgisi — Node 20 ömrünü tamamladı (2026-04-30) ve Prisma 7 zaten ≥ 20.19.0 istiyor. **24 LTS önerilir** (2028-04-30'a kadar Active LTS) |
+| pnpm | 9 veya üzeri | `pnpm -v` | Corepack üzerinden: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack, Node ≥ 25 ile artık birlikte gelmiyor — orada önce `npm i -g corepack`, ya da pnpm'i bağımsız kurun: `npm i -g pnpm` |
 | Docker | herhangi güncel | `docker -v` | macOS'ta Docker Desktop veya Colima |
 | Docker Compose | v2 (plugin) | `docker compose version` | `docker-compose` v1 desteklenmiyor |
 | Git | 2.30+ | `git --version` | |
@@ -130,6 +131,7 @@ Repository kökünden çalıştırın.
 | `lint` | `pnpm lint` | Tüm paketlerde ESLint + Prettier kontrolü |
 | `test` | `pnpm test` | Tüm workspace paketlerinin test suite'lerini çalıştırır |
 | `db:migrate` | `pnpm db:migrate` | Prisma migration'larını uygular (şema değiştiyse dev'de bir tane oluşturur) |
+| `db:seed` | `pnpm db:seed` | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır |
 | `db:studio` | `pnpm db:studio` | http://localhost:5555 adresinde Prisma Studio'yu açar |
 
 Tek bir workspace'i hedeflemek için pnpm'in filter flag'ini kullanın:
@@ -146,7 +148,9 @@ pnpm --filter @kurultay/api test
 # 1. apps/api/prisma/schema.prisma dosyasını düzenle
 # 2. Bir migration oluştur ve uygula
 pnpm db:migrate
-# 3. Veriyi incele
+# 3. Demo veriyi yükle (boş board'lara karşı geliştirmek zor)
+pnpm db:seed
+# 4. Veriyi incele
 pnpm db:studio
 ```
 
@@ -165,7 +169,38 @@ Yerel bir veritabanını sıfırdan sıfırlamak:
 docker compose -f docker-compose.dev.yml down -v
 docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
+pnpm db:seed
 ```
+
+## Yükseltme ve yedekleme
+
+Bu, önemsediği veriyle Kurultay çalıştıran herkes için geçerlidir, atılabilir yerel
+veritabanları için değil. 1.0 öncesi, kırıcı şema değişiklikleri herhangi bir `0.y.0`
+release'inde gelebilir ([git-strategy.md](git-strategy.md#versiyonlama-politikası-semver)),
+dolayısıyla kural basit:
+
+**Her yükseltmeden önce veritabanını dump'layın.**
+
+```bash
+docker compose exec -T postgres pg_dump -U kurultay kurultay > kurultay-$(date +%F).sql
+```
+
+- Önce hedef sürümün `CHANGELOG.md` girdisini okuyun — her kırıcı değişiklik orada bir
+  migration notu taşır.
+- Sonra image'ları yükseltin ve migration'ları çalıştırın.
+
+**PostgreSQL major sürüm yükseltmeleri bir dump ve restore gerektirir.** Resmi `postgres`
+imajı, `PGDATA` volume'ü farklı bir major sürüm tarafından initialize edildiğinde başlamayı
+reddediyor ("database files are incompatible with server"); volume kendini migrate etmiyor.
+Bir major'dan sonrakine geçmek için: eski image'da `pg_dump`, yeni major'ı boş bir volume'e
+karşı başlatın, dump'ı `psql`/`pg_restore` edin. Minor yükseltmeler (18.4 → 18.5) yerinde
+yapılır ve dump gerektirmez — yukarıdaki upgrade-öncesi yedek yine de sağlıklı bir alışkanlık.
+
+**Redis yedeklenmez.** Cache, session'lar, rate-limit sayaçları, Socket.io pub/sub
+fan-out'u ve bildirim kuyruğunu tutar — hepsi yeniden inşa edilebilir. Onu kaybetmek
+herkesin oturumunu kapatır ve henüz teslim edilmemiş kuyruklanmış bildirimleri düşürür;
+hiçbir board verisini kaybetmez. Redis yükseltmeleri bir major içinde, ve 7 → 8, yerinde
+ve RDB/AOF uyumludur.
 
 ## Günlük döngü
 

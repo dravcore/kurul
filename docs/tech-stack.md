@@ -19,8 +19,8 @@ The technology chosen for each layer of Kurultay, with a short rationale and the
 | Layer | Choice | Alternative considered |
 |---|---|---|
 | Backend | NestJS + TypeScript | Fastify (lighter), Django |
-| Database | PostgreSQL 17 | — |
-| Cache / PubSub / Queue | Redis | — |
+| Database | PostgreSQL 18 | — |
+| Cache / PubSub / Queue | Redis 8 (AGPLv3) | Valkey (BSD-3, Linux Foundation fork) |
 | ORM | Prisma | Drizzle ORM |
 | API | REST (initially) | GraphQL (later) |
 | Realtime | Socket.io + `@socket.io/redis-adapter` | `ws` (lighter, no features) |
@@ -46,6 +46,8 @@ Both commercial reference points run this way: ClickUp on TypeScript/Node.js/Nes
 
 Uncontroversial: ClickUp, Linear, Plane, Taiga, and Focalboard all sit on Postgres. JSON columns cover flexible metadata (custom fields, activity payloads) while relational integrity covers the task/board graph. Redis then serves four needs with one tool: notification queue, session store, rate limiting, and the Socket.io pub/sub adapter.
 
+Both versions are pinned on purpose. **PostgreSQL 18** is the current major; the previous one is supported for years yet, but a major bump after v0.1 ships costs every self-hoster a `pg_dump`/restore — the official image refuses to start against a `PGDATA` volume initialized by a different major ([development.md](development.md#upgrading-and-backups)). Doing it now, with no data in existence, is free. **Redis 8** is a licensing choice as much as a version one: the 7.4–7.8 band is RSALv2/SSPLv1 only, which is source-available and not OSI open source, and Redis 8 restored an OSI option — AGPLv3, the same licence Kurultay ships under. A self-hoster who redistributes the stack inherits no licence question they did not ask for. Valkey (BSD-3-Clause, the Linux Foundation fork of Redis 7.2.4) is protocol-compatible and remains a one-line image swap if a permissive licence is ever needed downstream.
+
 ### ORM — Prisma
 
 Drizzle and Prisma are the two dominant TypeScript ORMs in 2026 and both are production-ready. Drizzle offers SQL-level control and the smallest footprint (~7.4kb); Prisma offers a schema-first workflow, a mature ecosystem, and tooling such as Prisma Studio — and since Prisma 7 dropped its Rust dependency, the old bundle-size objection is largely gone. Prisma wins here because its migration story is more guided, which saves debugging time when working alone. Drizzle's performance edge lives in the ORM layer, and a 5–50 ms database round trip dwarfs it in practice.
@@ -56,11 +58,11 @@ For self-hosted infrastructure, Socket.io with `@socket.io/redis-adapter` is the
 
 ### Drag & drop — @dnd-kit
 
-`react-beautiful-dnd` is deprecated — Atlassian withdrew from it. In 2026 `@dnd-kit` is the default for most React drag-and-drop work: ~6 KB core, accessible (keyboard and screen reader), framework-agnostic, and actively maintained; Linear uses it for issue ordering. At the typical 50–200 items per board there is no measurable performance gap with Atlassian's newer `pragmatic-drag-and-drop`, which only pulls ahead past ~1000 items and requires writing your own collision detection. The critical companion rule is ordering: positions are stored as floats and reordered by **fractional indexing**, never as renumbered integers.
+`react-beautiful-dnd` is deprecated — Atlassian withdrew from it. Kurultay uses the **classic `@dnd-kit` line** (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0, pinned): MIT, ~6 KB core, accessible (keyboard and screen reader), framework-agnostic, and the most widely deployed React drag-and-drop library. It is also **frozen** — no release since December 2024, docs-site repo archived in February 2026, maintainer effort moved to a pre-1.0 rewrite (`@dnd-kit/react`) with a different API that we are not adopting. Atlassian's `pragmatic-drag-and-drop` (Apache-2.0) is actively released and is the fallback, at the cost of hand-writing collision detection. Frozen-but-stable beats moving-and-pre-1.0 for a solo maintainer at 50–200 cards per board; the full argument and the re-evaluation trigger are in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md). The critical companion rule is ordering: positions are stored as floats and reordered by **fractional indexing**, never as renumbered integers.
 
 ### Charts — Recharts
 
-The safest default for a React dashboard: broad ecosystem adoption, a comprehensible component API, SVG rendering, MIT licensed, and it composes well with shadcn/ui. It is not the lightest option (~290 KB). If the number of charts grows sharply or datasets get large, a Canvas-based library (Chart.js, Apache ECharts) becomes worth revisiting.
+The safest default for a React dashboard: broad ecosystem adoption, a comprehensible component API, SVG rendering, MIT licensed, and it composes well with shadcn/ui. It is not the lightest option, and the cost worth recording is the dependency surface rather than a byte count: Recharts v3 declares `@reduxjs/toolkit`, `react-redux`, `immer`, and `victory-vendor` (d3 modules) as runtime dependencies, so adopting it pulls Redux Toolkit into an app that otherwise has no state library. Revisit if the chart count grows, if a bundle budget tightens, or if that dependency graph starts conflicting with app-level state choices — a Canvas-based library (Chart.js, Apache ECharts) is the fallback.
 
 ### Auth — Better Auth
 
@@ -91,7 +93,7 @@ Projects worth studying for architecture and data modelling:
 
 | Project | Backend | Frontend | Note |
 |---|---|---|---|
-| Plane | Django | Next.js | Most popular OSS PM tool (46k+ stars), AGPL-3.0 |
+| Plane | Django | Next.js | The most popular OSS PM tool, AGPL-3.0 |
 | Huly | TypeScript / Node.js | Svelte | Full TS, but carries Rush monorepo complexity |
 | Taiga | Django | React | Agile/Scrum focused, MPL-2.0 |
 | OpenProject | Ruby on Rails | Angular | Oldest / enterprise, GPL-3.0 |

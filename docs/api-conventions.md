@@ -33,8 +33,9 @@ Base URL in development: `http://localhost:4000`.
 | Plural collections | `/boards`, `/tasks`, `/workspaces` |
 | kebab-case in paths | `/workspace-members`, not `/workspaceMembers` |
 | camelCase path params | `:workspaceId`, `:boardId`, `:taskId` |
-| Nesting expresses ownership | A task is reached through its board and workspace |
-| Nesting stops at 3 levels | Deeper hierarchies use query filters instead |
+| Nesting expresses ownership | A collection is reached through its owner: a board's tasks, a task's comments |
+| Nesting stops at 2 levels below the workspace root | `:workspaceId` is mandatory on every route and does not count toward the limit — it is the tenant scope, not a hierarchy level. Deeper hierarchies use query filters instead |
+| Once a resource has an id, address it shallowly | `/workspaces/:workspaceId/tasks/:taskId`, never `/workspaces/:workspaceId/boards/:boardId/tasks/:taskId`. The id already identifies the row; the workspace guard already scopes it. The parent segment adds a value the server must validate for no benefit |
 
 ### Workspace scoping
 
@@ -60,15 +61,20 @@ GET    /workspaces/:workspaceId/boards/:boardId
 GET    /workspaces/:workspaceId/boards/:boardId/columns
 POST   /workspaces/:workspaceId/boards/:boardId/columns
 
-GET    /workspaces/:workspaceId/boards/:boardId/tasks
-POST   /workspaces/:workspaceId/boards/:boardId/tasks
-GET    /workspaces/:workspaceId/boards/:boardId/tasks/:taskId
-PATCH  /workspaces/:workspaceId/boards/:boardId/tasks/:taskId
-DELETE /workspaces/:workspaceId/boards/:boardId/tasks/:taskId
+GET    /workspaces/:workspaceId/boards/:boardId/tasks     # list, scoped to a board
+POST   /workspaces/:workspaceId/boards/:boardId/tasks     # create in a board
 
-GET    /workspaces/:workspaceId/boards/:boardId/tasks/:taskId/comments
-POST   /workspaces/:workspaceId/boards/:boardId/tasks/:taskId/comments
+GET    /workspaces/:workspaceId/tasks/:taskId
+PATCH  /workspaces/:workspaceId/tasks/:taskId
+DELETE /workspaces/:workspaceId/tasks/:taskId
+
+GET    /workspaces/:workspaceId/tasks/:taskId/comments
+POST   /workspaces/:workspaceId/tasks/:taskId/comments
 ```
+
+Note the shape: a **collection** is nested under the parent that owns it, because that is
+what scopes the list. A **single resource** is addressed by its own id directly under the
+workspace, because nothing further is needed to find it.
 
 Non-workspace routes (the complete list):
 
@@ -85,9 +91,9 @@ is accepted rather than edited. Model these as a **sub-resource with a verb-free
 possible, and as an explicit action segment where not:
 
 ```
-PATCH /workspaces/:workspaceId/boards/:boardId/tasks/:taskId/position
+PATCH /workspaces/:workspaceId/tasks/:taskId/position
 POST  /workspaces/:workspaceId/invitations/:invitationId/accept
-POST  /workspaces/:workspaceId/boards/:boardId/tasks/:taskId/assignees
+POST  /workspaces/:workspaceId/tasks/:taskId/assignees
 ```
 
 Action segments are the exception and each one needs a reason. Do not invent
@@ -131,11 +137,11 @@ Resources are returned as **plain JSON objects**. There is no `data` wrapper, no
 flag, no envelope.
 
 ```jsonc
-// GET /workspaces/w_1/boards/b_1/tasks/t_1  → 200
+// GET /workspaces/w_1/tasks/t_1  → 200
 {
-  "id": "clx8f2k9a0001qw3h4t2v9m1p",
-  "boardId": "clx8f2k9a0000qw3h1a2b3c4d",
-  "columnId": "clx8f2k9a0002qw3h7y8z9w0v",
+  "id": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
+  "boardId": "0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f",
+  "columnId": "0198e2c0-c2d3-7a15-b6e7-8f90a1b2c3d4",
   "title": "Implement fractional indexing",
   "description": "Positions must survive concurrent moves.",
   "priority": "HIGH",
@@ -203,17 +209,35 @@ naturally small and stable.
 
 Why cursor by default:
 
-- Task lists are the hot path and they **reorder constantly** — drag-and-drop changes
-  `position` while a user is scrolling. Offset pagination on a shifting list drops and
-  duplicates rows; a cursor anchored to a row does not.
 - `OFFSET` degrades linearly on large tables; keyset lookups stay flat.
-- The realtime layer inserts rows underneath the client mid-session, which is exactly the
-  case offset pagination handles worst.
+- Rows are inserted underneath the client mid-session — by another user, and once the
+  realtime layer lands, visibly. Offset pagination handles that worst: every insert before
+  the client's window shifts the whole list and the next page repeats or skips rows.
+
+### The cursor key is always `id`, never `position`
+
+**This is a correctness rule, not a preference.** A keyset cursor only guarantees no dropped
+rows if the field it is keyed on is *immutable* for rows the client has not seen yet.
+`Task.position` is the opposite of immutable: fractional indexing rewrites it on every
+drag-and-drop ([`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)).
+A task sitting past the client's cursor that someone drags to the top of the column now has
+a `position` *below* the cursor value — `WHERE position > :cursor` will never return it
+again, and the row is silently dropped. Concurrent reordering is exactly why `position`
+cannot be the cursor key.
+
+`id` has the properties the cursor needs: it is a **UUIDv7**
+([Data types](#data-types)), so it is immutable for the life of the row, monotonic with
+insertion time, and index-local — a real keyset, not a random seek.
+
+Board rendering still orders tasks by `position`; the two are separate concerns. `position`
+decides where a card *appears*, `id` decides where the *page boundary* falls. A client
+paginating a large task list receives every row exactly once and sorts the accumulated set
+by `position` for display.
 
 ### Cursor request and response
 
 ```
-GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=clx8f2k9a0001qw3h4t2v9m1p
+GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d
 ```
 
 | Param | Default | Max | Notes |
@@ -224,7 +248,7 @@ GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=clx8f2k9a0001qw3h4t2v9m1p
 ```jsonc
 {
   "items": [ /* … resources … */ ],
-  "nextCursor": "clx8f2k9a0051qw3h9k1m2n3o",  // null on the last page
+  "nextCursor": "0198e2c1-8b6d-7e93-a015-4c2f8d1e6b70",  // null on the last page
   "hasMore": true
 }
 ```
@@ -265,7 +289,9 @@ clients handle them generically.
 - Only whitelisted fields are filterable and sortable, declared in the query DTO. An unknown
   filter is a `400`, never silently ignored — a silently dropped filter shows the user data
   they asked not to see.
-- Default sort for tasks is `position` ascending; for everything else, `-createdAt`.
+- Default **display** sort for tasks is `position` ascending; for everything else,
+  `-createdAt`. Note that a paginated task list is *walked* by `id` regardless of the
+  requested sort — see [Pagination](#the-cursor-key-is-always-id-never-position).
 - No `?fields=` sparse-fieldset support. Response shapes are fixed by their DTO; if a client
   needs less, that is not worth the caching and typing complexity.
 
@@ -292,7 +318,7 @@ Full DTO/validation rules: [coding-standards.md](coding-standards.md#dtos-and-va
 
 | Type | Representation | Example |
 |---|---|---|
-| Identifier | Opaque string (cuid, occasionally uuid). Clients never parse, sort, or generate them. | `"clx8f2k9a0001qw3h4t2v9m1p"` |
+| Identifier | **UUIDv7**, generated by Prisma's `@default(uuid(7))` (available since Prisma 5.18). Opaque to clients: never parsed, never sorted, never generated client-side. | `"0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d"` |
 | Date/time | **ISO 8601, always UTC, always with `Z`** | `"2026-08-08T09:12:31.114Z"` |
 | Date-only value | Still a full ISO 8601 timestamp at `T00:00:00.000Z` | `"2026-09-01T00:00:00.000Z"` |
 | Duration | Integer minutes (`estimatedMinutes`) — never a formatted string | `240` |
@@ -302,6 +328,12 @@ Full DTO/validation rules: [coding-standards.md](coding-standards.md#dtos-and-va
 
 The API never returns local time or a timezone offset. Formatting for the user's locale is
 the frontend's job.
+
+"Opaque" cuts both ways. UUIDv7 embeds a timestamp, and the server relies on that ordering
+for cursor pagination — but clients must not. A client that sorts by `id` or reads a
+creation time out of it is depending on an implementation detail that a future id strategy
+would break. URL examples in this document abbreviate ids (`w_1`, `b_1`, `t_1`) for
+readability; real ones are 36-character UUIDv7 strings.
 
 ## Versioning
 

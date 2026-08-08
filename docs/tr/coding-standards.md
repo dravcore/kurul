@@ -185,8 +185,8 @@ export class CreateTaskDto {
 - Global bir `ValidationPipe`, `whitelist: true`, `forbidNonWhitelisted: true` ve
   `transform: true` ile çalışır. Bilinmeyen property'ler sessizce düşürülmez, reddedilir.
 - `UpdateXDto` türetilir: `export class UpdateTaskDto extends PartialType(CreateTaskDto) {}`.
-- Path'teki id'ler de doğrulanır (`@IsString()` / bir cuid kontrolü), asla ham
-  güvenilmez.
+- Path'teki id'ler de doğrulanır (`@IsUUID('7')` — her id bir UUIDv7'dir, bkz.
+  [api-conventions.md](api-conventions.md#veri-tipleri)), asla ham güvenilmez.
 - Response DTO'ları açıktır — bir controller'dan asla doğrudan bir Prisma entity'si
   döndürülmez. Response şekli deklare edildiğinde şifre hash'leri, dahili flag'ler ve
   soft-delete kolonları kazara sızmaz.

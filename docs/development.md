@@ -13,6 +13,7 @@ How to set up a Kurultay development environment and work in it day to day.
 - [Run modes](#run-modes)
 - [pnpm scripts](#pnpm-scripts)
 - [Database workflow](#database-workflow)
+- [Upgrading and backups](#upgrading-and-backups)
 - [Day-to-day loop](#day-to-day-loop)
 - [Troubleshooting](#troubleshooting)
 
@@ -35,8 +36,8 @@ lands, one of the two is a bug and gets fixed in the same PR.
 
 | Tool | Version | Check | Notes |
 |---|---|---|---|
-| Node.js | 20 LTS or newer | `node -v` | 20+ required; 22 LTS recommended |
-| pnpm | 9 or newer | `pnpm -v` | `corepack enable && corepack prepare pnpm@latest --activate` |
+| Node.js | 22 or newer | `node -v` | 22 is the floor — Node 20 is end-of-life (2026-04-30) and Prisma 7 needs ≥ 20.19.0 regardless. **24 LTS recommended** (Active LTS to 2028-04-30) |
+| pnpm | 9 or newer | `pnpm -v` | Via Corepack: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack is no longer bundled with Node ≥ 25 — there, `npm i -g corepack` first, or install pnpm standalone with `npm i -g pnpm` |
 | Docker | any current | `docker -v` | Docker Desktop or Colima on macOS |
 | Docker Compose | v2 (plugin) | `docker compose version` | `docker-compose` v1 is not supported |
 | Git | 2.30+ | `git --version` | |
@@ -130,6 +131,7 @@ Run from the repository root.
 | `lint` | `pnpm lint` | ESLint + Prettier check across all packages |
 | `test` | `pnpm test` | Runs the test suites of every workspace package |
 | `db:migrate` | `pnpm db:migrate` | Applies Prisma migrations (creates one in dev if the schema changed) |
+| `db:seed` | `pnpm db:seed` | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly |
 | `db:studio` | `pnpm db:studio` | Opens Prisma Studio at http://localhost:5555 |
 
 To target a single workspace, use pnpm's filter flag:
@@ -146,7 +148,9 @@ pnpm --filter @kurultay/api test
 # 1. Edit apps/api/prisma/schema.prisma
 # 2. Create and apply a migration
 pnpm db:migrate
-# 3. Inspect the data
+# 3. Load demo data (empty boards are hard to develop against)
+pnpm db:seed
+# 4. Inspect the data
 pnpm db:studio
 ```
 
@@ -166,7 +170,36 @@ Resetting a local database from scratch:
 docker compose -f docker-compose.dev.yml down -v
 docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
+pnpm db:seed
 ```
+
+## Upgrading and backups
+
+This applies to anyone running Kurultay with data they care about, not to throwaway local
+databases. Pre-1.0, breaking schema changes can ship in any `0.y.0` release
+([git-strategy.md](git-strategy.md#versioning-policy-semver)), so the rule is simple:
+
+**Dump the database before every upgrade.**
+
+```bash
+docker compose exec -T postgres pg_dump -U kurultay kurultay > kurultay-$(date +%F).sql
+```
+
+- Read the `CHANGELOG.md` entry for the target version first — every breaking change carries
+  a migration note there.
+- Then upgrade the images and run the migrations.
+
+**PostgreSQL major-version upgrades need a dump and restore.** The official `postgres` image
+refuses to start when the `PGDATA` volume was initialized by a different major version
+("database files are incompatible with server"); the volume does not migrate itself. To move
+from one major to the next: `pg_dump` on the old image, start the new major against an empty
+volume, `psql`/`pg_restore` the dump. Minor upgrades (18.4 → 18.5) are in-place and need no
+dump — the pre-upgrade backup above is still the sane habit.
+
+**Redis is not backed up.** It holds cache, sessions, rate-limit counters, the Socket.io
+pub/sub fan-out, and the notification queue — all rebuildable. Losing it logs everyone out
+and drops queued notifications that had not been delivered yet; it loses no board data.
+Redis upgrades within a major, and 7 → 8, are in-place and RDB/AOF compatible.
 
 ## Day-to-day loop
 

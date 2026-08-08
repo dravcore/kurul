@@ -161,6 +161,13 @@ why it was wrong before. Commits are read months later by people without the con
 6. CI must be green: lint, typecheck, tests (see [testing.md](testing.md)).
 7. At least one approving review before merge.
 
+**Solo-maintainer carve-out.** Rule 7 has no one to satisfy while the project has a single
+maintainer, so it is suspended for maintainer-authored PRs: those are self-reviewed and
+self-merged once CI is green. Everything else still applies — the branch, the PR, the
+Conventional Commits title, the green pipeline. Contributor PRs are reviewed by the
+maintainer as normal. **The one-approving-review rule activates the moment a second
+maintainer exists**, and this paragraph is deleted then.
+
 ### Merge strategy
 
 | Merge | Strategy | Reason |
@@ -218,6 +225,27 @@ git push origin develop
 
 `CHANGELOG.md` is maintained continuously under `[Unreleased]`, not reconstructed from git
 log at release time. If a PR is user-visible, it updates the changelog.
+
+### CHANGELOG conflicts on the back-merge
+
+Expect one on every release and every hotfix. `develop` keeps accumulating `[Unreleased]`
+entries while the `release/*` branch renames its own `[Unreleased]` to a version heading, so
+the two versions of the file diverge at exactly the same lines and `git merge --no-ff main`
+conflicts at the top of the file. This is normal, not a sign something went wrong.
+
+The rule that resolves it:
+
+- **`CHANGELOG.md` is finalized only on `release/*` and `hotfix/*` branches.** Renaming
+  `[Unreleased]` to `## [x.y.z] - YYYY-MM-DD` happens there and nowhere else.
+- **On back-merge, take the release side for the version headings**, then re-add any
+  `[Unreleased]` entries that landed on `develop` while the release branch was open,
+  underneath a fresh empty `[Unreleased]` at the top. Result: `[Unreleased]` first, the new
+  version section below it, older versions below that.
+- Nothing is ever deleted in this resolution. If an entry existed on either side before the
+  merge, it exists after.
+
+`git config rerere.enabled true` is worth setting once — the resolution is structurally the
+same every release, and rerere replays it automatically after the first time.
 
 ## Hotfix process
 

@@ -34,8 +34,9 @@ Geliştirmede base URL: `http://localhost:4000`.
 | Çoğul koleksiyonlar | `/boards`, `/tasks`, `/workspaces` |
 | Path'lerde kebab-case | `/workspace-members`, `/workspaceMembers` değil |
 | camelCase path param'ları | `:workspaceId`, `:boardId`, `:taskId` |
-| İç içelik sahipliği ifade eder | Bir task'a kendi board'u ve workspace'i üzerinden ulaşılır |
-| İç içelik 3 seviyede durur | Daha derin hiyerarşiler yerine query filtreleri kullanılır |
+| İç içelik sahipliği ifade eder | Bir koleksiyona kendi sahibi üzerinden ulaşılır: bir board'un task'ları, bir task'ın yorumları |
+| İç içelik, workspace kökünün 2 seviye altında durur | `:workspaceId` her route'ta zorunludur ve limite dahil edilmez — o bir hiyerarşi seviyesi değil, tenant scope'udur. Daha derin hiyerarşiler yerine query filtreleri kullanılır |
+| Bir kaynağın id'si olduğunda, ona sığ (shallow) biçimde ulaşılır | `/workspaces/:workspaceId/tasks/:taskId`, asla `/workspaces/:workspaceId/boards/:boardId/tasks/:taskId` değil. Id zaten satırı tanımlıyor; workspace guard'ı zaten onu scope'luyor. Ebeveyn segmenti, sunucunun doğrulaması gereken ama hiçbir fayda sağlamayan bir değer ekliyor |
 
 ### Workspace scoping
 
@@ -62,15 +63,21 @@ GET    /workspaces/:workspaceId/boards/:boardId
 GET    /workspaces/:workspaceId/boards/:boardId/columns
 POST   /workspaces/:workspaceId/boards/:boardId/columns
 
-GET    /workspaces/:workspaceId/boards/:boardId/tasks
-POST   /workspaces/:workspaceId/boards/:boardId/tasks
-GET    /workspaces/:workspaceId/boards/:boardId/tasks/:taskId
-PATCH  /workspaces/:workspaceId/boards/:boardId/tasks/:taskId
-DELETE /workspaces/:workspaceId/boards/:boardId/tasks/:taskId
+GET    /workspaces/:workspaceId/boards/:boardId/tasks     # listele, board'a scope'lu
+POST   /workspaces/:workspaceId/boards/:boardId/tasks     # bir board içinde oluştur
 
-GET    /workspaces/:workspaceId/boards/:boardId/tasks/:taskId/comments
-POST   /workspaces/:workspaceId/boards/:boardId/tasks/:taskId/comments
+GET    /workspaces/:workspaceId/tasks/:taskId
+PATCH  /workspaces/:workspaceId/tasks/:taskId
+DELETE /workspaces/:workspaceId/tasks/:taskId
+
+GET    /workspaces/:workspaceId/tasks/:taskId/comments
+POST   /workspaces/:workspaceId/tasks/:taskId/comments
 ```
+
+Şekle dikkat edin: bir **koleksiyon**, listeyi scope'layan şey olduğu için onu sahiplenen
+ebeveynin altına iç içe yerleştirilir. Bir **tekil kaynak**, kendisini bulmak için
+başka hiçbir şeye ihtiyaç olmadığı için kendi id'siyle doğrudan workspace'in altında
+adreslenir.
 
 Workspace olmayan route'lar (tam liste):
 
@@ -88,9 +95,9 @@ isimli bir alt-kaynak** olarak, mümkün olmadığında ise açık bir aksiyon s
 modelleyin:
 
 ```
-PATCH /workspaces/:workspaceId/boards/:boardId/tasks/:taskId/position
+PATCH /workspaces/:workspaceId/tasks/:taskId/position
 POST  /workspaces/:workspaceId/invitations/:invitationId/accept
-POST  /workspaces/:workspaceId/boards/:boardId/tasks/:taskId/assignees
+POST  /workspaces/:workspaceId/tasks/:taskId/assignees
 ```
 
 Aksiyon segmentleri istisnadır ve her birinin bir sebebi olmalıdır.
@@ -135,11 +142,11 @@ Kaynaklar **düz JSON objeleri** olarak döndürülür. Bir `data` sarmalayıcı
 flag'i, bir zarf (envelope) yoktur.
 
 ```jsonc
-// GET /workspaces/w_1/boards/b_1/tasks/t_1  → 200
+// GET /workspaces/w_1/tasks/t_1  → 200
 {
-  "id": "clx8f2k9a0001qw3h4t2v9m1p",
-  "boardId": "clx8f2k9a0000qw3h1a2b3c4d",
-  "columnId": "clx8f2k9a0002qw3h7y8z9w0v",
+  "id": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
+  "boardId": "0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f",
+  "columnId": "0198e2c0-c2d3-7a15-b6e7-8f90a1b2c3d4",
   "title": "Implement fractional indexing",
   "description": "Positions must survive concurrent moves.",
   "priority": "HIGH",
@@ -209,17 +216,37 @@ doğal olarak küçük ve kararlı olduğu, küçük ve sınırlı koleksiyonlar
 
 Neden varsayılan olarak cursor:
 
-- Task listeleri en sık kullanılan yoldur ve **sürekli yeniden sıralanır** — bir kullanıcı
-  kaydırırken drag-and-drop `position`'ı değiştirir. Kayan bir liste üzerinde offset
-  pagination satırları düşürür ve çoğaltır; bir satıra bağlanmış bir cursor bunu yapmaz.
 - `OFFSET`, büyük tablolarda doğrusal olarak bozulur; keyset lookup'lar sabit kalır.
-- Realtime katmanı, session ortasında client'ın altına satır ekler, ki bu tam olarak offset
-  pagination'ın en kötü ele aldığı durumdur.
+- Satırlar session ortasında client'ın altına ekleniyor — başka bir kullanıcı tarafından,
+  ve realtime katmanı devreye girdiğinde görünür biçimde. Offset pagination bunu en kötü
+  ele alan yöntem: client'ın penceresinden önceki her ekleme tüm listeyi kaydırır ve
+  sonraki sayfa satırları ya tekrarlar ya da atlar.
+
+### Cursor anahtarı her zaman `id`'dir, asla `position` değil
+
+**Bu bir tercih değil, doğruluk kuralıdır.** Bir keyset cursor'ın hiçbir satırı
+düşürmemeyi garanti etmesi, ancak üzerine key'lendiği alan client'ın henüz görmediği
+satırlar için *değişmez (immutable)* ise mümkündür. `Task.position` değişmezliğin tam
+tersidir: fractional indexing onu her drag-and-drop'ta yeniden yazar
+([`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)).
+Client'ın cursor'ının ötesinde oturan bir task, biri onu column'un en üstüne sürüklediğinde
+artık cursor değerinin *altında* bir `position`'a sahip oluyor — `WHERE position > :cursor`
+onu bir daha asla döndürmeyecek ve satır sessizce düşecek. Eşzamanlı yeniden sıralama, tam
+olarak `position`'ın neden cursor anahtarı olamayacağının nedenidir.
+
+`id`, cursor'ın ihtiyaç duyduğu özelliklere sahip: bir **UUIDv7**
+([Veri tipleri](#veri-tipleri)), dolayısıyla satırın ömrü boyunca değişmez, ekleme
+zamanına göre monotonik ve index-local — rastgele bir seek değil, gerçek bir keyset.
+
+Board rendering hâlâ task'ları `position`'a göre sıralıyor; bu ikisi ayrı kaygılar.
+`position` bir kartın *nerede göründüğüne* karar verir, `id` *sayfa sınırının nerede
+düştüğüne* karar verir. Büyük bir task listesini sayfalayan bir client, her satırı tam
+olarak bir kez alır ve gösterim için biriktirilmiş kümeyi `position`'a göre sıralar.
 
 ### Cursor request ve response
 
 ```
-GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=clx8f2k9a0001qw3h4t2v9m1p
+GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d
 ```
 
 | Param | Varsayılan | Maks | Notlar |
@@ -230,7 +257,7 @@ GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=clx8f2k9a0001qw3h4t2v9m1p
 ```jsonc
 {
   "items": [ /* … kaynaklar … */ ],
-  "nextCursor": "clx8f2k9a0051qw3h9k1m2n3o",  // son sayfada null
+  "nextCursor": "0198e2c1-8b6d-7e93-a015-4c2f8d1e6b70",  // son sayfada null
   "hasMore": true
 }
 ```
@@ -271,8 +298,10 @@ böylece client'lar bunları genel olarak ele alabilir.
 - Yalnızca query DTO'sunda deklare edilen whitelist'lenmiş alanlar filtrelenebilir ve
   sıralanabilir. Bilinmeyen bir filtre sessizce yok sayılmaz, her zaman `400`'dür — sessizce
   düşürülen bir filtre kullanıcıya görmemesi gereken veriyi gösterir.
-- Task'lar için varsayılan sıralama artan `position`'dır; geri kalan her şey için
-  `-createdAt`.
+- Task'lar için varsayılan **gösterim** sıralaması artan `position`'dır; geri kalan her şey
+  için `-createdAt`. Dikkat: sayfalı bir task listesi, istenen sıralamadan bağımsız olarak
+  her zaman `id`'ye göre *dolaşılır* — bkz.
+  [Pagination](#cursor-anahtarı-her-zaman-iddir-asla-position-değil).
 - `?fields=` sparse-fieldset desteği yok. Response şekilleri DTO'ları tarafından
   sabitlenmiştir; bir client daha azına ihtiyaç duyuyorsa, bu caching ve tipleme
   karmaşıklığına değmez.
@@ -301,7 +330,7 @@ Tam DTO/validation kuralları: [coding-standards.md](coding-standards.md#dtolar-
 
 | Tip | Gösterim | Örnek |
 |---|---|---|
-| Identifier | Opak string (cuid, ara sıra uuid). Client'lar onları asla parse etmez, sıralamaz, üretmez. | `"clx8f2k9a0001qw3h4t2v9m1p"` |
+| Identifier | **UUIDv7**, Prisma'nın `@default(uuid(7))`'i tarafından üretilir (Prisma 5.18'den beri mevcut). Client'lara opak: asla parse edilmez, asla sıralanmaz, asla client tarafında üretilmez. | `"0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d"` |
 | Tarih/saat | **ISO 8601, her zaman UTC, her zaman `Z` ile** | `"2026-08-08T09:12:31.114Z"` |
 | Yalnızca tarih değeri | Yine de `T00:00:00.000Z`'de tam bir ISO 8601 timestamp'i | `"2026-09-01T00:00:00.000Z"` |
 | Süre | Tam sayı dakika (`estimatedMinutes`) — asla formatlanmış bir string değil | `240` |
@@ -311,6 +340,13 @@ Tam DTO/validation kuralları: [coding-standards.md](coding-standards.md#dtolar-
 
 API asla lokal saat veya bir timezone offset'i döndürmez. Kullanıcının locale'ine göre
 formatlamak frontend'in işidir.
+
+"Opak" ifadesi iki yönlü işliyor. UUIDv7 bir timestamp gömer ve sunucu cursor pagination
+için bu sıralamaya güvenir — ama client'lar güvenmemelidir. `id`'ye göre sıralayan veya
+içinden bir oluşturulma zamanı okuyan bir client, gelecekteki bir id stratejisinin
+kırabileceği bir implementasyon detayına bağımlı olmuş olur. Bu belgedeki URL örnekleri
+okunabilirlik için id'leri kısaltır (`w_1`, `b_1`, `t_1`); gerçek olanlar 36 karakterlik
+UUIDv7 string'leridir.
 
 ## Versiyonlama
 

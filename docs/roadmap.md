@@ -105,20 +105,32 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 **Reference:** [project-skeleton.md](project-skeleton.md)
 **Status:** not started
 
+**This phase lands as one large maintainer-authored PR** — a documented exception to the
+<500-line guideline in [CONTRIBUTING.md](../CONTRIBUTING.md). Scaffolding a pnpm workspace,
+a NestJS app, a Next.js app, the Prisma schema, and Docker Compose does not decompose into
+independently mergeable units; each half is unbuildable without the other. Every phase after
+this one follows the usual size rule.
+
 - [ ] pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, `pnpm-workspace.yaml`
-- [ ] Root `package.json` scripts: `dev`, `build`, `lint`, `db:migrate`, `db:studio`
+- [ ] Root `package.json` scripts: `dev`, `build`, `lint`, `db:migrate`, `db:seed`,
+      `db:studio`
 - [ ] Shared tooling: TypeScript strict base config, ESLint, Prettier
 - [ ] `.env.example` and `.gitignore`
-- [ ] `docker-compose.yml` — postgres 17, redis 7, api, web (healthchecks + `depends_on`)
+- [ ] `docker-compose.yml` — postgres 18, redis 8, api, web (healthchecks + `depends_on`)
 - [ ] `docker-compose.dev.yml` — postgres + redis only
 - [ ] `apps/api` — NestJS bootstrap, `app.module.ts`, global `ValidationPipe`, exception filter
 - [ ] `apps/api` — empty module folders: `common/`, `prisma/`, `auth/`, `workspace/`,
       `board/`, `task/`, `label/`, `comment/`, `activity/`, `dashboard/`, `notification/`,
       `realtime/`
+- [ ] `prisma.config.ts` at the repo root (Prisma 7: schema path, seed entry, env loading)
 - [ ] Prisma schema — `User`, `Workspace`, `WorkspaceMember`, `Board`, `Column`, `Task`,
       `TaskAssignee`, `Label`, `TaskLabel`, `Comment`, `Activity`
-- [ ] `Task.position` is `Float`; `dueDate` and `estimatedMinutes` are separate fields
+- [ ] Ids are `@default(uuid(7))`; `Task.position` is `Float`; `dueDate` and
+      `estimatedMinutes` are separate fields
+- [ ] Join-table unique constraints, the `Column @@unique([boardId, id])` composite FK, and
+      explicit `onDelete` actions ([project-skeleton.md](project-skeleton.md#prisma-schema--initial-tables))
 - [ ] First migration committed
+- [ ] `db:seed` — one demo workspace, board, default columns, a handful of tasks
 - [ ] `GET /health` returning 200
 - [ ] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
       `socket.io-client`
@@ -131,6 +143,7 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 ```bash
 docker compose up            # all services come up healthy
 pnpm db:migrate              # migration succeeds
+pnpm db:seed                 # demo data loads
 curl localhost:4000/health   # 200
 # localhost:3000 renders the login page
 pnpm lint && pnpm test && pnpm build   # no errors
@@ -179,10 +192,15 @@ tenant-safely until this exists.
 - [ ] Task CRUD
 - [ ] **Fractional indexing** for `Task.position` — insert between, top, bottom, empty column
 - [ ] `PATCH .../tasks/:taskId/position` — move within and across columns
-- [ ] Rebalancing when the gap between neighbours becomes too small
+- [ ] On-demand rebalancing: reflow a column when the gap between neighbours falls below the
+      precision threshold, in the same transaction as the move (no scheduled job — see
+      [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md))
 - [ ] Concurrent-move handling (no duplicate positions)
 - [ ] Web: `@dnd-kit` board, optimistic reorder with rollback on failure
 - [ ] Web: task detail panel
+- [ ] **Re-evaluate `@dnd-kit`** now that the board interaction actually exists: the classic
+      line is frozen and the ADR's fallback is `pragmatic-drag-and-drop`. Record the outcome
+      in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) either way
 - [ ] Tests: the full positioning matrix in [testing.md](testing.md#1-fractional-indexing-taskposition)
 
 ---

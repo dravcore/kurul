@@ -165,6 +165,14 @@ insanlar tarafından okunur.
 6. CI yeşil olmalıdır: lint, typecheck, testler (bkz. [testing.md](testing.md)).
 7. Merge öncesi en az bir onaylayıcı review.
 
+**Solo-maintainer istisnası.** Proje tek bir maintainer'a sahipken kural 7'yi
+memnun edecek kimse yok, dolayısıyla maintainer'ın açtığı PR'lar için askıya
+alınır: bunlar CI yeşile döndüğünde kendi kendine review edilir ve kendi kendine
+merge edilir. Geri kalan her şey hâlâ geçerli — branch, PR, Conventional Commits
+başlığı, yeşil pipeline. Katkıda bulunanların PR'ları maintainer tarafından her
+zamanki gibi review edilir. **Tek-onay-review kuralı ikinci bir maintainer var
+olduğu anda tekrar devreye girer** ve bu paragraf o zaman silinir.
+
 ### Merge stratejisi
 
 | Merge | Strateji | Sebep |
@@ -223,6 +231,29 @@ git push origin develop
 `CHANGELOG.md`, release zamanında git log'undan yeniden kurulmak yerine sürekli olarak
 `[Unreleased]` altında bakımı yapılır. Bir PR kullanıcı tarafından görülebilirse,
 changelog'u günceller.
+
+### Geri-merge'de CHANGELOG çakışmaları
+
+Her release'de ve her hotfix'te bir tane bekleyin. `develop`, `[Unreleased]` girdilerini
+biriktirmeye devam ederken `release/*` branch'i kendi `[Unreleased]`'ini bir versiyon
+başlığına yeniden adlandırıyor, dolayısıyla dosyanın iki versiyonu tam olarak aynı
+satırlarda ayrışıyor ve `git merge --no-ff main` dosyanın en üstünde çakışıyor. Bu normal,
+bir şeylerin ters gittiğinin işareti değil.
+
+Bunu çözen kural:
+
+- **`CHANGELOG.md` yalnızca `release/*` ve `hotfix/*` branch'lerinde finalize edilir.**
+  `[Unreleased]`'i `## [x.y.z] - YYYY-MM-DD`'ye yeniden adlandırmak orada olur, başka hiçbir
+  yerde değil.
+- **Geri-merge'de, versiyon başlıkları için release tarafını alın**, sonra release branch'i
+  açıkken `develop`'a inen tüm `[Unreleased]` girdilerini, en üstteki taze ve boş bir
+  `[Unreleased]`'in altına yeniden ekleyin. Sonuç: önce `[Unreleased]`, altında yeni versiyon
+  bölümü, onun altında daha eski versiyonlar.
+- Bu çözümde hiçbir şey silinmez. Bir girdi merge'den önce iki taraftan birinde varsa,
+  merge'den sonra da vardır.
+
+`git config rerere.enabled true`'yu bir kez ayarlamaya değer — çözüm yapısal olarak her
+release'de aynı, ve rerere ilk seferden sonra bunu otomatik olarak tekrarlıyor.
 
 ## Hotfix süreci
 

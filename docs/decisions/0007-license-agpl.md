@@ -22,8 +22,8 @@ leaving a realistic path to a sustainable business model for the maintainers.
   modified code as a network service isn't "distribution" under GPL, so GPL
   alone doesn't force a SaaS operator to release their changes. AGPL's
   network-use clause does.
-- Precedent: Plane, the most popular OSS project-management tool (46k+ stars),
-  also chose AGPL-3.0.
+- Precedent: Plane, the most popular OSS project-management tool, also chose
+  AGPL-3.0.
 - AGPL keeps an open-core path available — an AGPL community edition alongside
   separately licensed enterprise features — without foreclosing that model.
 - Relicensing or relaxing AGPL later requires consent from every contributor

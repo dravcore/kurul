@@ -16,7 +16,7 @@ Kurultay, üçüncü bir tarafça alınıp katkıda bulunma zorunluluğu olmadan
 ## Gerekçe
 
 - AGPL-3.0, düz GPL'in açık bıraktığı network-use boşluğunu kapatıyor: değiştirilmiş kodu bir network servisi olarak çalıştırmak GPL altında "dağıtım" sayılmıyor, dolayısıyla GPL tek başına bir SaaS operatörünü değişikliklerini yayınlamaya zorlamıyor. AGPL'in network-use maddesi bunu yapıyor.
-- Emsal: en popüler OSS proje yönetim aracı Plane (46k+ yıldız) de AGPL-3.0'ı seçti.
+- Emsal: en popüler OSS proje yönetim aracı Plane de AGPL-3.0'ı seçti.
 - AGPL, açık bir open-core yolunu mümkün kılıyor — bu modeli dışlamadan, ayrı lisanslı enterprise özelliklerin yanında bir AGPL community edition'ı.
 - AGPL'i sonradan yeniden lisanslamak veya gevşetmek, kod tabanında kalan kodu olan her katkıda bulunandan onay gerektiriyor. Bu da onu fiilen tek yönlü bir kapı yapıyor, dolayısıyla sonradan "düzeltmek" yerine ilk günden doğru olması gerekiyor.
 
