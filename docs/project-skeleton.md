@@ -6,7 +6,7 @@ A step-by-step reference for building the Kurultay monorepo skeleton: workspace,
 
 **Package name:** `kurultay` · **Organization:** dravcore · **License:** AGPL-3.0 · **Architecture:** monorepo + modular monolith
 
-## Table of contents
+## Contents
 
 - [0. Preflight](#0-preflight)
 - [1. Monorepo setup](#1-monorepo-setup)

@@ -34,13 +34,14 @@ lands, full environment setup, commands, and daily workflow will live in
 
 ## Branching and commits
 
-- Branch off `develop`, named `<type>/<short-description>` (e.g. `feat/board-dnd`,
+- Branch off `develop`, named `<type>/<short-description>` (e.g. `feature/board-dnd`,
   `fix/task-position-rounding`)
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
   (`feat:`, `fix:`, `docs:`, ...), in English
 
-Full branch model (Git Flow: `main` / `develop` / `feature/*` / `release/*` / `hotfix/*`)
-and commit conventions: [docs/git-strategy.md](docs/git-strategy.md).
+Full branch model (Git Flow: `main` / `develop` / `feature/*` / `fix/*` / `docs/*` /
+`chore/*` / `release/*` / `hotfix/*`) and commit conventions:
+[docs/git-strategy.md](docs/git-strategy.md).
 
 ## Coding guidelines
 

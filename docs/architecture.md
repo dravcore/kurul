@@ -4,7 +4,7 @@ The shape of the Kurultay system: how the code is stored, how it runs, and how t
 
 > 🌐 English (canonical) | [Türkçe](tr/architecture.md)
 
-## Table of contents
+## Contents
 
 - [1. Decision summary](#1-decision-summary)
 - [2. Monorepo layout](#2-monorepo-layout)

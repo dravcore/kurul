@@ -4,7 +4,7 @@ The technology chosen for each layer of Kurultay, with a short rationale and the
 
 > 🌐 English (canonical) | [Türkçe](tr/tech-stack.md)
 
-## Table of contents
+## Contents
 
 - [1. Summary](#1-summary)
 - [2. Rationale by layer](#2-rationale-by-layer)

@@ -44,7 +44,7 @@ Bu repository'deki TypeScript, NestJS ve Next.js kodu için konvansiyonlar.
 | `null` vs `undefined` | `null` saklanan bir yokluktur (bir DB kolonu), `undefined` yok olan bir değerdir (opsiyonel bir alan). İkisini birbirinin yerine kullanmayın. |
 
 Hatalar tiplenir ve throw edilir, bir servisten asla `{ error: string }` olarak
-döndürülmez. API, bunları [api-conventions.md](api-conventions.md#errors)'de tarif edilen
+döndürülmez. API, bunları [api-conventions.md](api-conventions.md#hatalar)'de tarif edilen
 yanıt şekline çevirir.
 
 ## Adlandırma konvansiyonları

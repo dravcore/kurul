@@ -268,7 +268,7 @@ Kurultay, SemVer'ın garantilerinin 1.0 öncesi daha zayıf olduğu dürüst çe
 vaat edecek kadar kararlı sayıldığında kesilir.
 
 API versiyonlama duruşu (1.0 öncesi `/v1` öneki yok)
-[api-conventions.md](api-conventions.md#versioning)'de ele alınıyor.
+[api-conventions.md](api-conventions.md#versiyonlama)'de ele alınıyor.
 
 ## Kurallar özeti
 
