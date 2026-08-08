@@ -20,6 +20,8 @@ Open-source Kanban-focused project management tool. `dravcore/kurultay` — AGPL
 - `dueDate` and `estimatedMinutes` are separate fields — do not merge them
 - `priority` is kept separate from labels
 - Multi-tenant isolation: every query is scoped by `workspaceId`, enforced at guard/interceptor level
+- Every `id` is UUIDv7 (`@default(uuid(7))`) — never cuid or autoincrement; pagination cursors key on `id`, never on `position`
+- `Label.color` stores a theme-resolved design-token slot name (`slot-1`…`slot-8`), never a raw hex
 
 ## Git
 

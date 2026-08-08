@@ -88,7 +88,7 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 ### Localization
 
 - [x] `docs/tr/` — Turkish copy of every published process/architecture doc under `docs/`
-      (excluding `docs/superpowers/`)
+      (excluding `docs/specs/`)
 - [x] Cross-link check: every EN doc links its TR sibling and vice versa
 - [x] `docs/tr/design.md` — Turkish mirror of the design document (later pass)
 
@@ -136,7 +136,8 @@ this one follows the usual size rule.
 - [ ] `db:seed` — one demo workspace, board, default columns, a handful of tasks
 - [ ] `GET /health` returning 200
 - [ ] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
-      `socket.io-client`
+      `socket.io-client`, `next-intl` (i18n layer wired; strings through the catalog from
+      the first component — [design.md](design.md) §7)
 - [ ] `apps/web` — route groups `(auth)/` and `(app)/`, placeholder login page
 - [ ] `packages/shared-types` — `Priority`, `MemberRole` enums; entity and page types
 - [ ] `.github/workflows/ci.yml` — lint + typecheck + test + build on push and PR
@@ -303,7 +304,7 @@ Not scheduled. Listed so the architecture stays compatible with them, not as com
 | `[-]` Webhooks | |
 | `[-]` Email notifications | |
 | `[-]` Import from Trello / Jira | |
-| `[-]` i18n in the application UI | Docs are bilingual already; the app is not |
+| `[-]` Further UI language packs | The next-intl layer itself ships in Phase 1 and MVP is English-only; this row is about additional locales (Turkish first) — see [design.md](design.md#7-ui-writing) |
 | `[-]` Self-host deployment guide beyond Docker Compose | |
 
 **1.0.0** is cut when Phases 1–9 are complete and the REST API is stable enough to promise

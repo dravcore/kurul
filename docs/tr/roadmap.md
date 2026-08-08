@@ -91,7 +91,7 @@ dökülmesi.
 ### Lokalizasyon
 
 - [x] `docs/tr/` — `docs/` altındaki her yayımlanmış süreç/mimari dokümanın Türkçe kopyası
-      (`docs/superpowers/` hariç)
+      (`docs/specs/` hariç)
 - [x] Cross-link kontrolü: her EN doc kendi TR eşini linkler ve tersi
 - [x] `docs/tr/design.md` — tasarım dokümanının Türkçe çevirisi (daha sonraki bir geçiş)
 
@@ -143,7 +143,8 @@ takip ediyor.
 - [ ] `db:seed` — bir demo workspace, board, varsayılan column'lar, birkaç task
 - [ ] 200 dönen `GET /health`
 - [ ] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
-      `socket.io-client`
+      `socket.io-client`, `next-intl` (i18n katmanı bağlanır; string'ler ilk component'ten
+      itibaren katalogdan geçer — [design.md](design.md) §7)
 - [ ] `apps/web` — `(auth)/` ve `(app)/` route group'ları, placeholder login sayfası
 - [ ] `packages/shared-types` — `Priority`, `MemberRole` enum'ları; entity ve sayfa tipleri
 - [ ] `.github/workflows/ci.yml` — push ve PR'da lint + typecheck + test + build
@@ -319,7 +320,7 @@ Planlanmadı. Mimarinin bunlarla uyumlu kalması için listelendi, taahhüt olar
 | `[-]` Webhook'lar | |
 | `[-]` E-posta bildirimleri | |
 | `[-]` Trello / Jira'dan import | |
-| `[-]` Uygulama UI'ında i18n | Doküman zaten iki dilli; uygulama değil |
+| `[-]` Ek UI dil paketleri | next-intl katmanının kendisi Faz 1'de gelir ve MVP yalnız İngilizce'dir; bu satır ek dillerin (önce Türkçe) paketlenmesiyle ilgilidir — bkz. [design.md](design.md#7-ui-metni) |
 | `[-]` Docker Compose ötesinde self-host deployment rehberi | |
 
 **1.0.0**, Faz 1–9 tamamlandığında ve REST API geriye dönük uyumluluk vaat edecek kadar

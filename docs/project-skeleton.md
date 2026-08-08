@@ -236,7 +236,7 @@ apps/web/
 └── package.json
 ```
 
-Setup: Next.js (App Router) + Tailwind + `shadcn/ui` init + `@dnd-kit/core` + `@dnd-kit/sortable` + `recharts` + `socket.io-client`.
+Setup: Next.js (App Router) + Tailwind + `shadcn/ui` init + `@dnd-kit/core` + `@dnd-kit/sortable` + `recharts` + `socket.io-client` + `next-intl` (the i18n layer is wired from the first component — see [design.md](design.md)).
 
 ---
 

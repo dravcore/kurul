@@ -250,7 +250,8 @@ apps/web/
 ```
 
 Kurulum: Next.js (App Router) + Tailwind + `shadcn/ui` init + `@dnd-kit/core` +
-`@dnd-kit/sortable` + `recharts` + `socket.io-client`.
+`@dnd-kit/sortable` + `recharts` + `socket.io-client` + `next-intl` (i18n katmanı ilk
+component'ten itibaren bağlanır — bkz. [design.md](design.md)).
 
 ---
 
