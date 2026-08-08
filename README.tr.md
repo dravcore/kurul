@@ -6,11 +6,9 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 ## Durum
 
-Kurultay **MVP öncesi** aşamada. Proje şu anda dokümantasyon öncelikli ilerliyor: herhangi
-bir uygulama kodu iskeletlenmeden önce mimari, teknoloji stack'i ve süreç kararları yazıya
-dökülüyor. Aşağıda tarif edilen `apps/api` ve `apps/web` iskeleti bu repoda henüz mevcut
-değil — neyin, hangi sırayla planlandığını görmek için
-[docs/roadmap.md](docs/tr/roadmap.md)'ye bakın.
+Kurultay **MVP öncesi** aşamada. Faz 0 (dokümantasyon) ve Faz 1 (monorepo iskeleti)
+yerinde — `apps/api`, `apps/web` ve `packages/shared-types` yerelde çalışır. Auth ve ürün
+özellikleri Faz 2'de başlar — bkz. [docs/roadmap.md](docs/tr/roadmap.md).
 
 ## Kurultay nedir?
 
@@ -40,18 +38,22 @@ alternatif olmayı hedefliyor.
 
 ## Hızlı başlangıç
 
-*İskeletle birlikte geliyor — henüz çalıştırılamıyor.* `apps/api` ve `apps/web` var
-olduğunda planlanan akış şu şekilde olacak:
-
 ```bash
 git clone https://github.com/dravcore/kurultay.git
 cd kurultay
-cp .env.example .env
-docker compose up
+cp .env.example .env   # BETTER_AUTH_SECRET ayarla (openssl rand -base64 32)
+pnpm install
+docker compose -f docker-compose.dev.yml up -d
+pnpm db:migrate
+pnpm db:seed
+pnpm dev
 ```
 
-Docker olmadan, hot reload ile tam yerel geliştirme kurulumu, iskelet öncesi sözleşme
-olarak [docs/tr/development.md](docs/tr/development.md) içinde belgelenmiştir.
+- Web: http://localhost:3000  
+- API health: http://localhost:4000/health  
+
+Tam stack Docker: `docker compose up --build`. Günlük detaylar:
+[docs/tr/development.md](docs/tr/development.md).
 
 ## Stack
 

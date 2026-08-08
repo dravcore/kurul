@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Prisma generated client (Prisma 7 output)
+apps/api/src/generated/
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Logs and caches
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.eslintcache
+.turbo/
+.cache/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Docker volumes / local overrides
+docker-compose.override.yml

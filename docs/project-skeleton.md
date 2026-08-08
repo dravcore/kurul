@@ -268,7 +268,7 @@ exists.
 
 ```
 DATABASE_URL=postgresql://kurultay:kurultay@localhost:5432/kurultay
-REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://localhost:6380
 BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:3000
 API_PORT=4000

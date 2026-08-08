@@ -11,3 +11,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Phase 0 documentation and standards: governance files, process docs, architecture docs,
   ADRs 0001–0008, EN/TR mirrors, and repository branch protection / merge defaults.
+- Phase 1 monorepo skeleton: pnpm workspace (`apps/api`, `apps/web`,
+  `packages/shared-types`), NestJS + Prisma schema/migration/seed, Next.js + next-intl
+  placeholder login, Docker Compose, and CI workflow.

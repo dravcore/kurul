@@ -6,7 +6,7 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 
 ## İçindekiler
 
-- [Durum: iskelet henüz mevcut değil](#durum-iskelet-henüz-mevcut-değil)
+- [Durum: iskelet ayakta](#durum-iskelet-ayakta)
 - [Ön koşullar](#ön-koşullar)
 - [Klonlama ve kurulum](#klonlama-ve-kurulum)
 - [Ortam değişkenleri](#ortam-değişkenleri)
@@ -17,19 +17,14 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 - [Günlük döngü](#günlük-döngü)
 - [Sorun giderme](#sorun-giderme)
 
-## Durum: iskelet henüz mevcut değil
+## Durum: iskelet ayakta
 
-Kurultay **iskelet öncesi** durumda. Aşağıda anlatılan `apps/api`, `apps/web`,
-`packages/shared-types`, `docker-compose.yml` ve kök `package.json` **henüz repository'de
-değil**.
-
-Bu doküman dolayısıyla var olanın bir raporu değildir — **iskeletin sağlaması gereken
-kontrattır**. Monorepo'yu iskeletleyen kişi, bu sayfadaki her komutun yazıldığı gibi
-çalışacağı şekilde kurar. İskelet geldikten sonra gerçeklik bu dokümandan sapıyorsa,
-ikisinden biri buglıdır ve aynı PR'da düzeltilir.
+Aşağıda anlatılan monorepo iskeleti repository'de **mevcuttur**. Bu sayfadaki komutlar
+gündelik kontrattır — gerçeklik bu dokümandan sapıyorsa ikisinden biri buglıdır ve aynı
+PR'da düzeltilir.
 
 - Yerleşim, Prisma modelleri ve kabul kriterleri: [project-skeleton.md](project-skeleton.md)
-- İskelet ne zaman planlanıyor: [roadmap.md](roadmap.md) (Faz 1)
+- Faz ilerlemesi: [roadmap.md](roadmap.md)
 - Her aracın neden seçildiği: [tech-stack.md](tech-stack.md)
 
 ## Ön koşullar
@@ -66,7 +61,7 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | Değişken | Örnek | Amaç |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma bağlantı string'i |
-| `REDIS_URL` | `redis://localhost:6379` | Socket.io adapter'ı, caching |
+| `REDIS_URL` | `redis://localhost:6380` | Socket.io adapter'ı, caching |
 | `BETTER_AUTH_SECRET` | *(üret)* | Session imzalama secret'ı — zorunlu, varsayılan yok |
 | `BETTER_AUTH_URL` | `http://localhost:3000` | Web uygulamasının public URL'i |
 | `API_PORT` | `4000` | NestJS dinleme portu |

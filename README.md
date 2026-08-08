@@ -6,10 +6,9 @@ Open-source, Kanban-focused project management tool.
 
 ## Status
 
-Kurultay is **pre-MVP**. The project is currently docs-first: architecture, stack, and
-process decisions are being written down before any application code is scaffolded. The
-`apps/api` and `apps/web` skeleton described below does not exist in this repository yet —
-see [docs/roadmap.md](docs/roadmap.md) for what's planned and in what order.
+Kurultay is **pre-MVP**. Phase 0 (docs) and Phase 1 (monorepo skeleton) are in place —
+`apps/api`, `apps/web`, and `packages/shared-types` run locally. Auth and product features
+start in Phase 2 — see [docs/roadmap.md](docs/roadmap.md).
 
 ## What is Kurultay?
 
@@ -37,18 +36,22 @@ Planned for the initial release — see [docs/roadmap.md](docs/roadmap.md) for s
 
 ## Quick start
 
-*Coming with the skeleton — not runnable yet.* Once `apps/api` and `apps/web` exist, the
-planned flow is:
-
 ```bash
 git clone https://github.com/dravcore/kurultay.git
 cd kurultay
-cp .env.example .env
-docker compose up
+cp .env.example .env   # set BETTER_AUTH_SECRET (openssl rand -base64 32)
+pnpm install
+docker compose -f docker-compose.dev.yml up -d
+pnpm db:migrate
+pnpm db:seed
+pnpm dev
 ```
 
-Full local development setup (without Docker, with hot reload) is documented as the
-pre-skeleton contract in [docs/development.md](docs/development.md).
+- Web: http://localhost:3000  
+- API health: http://localhost:4000/health  
+
+Full stack in Docker: `docker compose up --build`. Day-to-day details:
+[docs/development.md](docs/development.md).
 
 ## Stack
 

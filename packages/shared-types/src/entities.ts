@@ -1,0 +1,84 @@
+import type { MemberRole, Priority } from './enums.js';
+
+export interface UserDto {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl: string | null;
+  createdAt: string;
+}
+
+export interface WorkspaceDto {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+}
+
+export interface WorkspaceMemberDto {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  role: MemberRole;
+}
+
+export interface BoardDto {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface ColumnDto {
+  id: string;
+  boardId: string;
+  name: string;
+  position: number;
+  color: string | null;
+}
+
+export interface TaskDto {
+  id: string;
+  boardId: string;
+  columnId: string;
+  title: string;
+  description: string | null;
+  priority: Priority;
+  position: number;
+  dueDate: string | null;
+  estimatedMinutes: number | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LabelDto {
+  id: string;
+  boardId: string;
+  name: string;
+  color: string;
+}
+
+export interface CommentDto {
+  id: string;
+  taskId: string;
+  userId: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ActivityDto {
+  id: string;
+  workspaceId: string;
+  taskId: string | null;
+  userId: string;
+  type: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}

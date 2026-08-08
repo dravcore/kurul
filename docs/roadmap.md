@@ -105,7 +105,7 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 **Goal:** an empty but running monorepo. No business logic — every later feature becomes
 "fill in the box."
 **Reference:** [project-skeleton.md](project-skeleton.md)
-**Status:** not started
+**Status:** done
 
 **This phase lands as one large maintainer-authored PR** — a documented exception to the
 <500-line guideline in [CONTRIBUTING.md](../CONTRIBUTING.md). Scaffolding a pnpm workspace,
@@ -113,34 +113,34 @@ a NestJS app, a Next.js app, the Prisma schema, and Docker Compose does not deco
 independently mergeable units; each half is unbuildable without the other. Every phase after
 this one follows the usual size rule.
 
-- [ ] pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, `pnpm-workspace.yaml`
-- [ ] Root `package.json` scripts: `dev`, `build`, `lint`, `test`, `db:migrate`, `db:seed`,
+- [x] pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, `pnpm-workspace.yaml`
+- [x] Root `package.json` scripts: `dev`, `build`, `lint`, `test`, `db:migrate`, `db:seed`,
       `db:studio`
-- [ ] Shared tooling: TypeScript strict base config, ESLint, Prettier
-- [ ] `.env.example` and `.gitignore`
-- [ ] `docker-compose.yml` — postgres 18, redis 8, api, web (healthchecks + `depends_on`)
-- [ ] `docker-compose.dev.yml` — postgres + redis only
-- [ ] `apps/api` — NestJS bootstrap, `app.module.ts`, global `ValidationPipe`, exception filter
-- [ ] `apps/api` — empty module folders: `common/`, `prisma/`, `auth/`, `workspace/`,
+- [x] Shared tooling: TypeScript strict base config, ESLint, Prettier
+- [x] `.env.example` and `.gitignore`
+- [x] `docker-compose.yml` — postgres 18, redis 8, api, web (healthchecks + `depends_on`)
+- [x] `docker-compose.dev.yml` — postgres + redis only
+- [x] `apps/api` — NestJS bootstrap, `app.module.ts`, global `ValidationPipe`, exception filter
+- [x] `apps/api` — empty module folders: `common/`, `prisma/`, `auth/`, `workspace/`,
       `board/`, `task/`, `label/`, `comment/`, `activity/`, `dashboard/`, `notification/`,
       `realtime/`
-- [ ] `prisma.config.ts` at the repo root (Prisma 7: schema path, seed entry, env loading)
-- [ ] Prisma schema — `User`, `Workspace`, `WorkspaceMember`, `Board`, `Column`, `Task`,
+- [x] `prisma.config.ts` at the repo root (Prisma 7: schema path, seed entry, env loading)
+- [x] Prisma schema — `User`, `Workspace`, `WorkspaceMember`, `Board`, `Column`, `Task`,
       `TaskAssignee`, `Label`, `TaskLabel`, `Comment`, `Activity`
-- [ ] Ids are `@default(uuid(7))`; `Task.position` and `Column.position` are `Float`;
+- [x] Ids are `@default(uuid(7))`; `Task.position` and `Column.position` are `Float`;
       `dueDate` and `estimatedMinutes` are separate fields
-- [ ] Join-table unique constraints, the `Column @@unique([boardId, id])` composite FK, and
+- [x] Join-table unique constraints, the `Column @@unique([boardId, id])` composite FK, and
       explicit `onDelete` actions ([project-skeleton.md](project-skeleton.md#prisma-schema--initial-tables))
-- [ ] First migration committed — Phase 1 tables only; `Notification` is deferred to
+- [x] First migration committed — Phase 1 tables only; `Notification` is deferred to
       [Phase 8](#phase-8--activity-log-and-notifications)
-- [ ] `db:seed` — one demo workspace, board, default columns, a handful of tasks
-- [ ] `GET /health` returning 200
-- [ ] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
+- [x] `db:seed` — one demo workspace, board, default columns, a handful of tasks
+- [x] `GET /health` returning 200
+- [x] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
       `socket.io-client`, `next-intl` (i18n layer wired; strings through the catalog from
       the first component — [design.md](design.md) §7)
-- [ ] `apps/web` — route groups `(auth)/` and `(app)/`, placeholder login page
-- [ ] `packages/shared-types` — `Priority`, `MemberRole` enums; entity and page types
-- [ ] `.github/workflows/ci.yml` — lint + typecheck + test + build on push and PR
+- [x] `apps/web` — route groups `(auth)/` and `(app)/`, placeholder login page
+- [x] `packages/shared-types` — `Priority`, `MemberRole` enums; entity and page types
+- [x] `.github/workflows/ci.yml` — lint + typecheck + test + build on push and PR
 
 ### Acceptance criteria
 

@@ -173,9 +173,7 @@ Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalı
 Merge öncesi tüm adımlar geçmelidir. Bkz.
 [git-strategy.md](git-strategy.md#pull-request-süreci).
 
-> Workflow dosyası (`.github/workflows/ci.yml`) henüz mevcut değil — Faz 1'deki iskeletle
-> birlikte gelir ([roadmap.md](roadmap.md)). Bu bölüm, onun ne çalıştırması gerektiğinin
-> spesifikasyonudur.
+Workflow dosyası: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
 
 ## Ayrıca bakınız
 

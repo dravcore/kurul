@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: kurultay
+          POSTGRES_PASSWORD: kurultay
+          POSTGRES_DB: kurultay_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kurultay -d kurultay_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_test
+      REDIS_URL: redis://localhost:6379
+      API_PORT: 4000
+      WEB_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ci-test-secret
+      BETTER_AUTH_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm --filter @kurultay/api test
+
+      - name: Migrate test database
+        run: pnpm db:migrate
+
+      - name: Integration tests
+        run: pnpm --filter @kurultay/api test:e2e
+
+      - name: Build
+        run: pnpm build

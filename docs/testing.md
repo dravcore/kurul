@@ -168,9 +168,7 @@ Every pull request runs, on `develop` and `main` as well:
 
 All steps must pass before merge. See [git-strategy.md](git-strategy.md#pull-request-process).
 
-> The workflow file (`.github/workflows/ci.yml`) does not exist yet — it ships with the
-> skeleton in Phase 1 ([roadmap.md](roadmap.md)). This section is the specification for what
-> it must run.
+The workflow file is [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 
 ## See also
 

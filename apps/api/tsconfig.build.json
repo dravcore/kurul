@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": false,
+    "declarationMap": false,
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo.build"
+  },
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+}
