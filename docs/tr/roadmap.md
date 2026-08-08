@@ -109,7 +109,7 @@ dökülmesi.
 **Hedef:** boş ama çalışan bir monorepo. İş mantığı yok — sonraki her özellik "kutuyu
 doldurmak" oluyor.
 **Referans:** [project-skeleton.md](project-skeleton.md)
-**Durum:** başlanmadı
+**Durum:** tamamlandı
 
 **Bu faz tek büyük bir maintainer-authored PR olarak iniyor** —
 [CONTRIBUTING.md](../../CONTRIBUTING.md)'deki <500 satır kılavuzunun belgelenmiş bir
@@ -118,36 +118,36 @@ ve Docker Compose'u iskeletlemek, bağımsız olarak merge edilebilir birimlere 
 her yarısı diğeri olmadan build edilemiyor. Bundan sonraki her faz olağan boyut kuralını
 takip ediyor.
 
-- [ ] pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, `pnpm-workspace.yaml`
-- [ ] Kök `package.json` script'leri: `dev`, `build`, `lint`, `test`, `db:migrate`, `db:seed`,
+- [x] pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, `pnpm-workspace.yaml`
+- [x] Kök `package.json` script'leri: `dev`, `build`, `lint`, `test`, `db:migrate`, `db:seed`,
       `db:studio`
-- [ ] Paylaşılan tooling: TypeScript strict base config, ESLint, Prettier
-- [ ] `.env.example` ve `.gitignore`
-- [ ] `docker-compose.yml` — postgres 18, redis 8, api, web (healthcheck'ler +
+- [x] Paylaşılan tooling: TypeScript strict base config, ESLint, Prettier
+- [x] `.env.example` ve `.gitignore`
+- [x] `docker-compose.yml` — postgres 18, redis 8, api, web (healthcheck'ler +
       `depends_on`)
-- [ ] `docker-compose.dev.yml` — yalnızca postgres + redis
-- [ ] `apps/api` — NestJS bootstrap, `app.module.ts`, global `ValidationPipe`, exception
+- [x] `docker-compose.dev.yml` — yalnızca postgres + redis
+- [x] `apps/api` — NestJS bootstrap, `app.module.ts`, global `ValidationPipe`, exception
       filter
-- [ ] `apps/api` — boş modül klasörleri: `common/`, `prisma/`, `auth/`, `workspace/`,
+- [x] `apps/api` — boş modül klasörleri: `common/`, `prisma/`, `auth/`, `workspace/`,
       `board/`, `task/`, `label/`, `comment/`, `activity/`, `dashboard/`, `notification/`,
       `realtime/`
-- [ ] Repository kökünde `prisma.config.ts` (Prisma 7: şema yolu, seed girişi, env yükleme)
-- [ ] Prisma şeması — `User`, `Workspace`, `WorkspaceMember`, `Board`, `Column`, `Task`,
+- [x] Repository kökünde `prisma.config.ts` (Prisma 7: şema yolu, seed girişi, env yükleme)
+- [x] Prisma şeması — `User`, `Workspace`, `WorkspaceMember`, `Board`, `Column`, `Task`,
       `TaskAssignee`, `Label`, `TaskLabel`, `Comment`, `Activity`
-- [ ] Id'ler `@default(uuid(7))`; `Task.position` ve `Column.position` `Float`'tır;
+- [x] Id'ler `@default(uuid(7))`; `Task.position` ve `Column.position` `Float`'tır;
       `dueDate` ve `estimatedMinutes` ayrı alanlardır
-- [ ] Join-tablosu unique kısıtları, `Column @@unique([boardId, id])` composite FK'i, ve
+- [x] Join-tablosu unique kısıtları, `Column @@unique([boardId, id])` composite FK'i, ve
       açık `onDelete` aksiyonları ([project-skeleton.md](project-skeleton.md#prisma-şeması--ilk-tablolar))
-- [ ] İlk migration commit edildi — yalnızca Faz 1 tabloları; `Notification`
+- [x] İlk migration commit edildi — yalnızca Faz 1 tabloları; `Notification`
       [Faz 8](#faz-8--aktivite-logu-ve-bildirimler)'e ertelenmiştir
-- [ ] `db:seed` — bir demo workspace, board, varsayılan column'lar, birkaç task
-- [ ] 200 dönen `GET /health`
-- [ ] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
+- [x] `db:seed` — bir demo workspace, board, varsayılan column'lar, birkaç task
+- [x] 200 dönen `GET /health`
+- [x] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
       `socket.io-client`, `next-intl` (i18n katmanı bağlanır; string'ler ilk component'ten
       itibaren katalogdan geçer — [design.md](design.md) §7)
-- [ ] `apps/web` — `(auth)/` ve `(app)/` route group'ları, placeholder login sayfası
-- [ ] `packages/shared-types` — `Priority`, `MemberRole` enum'ları; entity ve sayfa tipleri
-- [ ] `.github/workflows/ci.yml` — push ve PR'da lint + typecheck + test + build
+- [x] `apps/web` — `(auth)/` ve `(app)/` route group'ları, placeholder login sayfası
+- [x] `packages/shared-types` — `Priority`, `MemberRole` enum'ları; entity ve sayfa tipleri
+- [x] `.github/workflows/ci.yml` — push ve PR'da lint + typecheck + test + build
 
 ### Kabul kriterleri
 

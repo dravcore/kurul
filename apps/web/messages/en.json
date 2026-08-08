@@ -1,0 +1,25 @@
+{
+  "auth": {
+    "login": {
+      "title": "Sign in to Kurultay",
+      "subtitle": "Placeholder login — auth lands in Phase 2.",
+      "submit": "Continue"
+    },
+    "register": {
+      "title": "Create an account",
+      "subtitle": "Registration will be wired with Better Auth."
+    }
+  },
+  "app": {
+    "shell": {
+      "title": "Kurultay"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "placeholder": "Charts and aggregations arrive in Phase 7."
+    },
+    "board": {
+      "placeholder": "Board canvas arrives in Phase 3."
+    }
+  }
+}

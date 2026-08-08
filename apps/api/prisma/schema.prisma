@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+model User {
+  id        String   @id @default(uuid(7))
+  email     String   @unique
+  name      String
+  avatarUrl String?
+  createdAt DateTime @default(now())
+
+  memberships WorkspaceMember[]
+  createdTasks Task[]           @relation("TaskCreatedBy")
+  assignees    TaskAssignee[]
+  comments     Comment[]
+  activities   Activity[]
+}
+
+model Workspace {
+  id        String   @id @default(uuid(7))
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  members    WorkspaceMember[]
+  boards     Board[]
+  activities Activity[]
+}
+
+model WorkspaceMember {
+  id          String     @id @default(uuid(7))
+  workspaceId String
+  userId      String
+  role        MemberRole
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([workspaceId, userId])
+}
+
+model Board {
+  id          String   @id @default(uuid(7))
+  workspaceId String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  columns   Column[]
+  tasks     Task[]
+  labels    Label[]
+}
+
+model Column {
+  id       String  @id @default(uuid(7))
+  boardId  String
+  name     String
+  position Float
+  color    String?
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@unique([boardId, id])
+}
+
+model Task {
+  id               String    @id @default(uuid(7))
+  boardId          String
+  columnId         String
+  title            String
+  description      String?
+  priority         Priority  @default(MEDIUM)
+  position         Float
+  dueDate          DateTime?
+  estimatedMinutes Int?
+  createdById      String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  board     Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column    Column         @relation(fields: [boardId, columnId], references: [boardId, id], onDelete: Cascade)
+  createdBy User           @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  assignees TaskAssignee[]
+  labels    TaskLabel[]
+  comments  Comment[]
+  activities Activity[]
+}
+
+model TaskAssignee {
+  id     String @id @default(uuid(7))
+  taskId String
+  userId String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([taskId, userId])
+}
+
+model Label {
+  id      String @id @default(uuid(7))
+  boardId String
+  name    String
+  color   String
+
+  board Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks TaskLabel[]
+}
+
+model TaskLabel {
+  id      String @id @default(uuid(7))
+  taskId  String
+  labelId String
+
+  task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, labelId])
+}
+
+model Comment {
+  id        String   @id @default(uuid(7))
+  taskId    String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model Activity {
+  id          String   @id @default(uuid(7))
+  workspaceId String
+  taskId      String?
+  userId      String
+  type        String
+  payload     Json
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task      Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+}

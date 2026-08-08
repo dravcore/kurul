@@ -6,7 +6,7 @@ How to set up a Kurultay development environment and work in it day to day.
 
 ## Contents
 
-- [Status: the skeleton does not exist yet](#status-the-skeleton-does-not-exist-yet)
+- [Status: skeleton is live](#status-skeleton-is-live)
 - [Prerequisites](#prerequisites)
 - [Clone and install](#clone-and-install)
 - [Environment variables](#environment-variables)
@@ -17,19 +17,14 @@ How to set up a Kurultay development environment and work in it day to day.
 - [Day-to-day loop](#day-to-day-loop)
 - [Troubleshooting](#troubleshooting)
 
-## Status: the skeleton does not exist yet
+## Status: skeleton is live
 
-Kurultay is **pre-skeleton**. `apps/api`, `apps/web`, `packages/shared-types`,
-`docker-compose.yml`, and the root `package.json` described below are **not in the
-repository yet**.
-
-This document is therefore not a report of what exists — it is the **contract for what the
-skeleton must provide**. Whoever scaffolds the monorepo builds it so that every command on
-this page works exactly as written. If reality and this document diverge after the skeleton
-lands, one of the two is a bug and gets fixed in the same PR.
+The monorepo skeleton described below **exists** in the repository. Commands on this page
+are the day-to-day contract — if reality and this document diverge, one of the two is a bug
+and gets fixed in the same PR.
 
 - Layout, Prisma models, and acceptance criteria: [project-skeleton.md](project-skeleton.md)
-- When the skeleton is scheduled: [roadmap.md](roadmap.md) (Phase 1)
+- Phase progress: [roadmap.md](roadmap.md)
 - Why each tool was chosen: [tech-stack.md](tech-stack.md)
 
 ## Prerequisites
@@ -66,7 +61,7 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | Variable | Example | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string |
-| `REDIS_URL` | `redis://localhost:6379` | Socket.io adapter, caching |
+| `REDIS_URL` | `redis://localhost:6380` | Socket.io adapter, caching. `docker-compose.dev.yml` publishes Redis on host port **6380** (container port remains 6379) so a host Redis/OrbStack proxy on 6379 does not collide. |
 | `BETTER_AUTH_SECRET` | *(generate)* | Session signing secret — required, no default |
 | `BETTER_AUTH_URL` | `http://localhost:3000` | Public URL of the web app |
 | `API_PORT` | `4000` | NestJS listen port |

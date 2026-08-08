@@ -1,0 +1,36 @@
+{
+  "name": "kurultay",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Open-source Kanban-focused project management",
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @kurultay/api --filter @kurultay/web dev",
+    "build": "pnpm -r --filter @kurultay/shared-types --filter @kurultay/api --filter @kurultay/web build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r --filter @kurultay/api --filter @kurultay/web --filter @kurultay/shared-types test",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "dotenv": "^16.6.1",
+    "eslint": "^9.22.0",
+    "eslint-config-prettier": "^10.1.1",
+    "prettier": "^3.5.3",
+    "prisma": "^7.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.1"
+  }
+}

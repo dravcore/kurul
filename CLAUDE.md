@@ -4,10 +4,6 @@ Open-source Kanban-focused project management tool. `dravcore/kurultay` — AGPL
 
 ## Architecture
 
-> **Pre-skeleton (Phase 0):** the layout below is the **target** monorepo. `apps/`,
-> `packages/`, and workspace tooling are not in the repository yet — see
-> [docs/roadmap.md](docs/roadmap.md) Phase 1 and [docs/project-skeleton.md](docs/project-skeleton.md).
-
 - Monorepo (pnpm workspace) + **modular monolith** — no microservices
 - `apps/api` (NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io)
 - `apps/web` (Next.js 16 App Router + Tailwind + shadcn/ui + @dnd-kit + Recharts)
