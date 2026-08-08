@@ -85,11 +85,11 @@ Her doc dosyası şu şablona uyar — mevcut iki MD de bu standarda **güncelle
 
 1. `# Başlık` (H1, tek satır)
 2. Hemen altında bir satırlık amaç cümlesi
-3. Dil satırı: `> 🌐 English (canonical) | [Türkçe](tr/<dosya>.md)` (TR kopyada tersi +
+3. Dil satırı: `> 🌐 English (canonical) | `[Türkçe](tr/<dosya>.md)`` (TR kopyada tersi +
    "çeviri güncel olmayabilir, kanonik kaynak İngilizce" notu)
 4. Uzun docs'larda (100+ satır) içindekiler bölümü
 5. Başlık hiyerarşisi `##`/`###`, tablo ve kod bloğu tercih edilir, süslü prose değil
-6. Dosya içi çapraz referanslar göreli link ile (`[git-strategy](git-strategy.md)`)
+6. Dosya içi çapraz referanslar göreli link ile (``[git-strategy](git-strategy.md)``)
 7. ADR'ler MADR-lite: Başlık, Durum, Tarih, Bağlam, Karar, Gerekçe, Sonuçlar
 
 ## 5. Mevcut Dosyaların Akıbeti
