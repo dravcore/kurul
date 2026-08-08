@@ -48,10 +48,8 @@ request üzerinden ulaşır. Bu maintainer'lar için de geçerlidir.
 `main` yalnızca release'lerdir: `main` üzerinde bir commit varsa ve bu `release/*` veya
 `hotfix/*`'ten bir merge değilse, bir şeyler ters gitmiştir.
 
-> Not: GitHub repository'sinde branch protection kuralları henüz yapılandırılmadı. Bunlar
-> yapılandırılana kadar bu kural mekanik bir garanti değil, sosyal bir sözleşmedir. `main`
-> ve `develop` üzerinde protection yapılandırmak [roadmap.md](roadmap.md) Faz 0'da takip
-> ediliyor.
+`main` ve `develop` üzerindeki branch protection bunu zorunlu kılar: doğrudan push yok,
+pull request zorunlu. Zorunlu status check'ler Faz 1'de CI geldiğinde eklenir.
 
 ## Branch adlandırma
 

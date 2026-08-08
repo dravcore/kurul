@@ -54,7 +54,7 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 ## Phase 0 — Documentation and standards
 
 **Goal:** every project standard is written down before a line of application code exists.
-**Status:** in progress
+**Status:** done
 
 ### Governance and community files
 
@@ -90,13 +90,13 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 - [x] `docs/tr/` — Turkish copy of every published process/architecture doc under `docs/`
       (excluding `docs/specs/`)
 - [x] Cross-link check: every EN doc links its TR sibling and vice versa
-- [x] `docs/tr/design.md` — Turkish mirror of the design document (later pass)
+- [x] `docs/tr/design.md` — Turkish mirror of the design document
 
 ### Repository configuration
 
 - [x] `develop` branch created from `main`
-- [ ] Branch protection on `main` and `develop` (no direct pushes, PR + green CI required)
-- [ ] "Delete branch on merge" and squash-merge defaults enabled
+- [x] Branch protection on `main` and `develop` (no direct pushes, PR required; status checks when CI exists)
+- [x] "Delete branch on merge" and squash-merge defaults enabled
 
 ---
 

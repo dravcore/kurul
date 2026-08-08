@@ -57,7 +57,7 @@ tekrarlanmıştır.
 
 **Hedef:** bir satır uygulama kodu var olmadan önce her proje standardının yazıya
 dökülmesi.
-**Durum:** devam ediyor
+**Durum:** tamamlandı
 
 ### Governance ve topluluk dosyaları
 
@@ -93,14 +93,14 @@ dökülmesi.
 - [x] `docs/tr/` — `docs/` altındaki her yayımlanmış süreç/mimari dokümanın Türkçe kopyası
       (`docs/specs/` hariç)
 - [x] Cross-link kontrolü: her EN doc kendi TR eşini linkler ve tersi
-- [x] `docs/tr/design.md` — tasarım dokümanının Türkçe çevirisi (daha sonraki bir geçiş)
+- [x] `docs/tr/design.md` — tasarım dokümanının Türkçe çevirisi
 
 ### Repository yapılandırması
 
 - [x] `develop` branch'i `main`'den oluşturuldu
-- [ ] `main` ve `develop` üzerinde branch protection (doğrudan push yok, PR + yeşil CI
-      zorunlu)
-- [ ] "Delete branch on merge" ve squash-merge varsayılanları etkinleştirildi
+- [x] `main` ve `develop` üzerinde branch protection (doğrudan push yok, PR zorunlu; CI
+      var olunca status check)
+- [x] "Delete branch on merge" ve squash-merge varsayılanları etkinleştirildi
 
 ---
 
