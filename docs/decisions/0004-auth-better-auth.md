@@ -46,12 +46,18 @@ Better Auth's organization plugin speaks *organization*, *member*, and
 | Member | WorkspaceMember |
 | Invitation | Invitation (no separate Prisma model in Phase 1) |
 
-Invite persistence lives in Better Auth's organization tables. Phase 1 does
-**not** add a Kurultay `Invitation` model; Phase 2 wires the Nest `workspace`
-module to the plugin and decides whether our `Workspace` / `WorkspaceMember`
-rows are the same tables (via Prisma models aligned to Better Auth) or a thin
-sync layer on top. Either way, public API responses never expose the word
-"organization".
+Invite persistence lives in Better Auth's organization tables. Phase 1 did
+**not** add a Kurultay `Invitation` model.
+
+**Phase 2 resolution (2026-08-09):** single source of truth — Prisma models keep
+Kurultay names (`Workspace`, `WorkspaceMember`, `WorkspaceInvitation`) and
+Better Auth's organization plugin maps onto them via `schema.modelName` /
+field maps (`organizationId` → `workspaceId`). No sync layer. Roles are the
+`MemberRole` enum values (`OWNER` / `ADMIN` / `MEMBER` / `GUEST`) registered
+1:1 with Better Auth access control (`creatorRole: "OWNER"`). Nest mounts the
+framework-agnostic Node handler on Express at `/auth/{*splat}` (escape hatch —
+the community Nest wrapper is not used). Public API responses never expose the
+word "organization".
 
 ## Integration risk
 

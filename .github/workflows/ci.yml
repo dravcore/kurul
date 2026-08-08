@@ -35,7 +35,7 @@ jobs:
       API_PORT: 4000
       WEB_URL: http://localhost:3000
       BETTER_AUTH_SECRET: ci-test-secret
-      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_URL: http://localhost:4000
 
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +52,10 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
+
+      # shared-types exports point at dist/; consumers need it before typecheck/test.
+      - name: Build shared types
+        run: pnpm --filter @kurultay/shared-types build
 
       - name: Lint
         run: pnpm lint

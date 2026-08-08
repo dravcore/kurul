@@ -1,6 +1,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { mountBetterAuth } from './auth/mount-better-auth';
 import { loadRootEnv, envPort, envString } from './common/env';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { validationExceptionFactory } from './common/validation/validation-exception.factory';
@@ -19,6 +20,8 @@ async function bootstrap(): Promise<void> {
     origin: webUrl,
     credentials: true,
   });
+
+  mountBetterAuth(app);
 
   app.useGlobalPipes(
     new ValidationPipe({

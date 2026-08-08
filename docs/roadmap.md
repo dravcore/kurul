@@ -4,7 +4,7 @@ Phased delivery plan for Kurultay, from documentation to MVP and beyond.
 
 > 🌐 English (canonical) | [Türkçe](tr/roadmap.md)
 
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-09
 
 ## Contents
 
@@ -159,18 +159,18 @@ pnpm lint && pnpm test && pnpm build   # no errors
 
 **Goal:** a user can sign up, log in, and own a workspace. Nothing else can be built
 tenant-safely until this exists.
-**Status:** not started
+**Status:** done
 
-- [ ] Better Auth integration (organization plugin), session handling
-- [ ] Register / login / logout / session refresh
-- [ ] `GET /me`
-- [ ] Auth guard on all protected routes
-- [ ] **Workspace scoping guard** — every request resolves and verifies `workspaceId`
-- [ ] Workspace CRUD, slug uniqueness
-- [ ] Membership + roles: `OWNER`, `ADMIN`, `MEMBER`, `GUEST`; role guard
-- [ ] Invitations: create, accept, revoke
-- [ ] Web: login/register pages, session provider, workspace switcher, app shell layout
-- [ ] Tests: auth flows, workspace isolation, role matrix
+- [x] Better Auth integration (organization plugin), session handling
+- [x] Register / login / logout / session refresh
+- [x] `GET /me`
+- [x] Auth guard on all protected routes
+- [x] **Workspace scoping guard** — every request resolves and verifies `workspaceId`
+- [x] Workspace CRUD, slug uniqueness
+- [x] Membership + roles: `OWNER`, `ADMIN`, `MEMBER`, `GUEST`; role guard
+- [x] Invitations: create, accept, revoke
+- [x] Web: login/register pages, session provider, workspace switcher, app shell layout
+- [x] Tests: auth flows, workspace isolation, role matrix
       ([testing.md](testing.md#what-must-be-tested))
 
 ---

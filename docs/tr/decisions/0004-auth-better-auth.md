@@ -37,11 +37,17 @@ ve workspace-scoped davet route'larını kullanır
 | Invitation | Invitation (Faz 1'de ayrı Prisma modeli yok) |
 
 Davet persistence'ı Better Auth'un organization tablolarında yaşar. Faz 1 bir
-Kurultay `Invitation` modeli **eklemez**; Faz 2 Nest `workspace` modülünü
-plugin'e bağlar ve `Workspace` / `WorkspaceMember` satırlarının aynı tablolar mı
-(Better Auth ile hizalı Prisma modelleri) yoksa üstünde ince bir sync katmanı mı
-olduğuna karar verir. Her iki durumda da public API yanıtları "organization"
-kelimesini asla göstermez.
+Kurultay `Invitation` modeli **eklemedi**.
+
+**Faz 2 kararı (2026-08-09):** tek kaynak — Prisma modelleri Kurultay adlarını
+korur (`Workspace`, `WorkspaceMember`, `WorkspaceInvitation`); Better Auth
+organization plugin'i `schema.modelName` / alan eşlemeleriyle
+(`organizationId` → `workspaceId`) bu tablolara bağlanır. Sync katmanı yok.
+Roller `MemberRole` enum değerleridir (`OWNER` / `ADMIN` / `MEMBER` / `GUEST`)
+ve Better Auth access control'de 1:1 kayıtlıdır (`creatorRole: "OWNER"`). Nest,
+framework-agnostik Node handler'ı Express üzerinde `/auth/{*splat}` olarak
+monte eder (çıkış yolu — topluluk Nest wrapper'ı kullanılmaz). Public API
+yanıtları "organization" kelimesini asla göstermez.
 
 ## Entegrasyon riski
 

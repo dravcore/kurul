@@ -69,7 +69,7 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `DATABASE_URL` | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma bağlantı string'i |
 | `REDIS_URL` | `redis://localhost:6379` | Socket.io adapter'ı, caching |
 | `BETTER_AUTH_SECRET` | *(üret)* | Session imzalama secret'ı — zorunlu, varsayılan yok |
-| `BETTER_AUTH_URL` | `http://localhost:3000` | Web uygulamasının public URL'i |
+| `BETTER_AUTH_URL` | `http://localhost:4000` | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir) |
 | `API_PORT` | `4000` | NestJS dinleme portu |
 | `WEB_URL` | `http://localhost:3000` | API için CORS origin'i |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:4000` | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir) |

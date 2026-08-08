@@ -1,7 +1,12 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import { MemberRole, Priority, PrismaClient } from '../src/generated/prisma';
+import { Priority, PrismaClient } from '../src/generated/prisma';
+import { auth } from '../src/auth/auth';
+
+const DEMO_EMAIL = 'demo@kurultay.dev';
+const DEMO_PASSWORD = 'demo-password-change-me';
+const DEMO_NAME = 'Demo User';
 
 async function main(): Promise<void> {
   const connectionString = process.env.DATABASE_URL;
@@ -21,29 +26,36 @@ async function main(): Promise<void> {
   await prisma.label.deleteMany();
   await prisma.column.deleteMany();
   await prisma.board.deleteMany();
+  await prisma.workspaceInvitation.deleteMany();
   await prisma.workspaceMember.deleteMany();
   await prisma.workspace.deleteMany();
+  await prisma.session.deleteMany();
+  await prisma.account.deleteMany();
+  await prisma.verification.deleteMany();
   await prisma.user.deleteMany();
 
-  const user = await prisma.user.create({
-    data: {
-      email: 'demo@kurultay.dev',
-      name: 'Demo User',
+  const signUp = await auth.api.signUpEmail({
+    body: {
+      email: DEMO_EMAIL,
+      password: DEMO_PASSWORD,
+      name: DEMO_NAME,
     },
   });
 
-  const workspace = await prisma.workspace.create({
-    data: {
+  const userId = signUp.user.id;
+
+  const workspace = await auth.api.createOrganization({
+    body: {
       name: 'Demo Workspace',
       slug: 'demo',
-      members: {
-        create: {
-          userId: user.id,
-          role: MemberRole.OWNER,
-        },
-      },
+      userId,
+      keepCurrentActiveOrganization: false,
     },
   });
+
+  if (!workspace) {
+    throw new Error('Failed to create demo workspace');
+  }
 
   const board = await prisma.board.create({
     data: {
@@ -74,7 +86,7 @@ async function main(): Promise<void> {
         description: 'pnpm workspace, NestJS, Next.js, Prisma',
         priority: Priority.HIGH,
         position: 1000,
-        createdById: user.id,
+        createdById: userId,
         estimatedMinutes: 240,
       },
       {
@@ -83,7 +95,7 @@ async function main(): Promise<void> {
         title: 'Wire Better Auth',
         priority: Priority.MEDIUM,
         position: 2000,
-        createdById: user.id,
+        createdById: userId,
         estimatedMinutes: 180,
       },
       {
@@ -92,7 +104,7 @@ async function main(): Promise<void> {
         title: 'Draft design tokens',
         priority: Priority.LOW,
         position: 1000,
-        createdById: user.id,
+        createdById: userId,
       },
       {
         boardId: board.id,
@@ -100,11 +112,16 @@ async function main(): Promise<void> {
         title: 'Write Phase 0 docs',
         priority: Priority.URGENT,
         position: 1000,
-        createdById: user.id,
+        createdById: userId,
         estimatedMinutes: 480,
       },
     ],
   });
+
+  // eslint-disable-next-line no-console -- seed feedback
+  console.log(`Seeded demo user ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
+  // eslint-disable-next-line no-console -- seed feedback
+  console.log(`Seeded workspace slug=demo id=${workspace.id}`);
 
   await prisma.$disconnect();
   await pool.end();

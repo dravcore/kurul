@@ -69,7 +69,7 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `DATABASE_URL` | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string |
 | `REDIS_URL` | `redis://localhost:6379` | Socket.io adapter, caching |
 | `BETTER_AUTH_SECRET` | *(generate)* | Session signing secret — required, no default |
-| `BETTER_AUTH_URL` | `http://localhost:3000` | Public URL of the web app |
+| `BETTER_AUTH_URL` | `http://localhost:4000` | Public URL of the API (Better Auth is mounted at `/auth/*`) |
 | `API_PORT` | `4000` | NestJS listen port |
 | `WEB_URL` | `http://localhost:3000` | CORS origin for the API |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:4000` | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg) |

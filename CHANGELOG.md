@@ -14,3 +14,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Phase 1 monorepo skeleton: pnpm workspace (`apps/api`, `apps/web`,
   `packages/shared-types`), NestJS + Prisma schema/migration/seed, Next.js + next-intl
   placeholder login, Docker Compose, and CI workflow.
+- Phase 2 auth and workspaces: Better Auth (organization plugin) on Nest `/auth/*`,
+  `GET /me`, session/workspace/role guards, workspace CRUD + invitations, web
+  login/register/invite + workspace switcher, and auth/isolation/role-matrix tests.

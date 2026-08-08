@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -11,6 +12,7 @@ import { ActivityModule } from './activity/activity.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationModule } from './notification/notification.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { SessionAuthGuard } from './common/guards/session-auth.guard';
 
 @Module({
   imports: [
@@ -26,6 +28,12 @@ import { RealtimeModule } from './realtime/realtime.module';
     DashboardModule,
     NotificationModule,
     RealtimeModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: SessionAuthGuard,
+    },
   ],
 })
 export class AppModule {}

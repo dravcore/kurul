@@ -22,6 +22,16 @@ export interface WorkspaceMemberDto {
   role: MemberRole;
 }
 
+export interface InvitationDto {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: MemberRole;
+  status: string;
+  expiresAt: string;
+  acceptUrl: string;
+}
+
 export interface BoardDto {
   id: string;
   workspaceId: string;
