@@ -1,0 +1,117 @@
+# Tech Stack
+
+The technology chosen for each layer of Kurultay, with a short rationale and the alternative it was weighed against.
+
+> 🌐 English (canonical) | [Türkçe](tr/tech-stack.md)
+
+## Table of contents
+
+- [1. Summary](#1-summary)
+- [2. Rationale by layer](#2-rationale-by-layer)
+- [3. Deliberately not included](#3-deliberately-not-included)
+- [4. Open-source references](#4-open-source-references)
+- [5. Decision records](#5-decision-records)
+
+---
+
+## 1. Summary
+
+| Layer | Choice | Alternative considered |
+|---|---|---|
+| Backend | NestJS + TypeScript | Fastify (lighter), Django |
+| Database | PostgreSQL 17 | — |
+| Cache / PubSub / Queue | Redis | — |
+| ORM | Prisma | Drizzle ORM |
+| API | REST (initially) | GraphQL (later) |
+| Realtime | Socket.io + `@socket.io/redis-adapter` | `ws` (lighter, no features) |
+| Frontend | Next.js + React + TypeScript | — |
+| Styling | Tailwind CSS | — |
+| UI kit | shadcn/ui | Radix UI (raw) |
+| Drag & drop | @dnd-kit | pragmatic-drag-and-drop |
+| Charts | Recharts | Chart.js, Apache ECharts |
+| Auth | Better Auth (organization plugin) | Auth.js / NextAuth (maintenance mode) |
+| Deployment | Docker Compose | Kubernetes (once scale demands it) |
+
+Architecture (monorepo + modular monolith) is covered separately in [architecture.md](architecture.md).
+
+---
+
+## 2. Rationale by layer
+
+### Backend — NestJS + TypeScript
+
+Both commercial reference points run this way: ClickUp on TypeScript/Node.js/NestJS/PostgreSQL, Linear fully on Node.js + TypeScript with PostgreSQL and Redis. NestJS's module system keeps a many-module product (auth, workspace, board, task, dashboard, notification) orderly when a single developer or a small team is building it. Sharing a language with the frontend is what makes `packages/shared-types` possible, which pays off on every data model change. Most open-source alternatives (Plane, Taiga) chose Django for fast CRUD plus a free admin panel — a good trade when realtime sync is not the priority, and the wrong one here.
+
+### Database — PostgreSQL + Redis
+
+Uncontroversial: ClickUp, Linear, Plane, Taiga, and Focalboard all sit on Postgres. JSON columns cover flexible metadata (custom fields, activity payloads) while relational integrity covers the task/board graph. Redis then serves four needs with one tool: notification queue, session store, rate limiting, and the Socket.io pub/sub adapter.
+
+### ORM — Prisma
+
+Drizzle and Prisma are the two dominant TypeScript ORMs in 2026 and both are production-ready. Drizzle offers SQL-level control and the smallest footprint (~7.4kb); Prisma offers a schema-first workflow, a mature ecosystem, and tooling such as Prisma Studio — and since Prisma 7 dropped its Rust dependency, the old bundle-size objection is largely gone. Prisma wins here because its migration story is more guided, which saves debugging time when working alone. Drizzle's performance edge lives in the ORM layer, and a 5–50 ms database round trip dwarfs it in practice.
+
+### Realtime — Socket.io + Redis adapter
+
+For self-hosted infrastructure, Socket.io with `@socket.io/redis-adapter` is the standard answer: the adapter broadcasts events across every server instance, which is a hard requirement for horizontal scaling. Raw `ws` has lower overhead but leaves room management and reconnection logic to you — and a Kanban board needs both. Managed services (Ably, Pusher, Liveblocks) solve a serverless problem that does not apply when we run our own servers.
+
+### Drag & drop — @dnd-kit
+
+`react-beautiful-dnd` is deprecated — Atlassian withdrew from it. In 2026 `@dnd-kit` is the default for most React drag-and-drop work: ~6 KB core, accessible (keyboard and screen reader), framework-agnostic, and actively maintained; Linear uses it for issue ordering. At the typical 50–200 items per board there is no measurable performance gap with Atlassian's newer `pragmatic-drag-and-drop`, which only pulls ahead past ~1000 items and requires writing your own collision detection. The critical companion rule is ordering: positions are stored as floats and reordered by **fractional indexing**, never as renumbered integers.
+
+### Charts — Recharts
+
+The safest default for a React dashboard: broad ecosystem adoption, a comprehensible component API, SVG rendering, MIT licensed, and it composes well with shadcn/ui. It is not the lightest option (~290 KB). If the number of charts grows sharply or datasets get large, a Canvas-based library (Chart.js, Apache ECharts) becomes worth revisiting.
+
+### Auth — Better Auth
+
+Multi-tenant workspaces are the heart of this product, so auth is a load-bearing choice. Better Auth is the strongest self-hosted option for new projects in 2026 — more capable than NextAuth, free, actively maintained — and Auth.js/NextAuth is in maintenance mode with Better Auth positioned as its successor. The decisive factor is the **organization plugin**: multi-tenant organizations, invitations, member roles, and permissions out of the box, which would take weeks to build. Self-hosting keeps data sovereignty in-house with no dependency on a managed service like Clerk. Note that Better Auth ships backend logic only — login and register UI is ours to write.
+
+### Deployment — Docker Compose
+
+Four services — `api`, `web`, `postgres`, `redis` — matching the existing self-managed Linux server setup. The path to Kubernetes stays open for when scale demands it (both ClickUp and Linear ended up there), but Compose on a single host is the right size for now.
+
+---
+
+## 3. Deliberately not included
+
+| Technology | Why not now |
+|---|---|
+| Kafka | ClickUp uses it, but at 20M+ user scale. Redis pub/sub is more than enough for the MVP; it can be added later |
+| GraphQL | Linear uses it. REST is faster to start with; revisit when API consumers diversify |
+| Elasticsearch | Full-text search can start with PostgreSQL's built-in FTS |
+| Kubernetes | Docker Compose on one host is sufficient. Migrate when traffic requires it |
+| MinIO / S3 | File attachments are out of MVP scope. When added, pick an S3-compatible store |
+| Local-first sync engine | Linear's largest technical investment. Very high complexity — start server-first |
+
+---
+
+## 4. Open-source references
+
+Projects worth studying for architecture and data modelling:
+
+| Project | Backend | Frontend | Note |
+|---|---|---|---|
+| Plane | Django | Next.js | Most popular OSS PM tool (46k+ stars), AGPL-3.0 |
+| Huly | TypeScript / Node.js | Svelte | Full TS, but carries Rush monorepo complexity |
+| Taiga | Django | React | Agile/Scrum focused, MPL-2.0 |
+| OpenProject | Ruby on Rails | Angular | Oldest / enterprise, GPL-3.0 |
+| Focalboard | Go | React | Simple Kanban, no longer actively maintained |
+
+---
+
+## 5. Decision records
+
+Full arguments and consequences live in [`decisions/`](decisions/) rather than being repeated here:
+
+| ADR | Topic |
+|---|---|
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modular monolith |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS + Prisma + PostgreSQL + Redis |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js + Tailwind + shadcn/ui + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Better Auth with the organization plugin |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md) | Socket.io + Redis adapter |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) | Float positions for ordering |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md) | AGPL-3.0 |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md) | Git Flow + SemVer |
+
+Related: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)

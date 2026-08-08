@@ -1,0 +1,97 @@
+# Kurultay
+
+Açık kaynak, Kanban odaklı proje yönetim aracı.
+
+> 🌐 [English (canonical)](README.md) | Türkçe
+
+## Durum
+
+Kurultay **MVP öncesi** aşamada. Proje şu anda dokümantasyon öncelikli ilerliyor: herhangi
+bir uygulama kodu iskeletlenmeden önce mimari, teknoloji stack'i ve süreç kararları yazıya
+dökülüyor. Aşağıda tarif edilen `apps/api` ve `apps/web` iskeleti bu repoda henüz mevcut
+değil — neyin, hangi sırayla planlandığını görmek için
+[docs/roadmap.md](docs/tr/roadmap.md)'ye bakın.
+
+## Kurultay nedir?
+
+*Kurultay*, Türk-Moğol geleneğinde boyların bir araya gelip meseleleri tartıştığı, kararlar
+aldığı ve önündeki işi bölüştüğü büyük meclisin adıdır. Bu aracın bir ekip için yaptığı şey
+de tam olarak bu: insanlar bir board etrafında toplanır, işi konuşur, neyin önemli olduğuna
+karar verir ve görevleri aralarında paylaştırır — herkes için izlenebilir, önceliklendirilmiş
+ve görünür şekilde.
+
+Kurultay, verisinin ve iş akışının sahibi olmak isteyen ekipler için ticari Kanban/PM
+araçlarına (Trello, Linear, Jira) kendi kendine barındırılabilir, AGPL lisanslı bir
+alternatif olmayı hedefliyor.
+
+## Özellikler
+
+İlk sürüm için planlananlar — sıralama için [docs/roadmap.md](docs/tr/roadmap.md)'ye bakın:
+
+- **Board'lar ve kolonlar** — sürükle-bırakla yeniden sıralanabilen klasik Kanban düzeni
+- **Task'lar** — çoklu atanan kişi, label'lar, (label'lardan bağımsız tutulan) priority,
+  ayrı alanlar olarak due date ve süre tahmini
+- **Fractional-indexed sıralama** — bir kartı yeniden sıralamak yalnızca o kartın position'ına
+  dokunur, tüm listeyi yeniden numaralandırmaz
+- **Workspace'ler** — temelden itibaren multi-tenant; her sorgu workspace'e göre scope'lanır
+- **Dashboard** — task/board aktivitesi üzerinde agregasyon görünümleri ve grafikler
+- **Realtime senkronizasyon** — board değişiklikleri Socket.io üzerinden canlı yayılır
+- **Aktivite log'u ve bildirimler**
+
+## Hızlı başlangıç
+
+*İskeletle birlikte geliyor — henüz çalıştırılamıyor.* `apps/api` ve `apps/web` var
+olduğunda planlanan akış şu şekilde olacak:
+
+```bash
+git clone https://github.com/dravcore/kurultay.git
+cd kurultay
+cp .env.example .env
+docker compose up
+```
+
+Docker olmadan, hot reload ile tam yerel geliştirme kurulumu
+[docs/development.md](docs/tr/development.md) içinde belgelenecek.
+
+## Stack
+
+| Katman | Seçim |
+|---|---|
+| Backend | NestJS + Prisma + PostgreSQL + Redis + Socket.io |
+| Frontend | Next.js (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts |
+| Auth | Better Auth (organization plugin) |
+| Paylaşılan tipler | `packages/shared-types` (frontend/backend arasında paylaşılan TS tipleri) |
+| Deployment | Docker Compose |
+| Mimari | Monorepo, modüler monolit — mikroservis yok |
+
+Her seçimin tam gerekçesi: [docs/tech-stack.md](docs/tr/tech-stack.md) ve
+[docs/decisions/](docs/decisions/).
+
+## Dokümantasyon
+
+| Doküman | Kapsam |
+|---|---|
+| [docs/tr/architecture.md](docs/tr/architecture.md) | Modül haritası, veri modeli özeti |
+| [docs/tr/tech-stack.md](docs/tr/tech-stack.md) | Stack seçimleri ve gerekçeleri |
+| [docs/tr/project-skeleton.md](docs/tr/project-skeleton.md) | Planlanan repo yerleşimi, ilk Prisma şeması |
+| [docs/tr/development.md](docs/tr/development.md) | Ortam kurulumu, günlük iş akışı, komutlar |
+| [docs/tr/coding-standards.md](docs/tr/coding-standards.md) | TS/NestJS/Next.js konvansiyonları |
+| [docs/tr/git-strategy.md](docs/tr/git-strategy.md) | Git Flow, Conventional Commits, release'ler |
+| [docs/tr/testing.md](docs/tr/testing.md) | Test katmanları, araçlar, beklentiler |
+| [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST adlandırma, hata formatı, pagination |
+| [docs/tr/roadmap.md](docs/tr/roadmap.md) | Fazlar ve ilerleme |
+| [docs/decisions/](docs/decisions/) | Hafif mimari karar kayıtları (ADR) |
+
+## Katkıda bulunma
+
+Kurultay henüz iskelet öncesi ve issue-first çalışıyor: uygulamaya geçmeden önce öner. Süreç
+için [CONTRIBUTING.md](CONTRIBUTING.md)'ye, birlikte nasıl çalıştığımız için ise
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)'ye bakın.
+
+## Güvenlik
+
+Bir güvenlik açığı bildirmek için [SECURITY.md](SECURITY.md)'ye bakın.
+
+## Lisans
+
+[AGPL-3.0](LICENSE).

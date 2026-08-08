@@ -1,0 +1,249 @@
+# Mimari
+
+Kurultay sisteminin şekli: kod nasıl saklanıyor, nasıl çalışıyor ve veri nasıl modelleniyor.
+
+> 🌐 [English (canonical)](../architecture.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+
+## İçindekiler
+
+- [1. Karar özeti](#1-karar-özeti)
+- [2. Monorepo yerleşimi](#2-monorepo-yerleşimi)
+- [3. apps/api — modül haritası](#3-appsapi--modül-haritası)
+- [4. apps/web — yapı](#4-appsweb--yapı)
+- [5. packages/shared-types](#5-packagesshared-types)
+- [6. Veri modeli](#6-veri-modeli)
+- [7. Multi-tenant izolasyonu](#7-multi-tenant-izolasyonu)
+- [8. Runtime evrimi](#8-runtime-evrimi)
+- [9. Karar kayıtları](#9-karar-kayıtları)
+
+---
+
+## 1. Karar özeti
+
+Kurultay bir **modüler monolit** içeren bir **monorepo**'dur.
+
+Bu iki bağımsız eksendir ve ikisini ayrı tutmak önemlidir:
+
+| Eksen | Hangi soruyu yanıtlar | Kurultay'ın cevabı |
+|---|---|---|
+| Monorepo vs. polyrepo | Kod nasıl *saklanır*? | Monorepo (tek pnpm workspace) |
+| Monolit vs. mikroservis | Kod nasıl *çalışır*? | Modüler monolit (tek deploy edilebilir birim) |
+
+**Neden monorepo**
+
+- Frontend ve backend'in ikisi de TypeScript, bu yüzden `packages/shared-types` task/board
+  tiplerinin tek tanımını tutabiliyor. Veri modeli değişikliği tek bir yerde olur.
+- Tek geliştirici / küçük ekip: iki repo, her cross-cutting değişiklik için iki PR ve manuel
+  versiyon uyumu demek.
+- Katkı bariyeri: bir katkıda bulunan tek bir repo klonlar ve `docker compose up` çalıştırır.
+- Bu alandaki çoğu referans proje (Plane, Huly) monorepo.
+
+**Neden modüler monolit, mikroservis değil**
+
+- Mikroservisler bağımsız ölçeklenmeyi dağıtık sistem karmaşıklığı pahasına satın alır:
+  servisler arası çağrılar, dağıtık transaction'lar, ayrı deploy pipeline'ları, dağıtık
+  observability. MVP ölçeğinde bağımsız ölçeklenmesi gereken henüz hiçbir şey yok.
+- Kanban doğası gereği yüksek derecede bağlı (coupled). Bir task'ı taşımak task satırına,
+  aktivite log'una, bildirimlere ve dashboard agregatlarına dokunur — bugün tek bir lokal
+  transaction, bölünürse dağıtık bir transaction.
+- Veri modeli henüz oturmadı. Servis sınırlarını erken çizmek pahalı türden bir hatadır:
+  yanlış bir bölünmeyi düzeltmek, monoliti daha sonra bölmekten çok daha maliyetlidir.
+
+**Referans projeler ne yapıyor**
+
+| Proje | Yaklaşım |
+|---|---|
+| Plane | Çekirdekte monolit, artı iki destek servisi (Gateway = DB proxy, Pilot = entegrasyon yüzeyi) |
+| Linear | Tek kod tabanı, farklı rollerde birkaç workload olarak deploy edilir: WebSocket sunucuları, public/private GraphQL API, arka plan iş çalıştırıcıları — her biri bağımsız ölçeklenir |
+| Huly | Kendi Rush-tabanlı build sistemini kurmak pahasına, çok servisli monorepo |
+
+Kurultay'ın izlediği model Linear'ınki: **tek kod tabanı, gerektiğinde birkaç process rolü.**
+WebSocket sunucusunu kendi container'ında çalıştırmak kodu değil, deployment'ı bölmek
+demektir.
+
+Tam gerekçe: [`decisions/0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md).
+
+---
+
+## 2. Monorepo yerleşimi
+
+```
+kurultay/
+├── apps/
+│   ├── api/               # NestJS backend (modüler monolit)
+│   └── web/               # Next.js App Router frontend
+├── packages/
+│   └── shared-types/      # api ve web tarafından paylaşılan TS tipleri
+├── pnpm-workspace.yaml
+├── docker-compose.yml
+├── docker-compose.dev.yml
+└── .env.example
+```
+
+Bu ağacın adım adım kurulabilir versiyonu [project-skeleton.md](project-skeleton.md)'de;
+arkasındaki teknoloji seçimleri ise [tech-stack.md](tech-stack.md)'de.
+
+---
+
+## 3. apps/api — modül haritası
+
+Her modül aynı iskelete sahip: `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`.
+Modül sınırları en baştan temiz tutulur — process rollerini daha sonra bölme imkânı tamamen
+buna bağlıdır.
+
+| Modül | Sorumluluk |
+|---|---|
+| `auth` | Better Auth entegrasyonu, session yönetimi, request user çözümlemesi |
+| `workspace` | Workspace CRUD, üyelik, davetler, rol'ler |
+| `board` | Board ve column yönetimi, column sıralaması |
+| `task` | Task CRUD, column'lar arası taşıma, fractional-index ile yeniden sıralama |
+| `label` | Board-scoped label'lar ve task-label ataması |
+| `comment` | Task yorumları |
+| `activity` | Yalnızca-ekleme (append-only) aktivite log'u (`payload` Json) |
+| `dashboard` | Grafikleri besleyen agregasyon sorguları |
+| `notification` | Bildirim dağıtımı, Redis destekli kuyruk |
+| `realtime` | Socket.io gateway + `@socket.io/redis-adapter` |
+
+Cross-cutting altyapı:
+
+| Modül | Sorumluluk |
+|---|---|
+| `common` | Guard'lar, interceptor'lar, exception filter'lar, decorator'lar — workspace scoping dahil |
+| `prisma` | Global modül olarak `PrismaService`; DB client'ının kurulduğu tek yer |
+
+Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdır, asla tersi değil.
+`realtime`, domain event'lerinin tüketicisidir, domain logic'in yaşadığı bir yer değil —
+böylece iş kurallarını beraberinde sürüklemeden kendi process rolüne çıkarılabilir.
+
+---
+
+## 4. apps/web — yapı
+
+```
+apps/web/
+├── app/
+│   ├── (auth)/            # login, register — kimliksiz kabuk
+│   ├── (app)/             # kimlikli kabuk: sidebar + workspace switcher
+│   │   ├── dashboard/
+│   │   └── board/[boardId]/
+│   └── layout.tsx
+├── components/
+│   ├── ui/                # shadcn/ui primitive'leri
+│   ├── board/              # KanbanBoard, Column, TaskCard
+│   ├── task/               # TaskDetailPanel
+│   └── dashboard/          # grafik component'leri
+└── lib/
+    ├── api.ts             # REST client
+    ├── socket.ts          # Socket.io client
+    └── auth.ts            # Better Auth client
+```
+
+İki route group layout ağacını böler: `(auth)` sade bir kabuk render eder, `(app)` workspace
+chrome'unu render eder ve bir session olduğunu varsayar. Board etkileşimi client-side'dır
+(`@dnd-kit`), doğruluk kaynağı olarak sunucu ile birlikte — optimistic bir taşıma hem API
+yanıtına hem de gelen socket event'lerine karşı uzlaştırılır.
+
+---
+
+## 5. packages/shared-types
+
+Telden geçen her şey için tek doğruluk kaynağı. Backend ve frontend aynı deklarasyonları
+import eder, böylece aralarındaki bir sapma runtime sürprizi yerine bir type hatasına
+dönüşür.
+
+| İçerik | Örnekler |
+|---|---|
+| Enum'lar | `Priority` (`LOW \| MEDIUM \| HIGH \| URGENT`), `MemberRole` (`OWNER \| ADMIN \| MEMBER \| GUEST`) |
+| DTO tipleri | Workspace, Board, Column, Task, Label request/response şekilleri |
+| Socket kontratı | Event isim sabitleri ve payload tipleri |
+
+En kritik olan socket kontratıdır: event isimlerinin tek bir yerde tanımlanması, sunucunun
+`task:moved` yaydığı, client'ın ise `taskMoved` dinlediği klasik hatayı ortadan kaldırır.
+Faydalı olduğu yerde tipler Prisma'nın ürettiği model tiplerinden türetilir, ancak paket
+Prisma'ya runtime bağımlılığından bağımsız kalır.
+
+---
+
+## 6. Veri modeli
+
+| Model | Anahtar alanlar | Notlar |
+|---|---|---|
+| `User` | `id`, `email`, `name`, `avatarUrl`, `createdAt` | Kimlik, Better Auth'a ait |
+| `Workspace` | `id`, `name`, `slug`, `createdAt` | Tenant kökü — her şey buna bağlanır |
+| `WorkspaceMember` | `id`, `workspaceId`, `userId`, `role` | Join tablosu; `role` yetkileri belirler |
+| `Board` | `id`, `workspaceId`, `name`, `description`, `createdAt` | Board'lar bir workspace'e ait |
+| `Column` | `id`, `boardId`, `name`, `position`, `color` | `position` bir board içindeki column'ları sıralar |
+| `Task` | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt` | Çekirdek entity — kurallar aşağıda |
+| `TaskAssignee` | `id`, `taskId`, `userId` | Join tablosu; task başına birden fazla atanan |
+| `Label` | `id`, `boardId`, `name`, `color` | Board-scoped |
+| `TaskLabel` | `id`, `taskId`, `labelId` | Join tablosu |
+| `Comment` | `id`, `taskId`, `userId`, `body`, `createdAt` | |
+| `Activity` | `id`, `taskId`, `userId`, `type`, `payload` (Json), `createdAt` | Yalnızca-ekleme log |
+
+### Kritik alan kuralları
+
+Bunlar pazarlığa açık değildir; ayrıca `CLAUDE.md` içinde de kayıtlıdır.
+
+| Kural | Sebep |
+|---|---|
+| `Task.position` **Float**'tır, asla Int değil | Fractional indexing. `1` ve `2` position'ları arasına eklemek `1.5` yazar — tüm listeyi yeniden numaralamak yerine tek satır güncellenir. Bkz. [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
+| `dueDate` ve `estimatedMinutes` **ayrı alanlardır** | "Ne zamana kadar" ve "ne kadar sürer" farklı kavramlardır; ileride bir Gantt görünümü ikisine de ihtiyaç duyar |
+| `priority` label'lardan **ayrı tutulur** | Filtreleme ve dashboard agregasyonunu temiz tutar — priority sıralı bir skaler, label'lar ise sırasız bir küme |
+| `Activity.payload` **Json**'dır | Şema migration'ı gerektirmeden yeni aktivite tipleri eklenebilir |
+
+---
+
+## 7. Multi-tenant izolasyonu
+
+Her workspace bir tenant'tır ve izolasyon kuralı mutlaktır: **her sorgu `workspaceId` ile
+scope'lanır.**
+
+Bu kural her serviste yeniden uygulanmak yerine guard/interceptor seviyesinde zorlanır:
+
+1. Bir guard, mevcut kullanıcının istenen workspace'teki üyeliğini çözümler ve üyelik yoksa
+   isteği reddeder.
+2. Çözümlenen `workspaceId`, request context'ine eklenir.
+3. Servisler scope'u bu context'ten okur; repository erişim yolları her zaman ona göre
+   filtreler.
+4. İç içe geçmiş kaynaklar, ebeveyn zincirleri üzerinden doğrulanır (task → board →
+   workspace); böylece başka bir tenant'a ait geçerli bir id içeri kaçırılamaz.
+
+Bunu tek bir katmana yerleştirmek, yeni bir modülün izolasyonu varsayılan olarak devralması
+demektir. Bunun etrafından dolanan bir modül, bir stil farkı değil, bir bug'dır. Üyelik
+`role`'ü (`OWNER`/`ADMIN`/`MEMBER`/`GUEST`) yetki kararları için aynı katmanda kontrol
+edilir.
+
+---
+
+## 8. Runtime evrimi
+
+Aşamalı yol bilinçli bir tercihtir: mikroservis kapısı açık kalır, bedeli sadece baştan
+ödenmez.
+
+| Aşama | Tetikleyici | Runtime |
+|---|---|---|
+| MVP | Şimdi | Tek bir NestJS process (`api`) + `web` + `postgres` + `redis` |
+| Rolleri bölme | Trafik artışı | Aynı kod tabanı, aynı image, farklı roller: `api`, `ws` (Socket.io), `worker` (kuyruk) — Compose'da üç servis |
+| Ayırma | Kanıtlanmış bir darboğaz | *Sadece* o modülü kendi servisine çıkar |
+
+2. aşamaya ulaşmak mimari bir değişiklik gerektirmez — temiz NestJS modül sınırları tek ön
+   koşuldur. 3. aşamaya yalnızca kanıt karşısında girilir, asla spekülasyonla değil.
+
+---
+
+## 9. Karar kayıtları
+
+Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
+
+| ADR | Konu |
+|---|---|
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modüler monolit |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS + Prisma + PostgreSQL + Redis |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js + Tailwind + shadcn/ui + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Organization plugin'i ile Better Auth |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md) | Socket.io + Redis adapter |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) | Sıralama için Float position'lar |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md) | AGPL-3.0 |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md) | Git Flow + SemVer |
+
+İlgili: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
