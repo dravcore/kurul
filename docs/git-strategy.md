@@ -48,9 +48,8 @@ pull request. This holds for maintainers too.
 `main` is releases only: if a commit is on `main` and is not a merge from `release/*` or
 `hotfix/*`, something went wrong.
 
-> Note: branch protection rules are not yet configured on the GitHub repository. Until they
-> are, this rule is a social contract, not a mechanical guarantee. Configuring protection on
-> `main` and `develop` is tracked in [roadmap.md](roadmap.md) Phase 0.
+Branch protection on `main` and `develop` enforces this: no direct pushes, pull requests
+required. Required status checks are added once CI lands in Phase 1.
 
 ## Branch naming
 
