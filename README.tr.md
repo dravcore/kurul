@@ -76,6 +76,7 @@ Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
 | [docs/tr/project-skeleton.md](docs/tr/project-skeleton.md) | Planlanan repo yerleşimi, ilk Prisma şeması |
 | [docs/tr/development.md](docs/tr/development.md) | Ortam kurulumu, günlük iş akışı, komutlar |
 | [docs/tr/coding-standards.md](docs/tr/coding-standards.md) | TS/NestJS/Next.js konvansiyonları |
+| [docs/tr/design.md](docs/tr/design.md) | UI/UX dili: ilkeler, token'lar, yerleşim, hareket, durumlar, metin |
 | [docs/tr/git-strategy.md](docs/tr/git-strategy.md) | Git Flow, Conventional Commits, release'ler |
 | [docs/tr/testing.md](docs/tr/testing.md) | Test katmanları, araçlar, beklentiler |
 | [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST adlandırma, hata formatı, pagination |

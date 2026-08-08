@@ -147,7 +147,7 @@ Task            id, boardId, columnId, title, description,
                 priority, position, dueDate, estimatedMinutes,
                 createdById, createdAt, updatedAt
 TaskAssignee    id, taskId, userId          # çoklu atanan
-Label           id, boardId, name, color
+Label           id, boardId, name, color   # color = design-token slot adı (slot-1..8), hex değil
 TaskLabel       id, taskId, labelId
 Comment         id, taskId, userId, body, createdAt
 Activity        id, workspaceId, taskId?, userId, type, payload(Json), createdAt

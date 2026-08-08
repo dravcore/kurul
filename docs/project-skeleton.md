@@ -138,7 +138,7 @@ Task            id, boardId, columnId, title, description,
                 priority, position, dueDate, estimatedMinutes,
                 createdById, createdAt, updatedAt
 TaskAssignee    id, taskId, userId          # multiple assignees
-Label           id, boardId, name, color
+Label           id, boardId, name, color   # color = design-token slot name (slot-1..8), not hex
 TaskLabel       id, taskId, labelId
 Comment         id, taskId, userId, body, createdAt
 Activity        id, workspaceId, taskId?, userId, type, payload(Json), createdAt

@@ -181,7 +181,7 @@ Bu türetmenin Prisma 7 altında somut bir ön koşulu var: client artık `node_
 | `Column` | `id`, `boardId`, `name`, `position`, `color` | `position` bir board içindeki column'ları sıralar |
 | `Task` | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt` | Çekirdek entity — kurallar aşağıda |
 | `TaskAssignee` | `id`, `taskId`, `userId` | Join tablosu; task başına birden fazla atanan |
-| `Label` | `id`, `boardId`, `name`, `color` | Board-scoped |
+| `Label` | `id`, `boardId`, `name`, `color` | Board-scoped. `color`, bir design-token slot adı saklar (`slot-1`…`slot-8`), temaya göre resolve edilir — ham bir hex değil; bkz. [design.md](design.md) |
 | `TaskLabel` | `id`, `taskId`, `labelId` | Join tablosu |
 | `Comment` | `id`, `taskId`, `userId`, `body`, `createdAt` | |
 | `Activity` | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt` | Yalnızca-ekleme log. `workspaceId` zorunlu ve `taskId` opsiyonel, böylece task'ı olmayan workspace seviyesi olaylar — "board yeniden adlandırıldı", "üye katıldı" — temsil edilebilir; Faz 8 feed'inin vaat ettiği de bu |

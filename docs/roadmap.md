@@ -73,6 +73,7 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 - [x] `docs/git-strategy.md` — Git Flow, Conventional Commits, release process, SemVer
 - [x] `docs/development.md` — environment setup and daily loop
 - [x] `docs/coding-standards.md` — TypeScript, NestJS, Next.js conventions
+- [x] `docs/design.md` — design principles, tokens, layout, motion, states, UI writing
 - [x] `docs/testing.md` — test strategy and CI expectations
 - [x] `docs/api-conventions.md` — REST, errors, pagination, DTOs
 - [x] `docs/roadmap.md` — this file
@@ -89,6 +90,7 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 - [x] `docs/tr/` — Turkish copy of every published process/architecture doc under `docs/`
       (excluding `docs/superpowers/`)
 - [x] Cross-link check: every EN doc links its TR sibling and vice versa
+- [x] `docs/tr/design.md` — Turkish mirror of the design document (later pass)
 
 ### Repository configuration
 
@@ -175,8 +177,12 @@ tenant-safely until this exists.
 ## Phase 3 — Boards and columns
 
 **Goal:** the container the Kanban actually lives in.
+**Reference:** [design.md](design.md) — the binding reference for all board UI work from here on
 **Status:** not started
 
+- [ ] Web: design tokens (light + dark), typography, and app shell chrome per
+      [design.md](design.md) §3–§4 — validate the proposed values on real screens and record
+      any change back into that document
 - [ ] Board CRUD, scoped to workspace
 - [ ] Column CRUD
 - [ ] Column reordering (`position`)

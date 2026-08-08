@@ -155,7 +155,7 @@ That derivation has a concrete prerequisite under Prisma 7: the client is no lon
 | `Column` | `id`, `boardId`, `name`, `position`, `color` | `position` orders columns within a board |
 | `Task` | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt` | The core entity — see rules below |
 | `TaskAssignee` | `id`, `taskId`, `userId` | Join table; multiple assignees per task |
-| `Label` | `id`, `boardId`, `name`, `color` | Board-scoped |
+| `Label` | `id`, `boardId`, `name`, `color` | Board-scoped. `color` stores a design-token slot name (`slot-1`…`slot-8`), resolved per theme — not a raw hex; see [design.md](design.md) |
 | `TaskLabel` | `id`, `taskId`, `labelId` | Join table |
 | `Comment` | `id`, `taskId`, `userId`, `body`, `createdAt` | |
 | `Activity` | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt` | Append-only log. `workspaceId` is required and `taskId` is optional so that workspace-level events with no task — "board renamed", "member joined" — are representable, which is what the Phase 8 feed promises |

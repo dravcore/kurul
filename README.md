@@ -73,6 +73,7 @@ Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 | [docs/project-skeleton.md](docs/project-skeleton.md) | Planned repo layout, first Prisma schema |
 | [docs/development.md](docs/development.md) | Environment setup, daily workflow, commands |
 | [docs/coding-standards.md](docs/coding-standards.md) | TS/NestJS/Next.js conventions |
+| [docs/design.md](docs/design.md) | UI/UX language: principles, tokens, layout, motion, states, copy |
 | [docs/git-strategy.md](docs/git-strategy.md) | Git Flow, Conventional Commits, releases |
 | [docs/testing.md](docs/testing.md) | Test layers, tools, expectations |
 | [docs/api-conventions.md](docs/api-conventions.md) | REST naming, error format, pagination |

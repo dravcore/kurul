@@ -76,6 +76,7 @@ dökülmesi.
 - [x] `docs/git-strategy.md` — Git Flow, Conventional Commits, release süreci, SemVer
 - [x] `docs/development.md` — ortam kurulumu ve günlük döngü
 - [x] `docs/coding-standards.md` — TypeScript, NestJS, Next.js konvansiyonları
+- [x] `docs/design.md` — tasarım ilkeleri, token'lar, yerleşim, hareket, durumlar, UI writing
 - [x] `docs/testing.md` — test stratejisi ve CI beklentileri
 - [x] `docs/api-conventions.md` — REST, hatalar, pagination, DTO'lar
 - [x] `docs/roadmap.md` — bu dosya
@@ -92,6 +93,7 @@ dökülmesi.
 - [x] `docs/tr/` — `docs/` altındaki her yayımlanmış süreç/mimari dokümanın Türkçe kopyası
       (`docs/superpowers/` hariç)
 - [x] Cross-link kontrolü: her EN doc kendi TR eşini linkler ve tersi
+- [x] `docs/tr/design.md` — tasarım dokümanının Türkçe çevirisi (daha sonraki bir geçiş)
 
 ### Repository yapılandırması
 
@@ -183,8 +185,12 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 ## Faz 3 — Board'lar ve column'lar
 
 **Hedef:** Kanban'ın gerçekten yaşadığı konteyner.
+**Referans:** [design.md](design.md) — buradan itibaren tüm board UI çalışmaları için bağlayıcı referans
 **Durum:** başlanmadı
 
+- [ ] Web: [design.md](design.md) §3–§4'e göre design token'ları (açık + koyu), tipografi ve
+      app shell chrome'u — önerilen değerleri gerçek ekranlarda doğrula ve her değişikliği o
+      dokümana geri kaydet
 - [ ] Board CRUD, workspace'e scope'lanmış
 - [ ] Column CRUD
 - [ ] Column yeniden sıralama (`position`)

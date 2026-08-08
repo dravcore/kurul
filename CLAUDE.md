@@ -31,6 +31,6 @@ Open-source Kanban-focused project management tool. `dravcore/kurultay` — AGPL
 
 - English is canonical; Turkish copies live under `docs/tr/`; root has `README.md` + `README.tr.md`
 - Naming: root community files UPPERCASE, `docs/` files kebab-case, ADRs `NNNN-title.md`
-- Architecture/stack details: `docs/architecture.md`, `docs/tech-stack.md`
+- Architecture/stack details: `docs/architecture.md`, `docs/tech-stack.md`, `docs/design.md` (UI/UX language)
 - Process: `docs/git-strategy.md`, `docs/coding-standards.md`, `docs/testing.md`, `docs/api-conventions.md`
 - Decisions: `docs/decisions/` (lightweight ADRs) · Progress: `docs/roadmap.md`
