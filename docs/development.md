@@ -61,7 +61,7 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | Variable | Example | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string |
-| `REDIS_URL` | `redis://localhost:6380` | Socket.io adapter, caching. `docker-compose.dev.yml` publishes Redis on host port **6380** (container port remains 6379) so a host Redis/OrbStack proxy on 6379 does not collide. |
+| `REDIS_URL` | `redis://localhost:6379` | Socket.io adapter, caching |
 | `BETTER_AUTH_SECRET` | *(generate)* | Session signing secret — required, no default |
 | `BETTER_AUTH_URL` | `http://localhost:3000` | Public URL of the web app |
 | `API_PORT` | `4000` | NestJS listen port |

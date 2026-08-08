@@ -61,7 +61,7 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | Değişken | Örnek | Amaç |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma bağlantı string'i |
-| `REDIS_URL` | `redis://localhost:6380` | Socket.io adapter'ı, caching |
+| `REDIS_URL` | `redis://localhost:6379` | Socket.io adapter'ı, caching |
 | `BETTER_AUTH_SECRET` | *(üret)* | Session imzalama secret'ı — zorunlu, varsayılan yok |
 | `BETTER_AUTH_URL` | `http://localhost:3000` | Web uygulamasının public URL'i |
 | `API_PORT` | `4000` | NestJS dinleme portu |
