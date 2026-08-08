@@ -1,3 +1,5 @@
+// Manually mirrors the `Priority` enum in apps/api/prisma/schema.prisma.
+// The Prisma schema is the source of truth — if you change one, change both.
 export const Priority = {
   LOW: 'LOW',
   MEDIUM: 'MEDIUM',
@@ -7,6 +9,8 @@ export const Priority = {
 
 export type Priority = (typeof Priority)[keyof typeof Priority];
 
+// Manually mirrors the `MemberRole` enum in apps/api/prisma/schema.prisma.
+// The Prisma schema is the source of truth — if you change one, change both.
 export const MemberRole = {
   OWNER: 'OWNER',
   ADMIN: 'ADMIN',

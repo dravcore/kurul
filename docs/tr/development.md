@@ -45,10 +45,16 @@ Yerel bir PostgreSQL veya Redis kurulumu gerekmiyor — ikisi de Docker içinde 
 git clone https://github.com/dravcore/kurultay.git
 cd kurultay
 pnpm install          # her workspace paketini kurar
+pnpm db:generate       # apps/api/prisma/schema.prisma'dan Prisma client'ı üret
 ```
 
 Repository bir pnpm workspace'idir (`apps/*`, `packages/*`). `pnpm install`'ı her zaman
 repository kökünden çalıştırın — asla `apps/api` veya `apps/web` içinden değil.
+
+Üretilen Prisma client'ı (`apps/api/src/generated/`) git tarafından ignore edilir ve onu
+oluşturan bir `postinstall` hook'u yoktur — `pnpm db:generate` her yeni klonda gerekli, açık
+bir adımdır. `@prisma/client`'tan türeyen tipleri import eden kod, bunu en az bir kez
+çalıştırana kadar typecheck veya build olmaz.
 
 ## Ortam değişkenleri
 
@@ -66,6 +72,7 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `BETTER_AUTH_URL` | `http://localhost:3000` | Web uygulamasının public URL'i |
 | `API_PORT` | `4000` | NestJS dinleme portu |
 | `WEB_URL` | `http://localhost:3000` | API için CORS origin'i |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000` | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir) |
 
 Bir secret üretmek için:
 
@@ -85,6 +92,7 @@ Postgres ve Redis container'larda çalışır; `api` ve `web` host'ta hot reload
 hızlı döngü — kod değişiklikleri arasında image rebuild gerekmez.
 
 ```bash
+pnpm db:generate                                 # Prisma client'ı üret (zaten yapıldıysa atla)
 docker compose -f docker-compose.dev.yml up -d   # yalnızca postgres + redis
 pnpm db:migrate                                  # migration'ları uygula
 pnpm dev                                         # api + web paralel, hot reload
@@ -125,7 +133,9 @@ Repository kökünden çalıştırın.
 | `build` | `pnpm build` | Her workspace paketini build eder |
 | `lint` | `pnpm lint` | Tüm paketlerde ESLint + Prettier kontrolü |
 | `test` | `pnpm test` | Tüm workspace paketlerinin test suite'lerini çalıştırır |
-| `db:migrate` | `pnpm db:migrate` | Prisma migration'larını uygular (şema değiştiyse dev'de bir tane oluşturur) |
+| `db:generate` | `pnpm db:generate` | `prisma generate`'i çalıştırır: Prisma client'ı şemadan (yeniden) üretir. Migration'lara veya veritabanına dokunmaz. Klonlama sonrasında ve başkasının yaptığı şema/migration değişikliklerini pull'ladıktan sonra gereklidir |
+| `db:migrate` | `pnpm db:migrate` | `prisma migrate deploy`'u çalıştırır: var olan, zaten commit edilmiş migration'ları uygular. Asla migration oluşturmaz ve client'ı asla yeniden üretmez — CI/production için güvenlidir. Bunu yalnızca yeni migration'ları pull'ladıktan sonra çalıştırdıysanız, ardından `pnpm db:generate` çalıştırın |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | `prisma migrate dev`'i çalıştırır: yerel şemanızı diff'ler, **yeni bir migration dosyası oluşturur**, uygular ve client'ı yeniden üretir. `schema.prisma`'yı düzenledikten sonra yerelde çalıştırmanız gereken komut budur — `db:migrate` tek başına onu oluşturmaz |
 | `db:seed` | `pnpm db:seed` | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır |
 | `db:studio` | `pnpm db:studio` | http://localhost:5555 adresinde Prisma Studio'yu açar |
 
@@ -141,13 +151,22 @@ pnpm --filter @kurultay/api test
 
 ```bash
 # 1. apps/api/prisma/schema.prisma dosyasını düzenle
-# 2. Bir migration oluştur ve uygula
-pnpm db:migrate
+# 2. Bir migration oluştur, uygula ve client'ı yeniden üret
+pnpm db:migrate:dev
 # 3. Demo veriyi yükle (boş board'lara karşı geliştirmek zor)
 pnpm db:seed
 # 4. Veriyi incele
 pnpm db:studio
 ```
+
+Migration'ı oluşturmak için `pnpm db:migrate` değil, `pnpm db:migrate:dev` kullanın —
+`db:migrate` yalnızca zaten var olan migration'ları uygular (`prisma migrate deploy`) ve şema
+değişikliğinizden bir tane oluşturmaz. `db:migrate:dev` ayrıca Prisma client'ı da yeniden
+üretir, dolayısıyla burada ayrı bir `pnpm db:generate` adımına gerek yoktur.
+
+Bunun yerine başkasının zaten commit ettiği migration'ları alıyorsanız (örn. `git pull`
+sonrası), `pnpm db:migrate` ardından `pnpm db:generate` kullanın — `db:migrate` onları uygular
+ama `db:migrate:dev`'in aksine client'ı yeniden üretmez.
 
 Kurallar:
 
@@ -233,7 +252,8 @@ PR/release süreci [git-strategy.md](git-strategy.md)'de belirtilmiştir.
 | `ECONNREFUSED 127.0.0.1:5432` | Postgres container'ı ayakta değil | `docker compose -f docker-compose.dev.yml up -d` |
 | `Environment variable not found: DATABASE_URL` | `.env` eksik | `cp .env.example .env` ve doldur |
 | 3000/4000/5432 portu zaten kullanımda | Başka bir process veya eski bir container | `docker compose down`, veya `.env`'de portu değiştir |
-| Pull sonrası Prisma tipleri güncel değil | Client yeniden üretilmedi | `pnpm db:migrate` (veya `pnpm --filter @kurultay/api exec prisma generate`) |
+| Pull sonrası Prisma tipleri güncel değil | Client yeniden üretilmedi — `pnpm db:migrate` onu yeniden üretmez | `pnpm db:generate` (yeni migration'ları `pnpm db:migrate` ile uyguladıktan sonra) |
+| Yeni üretilen client devreye girmiyor | Çalışan `pnpm dev` `dist`'teki eski client'ı tutar | `pnpm db:generate` sonrası `pnpm dev`'i yeniden başlatın — asset'ler (yeniden) başlangıçta kopyalanır |
 | `pnpm install` bir workspace hatasıyla başarısız oluyor | Bir alt-paket içinde çalıştırıldı | Repository kökünden çalıştırın |
 
 ## Ayrıca bakınız

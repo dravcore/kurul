@@ -45,10 +45,16 @@ No local PostgreSQL or Redis installation is needed — both run in Docker.
 git clone https://github.com/dravcore/kurultay.git
 cd kurultay
 pnpm install          # installs every workspace package
+pnpm db:generate       # generate the Prisma client from apps/api/prisma/schema.prisma
 ```
 
 The repository is a pnpm workspace (`apps/*`, `packages/*`). Always run `pnpm install` from
 the repository root — never inside `apps/api` or `apps/web`.
+
+The generated Prisma client (`apps/api/src/generated/`) is git-ignored and there is no
+`postinstall` hook that creates it — `pnpm db:generate` is a required, explicit step on every
+fresh clone. Code that imports `@prisma/client`-derived types will not typecheck or build
+until you've run it at least once.
 
 ## Environment variables
 
@@ -66,6 +72,7 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `BETTER_AUTH_URL` | `http://localhost:3000` | Public URL of the web app |
 | `API_PORT` | `4000` | NestJS listen port |
 | `WEB_URL` | `http://localhost:3000` | CORS origin for the API |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000` | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg) |
 
 Generate a secret with:
 
@@ -85,6 +92,7 @@ Postgres and Redis run in containers; `api` and `web` run on the host with hot r
 is the fast loop — no image rebuild between code changes.
 
 ```bash
+pnpm db:generate                                 # generate the Prisma client (skip if already done)
 docker compose -f docker-compose.dev.yml up -d   # postgres + redis only
 pnpm db:migrate                                  # apply migrations
 pnpm dev                                         # api + web in parallel, hot reload
@@ -125,7 +133,9 @@ Run from the repository root.
 | `build` | `pnpm build` | Builds every workspace package |
 | `lint` | `pnpm lint` | ESLint + Prettier check across all packages |
 | `test` | `pnpm test` | Runs the test suites of every workspace package |
-| `db:migrate` | `pnpm db:migrate` | Applies Prisma migrations (creates one in dev if the schema changed) |
+| `db:generate` | `pnpm db:generate` | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made |
+| `db:migrate` | `pnpm db:migrate` | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate` |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it |
 | `db:seed` | `pnpm db:seed` | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly |
 | `db:studio` | `pnpm db:studio` | Opens Prisma Studio at http://localhost:5555 |
 
@@ -141,13 +151,22 @@ pnpm --filter @kurultay/api test
 
 ```bash
 # 1. Edit apps/api/prisma/schema.prisma
-# 2. Create and apply a migration
-pnpm db:migrate
+# 2. Create and apply a migration, and regenerate the client
+pnpm db:migrate:dev
 # 3. Load demo data (empty boards are hard to develop against)
 pnpm db:seed
 # 4. Inspect the data
 pnpm db:studio
 ```
+
+Use `pnpm db:migrate:dev`, not `pnpm db:migrate`, to create the migration — `db:migrate` only
+applies migrations that already exist (`prisma migrate deploy`) and will not generate one from
+your schema edit. `db:migrate:dev` also regenerates the Prisma client, so no separate
+`pnpm db:generate` step is needed here.
+
+When you're instead picking up migrations someone else already committed (e.g. after
+`git pull`), use `pnpm db:migrate` followed by `pnpm db:generate` — `db:migrate` applies them
+but, unlike `db:migrate:dev`, does not regenerate the client.
 
 Rules:
 
@@ -232,7 +251,8 @@ specified in [git-strategy.md](git-strategy.md).
 | `ECONNREFUSED 127.0.0.1:5432` | Postgres container is not up | `docker compose -f docker-compose.dev.yml up -d` |
 | `Environment variable not found: DATABASE_URL` | `.env` missing | `cp .env.example .env` and fill it in |
 | Port 3000/4000/5432 already in use | Another process or a stale container | `docker compose down`, or change the port in `.env` |
-| Prisma types out of date after pulling | Client not regenerated | `pnpm db:migrate` (or `pnpm --filter @kurultay/api exec prisma generate`) |
+| Prisma types out of date after pulling | Client not regenerated — `pnpm db:migrate` does not regenerate it | `pnpm db:generate` (after applying any new migrations with `pnpm db:migrate`) |
+| Freshly generated client not picked up | A running `pnpm dev` keeps the old client in `dist` | Restart `pnpm dev` after `pnpm db:generate` — assets are copied at (re)start |
 | `pnpm install` fails with a workspace error | Ran inside a sub-package | Run it from the repository root |
 
 ## See also

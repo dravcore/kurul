@@ -10,7 +10,6 @@ export default tseslint.config(
       '**/.next/**',
       '**/coverage/**',
       'apps/api/src/generated/**',
-      'apps/api/scripts/**',
     ],
   },
   eslint.configs.recommended,

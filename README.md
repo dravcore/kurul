@@ -41,6 +41,7 @@ git clone https://github.com/dravcore/kurultay.git
 cd kurultay
 cp .env.example .env   # set BETTER_AUTH_SECRET (openssl rand -base64 32)
 pnpm install
+pnpm db:generate        # generate the Prisma client (gitignored, not created automatically)
 docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
 pnpm db:seed

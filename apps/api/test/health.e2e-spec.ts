@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { validationExceptionFactory } from '../src/common/validation/validation-exception.factory';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('Health (e2e)', () => {
@@ -28,6 +29,7 @@ describe('Health (e2e)', () => {
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
+        exceptionFactory: validationExceptionFactory,
       }),
     );
     app.useGlobalFilters(new AllExceptionsFilter());
