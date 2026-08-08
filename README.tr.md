@@ -50,8 +50,8 @@ cp .env.example .env
 docker compose up
 ```
 
-Docker olmadan, hot reload ile tam yerel geliştirme kurulumu
-[docs/development.md](docs/tr/development.md) içinde belgelenecek.
+Docker olmadan, hot reload ile tam yerel geliştirme kurulumu, iskelet öncesi sözleşme
+olarak [docs/tr/development.md](docs/tr/development.md) içinde belgelenmiştir.
 
 ## Stack
 
@@ -64,8 +64,8 @@ Docker olmadan, hot reload ile tam yerel geliştirme kurulumu
 | Deployment | Docker Compose |
 | Mimari | Monorepo, modüler monolit — mikroservis yok |
 
-Her seçimin tam gerekçesi: [docs/tech-stack.md](docs/tr/tech-stack.md) ve
-[docs/decisions/](docs/decisions/).
+Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
+[docs/tr/decisions/](docs/tr/decisions/).
 
 ## Dokümantasyon
 
@@ -80,7 +80,7 @@ Her seçimin tam gerekçesi: [docs/tech-stack.md](docs/tr/tech-stack.md) ve
 | [docs/tr/testing.md](docs/tr/testing.md) | Test katmanları, araçlar, beklentiler |
 | [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST adlandırma, hata formatı, pagination |
 | [docs/tr/roadmap.md](docs/tr/roadmap.md) | Fazlar ve ilerleme |
-| [docs/decisions/](docs/decisions/) | Hafif mimari karar kayıtları (ADR) |
+| [docs/tr/decisions/](docs/tr/decisions/) | Hafif mimari karar kayıtları (ADR) |
 
 ## Katkıda bulunma
 

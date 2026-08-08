@@ -89,7 +89,8 @@ dökülmesi.
 
 ### Lokalizasyon
 
-- [x] `docs/tr/` — her `docs/` dosyasının Türkçe kopyası
+- [x] `docs/tr/` — `docs/` altındaki her yayımlanmış süreç/mimari dokümanın Türkçe kopyası
+      (`docs/superpowers/` hariç)
 - [x] Cross-link kontrolü: her EN doc kendi TR eşini linkler ve tersi
 
 ### Repository yapılandırması
@@ -138,7 +139,7 @@ docker compose up            # tüm servisler sağlıklı ayağa kalkıyor
 pnpm db:migrate               # migration başarılı
 curl localhost:4000/health   # 200
 # localhost:3000 login sayfasını render ediyor
-pnpm lint && pnpm build      # hata yok
+pnpm lint && pnpm test && pnpm build   # hata yok
 ```
 
 ---
@@ -302,5 +303,5 @@ kararlı olduğunda kesilir.
 - [architecture.md](architecture.md) — modüllerin nasıl bir araya geldiği
 - [git-strategy.md](git-strategy.md) — bir fazın nasıl bir release'e dönüştüğü
 - [development.md](development.md) — bunların herhangi birinin yerelde nasıl inşa edileceği
-- [../CHANGELOG.md](../../CHANGELOG.md) — gerçekte neyin teslim edildiği
+- [CHANGELOG.md](../../CHANGELOG.md) — gerçekte neyin teslim edildiği
 - [GitHub Issues](https://github.com/dravcore/kurultay/issues) — görev seviyesi takip

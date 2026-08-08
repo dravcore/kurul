@@ -50,7 +50,7 @@ request üzerinden ulaşır. Bu maintainer'lar için de geçerlidir.
 
 > Not: GitHub repository'sinde branch protection kuralları henüz yapılandırılmadı. Bunlar
 > yapılandırılana kadar bu kural mekanik bir garanti değil, sosyal bir sözleşmedir. `main`
-> ve `develop` üzerinde protection yapılandırmak [roadmap.md](roadmap.md) Faz 1'de takip
+> ve `develop` üzerinde protection yapılandırmak [roadmap.md](roadmap.md) Faz 0'da takip
 > ediliyor.
 
 ## Branch adlandırma
@@ -67,7 +67,7 @@ Format: `type/kebab-kısa-açıklama`
 | `feature/board-drag-and-drop` | `feature/phase3` | Faz numaraları değişiklik hakkında hiçbir şey söylemez |
 | `fix/task-position-collision` | `fix/bug` | Bir branch listesinde tanımlanamaz |
 | `docs/api-conventions` | `docs/update-docs` | Gereksiz, bilgi yok |
-| `chore/bump-prisma-6` | `dogan-work` | Type öneki yok, taranabilir değil |
+| `chore/bump-prisma-7` | `dogan-work` | Type öneki yok, taranabilir değil |
 | `release/0.2.0` | `release/v0.2.0` | `v` öneki tag'lere aittir, branch'lere değil |
 
 Commit type'ları ve branch type'ları kasıtlı olarak aynı kelime dağarcığını paylaşır —

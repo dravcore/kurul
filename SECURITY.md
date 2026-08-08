@@ -6,7 +6,8 @@ How to report a vulnerability in Kurultay.
 
 Kurultay is pre-release — there is no stable version yet and no version support matrix.
 All security fixes land on `main`/latest until a first stable release exists; this file
-will gain a supported-versions table at that point.
+will gain a supported-versions table at that point. After the first release, fixes follow
+`hotfix/*` per [docs/git-strategy.md](docs/git-strategy.md).
 
 ## Reporting a vulnerability
 

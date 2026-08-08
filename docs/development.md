@@ -128,6 +128,7 @@ Run from the repository root.
 | `dev` | `pnpm dev` | Runs `apps/api` and `apps/web` in parallel with hot reload |
 | `build` | `pnpm build` | Builds every workspace package |
 | `lint` | `pnpm lint` | ESLint + Prettier check across all packages |
+| `test` | `pnpm test` | Runs the test suites of every workspace package |
 | `db:migrate` | `pnpm db:migrate` | Applies Prisma migrations (creates one in dev if the schema changed) |
 | `db:studio` | `pnpm db:studio` | Opens Prisma Studio at http://localhost:5555 |
 

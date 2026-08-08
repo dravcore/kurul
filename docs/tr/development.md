@@ -128,6 +128,7 @@ Repository kökünden çalıştırın.
 | `dev` | `pnpm dev` | `apps/api` ve `apps/web`'i hot reload ile paralel çalıştırır |
 | `build` | `pnpm build` | Her workspace paketini build eder |
 | `lint` | `pnpm lint` | Tüm paketlerde ESLint + Prettier kontrolü |
+| `test` | `pnpm test` | Tüm workspace paketlerinin test suite'lerini çalıştırır |
 | `db:migrate` | `pnpm db:migrate` | Prisma migration'larını uygular (şema değiştiyse dev'de bir tane oluşturur) |
 | `db:studio` | `pnpm db:studio` | http://localhost:5555 adresinde Prisma Studio'yu açar |
 

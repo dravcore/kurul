@@ -73,6 +73,7 @@ Root `package.json` scripts:
 | `dev` | Run `api` and `web` in parallel |
 | `build` | Build every workspace package |
 | `lint` | Lint every workspace package |
+| `test` | Run tests in every workspace package |
 | `db:migrate` | Run Prisma migrations |
 | `db:studio` | Open Prisma Studio |
 
@@ -217,7 +218,7 @@ The real `.env` must be in `.gitignore`.
 | `LICENSE` | AGPL-3.0 — prevents the code being resold as a closed-source SaaS, and leaves an open-core path available. Relaxing AGPL later requires every contributor's consent, so it must be right from the start. See [`decisions/0007-license-agpl.md`](decisions/0007-license-agpl.md) |
 | `CONTRIBUTING.md` | Environment setup, commit convention, PR process |
 | `CODE_OF_CONDUCT.md` | Contributor Covenant |
-| `.github/workflows/ci.yml` | lint + typecheck + build, on push and PR |
+| `.github/workflows/ci.yml` | lint + typecheck + test + build, on push and PR |
 
 ---
 
@@ -228,7 +229,7 @@ docker compose up            # every service comes up
 pnpm db:migrate              # migration succeeds
 curl localhost:4000/health   # returns 200
 # localhost:3000 opens and renders the login page
-pnpm lint && pnpm build      # no errors
+pnpm lint && pnpm test && pnpm build   # no errors
 ```
 
 Once these pass, the skeleton is ready. There are no features yet, but from here every feature is "filling in an empty box".

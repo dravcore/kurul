@@ -14,6 +14,7 @@ Fixes #
 
 ## Checklist
 
+- [ ] Targets `develop` (or `main` for release/hotfix only)
 - [ ] Title follows Conventional Commits (`feat:`, `fix:`, `docs:`, ...)
 - [ ] Relevant docs updated (`docs/`, README, etc.)
-- [ ] Lint passes
+- [ ] Lint / typecheck / tests pass (once CI tooling exists)

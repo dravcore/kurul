@@ -79,6 +79,7 @@ Kök `package.json` script'leri:
 | `dev` | `api` ve `web`'i paralel çalıştırır |
 | `build` | Her workspace paketini build eder |
 | `lint` | Her workspace paketini lint eder |
+| `test` | Her workspace paketinde testleri çalıştırır |
 | `db:migrate` | Prisma migration'larını çalıştırır |
 | `db:studio` | Prisma Studio'yu açar |
 
@@ -229,7 +230,7 @@ Gerçek `.env` `.gitignore`'da olmalıdır.
 | `LICENSE` | AGPL-3.0 — kodun kapalı kaynak bir SaaS olarak yeniden satılmasını engeller ve bir open-core yolunu açık bırakır. AGPL'i sonradan gevşetmek her katkıda bulunanın onayını gerektirir, bu yüzden en başta doğru olmalı. Bkz. [`decisions/0007-license-agpl.md`](decisions/0007-license-agpl.md) |
 | `CONTRIBUTING.md` | Ortam kurulumu, commit convention'ı, PR süreci |
 | `CODE_OF_CONDUCT.md` | Contributor Covenant |
-| `.github/workflows/ci.yml` | lint + typecheck + build, push ve PR'da |
+| `.github/workflows/ci.yml` | lint + typecheck + test + build, push ve PR'da |
 
 ---
 
@@ -240,7 +241,7 @@ docker compose up            # her servis ayağa kalkar
 pnpm db:migrate              # migration başarılı olur
 curl localhost:4000/health   # 200 döner
 # localhost:3000 açılır ve login sayfasını render eder
-pnpm lint && pnpm build      # hata yok
+pnpm lint && pnpm test && pnpm build   # hata yok
 ```
 
 Bunlar geçtiğinde iskelet hazırdır. Henüz hiçbir özellik yoktur, ama bu noktadan sonra her

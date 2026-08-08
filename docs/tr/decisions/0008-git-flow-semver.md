@@ -11,7 +11,7 @@ Kurultay, tek bir hosted SaaS instance'ını sürekli deploy etmek yerine, self-
 
 ## Karar
 
-**Git Flow** (`main` / `develop` / `feature/*` / `release/*` / `hotfix/*`) + **Conventional Commits** + **SemVer** + **Keep a Changelog** formatında bakımı yapılan bir `CHANGELOG.md`.
+**Git Flow** (`main` / `develop` / `feature/*` / `fix/*` / `docs/*` / `chore/*` / `release/*` / `hotfix/*`) + **Conventional Commits** + **SemVer** + **Keep a Changelog** formatında bakımı yapılan bir `CHANGELOG.md`.
 
 ## Gerekçe
 
@@ -20,7 +20,7 @@ Kurultay, tek bir hosted SaaS instance'ını sürekli deploy etmek yerine, self-
 - SemVer, versiyonlar arasında yükselen self-hoster'lara uyumluluk beklentilerini iletiyor.
 - Keep a Changelog, `CHANGELOG.md`'yi insan-okunabilir ve tutarlı biçimde yapılandırılmış tutuyor (Added / Changed / Fixed / vb.).
 - **Emsallerden bilinçli sapma:** birçok büyük OSS proje, `CHANGELOG.md`'yi atlayıp yalnızca GitHub Releases'e güveniyor. Kurultay ikisini bilinçli olarak senkron tutuyor — repodaki bir changelog dosyası, clone'larından çıkmadan geçmişi tarayan self-hoster'lar için daha erişilebilir.
-- Maintainer'ın mevcut ev stiliyle eşleşiyor: `main`/`develop` artı tipli branch önekleri (`feature/`, `release/`, `hotfix/`) zaten maintainer'ın kendi repolarında kullanılan desen, süreç-değiştirme maliyetini en aza indiriyor.
+- Maintainer'ın mevcut ev stiliyle eşleşiyor: `main`/`develop` artı tipli branch önekleri (`feature/`, `fix/`, `docs/`, `chore/`, `release/`, `hotfix/`) zaten maintainer'ın kendi repolarında kullanılan desen, süreç-değiştirme maliyetini en aza indiriyor.
 
 ## Sonuçlar
 

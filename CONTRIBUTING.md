@@ -50,12 +50,15 @@ Test expectations: [docs/testing.md](docs/testing.md).
 
 ## Making a pull request
 
+- **Target `develop`** (except `release/*` / `hotfix/*`, which follow
+  [docs/git-strategy.md](docs/git-strategy.md)).
 - **Keep PRs small and focused.** Aim for under 500 lines changed and a single
   responsibility per PR (excluding docs/lockfiles). Split schema changes from logic
   changes, and frontend from backend, where possible.
 - Link the issue the PR addresses.
-- Fill in the PR template checklist (conventional title, docs updated where relevant, lint
-  passes).
+- Fill in the PR template checklist (conventional title, docs updated where relevant,
+  lint/typecheck/tests once CI exists).
+- Expect **one approving review** before merge; maintainers squash-merge into `develop`.
 - Keep commit history readable; squash noisy fixup commits before requesting review.
 
 ## Need help?

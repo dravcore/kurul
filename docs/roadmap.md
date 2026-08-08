@@ -86,7 +86,8 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 
 ### Localization
 
-- [x] `docs/tr/` — Turkish copy of every `docs/` file
+- [x] `docs/tr/` — Turkish copy of every published process/architecture doc under `docs/`
+      (excluding `docs/superpowers/`)
 - [x] Cross-link check: every EN doc links its TR sibling and vice versa
 
 ### Repository configuration
@@ -132,7 +133,7 @@ docker compose up            # all services come up healthy
 pnpm db:migrate              # migration succeeds
 curl localhost:4000/health   # 200
 # localhost:3000 renders the login page
-pnpm lint && pnpm build      # no errors
+pnpm lint && pnpm test && pnpm build   # no errors
 ```
 
 ---

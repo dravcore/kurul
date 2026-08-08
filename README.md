@@ -47,8 +47,8 @@ cp .env.example .env
 docker compose up
 ```
 
-Full local development setup (without Docker, with hot reload) will be documented in
-[docs/development.md](docs/development.md).
+Full local development setup (without Docker, with hot reload) is documented as the
+pre-skeleton contract in [docs/development.md](docs/development.md).
 
 ## Stack
 

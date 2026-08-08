@@ -50,7 +50,7 @@ pull request. This holds for maintainers too.
 
 > Note: branch protection rules are not yet configured on the GitHub repository. Until they
 > are, this rule is a social contract, not a mechanical guarantee. Configuring protection on
-> `main` and `develop` is tracked in [roadmap.md](roadmap.md) Phase 1.
+> `main` and `develop` is tracked in [roadmap.md](roadmap.md) Phase 0.
 
 ## Branch naming
 
@@ -66,7 +66,7 @@ Format: `type/kebab-short-description`
 | `feature/board-drag-and-drop` | `feature/phase3` | Phase numbers say nothing about the change |
 | `fix/task-position-collision` | `fix/bug` | Not identifiable in a branch list |
 | `docs/api-conventions` | `docs/update-docs` | Redundant, no information |
-| `chore/bump-prisma-6` | `dogan-work` | No type prefix, not scannable |
+| `chore/bump-prisma-7` | `dogan-work` | No type prefix, not scannable |
 | `release/0.2.0` | `release/v0.2.0` | The `v` prefix belongs to tags, not branches |
 
 Commit types and branch types share the same vocabulary deliberately — a `feat:`-heavy

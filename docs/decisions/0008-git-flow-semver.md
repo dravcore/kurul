@@ -13,7 +13,8 @@ commit convention, and versioning scheme need to fit that release shape.
 
 ## Decision
 
-**Git Flow** (`main` / `develop` / `feature/*` / `release/*` / `hotfix/*`) +
+**Git Flow** (`main` / `develop` / `feature/*` / `fix/*` / `docs/*` / `chore/*` /
+`release/*` / `hotfix/*`) +
 **Conventional Commits** + **SemVer** + a maintained `CHANGELOG.md` in **Keep a
 Changelog** format.
 
@@ -35,9 +36,9 @@ Changelog** format.
   sync deliberately — a changelog file in the repo is more accessible to
   self-hosters scanning history without leaving their clone.
 - Matches the maintainer's existing house style: `main`/`develop` plus typed
-  branch prefixes (`feature/`, `release/`, `hotfix/`) are already the pattern
-  used across the maintainer's own repositories, minimizing process-switching
-  cost.
+  branch prefixes (`feature/`, `fix/`, `docs/`, `chore/`, `release/`, `hotfix/`)
+  are already the pattern used across the maintainer's own repositories,
+  minimizing process-switching cost.
 
 ## Consequences
 
