@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Topbar } from '@/components/layout/topbar';
 import { BoardColumn } from './board-column';
 import { CreateColumnDialog } from './create-column-dialog';
 import { DeleteColumnDialog } from './delete-column-dialog';
@@ -137,7 +138,7 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex h-[var(--topbar-height)] items-center border-b border-border px-4">
+        <div className="flex h-[var(--topbar-height)] items-center border-b border-border px-3">
           <Skeleton className="h-5 w-40" />
         </div>
         <div className="flex gap-3 overflow-x-auto p-4">
@@ -162,29 +163,33 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="sticky top-0 z-20 flex h-[var(--topbar-height)] items-center gap-3 border-b border-border bg-background/95 px-3 backdrop-blur-sm">
-        <Button asChild variant="ghost" size="icon-sm" aria-label={t('backToBoards')}>
-          <Link href="/dashboard">
-            <ArrowLeft />
-          </Link>
-        </Button>
-        <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{board.name}</h1>
-        {canMutate ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label={t('boardMenu')}>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setCreateOpen(true)}>
-                <Plus />
-                {t('column.createAction')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-      </header>
+      <Topbar
+        title={board.name}
+        leading={
+          <Button asChild variant="ghost" size="icon-sm" aria-label={t('backToBoards')}>
+            <Link href="/dashboard">
+              <ArrowLeft />
+            </Link>
+          </Button>
+        }
+        actions={
+          canMutate ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="icon-sm" aria-label={t('boardMenu')}>
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setCreateOpen(true)}>
+                  <Plus />
+                  {t('column.createAction')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : undefined
+        }
+      />
 
       {actionError ? (
         <p className="border-b border-border px-4 py-2 text-sm text-destructive">{actionError}</p>

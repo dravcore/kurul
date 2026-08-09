@@ -4,20 +4,24 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { LayoutDashboard, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { SancakRail, useSancakRail } from './sancak-rail';
 import { ThemeToggle } from './theme-toggle';
 import { useWorkspaceContext } from './workspace-provider';
+import { WorkspaceSwitcher } from './workspace-switcher';
 
 const COLLAPSE_MQ = '(max-width: 1279px)';
 
 export function AppSidebar(): React.ReactElement {
   const t = useTranslations('app');
   const pathname = usePathname();
-  const { workspaces, activeId, onSwitch, onSignOut } = useWorkspaceContext();
+  const { onSignOut } = useWorkspaceContext();
   const [collapsed, setCollapsed] = useState(false);
+  const navRef = useRef<HTMLElement | null>(null);
+  const railBox = useSancakRail(navRef, [pathname, collapsed]);
 
   useEffect(() => {
     const media = window.matchMedia(COLLAPSE_MQ);
@@ -61,28 +65,17 @@ export function AppSidebar(): React.ReactElement {
         </div>
       </div>
 
-      {!collapsed ? (
-        <label className="mx-3 mb-3 flex flex-col gap-1 text-xs text-muted-foreground">
-          <span>{t('shell.workspaces')}</span>
-          <select
-            value={activeId}
-            onChange={(e) => void onSwitch(e.target.value)}
-            className="h-9 rounded-[var(--radius-md)] border border-border bg-background px-2 text-sm text-foreground"
-          >
-            {workspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
+      <div className={cn('mb-3', collapsed ? 'px-2' : 'px-3')}>
+        <WorkspaceSwitcher collapsed={collapsed} />
+      </div>
 
       <Separator />
 
-      <nav className="flex flex-1 flex-col gap-1 p-2">
+      <nav ref={navRef} className="relative flex flex-1 flex-col gap-1 p-2">
+        <SancakRail box={railBox} />
         <Link
           href="/dashboard"
+          data-rail-active={dashboardActive || undefined}
           className={cn(
             'relative flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-2 text-sm transition-colors',
             dashboardActive
@@ -92,23 +85,9 @@ export function AppSidebar(): React.ReactElement {
           )}
           title={t('dashboard.title')}
         >
-          {dashboardActive ? (
-            <span
-              className="absolute top-1 bottom-1 left-0 w-0.5 rounded-full bg-signature"
-              aria-hidden
-            />
-          ) : null}
           <LayoutDashboard className="size-5 shrink-0" />
           {!collapsed ? <span>{t('dashboard.title')}</span> : null}
         </Link>
-        {!collapsed ? (
-          <Link
-            href="/workspaces/new"
-            className="rounded-[var(--radius-md)] px-2 py-2 text-sm text-foreground-secondary hover:bg-muted"
-          >
-            {t('shell.createWorkspace')}
-          </Link>
-        ) : null}
       </nav>
 
       <div className="border-t border-border p-2">

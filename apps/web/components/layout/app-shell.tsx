@@ -1,11 +1,10 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AppSidebar } from './app-sidebar';
 import { useWorkspaceContext, WorkspaceProvider } from './workspace-provider';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function AppShellFrame({
   children,
@@ -13,15 +12,28 @@ function AppShellFrame({
   children: React.ReactNode;
 }>): React.ReactElement {
   const t = useTranslations('app');
-  const pathname = usePathname();
   const { sessionPending, hasSession, bootstrapped, loadError, retryBootstrap } =
     useWorkspaceContext();
-  const isBoardRoute = pathname.startsWith('/board/');
 
   if (sessionPending || !hasSession || !bootstrapped) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        {t('shell.loading')}
+      <div className="flex min-h-screen bg-background" aria-busy>
+        <p className="sr-only">{t('shell.loading')}</p>
+        <div className="hidden w-[var(--sidebar-width)] shrink-0 flex-col gap-2 border-r border-border bg-card p-3 lg:flex">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="mt-4 h-9 w-full" />
+          <Skeleton className="h-9 w-2/3" />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex h-[var(--topbar-height)] items-center border-b border-border px-3">
+            <Skeleton className="h-5 w-40" />
+          </div>
+          <div className="grid gap-3 p-6 sm:grid-cols-2 lg:grid-cols-3">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -40,7 +52,7 @@ function AppShellFrame({
   return (
     <div className="flex min-h-screen bg-background">
       <AppSidebar />
-      <div className={cn('flex min-w-0 flex-1 flex-col', !isBoardRoute && 'p-6')}>{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>
   );
 }
