@@ -39,7 +39,11 @@
       "signOut": "Sign out",
       "loading": "Loading…",
       "loadError": "Could not load workspaces.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "themeLight": "Switch to light theme",
+      "themeDark": "Switch to dark theme",
+      "collapseSidebar": "Collapse sidebar",
+      "expandSidebar": "Expand sidebar"
     },
     "workspace": {
       "createTitle": "Create a workspace",

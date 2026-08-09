@@ -1,23 +1,187 @@
 @import 'tailwindcss';
 
+/* Kurultay design tokens — values from docs/design.md §3 (Phase 3 validated). */
+
+:root {
+  --background: #f7f8f7;
+  --foreground: #191c1b;
+  --card: #ffffff;
+  --card-foreground: #191c1b;
+  --popover: #ffffff;
+  --popover-foreground: #191c1b;
+  --primary: #a85a28;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f3f1;
+  --secondary-foreground: #191c1b;
+  --muted: #f1f3f1;
+  --muted-foreground: #6b726e;
+  --accent: #f1f3f1;
+  --accent-foreground: #191c1b;
+  --destructive: #c0281f;
+  --destructive-foreground: #ffffff;
+  --border: #d6dad8;
+  --border-strong: #b9bfbc;
+  --input: #d6dad8;
+  --ring: #a85a28;
+  --signature: #a85a28;
+  --signature-subtle: #f6ede5;
+  --foreground-secondary: #545a57;
+  --foreground-disabled: #8a918d;
+
+  --priority-low: #6b726e;
+  --priority-medium: #3f6b99;
+  --priority-high: #8a5a00;
+  --priority-urgent: #c0281f;
+  --status-info: #3f6b99;
+  --status-good: #1f7a4d;
+  --status-warning: #8a5a00;
+  --status-danger: #c0281f;
+
+  --label-slot-1: #2a78d6;
+  --label-slot-2: #eb6834;
+  --label-slot-3: #1baf7a;
+  --label-slot-4: #eda100;
+  --label-slot-5: #e87ba4;
+  --label-slot-6: #008300;
+  --label-slot-7: #4a3aa7;
+  --label-slot-8: #e34948;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --sidebar-width: 240px;
+  --sidebar-rail-width: 56px;
+  --topbar-height: 48px;
+  --column-width: 300px;
+}
+
+.dark {
+  --background: #0e100f;
+  --foreground: #e8ecea;
+  --card: #161918;
+  --card-foreground: #e8ecea;
+  --popover: #161918;
+  --popover-foreground: #e8ecea;
+  --primary: #d98a4e;
+  --primary-foreground: #0e100f;
+  --secondary: #1d2120;
+  --secondary-foreground: #e8ecea;
+  --muted: #1d2120;
+  --muted-foreground: #8a928e;
+  --accent: #1d2120;
+  --accent-foreground: #e8ecea;
+  --destructive: #f0665c;
+  --destructive-foreground: #0e100f;
+  --border: #2a2f2d;
+  --border-strong: #383e3b;
+  --input: #2a2f2d;
+  --ring: #d98a4e;
+  --signature: #d98a4e;
+  --signature-subtle: #241a12;
+  --foreground-secondary: #b3bab6;
+  --foreground-disabled: #6e7773;
+
+  --priority-low: #8a928e;
+  --priority-medium: #6ba3e8;
+  --priority-high: #d9a227;
+  --priority-urgent: #f0665c;
+  --status-info: #6ba3e8;
+  --status-good: #3fbf85;
+  --status-warning: #d9a227;
+  --status-danger: #f0665c;
+
+  --label-slot-1: #3987e5;
+  --label-slot-2: #d95926;
+  --label-slot-3: #199e70;
+  --label-slot-4: #c98500;
+  --label-slot-5: #d55181;
+  --label-slot-6: #008300;
+  --label-slot-7: #9085e9;
+  --label-slot-8: #e66767;
+}
+
 @theme inline {
-  --color-background: oklch(0.99 0.005 160);
-  --color-foreground: oklch(0.22 0.02 160);
-  --color-muted: oklch(0.95 0.01 160);
-  --color-muted-foreground: oklch(0.45 0.02 160);
-  --color-primary: oklch(0.55 0.12 50);
-  --color-primary-foreground: oklch(0.99 0.005 50);
-  --color-border: oklch(0.88 0.01 160);
-  --color-card: oklch(1 0 0);
-  --radius-lg: 0.5rem;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-signature: var(--signature);
+  --color-signature-subtle: var(--signature-subtle);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-foreground-disabled: var(--foreground-disabled);
+  --color-priority-low: var(--priority-low);
+  --color-priority-medium: var(--priority-medium);
+  --color-priority-high: var(--priority-high);
+  --color-priority-urgent: var(--priority-urgent);
+  --color-status-info: var(--status-info);
+  --color-status-good: var(--status-good);
+  --color-status-warning: var(--status-warning);
+  --color-status-danger: var(--status-danger);
+  --color-label-slot-1: var(--label-slot-1);
+  --color-label-slot-2: var(--label-slot-2);
+  --color-label-slot-3: var(--label-slot-3);
+  --color-label-slot-4: var(--label-slot-4);
+  --color-label-slot-5: var(--label-slot-5);
+  --color-label-slot-6: var(--label-slot-6);
+  --color-label-slot-7: var(--label-slot-7);
+  --color-label-slot-8: var(--label-slot-8);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius: 6px;
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 
 * {
-  border-color: var(--color-border);
+  border-color: var(--border);
 }
 
 body {
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
