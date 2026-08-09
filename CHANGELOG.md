@@ -9,6 +9,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Phase 6 filtering and search
+  ([spec](docs/specs/2026-08-09-phase-6-filtering-design.md)): whitelisted `TaskQueryDto`
+  on `GET .../boards/:boardId/tasks` (`q`, priority, assignee, label, due-date null/range,
+  sort), cursor pagination (`CursorPage<TaskDto>`), filter indexes, and a URL-synced board
+  filter bar with chips, `/` search focus, and empty state.
 - Phase 5 task metadata
   ([spec](docs/specs/2026-08-09-phase-5-task-metadata-design.md)): board label CRUD with
   `LabelColorSlot` colors, task assignees/labels, priority/`dueDate`/`estimatedMinutes`
@@ -51,6 +56,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Breaking:** `GET /workspaces/:workspaceId/boards/:boardId/tasks` now returns
+  `CursorPage<TaskDto>` (`{ items, nextCursor, hasMore }`) instead of a bare `TaskDto[]`.
+  Clients must drain pages (or raise `limit`, max 100) to load a full board.
 - Nest `/workspaces` is the sole public API for organization/workspace mutations; Better
   Auth `/auth/organization/*` mutation paths are HTTP-firewalled (reads + `set-active`
   remain).

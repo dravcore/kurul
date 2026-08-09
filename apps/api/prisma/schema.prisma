@@ -183,6 +183,9 @@ model Task {
 
   @@index([boardId, columnId, position])
   @@index([columnId, position])
+  @@index([boardId, priority])
+  @@index([boardId, dueDate])
+  @@index([boardId, id])
   @@index([createdById])
 }
 

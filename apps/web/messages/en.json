@@ -111,6 +111,21 @@
         "cancel": "Cancel",
         "forbidden": "You need Admin access to change columns. Ask a workspace owner."
       },
+      "filter": {
+        "searchLabel": "Search tasks",
+        "searchPlaceholder": "Search…",
+        "filters": "Filters",
+        "unassigned": "Unassigned",
+        "noDueDate": "No due date",
+        "overdue": "Overdue",
+        "dueRange": "Due date range",
+        "noLabels": "No labels on this board",
+        "clearAll": "Clear filters",
+        "removeChip": "Remove filter {label}",
+        "chipSearch": "Search: {q}",
+        "emptyTitle": "No tasks match these filters",
+        "emptyBody": "{count, plural, one {# filter is active.} other {# filters are active.}}"
+      },
       "task": {
         "title": "Title",
         "description": "Description",

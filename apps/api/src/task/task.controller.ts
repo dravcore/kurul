@@ -7,10 +7,11 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { MemberRole } from '@kurultay/shared-types';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { CursorPage, TaskDto } from '@kurultay/shared-types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -21,6 +22,7 @@ import { AddAssigneeDto } from './dto/add-assignee.dto';
 import { AddTaskLabelDto } from './dto/add-task-label.dto';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { MoveTaskDto } from './dto/move-task.dto';
+import { TaskQueryDto } from './dto/task-query.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskService } from './task.service';
 
@@ -37,8 +39,9 @@ export class TaskController {
   list(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('boardId', ParseUuidV7Pipe) boardId: string,
-  ): Promise<TaskDto[]> {
-    return this.taskService.list(workspaceId, boardId);
+    @Query() query: TaskQueryDto,
+  ): Promise<CursorPage<TaskDto>> {
+    return this.taskService.list(workspaceId, boardId, query);
   }
 
   @Post('boards/:boardId/tasks')

@@ -71,9 +71,11 @@ describe('Tasks (e2e)', () => {
       .expect(200);
 
     const listed = await owner.agent
-      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?limit=100`)
       .expect(200);
-    const todoTasks = (listed.body as Array<{ id: string; columnId: string; position: number }>)
+    const todoTasks = (
+      listed.body as { items: Array<{ id: string; columnId: string; position: number }> }
+    ).items
       .filter((task) => task.columnId === todo.id)
       .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
     expect(todoTasks[0]!.id).toBe(toTop.body.id);
@@ -117,9 +119,12 @@ describe('Tasks (e2e)', () => {
     }
 
     const finalTodo = (
-      (await owner.agent.get(`/workspaces/${workspace.id}/boards/${boardId}/tasks`).expect(200))
-        .body as Array<{ id: string; columnId: string; position: number }>
-    )
+      (
+        await owner.agent
+          .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?limit=100`)
+          .expect(200)
+      ).body as { items: Array<{ id: string; columnId: string; position: number }> }
+    ).items
       .filter((task) => task.columnId === todo.id)
       .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
 
@@ -331,7 +336,7 @@ describe('Tasks (e2e)', () => {
     await owner.agent.post(base).send({ title: 'Sneaky', columnId, position: 1 }).expect(400);
 
     const tasks = await owner.agent.get(base).expect(200);
-    expect(tasks.body).toHaveLength(0);
+    expect(tasks.body.items).toHaveLength(0);
   });
 
   it('rejects invalid update and move payloads with 400', async () => {
@@ -421,5 +426,114 @@ describe('Tasks (e2e)', () => {
       .patch(`/workspaces/${workspace.id}/tasks/${second.body.id}/position`)
       .send({ columnId: todo.id, beforeTaskId: first.body.id })
       .expect(404);
+  });
+
+  it('filters, searches, paginates, and rejects unknown query keys', async () => {
+    const owner = await signUp(app, { name: 'Filter Owner' });
+    const member = await signUp(app, { name: 'Filter Member' });
+    const workspace = await createWorkspace(owner.agent, 'Filters', `filters-${Date.now()}`);
+    const memberMe = await member.agent.get('/me').expect(200);
+    await addMember(prisma, workspace.id, memberMe.body.id as string, MemberRole.MEMBER);
+    const { boardId, columns } = await boardWithColumns(owner.agent, workspace.id);
+    const todo = columns.find((column) => column.name === 'To Do')!;
+    const memberId = memberMe.body.id as string;
+
+    const label = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/labels`)
+      .send({ name: 'Bug', color: 'slot-1' })
+      .expect(201);
+
+    const high = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .send({ title: 'Fix login redirect', columnId: todo.id })
+      .expect(201);
+    await owner.agent
+      .patch(`/workspaces/${workspace.id}/tasks/${high.body.id}`)
+      .send({ priority: 'HIGH', dueDate: '2026-09-01T00:00:00.000Z' })
+      .expect(200);
+    await owner.agent
+      .post(`/workspaces/${workspace.id}/tasks/${high.body.id}/assignees`)
+      .send({ userId: memberId })
+      .expect(201);
+    await owner.agent
+      .post(`/workspaces/${workspace.id}/tasks/${high.body.id}/labels`)
+      .send({ labelId: label.body.id })
+      .expect(201);
+
+    const unassigned = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .send({ title: 'Backlog idea', columnId: todo.id })
+      .expect(201);
+    await owner.agent
+      .patch(`/workspaces/${workspace.id}/tasks/${unassigned.body.id}`)
+      .send({ priority: 'LOW', dueDate: null })
+      .expect(200);
+
+    const byPriority = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?priority=HIGH,URGENT`)
+      .expect(200);
+    expect(byPriority.body.items.map((t: { id: string }) => t.id)).toEqual([high.body.id]);
+
+    const byAssignee = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?assigneeId=${memberId}`)
+      .expect(200);
+    expect(byAssignee.body.items.map((t: { id: string }) => t.id)).toEqual([high.body.id]);
+
+    const unassignedOnly = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?assigneeId=null`)
+      .expect(200);
+    expect(unassignedOnly.body.items.map((t: { id: string }) => t.id)).toEqual([
+      unassigned.body.id,
+    ]);
+
+    const byLabel = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?labelId=${label.body.id}`)
+      .expect(200);
+    expect(byLabel.body.items.map((t: { id: string }) => t.id)).toEqual([high.body.id]);
+
+    const noDue = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?dueDate=null`)
+      .expect(200);
+    expect(noDue.body.items.map((t: { id: string }) => t.id)).toEqual([unassigned.body.id]);
+
+    const dueRange = await owner.agent
+      .get(
+        `/workspaces/${workspace.id}/boards/${boardId}/tasks?dueDate[gte]=2026-08-01T00:00:00.000Z&dueDate[lte]=2026-10-01T00:00:00.000Z`,
+      )
+      .expect(200);
+    expect(dueRange.body.items.map((t: { id: string }) => t.id)).toEqual([high.body.id]);
+
+    const search = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?q=login`)
+      .expect(200);
+    expect(search.body.items.map((t: { id: string }) => t.id)).toEqual([high.body.id]);
+
+    const andCombo = await owner.agent
+      .get(
+        `/workspaces/${workspace.id}/boards/${boardId}/tasks?priority=HIGH&assigneeId=${memberId}&q=login`,
+      )
+      .expect(200);
+    expect(andCombo.body.items.map((t: { id: string }) => t.id)).toEqual([high.body.id]);
+
+    const page1 = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?limit=1`)
+      .expect(200);
+    expect(page1.body.items).toHaveLength(1);
+    expect(page1.body.hasMore).toBe(true);
+    expect(page1.body.nextCursor).toBe(page1.body.items[0].id);
+
+    const page2 = await owner.agent
+      .get(
+        `/workspaces/${workspace.id}/boards/${boardId}/tasks?limit=1&cursor=${page1.body.nextCursor}`,
+      )
+      .expect(200);
+    expect(page2.body.items).toHaveLength(1);
+    expect(page2.body.items[0].id).not.toBe(page1.body.items[0].id);
+    expect(page2.body.hasMore).toBe(false);
+    expect(page2.body.nextCursor).toBeNull();
+
+    await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?unknown=1`)
+      .expect(400);
   });
 });

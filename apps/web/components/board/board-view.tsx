@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -12,9 +12,23 @@ import {
   defaultDropAnimationSideEffects,
   type DropAnimation,
 } from '@dnd-kit/core';
-import type { BoardDto, ColumnDto, TaskDto } from '@kurultay/shared-types';
+import type {
+  BoardDto,
+  ColumnDto,
+  LabelDto,
+  TaskDto,
+  WorkspaceMemberDto,
+} from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
 import { canMutateColumns, canMutateLabels, canMutateTasks } from '@/lib/board-permissions';
+import {
+  countActiveFilters,
+  fetchAllBoardTasks,
+  hasActiveFilters,
+  mergeFiltersIntoSearchParams,
+  parseFiltersFromSearchParams,
+  type BoardTaskFilters,
+} from '@/lib/task-query';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,6 +45,7 @@ import { TaskPanel } from '@/components/task/task-panel';
 import { TaskDragPreview } from '@/components/task/sortable-task-card';
 import { useBoardTaskDnd, type TaskMovePayload } from '@/components/task/use-board-task-dnd';
 import { BoardColumn } from './board-column';
+import { BoardFilters } from './board-filters';
 import { CreateColumnDialog } from './create-column-dialog';
 import { DeleteColumnDialog } from './delete-column-dialog';
 import { RenameColumnDialog } from './rename-column-dialog';
@@ -52,11 +67,16 @@ interface BoardViewProps {
 export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): React.ReactElement {
   const t = useTranslations('app.board');
   const tTask = useTranslations('app.board.task');
+  const tFilter = useTranslations('app.board.filter');
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { activeId, activeRole } = useWorkspaceContext();
   const [board, setBoard] = useState<BoardDto | null>(null);
   const [columns, setColumns] = useState<ColumnDto[]>([]);
   const [tasks, setTasks] = useState<TaskDto[]>([]);
+  const [members, setMembers] = useState<WorkspaceMemberDto[]>([]);
+  const [labels, setLabels] = useState<LabelDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
@@ -69,6 +89,14 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
   const [entranceDone, setEntranceDone] = useState(false);
   const columnsRef = useRef<ColumnDto[]>([]);
   const tasksRef = useRef<TaskDto[]>([]);
+
+  const filterKey = searchParams.toString();
+  const filters = useMemo(
+    () => parseFiltersFromSearchParams(new URLSearchParams(filterKey)),
+    [filterKey],
+  );
+  const filtersActive = hasActiveFilters(filters);
+  const loadedBoardIdRef = useRef<string | null>(null);
 
   const canEditColumns = canMutateColumns(activeRole);
   const canEditTasks = canMutateTasks(activeRole);
@@ -111,24 +139,44 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
 
   const reload = useCallback(async (): Promise<void> => {
     if (!activeId) return;
-    const [nextBoard, nextColumns, nextTasks] = await Promise.all([
+    const [nextBoard, nextColumns, nextTasks, nextMembers, nextLabels] = await Promise.all([
       api.get<BoardDto>(`/workspaces/${activeId}/boards/${boardId}`),
       api.get<ColumnDto[]>(`/workspaces/${activeId}/boards/${boardId}/columns`),
-      api.get<TaskDto[]>(`/workspaces/${activeId}/boards/${boardId}/tasks`),
+      fetchAllBoardTasks(activeId, boardId, filters),
+      api.get<WorkspaceMemberDto[]>(`/workspaces/${activeId}/members`),
+      api.get<LabelDto[]>(`/workspaces/${activeId}/boards/${boardId}/labels`),
     ]);
     setBoard(nextBoard);
     setColumns(nextColumns);
     setTasks(nextTasks);
-  }, [activeId, boardId]);
+    setMembers(nextMembers);
+    setLabels(nextLabels);
+  }, [activeId, boardId, filters]);
+
+  const applyFilters = useCallback(
+    (next: BoardTaskFilters): void => {
+      const params = mergeFiltersIntoSearchParams(
+        new URLSearchParams(searchParams.toString()),
+        next,
+      );
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
 
   useEffect(() => {
     if (!activeId) return;
     const controller = new AbortController();
-    setLoading(true);
+    const isInitial = loadedBoardIdRef.current !== boardId;
+    if (isInitial) setLoading(true);
     setError(null);
     void (async () => {
       try {
         await reload();
+        if (!controller.signal.aborted) {
+          loadedBoardIdRef.current = boardId;
+        }
       } catch {
         if (!controller.signal.aborted) {
           setError(t('loadError'));
@@ -342,6 +390,10 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
         }
       />
 
+      <div className="border-b border-border px-3 py-2">
+        <BoardFilters filters={filters} members={members} labels={labels} onChange={applyFilters} />
+      </div>
+
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {columns.length === 0 ? (
@@ -366,6 +418,16 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
               ) : (
                 <p className="text-body text-destructive">{t('errors.forbiddenColumns')}</p>
               )}
+            </div>
+          ) : filtersActive && tasks.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+              <h2 className="text-title">{tFilter('emptyTitle')}</h2>
+              <p className="max-w-md text-body text-muted-foreground">
+                {tFilter('emptyBody', { count: countActiveFilters(filters) })}
+              </p>
+              <Button type="button" variant="outline" onClick={() => applyFilters({})}>
+                {tFilter('clearAll')}
+              </Button>
             </div>
           ) : (
             <DndContext
