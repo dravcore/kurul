@@ -5,13 +5,10 @@ import { RealtimeGateway } from './realtime.gateway';
 import { RealtimeService } from './realtime.service';
 
 describe('RealtimeGateway board join', () => {
-  it('rejects join when the user is not a workspace member', async () => {
+  it('rejects join with an opaque error when the user is not a workspace member', async () => {
     const prisma = {
       board: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValueOnce(null) // membership-scoped lookup
-          .mockResolvedValueOnce({ id: 'board-1' }), // exists check
+        findFirst: jest.fn().mockResolvedValue(null),
       },
     };
     const moduleRef = await Test.createTestingModule({
@@ -29,8 +26,9 @@ describe('RealtimeGateway board join', () => {
     };
 
     const result = await gateway.onBoardJoin(client as never, { boardId: 'board-1' });
-    expect(result).toEqual({ ok: false, error: 'forbidden' });
+    expect(result).toEqual({ ok: false, error: 'board not found' });
     expect(client.join).not.toHaveBeenCalled();
+    expect(prisma.board.findFirst).toHaveBeenCalledTimes(1);
     expect(SocketClientEvents.BOARD_JOIN).toBe('board:join');
   });
 });

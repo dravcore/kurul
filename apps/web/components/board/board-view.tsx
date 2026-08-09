@@ -149,6 +149,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
 
   async function commitTaskMove(payload: TaskMovePayload): Promise<void> {
     if (!activeId) return;
+    const previousTasks = tasksRef.current;
     setTasks(payload.nextTasks);
     try {
       const updated = await api.patch<TaskDto>(
@@ -161,19 +162,30 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
       );
       setTasks((current) => current.map((task) => (task.id === updated.id ? updated : task)));
     } catch (caught) {
-      setTasks((current) =>
-        current.map((task) => {
-          if (task.id !== payload.taskId) return task;
-          return payload.previousTasks.find((previous) => previous.id === payload.taskId) ?? task;
-        }),
-      );
+      setTasks(previousTasks);
       if (caught instanceof ApiError && caught.statusCode === 403) {
         toast.error(t('errors.forbiddenTasks'));
       } else {
         toast.error(tTask('moveError'), {
           action: {
             label: tTask('retryAction'),
-            onClick: () => void commitTaskMove(payload),
+            onClick: () => {
+              const latest = tasksRef.current;
+              const target = payload.nextTasks.find((task) => task.id === payload.taskId);
+              if (!target) return;
+              void commitTaskMove({
+                taskId: payload.taskId,
+                columnId: payload.columnId,
+                beforeTaskId: payload.beforeTaskId,
+                afterTaskId: payload.afterTaskId,
+                previousTasks: latest,
+                nextTasks: latest.map((task) =>
+                  task.id === payload.taskId
+                    ? { ...task, columnId: payload.columnId, position: target.position }
+                    : task,
+                ),
+              });
+            },
           },
         });
       }
@@ -183,7 +195,9 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
   const dnd = useBoardTaskDnd(tasks, canMutateTasksFlag, commitTaskMove, (title) =>
     tTask('movedAnnouncement', { title }),
   );
-  dndRef.current = { cancelDrag: dnd.cancelDrag, isDragging: dnd.isDragging };
+  useEffect(() => {
+    dndRef.current = { cancelDrag: dnd.cancelDrag, isDragging: dnd.isDragging };
+  }, [dnd.cancelDrag, dnd.isDragging]);
 
   const upsertTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -523,11 +537,17 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             loadError={panelError}
             metaRefreshKey={metaRefreshKey}
             onUpdated={(patch) =>
-              setTasks((current) =>
-                current.some((item) => item.id === patch.id)
-                  ? current.map((item) => (item.id === patch.id ? { ...item, ...patch } : item))
-                  : [...current, patch as TaskDto],
-              )
+              setTasks((current) => {
+                const index = current.findIndex((item) => item.id === patch.id);
+                if (index < 0) {
+                  // Partial panel patches must not invent list rows.
+                  if (!('title' in patch) || !('columnId' in patch)) return current;
+                  return [...current, patch as TaskDto];
+                }
+                const next = [...current];
+                next[index] = { ...current[index]!, ...patch };
+                return next;
+              })
             }
             onRequestDelete={() => {
               if (selectedTask) setDeleteTask(selectedTask);

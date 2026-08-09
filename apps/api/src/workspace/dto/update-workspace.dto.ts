@@ -1,13 +1,16 @@
-import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsNotEmpty, IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
 
 export class UpdateWorkspaceDto {
-  @IsOptional()
+  /** Omitted = leave unchanged; explicit null is rejected (non-nullable column). */
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNotEmpty()
   @IsString()
   @MinLength(1)
   @MaxLength(80)
   name?: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNotEmpty()
   @IsString()
   @MinLength(2)
   @MaxLength(48)
