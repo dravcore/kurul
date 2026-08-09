@@ -6,10 +6,10 @@ Open-source, Kanban-focused project management tool.
 
 ## Status
 
-Kurultay is **pre-MVP**. Phases 0–1 (docs + monorepo skeleton) and Phase 2 auth/workspaces
-are in place — `apps/api`, `apps/web`, `packages/shared-types`, and `packages/auth-access`
-run locally. Boards and product features continue from Phase 3 — see
-[docs/roadmap.md](docs/roadmap.md).
+Kurultay’s **MVP feature set (Phases 1–9) is complete** — auth/workspaces, boards and
+tasks, filtering, dashboard, activity/notifications, and realtime board sync. See
+[docs/roadmap.md](docs/roadmap.md). Beyond-MVP items (email notifications, presence,
+Playwright e2e, extra locales, …) remain listed under Beyond MVP.
 
 ## What is Kurultay?
 
@@ -23,7 +23,7 @@ Kurultay aims to be a self-hostable, AGPL-licensed alternative to commercial Kan
 
 ## Features
 
-Planned for the initial release — see [docs/roadmap.md](docs/roadmap.md) for sequencing:
+Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
 
 - **Boards and columns** — classic Kanban layout with drag-and-drop reordering
 - **Tasks** — multi-assignee, labels, priority (kept independent of labels), due date and
@@ -31,9 +31,10 @@ Planned for the initial release — see [docs/roadmap.md](docs/roadmap.md) for s
 - **Fractional-indexed ordering** — reordering a card only touches that card's position,
   never a full-list renumber
 - **Workspaces** — multi-tenant from the ground up, every query scoped by workspace
-- **Dashboard** — aggregation views and charts over task/board activity
+- **Filtering and search** — board task filters with cursor pagination
+- **Dashboard** — aggregation views and charts (including created vs completed)
+- **Activity log and notifications** — in-app assignment, mention, due-soon; `/notifications`
 - **Realtime sync** — board changes propagate live via Socket.io
-- **Activity log and notifications**
 
 ## Quick start
 

@@ -17,7 +17,8 @@ What Kurultay tests, with which tools, and what CI enforces.
 
 ## Strategy
 
-Kurultay is pre-MVP. The testing strategy is deliberately **pragmatic, not exhaustive**:
+Kurultay’s MVP feature set is complete; the testing strategy stays deliberately
+**pragmatic, not exhaustive**:
 
 - Test the logic that is **hard to get right** and **expensive to get wrong** — ordering,
   tenant isolation, auth.

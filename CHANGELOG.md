@@ -76,6 +76,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Docs: README and process docs reflect MVP complete (Phases 1–9); Turkish architecture
+  module map aligned with English; api-conventions / testing / development status wording
+  updated for shipped realtime.
 - **Breaking:** `GET /workspaces/:workspaceId/boards/:boardId/tasks` now returns
   `CursorPage<TaskDto>` (`{ items, nextCursor, hasMore }`) instead of a bare `TaskDto[]`.
   Clients must drain pages (or raise `limit`, max 100) to load a full board.

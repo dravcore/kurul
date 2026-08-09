@@ -128,12 +128,12 @@ apps/web/
 │   └── dashboard/         # chart components (Phase 7+)
 └── lib/
     ├── api.ts             # typed REST client
-    ├── socket.ts          # Socket.io client stub (Phase 9)
+    ├── socket.ts          # Socket.io client (board realtime)
     ├── permissions.ts     # re-exports `@kurultay/auth-access`
     └── auth.ts            # Better Auth client
 ```
 
-Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Next.js middleware checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run; the client shell still bootstraps workspaces once the session is present. Board interaction uses `@dnd-kit` with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events (Phase 9).
+Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Next.js middleware checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run; the client shell still bootstraps workspaces once the session is present. Board interaction uses `@dnd-kit` with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events.
 
 ---
 

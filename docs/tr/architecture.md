@@ -92,11 +92,8 @@ Her modül aynı iskelete sahip: `*.module.ts`, `*.controller.ts`, `*.service.ts
 Modül sınırları en baştan temiz tutulur — process rollerini daha sonra bölme imkânı tamamen
 buna bağlıdır.
 
-**Mevcut vs planlanan:** Faz 5 sonrası `auth`, `workspace`, `board`, `task`, `label`,
-`comment`, `health`, `common` ve `prisma` gerçek handler'lara sahip. `activity`, `dashboard`,
-`notification` ve `realtime` route iskeleti olarak kalır; path'ler
-`/workspaces/:workspaceId/...` altında yuvalanmıştır ve roadmap fazlarını bekler. Aşağıdaki
-tabloyu hedef harita olarak okuyun — her modülün uygulandığı iddiası değildir.
+**Mevcut vs planlanan:** Faz 9 sonrası `realtime` dahil özellik modülleri uygulanmıştır.
+Aşağıdaki tabloyu modül haritası olarak okuyun.
 
 | Modül          | Sorumluluk                                                                |
 | -------------- | ------------------------------------------------------------------------- |
@@ -145,7 +142,7 @@ apps/web/
 │   └── dashboard/         # grafik component'leri (Faz 7+)
 └── lib/
     ├── api.ts             # typed REST client
-    ├── socket.ts          # Socket.io client stub (Faz 9)
+    ├── socket.ts          # Socket.io client (board realtime)
     ├── permissions.ts     # `@kurultay/auth-access` re-export
     └── auth.ts            # Better Auth client
 ```
@@ -155,7 +152,7 @@ chrome'unu render eder ve bir session olduğunu varsayar. Next.js middleware, `(
 route'larından önce Better Auth session cookie'sini `/auth/get-session` ile doğrular; client
 shell session varken workspace bootstrap'ını yapar. Board etkileşimi `@dnd-kit` kullanır;
 doğruluk kaynağı sunucudur — optimistic bir taşıma hem API yanıtına hem de gelen socket
-event'lerine (Faz 9) karşı uzlaştırılır.
+event'lerine karşı uzlaştırılır.
 
 ---
 
