@@ -16,12 +16,12 @@ the product stance that **members do content work; admins own board shape**.
 
 Task authorization is enforced in Nest with `@Roles`:
 
-| Action                                      | OWNER | ADMIN | MEMBER | GUEST |
-| ------------------------------------------- | :---: | :---: | :----: | :---: |
-| Read tasks                                  |   ✓   |   ✓   |   ✓    |   ✓   |
-| Create task; update title / description     |   ✓   |   ✓   |   ✓    |   —   |
-| Move task (within or across columns)        |   ✓   |   ✓   |   ✓    |   —   |
-| Delete task                                 |   ✓   |   ✓   |   ✓    |   —   |
+| Action                                  | OWNER | ADMIN | MEMBER | GUEST |
+| --------------------------------------- | :---: | :---: | :----: | :---: |
+| Read tasks                              |   ✓   |   ✓   |   ✓    |   ✓   |
+| Create task; update title / description |   ✓   |   ✓   |   ✓    |   —   |
+| Move task (within or across columns)    |   ✓   |   ✓   |   ✓    |   —   |
+| Delete task                             |   ✓   |   ✓   |   ✓    |   —   |
 
 Column create / rename / reorder / delete remains OWNER/ADMIN only (ADR 0009).
 
@@ -45,8 +45,8 @@ Column create / rename / reorder / delete remains OWNER/ADMIN only (ADR 0009).
 
 ## Alternatives considered
 
-| Alternative                                              | Why not                                                                 |
-| -------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Admin-only task moves                                    | Breaks everyday kanban for MEMBER; too close to column-structure rules  |
-| MEMBER may edit/move but only OWNER/ADMIN may delete     | Extra mental model for little security gain on a soft-delete-less MVP   |
-| Author-only edit/delete                                  | Requires `createdById` checks on every path; overkill for Phase 4       |
+| Alternative                                          | Why not                                                                |
+| ---------------------------------------------------- | ---------------------------------------------------------------------- |
+| Admin-only task moves                                | Breaks everyday kanban for MEMBER; too close to column-structure rules |
+| MEMBER may edit/move but only OWNER/ADMIN may delete | Extra mental model for little security gain on a soft-delete-less MVP  |
+| Author-only edit/delete                              | Requires `createdById` checks on every path; overkill for Phase 4      |
