@@ -63,6 +63,24 @@ export async function findTask(
   return task;
 }
 
+/**
+ * Lightweight existence/ownership check that skips the assignees/labels relations —
+ * use this for pre-mutation reads where only id/title/boardId are needed, and reserve
+ * `findTask` for the single read that builds the response DTO.
+ */
+export async function findTaskBasic(
+  prisma: PrismaService,
+  workspaceId: string,
+  taskId: string,
+): Promise<{ id: string; title: string; boardId: string }> {
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, board: { workspaceId } },
+    select: { id: true, title: true, boardId: true },
+  });
+  if (!task) throw new NotFoundException('Task not found');
+  return task;
+}
+
 export function emitTaskUpdated(
   realtime: RealtimeService,
   workspaceId: string,

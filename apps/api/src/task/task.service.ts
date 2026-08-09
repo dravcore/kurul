@@ -11,6 +11,7 @@ import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
 import { resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
+import { batchUpdateTaskPositions } from '../common/position/rebalance-sql';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import type { AddAssigneeDto } from './dto/add-assignee.dto';
@@ -151,14 +152,11 @@ export class TaskService {
       if (needsRebalance(beforePos, afterPos)) {
         const positions = rebalancePositions(siblings.length + 1);
         const insertionIndex = after ? afterIndex + 1 : 0;
-        await Promise.all(
-          siblings.map((task, index) =>
-            tx.task.updateMany({
-              where: { id: task.id, columnId: column.id },
-              data: { position: positions[index < insertionIndex ? index : index + 1]! },
-            }),
-          ),
-        );
+        const updates = siblings.map((task, index) => ({
+          id: task.id,
+          position: positions[index < insertionIndex ? index : index + 1]!,
+        }));
+        await batchUpdateTaskPositions(tx, column.id, updates);
         created = await tx.task.create({
           data: {
             boardId,
@@ -370,24 +368,21 @@ export class TaskService {
         const reordered = [...remaining];
         reordered.splice(insertionIndex, 0, { ...task, columnId: targetColumn.id });
         const positions = rebalancePositions(reordered.length);
-        await Promise.all(
-          reordered.map(async (item, index) => {
-            if (item.id === taskId) {
-              await tx.task.update({
-                where: { id: item.id },
-                data: {
-                  position: positions[index]!,
-                  columnId: targetColumn.id,
-                },
-              });
-              return;
-            }
-            await tx.task.updateMany({
-              where: { id: item.id, columnId: targetColumn.id },
-              data: { position: positions[index]! },
-            });
+        const otherUpdates = reordered
+          .map((item, index) => ({ item, index }))
+          .filter(({ item }) => item.id !== taskId)
+          .map(({ item, index }) => ({ id: item.id, position: positions[index]! }));
+
+        await Promise.all([
+          tx.task.update({
+            where: { id: taskId },
+            data: {
+              position: positions[insertionIndex]!,
+              columnId: targetColumn.id,
+            },
           }),
-        );
+          batchUpdateTaskPositions(tx, targetColumn.id, otherUpdates),
+        ]);
         result = toTaskDto({
           ...task,
           columnId: targetColumn.id,

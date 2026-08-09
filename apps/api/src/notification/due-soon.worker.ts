@@ -11,6 +11,16 @@ const JOB_NAME = 'scan-due-soon';
 const JOB_ID = 'due-soon-scan';
 const REPEAT_EVERY_MS = 15 * 60 * 1000;
 export const DUE_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** Page size for the due-task scan — bounds memory/row-count per query instead of loading the whole window at once. */
+export const SCAN_BATCH_SIZE = 500;
+
+type ScanTaskRow = {
+  id: string;
+  title: string;
+  dueDate: Date | null;
+  board: { workspaceId: string };
+  assignees: { userId: string }[];
+};
 
 @Injectable()
 export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
@@ -66,28 +76,60 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
     await this.queue?.close();
   }
 
-  /** Exposed for tests — scan once. */
+  /**
+   * Exposed for tests — scan once.
+   *
+   * Walks the due window in keyset-paginated batches (ordered by dueDate, id) rather than
+   * loading every due task into memory in one query, so the scan stays bounded as the
+   * table grows.
+   */
   async runScan(): Promise<number> {
     const now = new Date();
     const until = new Date(now.getTime() + DUE_WINDOW_MS);
     const since = new Date(now.getTime() - DUE_WINDOW_MS);
 
-    const tasks = await this.prisma.task.findMany({
-      where: {
-        dueDate: { gt: now, lte: until },
-        assignees: { some: {} },
-      },
-      select: {
-        id: true,
-        title: true,
-        dueDate: true,
-        board: { select: { workspaceId: true } },
-        assignees: { select: { userId: true } },
-      },
-    });
+    let cursor: { dueDate: Date; id: string } | null = null;
+    let totalCreated = 0;
 
-    if (tasks.length === 0) return 0;
+    for (;;) {
+      const tasks: ScanTaskRow[] = await this.prisma.task.findMany({
+        where: {
+          dueDate: { gt: now, lte: until },
+          assignees: { some: {} },
+          ...(cursor
+            ? {
+                OR: [
+                  { dueDate: { gt: cursor.dueDate } },
+                  { dueDate: cursor.dueDate, id: { gt: cursor.id } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          title: true,
+          dueDate: true,
+          board: { select: { workspaceId: true } },
+          assignees: { select: { userId: true } },
+        },
+        orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
+        take: SCAN_BATCH_SIZE,
+      });
 
+      if (tasks.length === 0) break;
+
+      totalCreated += await this.notifyBatch(tasks, since);
+
+      if (tasks.length < SCAN_BATCH_SIZE) break;
+      const last = tasks[tasks.length - 1]!;
+      if (!last.dueDate) break;
+      cursor = { dueDate: last.dueDate, id: last.id };
+    }
+
+    return totalCreated;
+  }
+
+  private async notifyBatch(tasks: ScanTaskRow[], since: Date): Promise<number> {
     const taskIds = tasks.map((task) => task.id);
     const userIds = [...new Set(tasks.flatMap((task) => task.assignees.map((row) => row.userId)))];
 

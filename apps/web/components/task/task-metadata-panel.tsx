@@ -105,9 +105,10 @@ export function TaskMetadataPanel({
             : api.get<LabelDto[]>(`/workspaces/${workspaceId}/boards/${boardId}/labels`, {
                 signal: controller.signal,
               }),
-          api.get<CommentDto[]>(`/workspaces/${workspaceId}/tasks/${task.id}/comments`, {
-            signal: controller.signal,
-          }),
+          api.get<CursorPage<CommentDto>>(
+            `/workspaces/${workspaceId}/tasks/${task.id}/comments?limit=100`,
+            { signal: controller.signal },
+          ),
           api.get<CursorPage<ActivityDto>>(
             `/workspaces/${workspaceId}/tasks/${task.id}/activities?limit=50`,
             { signal: controller.signal },
@@ -118,7 +119,7 @@ export function TaskMetadataPanel({
             setMembers(nextMembers);
             setBoardLabels(nextLabels);
           }
-          setComments(nextComments);
+          setComments(nextComments.items);
           setActivities(nextActivities.items);
         }
       } catch {

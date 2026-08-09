@@ -14,6 +14,9 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create(AppModule);
   configureApp(app, { corsOrigin: webUrl });
+  // Lets OnModuleDestroy hooks (PrismaService, DueSoonWorker) run on SIGTERM/SIGINT
+  // instead of the process being killed mid-connection.
+  app.enableShutdownHooks();
   await app.listen(port);
 }
 

@@ -56,6 +56,7 @@ export class DashboardService {
       assigneeRows,
       unassignedCount,
       columns,
+      columnCounts,
       createdDays,
       completedDays,
     ] = await Promise.all([
@@ -81,11 +82,20 @@ export class DashboardService {
       this.prisma.task.count({
         where: { ...taskWhere, assignees: { none: {} } },
       }),
+      // `columns` and `columnCounts` are independent of each other — both only need
+      // `query.boardId`, not one another's result — so they run in the same wave.
       query.boardId
         ? this.prisma.column.findMany({
             where: { boardId: query.boardId, board: { workspaceId } },
             orderBy: [{ position: 'asc' }, { id: 'asc' }],
             select: { id: true, name: true, position: true },
+          })
+        : Promise.resolve(null),
+      query.boardId
+        ? this.prisma.task.groupBy({
+            by: ['columnId'],
+            where: taskWhere,
+            _count: { _all: true },
           })
         : Promise.resolve(null),
       this.countActivitiesByDay(workspaceId, ActivityType.TaskCreated, since, query.boardId),
@@ -100,12 +110,7 @@ export class DashboardService {
     const byAssignee = await this.buildAssigneeBuckets(assigneeRows, unassignedCount);
 
     let byColumn: DashboardCountByColumn[] | null = null;
-    if (columns) {
-      const columnCounts = await this.prisma.task.groupBy({
-        by: ['columnId'],
-        where: taskWhere,
-        _count: { _all: true },
-      });
+    if (columns && columnCounts) {
       const countByColumn = new Map(
         columnCounts.map((row) => [row.columnId, row._count._all] as const),
       );

@@ -8,7 +8,7 @@ import type { TaskDto } from '@kurultay/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import type { AddTaskLabelDto } from './dto/add-task-label.dto';
-import { emitTaskUpdated, findTask, isPrismaUniqueViolation } from './task.mapper';
+import { emitTaskUpdated, findTask, findTaskBasic, isPrismaUniqueViolation } from './task.mapper';
 
 @Injectable()
 export class TaskLabelService {
@@ -23,7 +23,7 @@ export class TaskLabelService {
     actorId: string,
     dto: AddTaskLabelDto,
   ): Promise<TaskDto> {
-    const task = await findTask(this.prisma, workspaceId, taskId);
+    const task = await findTaskBasic(this.prisma, workspaceId, taskId);
     const label = await this.prisma.label.findFirst({
       where: { id: dto.labelId, boardId: task.boardId },
     });
@@ -56,7 +56,7 @@ export class TaskLabelService {
     actorId: string,
     labelId: string,
   ): Promise<TaskDto> {
-    await findTask(this.prisma, workspaceId, taskId);
+    await findTaskBasic(this.prisma, workspaceId, taskId);
     const result = await this.prisma.taskLabel.deleteMany({
       where: { taskId, labelId },
     });

@@ -27,6 +27,7 @@ const api = auth.api as unknown as {
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
 interface PrismaStub {
   workspace: { findUnique: jest.Mock; findFirst: jest.Mock };
+  workspaceMember: { findMany: jest.Mock };
 }
 
 function buildService(): { service: WorkspaceService; prisma: PrismaStub } {
@@ -34,6 +35,9 @@ function buildService(): { service: WorkspaceService; prisma: PrismaStub } {
     workspace: {
       findUnique: jest.fn().mockResolvedValue(null),
       findFirst: jest.fn().mockResolvedValue(null),
+    },
+    workspaceMember: {
+      findMany: jest.fn().mockResolvedValue([]),
     },
   };
 
@@ -98,5 +102,17 @@ describe('WorkspaceService Better Auth error mapping', () => {
     api.deleteOrganization.mockRejectedValue(failure);
 
     await expect(service.remove(WORKSPACE_ID, request)).rejects.toBe(failure);
+  });
+});
+
+describe('WorkspaceService.listMembers', () => {
+  it('caps the query with a hard take limit', async () => {
+    const { service, prisma } = buildService();
+
+    await service.listMembers(WORKSPACE_ID);
+
+    expect(prisma.workspaceMember.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { workspaceId: WORKSPACE_ID }, take: 1000 }),
+    );
   });
 });

@@ -90,6 +90,7 @@ describe('TaskService', () => {
         findFirst: jest.fn(),
       },
       $transaction: jest.fn(),
+      $executeRaw: jest.fn().mockResolvedValue(0),
     };
     prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
       callback(prisma),
@@ -226,24 +227,23 @@ describe('TaskService', () => {
     ];
     const moving = taskRow({ id: 'c', position: 5000, columnId: 'other' });
 
-    const updates: Array<{ id: string; position: number; columnId?: string }> = [];
+    let updateCall: { where: { id: string }; data: { position: number; columnId: string } } | null =
+      null;
+    const executeRaw = jest.fn().mockResolvedValue(2);
     prisma.$transaction.mockImplementation(async (callback) =>
       callback({
         task: {
           findFirst: jest.fn().mockResolvedValue(moving),
           findMany: jest.fn().mockResolvedValue(tight),
           update: jest.fn().mockImplementation(({ where, data }) => {
-            updates.push({ id: where.id as string, ...data });
+            updateCall = { where, data };
             return Promise.resolve({ ...moving, ...data, id: where.id });
-          }),
-          updateMany: jest.fn().mockImplementation(({ where, data }) => {
-            updates.push({ id: where.id as string, ...data });
-            return Promise.resolve({ count: 1 });
           }),
         },
         column: {
           findFirst: jest.fn().mockResolvedValue({ id: COLUMN_ID, boardId: BOARD_ID }),
         },
+        $executeRaw: executeRaw,
       }),
     );
 
@@ -252,8 +252,15 @@ describe('TaskService', () => {
       beforeTaskId: 'a',
     });
 
-    expect(updates).toHaveLength(3);
-    expect(updates.map((row) => row.position)).toEqual([1000, 2000, 3000]);
+    expect(updateCall).toEqual({
+      where: { id: 'c' },
+      data: { position: 2000, columnId: COLUMN_ID },
+    });
+    expect(executeRaw).toHaveBeenCalledTimes(1);
+    const [, ids, positions, columnId] = executeRaw.mock.calls[0]!;
+    expect(ids).toEqual(['a', 'b']);
+    expect(positions).toEqual([1000, 3000]);
+    expect(columnId).toBe(COLUMN_ID);
     expect(result.position).toBe(2000);
     expect(result.columnId).toBe(COLUMN_ID);
   });
@@ -315,20 +322,17 @@ describe('TaskService', () => {
     const b = taskRow({ id: 'b', position: 1000 + MIN_GAP / 2 });
     prisma.task.findMany.mockResolvedValue([a, b]);
 
-    const updates: Array<{ id: string; position: number }> = [];
     let createdPosition: number | undefined;
+    const executeRaw = jest.fn().mockResolvedValue(2);
     prisma.$transaction.mockImplementation(async (callback) =>
       callback({
         task: {
-          updateMany: jest.fn().mockImplementation(({ where, data }) => {
-            updates.push({ id: where.id as string, position: data.position as number });
-            return Promise.resolve({ count: 1 });
-          }),
           create: jest.fn().mockImplementation(({ data }) => {
             createdPosition = data.position as number;
             return Promise.resolve(taskRow({ id: 'new', position: data.position as number }));
           }),
         },
+        $executeRaw: executeRaw,
       }),
     );
 
@@ -338,10 +342,11 @@ describe('TaskService', () => {
       afterTaskId: 'a',
     });
 
-    expect(updates).toEqual([
-      { id: 'a', position: 1000 },
-      { id: 'b', position: 3000 },
-    ]);
+    expect(executeRaw).toHaveBeenCalledTimes(1);
+    const [, ids, positions, columnId] = executeRaw.mock.calls[0]!;
+    expect(ids).toEqual(['a', 'b']);
+    expect(positions).toEqual([1000, 3000]);
+    expect(columnId).toBe(COLUMN_ID);
     expect(createdPosition).toBe(2000);
     expect(result.position).toBe(2000);
   });
