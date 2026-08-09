@@ -130,6 +130,8 @@ apps/web/
 │   ├── task/              # TaskCard, TaskPanel, metadata editors, DnD helpers
 │   ├── dashboard/         # chart components (Phase 7+)
 │   └── notification/      # NotificationBell, NotificationsList
+├── i18n/                  # next-intl request config (locale resolution)
+├── messages/              # en.json — UI copy, one flat file per locale
 └── lib/
     ├── api.ts             # typed REST client
     ├── socket.ts          # Socket.io client (board realtime)
@@ -138,6 +140,13 @@ apps/web/
 ```
 
 Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Next.js middleware checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run; the client shell still bootstraps workspaces once the session is present. Board interaction uses `@dnd-kit` with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events.
+
+**i18n:** `next-intl` is wired from Phase 1 (`i18n/request.ts`, `NextIntlClientProvider` in the
+root layout, UI copy in `messages/en.json`) so every user-facing string already goes through
+`useTranslations()` rather than being hardcoded. The locale is currently hardcoded to `en` —
+no locale routing, switcher, or second `messages/*.json` file yet. Adding a locale is a
+messages file plus locale-resolution logic, not a rewrite of the component tree. See
+[roadmap.md — Beyond MVP](roadmap.md#beyond-mvp) for additional UI language packs.
 
 ---
 

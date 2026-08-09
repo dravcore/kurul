@@ -72,6 +72,10 @@ Multi-tenant workspaces are the heart of this product, so auth is a load-bearing
 
 **Next.js 16** (App Router) is the pinned major for `apps/web`. Tailwind, shadcn/ui, classic `@dnd-kit`, and Recharts sit on top; details and trade-offs are in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md).
 
+### i18n — next-intl
+
+`next-intl` is wired from Phase 1 — every user-facing string goes through `useTranslations()` / `messages/en.json` rather than being hardcoded — so the app is translation-ready even though the locale is currently hardcoded to `en` and there is no locale switcher yet (MVP is English-only, see [roadmap.md — Beyond MVP](roadmap.md#beyond-mvp)). The alternative was retrofitting i18n after strings had already spread through the component tree, which is the more expensive order.
+
 ### Deployment — Docker Compose
 
 Four services — `api`, `web`, `postgres`, `redis` — matching the existing self-managed Linux server setup. The path to Kubernetes stays open for when scale demands it (both ClickUp and Linear ended up there), but Compose on a single host is the right size for now.
@@ -109,15 +113,19 @@ Projects worth studying for architecture and data modelling:
 
 Full arguments and consequences live in [`decisions/`](decisions/) rather than being repeated here:
 
-| ADR                                                                                | Topic                                                   |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modular monolith                             |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                         | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                       | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                   | Better Auth with the organization plugin (→ Workspace)  |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                 | Socket.io + Redis adapter                               |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)             | Float positions for ordering                            |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                           | AGPL-3.0                                                |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                     | Git Flow + SemVer                                       |
+| ADR                                                                                            | Topic                                                   |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modular monolith                             |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Better Auth with the organization plugin (→ Workspace)  |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                               |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Float positions for ordering                            |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                       |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board and column role matrix (OWNER/ADMIN structure)    |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task role matrix (MEMBER+ content work)                 |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata role matrix                     |
+| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Comment delete: authorship or OWNER/ADMIN               |
 
 Related: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)

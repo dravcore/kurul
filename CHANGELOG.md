@@ -17,13 +17,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Deferred follow-ups: `/notifications` page (unread + type filters, cursor Load more,
   View all from the bell) and dashboard created-vs-completed throughput (14 UTC days;
   `task.moved` payloads include column names). See
-  [deferred notes](docs/specs/2026-08-09-phase-8-deferred.md).
+  [deferred notes](docs/archive/specs/2026-08-09-phase-8-deferred.md) (archived; open items
+  moved to [roadmap.md](docs/roadmap.md#beyond-mvp)).
 - Phase 8 activity log and notifications
   ([spec](docs/specs/2026-08-09-phase-8-activity-notifications-design.md)): activity writes
   on task create/update/move/delete/assign/comment; workspace and task feeds; `Notification`
   model (assignment, mention, due-soon via BullMQ); shell bell + task History; comment
   `@[Name](userId)` mentions. Email deferred
-  ([notes](docs/specs/2026-08-09-phase-8-deferred.md)).
+  ([notes](docs/archive/specs/2026-08-09-phase-8-deferred.md), archived).
 - Phase 7 dashboard
   ([spec](docs/specs/2026-08-09-phase-7-dashboard-design.md)):
   `GET .../dashboard/summary?boardId?` with total/overdue tiles, priority and assignee
@@ -79,6 +80,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Docs: README and process docs reflect MVP complete (Phases 1–9); Turkish architecture
   module map aligned with English; api-conventions / testing / development status wording
   updated for shipped realtime.
+- Docs: `docs/decisions/0011-label-task-metadata-permissions.md` superseded on the comment-delete
+  rule by [ADR 0012](docs/decisions/0012-comment-delete-authorship.md) (author OR OWNER/ADMIN,
+  not any MEMBER); `docs/specs/2026-08-09-phase-8-deferred.md` archived to
+  `docs/archive/specs/` with its remaining open follow-ups folded into
+  [roadmap Beyond MVP](docs/roadmap.md#beyond-mvp); api-conventions, tech-stack, testing, and
+  architecture docs refreshed to match the shipped activity/dashboard/notification routes, ADRs
+  0009–0012, web Vitest in CI, next-intl, and the develop merge-commit practice actually in use.
+- Tooling: type-aware ESLint (floating-promise, React hooks rules), Husky pre-commit, Dependabot,
+  and CI coverage; added comment/label guardrail unit specs.
 - **Breaking:** `GET /workspaces/:workspaceId/boards/:boardId/tasks` now returns
   `CursorPage<TaskDto>` (`{ items, nextCursor, hasMore }`) instead of a bare `TaskDto[]`.
   Clients must drain pages (or raise `limit`, max 100) to load a full board.
@@ -91,3 +101,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `LabelColorSlot` (`slot-1`…`slot-8`); invitation DTO status is no longer a free string.
 - ESLint docs aligned with the flat config actually shipped (no Nest/Next/import plugins
   yet).
+
+### Removed
+
+- Tech-debt cleanup: unused `@prisma/client` and `ts-node` from `apps/api`; dead
+  `NotificationService.createDueSoon` (the due-soon worker batches inserts directly) and the
+  `dashboard-throughput` helpers (`isDoneColumnName`, `isCompletedMove`, `applyThroughputCounts`)
+  that only specs exercised; stale `.gitkeep` placeholders in directories that now hold real
+  files; unused `--ease-in-out` / `--ease-drawer` CSS tokens.
+
+### Fixed
+
+- Tech-debt correctness pass (Wave 2): reject `null` on non-nullable update DTOs, preserve
+  column `taskCount` after rebalance, map Prisma errors, fix dashboard "Other" assignee
+  buckets, opaque `board:join` denies, scoped task updates, and board-view retry/patch/ref bugs.
+- Tech-debt performance and resource pass (Wave 3): enable Nest shutdown hooks and Better Auth
+  session cookie cache, batch due-soon scans and rebalance SQL, paginate comments, and add
+  `pg_trgm` search indexes.

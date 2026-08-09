@@ -3,10 +3,11 @@
 **Date:** 2026-08-09 · **Status:** shipped · **Scope:** activity writes/feeds, Notification
 model, BullMQ due-soon, panel timeline, mention picker, shell bell
 
-**Follow-ups:** [deferred notes](2026-08-09-phase-8-deferred.md); board realtime in
-[Phase 9](2026-08-09-phase-9-realtime-design.md)
+**Follow-ups:** [deferred notes](../archive/specs/2026-08-09-phase-8-deferred.md) (archived);
+board realtime in [Phase 9](2026-08-09-phase-9-realtime-design.md)
 
-**Deferred alternatives:** [2026-08-09-phase-8-deferred.md](2026-08-09-phase-8-deferred.md)
+**Deferred alternatives:**
+[2026-08-09-phase-8-deferred.md](../archive/specs/2026-08-09-phase-8-deferred.md) (archived)
 
 ## Goals
 
@@ -23,7 +24,8 @@ and due-soon. Email stays out of MVP.
 
 Email; notification/activity Socket push (board realtime shipped in Phase 9 — see
 [phase-9 design](2026-08-09-phase-9-realtime-design.md) and
-[deferred notes](2026-08-09-phase-8-deferred.md)); full `/notifications` page was deferred
+[deferred notes](../archive/specs/2026-08-09-phase-8-deferred.md), archived); full
+`/notifications` page was deferred
 then shipped as a follow-up; workspace-level activity types beyond task events in this phase
 (board rename / member joined can wait).
 

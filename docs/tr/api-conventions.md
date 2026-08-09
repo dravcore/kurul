@@ -89,12 +89,25 @@ DELETE /workspaces/:workspaceId/tasks/:taskId/labels/:labelId
 GET    /workspaces/:workspaceId/tasks/:taskId/comments
 POST   /workspaces/:workspaceId/tasks/:taskId/comments
 DELETE /workspaces/:workspaceId/comments/:commentId
+
+GET    /workspaces/:workspaceId/activities                 # workspace aktivite akışı
+GET    /workspaces/:workspaceId/tasks/:taskId/activities    # task aktivite akışı
+
+GET    /workspaces/:workspaceId/dashboard/summary
+
+GET    /workspaces/:workspaceId/notifications
+GET    /workspaces/:workspaceId/notifications/unread-count
+POST   /workspaces/:workspaceId/notifications/read-all
+POST   /workspaces/:workspaceId/notifications/:notificationId/read
 ```
 
 Board ve column rol kapıları:
 [ADR 0009](decisions/0009-board-column-permissions.md). Task kapıları:
 [ADR 0010](decisions/0010-task-permissions.md). Label ve metadata kapıları:
-[ADR 0011](decisions/0011-label-task-metadata-permissions.md).
+[ADR 0011](decisions/0011-label-task-metadata-permissions.md). Comment silme yetkisi:
+[ADR 0012](decisions/0012-comment-delete-authorship.md). Activity, dashboard ve notification
+route'ları aynı veri üzerinde salt-okunur agregasyon/akışlardır ve ayrı bir rol matrisi
+yerine workspace üyelik kapısını (`WorkspaceGuard`) miras alır.
 
 Davetler public API'de workspace-scoped'dır. Persistence Better Auth organization
 plugin'ine aittir (Faz 1'de Prisma `Invitation` modeli yok). Ürün isimleri

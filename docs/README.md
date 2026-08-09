@@ -14,39 +14,38 @@ Map of Kurultay docs, language policy, and what belongs in the archive.
 
 ## Active docs
 
-| Doc                                                                          | Covers                                       |
-| ---------------------------------------------------------------------------- | -------------------------------------------- |
-| [architecture.md](architecture.md)                                           | Module map, data model, runtime evolution    |
-| [tech-stack.md](tech-stack.md)                                               | Stack choices and rationale                  |
-| [development.md](development.md)                                             | Env setup, Compose, pnpm scripts, day-to-day |
-| [coding-standards.md](coding-standards.md)                                   | TS / NestJS / Next.js conventions            |
-| [design.md](design.md)                                                       | UI/UX language                               |
-| [git-strategy.md](git-strategy.md)                                           | Git Flow, Conventional Commits, releases     |
-| [testing.md](testing.md)                                                     | Test layers and expectations                 |
-| [api-conventions.md](api-conventions.md)                                     | REST naming, errors, pagination              |
-| [roadmap.md](roadmap.md)                                                     | Phases and MVP / beyond-MVP status           |
-| [decisions/](decisions/)                                                     | Architecture decision records (ADRs)         |
-| [specs/2026-08-09-phase-8-deferred.md](specs/2026-08-09-phase-8-deferred.md) | Active deferred notes for Phase 8 follow-ups |
+| Doc                                        | Covers                                       |
+| ------------------------------------------ | -------------------------------------------- |
+| [architecture.md](architecture.md)         | Module map, data model, runtime evolution    |
+| [tech-stack.md](tech-stack.md)             | Stack choices and rationale                  |
+| [development.md](development.md)           | Env setup, Compose, pnpm scripts, day-to-day |
+| [coding-standards.md](coding-standards.md) | TS / NestJS / Next.js conventions            |
+| [design.md](design.md)                     | UI/UX language                               |
+| [git-strategy.md](git-strategy.md)         | Git Flow, Conventional Commits, releases     |
+| [testing.md](testing.md)                   | Test layers and expectations                 |
+| [api-conventions.md](api-conventions.md)   | REST naming, errors, pagination              |
+| [roadmap.md](roadmap.md)                   | Phases and MVP / beyond-MVP status           |
+| [decisions/](decisions/)                   | Architecture decision records (ADRs)         |
 
 Root community files (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, …)
 sit outside `docs/` because GitHub treats them specially.
 
 ## Historical / demoted (still in tree)
 
-| Doc                                         | Status                                                                                                                                           |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [project-skeleton.md](project-skeleton.md)  | **Historical Phase 1 scaffold** — prefer [architecture.md](architecture.md) and the live repo for current layout.                                |
-| Phase design specs under [`specs/`](specs/) | Shipped design records kept in place so [`CHANGELOG.md`](../CHANGELOG.md) links stay stable. Treat as historical — except `phase-8-deferred.md`. |
+| Doc                                         | Status                                                                                                            |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [project-skeleton.md](project-skeleton.md)  | **Historical Phase 1 scaffold** — prefer [architecture.md](architecture.md) and the live repo for current layout. |
+| Phase design specs under [`specs/`](specs/) | Shipped design records kept in place so [`CHANGELOG.md`](../CHANGELOG.md) links stay stable. Treat as historical. |
 
 ## Archive policy
 
 `docs/archive/` holds **finished implementation plans** and **meta-specs** that are no
 longer day-to-day reading:
 
-| Path             | Contents                                                                       |
-| ---------------- | ------------------------------------------------------------------------------ |
-| `archive/plans/` | Completed implementation plans formerly under `docs/plans/`                    |
-| `archive/specs/` | Historical meta-specs (e.g. docs-structure) that are not linked from CHANGELOG |
+| Path             | Contents                                                                                                                                                                                     |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `archive/plans/` | Completed implementation plans formerly under `docs/plans/`                                                                                                                                  |
+| `archive/specs/` | Historical meta-specs (e.g. docs-structure); mostly not linked from CHANGELOG — `phase-8-deferred.md` is the one exception, moved here with every `CHANGELOG.md` link updated in the same PR |
 
 **Do not archive** CHANGELOG-linked phase design specs unless you update every
 `docs/specs/...` link in `CHANGELOG.md` to `docs/archive/specs/...` in the same PR.

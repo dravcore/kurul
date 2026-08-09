@@ -143,6 +143,8 @@ apps/web/
 │   ├── task/              # TaskCard, TaskPanel, metadata editörleri, DnD yardımcıları
 │   ├── dashboard/         # grafik component'leri (Faz 7+)
 │   └── notification/      # NotificationBell, NotificationsList
+├── i18n/                  # next-intl request config (locale çözümleme)
+├── messages/              # en.json — UI metni, locale başına tek düz dosya
 └── lib/
     ├── api.ts             # typed REST client
     ├── socket.ts          # Socket.io client (board realtime)
@@ -156,6 +158,14 @@ route'larından önce Better Auth session cookie'sini `/auth/get-session` ile do
 shell session varken workspace bootstrap'ını yapar. Board etkileşimi `@dnd-kit` kullanır;
 doğruluk kaynağı sunucudur — optimistic bir taşıma hem API yanıtına hem de gelen socket
 event'lerine karşı uzlaştırılır.
+
+**i18n:** `next-intl` Faz 1'den beri kurulu (`i18n/request.ts`, root layout'ta
+`NextIntlClientProvider`, UI metni `messages/en.json`'da), yani her kullanıcıya görünen metin
+zaten hardcode edilmek yerine `useTranslations()` üzerinden geçiyor. Locale şu an `en` olarak
+sabitlenmiş — henüz locale routing, switcher veya ikinci bir `messages/*.json` dosyası yok.
+Bir locale eklemek component ağacını yeniden yazmak değil, bir messages dosyası artı
+locale-çözümleme mantığı eklemektir. Ek UI dil paketleri için bkz.
+[roadmap.md — MVP ötesi](roadmap.md#mvp-ötesi).
 
 ---
 
