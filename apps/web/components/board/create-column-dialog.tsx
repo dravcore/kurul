@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { ColumnDto } from '@kurultay/shared-types';
+import type { ColumnDto, CreateColumnRequest } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,12 +42,13 @@ export function CreateColumnDialog({
     setPending(true);
     setError(null);
     try {
+      const body: CreateColumnRequest = {
+        name: name.trim(),
+        ...(afterColumnId ? { afterColumnId } : {}),
+      };
       const column = await api.post<ColumnDto>(
         `/workspaces/${workspaceId}/boards/${boardId}/columns`,
-        {
-          name: name.trim(),
-          ...(afterColumnId ? { afterColumnId } : {}),
-        },
+        body,
       );
       onCreated(column);
       setName('');

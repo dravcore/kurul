@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { ActivityType, SocketEvents } from '@kurultay/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { MIN_GAP } from '../common/position/fractional-index';
 import { NotificationService } from '../notification/notification.service';
@@ -95,9 +96,9 @@ describe('TaskService', () => {
     prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
       callback(prisma),
     );
-    const realtime = {
-      emitToBoard: jest.fn(),
-    } as unknown as import('../realtime/realtime.service').RealtimeService;
+    const realtimeMock = { emitToBoard: jest.fn() };
+    const realtime =
+      realtimeMock as unknown as import('../realtime/realtime.service').RealtimeService;
     const prismaService = prisma as unknown as PrismaService;
     const activity = activityService as unknown as ActivityService;
     const notifications = notificationService as unknown as NotificationService;
@@ -109,6 +110,7 @@ describe('TaskService', () => {
       activityService,
       notificationService,
       realtime,
+      realtimeMock,
     };
   }
 
@@ -546,6 +548,70 @@ describe('TaskService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.taskLabel.deleteMany).toHaveBeenCalledWith({
       where: { taskId: 't1', labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80' },
+    });
+  });
+
+  describe('remove', () => {
+    it('records the deletion as a workspace stub before dropping the row', async () => {
+      const { service, prisma, activityService, realtimeMock } = buildService();
+      const task = taskRow({ id: 't1', title: 'Doomed' });
+      prisma.task.findFirst.mockResolvedValue(task);
+      prisma.task.delete.mockResolvedValue(task);
+
+      await expect(service.remove(WORKSPACE_ID, 't1', ACTOR_ID)).resolves.toBeUndefined();
+
+      // Activity.task is SetNull on delete, so the payload has to carry the id itself.
+      expect(activityService.record).toHaveBeenCalledWith(prisma, {
+        workspaceId: WORKSPACE_ID,
+        taskId: null,
+        userId: ACTOR_ID,
+        type: ActivityType.TaskDeleted,
+        payload: {
+          taskId: 't1',
+          title: 'Doomed',
+          columnId: COLUMN_ID,
+          boardId: BOARD_ID,
+        },
+      });
+      expect(prisma.task.delete).toHaveBeenCalledWith({ where: { id: 't1' } });
+      expect(realtimeMock.emitToBoard).toHaveBeenCalledWith(BOARD_ID, SocketEvents.TASK_DELETED, {
+        workspaceId: WORKSPACE_ID,
+        boardId: BOARD_ID,
+        actorId: ACTOR_ID,
+        taskId: 't1',
+      });
+    });
+
+    it('scopes the lookup to the workspace and returns 404 outside it', async () => {
+      const { service, prisma, activityService, realtimeMock } = buildService();
+      prisma.task.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.remove(WORKSPACE_ID, '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d99', ACTOR_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(prisma.task.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d99',
+            board: { workspaceId: WORKSPACE_ID },
+          },
+        }),
+      );
+      expect(prisma.task.delete).not.toHaveBeenCalled();
+      expect(activityService.record).not.toHaveBeenCalled();
+      expect(realtimeMock.emitToBoard).not.toHaveBeenCalled();
+    });
+
+    it('leaves the row in place and stays silent when the delete fails', async () => {
+      const { service, prisma, realtimeMock } = buildService();
+      prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+      prisma.task.delete.mockRejectedValue(new Error('deadlock'));
+
+      await expect(service.remove(WORKSPACE_ID, 't1', ACTOR_ID)).rejects.toThrow('deadlock');
+
+      // The transaction rolled back, so no client may be told the task is gone.
+      expect(realtimeMock.emitToBoard).not.toHaveBeenCalled();
     });
   });
 

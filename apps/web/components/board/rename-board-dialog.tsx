@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { BoardDto } from '@kurultay/shared-types';
+import type { BoardDto, UpdateBoardRequest } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,10 +50,14 @@ export function RenameBoardDialog({
     setPending(true);
     setError(null);
     try {
-      const updated = await api.patch<BoardDto>(`/workspaces/${workspaceId}/boards/${board.id}`, {
+      const body: UpdateBoardRequest = {
         name: name.trim(),
         description: description.trim() || null,
-      });
+      };
+      const updated = await api.patch<BoardDto>(
+        `/workspaces/${workspaceId}/boards/${board.id}`,
+        body,
+      );
       onRenamed(updated);
       onOpenChange(false);
     } catch {

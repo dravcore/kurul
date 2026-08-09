@@ -5,7 +5,12 @@ import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type { TaskDto, LabelDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import type {
+  LabelDto,
+  TaskDto,
+  UpdateTaskRequest,
+  WorkspaceMemberDto,
+} from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,10 +89,8 @@ export function TaskPanel({
     const previousDescription = task.description;
     onUpdated({ id: task.id, title: nextTitle, description: nextDescription });
     try {
-      const updated = await api.patch<TaskDto>(`/workspaces/${workspaceId}/tasks/${task.id}`, {
-        title: nextTitle,
-        description: nextDescription,
-      });
+      const body: UpdateTaskRequest = { title: nextTitle, description: nextDescription };
+      const updated = await api.patch<TaskDto>(`/workspaces/${workspaceId}/tasks/${task.id}`, body);
       onUpdated(updated);
     } catch (caught) {
       onUpdated({

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { CreateTaskRequest, TaskDto } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,10 +42,11 @@ export function CreateTaskDialog({
     setPending(true);
     setError(null);
     try {
-      const task = await api.post<TaskDto>(`/workspaces/${workspaceId}/boards/${boardId}/tasks`, {
-        title: title.trim(),
-        columnId,
-      });
+      const body: CreateTaskRequest = { title: title.trim(), columnId };
+      const task = await api.post<TaskDto>(
+        `/workspaces/${workspaceId}/boards/${boardId}/tasks`,
+        body,
+      );
       onCreated(task);
       setTitle('');
       onOpenChange(false);

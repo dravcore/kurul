@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { ColumnDto } from '@kurultay/shared-types';
+import type { ColumnDto, UpdateColumnRequest } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,9 +48,10 @@ export function RenameColumnDialog({
     setPending(true);
     setError(null);
     try {
+      const body: UpdateColumnRequest = { name: name.trim() };
       const updated = await api.patch<ColumnDto>(
         `/workspaces/${workspaceId}/columns/${column.id}`,
-        { name: name.trim() },
+        body,
       );
       onRenamed(updated);
       onOpenChange(false);
