@@ -46,7 +46,7 @@ export default function NewWorkspacePage(): React.ReactElement {
   }
 
   return (
-    <main className="mx-auto flex max-w-md flex-col gap-4">
+    <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-6">
       <h1 className="text-2xl font-semibold tracking-tight">{t('createTitle')}</h1>
       <p className="text-sm text-[var(--color-muted-foreground)]">{t('createSubtitle')}</p>
 
