@@ -180,6 +180,10 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
       layout'u
 - [x] Testler: auth akışları, workspace izolasyonu, rol matrisi
       ([testing.md](testing.md#neler-test-edilmeli))
+- [x] Faz 2 kalite sertleştirmesi (board öncesi): Nest-tek workspace mutation (BA org HTTP
+      firewall), paylaşılan `pg` pool, sorgu index'leri, `@kurultay/auth-access`, typed web
+      API client + middleware session gate, workspace-nested scaffold route'lar, CI'da
+      `format:check`
 
 ---
 

@@ -8,6 +8,7 @@ Open-source Kanban-focused project management tool. `dravcore/kurultay` — AGPL
 - `apps/api` (NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io)
 - `apps/web` (Next.js 16 App Router + Tailwind + shadcn/ui + @dnd-kit + Recharts)
 - `packages/shared-types` (TS types shared between frontend/backend — DTOs, enums, socket events)
+- `packages/auth-access` (Better Auth organization access-control roles for api + web)
 - Auth: Better Auth (organization plugin; product domain = Workspace) · Deploy: Docker Compose
 
 ## Critical rules

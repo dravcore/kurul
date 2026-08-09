@@ -90,15 +90,24 @@ Kök `package.json` script'leri:
 
 ## 2. packages/shared-types
 
-Frontend ve backend arasında paylaşılan TypeScript tipleri — Prisma'nın ürettiği
-modellerden türetilen DTO'lar ve enum'lar, artı socket kontratı.
+Frontend ve backend arasında paylaşılan TypeScript tipleri — Prisma şemasıyla hizalı,
+elle tutulan DTO/enum'lar (codegen hâlâ aspirasyonel), artı socket kontratı.
 
-| İçerik            | Detay                                                                                                           |
-| ----------------- | --------------------------------------------------------------------------------------------------------------- |
-| `Priority` enum   | `LOW \| MEDIUM \| HIGH \| URGENT`                                                                               |
-| `MemberRole` enum | `OWNER \| ADMIN \| MEMBER \| GUEST`                                                                             |
-| DTO tipleri       | Task, Board, Column, Label, Workspace                                                                           |
-| Socket event'leri | Event isim sabitleri ve payload tipleri — tek doğruluk kaynağı, böylece frontend ve backend birbirinden sapamaz |
+| İçerik             | Detay                                             |
+| ------------------ | ------------------------------------------------- |
+| `Priority` enum    | `LOW \| MEDIUM \| HIGH \| URGENT`                 |
+| `MemberRole` enum  | `OWNER \| ADMIN \| MEMBER \| GUEST`               |
+| `InvitationStatus` | `pending \| accepted \| canceled \| rejected`     |
+| `LabelColorSlot`   | `slot-1`…`slot-8` (ham hex değil)                 |
+| DTO tipleri        | Task, Board, Column, Label, Workspace, Invitation |
+| `CursorPage<T>`    | Varsayılan liste sayfalama şekli                  |
+| Socket event'leri  | Event isim sabitleri ve payload tipleri           |
+
+### packages/auth-access
+
+Better Auth organization access-control rolleri (`OWNER` / `ADMIN` / `MEMBER` / `GUEST`) —
+`apps/api` ve `apps/web` tarafından paylaşılır. `better-auth` peer dependency; rol
+açıklamalarını uygulamalar arasında kopyalamayın, burada tutun.
 
 ---
 
@@ -116,11 +125,11 @@ apps/api/
 │   ├── app.module.ts
 │   ├── generated/prisma/  # Prisma 7 client çıktısı — git-ignored, üretilir
 │   ├── common/            # guard, interceptor, filter, decorator
-│   ├── prisma/            # PrismaService (global module, pg Pool'u sahiplenir)
-│   ├── auth/              # Better Auth entegrasyonu
+│   ├── prisma/            # PrismaService + paylaşılan pg pool factory
+│   ├── auth/              # Better Auth entegrasyonu (+ org HTTP firewall)
 │   ├── workspace/         # workspace CRUD + üyelik/davet
-│   ├── board/             # board + column yönetimi
-│   ├── task/              # task CRUD, taşıma, sıralama
+│   ├── board/             # scaffold: /workspaces/:workspaceId/boards
+│   ├── task/              # scaffold: /workspaces/:workspaceId/tasks
 │   ├── label/
 │   ├── comment/
 │   ├── activity/          # aktivite log'u
@@ -212,13 +221,13 @@ Prisma 7, Rust query engine'i kaldırdı, bu da seçilme sebebi
 değil, ve aşağıdakilerin her biri sonradan keşfedilen bir detay olmak yerine iskeleti
 şekillendiriyor:
 
-| Gereklilik                            | İskelet üzerindeki etki                                                                                                                                                                                                                                                                               |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bir driver adapter zorunlu            | `@prisma/adapter-pg`, `apps/api`'nin bir bağımlılığı, ve `PrismaService`, `OnModuleInit`/`OnModuleDestroy` içinde bir `pg` Pool'un yaşam döngüsünü sahipleniyor — yalnızca bir connection string değil                                                                                                |
-| Kök dizinde `prisma.config.ts`        | `schema.prisma` içindeki env-var yapılandırmasının yerini alır ve seed giriş noktasını deklare eder (yukarıdaki `db:seed`)                                                                                                                                                                            |
-| Generator `output`'u zorunlu          | Client artık `node_modules`'a üretilmiyor. `apps/api/src/generated/prisma`'ya gidiyor, ve bunun hem `apps/api`'den hem de `packages/shared-types`'tan çözümlenebilmesi gerekiyor — sonuncusu DTO tiplerini üretilen modellerden türetiyor ([architecture.md](architecture.md#5-packagesshared-types)) |
-| Client middleware (`$use`) kaldırıldı | Herhangi bir sorgu-seviyesi cross-cutting kaygı — `workspaceId` scoping helper'ı, `position` üzerinde bir compare-and-swap guard'ı — artık bir **Client Extension**. Baştan extension'lar için tasarlayın; geri düşülecek bir middleware yok                                                          |
-| Env değişkenleri otomatik yüklenmiyor | `dotenv` açıkça çağrılıyor. Aşağıdaki `.env.example` aynı değişkenleri tarif etmeye devam ediyor; yalnızca yükleme elle yapılıyor                                                                                                                                                                     |
+| Gereklilik                            | İskelet üzerindeki etki                                                                                                                                                                                                                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Bir driver adapter zorunlu            | `@prisma/adapter-pg`, `apps/api`'nin bir bağımlılığı, ve `PrismaService`, `OnModuleInit`/`OnModuleDestroy` içinde bir `pg` Pool'un yaşam döngüsünü sahipleniyor — yalnızca bir connection string değil                                                                                           |
+| Kök dizinde `prisma.config.ts`        | `schema.prisma` içindeki env-var yapılandırmasının yerini alır ve seed giriş noktasını deklare eder (yukarıdaki `db:seed`)                                                                                                                                                                       |
+| Generator `output`'u zorunlu          | Client artık `node_modules`'a üretilmiyor. Nest ve Better Auth adapter için `apps/api/src/generated/prisma`'ya gider. `@kurultay/shared-types` içindeki DTO/enum'lar bugün şemayla elle hizalanır; mekanik codegen hâlâ aspirasyonel ([architecture.md](architecture.md#5-packagesshared-types)) |
+| Client middleware (`$use`) kaldırıldı | Herhangi bir sorgu-seviyesi cross-cutting kaygı — `workspaceId` scoping helper'ı, `position` üzerinde bir compare-and-swap guard'ı — artık bir **Client Extension**. Baştan extension'lar için tasarlayın; geri düşülecek bir middleware yok                                                     |
+| Env değişkenleri otomatik yüklenmiyor | `dotenv` açıkça çağrılıyor. Aşağıdaki `.env.example` aynı değişkenleri tarif etmeye devam ediyor; yalnızca yükleme elle yapılıyor                                                                                                                                                                |
 
 Bundan doğan asgari sürümler: Node ≥ 20.19.0 (projenin taban çizgisi daha yüksek — bkz.
 [development.md](development.md#ön-koşullar)) ve TypeScript 5.4.
@@ -231,22 +240,25 @@ Bootstrap hedefi: **Next.js 16** (App Router).
 
 ```
 apps/web/
+├── middleware.ts                # korumalı app route'ları için session gate
 ├── app/
 │   ├── (auth)/
 │   │   ├── login/
 │   │   └── register/
 │   ├── (app)/
-│   │   ├── layout.tsx           # sidebar + workspace switcher
+│   │   ├── layout.tsx           # AppShell + workspace switcher
 │   │   ├── dashboard/
 │   │   └── board/[boardId]/
 │   └── layout.tsx
 ├── components/
 │   ├── ui/                      # shadcn/ui
-│   ├── board/                   # KanbanBoard, Column, TaskCard
-│   ├── task/                    # TaskDetailPanel
-│   └── dashboard/                # grafik component'leri
+│   ├── layout/                  # AppShell, AppSidebar, WorkspaceProvider
+│   ├── auth/                    # paylaşılan auth form alanları
+│   ├── board/                   # KanbanBoard, Column, TaskCard (Faz 3+)
+│   ├── task/                    # TaskDetailPanel (Faz 3+)
+│   └── dashboard/               # grafik component'leri (Faz 6+)
 ├── lib/
-│   ├── api.ts                   # backend client
+│   ├── api.ts                   # typed Nest API client
 │   ├── socket.ts                # Socket.io client
 │   └── auth.ts                  # Better Auth client
 └── package.json

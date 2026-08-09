@@ -2,7 +2,8 @@
 
 **Status:** Accepted
 **Date:** 2026-08-08
-**Updated:** 2026-08-08 — adds the integration risk of the community-maintained NestJS path and Better Auth's pre-2.0 release cadence.
+**Updated:** 2026-08-09 — Phase 2 quality hardening: Nest-only org mutations, HTTP
+firewall on Better Auth organization writes, shared `@kurultay/auth-access` roles.
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0004-auth-better-auth.md)
 
@@ -54,10 +55,13 @@ Kurultay names (`Workspace`, `WorkspaceMember`, `WorkspaceInvitation`) and
 Better Auth's organization plugin maps onto them via `schema.modelName` /
 field maps (`organizationId` → `workspaceId`). No sync layer. Roles are the
 `MemberRole` enum values (`OWNER` / `ADMIN` / `MEMBER` / `GUEST`) registered
-1:1 with Better Auth access control (`creatorRole: "OWNER"`). Nest mounts the
-framework-agnostic Node handler on Express at `/auth/{*splat}` (escape hatch —
-the community Nest wrapper is not used). Public API responses never expose the
-word "organization".
+1:1 with Better Auth access control (`creatorRole: "OWNER"`). Access-control role
+statements live in `@kurultay/auth-access` and are imported by both api and web.
+Nest mounts the framework-agnostic Node handler on Express at `/auth/{*splat}`
+(escape hatch — the community Nest wrapper is not used). **Workspace/org mutations
+go only through Nest `/workspaces/*`.** Better Auth `/auth/organization/*` mutation
+HTTP paths are firewalled (list/get reads and `set-active` remain). Public API
+responses never expose the word "organization".
 
 ## Integration risk
 

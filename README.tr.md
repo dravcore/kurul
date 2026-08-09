@@ -6,9 +6,10 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 ## Durum
 
-Kurultay **MVP öncesi** aşamada. Faz 0 (dokümantasyon) ve Faz 1 (monorepo iskeleti)
-yerinde — `apps/api`, `apps/web` ve `packages/shared-types` yerelde çalışır. Auth ve ürün
-özellikleri Faz 2'de başlar — bkz. [docs/roadmap.md](docs/tr/roadmap.md).
+Kurultay **MVP öncesi** aşamada. Faz 0–1 (dokümantasyon + monorepo iskeleti) ve Faz 2
+auth/workspace'ler yerinde — `apps/api`, `apps/web`, `packages/shared-types` ve
+`packages/auth-access` yerelde çalışır. Board ve ürün özellikleri Faz 3'ten devam eder —
+bkz. [docs/roadmap.md](docs/tr/roadmap.md).
 
 ## Kurultay nedir?
 
@@ -58,14 +59,14 @@ Tam stack Docker: `docker compose up --build`. Günlük detaylar:
 
 ## Stack
 
-| Katman            | Seçim                                                                     |
-| ----------------- | ------------------------------------------------------------------------- |
-| Backend           | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                |
-| Frontend          | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts  |
-| Auth              | Better Auth (organization plugin → Workspace)                             |
-| Paylaşılan tipler | `packages/shared-types` (frontend/backend arasında paylaşılan TS tipleri) |
-| Deployment        | Docker Compose                                                            |
-| Mimari            | Monorepo, modüler monolit — mikroservis yok                               |
+| Katman            | Seçim                                                                          |
+| ----------------- | ------------------------------------------------------------------------------ |
+| Backend           | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                     |
+| Frontend          | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts       |
+| Auth              | Better Auth (organization plugin → Workspace)                                  |
+| Paylaşılan tipler | `packages/shared-types` + `packages/auth-access` (DTO'lar / BA org AC rolleri) |
+| Deployment        | Docker Compose                                                                 |
+| Mimari            | Monorepo, modüler monolit — mikroservis yok                                    |
 
 Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
 [docs/tr/decisions/](docs/tr/decisions/).

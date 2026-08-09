@@ -73,7 +73,8 @@ kurultay/
 │   ├── api/               # NestJS backend (modüler monolit)
 │   └── web/               # Next.js App Router frontend
 ├── packages/
-│   └── shared-types/      # api ve web tarafından paylaşılan TS tipleri
+│   ├── shared-types/      # api ve web tarafından paylaşılan TS tipleri / DTO'lar
+│   └── auth-access/       # Better Auth organization AC rolleri (api + web)
 ├── pnpm-workspace.yaml
 ├── docker-compose.yml
 ├── docker-compose.dev.yml
@@ -91,6 +92,12 @@ Her modül aynı iskelete sahip: `*.module.ts`, `*.controller.ts`, `*.service.ts
 Modül sınırları en baştan temiz tutulur — process rollerini daha sonra bölme imkânı tamamen
 buna bağlıdır.
 
+**Mevcut vs planlanan:** Faz 2 sonrası yalnızca `auth`, `workspace`, `health`, `common` ve
+`prisma` gerçek handler'lara sahip. `board`, `task`, `label`, `comment`, `activity`,
+`dashboard`, `notification` ve `realtime` route iskeletleridir; path'ler
+`/workspaces/:workspaceId/...` altında yuvalanmıştır ve roadmap fazlarını bekler. Aşağıdaki
+tabloyu hedef harita olarak okuyun — her modülün uygulandığı iddiası değildir.
+
 | Modül          | Sorumluluk                                                                |
 | -------------- | ------------------------------------------------------------------------- |
 | `auth`         | Better Auth entegrasyonu, session yönetimi, request user çözümlemesi      |
@@ -106,10 +113,10 @@ buna bağlıdır.
 
 Cross-cutting altyapı:
 
-| Modül    | Sorumluluk                                                                                |
-| -------- | ----------------------------------------------------------------------------------------- |
-| `common` | Guard'lar, interceptor'lar, exception filter'lar, decorator'lar — workspace scoping dahil |
-| `prisma` | Global modül olarak `PrismaService`; DB client'ının kurulduğu tek yer                     |
+| Modül    | Sorumluluk                                                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `common` | Guard'lar, exception filter'lar, decorator'lar, paylaşılan Nest bootstrap — workspace scoping; interceptor'lar Faz 3+ ile gelir |
+| `prisma` | Paylaşılan `pg` pool + Nest `PrismaService`; Better Auth aynı pool'u kullanır                                                   |
 
 Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdır, asla tersi değil.
 `realtime`, domain event'lerinin tüketicisidir, domain logic'in yaşadığı bir yer değil —
@@ -128,18 +135,23 @@ apps/web/
 │   │   └── board/[boardId]/
 │   └── layout.tsx
 ├── components/
-│   ├── ui/                # shadcn/ui primitive'leri
-│   ├── board/              # KanbanBoard, Column, TaskCard
-│   ├── task/               # TaskDetailPanel
-│   └── dashboard/          # grafik component'leri
+│   ├── layout/            # AppShell, WorkspaceProvider, AppSidebar
+│   ├── auth/              # paylaşılan auth form primitive'leri
+│   ├── ui/                # shadcn/ui primitive'leri (Faz 3+)
+│   ├── board/             # KanbanBoard, Column, TaskCard (Faz 3+)
+│   ├── task/              # TaskDetailPanel (Faz 5+)
+│   └── dashboard/         # grafik component'leri (Faz 7+)
 └── lib/
-    ├── api.ts             # REST client
-    ├── socket.ts          # Socket.io client
+    ├── api.ts             # typed REST client
+    ├── socket.ts          # Socket.io client stub (Faz 9)
+    ├── permissions.ts     # `@kurultay/auth-access` re-export
     └── auth.ts            # Better Auth client
 ```
 
 İki route group layout ağacını böler: `(auth)` sade bir kabuk render eder, `(app)` workspace
-chrome'unu render eder ve bir session olduğunu varsayar. Board etkileşimi client-side'dır
+chrome'unu render eder ve bir session olduğunu varsayar. Next.js middleware, `(app)`
+route'larından önce Better Auth session cookie'sini `/auth/get-session` ile doğrular; client
+shell session varken workspace bootstrap'ını yapar. Board etkileşimi client-side'dır
 (`@dnd-kit`), doğruluk kaynağı olarak sunucu ile birlikte — optimistic bir taşıma hem API
 yanıtına hem de gelen socket event'lerine karşı uzlaştırılır.
 
@@ -151,22 +163,20 @@ Telden geçen her şey için tek doğruluk kaynağı. Backend ve frontend aynı 
 import eder, böylece aralarındaki bir sapma runtime sürprizi yerine bir type hatasına
 dönüşür.
 
-| İçerik          | Örnekler                                                                                           |
-| --------------- | -------------------------------------------------------------------------------------------------- |
-| Enum'lar        | `Priority` (`LOW \| MEDIUM \| HIGH \| URGENT`), `MemberRole` (`OWNER \| ADMIN \| MEMBER \| GUEST`) |
-| DTO tipleri     | Workspace, Board, Column, Task, Label request/response şekilleri                                   |
-| Socket kontratı | Event isim sabitleri ve payload tipleri                                                            |
+| İçerik          | Örnekler                                                                           |
+| --------------- | ---------------------------------------------------------------------------------- |
+| Enum'lar        | `Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot` (`slot-1`…`slot-8`) |
+| DTO tipleri     | Workspace, Board, Column, Task, Label, Invitation request/response şekilleri       |
+| Sayfalama       | `CursorPage<T>` (varsayılan liste şekli; anahtar `id`)                             |
+| Socket kontratı | Event isim sabitleri ve payload tipleri                                            |
 
-En kritik olan socket kontratıdır: event isimlerinin tek bir yerde tanımlanması, sunucunun
-`task:moved` yaydığı, client'ın ise `taskMoved` dinlediği klasik hatayı ortadan kaldırır.
-Faydalı olduğu yerde tipler Prisma'nın ürettiği model tiplerinden türetilir, ancak paket
-Prisma'ya runtime bağımlılığından bağımsız kalır.
+Better Auth organization **rol / access-control** tanımları `@kurultay/auth-access` içindedir
+(bu pakette değil); böylece api ve web tek AC tanımını paylaşır, types paketine Better Auth
+çekilmez.
 
-Bu türetmenin Prisma 7 altında somut bir ön koşulu var: client artık `node_modules`'a
-üretilmiyor ve generator'ın `output` yolu zorunlu. Bu bir repo yolu — `apps/api/src/generated/prisma`
-— ve pnpm workspace içinde hem `apps/api`'den hem de `packages/shared-types`'tan
-çözümlenebilmesi gerekiyor. Prisma 7'nin gerektirdiği geri kalan her şey için bkz.
-[`decisions/0002-backend-stack.md`](decisions/0002-backend-stack.md).
+Enum'lar ve DTO'lar bugün Prisma şemasıyla **elle hizalanır**; mekanik Prisma→shared-types
+codegen yolu hedef olarak kalır (ADR 0002). Paket runtime Prisma bağımlılığı taşımaz. Prisma 7
+client hâlâ Nest ve Better Auth adapter için `apps/api/src/generated/prisma`'ya üretilir.
 
 ---
 
@@ -234,20 +244,24 @@ kasıtlı bir operasyon olmalıdır.
 Her workspace bir tenant'tır ve izolasyon kuralı mutlaktır: **her sorgu `workspaceId` ile
 scope'lanır.**
 
-Bu kural her serviste yeniden uygulanmak yerine guard/interceptor seviyesinde zorlanır:
+Bu kural bugün guard seviyesinde zorlanır (request-scoped Prisma Client Extension /
+interceptor'lar Faz 3+ ile gelir); her serviste yeniden uygulanmaz:
 
 1. Bir guard, mevcut kullanıcının istenen workspace'teki üyeliğini çözümler ve üyelik yoksa
-   isteği reddeder.
-2. Çözümlenen `workspaceId`, request context'ine eklenir.
+   isteği reddeder (üye olmayanlara 404 — anti-enumeration).
+2. Çözümlenen `workspaceId` / üyelik rolü, request context'ine eklenir.
 3. Servisler scope'u bu context'ten okur; repository erişim yolları her zaman ona göre
    filtreler.
 4. İç içe geçmiş kaynaklar, ebeveyn zincirleri üzerinden doğrulanır (task → board →
    workspace); böylece başka bir tenant'a ait geçerli bir id içeri kaçırılamaz.
+5. Workspace/org **mutation**'ları yalnızca Nest `/workspaces/*` üzerinden gider — Better Auth
+   `/auth/organization/*` mutation HTTP'si firewall'lanır; Nest politikası bypass edilemez.
 
 Bunu tek bir katmana yerleştirmek, yeni bir modülün izolasyonu varsayılan olarak devralması
 demektir. Bunun etrafından dolanan bir modül, bir stil farkı değil, bir bug'dır. Üyelik
 `role`'ü (`OWNER`/`ADMIN`/`MEMBER`/`GUEST`) yetki kararları için aynı katmanda kontrol
-edilir.
+edilir. Scaffold controller'lar `/workspaces/:workspaceId/...` kullanır; handler'lar
+geldiğinde `WorkspaceGuard` `params.workspaceId` okuyabilir.
 
 ---
 

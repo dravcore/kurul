@@ -105,14 +105,15 @@ bölümüne bakın.
 
 Scope opsiyoneldir ama kuvvetle tercih edilir. Monorepo'nun etkilenen kısmını adlandırır.
 
-| Scope    | Anlam                                             |
-| -------- | ------------------------------------------------- |
-| `api`    | `apps/api` — NestJS backend                       |
-| `web`    | `apps/web` — Next.js frontend                     |
-| `shared` | `packages/shared-types`                           |
-| `deps`   | Dependency bump'ları                              |
-| `docs`   | `docs/` seti (commit type'ı zaten `docs` değilse) |
-| `ci`     | Workflow'lar ve pipeline config'i                 |
+| Scope         | Anlam                                                        |
+| ------------- | ------------------------------------------------------------ |
+| `api`         | `apps/api` — NestJS backend                                  |
+| `web`         | `apps/web` — Next.js frontend                                |
+| `shared`      | `packages/shared-types`                                      |
+| `auth-access` | `packages/auth-access` — Better Auth organization AC rolleri |
+| `deps`        | Dependency bump'ları                                         |
+| `docs`        | `docs/` seti (commit type'ı zaten `docs` değilse)            |
+| `ci`          | Workflow'lar ve pipeline config'i                            |
 
 Daha dar modül scope'ları netlik kattığında sorun değildir: `feat(api/task)`,
 `fix(web/board)`.
@@ -277,9 +278,9 @@ Kurultay, SemVer'ın garantilerinin 1.0 öncesi daha zayıf olduğu dürüst çe
 
 **1.0 öncesi (`0.y.z`) — projenin şu anda bulunduğu yer:**
 
-- Public API (REST endpoint'leri, `@kurultay/shared-types`, veritabanı şeması, env
-  değişken isimleri) **kararlı değildir**. Breaking değişiklikler herhangi bir `0.y.0`'da
-  gelebilir.
+- Public API (REST endpoint'leri, `@kurultay/shared-types`, `@kurultay/auth-access`,
+  veritabanı şeması, env değişken isimleri) **kararlı değildir**. Breaking değişiklikler
+  herhangi bir `0.y.0`'da gelebilir.
 - `0.y.0` (MINOR): yeni özellikler **ve** breaking değişiklikler.
 - `0.0.z` / `0.y.z` (PATCH): yalnızca bug fix'leri ve breaking olmayan değişiklikler.
 - Her breaking değişiklik, bir migration notuyla birlikte `CHANGELOG.md`'de `### Changed`

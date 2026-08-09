@@ -6,9 +6,10 @@ Open-source, Kanban-focused project management tool.
 
 ## Status
 
-Kurultay is **pre-MVP**. Phase 0 (docs) and Phase 1 (monorepo skeleton) are in place —
-`apps/api`, `apps/web`, and `packages/shared-types` run locally. Auth and product features
-start in Phase 2 — see [docs/roadmap.md](docs/roadmap.md).
+Kurultay is **pre-MVP**. Phases 0–1 (docs + monorepo skeleton) and Phase 2 auth/workspaces
+are in place — `apps/api`, `apps/web`, `packages/shared-types`, and `packages/auth-access`
+run locally. Boards and product features continue from Phase 3 — see
+[docs/roadmap.md](docs/roadmap.md).
 
 ## What is Kurultay?
 
@@ -56,14 +57,14 @@ Full stack in Docker: `docker compose up --build`. Day-to-day details:
 
 ## Stack
 
-| Layer        | Choice                                                                   |
-| ------------ | ------------------------------------------------------------------------ |
-| Backend      | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io               |
-| Frontend     | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts |
-| Auth         | Better Auth (organization plugin → Workspace)                            |
-| Shared types | `packages/shared-types` (TS types shared between frontend/backend)       |
-| Deployment   | Docker Compose                                                           |
-| Architecture | Monorepo, modular monolith — no microservices                            |
+| Layer        | Choice                                                                    |
+| ------------ | ------------------------------------------------------------------------- |
+| Backend      | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                |
+| Frontend     | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts  |
+| Auth         | Better Auth (organization plugin → Workspace)                             |
+| Shared types | `packages/shared-types` + `packages/auth-access` (DTOs / BA org AC roles) |
+| Deployment   | Docker Compose                                                            |
+| Architecture | Monorepo, modular monolith — no microservices                             |
 
 Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 [docs/decisions/](docs/decisions/).

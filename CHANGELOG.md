@@ -17,3 +17,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Phase 2 auth and workspaces: Better Auth (organization plugin) on Nest `/auth/*`,
   `GET /me`, session/workspace/role guards, workspace CRUD + invitations, web
   login/register/invite + workspace switcher, and auth/isolation/role-matrix tests.
+- `@kurultay/auth-access` — shared Better Auth organization access-control roles for api
+  and web.
+- Shared Prisma/`pg` pool for Nest and Better Auth; FK and list query indexes migration;
+  workspace-nested scaffold routes (`/workspaces/:workspaceId/...`).
+- Web: typed Nest API client, Next.js middleware session gate, layout split
+  (`WorkspaceProvider` / `AppSidebar` / `AppShell`).
+- CI `format:check` (Prettier) on every PR.
+
+### Changed
+
+- Nest `/workspaces` is the sole public API for organization/workspace mutations; Better
+  Auth `/auth/organization/*` mutation paths are HTTP-firewalled (reads + `set-active`
+  remain).
+- Pagination docs: cursor `CursorPage<T>` is the shared typed default; no `OffsetPage`
+  export.
+- Product enums in `@kurultay/shared-types` include `InvitationStatus` and
+  `LabelColorSlot` (`slot-1`…`slot-8`); invitation DTO status is no longer a free string.
+- ESLint docs aligned with the flat config actually shipped (no Nest/Next/import plugins
+  yet).

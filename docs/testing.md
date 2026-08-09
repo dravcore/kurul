@@ -158,13 +158,15 @@ This stance is revisited at 1.0, when the API is stable enough for a floor to be
 
 Every pull request runs, on `develop` and `main` as well:
 
-| Step              | Command                                                                     |
-| ----------------- | --------------------------------------------------------------------------- |
-| Lint              | `pnpm lint`                                                                 |
-| Typecheck         | `tsc --noEmit` across workspaces                                            |
-| Unit tests        | `pnpm --filter @kurultay/api test`                                          |
-| Integration tests | `pnpm --filter @kurultay/api test:e2e` against a Postgres service container |
-| Build             | `pnpm build`                                                                |
+| Step              | Command                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| Build shared pkgs | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build` |
+| Lint              | `pnpm lint`                                                                               |
+| Format check      | `pnpm format:check`                                                                       |
+| Typecheck         | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                       |
+| Unit tests        | `pnpm --filter @kurultay/api test`                                                        |
+| Integration tests | `pnpm --filter @kurultay/api test:e2e` against a Postgres service container               |
+| Build             | `pnpm build`                                                                              |
 
 All steps must pass before merge. See [git-strategy.md](git-strategy.md#pull-request-process).
 
