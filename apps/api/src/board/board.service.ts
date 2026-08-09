@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { BoardDto } from '@kurultay/shared-types';
+import { DEFAULT_COLUMNS } from '../common/board-defaults';
 import { assertBoard } from '../common/board-access';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateBoardDto } from './dto/create-board.dto';
@@ -40,13 +41,7 @@ export class BoardService {
           workspaceId,
           name: dto.name,
           description: dto.description,
-          columns: {
-            create: [
-              { name: 'To Do', position: 1000 },
-              { name: 'In Progress', position: 2000 },
-              { name: 'Done', position: 3000 },
-            ],
-          },
+          columns: { create: DEFAULT_COLUMNS.map((column) => ({ ...column })) },
         },
       }),
     );

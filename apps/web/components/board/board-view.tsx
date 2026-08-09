@@ -37,6 +37,7 @@ import { CreateTaskDialog } from '@/components/task/create-task-dialog';
 import { DeleteTaskDialog } from '@/components/task/delete-task-dialog';
 import { TaskPanel } from '@/components/task/task-panel';
 import { TaskDragPreview } from '@/components/task/sortable-task-card';
+import { buildTaskDndAnnouncements } from '@/components/task/task-dnd-announcements';
 import { useBoardTaskDnd, type TaskMovePayload } from '@/components/task/use-board-task-dnd';
 import { BoardColumn } from './board-column';
 import { BoardFilters } from './board-filters';
@@ -192,8 +193,13 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     }
   }
 
-  const dnd = useBoardTaskDnd(tasks, canMutateTasksFlag, commitTaskMove, (title) =>
-    tTask('movedAnnouncement', { title }),
+  const dnd = useBoardTaskDnd(tasks, canMutateTasksFlag, commitTaskMove);
+  const dndAccessibility = useMemo(
+    () => ({
+      announcements: buildTaskDndAnnouncements(tasks, columns, tTask),
+      screenReaderInstructions: { draggable: tTask('dnd.instructions') },
+    }),
+    [tasks, columns, tTask],
   );
   useEffect(() => {
     dndRef.current = { cancelDrag: dnd.cancelDrag, isDragging: dnd.isDragging };
@@ -472,6 +478,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             </div>
           ) : (
             <DndContext
+              accessibility={dndAccessibility}
               sensors={dnd.sensors}
               collisionDetection={dnd.collisionDetection}
               onDragStart={dnd.onDragStart}
@@ -518,9 +525,6 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
               <DragOverlay dropAnimation={dropAnimation}>
                 {dnd.activeTask ? <TaskDragPreview task={dnd.activeTask} /> : null}
               </DragOverlay>
-              <div className="sr-only" aria-live="polite">
-                {dnd.announcement}
-              </div>
             </DndContext>
           )}
         </div>

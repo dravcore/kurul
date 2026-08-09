@@ -187,7 +187,18 @@
         "mentions": {
           "pickerLabel": "Mention a member",
           "empty": "No members match",
-          "hint": "Type @ to mention someone"
+          "hint": "Type @ to mention someone. Use the up and down arrows to choose, Enter to insert, Escape to dismiss."
+        },
+        "dragHandle": "Reorder {title}",
+        "dnd": {
+          "roleDescription": "sortable task",
+          "instructions": "Press Space or Enter on a task's reorder button to pick it up. Use the arrow keys to move it between positions and columns. Press Space or Enter again to drop it, or Escape to cancel.",
+          "pickedUp": "Picked up {title}.",
+          "overColumn": "{title} is over {column}.",
+          "overNothing": "{title} is not over a column.",
+          "dropped": "Dropped {title} into {column}.",
+          "droppedNowhere": "{title} was returned to where it started.",
+          "cancelled": "Cancelled moving {title}. It returned to where it started."
         },
         "activity": {
           "title": "History",
@@ -220,7 +231,6 @@
         "saveError": "Could not save this task.",
         "missing": "This task no longer exists. Someone may have deleted it.",
         "moveError": "Could not move this task.",
-        "movedAnnouncement": "Moved {title}",
         "retryAction": "Try again",
         "cancel": "Cancel",
         "forbidden": "You need to be a workspace member to change tasks."

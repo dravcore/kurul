@@ -1,23 +1,14 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Patch,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Req } from '@nestjs/common';
 import { MemberRole } from '@kurultay/shared-types';
 import type { InvitationDto, WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import type { Request } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { WorkspaceGuard } from '../common/guards/workspace.guard';
-import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
+import { UuidParam } from '../common/decorators/uuid-param.decorator';
+import {
+  ADMIN_ROLES,
+  WorkspaceRoles,
+  WorkspaceScoped,
+} from '../common/decorators/workspace-roles.decorator';
 import type { AuthenticatedUser } from '../common/types/request-context';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
@@ -47,16 +38,15 @@ export class WorkspaceController {
   }
 
   @Get(':workspaceId')
-  @UseGuards(WorkspaceGuard)
-  get(@Param('workspaceId', ParseUuidV7Pipe) workspaceId: string): Promise<WorkspaceDto> {
+  @WorkspaceScoped()
+  get(@UuidParam('workspaceId') workspaceId: string): Promise<WorkspaceDto> {
     return this.workspaceService.getById(workspaceId);
   }
 
   @Patch(':workspaceId')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   update(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @UuidParam('workspaceId') workspaceId: string,
     @Body() dto: UpdateWorkspaceDto,
     @Req() request: Request,
   ): Promise<WorkspaceDto> {
@@ -65,28 +55,24 @@ export class WorkspaceController {
 
   @Delete(':workspaceId')
   @HttpCode(204)
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER)
+  @WorkspaceRoles(MemberRole.OWNER)
   async remove(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @UuidParam('workspaceId') workspaceId: string,
     @Req() request: Request,
   ): Promise<void> {
     await this.workspaceService.remove(workspaceId, request);
   }
 
   @Get(':workspaceId/members')
-  @UseGuards(WorkspaceGuard)
-  listMembers(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-  ): Promise<WorkspaceMemberDto[]> {
+  @WorkspaceScoped()
+  listMembers(@UuidParam('workspaceId') workspaceId: string): Promise<WorkspaceMemberDto[]> {
     return this.workspaceService.listMembers(workspaceId);
   }
 
   @Post(':workspaceId/invitations')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   createInvitation(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @UuidParam('workspaceId') workspaceId: string,
     @Body() dto: CreateInvitationDto,
     @Req() request: Request,
   ): Promise<InvitationDto> {
@@ -95,11 +81,10 @@ export class WorkspaceController {
 
   @Delete(':workspaceId/invitations/:invitationId')
   @HttpCode(204)
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   async revokeInvitation(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('invitationId', ParseUuidV7Pipe) invitationId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('invitationId') invitationId: string,
     @Req() request: Request,
   ): Promise<void> {
     await this.invitationService.revokeInvitation(workspaceId, invitationId, request);
@@ -108,11 +93,15 @@ export class WorkspaceController {
   /**
    * Accept is session-authenticated but not membership-gated — the invitee is not a
    * member until after accept. `:workspaceId` must match the invitation's workspace.
+   *
+   * 200, not 201: this is an action on an existing invitation (api-conventions), and the
+   * membership it returns has no URL of its own for a `Location` header to point at.
    */
   @Post(':workspaceId/invitations/:invitationId/accept')
+  @HttpCode(200)
   acceptInvitation(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('invitationId', ParseUuidV7Pipe) invitationId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('invitationId') invitationId: string,
     @Req() request: Request,
   ): Promise<WorkspaceMemberDto> {
     return this.invitationService.acceptInvitation(workspaceId, invitationId, request);

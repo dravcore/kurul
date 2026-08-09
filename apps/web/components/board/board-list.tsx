@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { MoreHorizontal } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BoardDto } from '@kurultay/shared-types';
 import { canCreateOrUpdateBoard, canDeleteBoard } from '@/lib/board-permissions';
+import { useApiResource } from '@/lib/use-api-resource';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { Button } from '@/components/ui/button';
@@ -24,9 +25,6 @@ import { DamgaMark } from '@/components/brand/damga-mark';
 export function BoardList(): React.ReactElement {
   const t = useTranslations('app.board');
   const { activeId, activeRole } = useWorkspaceContext();
-  const [boards, setBoards] = useState<BoardDto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [renameBoard, setRenameBoard] = useState<BoardDto | null>(null);
   const [deleteBoard, setDeleteBoard] = useState<BoardDto | null>(null);
@@ -35,31 +33,16 @@ export function BoardList(): React.ReactElement {
   const canDelete = canDeleteBoard(activeRole);
   const canRename = canCreateOrUpdateBoard(activeRole);
 
-  useEffect(() => {
-    if (!activeId) return;
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    void (async () => {
-      try {
-        const list = await fetchWorkspaceBoards(activeId, {
-          signal: controller.signal,
-        });
-        if (!controller.signal.aborted) {
-          setBoards(list);
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          setError(t('listError'));
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, [activeId, t]);
+  const fetchBoards = useMemo(
+    () => (activeId ? (signal: AbortSignal) => fetchWorkspaceBoards(activeId, { signal }) : null),
+    [activeId],
+  );
+  const {
+    data: boards,
+    loading,
+    error,
+    setData: setBoards,
+  } = useApiResource<BoardDto[]>(fetchBoards, [], t('listError'));
 
   if (!activeId) {
     return <p className="text-body text-muted-foreground">{t('listError')}</p>;

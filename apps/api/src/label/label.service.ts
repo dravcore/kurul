@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { LabelColorSlot, LabelDto } from '@kurultay/shared-types';
+import type { LabelDto } from '@kurultay/shared-types';
 import { assertBoard } from '../common/board-access';
+import { toLabelColorSlot } from '../common/label-color';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateLabelDto } from './dto/create-label.dto';
 import type { UpdateLabelDto } from './dto/update-label.dto';
@@ -21,7 +22,7 @@ export class LabelService {
       id: row.id,
       boardId: row.boardId,
       name: row.name,
-      color: row.color as LabelColorSlot,
+      color: toLabelColorSlot(row.color),
     };
   }
 

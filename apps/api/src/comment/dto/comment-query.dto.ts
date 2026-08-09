@@ -1,21 +1,11 @@
-import { Transform, Type } from 'class-transformer';
-import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
-
-function clampLimit(value: unknown): number {
-  const n = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(n) || n < 1) return 100;
-  return Math.min(Math.trunc(n), 100);
-}
+import { IsOptional, IsUUID } from 'class-validator';
+import { MAX_PAGE_LIMIT, PageLimit } from '../../common/pagination/page-limit';
 
 /** Cursor page query for a task's comments. */
 export class CommentQueryDto {
-  @IsOptional()
-  @Transform(({ value }) => clampLimit(value ?? 100))
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit: number = 100;
+  /** A task's comment thread is short, so the default is the ceiling — one round trip. */
+  @PageLimit(MAX_PAGE_LIMIT)
+  limit: number = MAX_PAGE_LIMIT;
 
   @IsOptional()
   @IsUUID('7')
