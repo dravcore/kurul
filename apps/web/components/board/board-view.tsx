@@ -143,24 +143,39 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     return () => window.clearTimeout(timeout);
   }, [loading, entranceDone, columns.length]);
 
-  const reload = useCallback(
+  const reloadBoardMeta = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
       if (!activeId) return;
-      const [nextBoard, nextColumns, nextTasks, nextMembers, nextLabels] = await Promise.all([
+      const [nextBoard, nextColumns, nextMembers, nextLabels] = await Promise.all([
         api.get<BoardDto>(`/workspaces/${activeId}/boards/${boardId}`, { signal }),
         api.get<ColumnDto[]>(`/workspaces/${activeId}/boards/${boardId}/columns`, { signal }),
-        fetchAllBoardTasks(activeId, boardId, filters, { signal }),
         api.get<WorkspaceMemberDto[]>(`/workspaces/${activeId}/members`, { signal }),
         api.get<LabelDto[]>(`/workspaces/${activeId}/boards/${boardId}/labels`, { signal }),
       ]);
       if (signal?.aborted) return;
       setBoard(nextBoard);
       setColumns(nextColumns);
-      setTasks(nextTasks);
       setMembers(nextMembers);
       setLabels(nextLabels);
     },
+    [activeId, boardId],
+  );
+
+  const reloadTasks = useCallback(
+    async (signal?: AbortSignal): Promise<void> => {
+      if (!activeId) return;
+      const nextTasks = await fetchAllBoardTasks(activeId, boardId, filters, { signal });
+      if (signal?.aborted) return;
+      setTasks(nextTasks);
+    },
     [activeId, boardId, filters],
+  );
+
+  const reload = useCallback(
+    async (signal?: AbortSignal): Promise<void> => {
+      await Promise.all([reloadBoardMeta(signal), reloadTasks(signal)]);
+    },
+    [reloadBoardMeta, reloadTasks],
   );
 
   const applyFilters = useCallback(
@@ -183,7 +198,11 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     setError(null);
     void (async () => {
       try {
-        await reload(controller.signal);
+        if (isInitial) {
+          await reload(controller.signal);
+        } else {
+          await reloadTasks(controller.signal);
+        }
         if (!controller.signal.aborted) {
           loadedBoardIdRef.current = boardId;
         }
@@ -198,7 +217,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
       }
     })();
     return () => controller.abort();
-  }, [activeId, boardId, reload, t]);
+  }, [activeId, boardId, filters, reload, reloadTasks, t]);
 
   useEffect(() => {
     if (!activeId || !selectedTaskId || loading) {
@@ -266,24 +285,41 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
   );
   dndRef.current = { cancelDrag: dnd.cancelDrag, isDragging: dnd.isDragging };
 
+  const upsertTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
   const upsertRemoteTask = useCallback(
-    async (taskId: string): Promise<void> => {
+    (taskId: string): void => {
       if (!activeId) return;
-      try {
-        const remote = await api.get<TaskDto>(`/workspaces/${activeId}/tasks/${taskId}`);
-        setTasks((current) => {
-          const index = current.findIndex((task) => task.id === taskId);
-          if (index < 0) return [...current, remote];
-          const next = [...current];
-          next[index] = remote;
-          return next;
-        });
-      } catch {
-        // Task may have been deleted before fetch completed.
-      }
+      const pending = upsertTimersRef.current.get(taskId);
+      if (pending) clearTimeout(pending);
+      const timer = setTimeout(() => {
+        upsertTimersRef.current.delete(taskId);
+        void (async () => {
+          try {
+            const remote = await api.get<TaskDto>(`/workspaces/${activeId}/tasks/${taskId}`);
+            setTasks((current) => {
+              const index = current.findIndex((task) => task.id === taskId);
+              if (index < 0) return [...current, remote];
+              const next = [...current];
+              next[index] = remote;
+              return next;
+            });
+          } catch {
+            // Task may have been deleted before fetch completed.
+          }
+        })();
+      }, 120);
+      upsertTimersRef.current.set(taskId, timer);
     },
     [activeId],
   );
+
+  useEffect(() => {
+    return () => {
+      for (const timer of upsertTimersRef.current.values()) clearTimeout(timer);
+      upsertTimersRef.current.clear();
+    };
+  }, []);
 
   const refetchColumns = useCallback(async (): Promise<void> => {
     if (!activeId) return;
@@ -581,6 +617,8 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             task={selectedTask}
             canMutate={canEditTasks}
             canManageLabels={canEditLabels}
+            members={members}
+            labels={labels}
             loadError={panelError}
             metaRefreshKey={metaRefreshKey}
             onUpdated={(patch) =>

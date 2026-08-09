@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { TaskDto } from '@kurultay/shared-types';
@@ -15,7 +16,7 @@ interface SortableTaskCardProps {
   disabled?: boolean;
 }
 
-export function SortableTaskCard({
+export const SortableTaskCard = memo(function SortableTaskCard({
   task,
   boardId,
   selected = false,
@@ -46,7 +47,7 @@ export function SortableTaskCard({
       />
     </div>
   );
-}
+});
 
 /** Drag overlay preview — matches design.md lift treatment. */
 export function TaskDragPreview({ task }: { task: TaskDto }): React.ReactElement {

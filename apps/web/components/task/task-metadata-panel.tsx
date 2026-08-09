@@ -34,6 +34,9 @@ interface TaskMetadataPanelProps {
   task: TaskDto;
   canMutate: boolean;
   canManageLabels: boolean;
+  /** Board-scoped caches from BoardView — skip refetch when provided. */
+  members?: WorkspaceMemberDto[];
+  labels?: LabelDto[];
   /** Bump to refetch comments/activity without remounting. */
   metaRefreshKey?: number;
   onUpdated: (patch: Partial<TaskDto> & Pick<TaskDto, 'id'>) => void;
@@ -45,6 +48,8 @@ export function TaskMetadataPanel({
   task,
   canMutate,
   canManageLabels,
+  members: membersProp,
+  labels: labelsProp,
   metaRefreshKey = 0,
   onUpdated,
 }: TaskMetadataPanelProps): React.ReactElement {
@@ -57,8 +62,8 @@ export function TaskMetadataPanel({
   const labelNameId = useId();
   const commentRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const [members, setMembers] = useState<WorkspaceMemberDto[]>([]);
-  const [boardLabels, setBoardLabels] = useState<LabelDto[]>([]);
+  const [members, setMembers] = useState<WorkspaceMemberDto[]>(membersProp ?? []);
+  const [boardLabels, setBoardLabels] = useState<LabelDto[]>(labelsProp ?? []);
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [activities, setActivities] = useState<ActivityDto[]>([]);
   const [commentBody, setCommentBody] = useState('');
@@ -76,17 +81,30 @@ export function TaskMetadataPanel({
   }, [task.id, task.estimatedMinutes]);
 
   useEffect(() => {
+    if (membersProp) setMembers(membersProp);
+  }, [membersProp]);
+
+  useEffect(() => {
+    if (labelsProp) setBoardLabels(labelsProp);
+  }, [labelsProp]);
+
+  useEffect(() => {
     const controller = new AbortController();
     setLoadingMeta(true);
     void (async () => {
       try {
+        const sharedReady = membersProp !== undefined && labelsProp !== undefined;
         const [nextMembers, nextLabels, nextComments, nextActivities] = await Promise.all([
-          api.get<WorkspaceMemberDto[]>(`/workspaces/${workspaceId}/members`, {
-            signal: controller.signal,
-          }),
-          api.get<LabelDto[]>(`/workspaces/${workspaceId}/boards/${boardId}/labels`, {
-            signal: controller.signal,
-          }),
+          sharedReady
+            ? Promise.resolve(membersProp)
+            : api.get<WorkspaceMemberDto[]>(`/workspaces/${workspaceId}/members`, {
+                signal: controller.signal,
+              }),
+          sharedReady
+            ? Promise.resolve(labelsProp)
+            : api.get<LabelDto[]>(`/workspaces/${workspaceId}/boards/${boardId}/labels`, {
+                signal: controller.signal,
+              }),
           api.get<CommentDto[]>(`/workspaces/${workspaceId}/tasks/${task.id}/comments`, {
             signal: controller.signal,
           }),
@@ -96,8 +114,10 @@ export function TaskMetadataPanel({
           ),
         ]);
         if (!controller.signal.aborted) {
-          setMembers(nextMembers);
-          setBoardLabels(nextLabels);
+          if (!sharedReady) {
+            setMembers(nextMembers);
+            setBoardLabels(nextLabels);
+          }
           setComments(nextComments);
           setActivities(nextActivities.items);
         }
@@ -112,7 +132,7 @@ export function TaskMetadataPanel({
       }
     })();
     return () => controller.abort();
-  }, [workspaceId, boardId, task.id, metaRefreshKey, t]);
+  }, [workspaceId, boardId, task.id, metaRefreshKey, membersProp, labelsProp, t]);
 
   function syncMentionQuery(value: string, cursor: number): void {
     const active = getActiveMentionQuery(value, cursor);

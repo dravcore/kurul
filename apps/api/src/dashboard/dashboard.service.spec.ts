@@ -3,6 +3,7 @@ import { Priority } from '@kurultay/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   applyThroughputCounts,
+  applyThroughputDayCounts,
   emptyThroughputSeries,
   isCompletedMove,
   THROUGHPUT_DAYS,
@@ -43,6 +44,17 @@ describe('dashboard-throughput helpers', () => {
     expect(result.find((day) => day.date === '2026-08-08')!.completed).toBe(1);
     expect(result.reduce((sum, day) => sum + day.created, 0)).toBe(1);
   });
+
+  it('applies pre-aggregated day counts', () => {
+    const series = emptyThroughputSeries(new Date('2026-08-09T12:00:00.000Z'));
+    const result = applyThroughputDayCounts(
+      series,
+      new Map([['2026-08-09', 3]]),
+      new Map([['2026-08-08', 2]]),
+    );
+    expect(result.find((day) => day.date === '2026-08-09')!.created).toBe(3);
+    expect(result.find((day) => day.date === '2026-08-08')!.completed).toBe(2);
+  });
 });
 
 describe('DashboardService', () => {
@@ -61,12 +73,10 @@ describe('DashboardService', () => {
       column: {
         findMany: jest.fn().mockResolvedValue([]),
       },
-      activity: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
       user: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     return { service: new DashboardService(prisma as unknown as PrismaService), prisma };
   }
@@ -90,6 +100,7 @@ describe('DashboardService', () => {
       { priority: Priority.URGENT, count: 0 },
     ]);
     expect(prisma.board.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
   });
 
   it('fills byColumn including zero-count columns when boardId is set', async () => {
@@ -98,12 +109,10 @@ describe('DashboardService', () => {
     prisma.task.groupBy
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ columnId: 'c1', _count: { _all: 4 } }]);
-    prisma.column.findMany
-      .mockResolvedValueOnce([
-        { id: 'c1', name: 'To Do', position: 1000 },
-        { id: 'c2', name: 'Done', position: 2000 },
-      ])
-      .mockResolvedValueOnce([{ id: 'c2' }]);
+    prisma.column.findMany.mockResolvedValueOnce([{ id: 'c2' }]).mockResolvedValueOnce([
+      { id: 'c1', name: 'To Do', position: 1000 },
+      { id: 'c2', name: 'Done', position: 2000 },
+    ]);
 
     const summary = await service.summary(WORKSPACE_ID, { boardId: BOARD_ID });
 
@@ -119,18 +128,9 @@ describe('DashboardService', () => {
     prisma.task.groupBy.mockResolvedValue([]);
     prisma.column.findMany.mockResolvedValue([{ id: 'done-id' }]);
     const today = emptyThroughputSeries()[THROUGHPUT_DAYS - 1]!.date;
-    prisma.activity.findMany
-      .mockResolvedValueOnce([{ createdAt: new Date(`${today}T10:00:00.000Z`) }])
-      .mockResolvedValueOnce([
-        {
-          createdAt: new Date(`${today}T11:00:00.000Z`),
-          payload: { toColumnName: 'Done', toColumnId: 'done-id' },
-        },
-        {
-          createdAt: new Date(`${today}T12:00:00.000Z`),
-          payload: { toColumnId: 'other' },
-        },
-      ]);
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ day: new Date(`${today}T00:00:00.000Z`), count: 1 }])
+      .mockResolvedValueOnce([{ day: new Date(`${today}T00:00:00.000Z`), count: 1 }]);
 
     const summary = await service.summary(WORKSPACE_ID, {});
     const todayRow = summary.throughput.find((day) => day.date === today)!;

@@ -10,13 +10,15 @@ import type { Prisma } from '../generated/prisma';
 import { PrismaService } from '../prisma/prisma.service';
 import type { DashboardQueryDto } from './dto/dashboard-query.dto';
 import {
-  applyThroughputCounts,
+  applyThroughputDayCounts,
   emptyThroughputSeries,
-  isCompletedMove,
+  utcDateKey,
 } from './dashboard-throughput';
 
 const ALL_PRIORITIES = Object.values(Priority);
 const ASSIGNEE_TOP_N = 8;
+
+type DayCountRow = { day: Date; count: number | bigint };
 
 @Injectable()
 export class DashboardService {
@@ -36,11 +38,15 @@ export class DashboardService {
     const throughputSeries = emptyThroughputSeries(now);
     const since = new Date(`${throughputSeries[0]!.date}T00:00:00.000Z`);
 
-    const activityWhere: Prisma.ActivityWhereInput = {
-      workspaceId,
-      createdAt: { gte: since },
-      ...(query.boardId ? { task: { boardId: query.boardId } } : {}),
-    };
+    const doneColumns = await this.prisma.column.findMany({
+      where: {
+        board: { workspaceId },
+        ...(query.boardId ? { boardId: query.boardId } : {}),
+        name: { equals: 'Done', mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+    const doneColumnIds = doneColumns.map((column) => column.id);
 
     const [
       totalTasks,
@@ -49,13 +55,16 @@ export class DashboardService {
       assigneeRows,
       unassignedCount,
       columns,
-      doneColumns,
-      createdActivities,
-      movedActivities,
+      createdDays,
+      completedDays,
     ] = await Promise.all([
       this.prisma.task.count({ where: taskWhere }),
       this.prisma.task.count({
-        where: { ...taskWhere, dueDate: { not: null, lt: now } },
+        where: {
+          ...taskWhere,
+          dueDate: { not: null, lt: now },
+          ...(doneColumnIds.length > 0 ? { columnId: { notIn: doneColumnIds } } : {}),
+        },
       }),
       this.prisma.task.groupBy({
         by: ['priority'],
@@ -67,6 +76,7 @@ export class DashboardService {
         where: { task: taskWhere },
         _count: { _all: true },
         orderBy: { _count: { userId: 'desc' } },
+        take: ASSIGNEE_TOP_N + 20,
       }),
       this.prisma.task.count({
         where: { ...taskWhere, assignees: { none: {} } },
@@ -78,22 +88,8 @@ export class DashboardService {
             select: { id: true, name: true, position: true },
           })
         : Promise.resolve(null),
-      this.prisma.column.findMany({
-        where: {
-          board: { workspaceId },
-          ...(query.boardId ? { boardId: query.boardId } : {}),
-          name: { equals: 'Done', mode: 'insensitive' },
-        },
-        select: { id: true },
-      }),
-      this.prisma.activity.findMany({
-        where: { ...activityWhere, type: ActivityType.TaskCreated },
-        select: { createdAt: true },
-      }),
-      this.prisma.activity.findMany({
-        where: { ...activityWhere, type: ActivityType.TaskMoved },
-        select: { createdAt: true, payload: true },
-      }),
+      this.countActivitiesByDay(workspaceId, ActivityType.TaskCreated, since, query.boardId),
+      this.countCompletedMovesByDay(workspaceId, since, doneColumnIds, query.boardId),
     ]);
 
     const byPriority: DashboardCountByPriority[] = ALL_PRIORITIES.map((priority) => ({
@@ -121,17 +117,10 @@ export class DashboardService {
       }));
     }
 
-    const doneColumnIds = new Set(doneColumns.map((column) => column.id));
-    const completedAts = movedActivities
-      .filter((row) =>
-        isCompletedMove((row.payload ?? {}) as Record<string, unknown>, doneColumnIds),
-      )
-      .map((row) => row.createdAt);
-
-    const throughput = applyThroughputCounts(
+    const throughput = applyThroughputDayCounts(
       throughputSeries,
-      createdActivities.map((row) => row.createdAt),
-      completedAts,
+      toDayCountMap(createdDays),
+      toDayCountMap(completedDays),
     );
 
     return {
@@ -142,6 +131,74 @@ export class DashboardService {
       byColumn,
       throughput,
     };
+  }
+
+  private async countActivitiesByDay(
+    workspaceId: string,
+    type: string,
+    since: Date,
+    boardId?: string,
+  ): Promise<DayCountRow[]> {
+    if (boardId) {
+      return this.prisma.$queryRaw<DayCountRow[]>`
+        SELECT date_trunc('day', a."createdAt" AT TIME ZONE 'UTC') AS day,
+               COUNT(*)::int AS count
+        FROM "Activity" a
+        INNER JOIN "Task" t ON t."id" = a."taskId"
+        WHERE a."workspaceId" = ${workspaceId}
+          AND a."type" = ${type}
+          AND a."createdAt" >= ${since}
+          AND t."boardId" = ${boardId}
+        GROUP BY 1
+      `;
+    }
+    return this.prisma.$queryRaw<DayCountRow[]>`
+      SELECT date_trunc('day', "createdAt" AT TIME ZONE 'UTC') AS day,
+             COUNT(*)::int AS count
+      FROM "Activity"
+      WHERE "workspaceId" = ${workspaceId}
+        AND "type" = ${type}
+        AND "createdAt" >= ${since}
+      GROUP BY 1
+    `;
+  }
+
+  private async countCompletedMovesByDay(
+    workspaceId: string,
+    since: Date,
+    doneColumnIds: string[],
+    boardId?: string,
+  ): Promise<DayCountRow[]> {
+    if (boardId) {
+      return this.prisma.$queryRaw<DayCountRow[]>`
+        SELECT date_trunc('day', a."createdAt" AT TIME ZONE 'UTC') AS day,
+               COUNT(*)::int AS count
+        FROM "Activity" a
+        INNER JOIN "Task" t ON t."id" = a."taskId"
+        WHERE a."workspaceId" = ${workspaceId}
+          AND a."type" = ${ActivityType.TaskMoved}
+          AND a."createdAt" >= ${since}
+          AND t."boardId" = ${boardId}
+          AND (
+            lower(trim(both from COALESCE(a."payload"->>'toColumnName', ''))) = 'done'
+            OR a."payload"->>'toColumnId' = ANY(${doneColumnIds})
+          )
+        GROUP BY 1
+      `;
+    }
+    return this.prisma.$queryRaw<DayCountRow[]>`
+      SELECT date_trunc('day', "createdAt" AT TIME ZONE 'UTC') AS day,
+             COUNT(*)::int AS count
+      FROM "Activity"
+      WHERE "workspaceId" = ${workspaceId}
+        AND "type" = ${ActivityType.TaskMoved}
+        AND "createdAt" >= ${since}
+        AND (
+          lower(trim(both from COALESCE("payload"->>'toColumnName', ''))) = 'done'
+          OR "payload"->>'toColumnId' = ANY(${doneColumnIds})
+        )
+      GROUP BY 1
+    `;
   }
 
   private async buildAssigneeBuckets(
@@ -188,4 +245,13 @@ export class DashboardService {
     if (!board) throw new NotFoundException('Board not found');
     return board;
   }
+}
+
+function toDayCountMap(rows: DayCountRow[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const key = utcDateKey(new Date(row.day));
+    map.set(key, Number(row.count));
+  }
+  return map;
 }

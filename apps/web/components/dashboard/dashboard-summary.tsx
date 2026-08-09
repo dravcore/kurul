@@ -1,20 +1,35 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BoardDto, DashboardSummaryDto } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
+import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { DamgaMark } from '@/components/brand/damga-mark';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AssigneeChart } from './assignee-chart';
-import { ColumnChart } from './column-chart';
-import { CompletionChart } from './completion-chart';
-import { PriorityChart } from './priority-chart';
 import { StatTile } from './stat-tile';
+
+const PriorityChart = dynamic(() => import('./priority-chart').then((mod) => mod.PriorityChart), {
+  ssr: false,
+  loading: () => <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" />,
+});
+const AssigneeChart = dynamic(() => import('./assignee-chart').then((mod) => mod.AssigneeChart), {
+  ssr: false,
+  loading: () => <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" />,
+});
+const ColumnChart = dynamic(() => import('./column-chart').then((mod) => mod.ColumnChart), {
+  ssr: false,
+  loading: () => <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" />,
+});
+const CompletionChart = dynamic(
+  () => import('./completion-chart').then((mod) => mod.CompletionChart),
+  { ssr: false, loading: () => <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" /> },
+);
 
 export function DashboardSummary(): React.ReactElement {
   const t = useTranslations('app.dashboard');
@@ -39,7 +54,7 @@ export function DashboardSummary(): React.ReactElement {
     const controller = new AbortController();
     void (async () => {
       try {
-        const list = await api.get<BoardDto[]>(`/workspaces/${activeId}/boards`, {
+        const list = await fetchWorkspaceBoards(activeId, {
           signal: controller.signal,
         });
         if (!controller.signal.aborted) setBoards(list);
