@@ -3,12 +3,7 @@ import { MemberRole } from '@kurultay/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';
-import {
-  addMember,
-  createWorkspace,
-  setMemberRole,
-  signUp,
-} from './helpers/auth';
+import { addMember, createWorkspace, setMemberRole, signUp } from './helpers/auth';
 import { resetDatabase } from './helpers/db';
 
 describe('Workspace isolation and roles (e2e)', () => {

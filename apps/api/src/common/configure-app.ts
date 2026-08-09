@@ -4,10 +4,7 @@ import { AllExceptionsFilter } from './filters/all-exceptions.filter';
 import { validationExceptionFactory } from './validation/validation-exception.factory';
 
 /** Shared Nest bootstrap (HTTP app + e2e) so pipes/filters/CORS/auth stay in sync. */
-export function configureApp(
-  app: INestApplication,
-  options: { corsOrigin: string },
-): void {
+export function configureApp(app: INestApplication, options: { corsOrigin: string }): void {
   app.enableCors({
     origin: options.corsOrigin,
     credentials: true,

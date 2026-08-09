@@ -33,8 +33,8 @@ Kurultay, tek bir hosted SaaS instance'ını sürekli deploy etmek yerine, self-
 
 ## Değerlendirilen Alternatifler
 
-| Alternatif | Neden değil |
-|---|---|
-| GitHub Flow | Sürekli deploy edilen SaaS'a uyuyor; stabil release hatlarına ve hotfix'lere ihtiyaç duyan versiyonlanmış self-hosted bir ürüne uymuyor |
-| Trunk-based development | Aynı uyumsuzluk — release stabilizasyonu veya eski versiyonlara karşı hotfix'ler için doğal bir yer yok |
+| Alternatif                                  | Neden değil                                                                                                                                           |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub Flow                                 | Sürekli deploy edilen SaaS'a uyuyor; stabil release hatlarına ve hotfix'lere ihtiyaç duyan versiyonlanmış self-hosted bir ürüne uymuyor               |
+| Trunk-based development                     | Aynı uyumsuzluk — release stabilizasyonu veya eski versiyonlara karşı hotfix'ler için doğal bir yer yok                                               |
 | Yalnızca GitHub Releases (CHANGELOG.md yok) | Yaygın bir emsal deseni, ama repoyu doğrudan tarayan self-hoster'lar için daha az erişilebilir; yukarıdaki bilinçli-sapma gerekçesine göre reddedildi |

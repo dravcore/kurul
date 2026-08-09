@@ -41,7 +41,7 @@ move into an O(n) write and a source of lock contention as boards grow.
   precision threshold, that column's positions are reflowed to round,
   well-spaced numbers in the same transaction as the move, and only then is
   the move applied. A scheduled job was rejected — it needs a scheduler and
-  can still let a write fail *between* runs if the gap is already exhausted,
+  can still let a write fail _between_ runs if the gap is already exhausted,
   whereas the reactive check cannot. Rebalancing is the one O(n) write in the
   model, bounded to a single column and rare enough at ordinary insertion
   depths that it is an accepted trade-off rather than a design gap.
@@ -50,7 +50,7 @@ move into an O(n) write and a source of lock contention as boards grow.
 
 ## Alternatives considered
 
-| Alternative | Why not |
-|---|---|
-| Integer position with renumbering | Every move updates every row after the insertion point — O(n) writes, and race conditions under concurrent multi-user drag-and-drop |
+| Alternative                                                | Why not                                                                                                                                                                        |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Integer position with renumbering                          | Every move updates every row after the insertion point — O(n) writes, and race conditions under concurrent multi-user drag-and-drop                                            |
 | String-based fractional indexing (e.g., base62 order keys) | Avoids float precision limits entirely, but adds key-generation complexity not justified yet; worth reconsidering if float rebalancing ever becomes a real operational problem |

@@ -37,8 +37,7 @@ managed realtime services (Ably, Pusher, Liveblocks).
   in-process state (a module-level `Map<socketId, workspaceId>`), which is the
   thing that actually breaks when the adapter is added later.
 - **Integrate early while compatibility is known-good.** `@socket.io/redis-adapter`
-  is small and feature-complete but slow-moving — its last release was March
-  2024. Its compatibility with the current socket.io 4.8.x line is known to
+  is small and feature-complete but slow-moving — its last release was March 2024. Its compatibility with the current socket.io 4.8.x line is known to
   work today; discovering an incompatibility later, under scaling pressure, is
   the expensive version of the same task.
 - Bare `ws` has lower overhead but leaves room management and automatic
@@ -71,7 +70,7 @@ managed realtime services (Ably, Pusher, Liveblocks).
 
 ## Alternatives considered
 
-| Alternative | Why not |
-|---|---|
-| Bare `ws` | Lower overhead, but rooms and reconnection logic — both needed anyway — would have to be hand-written |
+| Alternative                          | Why not                                                                                                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Bare `ws`                            | Lower overhead, but rooms and reconnection logic — both needed anyway — would have to be hand-written                         |
 | Ably / Pusher / Liveblocks (managed) | Solve serverless scaling problems we don't have; add cost and an external dependency that self-hosted infra makes unnecessary |

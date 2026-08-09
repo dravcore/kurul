@@ -36,8 +36,8 @@ Frontend; interaktif bir kanban board'u (drag-and-drop ile yeniden sıralama), s
 
 ## Değerlendirilen Alternatifler
 
-| Alternatif | Neden değil |
-|---|---|
-| react-beautiful-dnd | Deprecated; Atlassian bakımından çekildi |
-| pragmatic-drag-and-drop | Aktif bakımda (2.0.x, Apache-2.0) ve belirlenmiş fallback, ama collision detection'ın elle yazılmasını gerektiriyor ve v2'si ince bir upgrade dokümantasyonuyla geldi — yalnızca @dnd-kit bizi engellerse kabul edilecek kalıcı bir maliyet |
-| Chart.js / Apache ECharts | Canvas tabanlı, çok büyük veri setleri için daha iyi, ama entegrasyonu daha ağır ve şu an shadcn/ui ile daha az idiomatic |
+| Alternatif                | Neden değil                                                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| react-beautiful-dnd       | Deprecated; Atlassian bakımından çekildi                                                                                                                                                                                                    |
+| pragmatic-drag-and-drop   | Aktif bakımda (2.0.x, Apache-2.0) ve belirlenmiş fallback, ama collision detection'ın elle yazılmasını gerektiriyor ve v2'si ince bir upgrade dokümantasyonuyla geldi — yalnızca @dnd-kit bizi engellerse kabul edilecek kalıcı bir maliyet |
+| Chart.js / Apache ECharts | Canvas tabanlı, çok büyük veri setleri için daha iyi, ama entegrasyonu daha ağır ve şu an shadcn/ui ile daha az idiomatic                                                                                                                   |

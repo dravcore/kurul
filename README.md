@@ -12,7 +12,7 @@ start in Phase 2 — see [docs/roadmap.md](docs/roadmap.md).
 
 ## What is Kurultay?
 
-A *kurultay* was the great assembly of Turkic-Mongol tradition, where clans gathered to
+A _kurultay_ was the great assembly of Turkic-Mongol tradition, where clans gathered to
 discuss matters, reach decisions, and divide the work ahead. That's the shape of what this
 tool does for a team: people gather around a board, discuss the work, decide what matters,
 and divide tasks among themselves — tracked, prioritized, and visible to everyone.
@@ -48,41 +48,41 @@ pnpm db:seed
 pnpm dev
 ```
 
-- Web: http://localhost:3000  
-- API health: http://localhost:4000/health  
+- Web: http://localhost:3000
+- API health: http://localhost:4000/health
 
 Full stack in Docker: `docker compose up --build`. Day-to-day details:
 [docs/development.md](docs/development.md).
 
 ## Stack
 
-| Layer | Choice |
-|---|---|
-| Backend | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io |
-| Frontend | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts |
-| Auth | Better Auth (organization plugin → Workspace) |
-| Shared types | `packages/shared-types` (TS types shared between frontend/backend) |
-| Deployment | Docker Compose |
-| Architecture | Monorepo, modular monolith — no microservices |
+| Layer        | Choice                                                                   |
+| ------------ | ------------------------------------------------------------------------ |
+| Backend      | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io               |
+| Frontend     | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts |
+| Auth         | Better Auth (organization plugin → Workspace)                            |
+| Shared types | `packages/shared-types` (TS types shared between frontend/backend)       |
+| Deployment   | Docker Compose                                                           |
+| Architecture | Monorepo, modular monolith — no microservices                            |
 
 Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 [docs/decisions/](docs/decisions/).
 
 ## Documentation
 
-| Doc | Covers |
-|---|---|
-| [docs/architecture.md](docs/architecture.md) | Module map, data model overview |
-| [docs/tech-stack.md](docs/tech-stack.md) | Stack choices and rationale |
-| [docs/project-skeleton.md](docs/project-skeleton.md) | Planned repo layout, first Prisma schema |
-| [docs/development.md](docs/development.md) | Environment setup, daily workflow, commands |
-| [docs/coding-standards.md](docs/coding-standards.md) | TS/NestJS/Next.js conventions |
-| [docs/design.md](docs/design.md) | UI/UX language: principles, tokens, layout, motion, states, copy |
-| [docs/git-strategy.md](docs/git-strategy.md) | Git Flow, Conventional Commits, releases |
-| [docs/testing.md](docs/testing.md) | Test layers, tools, expectations |
-| [docs/api-conventions.md](docs/api-conventions.md) | REST naming, error format, pagination |
-| [docs/roadmap.md](docs/roadmap.md) | Phases and progress |
-| [docs/decisions/](docs/decisions/) | Lightweight architecture decision records |
+| Doc                                                  | Covers                                                           |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
+| [docs/architecture.md](docs/architecture.md)         | Module map, data model overview                                  |
+| [docs/tech-stack.md](docs/tech-stack.md)             | Stack choices and rationale                                      |
+| [docs/project-skeleton.md](docs/project-skeleton.md) | Planned repo layout, first Prisma schema                         |
+| [docs/development.md](docs/development.md)           | Environment setup, daily workflow, commands                      |
+| [docs/coding-standards.md](docs/coding-standards.md) | TS/NestJS/Next.js conventions                                    |
+| [docs/design.md](docs/design.md)                     | UI/UX language: principles, tokens, layout, motion, states, copy |
+| [docs/git-strategy.md](docs/git-strategy.md)         | Git Flow, Conventional Commits, releases                         |
+| [docs/testing.md](docs/testing.md)                   | Test layers, tools, expectations                                 |
+| [docs/api-conventions.md](docs/api-conventions.md)   | REST naming, error format, pagination                            |
+| [docs/roadmap.md](docs/roadmap.md)                   | Phases and progress                                              |
+| [docs/decisions/](docs/decisions/)                   | Lightweight architecture decision records                        |
 
 ## Contributing
 

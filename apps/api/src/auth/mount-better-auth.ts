@@ -18,8 +18,7 @@ export function mountBetterAuth(app: INestApplication): void {
       res.status(403).json({
         statusCode: 403,
         error: 'Forbidden',
-        message:
-          'Organization mutations must use the Nest workspace API (/workspaces).',
+        message: 'Organization mutations must use the Nest workspace API (/workspaces).',
       });
       return;
     }

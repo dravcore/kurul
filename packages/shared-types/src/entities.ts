@@ -1,9 +1,4 @@
-import type {
-  InvitationStatus,
-  LabelColorSlot,
-  MemberRole,
-  Priority,
-} from './enums.js';
+import type { InvitationStatus, LabelColorSlot, MemberRole, Priority } from './enums.js';
 
 export interface UserDto {
   id: string;

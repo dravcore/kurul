@@ -60,7 +60,9 @@ export async function createWorkspace(
     slug: slug ?? `ws-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   });
   if (response.status >= 400) {
-    throw new Error(`create workspace failed (${response.status}): ${JSON.stringify(response.body)}`);
+    throw new Error(
+      `create workspace failed (${response.status}): ${JSON.stringify(response.body)}`,
+    );
   }
   return response.body as { id: string; name: string; slug: string };
 }

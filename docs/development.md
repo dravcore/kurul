@@ -29,13 +29,13 @@ and gets fixed in the same PR.
 
 ## Prerequisites
 
-| Tool | Version | Check | Notes |
-|---|---|---|---|
-| Node.js | 22 or newer | `node -v` | 22 is the floor — Node 20 is end-of-life (2026-04-30) and Prisma 7 needs ≥ 20.19.0 regardless. **24 LTS recommended** (Active LTS to 2028-04-30) |
-| pnpm | 9 or newer | `pnpm -v` | Via Corepack: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack is no longer bundled with Node ≥ 25 — there, `npm i -g corepack` first, or install pnpm standalone with `npm i -g pnpm` |
-| Docker | any current | `docker -v` | Docker Desktop or Colima on macOS |
-| Docker Compose | v2 (plugin) | `docker compose version` | `docker-compose` v1 is not supported |
-| Git | 2.30+ | `git --version` | |
+| Tool           | Version     | Check                    | Notes                                                                                                                                                                                                        |
+| -------------- | ----------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Node.js        | 22 or newer | `node -v`                | 22 is the floor — Node 20 is end-of-life (2026-04-30) and Prisma 7 needs ≥ 20.19.0 regardless. **24 LTS recommended** (Active LTS to 2028-04-30)                                                             |
+| pnpm           | 9 or newer  | `pnpm -v`                | Via Corepack: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack is no longer bundled with Node ≥ 25 — there, `npm i -g corepack` first, or install pnpm standalone with `npm i -g pnpm` |
+| Docker         | any current | `docker -v`              | Docker Desktop or Colima on macOS                                                                                                                                                                            |
+| Docker Compose | v2 (plugin) | `docker compose version` | `docker-compose` v1 is not supported                                                                                                                                                                         |
+| Git            | 2.30+       | `git --version`          |                                                                                                                                                                                                              |
 
 No local PostgreSQL or Redis installation is needed — both run in Docker.
 
@@ -64,15 +64,15 @@ cp .env.example .env
 
 Then fill in the blanks. `.env` is git-ignored and must never be committed.
 
-| Variable | Example | Purpose |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string |
-| `REDIS_URL` | `redis://localhost:6379` | Socket.io adapter, caching |
-| `BETTER_AUTH_SECRET` | *(generate)* | Session signing secret — required, no default |
-| `BETTER_AUTH_URL` | `http://localhost:4000` | Public URL of the API (Better Auth is mounted at `/auth/*`) |
-| `API_PORT` | `4000` | NestJS listen port |
-| `WEB_URL` | `http://localhost:3000` | CORS origin for the API |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000` | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg) |
+| Variable              | Example                                                  | Purpose                                                                                               |
+| --------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string                                                                              |
+| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io adapter, caching                                                                            |
+| `BETTER_AUTH_SECRET`  | _(generate)_                                             | Session signing secret — required, no default                                                         |
+| `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | Public URL of the API (Better Auth is mounted at `/auth/*`)                                           |
+| `API_PORT`            | `4000`                                                   | NestJS listen port                                                                                    |
+| `WEB_URL`             | `http://localhost:3000`                                  | CORS origin for the API                                                                               |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                  | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg) |
 
 Generate a secret with:
 
@@ -98,10 +98,10 @@ pnpm db:migrate                                  # apply migrations
 pnpm dev                                         # api + web in parallel, hot reload
 ```
 
-| URL | What |
-|---|---|
-| http://localhost:3000 | Web app (Next.js) |
-| http://localhost:4000 | API (NestJS) |
+| URL                          | What                           |
+| ---------------------------- | ------------------------------ |
+| http://localhost:3000        | Web app (Next.js)              |
+| http://localhost:4000        | API (NestJS)                   |
 | http://localhost:4000/health | Health check — must return 200 |
 
 Stop the containers with `docker compose -f docker-compose.dev.yml down` (add `-v` to also
@@ -116,28 +116,28 @@ compose wiring, or when you just want to run Kurultay rather than develop it.
 docker compose up --build
 ```
 
-| | Dev loop | Full Docker |
-|---|---|---|
-| Hot reload | Yes | No — rebuild required |
-| Startup after a code change | seconds | tens of seconds |
-| Matches production | Partially | Yes |
-| Use for | Everyday development | Verifying images, release checks, running the app |
+|                             | Dev loop             | Full Docker                                       |
+| --------------------------- | -------------------- | ------------------------------------------------- |
+| Hot reload                  | Yes                  | No — rebuild required                             |
+| Startup after a code change | seconds              | tens of seconds                                   |
+| Matches production          | Partially            | Yes                                               |
+| Use for                     | Everyday development | Verifying images, release checks, running the app |
 
 ## pnpm scripts
 
 Run from the repository root.
 
-| Script | Command | What it does |
-|---|---|---|
-| `dev` | `pnpm dev` | Runs `apps/api` and `apps/web` in parallel with hot reload |
-| `build` | `pnpm build` | Builds every workspace package |
-| `lint` | `pnpm lint` | ESLint + Prettier check across all packages |
-| `test` | `pnpm test` | Runs the test suites of every workspace package |
-| `db:generate` | `pnpm db:generate` | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made |
-| `db:migrate` | `pnpm db:migrate` | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate` |
-| `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it |
-| `db:seed` | `pnpm db:seed` | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly |
-| `db:studio` | `pnpm db:studio` | Opens Prisma Studio at http://localhost:5555 |
+| Script           | Command               | What it does                                                                                                                                                                                                                                            |
+| ---------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dev`            | `pnpm dev`            | Runs `apps/api` and `apps/web` in parallel with hot reload                                                                                                                                                                                              |
+| `build`          | `pnpm build`          | Builds every workspace package                                                                                                                                                                                                                          |
+| `lint`           | `pnpm lint`           | ESLint + Prettier check across all packages                                                                                                                                                                                                             |
+| `test`           | `pnpm test`           | Runs the test suites of every workspace package                                                                                                                                                                                                         |
+| `db:generate`    | `pnpm db:generate`    | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made                                                    |
+| `db:migrate`     | `pnpm db:migrate`     | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate` |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it                 |
+| `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                       |
+| `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                            |
 
 To target a single workspace, use pnpm's filter flag:
 
@@ -246,14 +246,14 @@ specified in [git-strategy.md](git-strategy.md).
 
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `ECONNREFUSED 127.0.0.1:5432` | Postgres container is not up | `docker compose -f docker-compose.dev.yml up -d` |
-| `Environment variable not found: DATABASE_URL` | `.env` missing | `cp .env.example .env` and fill it in |
-| Port 3000/4000/5432 already in use | Another process or a stale container | `docker compose down`, or change the port in `.env` |
-| Prisma types out of date after pulling | Client not regenerated — `pnpm db:migrate` does not regenerate it | `pnpm db:generate` (after applying any new migrations with `pnpm db:migrate`) |
-| Freshly generated client not picked up | A running `pnpm dev` keeps the old client in `dist` | Restart `pnpm dev` after `pnpm db:generate` — assets are copied at (re)start |
-| `pnpm install` fails with a workspace error | Ran inside a sub-package | Run it from the repository root |
+| Symptom                                        | Cause                                                             | Fix                                                                           |
+| ---------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `ECONNREFUSED 127.0.0.1:5432`                  | Postgres container is not up                                      | `docker compose -f docker-compose.dev.yml up -d`                              |
+| `Environment variable not found: DATABASE_URL` | `.env` missing                                                    | `cp .env.example .env` and fill it in                                         |
+| Port 3000/4000/5432 already in use             | Another process or a stale container                              | `docker compose down`, or change the port in `.env`                           |
+| Prisma types out of date after pulling         | Client not regenerated — `pnpm db:migrate` does not regenerate it | `pnpm db:generate` (after applying any new migrations with `pnpm db:migrate`) |
+| Freshly generated client not picked up         | A running `pnpm dev` keeps the old client in `dist`               | Restart `pnpm dev` after `pnpm db:generate` — assets are copied at (re)start  |
+| `pnpm install` fails with a workspace error    | Ran inside a sub-package                                          | Run it from the repository root                                               |
 
 ## See also
 

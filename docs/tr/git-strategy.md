@@ -20,16 +20,16 @@ Kurultay için branch modeli, commit convention'ı, PR süreci ve release prosed
 Kurultay **Git Flow** kullanır. İki branch kalıcıdır; geri kalan her şey kısa ömürlüdür ve
 merge sonrası silinir.
 
-| Branch | Ömür | Şuradan dallanır | Şuraya merge olur | Amaç |
-|---|---|---|---|---|
-| `main` | kalıcı | — | — | Yalnızca release edilmiş kod. Her commit etiketli (tagged) bir release'tir. |
-| `develop` | kalıcı | `main` | — | Entegrasyon branch'i. Her zaman staging'e deploy edilebilir. |
-| `feature/*` | kısa ömürlü | `develop` | `develop` | Yeni işlevsellik |
-| `fix/*` | kısa ömürlü | `develop` | `develop` | Acil olmayan bug fix'leri |
-| `docs/*` | kısa ömürlü | `develop` | `develop` | Yalnızca dokümantasyon değişiklikleri |
-| `chore/*` | kısa ömürlü | `develop` | `develop` | Tooling, dependency'ler, config, CI |
-| `release/*` | kısa ömürlü | `develop` | `main` + `develop` | Versiyon bump'ı, changelog finalizasyonu, release sertleştirmesi |
-| `hotfix/*` | kısa ömürlü | `main` | `main` + `develop` | Acil production fix'i |
+| Branch      | Ömür        | Şuradan dallanır | Şuraya merge olur  | Amaç                                                                        |
+| ----------- | ----------- | ---------------- | ------------------ | --------------------------------------------------------------------------- |
+| `main`      | kalıcı      | —                | —                  | Yalnızca release edilmiş kod. Her commit etiketli (tagged) bir release'tir. |
+| `develop`   | kalıcı      | `main`           | —                  | Entegrasyon branch'i. Her zaman staging'e deploy edilebilir.                |
+| `feature/*` | kısa ömürlü | `develop`        | `develop`          | Yeni işlevsellik                                                            |
+| `fix/*`     | kısa ömürlü | `develop`        | `develop`          | Acil olmayan bug fix'leri                                                   |
+| `docs/*`    | kısa ömürlü | `develop`        | `develop`          | Yalnızca dokümantasyon değişiklikleri                                       |
+| `chore/*`   | kısa ömürlü | `develop`        | `develop`          | Tooling, dependency'ler, config, CI                                         |
+| `release/*` | kısa ömürlü | `develop`        | `main` + `develop` | Versiyon bump'ı, changelog finalizasyonu, release sertleştirmesi            |
+| `hotfix/*`  | kısa ömürlü | `main`           | `main` + `develop` | Acil production fix'i                                                       |
 
 ```
 main     ──●───────────────────────●──────────────●──  tags: v0.1.0, v0.1.1, v0.2.0
@@ -60,13 +60,13 @@ Format: `type/kebab-kısa-açıklama`
   değil, **değişikliği** tarif eder
 - `release/*` ve `hotfix/*`, bir açıklama yerine versiyonu taşır: `release/0.2.0`
 
-| İyi | Kötü | Neden |
-|---|---|---|
-| `feature/board-drag-and-drop` | `feature/phase3` | Faz numaraları değişiklik hakkında hiçbir şey söylemez |
-| `fix/task-position-collision` | `fix/bug` | Bir branch listesinde tanımlanamaz |
-| `docs/api-conventions` | `docs/update-docs` | Gereksiz, bilgi yok |
-| `chore/bump-prisma-7` | `dogan-work` | Type öneki yok, taranabilir değil |
-| `release/0.2.0` | `release/v0.2.0` | `v` öneki tag'lere aittir, branch'lere değil |
+| İyi                           | Kötü               | Neden                                                  |
+| ----------------------------- | ------------------ | ------------------------------------------------------ |
+| `feature/board-drag-and-drop` | `feature/phase3`   | Faz numaraları değişiklik hakkında hiçbir şey söylemez |
+| `fix/task-position-collision` | `fix/bug`          | Bir branch listesinde tanımlanamaz                     |
+| `docs/api-conventions`        | `docs/update-docs` | Gereksiz, bilgi yok                                    |
+| `chore/bump-prisma-7`         | `dogan-work`       | Type öneki yok, taranabilir değil                      |
+| `release/0.2.0`               | `release/v0.2.0`   | `v` öneki tag'lere aittir, branch'lere değil           |
 
 Commit type'ları ve branch type'ları kasıtlı olarak aynı kelime dağarcığını paylaşır —
 `feat:` ağırlıklı bir branch, bir `feature/*` branch'idir.
@@ -86,16 +86,16 @@ Tüm commit mesajları **İngilizce** yazılır ve
 
 ### Type'lar
 
-| Type | Ne için kullanılır | SemVer etkisi (1.0 sonrası) |
-|---|---|---|
-| `feat` | Kullanıcının göreceği yeni bir yetenek | MINOR |
-| `fix` | Bir bug fix'i | PATCH |
-| `docs` | Yalnızca dokümantasyon | yok |
-| `chore` | Tooling, dependency'ler, config, repo temizliği | yok |
-| `refactor` | Ne bir bug'ı düzelten ne de bir özellik ekleyen kod değişikliği | yok |
-| `test` | Test ekleme veya düzeltme | yok |
-| `ci` | CI/CD pipeline ve workflow değişiklikleri | yok |
-| `perf` | Davranış değişikliği olmadan performans iyileştirmesi | PATCH |
+| Type       | Ne için kullanılır                                              | SemVer etkisi (1.0 sonrası) |
+| ---------- | --------------------------------------------------------------- | --------------------------- |
+| `feat`     | Kullanıcının göreceği yeni bir yetenek                          | MINOR                       |
+| `fix`      | Bir bug fix'i                                                   | PATCH                       |
+| `docs`     | Yalnızca dokümantasyon                                          | yok                         |
+| `chore`    | Tooling, dependency'ler, config, repo temizliği                 | yok                         |
+| `refactor` | Ne bir bug'ı düzelten ne de bir özellik ekleyen kod değişikliği | yok                         |
+| `test`     | Test ekleme veya düzeltme                                       | yok                         |
+| `ci`       | CI/CD pipeline ve workflow değişiklikleri                       | yok                         |
+| `perf`     | Davranış değişikliği olmadan performans iyileştirmesi           | PATCH                       |
 
 `BREAKING CHANGE:` footer'ı olan (veya `type!:`) bir commit, 1.0 sonrası MAJOR'dır. Bunun
 1.0 öncesi ne anlama geldiği için [Versiyonlama politikası](#versiyonlama-politikası-semver)
@@ -105,14 +105,14 @@ bölümüne bakın.
 
 Scope opsiyoneldir ama kuvvetle tercih edilir. Monorepo'nun etkilenen kısmını adlandırır.
 
-| Scope | Anlam |
-|---|---|
-| `api` | `apps/api` — NestJS backend |
-| `web` | `apps/web` — Next.js frontend |
-| `shared` | `packages/shared-types` |
-| `deps` | Dependency bump'ları |
-| `docs` | `docs/` seti (commit type'ı zaten `docs` değilse) |
-| `ci` | Workflow'lar ve pipeline config'i |
+| Scope    | Anlam                                             |
+| -------- | ------------------------------------------------- |
+| `api`    | `apps/api` — NestJS backend                       |
+| `web`    | `apps/web` — Next.js frontend                     |
+| `shared` | `packages/shared-types`                           |
+| `deps`   | Dependency bump'ları                              |
+| `docs`   | `docs/` seti (commit type'ı zaten `docs` değilse) |
+| `ci`     | Workflow'lar ve pipeline config'i                 |
 
 Daha dar modül scope'ları netlik kattığında sorun değildir: `feat(api/task)`,
 `fix(web/board)`.
@@ -173,12 +173,12 @@ olduğu anda tekrar devreye girer** ve bu paragraf o zaman silinir.
 
 ### Merge stratejisi
 
-| Merge | Strateji | Sebep |
-|---|---|---|
-| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Squash merge** | İş birimi başına tek temiz commit; branch'in fixup gürültüsü history'ye girmez |
-| `release/*` → `main` | **Merge commit** (`--no-ff`) | Release'i history'de ayrı, geri alınabilir bir nokta olarak korur |
-| `hotfix/*` → `main` | **Merge commit** (`--no-ff`) | Aynı sebep |
-| `main` → `develop` (geri-merge) | **Merge commit** (`--no-ff`) | Release/hotfix commit'lerini yeniden yazmadan geri taşır |
+| Merge                                                 | Strateji                     | Sebep                                                                          |
+| ----------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------ |
+| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Squash merge**             | İş birimi başına tek temiz commit; branch'in fixup gürültüsü history'ye girmez |
+| `release/*` → `main`                                  | **Merge commit** (`--no-ff`) | Release'i history'de ayrı, geri alınabilir bir nokta olarak korur              |
+| `hotfix/*` → `main`                                   | **Merge commit** (`--no-ff`) | Aynı sebep                                                                     |
+| `main` → `develop` (geri-merge)                       | **Merge commit** (`--no-ff`) | Release/hotfix commit'lerini yeniden yazmadan geri taşır                       |
 
 Merge sonrası branch'i silin. GitHub'ın "delete branch on merge" ayarı bunu hallediyor.
 
@@ -219,12 +219,12 @@ git push origin develop
 # 8. release/0.2.0'ı sil.
 ```
 
-| Artifact | Format | Örnek |
-|---|---|---|
-| Branch | `release/x.y.z` | `release/0.2.0` |
-| `package.json`'daki versiyon | `x.y.z` | `0.2.0` |
-| Git tag'i | `vX.Y.Z` | `v0.2.0` |
-| Changelog başlığı | `## [x.y.z] - YYYY-MM-DD` | `## [0.2.0] - 2026-09-14` |
+| Artifact                     | Format                    | Örnek                     |
+| ---------------------------- | ------------------------- | ------------------------- |
+| Branch                       | `release/x.y.z`           | `release/0.2.0`           |
+| `package.json`'daki versiyon | `x.y.z`                   | `0.2.0`                   |
+| Git tag'i                    | `vX.Y.Z`                  | `v0.2.0`                  |
+| Changelog başlığı            | `## [x.y.z] - YYYY-MM-DD` | `## [0.2.0] - 2026-09-14` |
 
 `CHANGELOG.md`, release zamanında git log'undan yeniden kurulmak yerine sürekli olarak
 `[Unreleased]` altında bakımı yapılır. Bir PR kullanıcı tarafından görülebilirse,
@@ -301,16 +301,16 @@ API versiyonlama duruşu (1.0 öncesi `/v1` öneki yok)
 
 ## Kurallar özeti
 
-| Kural | |
-|---|---|
-| `main` / `develop`'a doğrudan commit | Asla |
-| PR hedef branch'i | `develop` (`main`'e giden `release/*` ve `hotfix/*` hariç) |
-| Commit dili | İngilizce |
-| Commit formatı | Conventional Commits |
-| Feature merge'i | Squash |
-| Release/hotfix merge'i | `--no-ff` + `develop`'a geri-merge |
-| Tag formatı | `vX.Y.Z` |
-| Changelog | Release zamanında değil, PR'da güncellenir |
+| Kural                                |                                                            |
+| ------------------------------------ | ---------------------------------------------------------- |
+| `main` / `develop`'a doğrudan commit | Asla                                                       |
+| PR hedef branch'i                    | `develop` (`main`'e giden `release/*` ve `hotfix/*` hariç) |
+| Commit dili                          | İngilizce                                                  |
+| Commit formatı                       | Conventional Commits                                       |
+| Feature merge'i                      | Squash                                                     |
+| Release/hotfix merge'i               | `--no-ff` + `develop`'a geri-merge                         |
+| Tag formatı                          | `vX.Y.Z`                                                   |
+| Changelog                            | Release zamanında değil, PR'da güncellenir                 |
 
 ## Ayrıca bakınız
 

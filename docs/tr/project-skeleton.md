@@ -34,7 +34,7 @@ pnpm -v
 İsim kontrolleri: npm paket adı `kurultay` müsait. Kalanlar: `github.com/dravcore/kurultay`
 ve bir domain (`kurultay.dev` / `kurultay.io`).
 
-> **İsmin kökeni.** *Kurultay*, Türk-Moğol geleneğinde boyların toplandığı, tartıştığı,
+> **İsmin kökeni.** _Kurultay_, Türk-Moğol geleneğinde boyların toplandığı, tartıştığı,
 > karar aldığı ve işi bölüştüğü büyük meclistir — aracın yaptığı şeyin adil bir tarifi.
 > (`kurultay` Türkçe yazımı; `kurultai` Moğolca/İngilizce transliterasyonudur.) README bu
 > hikâyeyi anlatmalı.
@@ -76,15 +76,15 @@ packages:
 
 Kök `package.json` script'leri:
 
-| Script | Ne yapar |
-|---|---|
-| `dev` | `api` ve `web`'i paralel çalıştırır |
-| `build` | Her workspace paketini build eder |
-| `lint` | Her workspace paketini lint eder |
-| `test` | Her workspace paketinde testleri çalıştırır |
-| `db:migrate` | Prisma migration'larını çalıştırır |
-| `db:seed` | Demo veriyi yükler (bir workspace, board, column'lar, birkaç task). Prisma 7 otomatik seeding'i kaldırdı — giriş noktası `prisma.config.ts` içinde deklare edilir ve açıkça çalıştırılır |
-| `db:studio` | Prisma Studio'yu açar |
+| Script       | Ne yapar                                                                                                                                                                                 |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dev`        | `api` ve `web`'i paralel çalıştırır                                                                                                                                                      |
+| `build`      | Her workspace paketini build eder                                                                                                                                                        |
+| `lint`       | Her workspace paketini lint eder                                                                                                                                                         |
+| `test`       | Her workspace paketinde testleri çalıştırır                                                                                                                                              |
+| `db:migrate` | Prisma migration'larını çalıştırır                                                                                                                                                       |
+| `db:seed`    | Demo veriyi yükler (bir workspace, board, column'lar, birkaç task). Prisma 7 otomatik seeding'i kaldırdı — giriş noktası `prisma.config.ts` içinde deklare edilir ve açıkça çalıştırılır |
+| `db:studio`  | Prisma Studio'yu açar                                                                                                                                                                    |
 
 ---
 
@@ -93,11 +93,11 @@ Kök `package.json` script'leri:
 Frontend ve backend arasında paylaşılan TypeScript tipleri — Prisma'nın ürettiği
 modellerden türetilen DTO'lar ve enum'lar, artı socket kontratı.
 
-| İçerik | Detay |
-|---|---|
-| `Priority` enum | `LOW \| MEDIUM \| HIGH \| URGENT` |
-| `MemberRole` enum | `OWNER \| ADMIN \| MEMBER \| GUEST` |
-| DTO tipleri | Task, Board, Column, Label, Workspace |
+| İçerik            | Detay                                                                                                           |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| `Priority` enum   | `LOW \| MEDIUM \| HIGH \| URGENT`                                                                               |
+| `MemberRole` enum | `OWNER \| ADMIN \| MEMBER \| GUEST`                                                                             |
+| DTO tipleri       | Task, Board, Column, Label, Workspace                                                                           |
 | Socket event'leri | Event isim sabitleri ve payload tipleri — tek doğruluk kaynağı, böylece frontend ve backend birbirinden sapamaz |
 
 ---
@@ -138,7 +138,7 @@ bölme seçeneği buna bağlı. Modül haritası ve aşamalı runtime planı iç
 
 ### Prisma şeması — ilk tablolar
 
-*Aşağıdaki şema Faz 1'in başlangıç noktasıdır; canlı doğruluk kaynağı `apps/api/prisma/schema.prisma`'dır; daha sonraki fazlar bunu genişletir (Faz 2, `Session`, `Account`, `Verification`, `WorkspaceInvitation` ekledi).*
+_Aşağıdaki şema Faz 1'in başlangıç noktasıdır; canlı doğruluk kaynağı `apps/api/prisma/schema.prisma`'dır; daha sonraki fazlar bunu genişletir (Faz 2, `Session`, `Account`, `Verification`, `WorkspaceInvitation` ekledi)._
 
 ```
 User            id, email, name, avatarUrl, createdAt
@@ -160,14 +160,14 @@ Activity        id, workspaceId, taskId?, userId, type, payload(Json), createdAt
 
 **Kritik detaylar**
 
-| Kural | Neden |
-|---|---|
-| Her `id` `@id @default(uuid(7))` | UUIDv7 (Prisma ≥ 5.18) — zaman-sıralı, dolayısıyla ekleme-yoğun task/comment/activity tablolarında primary key'ler index-local kalır *ve* kararlı bir pagination cursor'ı olarak kullanılabilir. Bkz. [api-conventions.md](api-conventions.md#pagination) |
-| `Task.position` ve `Column.position` **Float**'tır, Int değil | Fractional indexing — `1` ile `2` arasına bırakılan bir kart veya column `1.5` olur, böylece listeyi yeniden numaralamak yerine yalnızca taşınan satır yazılır. Bkz. [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
-| `dueDate` ve `estimatedMinutes` **ayrı alanlardır** | "Ne zamana kadar" ve "ne kadar sürer" farklı kavramlardır; ileride bir Gantt görünümü ikisine de ihtiyaç duyar |
-| `priority` label'lardan **ayrı tutulur** | Temiz filtreleme ve dashboard agregasyonu |
-| Multi-tenant izolasyonu | Her sorgu `workspaceId` ile scope'lanır, guard/interceptor seviyesinde zorlanır — asla her serviste yeniden uygulanmaz |
-| `Activity.payload` **Json**'dır | Yeni aktivite tipleri şema migration'ı gerektirmez |
+| Kural                                                              | Neden                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Her `id` `@id @default(uuid(7))`                                   | UUIDv7 (Prisma ≥ 5.18) — zaman-sıralı, dolayısıyla ekleme-yoğun task/comment/activity tablolarında primary key'ler index-local kalır _ve_ kararlı bir pagination cursor'ı olarak kullanılabilir. Bkz. [api-conventions.md](api-conventions.md#pagination)                      |
+| `Task.position` ve `Column.position` **Float**'tır, Int değil      | Fractional indexing — `1` ile `2` arasına bırakılan bir kart veya column `1.5` olur, böylece listeyi yeniden numaralamak yerine yalnızca taşınan satır yazılır. Bkz. [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                          |
+| `dueDate` ve `estimatedMinutes` **ayrı alanlardır**                | "Ne zamana kadar" ve "ne kadar sürer" farklı kavramlardır; ileride bir Gantt görünümü ikisine de ihtiyaç duyar                                                                                                                                                                 |
+| `priority` label'lardan **ayrı tutulur**                           | Temiz filtreleme ve dashboard agregasyonu                                                                                                                                                                                                                                      |
+| Multi-tenant izolasyonu                                            | Her sorgu `workspaceId` ile scope'lanır, guard/interceptor seviyesinde zorlanır — asla her serviste yeniden uygulanmaz                                                                                                                                                         |
+| `Activity.payload` **Json**'dır                                    | Yeni aktivite tipleri şema migration'ı gerektirmez                                                                                                                                                                                                                             |
 | `Activity.taskId` **nullable**, `Activity.workspaceId` **zorunlu** | Faz 8, workspace-seviyesi bir feed vaat ediyor. "Board yeniden adlandırıldı", "üye katıldı", "column silindi" bir task'a bağlı olmayan workspace olayları — bu şeklin ilk migration'dan itibaren bunlara izin vermesi gerekir, yoksa Faz 8 bir migration ve bir backfill ister |
 
 **İlk migration'da olması gereken kısıtlar**
@@ -175,12 +175,12 @@ Activity        id, workspaceId, taskId?, userId, type, payload(Json), createdAt
 Bunları sonradan eklemek önce yinelenen satırları temizlemek anlamına gelir, dolayısıyla
 şemayla birlikte gelirler:
 
-| Kısıt | Neyi önler |
-|---|---|
-| `WorkspaceMember @@unique([workspaceId, userId])` | Aynı kullanıcının bir workspace'e iki farklı rolle iki kez katılması — "hangi rol kazanır?" sorusunu tanımsız bırakır |
-| `TaskAssignee @@unique([taskId, userId])` | Aynı atananın iki kez eklenmesi; liste response'larında, bildirim fan-out'unda ve activity payload'larında ikilenir |
-| `TaskLabel @@unique([taskId, labelId])` | Aynı label'ın iki kez eklenmesi |
-| `Column @@unique([boardId, id])` | Tek başına hiçbir şeyi önlemez — `Task`'ın bir composite foreign key `(boardId, columnId) → Column(boardId, id)` deklare edebilmesi için var |
+| Kısıt                                             | Neyi önler                                                                                                                                   |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WorkspaceMember @@unique([workspaceId, userId])` | Aynı kullanıcının bir workspace'e iki farklı rolle iki kez katılması — "hangi rol kazanır?" sorusunu tanımsız bırakır                        |
+| `TaskAssignee @@unique([taskId, userId])`         | Aynı atananın iki kez eklenmesi; liste response'larında, bildirim fan-out'unda ve activity payload'larında ikilenir                          |
+| `TaskLabel @@unique([taskId, labelId])`           | Aynı label'ın iki kez eklenmesi                                                                                                              |
+| `Column @@unique([boardId, id])`                  | Tek başına hiçbir şeyi önlemez — `Task`'ın bir composite foreign key `(boardId, columnId) → Column(boardId, id)` deklare edebilmesi için var |
 
 Sonuncusunun asıl noktası bu composite FK: `Task`, sorgu kolaylığı için hem `boardId` hem de
 `columnId` taşır, ve bu olmadan veri katmanında hiçbir şey ikisinin senkron dışı kalmasını
@@ -193,14 +193,14 @@ hattı olmak yerine.
 
 **Cascade davranışı açıktır, varsayılana bırakılmamıştır.** Prisma'nın zorunlu bir ilişki
 için varsayılan referans aksiyonu `Restrict`'tir, yani burayı belirtmeden bırakmak
-şaşırtıcı sonuca çözülür: bir board'u silmek cascade etmek yerine *başarısız olur*.
+şaşırtıcı sonuca çözülür: bir board'u silmek cascade etmek yerine _başarısız olur_.
 Sahiplenilen çocuklar cascade eder:
 
 ```
 Workspace → Board → Column, Task → Comment, Activity, TaskAssignee, TaskLabel
 ```
 
-Bu ilişkilerin her biri `onDelete: Cascade` olarak deklare edilir. *Paylaşılan* satırlara
+Bu ilişkilerin her biri `onDelete: Cascade` olarak deklare edilir. _Paylaşılan_ satırlara
 referanslar cascade etmez: `Task.createdById`, `Comment.userId`, `Activity.userId` ve
 `TaskAssignee.userId`, `User`'a işaret eder ve `Restrict` kalır — bir kullanıcıyı silmek,
 yorumlarını sessizce silen bir yan etki değil, kasıtlı bir operasyon olmalıdır.
@@ -212,13 +212,13 @@ Prisma 7, Rust query engine'i kaldırdı, bu da seçilme sebebi
 değil, ve aşağıdakilerin her biri sonradan keşfedilen bir detay olmak yerine iskeleti
 şekillendiriyor:
 
-| Gereklilik | İskelet üzerindeki etki |
-|---|---|
-| Bir driver adapter zorunlu | `@prisma/adapter-pg`, `apps/api`'nin bir bağımlılığı, ve `PrismaService`, `OnModuleInit`/`OnModuleDestroy` içinde bir `pg` Pool'un yaşam döngüsünü sahipleniyor — yalnızca bir connection string değil |
-| Kök dizinde `prisma.config.ts` | `schema.prisma` içindeki env-var yapılandırmasının yerini alır ve seed giriş noktasını deklare eder (yukarıdaki `db:seed`) |
-| Generator `output`'u zorunlu | Client artık `node_modules`'a üretilmiyor. `apps/api/src/generated/prisma`'ya gidiyor, ve bunun hem `apps/api`'den hem de `packages/shared-types`'tan çözümlenebilmesi gerekiyor — sonuncusu DTO tiplerini üretilen modellerden türetiyor ([architecture.md](architecture.md#5-packagesshared-types)) |
-| Client middleware (`$use`) kaldırıldı | Herhangi bir sorgu-seviyesi cross-cutting kaygı — `workspaceId` scoping helper'ı, `position` üzerinde bir compare-and-swap guard'ı — artık bir **Client Extension**. Baştan extension'lar için tasarlayın; geri düşülecek bir middleware yok |
-| Env değişkenleri otomatik yüklenmiyor | `dotenv` açıkça çağrılıyor. Aşağıdaki `.env.example` aynı değişkenleri tarif etmeye devam ediyor; yalnızca yükleme elle yapılıyor |
+| Gereklilik                            | İskelet üzerindeki etki                                                                                                                                                                                                                                                                               |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bir driver adapter zorunlu            | `@prisma/adapter-pg`, `apps/api`'nin bir bağımlılığı, ve `PrismaService`, `OnModuleInit`/`OnModuleDestroy` içinde bir `pg` Pool'un yaşam döngüsünü sahipleniyor — yalnızca bir connection string değil                                                                                                |
+| Kök dizinde `prisma.config.ts`        | `schema.prisma` içindeki env-var yapılandırmasının yerini alır ve seed giriş noktasını deklare eder (yukarıdaki `db:seed`)                                                                                                                                                                            |
+| Generator `output`'u zorunlu          | Client artık `node_modules`'a üretilmiyor. `apps/api/src/generated/prisma`'ya gidiyor, ve bunun hem `apps/api`'den hem de `packages/shared-types`'tan çözümlenebilmesi gerekiyor — sonuncusu DTO tiplerini üretilen modellerden türetiyor ([architecture.md](architecture.md#5-packagesshared-types)) |
+| Client middleware (`$use`) kaldırıldı | Herhangi bir sorgu-seviyesi cross-cutting kaygı — `workspaceId` scoping helper'ı, `position` üzerinde bir compare-and-swap guard'ı — artık bir **Client Extension**. Baştan extension'lar için tasarlayın; geri düşülecek bir middleware yok                                                          |
+| Env değişkenleri otomatik yüklenmiyor | `dotenv` açıkça çağrılıyor. Aşağıdaki `.env.example` aynı değişkenleri tarif etmeye devam ediyor; yalnızca yükleme elle yapılıyor                                                                                                                                                                     |
 
 Bundan doğan asgari sürümler: Node ≥ 20.19.0 (projenin taban çizgisi daha yüksek — bkz.
 [development.md](development.md#ön-koşullar)) ve TypeScript 5.4.
@@ -262,12 +262,12 @@ component'ten itibaren bağlanır — bkz. [design.md](design.md)).
 
 `docker-compose.yml` — tam stack:
 
-| Servis | Detay |
-|---|---|
-| `postgres` | `postgres:18-alpine`, named volume, healthcheck |
-| `redis` | `redis:8-alpine`, named volume |
-| `api` | `apps/api` Dockerfile'ından build edilir; `condition: service_healthy` ile postgres + redis'e `depends_on` |
-| `web` | `apps/web` Dockerfile'ından build edilir; api'ye `depends_on` |
+| Servis     | Detay                                                                                                      |
+| ---------- | ---------------------------------------------------------------------------------------------------------- |
+| `postgres` | `postgres:18-alpine`, named volume, healthcheck                                                            |
+| `redis`    | `redis:8-alpine`, named volume                                                                             |
+| `api`      | `apps/api` Dockerfile'ından build edilir; `condition: service_healthy` ile postgres + redis'e `depends_on` |
+| `web`      | `apps/web` Dockerfile'ından build edilir; api'ye `depends_on`                                              |
 
 Her iki tag de bilerek sabitlenmiştir. **Redis 8, 7 değil:** `redis:7` bandı yalnızca
 RSALv2/SSPLv1 — source-available, OSI açık kaynak değil. Redis 8, OSI onaylı bir lisansı
@@ -301,13 +301,13 @@ Gerçek `.env` `.gitignore`'da olmalıdır.
 
 ## 7. Repository dosyaları
 
-| Dosya | İçerik |
-|---|---|
-| `README.md` | Ne yaptığı, ekran görüntüsü (sonra), hızlı başlangıç (`docker compose up`), stack listesi, katkı linki |
-| `LICENSE` | AGPL-3.0 — network-use maddesi, değiştirilmiş bir Kurultay'ı bir servis olarak çalıştıran herkesin değişikliklerini yayınlamasını gerektiriyor, bu da hosting'i yasaklamadan kapalı kaynak bir SaaS fork'unun teşvikini ortadan kaldırıyor. Bir open-core yolunu açık bırakır. AGPL'i sonradan gevşetmek her katkıda bulunanın onayını gerektirir, bu yüzden en başta doğru olmalı. Bkz. [`decisions/0007-license-agpl.md`](decisions/0007-license-agpl.md) |
-| `CONTRIBUTING.md` | Ortam kurulumu, commit convention'ı, PR süreci |
-| `CODE_OF_CONDUCT.md` | Contributor Covenant |
-| `.github/workflows/ci.yml` | lint + typecheck + test + build, push ve PR'da |
+| Dosya                      | İçerik                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `README.md`                | Ne yaptığı, ekran görüntüsü (sonra), hızlı başlangıç (`docker compose up`), stack listesi, katkı linki                                                                                                                                                                                                                                                                                                                                                      |
+| `LICENSE`                  | AGPL-3.0 — network-use maddesi, değiştirilmiş bir Kurultay'ı bir servis olarak çalıştıran herkesin değişikliklerini yayınlamasını gerektiriyor, bu da hosting'i yasaklamadan kapalı kaynak bir SaaS fork'unun teşvikini ortadan kaldırıyor. Bir open-core yolunu açık bırakır. AGPL'i sonradan gevşetmek her katkıda bulunanın onayını gerektirir, bu yüzden en başta doğru olmalı. Bkz. [`decisions/0007-license-agpl.md`](decisions/0007-license-agpl.md) |
+| `CONTRIBUTING.md`          | Ortam kurulumu, commit convention'ı, PR süreci                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `CODE_OF_CONDUCT.md`       | Contributor Covenant                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `.github/workflows/ci.yml` | lint + typecheck + test + build, push ve PR'da                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 ---
 

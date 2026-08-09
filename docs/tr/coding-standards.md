@@ -33,15 +33,15 @@ Bu repository'deki TypeScript, NestJS ve Next.js kodu için konvansiyonlar.
 - Ayrıca açık: `noUncheckedIndexedAccess`, `noImplicitOverride`,
   `noFallthroughCasesInSwitch`.
 
-| Kural | |
-|---|---|
-| `any` | Yasak. `unknown` kullanıp daraltın, ya da tipi yazın. `// eslint-disable` nedenini açıklayan bir yorum gerektirir. |
-| Non-null assertion `!` | Kaçının. Tipi daraltın ya da açıkça throw edin. |
-| `as` cast'leri | Yalnızca gerçekten tiplenemeyen sınırlar için (parse edilmiş JSON, üçüncü parti boşlukları), bir yorumla birlikte. |
-| Return tipleri | Export edilen fonksiyonlarda ve tüm public service/controller metotlarında açık. Lokal helper'lar için inferred olması sorun değil. |
-| `enum` | String-literal union'ları veya `as const` objelerini tercih edin; Prisma'nın ürettiği enum'lar istisnadır ve shared types'tan yeniden export edilir. |
-| `interface` vs `type` | Genişletilebilecek obje şekilleri için `interface`, union'lar, intersection'lar ve mapped tipler için `type`. Aynı kavram için ikisini karıştırmayın. |
-| `null` vs `undefined` | `null` saklanan bir yokluktur (bir DB kolonu), `undefined` yok olan bir değerdir (opsiyonel bir alan). İkisini birbirinin yerine kullanmayın. |
+| Kural                  |                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `any`                  | Yasak. `unknown` kullanıp daraltın, ya da tipi yazın. `// eslint-disable` nedenini açıklayan bir yorum gerektirir.                                    |
+| Non-null assertion `!` | Kaçının. Tipi daraltın ya da açıkça throw edin.                                                                                                       |
+| `as` cast'leri         | Yalnızca gerçekten tiplenemeyen sınırlar için (parse edilmiş JSON, üçüncü parti boşlukları), bir yorumla birlikte.                                    |
+| Return tipleri         | Export edilen fonksiyonlarda ve tüm public service/controller metotlarında açık. Lokal helper'lar için inferred olması sorun değil.                   |
+| `enum`                 | String-literal union'ları veya `as const` objelerini tercih edin; Prisma'nın ürettiği enum'lar istisnadır ve shared types'tan yeniden export edilir.  |
+| `interface` vs `type`  | Genişletilebilecek obje şekilleri için `interface`, union'lar, intersection'lar ve mapped tipler için `type`. Aynı kavram için ikisini karıştırmayın. |
+| `null` vs `undefined`  | `null` saklanan bir yokluktur (bir DB kolonu), `undefined` yok olan bir değerdir (opsiyonel bir alan). İkisini birbirinin yerine kullanmayın.         |
 
 Hatalar tiplenir ve throw edilir, bir servisten asla `{ error: string }` olarak
 döndürülmez. API, bunları [api-conventions.md](api-conventions.md#hatalar)'de tarif edilen
@@ -49,17 +49,17 @@ yanıt şekline çevirir.
 
 ## Adlandırma konvansiyonları
 
-| Şey | Konvansiyon | Örnek |
-|---|---|---|
-| Dosyalar ve dizinler | `kebab-case` | `task-position.service.ts`, `components/board/` |
-| Class'lar, decorator'lar, tipler, interface'ler, enum'lar | `PascalCase` | `TaskService`, `CreateTaskDto`, `MemberRole` |
-| Fonksiyonlar, değişkenler, metotlar, property'ler | `camelCase` | `moveTask`, `workspaceId` |
-| Sabitler (modül seviyesi, gerçekten sabit) | `UPPER_SNAKE_CASE` | `DEFAULT_PAGE_SIZE`, `POSITION_GAP` |
-| React component'leri | `PascalCase` dosya ve export | `components/board/task-card.tsx`, `TaskCard`'ı export eder |
-| React hook'ları | `use` öneki, camelCase | `use-board-socket.ts`, `useBoardSocket`'i export eder |
-| Boolean'lar | `is` / `has` / `can` öneki | `isArchived`, `hasUnreadComments` |
-| Prisma modelleri | `PascalCase` tekil | `Task`, `WorkspaceMember` |
-| Veritabanına bakan id'ler | `<entity>Id` | `workspaceId`, `boardId` |
+| Şey                                                       | Konvansiyon                  | Örnek                                                      |
+| --------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------- |
+| Dosyalar ve dizinler                                      | `kebab-case`                 | `task-position.service.ts`, `components/board/`            |
+| Class'lar, decorator'lar, tipler, interface'ler, enum'lar | `PascalCase`                 | `TaskService`, `CreateTaskDto`, `MemberRole`               |
+| Fonksiyonlar, değişkenler, metotlar, property'ler         | `camelCase`                  | `moveTask`, `workspaceId`                                  |
+| Sabitler (modül seviyesi, gerçekten sabit)                | `UPPER_SNAKE_CASE`           | `DEFAULT_PAGE_SIZE`, `POSITION_GAP`                        |
+| React component'leri                                      | `PascalCase` dosya ve export | `components/board/task-card.tsx`, `TaskCard`'ı export eder |
+| React hook'ları                                           | `use` öneki, camelCase       | `use-board-socket.ts`, `useBoardSocket`'i export eder      |
+| Boolean'lar                                               | `is` / `has` / `can` öneki   | `isArchived`, `hasUnreadComments`                          |
+| Prisma modelleri                                          | `PascalCase` tekil           | `Task`, `WorkspaceMember`                                  |
+| Veritabanına bakan id'ler                                 | `<entity>Id`                 | `workspaceId`, `boardId`                                   |
 
 Default export `PascalCase` olsa bile dosya adları kebab-case'dir — dosya sistemi macOS'ta
 büyük/küçük harf duyarsız, CI'da ise duyarlı, ve kebab-case bu bozulma sınıfının tamamından
@@ -69,18 +69,18 @@ kaçınır.
 
 `apps/api`'deki her dosya rolünü belirten bir son ek taşır:
 
-| Son ek | Rol |
-|---|---|
-| `*.module.ts` | Nest modül tanımı |
-| `*.controller.ts` | HTTP route handler'ları |
-| `*.service.ts` | İş mantığı |
-| `*.dto.ts` | Request/response DTO'ları (`dto/` içinde) |
-| `*.guard.ts` | Guard'lar |
-| `*.interceptor.ts` | Interceptor'lar |
-| `*.filter.ts` | Exception filter'lar |
-| `*.decorator.ts` | Özel decorator'lar |
-| `*.gateway.ts` | Socket.io gateway'leri |
-| `*.spec.ts` | Yerinde (colocated) unit testler |
+| Son ek             | Rol                                       |
+| ------------------ | ----------------------------------------- |
+| `*.module.ts`      | Nest modül tanımı                         |
+| `*.controller.ts`  | HTTP route handler'ları                   |
+| `*.service.ts`     | İş mantığı                                |
+| `*.dto.ts`         | Request/response DTO'ları (`dto/` içinde) |
+| `*.guard.ts`       | Guard'lar                                 |
+| `*.interceptor.ts` | Interceptor'lar                           |
+| `*.filter.ts`      | Exception filter'lar                      |
+| `*.decorator.ts`   | Özel decorator'lar                        |
+| `*.gateway.ts`     | Socket.io gateway'leri                    |
+| `*.spec.ts`        | Yerinde (colocated) unit testler          |
 
 ## NestJS (`apps/api`)
 
@@ -102,11 +102,11 @@ src/task/
 └── task.service.spec.ts
 ```
 
-| Katman | Sorumluluk | Yapmamalı |
-|---|---|---|
-| Controller | HTTP şekli: routing, param'lar, status kodları, giren/çıkan DTO | İş mantığı içermemeli veya Prisma'ya dokunmamalı |
-| Service | İş mantığı, transaction'lar, Prisma erişimi | HTTP'yi bilmemeli (saf logic helper'larında `Request`, `Response`, HTTP exception yok) |
-| DTO | Validation decorator'larıyla birlikte sınırdaki kontrat | Logic içermemeli |
+| Katman     | Sorumluluk                                                      | Yapmamalı                                                                              |
+| ---------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Controller | HTTP şekli: routing, param'lar, status kodları, giren/çıkan DTO | İş mantığı içermemeli veya Prisma'ya dokunmamalı                                       |
+| Service    | İş mantığı, transaction'lar, Prisma erişimi                     | HTTP'yi bilmemeli (saf logic helper'larında `Request`, `Response`, HTTP exception yok) |
+| DTO        | Validation decorator'larıyla birlikte sınırdaki kontrat         | Logic içermemeli                                                                       |
 
 ### Modül sınırları
 
@@ -218,12 +218,12 @@ components/
 └── layout/       # sidebar, workspace switcher
 ```
 
-| Kural | |
-|---|---|
-| `components/ui/` | Yalnızca shadcn/ui çıktısı. Proje component'lerini buraya koymayın ve primitive'leri shadcn workflow'unun ürettiğinin ötesinde elle değiştirmeyin. |
-| Domain klasörleri | Kendi component'lerine sahiptir; bir board component'i ne kadar küçük olursa olsun `board/`'a aittir |
-| Domain'ler arası paylaşılan component | Yalnızca 3+ domain tarafından kullanılıyorsa; aksi halde lokal tutun |
-| Sayfa dosyaları | `page.tsx` component'leri bir araya getirir; herhangi bir boyutta layout logic'i veya markup tutmaz |
+| Kural                                 |                                                                                                                                                    |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `components/ui/`                      | Yalnızca shadcn/ui çıktısı. Proje component'lerini buraya koymayın ve primitive'leri shadcn workflow'unun ürettiğinin ötesinde elle değiştirmeyin. |
+| Domain klasörleri                     | Kendi component'lerine sahiptir; bir board component'i ne kadar küçük olursa olsun `board/`'a aittir                                               |
+| Domain'ler arası paylaşılan component | Yalnızca 3+ domain tarafından kullanılıyorsa; aksi halde lokal tutun                                                                               |
+| Sayfa dosyaları                       | `page.tsx` component'leri bir araya getirir; herhangi bir boyutta layout logic'i veya markup tutmaz                                                |
 
 ### Stil
 
@@ -246,7 +246,11 @@ her iki taraftan da import edilir:
 import type { TaskResponse, Priority } from '@kurultay/shared-types';
 
 // Yanlış — sessizce sapacak yeniden deklare edilmiş bir şekil
-interface Task { id: string; title: string; priority: string }
+interface Task {
+  id: string;
+  title: string;
+  priority: string;
+}
 ```
 
 Asla yeniden deklare etmeyin, asla çoğaltmayın, asla "sadece bir alanı lokal olarak
@@ -293,11 +297,11 @@ Bunları ölçülü kullanın.
 
 ## Formatting ve linting
 
-| Araç | Rol |
-|---|---|
-| Prettier | Tüm formatting. Config commit edilir; editor-local override yok. |
-| ESLint | Flat config ile doğruluk kuralları (`@eslint/js`, `typescript-eslint`, `eslint-config-prettier`). Nest/Next/import plugin'leri henüz bağlı değil — import sırası konvansiyonla tutulur. |
-| `tsc --noEmit` | Typecheck, CI'da lint'ten ayrı çalışır |
+| Araç           | Rol                                                                                                                                                                                     |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prettier       | Tüm formatting. Config commit edilir; editor-local override yok.                                                                                                                        |
+| ESLint         | Flat config ile doğruluk kuralları (`@eslint/js`, `typescript-eslint`, `eslint-config-prettier`). Nest/Next/import plugin'leri henüz bağlı değil — import sırası konvansiyonla tutulur. |
+| `tsc --noEmit` | Typecheck, CI'da lint'ten ayrı çalışır                                                                                                                                                  |
 
 ```bash
 pnpm lint          # kontrol

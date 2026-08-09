@@ -27,11 +27,11 @@ Kurultay için dokümantasyondan MVP'ye ve ötesine uzanan, fazlara ayrılmış 
 **Bu dosya yalnızca yüksek seviyeli fazları tutar.** Görev seviyesi takip GitHub
 Issues'ta yaşar: [github.com/dravcore/kurultay/issues](https://github.com/dravcore/kurultay/issues).
 
-| Seviye | Nerede | Granülerlik |
-|---|---|---|
-| Faz | Bu dosya | "Board'lar ve column'lar" — haftalarca iş, tek bir tutarlı yetenek |
-| Görev | GitHub Issues | "Column reorder endpoint'i cross-board taşımada 409 dönüyor" — bir PR |
-| Karar | [decisions/](decisions/) | Bir fazın neden o şekilde inşa edildiği |
+| Seviye | Nerede                   | Granülerlik                                                           |
+| ------ | ------------------------ | --------------------------------------------------------------------- |
+| Faz    | Bu dosya                 | "Board'lar ve column'lar" — haftalarca iş, tek bir tutarlı yetenek    |
+| Görev  | GitHub Issues            | "Column reorder endpoint'i cross-board taşımada 409 dönüyor" — bir PR |
+| Karar  | [decisions/](decisions/) | Bir fazın neden o şekilde inşa edildiği                               |
 
 Fazlar sırayla teslim edilir. Her biri çalışan, merge edilmiş, gösterilebilir bir durumda
 biter — hiçbir faz `develop`'ta yarım kalmış kod bırakmaz. Bir faz bir `0.y.0` release'ine
@@ -44,12 +44,12 @@ tekrarlanmıştır.
 
 ## Durum lejantı
 
-| İşaret | Anlam |
-|---|---|
-| `[x]` | Bitti — `develop`'a merge edildi |
-| `[~]` | Devam ediyor |
-| `[ ]` | Başlanmadı |
-| `[-]` | Ertelendi / şimdilik kapsam dışı |
+| İşaret | Anlam                            |
+| ------ | -------------------------------- |
+| `[x]`  | Bitti — `develop`'a merge edildi |
+| `[~]`  | Devam ediyor                     |
+| `[ ]`  | Başlanmadı                       |
+| `[-]`  | Ertelendi / şimdilik kapsam dışı |
 
 ---
 
@@ -310,18 +310,18 @@ etmek ise ondan önceki sekiz fazın tümüne bir vergidir.
 
 Planlanmadı. Mimarinin bunlarla uyumlu kalması için listelendi, taahhüt olarak değil.
 
-| Öğe | Not |
-|---|---|
-| `[-]` E2E test suite (Playwright) | UI şekil değiştirmeyi bıraktığında — [testing.md](testing.md) |
-| `[-]` Gantt / zaman çizelgesi görünümü | `dueDate` + `estimatedMinutes` bunun için ayrı tutuluyor |
-| `[-]` Task ekleri | Bir object-storage kararı (ADR) gerektiriyor |
-| `[-]` Board şablonları | |
-| `[-]` Public API token'ları + `/v1` öneki | 1.0 sonrası — [api-conventions.md](api-conventions.md#versiyonlama) |
-| `[-]` Webhook'lar | |
-| `[-]` E-posta bildirimleri | |
-| `[-]` Trello / Jira'dan import | |
-| `[-]` Ek UI dil paketleri | next-intl katmanının kendisi Faz 1'de gelir ve MVP yalnız İngilizce'dir; bu satır ek dillerin (önce Türkçe) paketlenmesiyle ilgilidir — bkz. [design.md](design.md#7-ui-metni) |
-| `[-]` Docker Compose ötesinde self-host deployment rehberi | |
+| Öğe                                                        | Not                                                                                                                                                                            |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `[-]` E2E test suite (Playwright)                          | UI şekil değiştirmeyi bıraktığında — [testing.md](testing.md)                                                                                                                  |
+| `[-]` Gantt / zaman çizelgesi görünümü                     | `dueDate` + `estimatedMinutes` bunun için ayrı tutuluyor                                                                                                                       |
+| `[-]` Task ekleri                                          | Bir object-storage kararı (ADR) gerektiriyor                                                                                                                                   |
+| `[-]` Board şablonları                                     |                                                                                                                                                                                |
+| `[-]` Public API token'ları + `/v1` öneki                  | 1.0 sonrası — [api-conventions.md](api-conventions.md#versiyonlama)                                                                                                            |
+| `[-]` Webhook'lar                                          |                                                                                                                                                                                |
+| `[-]` E-posta bildirimleri                                 |                                                                                                                                                                                |
+| `[-]` Trello / Jira'dan import                             |                                                                                                                                                                                |
+| `[-]` Ek UI dil paketleri                                  | next-intl katmanının kendisi Faz 1'de gelir ve MVP yalnız İngilizce'dir; bu satır ek dillerin (önce Türkçe) paketlenmesiyle ilgilidir — bkz. [design.md](design.md#7-ui-metni) |
+| `[-]` Docker Compose ötesinde self-host deployment rehberi |                                                                                                                                                                                |
 
 **1.0.0**, Faz 1–9 tamamlandığında ve REST API geriye dönük uyumluluk vaat edecek kadar
 kararlı olduğunda kesilir.

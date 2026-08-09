@@ -32,11 +32,11 @@ Testler, bu maliyetin gerçek güven satın aldığı yerlerde yazılır.
 
 ## Piramit
 
-| Katman | Araç | Kapsam | Durum |
-|---|---|---|---|
-| **Unit** | Jest (NestJS varsayılanı) | Servisler, guard'lar, saf fonksiyonlar. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu |
-| **Integration** | Jest + Supertest | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden) | Her endpoint için zorunlu |
-| **E2E** | Playwright | Tam stack üzerinde browser akışları | **MVP'de kurulu değil** — ileride kritik akışlar için ayrılmıştır |
+| Katman          | Araç                      | Kapsam                                                                                         | Durum                                                             |
+| --------------- | ------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **Unit**        | Jest (NestJS varsayılanı) | Servisler, guard'lar, saf fonksiyonlar. Bağımlılıklar mock'lanır.                              | Baştan itibaren zorunlu                                           |
+| **Integration** | Jest + Supertest          | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden) | Her endpoint için zorunlu                                         |
+| **E2E**         | Playwright                | Tam stack üzerinde browser akışları                                                            | **MVP'de kurulu değil** — ileride kritik akışlar için ayrılmıştır |
 
 ```
         /\        e2e — ertelendi (Playwright)
@@ -59,16 +59,16 @@ Bu üç alan pazarlığa açık değildir. Bunlara dokunan ama testsiz bir PR me
 `Task.position` bir `Float`'tır ve tüm drag-and-drop sıralama modeli buna bağlıdır.
 Kapsanması gereken durumlar:
 
-| Durum | Beklenti |
-|---|---|
-| İki kart arasına ekleme | Yeni position, komşuların kesin arasındadır |
-| Bir column'un en üstüne ekleme | Position, mevcut ilkinden küçüktür |
-| En alta ekleme | Position, mevcut sonuncudan büyüktür |
-| Boş bir column'a ekleme | Geçerli bir başlangıç position'ı üretilir |
-| Aynı column içinde taşıma | Yalnızca taşınan satır güncellenir |
-| Column'lar arası taşıma | Hem `columnId` hem `position` güncellenir; başka hiçbir satır değişmez |
-| Aynı boşluğa (gap) tekrarlanan eklemeler | Float precision tükenmez; boşluk çok küçülürse column yeniden dengelenir (rebalance) |
-| Aynı boşluğa eşzamanlı (concurrent) taşımalar | İki task aynı position'da bitmez, ya da çakışma deterministik olarak çözülür |
+| Durum                                         | Beklenti                                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| İki kart arasına ekleme                       | Yeni position, komşuların kesin arasındadır                                          |
+| Bir column'un en üstüne ekleme                | Position, mevcut ilkinden küçüktür                                                   |
+| En alta ekleme                                | Position, mevcut sonuncudan büyüktür                                                 |
+| Boş bir column'a ekleme                       | Geçerli bir başlangıç position'ı üretilir                                            |
+| Aynı column içinde taşıma                     | Yalnızca taşınan satır güncellenir                                                   |
+| Column'lar arası taşıma                       | Hem `columnId` hem `position` güncellenir; başka hiçbir satır değişmez               |
+| Aynı boşluğa (gap) tekrarlanan eklemeler      | Float precision tükenmez; boşluk çok küçülürse column yeniden dengelenir (rebalance) |
+| Aynı boşluğa eşzamanlı (concurrent) taşımalar | İki task aynı position'da bitmez, ya da çakışma deterministik olarak çözülür         |
 
 Precision tükenmesi ve concurrency durumları production'da gerçekten kırılan durumlardır.
 Bunları ima yoluyla değil, açıkça test edin.
@@ -99,12 +99,12 @@ tek mekanik zorlaması olur.
 
 ## Dosya konvansiyonları
 
-| Tür | Konum | Desen |
-|---|---|---|
-| Unit | Kaynak dosyayla yerinde (colocated) | `apps/api/src/task/task.service.spec.ts` |
-| Integration | Ayrı bir test kökü | `apps/api/test/task.e2e-spec.ts` |
-| Test helper'ları/factory'ler | Test kökü altında paylaşılır | `apps/api/test/helpers/`, `apps/api/test/factories/` |
-| Playwright (ileride) | Repository seviyesinde | `e2e/` |
+| Tür                          | Konum                               | Desen                                                |
+| ---------------------------- | ----------------------------------- | ---------------------------------------------------- |
+| Unit                         | Kaynak dosyayla yerinde (colocated) | `apps/api/src/task/task.service.spec.ts`             |
+| Integration                  | Ayrı bir test kökü                  | `apps/api/test/task.e2e-spec.ts`                     |
+| Test helper'ları/factory'ler | Test kökü altında paylaşılır        | `apps/api/test/helpers/`, `apps/api/test/factories/` |
+| Playwright (ileride)         | Repository seviyesinde              | `e2e/`                                               |
 
 Nest'in generator'ı integration testlerini `*.e2e-spec.ts` olarak adlandırıyor; bunlar
 browser e2e değil API integration testleri olsa da bu isim tooling uyumluluğu için
@@ -149,7 +149,7 @@ veritabanına** (`kurultay_test`) karşı çalışır. Geliştirme veritabanına
 üzerinden başarısız olmaz.
 
 - Raporu, hiçbir testin çalıştırmadığı kodu bulmak için kullanın, sonra o kodun bir test
-  *hak edip etmediğine* karar verin.
+  _hak edip etmediğine_ karar verin.
 - Bir positioning algoritmasında düşük coverage bir problemdir. Bir DTO'da veya bir barrel
   dosyasında düşük coverage değildir.
 - Assertion'sız testlerle bir eşiği kandırmak, eşiğin hiç olmamasından daha kötüdür — bir
@@ -162,13 +162,13 @@ gözden geçirilir.
 
 Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalıştırır:
 
-| Adım | Komut |
-|---|---|
-| Lint | `pnpm lint` |
-| Typecheck | Workspace'ler genelinde `tsc --noEmit` |
-| Unit testler | `pnpm --filter @kurultay/api test` |
+| Adım                | Komut                                                                           |
+| ------------------- | ------------------------------------------------------------------------------- |
+| Lint                | `pnpm lint`                                                                     |
+| Typecheck           | Workspace'ler genelinde `tsc --noEmit`                                          |
+| Unit testler        | `pnpm --filter @kurultay/api test`                                              |
 | Integration testler | Bir Postgres service container'ına karşı `pnpm --filter @kurultay/api test:e2e` |
-| Build | `pnpm build` |
+| Build               | `pnpm build`                                                                    |
 
 Merge öncesi tüm adımlar geçmelidir. Bkz.
 [git-strategy.md](git-strategy.md#pull-request-süreci).

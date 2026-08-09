@@ -10,16 +10,16 @@ Kurultay, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğun
 
 ## Dizin
 
-| # | Başlık | Durum | Tarih |
-|---|---|---|---|
-| [0001](0001-monorepo-modular-monolith.md) | Monorepo + Modüler Monolit | Kabul edildi | 2026-08-08 |
-| [0002](0002-backend-stack.md) | Backend Stack: NestJS + Prisma + PostgreSQL + Redis | Kabul edildi | 2026-08-08 |
-| [0003](0003-frontend-stack.md) | Frontend Stack: Next.js + Tailwind + shadcn/ui + @dnd-kit + Recharts | Kabul edildi | 2026-08-08 |
-| [0004](0004-auth-better-auth.md) | Auth: Organization Plugin ile Better Auth | Kabul edildi | 2026-08-08 |
-| [0005](0005-realtime-socketio.md) | Realtime: Socket.io + Redis Adapter | Kabul edildi | 2026-08-08 |
-| [0006](0006-fractional-indexing.md) | Task ve Column Pozisyonu için Fractional Indexing | Kabul edildi | 2026-08-08 |
-| [0007](0007-license-agpl.md) | Lisans: AGPL-3.0 | Kabul edildi | 2026-08-08 |
-| [0008](0008-git-flow-semver.md) | Git Flow + Conventional Commits + SemVer | Kabul edildi | 2026-08-08 |
+| #                                         | Başlık                                                               | Durum        | Tarih      |
+| ----------------------------------------- | -------------------------------------------------------------------- | ------------ | ---------- |
+| [0001](0001-monorepo-modular-monolith.md) | Monorepo + Modüler Monolit                                           | Kabul edildi | 2026-08-08 |
+| [0002](0002-backend-stack.md)             | Backend Stack: NestJS + Prisma + PostgreSQL + Redis                  | Kabul edildi | 2026-08-08 |
+| [0003](0003-frontend-stack.md)            | Frontend Stack: Next.js + Tailwind + shadcn/ui + @dnd-kit + Recharts | Kabul edildi | 2026-08-08 |
+| [0004](0004-auth-better-auth.md)          | Auth: Organization Plugin ile Better Auth                            | Kabul edildi | 2026-08-08 |
+| [0005](0005-realtime-socketio.md)         | Realtime: Socket.io + Redis Adapter                                  | Kabul edildi | 2026-08-08 |
+| [0006](0006-fractional-indexing.md)       | Task ve Column Pozisyonu için Fractional Indexing                    | Kabul edildi | 2026-08-08 |
+| [0007](0007-license-agpl.md)              | Lisans: AGPL-3.0                                                     | Kabul edildi | 2026-08-08 |
+| [0008](0008-git-flow-semver.md)           | Git Flow + Conventional Commits + SemVer                             | Kabul edildi | 2026-08-08 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 
@@ -59,6 +59,6 @@ Bunun neyi kolaylaştırdığı, neyi zorlaştırdığı ve olumsuz trade-off'la
 ## Değerlendirilen Alternatifler
 
 | Alternatif | Neden değil |
-|---|---|
-| ... | ... |
+| ---------- | ----------- |
+| ...        | ...         |
 ```

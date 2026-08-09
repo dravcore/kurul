@@ -16,21 +16,21 @@ The technology chosen for each layer of Kurultay, with a short rationale and the
 
 ## 1. Summary
 
-| Layer | Choice | Alternative considered |
-|---|---|---|
-| Backend | NestJS 11 + TypeScript | Fastify (lighter), Django |
-| Database | PostgreSQL 18 | — |
-| Cache / PubSub / Queue | Redis 8 (AGPLv3) | Valkey (BSD-3, Linux Foundation fork) |
-| ORM | Prisma 7 | Drizzle ORM |
-| API | REST (initially) | GraphQL (later) |
-| Realtime | Socket.io + `@socket.io/redis-adapter` | `ws` (lighter, no features) |
-| Frontend | Next.js 16 + React + TypeScript | — |
-| Styling | Tailwind CSS | — |
-| UI kit | shadcn/ui | Radix UI (raw) |
-| Drag & drop | @dnd-kit | pragmatic-drag-and-drop |
-| Charts | Recharts | Chart.js, Apache ECharts |
-| Auth | Better Auth (organization plugin) | Auth.js / NextAuth (maintenance mode) |
-| Deployment | Docker Compose | Kubernetes (once scale demands it) |
+| Layer                  | Choice                                 | Alternative considered                |
+| ---------------------- | -------------------------------------- | ------------------------------------- |
+| Backend                | NestJS 11 + TypeScript                 | Fastify (lighter), Django             |
+| Database               | PostgreSQL 18                          | —                                     |
+| Cache / PubSub / Queue | Redis 8 (AGPLv3)                       | Valkey (BSD-3, Linux Foundation fork) |
+| ORM                    | Prisma 7                               | Drizzle ORM                           |
+| API                    | REST (initially)                       | GraphQL (later)                       |
+| Realtime               | Socket.io + `@socket.io/redis-adapter` | `ws` (lighter, no features)           |
+| Frontend               | Next.js 16 + React + TypeScript        | —                                     |
+| Styling                | Tailwind CSS                           | —                                     |
+| UI kit                 | shadcn/ui                              | Radix UI (raw)                        |
+| Drag & drop            | @dnd-kit                               | pragmatic-drag-and-drop               |
+| Charts                 | Recharts                               | Chart.js, Apache ECharts              |
+| Auth                   | Better Auth (organization plugin)      | Auth.js / NextAuth (maintenance mode) |
+| Deployment             | Docker Compose                         | Kubernetes (once scale demands it)    |
 
 Architecture (monorepo + modular monolith) is covered separately in [architecture.md](architecture.md).
 
@@ -80,14 +80,14 @@ Four services — `api`, `web`, `postgres`, `redis` — matching the existing se
 
 ## 3. Deliberately not included
 
-| Technology | Why not now |
-|---|---|
-| Kafka | ClickUp uses it, but at 20M+ user scale. Redis pub/sub is more than enough for the MVP; it can be added later |
-| GraphQL | Linear uses it. REST is faster to start with; revisit when API consumers diversify |
-| Elasticsearch | Full-text search can start with PostgreSQL's built-in FTS |
-| Kubernetes | Docker Compose on one host is sufficient. Migrate when traffic requires it |
-| MinIO / S3 | File attachments are out of MVP scope. When added, pick an S3-compatible store |
-| Local-first sync engine | Linear's largest technical investment. Very high complexity — start server-first |
+| Technology              | Why not now                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Kafka                   | ClickUp uses it, but at 20M+ user scale. Redis pub/sub is more than enough for the MVP; it can be added later |
+| GraphQL                 | Linear uses it. REST is faster to start with; revisit when API consumers diversify                            |
+| Elasticsearch           | Full-text search can start with PostgreSQL's built-in FTS                                                     |
+| Kubernetes              | Docker Compose on one host is sufficient. Migrate when traffic requires it                                    |
+| MinIO / S3              | File attachments are out of MVP scope. When added, pick an S3-compatible store                                |
+| Local-first sync engine | Linear's largest technical investment. Very high complexity — start server-first                              |
 
 ---
 
@@ -95,13 +95,13 @@ Four services — `api`, `web`, `postgres`, `redis` — matching the existing se
 
 Projects worth studying for architecture and data modelling:
 
-| Project | Backend | Frontend | Note |
-|---|---|---|---|
-| Plane | Django | Next.js | The most popular OSS PM tool, AGPL-3.0 |
-| Huly | TypeScript / Node.js | Svelte | Full TS, but carries Rush monorepo complexity |
-| Taiga | Django | React | Agile/Scrum focused, MPL-2.0 |
-| OpenProject | Ruby on Rails | Angular | Oldest / enterprise, GPL-3.0 |
-| Focalboard | Go | React | Simple Kanban, no longer actively maintained |
+| Project     | Backend              | Frontend | Note                                          |
+| ----------- | -------------------- | -------- | --------------------------------------------- |
+| Plane       | Django               | Next.js  | The most popular OSS PM tool, AGPL-3.0        |
+| Huly        | TypeScript / Node.js | Svelte   | Full TS, but carries Rush monorepo complexity |
+| Taiga       | Django               | React    | Agile/Scrum focused, MPL-2.0                  |
+| OpenProject | Ruby on Rails        | Angular  | Oldest / enterprise, GPL-3.0                  |
+| Focalboard  | Go                   | React    | Simple Kanban, no longer actively maintained  |
 
 ---
 
@@ -109,15 +109,15 @@ Projects worth studying for architecture and data modelling:
 
 Full arguments and consequences live in [`decisions/`](decisions/) rather than being repeated here:
 
-| ADR | Topic |
-|---|---|
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modular monolith |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Better Auth with the organization plugin (→ Workspace) |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md) | Socket.io + Redis adapter |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) | Float positions for ordering |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md) | AGPL-3.0 |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md) | Git Flow + SemVer |
+| ADR                                                                                | Topic                                                   |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modular monolith                             |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                         | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                       | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                   | Better Auth with the organization plugin (→ Workspace)  |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                 | Socket.io + Redis adapter                               |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)             | Float positions for ordering                            |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                           | AGPL-3.0                                                |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                     | Git Flow + SemVer                                       |
 
 Related: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)

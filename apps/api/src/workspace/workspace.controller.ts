@@ -11,11 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { MemberRole } from '@kurultay/shared-types';
-import type {
-  InvitationDto,
-  WorkspaceDto,
-  WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+import type { InvitationDto, WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import type { Request } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -52,9 +48,7 @@ export class WorkspaceController {
 
   @Get(':workspaceId')
   @UseGuards(WorkspaceGuard)
-  get(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-  ): Promise<WorkspaceDto> {
+  get(@Param('workspaceId', ParseUuidV7Pipe) workspaceId: string): Promise<WorkspaceDto> {
     return this.workspaceService.getById(workspaceId);
   }
 

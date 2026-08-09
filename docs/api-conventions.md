@@ -27,15 +27,15 @@ Base URL in development: `http://localhost:4000`.
 
 ## Resource naming
 
-| Rule | |
-|---|---|
-| Nouns, not verbs | `/tasks`, never `/getTasks` |
-| Plural collections | `/boards`, `/tasks`, `/workspaces` |
-| kebab-case in paths | `/workspace-members`, not `/workspaceMembers` |
-| camelCase path params | `:workspaceId`, `:boardId`, `:taskId` |
-| Nesting expresses ownership | A collection is reached through its owner: a board's tasks, a task's comments |
-| Nesting stops at 2 levels below the workspace root | `:workspaceId` is mandatory on every route and does not count toward the limit — it is the tenant scope, not a hierarchy level. Deeper hierarchies use query filters instead |
-| Once a resource has an id, address it shallowly | `/workspaces/:workspaceId/tasks/:taskId`, never `/workspaces/:workspaceId/boards/:boardId/tasks/:taskId`. The id already identifies the row; the workspace guard already scopes it. The parent segment adds a value the server must validate for no benefit |
+| Rule                                               |                                                                                                                                                                                                                                                             |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nouns, not verbs                                   | `/tasks`, never `/getTasks`                                                                                                                                                                                                                                 |
+| Plural collections                                 | `/boards`, `/tasks`, `/workspaces`                                                                                                                                                                                                                          |
+| kebab-case in paths                                | `/workspace-members`, not `/workspaceMembers`                                                                                                                                                                                                               |
+| camelCase path params                              | `:workspaceId`, `:boardId`, `:taskId`                                                                                                                                                                                                                       |
+| Nesting expresses ownership                        | A collection is reached through its owner: a board's tasks, a task's comments                                                                                                                                                                               |
+| Nesting stops at 2 levels below the workspace root | `:workspaceId` is mandatory on every route and does not count toward the limit — it is the tenant scope, not a hierarchy level. Deeper hierarchies use query filters instead                                                                                |
+| Once a resource has an id, address it shallowly    | `/workspaces/:workspaceId/tasks/:taskId`, never `/workspaces/:workspaceId/boards/:boardId/tasks/:taskId`. The id already identifies the row; the workspace guard already scopes it. The parent segment adds a value the server must validate for no benefit |
 
 ### Workspace scoping
 
@@ -107,31 +107,31 @@ Action segments are the exception and each one needs a reason. Do not invent
 
 ## HTTP verbs and status codes
 
-| Verb | Semantics | Idempotent | Body | Success |
-|---|---|---|---|---|
-| `GET` | Read a resource or collection | Yes | No | `200` |
-| `POST` | Create, or trigger a non-idempotent action | No | Yes | `201` (create), `200` (action) |
-| `PATCH` | Partial update — only the sent fields change | No | Yes | `200` |
-| `PUT` | Full replacement | Yes | Yes | `200` |
-| `DELETE` | Remove | Yes | No | `204` |
+| Verb     | Semantics                                    | Idempotent | Body | Success                        |
+| -------- | -------------------------------------------- | ---------- | ---- | ------------------------------ |
+| `GET`    | Read a resource or collection                | Yes        | No   | `200`                          |
+| `POST`   | Create, or trigger a non-idempotent action   | No         | Yes  | `201` (create), `200` (action) |
+| `PATCH`  | Partial update — only the sent fields change | No         | Yes  | `200`                          |
+| `PUT`    | Full replacement                             | Yes        | Yes  | `200`                          |
+| `DELETE` | Remove                                       | Yes        | No   | `204`                          |
 
 **`PATCH` is the default for updates.** `PUT` is used only where a full replacement is
 genuinely the operation (reordering an entire column, for example). A `PATCH` that omits a
 field leaves it untouched; sending `null` explicitly clears a nullable field.
 
-| Status | When |
-|---|---|
-| `200 OK` | Successful read, update, or action |
-| `201 Created` | Resource created; body is the created resource |
-| `204 No Content` | Successful delete; empty body |
-| `400 Bad Request` | Malformed request or validation failure |
-| `401 Unauthorized` | Missing or invalid session |
-| `403 Forbidden` | Authenticated, workspace member, but role is insufficient |
-| `404 Not Found` | Resource does not exist **or** belongs to another workspace |
-| `409 Conflict` | Uniqueness violation (duplicate slug), or a conflicting concurrent change |
-| `422 Unprocessable Entity` | Semantically invalid though well-formed (e.g. moving a task to a column on another board) |
-| `429 Too Many Requests` | Rate limited |
-| `500 Internal Server Error` | Unhandled failure. Never leaks a stack trace. |
+| Status                      | When                                                                                      |
+| --------------------------- | ----------------------------------------------------------------------------------------- |
+| `200 OK`                    | Successful read, update, or action                                                        |
+| `201 Created`               | Resource created; body is the created resource                                            |
+| `204 No Content`            | Successful delete; empty body                                                             |
+| `400 Bad Request`           | Malformed request or validation failure                                                   |
+| `401 Unauthorized`          | Missing or invalid session                                                                |
+| `403 Forbidden`             | Authenticated, workspace member, but role is insufficient                                 |
+| `404 Not Found`             | Resource does not exist **or** belongs to another workspace                               |
+| `409 Conflict`              | Uniqueness violation (duplicate slug), or a conflicting concurrent change                 |
+| `422 Unprocessable Entity`  | Semantically invalid though well-formed (e.g. moving a task to a column on another board) |
+| `429 Too Many Requests`     | Rate limited                                                                              |
+| `500 Internal Server Error` | Unhandled failure. Never leaks a stack trace.                                             |
 
 **Cross-workspace access returns `404`, not `403`.** A `403` would confirm that the resource
 exists, which leaks information across the tenant boundary. `403` is reserved for a
@@ -158,7 +158,7 @@ flag, no envelope.
   "labels": [{ "id": "lbl_1", "name": "backend", "color": "#00C896" }],
   "createdById": "usr_1",
   "createdAt": "2026-08-08T09:12:31.114Z",
-  "updatedAt": "2026-08-08T09:12:31.114Z"
+  "updatedAt": "2026-08-08T09:12:31.114Z",
 }
 ```
 
@@ -185,21 +185,25 @@ the framework's built-in exceptions and hand-written ones look identical):
   "message": "Validation failed",
   "details": [
     { "field": "title", "constraint": "isNotEmpty", "message": "title should not be empty" },
-    { "field": "estimatedMinutes", "constraint": "min", "message": "estimatedMinutes must not be less than 0" }
+    {
+      "field": "estimatedMinutes",
+      "constraint": "min",
+      "message": "estimatedMinutes must not be less than 0",
+    },
   ],
   "path": "/workspaces/w_1/boards/b_1/tasks",
-  "timestamp": "2026-08-08T09:12:31.114Z"
+  "timestamp": "2026-08-08T09:12:31.114Z",
 }
 ```
 
-| Field | Type | Required | Meaning |
-|---|---|---|---|
-| `statusCode` | number | yes | Mirrors the HTTP status |
-| `error` | string | yes | Stable, machine-readable reason phrase (`Bad Request`, `Not Found`) |
-| `message` | string | yes | Human-readable, single sentence, safe to log |
-| `details` | array | no | Per-field validation problems; present only for `400`/`422` |
-| `path` | string | yes | Request path |
-| `timestamp` | string | yes | ISO 8601 UTC |
+| Field        | Type   | Required | Meaning                                                             |
+| ------------ | ------ | -------- | ------------------------------------------------------------------- |
+| `statusCode` | number | yes      | Mirrors the HTTP status                                             |
+| `error`      | string | yes      | Stable, machine-readable reason phrase (`Bad Request`, `Not Found`) |
+| `message`    | string | yes      | Human-readable, single sentence, safe to log                        |
+| `details`    | array  | no       | Per-field validation problems; present only for `400`/`422`         |
+| `path`       | string | yes      | Request path                                                        |
+| `timestamp`  | string | yes      | ISO 8601 UTC                                                        |
 
 - One global exception filter produces this shape for **every** error, including unhandled
   ones. There is no second error format anywhere in the API.
@@ -223,11 +227,11 @@ Why cursor by default:
 ### The cursor key is always `id`, never `position`
 
 **This is a correctness rule, not a preference.** A keyset cursor only guarantees no dropped
-rows if the field it is keyed on is *immutable* for rows the client has not seen yet.
+rows if the field it is keyed on is _immutable_ for rows the client has not seen yet.
 `Task.position` is the opposite of immutable: fractional indexing rewrites it on every
 drag-and-drop ([`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)).
 A task sitting past the client's cursor that someone drags to the top of the column now has
-a `position` *below* the cursor value — `WHERE position > :cursor` will never return it
+a `position` _below_ the cursor value — `WHERE position > :cursor` will never return it
 again, and the row is silently dropped. Concurrent reordering is exactly why `position`
 cannot be the cursor key.
 
@@ -236,7 +240,7 @@ cannot be the cursor key.
 insertion time, and index-local — a real keyset, not a random seek.
 
 Board rendering still orders tasks by `position`; the two are separate concerns. `position`
-decides where a card *appears*, `id` decides where the *page boundary* falls. A client
+decides where a card _appears_, `id` decides where the _page boundary_ falls. A client
 paginating a large task list receives every row exactly once and sorts the accumulated set
 by `position` for display.
 
@@ -246,16 +250,16 @@ by `position` for display.
 GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d
 ```
 
-| Param | Default | Max | Notes |
-|---|---|---|---|
-| `limit` | 50 | 100 | Values above the max are clamped, not rejected |
-| `cursor` | — | — | Opaque. The `id` of the last item from the previous page. Clients must not parse it. |
+| Param    | Default | Max | Notes                                                                                |
+| -------- | ------- | --- | ------------------------------------------------------------------------------------ |
+| `limit`  | 50      | 100 | Values above the max are clamped, not rejected                                       |
+| `cursor` | —       | —   | Opaque. The `id` of the last item from the previous page. Clients must not parse it. |
 
 ```jsonc
 {
-  "items": [ /* … resources … */ ],
-  "nextCursor": "0198e2c1-8b6d-7e93-a015-4c2f8d1e6b70",  // null on the last page
-  "hasMore": true
+  "items": [/* … resources … */],
+  "nextCursor": "0198e2c1-8b6d-7e93-a015-4c2f8d1e6b70", // null on the last page
+  "hasMore": true,
 }
 ```
 
@@ -267,11 +271,11 @@ GET /workspaces/w_1/members?page=1&perPage=25
 
 ```jsonc
 {
-  "items": [ /* … */ ],
+  "items": [/* … */],
   "page": 1,
   "perPage": 25,
   "total": 7,
-  "totalPages": 1
+  "totalPages": 1,
 }
 ```
 
@@ -281,37 +285,37 @@ shape until a dedicated type is needed — do not invent a second shared paginat
 
 ## Filtering, sorting, field selection
 
-| Concern | Convention | Example |
-|---|---|---|
-| Equality filter | `?field=value` | `?priority=HIGH` |
-| Multiple values (OR) | Repeated or comma-separated | `?priority=HIGH,URGENT` |
-| Relation filter | `?relationId=value` | `?assigneeId=usr_1&labelId=lbl_2` |
-| Range | `?field[gte]=`, `?field[lte]=` | `?dueDate[lte]=2026-09-01T00:00:00Z` |
-| Null check | `?field=null` | `?dueDate=null` |
-| Free-text search | `?q=` | `?q=indexing` |
-| Sorting | `?sort=field` / `?sort=-field` for descending | `?sort=-createdAt` |
-| Multi-sort | Comma-separated, priority left to right | `?sort=priority,-dueDate` |
+| Concern              | Convention                                    | Example                              |
+| -------------------- | --------------------------------------------- | ------------------------------------ |
+| Equality filter      | `?field=value`                                | `?priority=HIGH`                     |
+| Multiple values (OR) | Repeated or comma-separated                   | `?priority=HIGH,URGENT`              |
+| Relation filter      | `?relationId=value`                           | `?assigneeId=usr_1&labelId=lbl_2`    |
+| Range                | `?field[gte]=`, `?field[lte]=`                | `?dueDate[lte]=2026-09-01T00:00:00Z` |
+| Null check           | `?field=null`                                 | `?dueDate=null`                      |
+| Free-text search     | `?q=`                                         | `?q=indexing`                        |
+| Sorting              | `?sort=field` / `?sort=-field` for descending | `?sort=-createdAt`                   |
+| Multi-sort           | Comma-separated, priority left to right       | `?sort=priority,-dueDate`            |
 
 - Combined filters are **AND**; repeated values within one filter are **OR**.
 - Only whitelisted fields are filterable and sortable, declared in the query DTO. An unknown
   filter is a `400`, never silently ignored — a silently dropped filter shows the user data
   they asked not to see.
 - Default **display** sort for tasks is `position` ascending; for everything else,
-  `-createdAt`. Note that a paginated task list is *walked* by `id` regardless of the
+  `-createdAt`. Note that a paginated task list is _walked_ by `id` regardless of the
   requested sort — see [Pagination](#the-cursor-key-is-always-id-never-position).
 - No `?fields=` sparse-fieldset support. Response shapes are fixed by their DTO; if a client
   needs less, that is not worth the caching and typing complexity.
 
 ## DTO naming
 
-| Purpose | Pattern | Example |
-|---|---|---|
-| Create request | `Create<Entity>Dto` | `CreateTaskDto` |
-| Full/partial update | `Update<Entity>Dto` | `UpdateTaskDto` |
-| Action request | `<Verb><Entity>Dto` | `MoveTaskDto`, `InviteMemberDto` |
-| List query params | `<Entity>QueryDto` | `TaskQueryDto` |
-| Single resource response | `<Entity>ResponseDto` | `TaskResponseDto` |
-| List response | `<Entity>ListResponseDto` | `TaskListResponseDto` |
+| Purpose                  | Pattern                   | Example                          |
+| ------------------------ | ------------------------- | -------------------------------- |
+| Create request           | `Create<Entity>Dto`       | `CreateTaskDto`                  |
+| Full/partial update      | `Update<Entity>Dto`       | `UpdateTaskDto`                  |
+| Action request           | `<Verb><Entity>Dto`       | `MoveTaskDto`, `InviteMemberDto` |
+| List query params        | `<Entity>QueryDto`        | `TaskQueryDto`                   |
+| Single resource response | `<Entity>ResponseDto`     | `TaskResponseDto`                |
+| List response            | `<Entity>ListResponseDto` | `TaskListResponseDto`            |
 
 - One DTO per file, in the module's `dto/` folder, named in kebab-case:
   `create-task.dto.ts`.
@@ -323,15 +327,15 @@ Full DTO/validation rules: [coding-standards.md](coding-standards.md#dtos-and-va
 
 ## Data types
 
-| Type | Representation | Example |
-|---|---|---|
-| Identifier | **UUIDv7**, generated by Prisma's `@default(uuid(7))` (available since Prisma 5.18). Opaque to clients: never parsed, never sorted, never generated client-side. | `"0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d"` |
-| Date/time | **ISO 8601, always UTC, always with `Z`** | `"2026-08-08T09:12:31.114Z"` |
-| Date-only value | Still a full ISO 8601 timestamp at `T00:00:00.000Z` | `"2026-09-01T00:00:00.000Z"` |
-| Duration | Integer minutes (`estimatedMinutes`) — never a formatted string | `240` |
-| Position | `Float` (fractional indexing) — never assume integers or contiguity | `1024.5` |
-| Enum | UPPER_SNAKE string, defined in shared types | `"HIGH"`, `"OWNER"` |
-| Money | Not used yet. When it is: integer minor units + currency code. | — |
+| Type            | Representation                                                                                                                                                   | Example                                  |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Identifier      | **UUIDv7**, generated by Prisma's `@default(uuid(7))` (available since Prisma 5.18). Opaque to clients: never parsed, never sorted, never generated client-side. | `"0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d"` |
+| Date/time       | **ISO 8601, always UTC, always with `Z`**                                                                                                                        | `"2026-08-08T09:12:31.114Z"`             |
+| Date-only value | Still a full ISO 8601 timestamp at `T00:00:00.000Z`                                                                                                              | `"2026-09-01T00:00:00.000Z"`             |
+| Duration        | Integer minutes (`estimatedMinutes`) — never a formatted string                                                                                                  | `240`                                    |
+| Position        | `Float` (fractional indexing) — never assume integers or contiguity                                                                                              | `1024.5`                                 |
+| Enum            | UPPER_SNAKE string, defined in shared types                                                                                                                      | `"HIGH"`, `"OWNER"`                      |
+| Money           | Not used yet. When it is: integer minor units + currency code.                                                                                                   | —                                        |
 
 The API never returns local time or a timezone offset. Formatting for the user's locale is
 the frontend's job.

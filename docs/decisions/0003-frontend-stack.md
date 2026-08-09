@@ -71,8 +71,8 @@ lightweight enough for a solo/small-team codebase to maintain.
 
 ## Alternatives considered
 
-| Alternative | Why not |
-|---|---|
-| react-beautiful-dnd | Deprecated; Atlassian withdrew maintenance |
-| pragmatic-drag-and-drop | Actively maintained (2.0.x, Apache-2.0) and the designated fallback, but requires hand-written collision detection and shipped v2 with thin upgrade documentation — a permanent cost accepted only if @dnd-kit blocks us |
-| Chart.js / Apache ECharts | Canvas-based, better for very large datasets, but heavier integration and less idiomatic with shadcn/ui right now |
+| Alternative               | Why not                                                                                                                                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| react-beautiful-dnd       | Deprecated; Atlassian withdrew maintenance                                                                                                                                                                               |
+| pragmatic-drag-and-drop   | Actively maintained (2.0.x, Apache-2.0) and the designated fallback, but requires hand-written collision detection and shipped v2 with thin upgrade documentation — a permanent cost accepted only if @dnd-kit blocks us |
+| Chart.js / Apache ECharts | Canvas-based, better for very large datasets, but heavier integration and less idiomatic with shadcn/ui right now                                                                                                        |

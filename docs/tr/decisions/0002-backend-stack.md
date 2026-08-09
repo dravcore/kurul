@@ -41,8 +41,8 @@ Backend'in; solo/küçük ekip tarafından geliştirilen, realtime'a eğilimli, 
 
 ## Değerlendirilen Alternatifler
 
-| Alternatif | Neden değil |
-|---|---|
-| Fastify | Daha hafif, ama Nest'in yerleşik modüler DI yapısından yoksun — çok modüllü bir ürün için elle daha fazla şey yazmak gerekir |
-| Django | Hızlı CRUD + ücretsiz admin paneli (Plane, Taiga'nın onu seçme nedeni), ama uçtan uca TS tip paylaşımını kırıyor ve realtime ağırlıklı bir ürüne daha az uyuyor |
-| Drizzle | Daha küçük footprint, SQL'e daha yakın, ama solo geliştirme için daha az rehberli migration tooling'i |
+| Alternatif | Neden değil                                                                                                                                                     |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fastify    | Daha hafif, ama Nest'in yerleşik modüler DI yapısından yoksun — çok modüllü bir ürün için elle daha fazla şey yazmak gerekir                                    |
+| Django     | Hızlı CRUD + ücretsiz admin paneli (Plane, Taiga'nın onu seçme nedeni), ama uçtan uca TS tip paylaşımını kırıyor ve realtime ağırlıklı bir ürüne daha az uyuyor |
+| Drizzle    | Daha küçük footprint, SQL'e daha yakın, ama solo geliştirme için daha az rehberli migration tooling'i                                                           |

@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { APIError } from 'better-auth/api';
 import type { Request } from 'express';
 import { auth } from '../auth/auth';
@@ -103,5 +99,4 @@ describe('WorkspaceService Better Auth error mapping', () => {
 
     await expect(service.remove(WORKSPACE_ID, request)).rejects.toBe(failure);
   });
-
 });

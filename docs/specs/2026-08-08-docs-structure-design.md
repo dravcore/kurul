@@ -16,16 +16,16 @@ güncellenecek.
 
 ## 2. Alınan Kararlar (Q&A sonucu)
 
-| Konu | Karar |
-|---|---|
-| Dil stratejisi | Tam lokalizasyon: EN kanonik, `docs/tr/` altında tam TR kopya |
-| Git stratejisi | Git Flow (`main` + `develop` + `feature/*` + `release/*` + `hotfix/*`) |
-| Karar kaydı | Hafif ADR — `docs/decisions/` altında numaralı MADR-benzeri dosyalar |
-| İlerleme | `docs/roadmap.md` (yüksek seviye fazlar) + GitHub Issues (görev takibi) |
-| Commit | Conventional Commits |
-| Versiyon | SemVer + `CHANGELOG.md` (Keep a Changelog formatı) |
-| Ek docs | Kod standartları, test stratejisi, API konvansiyonları, SECURITY.md + issue şablonları |
-| Araştırma | Büyük OSS PM araçları (Plane, Cal.com, Supabase, Novu) + kullanıcının kendi GitHub repoları |
+| Konu           | Karar                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| Dil stratejisi | Tam lokalizasyon: EN kanonik, `docs/tr/` altında tam TR kopya                               |
+| Git stratejisi | Git Flow (`main` + `develop` + `feature/*` + `release/*` + `hotfix/*`)                      |
+| Karar kaydı    | Hafif ADR — `docs/decisions/` altında numaralı MADR-benzeri dosyalar                        |
+| İlerleme       | `docs/roadmap.md` (yüksek seviye fazlar) + GitHub Issues (görev takibi)                     |
+| Commit         | Conventional Commits                                                                        |
+| Versiyon       | SemVer + `CHANGELOG.md` (Keep a Changelog formatı)                                          |
+| Ek docs        | Kod standartları, test stratejisi, API konvansiyonları, SECURITY.md + issue şablonları      |
+| Araştırma      | Büyük OSS PM araçları (Plane, Cal.com, Supabase, Novu) + kullanıcının kendi GitHub repoları |
 
 ## 3. Hedef Dosya Yapısı
 
@@ -94,11 +94,11 @@ Her doc dosyası şu şablona uyar — mevcut iki MD de bu standarda **güncelle
 
 ## 5. Mevcut Dosyaların Akıbeti
 
-| Dosya | İşlem |
-|---|---|
-| `tech-stack.md` | `docs/tech-stack.md`'ye taşınır, EN'e çevrilir, standarda uyarlanır; TR orijinali güncellenerek `docs/tr/tech-stack.md` olur; karar gerekçeleri ADR 0001–0007'ye damıtılır (özet + ADR linki docs'ta kalır) |
-| `project-skeleton.md` | `docs/project-skeleton.md`'ye taşınır, EN'e çevrilir, standarda uyarlanır; TR orijinali güncellenerek `docs/tr/project-skeleton.md` olur |
-| `CLAUDE.md` | Kökte kalır; docs referansları yeni yapıya göre güncellenir (kritik kurallar korunur) |
+| Dosya                 | İşlem                                                                                                                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tech-stack.md`       | `docs/tech-stack.md`'ye taşınır, EN'e çevrilir, standarda uyarlanır; TR orijinali güncellenerek `docs/tr/tech-stack.md` olur; karar gerekçeleri ADR 0001–0007'ye damıtılır (özet + ADR linki docs'ta kalır) |
+| `project-skeleton.md` | `docs/project-skeleton.md`'ye taşınır, EN'e çevrilir, standarda uyarlanır; TR orijinali güncellenerek `docs/tr/project-skeleton.md` olur                                                                    |
+| `CLAUDE.md`           | Kökte kalır; docs referansları yeni yapıya göre güncellenir (kritik kurallar korunur)                                                                                                                       |
 
 Taşımalar `git mv` ile yapılır (tarihçe korunur).
 

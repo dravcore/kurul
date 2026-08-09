@@ -12,7 +12,7 @@ yerinde — `apps/api`, `apps/web` ve `packages/shared-types` yerelde çalışı
 
 ## Kurultay nedir?
 
-*Kurultay*, Türk-Moğol geleneğinde boyların bir araya gelip meseleleri tartıştığı, kararlar
+_Kurultay_, Türk-Moğol geleneğinde boyların bir araya gelip meseleleri tartıştığı, kararlar
 aldığı ve önündeki işi bölüştüğü büyük meclisin adıdır. Bu aracın bir ekip için yaptığı şey
 de tam olarak bu: insanlar bir board etrafında toplanır, işi konuşur, neyin önemli olduğuna
 karar verir ve görevleri aralarında paylaştırır — herkes için izlenebilir, önceliklendirilmiş
@@ -50,41 +50,41 @@ pnpm db:seed
 pnpm dev
 ```
 
-- Web: http://localhost:3000  
-- API health: http://localhost:4000/health  
+- Web: http://localhost:3000
+- API health: http://localhost:4000/health
 
 Tam stack Docker: `docker compose up --build`. Günlük detaylar:
 [docs/tr/development.md](docs/tr/development.md).
 
 ## Stack
 
-| Katman | Seçim |
-|---|---|
-| Backend | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io |
-| Frontend | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts |
-| Auth | Better Auth (organization plugin → Workspace) |
+| Katman            | Seçim                                                                     |
+| ----------------- | ------------------------------------------------------------------------- |
+| Backend           | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                |
+| Frontend          | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts  |
+| Auth              | Better Auth (organization plugin → Workspace)                             |
 | Paylaşılan tipler | `packages/shared-types` (frontend/backend arasında paylaşılan TS tipleri) |
-| Deployment | Docker Compose |
-| Mimari | Monorepo, modüler monolit — mikroservis yok |
+| Deployment        | Docker Compose                                                            |
+| Mimari            | Monorepo, modüler monolit — mikroservis yok                               |
 
 Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
 [docs/tr/decisions/](docs/tr/decisions/).
 
 ## Dokümantasyon
 
-| Doküman | Kapsam |
-|---|---|
-| [docs/tr/architecture.md](docs/tr/architecture.md) | Modül haritası, veri modeli özeti |
-| [docs/tr/tech-stack.md](docs/tr/tech-stack.md) | Stack seçimleri ve gerekçeleri |
-| [docs/tr/project-skeleton.md](docs/tr/project-skeleton.md) | Planlanan repo yerleşimi, ilk Prisma şeması |
-| [docs/tr/development.md](docs/tr/development.md) | Ortam kurulumu, günlük iş akışı, komutlar |
-| [docs/tr/coding-standards.md](docs/tr/coding-standards.md) | TS/NestJS/Next.js konvansiyonları |
-| [docs/tr/design.md](docs/tr/design.md) | UI/UX dili: ilkeler, token'lar, yerleşim, hareket, durumlar, metin |
-| [docs/tr/git-strategy.md](docs/tr/git-strategy.md) | Git Flow, Conventional Commits, release'ler |
-| [docs/tr/testing.md](docs/tr/testing.md) | Test katmanları, araçlar, beklentiler |
-| [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST adlandırma, hata formatı, pagination |
-| [docs/tr/roadmap.md](docs/tr/roadmap.md) | Fazlar ve ilerleme |
-| [docs/tr/decisions/](docs/tr/decisions/) | Hafif mimari karar kayıtları (ADR) |
+| Doküman                                                    | Kapsam                                                             |
+| ---------------------------------------------------------- | ------------------------------------------------------------------ |
+| [docs/tr/architecture.md](docs/tr/architecture.md)         | Modül haritası, veri modeli özeti                                  |
+| [docs/tr/tech-stack.md](docs/tr/tech-stack.md)             | Stack seçimleri ve gerekçeleri                                     |
+| [docs/tr/project-skeleton.md](docs/tr/project-skeleton.md) | Planlanan repo yerleşimi, ilk Prisma şeması                        |
+| [docs/tr/development.md](docs/tr/development.md)           | Ortam kurulumu, günlük iş akışı, komutlar                          |
+| [docs/tr/coding-standards.md](docs/tr/coding-standards.md) | TS/NestJS/Next.js konvansiyonları                                  |
+| [docs/tr/design.md](docs/tr/design.md)                     | UI/UX dili: ilkeler, token'lar, yerleşim, hareket, durumlar, metin |
+| [docs/tr/git-strategy.md](docs/tr/git-strategy.md)         | Git Flow, Conventional Commits, release'ler                        |
+| [docs/tr/testing.md](docs/tr/testing.md)                   | Test katmanları, araçlar, beklentiler                              |
+| [docs/tr/api-conventions.md](docs/tr/api-conventions.md)   | REST adlandırma, hata formatı, pagination                          |
+| [docs/tr/roadmap.md](docs/tr/roadmap.md)                   | Fazlar ve ilerleme                                                 |
+| [docs/tr/decisions/](docs/tr/decisions/)                   | Hafif mimari karar kayıtları (ADR)                                 |
 
 ## Katkıda bulunma
 

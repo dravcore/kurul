@@ -16,9 +16,7 @@ export class ApiError extends Error {
   readonly body: ApiErrorBody;
 
   constructor(body: ApiErrorBody) {
-    const message = Array.isArray(body.message)
-      ? body.message.join(', ')
-      : body.message;
+    const message = Array.isArray(body.message) ? body.message.join(', ') : body.message;
     super(message);
     this.name = 'ApiError';
     this.statusCode = body.statusCode;

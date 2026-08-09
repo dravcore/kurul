@@ -32,15 +32,15 @@ Conventions for TypeScript, NestJS, and Next.js code in this repository.
   `packages/shared-types`. No package opts out.
 - Also on: `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`.
 
-| Rule | |
-|---|---|
-| `any` | Forbidden. Use `unknown` and narrow, or write the type. `// eslint-disable` needs a comment explaining why. |
-| Non-null assertion `!` | Avoid. Narrow the type or throw explicitly. |
-| `as` casts | Only for genuinely un-typeable boundaries (parsed JSON, third-party gaps), with a comment. |
-| Return types | Explicit on exported functions and all public service/controller methods. Inferred is fine for local helpers. |
-| `enum` | Prefer string-literal unions or `as const` objects; the Prisma-generated enums are the exception and are re-exported from shared types. |
-| `interface` vs `type` | `interface` for object shapes that may be extended, `type` for unions, intersections, and mapped types. Do not mix in the same concept. |
-| `null` vs `undefined` | `null` is a stored absence (a DB column), `undefined` is an absent value (an optional field). Do not use them interchangeably. |
+| Rule                   |                                                                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `any`                  | Forbidden. Use `unknown` and narrow, or write the type. `// eslint-disable` needs a comment explaining why.                             |
+| Non-null assertion `!` | Avoid. Narrow the type or throw explicitly.                                                                                             |
+| `as` casts             | Only for genuinely un-typeable boundaries (parsed JSON, third-party gaps), with a comment.                                              |
+| Return types           | Explicit on exported functions and all public service/controller methods. Inferred is fine for local helpers.                           |
+| `enum`                 | Prefer string-literal unions or `as const` objects; the Prisma-generated enums are the exception and are re-exported from shared types. |
+| `interface` vs `type`  | `interface` for object shapes that may be extended, `type` for unions, intersections, and mapped types. Do not mix in the same concept. |
+| `null` vs `undefined`  | `null` is a stored absence (a DB column), `undefined` is an absent value (an optional field). Do not use them interchangeably.          |
 
 Errors are typed and thrown, never returned as `{ error: string }` from a service. The API
 translates them into the response shape described in
@@ -48,17 +48,17 @@ translates them into the response shape described in
 
 ## Naming conventions
 
-| Thing | Convention | Example |
-|---|---|---|
-| Files and directories | `kebab-case` | `task-position.service.ts`, `components/board/` |
-| Classes, decorators, types, interfaces, enums | `PascalCase` | `TaskService`, `CreateTaskDto`, `MemberRole` |
-| Functions, variables, methods, properties | `camelCase` | `moveTask`, `workspaceId` |
-| Constants (module-level, truly constant) | `UPPER_SNAKE_CASE` | `DEFAULT_PAGE_SIZE`, `POSITION_GAP` |
-| React components | `PascalCase` file and export | `components/board/task-card.tsx` exporting `TaskCard` |
-| React hooks | `use` prefix, camelCase | `use-board-socket.ts` exporting `useBoardSocket` |
-| Booleans | `is` / `has` / `can` prefix | `isArchived`, `hasUnreadComments` |
-| Prisma models | `PascalCase` singular | `Task`, `WorkspaceMember` |
-| Database-facing ids | `<entity>Id` | `workspaceId`, `boardId` |
+| Thing                                         | Convention                   | Example                                               |
+| --------------------------------------------- | ---------------------------- | ----------------------------------------------------- |
+| Files and directories                         | `kebab-case`                 | `task-position.service.ts`, `components/board/`       |
+| Classes, decorators, types, interfaces, enums | `PascalCase`                 | `TaskService`, `CreateTaskDto`, `MemberRole`          |
+| Functions, variables, methods, properties     | `camelCase`                  | `moveTask`, `workspaceId`                             |
+| Constants (module-level, truly constant)      | `UPPER_SNAKE_CASE`           | `DEFAULT_PAGE_SIZE`, `POSITION_GAP`                   |
+| React components                              | `PascalCase` file and export | `components/board/task-card.tsx` exporting `TaskCard` |
+| React hooks                                   | `use` prefix, camelCase      | `use-board-socket.ts` exporting `useBoardSocket`      |
+| Booleans                                      | `is` / `has` / `can` prefix  | `isArchived`, `hasUnreadComments`                     |
+| Prisma models                                 | `PascalCase` singular        | `Task`, `WorkspaceMember`                             |
+| Database-facing ids                           | `<entity>Id`                 | `workspaceId`, `boardId`                              |
 
 File names are kebab-case even when the default export is `PascalCase` — the file system is
 case-insensitive on macOS and case-sensitive in CI, and kebab-case avoids that entire class
@@ -68,18 +68,18 @@ of breakage.
 
 Every file in `apps/api` carries a suffix naming its role:
 
-| Suffix | Role |
-|---|---|
-| `*.module.ts` | Nest module definition |
-| `*.controller.ts` | HTTP route handlers |
-| `*.service.ts` | Business logic |
-| `*.dto.ts` | Request/response DTOs (inside `dto/`) |
-| `*.guard.ts` | Guards |
-| `*.interceptor.ts` | Interceptors |
-| `*.filter.ts` | Exception filters |
-| `*.decorator.ts` | Custom decorators |
-| `*.gateway.ts` | Socket.io gateways |
-| `*.spec.ts` | Unit tests, colocated |
+| Suffix             | Role                                  |
+| ------------------ | ------------------------------------- |
+| `*.module.ts`      | Nest module definition                |
+| `*.controller.ts`  | HTTP route handlers                   |
+| `*.service.ts`     | Business logic                        |
+| `*.dto.ts`         | Request/response DTOs (inside `dto/`) |
+| `*.guard.ts`       | Guards                                |
+| `*.interceptor.ts` | Interceptors                          |
+| `*.filter.ts`      | Exception filters                     |
+| `*.decorator.ts`   | Custom decorators                     |
+| `*.gateway.ts`     | Socket.io gateways                    |
+| `*.spec.ts`        | Unit tests, colocated                 |
 
 ## NestJS (`apps/api`)
 
@@ -100,11 +100,11 @@ src/task/
 └── task.service.spec.ts
 ```
 
-| Layer | Responsibility | Must not |
-|---|---|---|
-| Controller | HTTP shape: routing, params, status codes, DTO in/out | Contain business logic or touch Prisma |
-| Service | Business logic, transactions, Prisma access | Know about HTTP (no `Request`, `Response`, no HTTP exceptions in pure logic helpers) |
-| DTO | The contract at the edge, with validation decorators | Contain logic |
+| Layer      | Responsibility                                        | Must not                                                                             |
+| ---------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Controller | HTTP shape: routing, params, status codes, DTO in/out | Contain business logic or touch Prisma                                               |
+| Service    | Business logic, transactions, Prisma access           | Know about HTTP (no `Request`, `Response`, no HTTP exceptions in pure logic helpers) |
+| DTO        | The contract at the edge, with validation decorators  | Contain logic                                                                        |
 
 ### Module boundaries
 
@@ -213,12 +213,12 @@ components/
 └── layout/       # sidebar, workspace switcher
 ```
 
-| Rule | |
-|---|---|
-| `components/ui/` | shadcn/ui output only. Do not put project components here, and do not hand-modify primitives beyond what the shadcn workflow produces. |
-| Domain folders | Own their components; a board component belongs in `board/`, however small |
-| Shared cross-domain component | Only when used by 3+ domains; otherwise keep it local |
-| Page files | `page.tsx` composes components; it does not hold layout logic or markup of any size |
+| Rule                          |                                                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `components/ui/`              | shadcn/ui output only. Do not put project components here, and do not hand-modify primitives beyond what the shadcn workflow produces. |
+| Domain folders                | Own their components; a board component belongs in `board/`, however small                                                             |
+| Shared cross-domain component | Only when used by 3+ domains; otherwise keep it local                                                                                  |
+| Page files                    | `page.tsx` composes components; it does not hold layout logic or markup of any size                                                    |
 
 ### Styling
 
@@ -241,7 +241,11 @@ Anything that crosses the API boundary is declared **once**, in
 import type { TaskResponse, Priority } from '@kurultay/shared-types';
 
 // Wrong — a redeclared shape that will silently drift
-interface Task { id: string; title: string; priority: string }
+interface Task {
+  id: string;
+  title: string;
+  priority: string;
+}
 ```
 
 Never redeclare, never duplicate, never "just add the one field locally". If the frontend
@@ -285,11 +289,11 @@ Use them sparingly.
 
 ## Formatting and linting
 
-| Tool | Role |
-|---|---|
-| Prettier | All formatting. Config is committed; no editor-local overrides. |
-| ESLint | Correctness rules via flat config (`@eslint/js`, `typescript-eslint`, `eslint-config-prettier`). Nest/Next/import plugins are not wired yet — keep import order by convention. |
-| `tsc --noEmit` | Typecheck, run in CI separately from lint |
+| Tool           | Role                                                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Prettier       | All formatting. Config is committed; no editor-local overrides.                                                                                                                |
+| ESLint         | Correctness rules via flat config (`@eslint/js`, `typescript-eslint`, `eslint-config-prettier`). Nest/Next/import plugins are not wired yet — keep import order by convention. |
+| `tsc --noEmit` | Typecheck, run in CI separately from lint                                                                                                                                      |
 
 ```bash
 pnpm lint          # check

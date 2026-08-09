@@ -7,7 +7,7 @@
 
 ## Bağlam
 
-Kurultay henüz iskelet öncesi aşamada: henüz hiç kod yok, dolayısıyla ilk satır yazılmadan önce hem kod organizasyonu ekseni (monorepo vs. polyrepo) hem de runtime ekseni (monolit vs. mikroservis) karara bağlanmalı. Bu iki eksen birbirinden bağımsız — kodun *nasıl saklandığı*, *nasıl çalıştığı* değildir — ve ikisi de açık bir cevap gerektiriyor.
+Kurultay henüz iskelet öncesi aşamada: henüz hiç kod yok, dolayısıyla ilk satır yazılmadan önce hem kod organizasyonu ekseni (monorepo vs. polyrepo) hem de runtime ekseni (monolit vs. mikroservis) karara bağlanmalı. Bu iki eksen birbirinden bağımsız — kodun _nasıl saklandığı_, _nasıl çalıştığı_ değildir — ve ikisi de açık bir cevap gerektiriyor.
 
 ## Karar
 
@@ -36,7 +36,7 @@ Kod organizasyonu için **monorepo** (pnpm workspace: `apps/api`, `apps/web`, `p
 
 ## Değerlendirilen Alternatifler
 
-| Alternatif | Neden değil |
-|---|---|
-| Polyrepo (ayrı api/web repoları) | Solo/küçük ekip için yinelenen PR/versiyon senkronizasyon yükü; OSS katkıda bulunanların yerel olarak çalıştırması daha zor |
-| Baştan itibaren mikroservis | Henüz ölçekleme ihtiyacı yokken dağıtık karmaşıklık; kanban'ın transaction'ları sıkı sıkıya bağlı; veri modeli oturmamış, dolayısıyla sınırlar muhtemelen yanlış olurdu |
+| Alternatif                       | Neden değil                                                                                                                                                             |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Polyrepo (ayrı api/web repoları) | Solo/küçük ekip için yinelenen PR/versiyon senkronizasyon yükü; OSS katkıda bulunanların yerel olarak çalıştırması daha zor                                             |
+| Baştan itibaren mikroservis      | Henüz ölçekleme ihtiyacı yokken dağıtık karmaşıklık; kanban'ın transaction'ları sıkı sıkıya bağlı; veri modeli oturmamış, dolayısıyla sınırlar muhtemelen yanlış olurdu |

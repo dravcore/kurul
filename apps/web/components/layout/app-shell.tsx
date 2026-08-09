@@ -10,13 +10,8 @@ function AppShellFrame({
   children: React.ReactNode;
 }>): React.ReactElement {
   const t = useTranslations('app');
-  const {
-    sessionPending,
-    hasSession,
-    bootstrapped,
-    loadError,
-    retryBootstrap,
-  } = useWorkspaceContext();
+  const { sessionPending, hasSession, bootstrapped, loadError, retryBootstrap } =
+    useWorkspaceContext();
 
   if (sessionPending || !hasSession || !bootstrapped) {
     return (

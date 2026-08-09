@@ -10,7 +10,7 @@
 Kurultay is pre-skeleton: no code exists yet, so both the code-organization axis
 (monorepo vs. polyrepo) and the runtime axis (monolith vs. microservices) must be
 decided before the first line is written. The two axes are independent — how code
-is *stored* is not how it *runs* — and both need an explicit answer.
+is _stored_ is not how it _runs_ — and both need an explicit answer.
 
 ## Decision
 
@@ -59,7 +59,7 @@ system, Rush, to manage it).
 
 ## Alternatives considered
 
-| Alternative | Why not |
-|---|---|
-| Polyrepo (separate api/web repos) | Duplicate PR/version-sync overhead for a solo/small team; harder for OSS contributors to run locally |
-| Microservices from day one | Distributed complexity with no scaling need yet; kanban's transactions are tightly coupled; data model unsettled, so boundaries would likely be wrong |
+| Alternative                       | Why not                                                                                                                                               |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Polyrepo (separate api/web repos) | Duplicate PR/version-sync overhead for a solo/small team; harder for OSS contributors to run locally                                                  |
+| Microservices from day one        | Distributed complexity with no scaling need yet; kanban's transactions are tightly coupled; data model unsettled, so boundaries would likely be wrong |

@@ -27,8 +27,7 @@ export const InvitationStatus = {
   rejected: 'rejected',
 } as const;
 
-export type InvitationStatus =
-  (typeof InvitationStatus)[keyof typeof InvitationStatus];
+export type InvitationStatus = (typeof InvitationStatus)[keyof typeof InvitationStatus];
 
 /**
  * Theme-resolved label color slots (`docs/design.md`). Never store raw hex.

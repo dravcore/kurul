@@ -29,13 +29,13 @@ PR'da düzeltilir.
 
 ## Ön koşullar
 
-| Araç | Sürüm | Kontrol | Notlar |
-|---|---|---|---|
-| Node.js | 22 veya üzeri | `node -v` | 22 taban çizgisi — Node 20 ömrünü tamamladı (2026-04-30) ve Prisma 7 zaten ≥ 20.19.0 istiyor. **24 LTS önerilir** (2028-04-30'a kadar Active LTS) |
-| pnpm | 9 veya üzeri | `pnpm -v` | Corepack üzerinden: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack, Node ≥ 25 ile artık birlikte gelmiyor — orada önce `npm i -g corepack`, ya da pnpm'i bağımsız kurun: `npm i -g pnpm` |
-| Docker | herhangi güncel | `docker -v` | macOS'ta Docker Desktop veya Colima |
-| Docker Compose | v2 (plugin) | `docker compose version` | `docker-compose` v1 desteklenmiyor |
-| Git | 2.30+ | `git --version` | |
+| Araç           | Sürüm           | Kontrol                  | Notlar                                                                                                                                                                                                           |
+| -------------- | --------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js        | 22 veya üzeri   | `node -v`                | 22 taban çizgisi — Node 20 ömrünü tamamladı (2026-04-30) ve Prisma 7 zaten ≥ 20.19.0 istiyor. **24 LTS önerilir** (2028-04-30'a kadar Active LTS)                                                                |
+| pnpm           | 9 veya üzeri    | `pnpm -v`                | Corepack üzerinden: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack, Node ≥ 25 ile artık birlikte gelmiyor — orada önce `npm i -g corepack`, ya da pnpm'i bağımsız kurun: `npm i -g pnpm` |
+| Docker         | herhangi güncel | `docker -v`              | macOS'ta Docker Desktop veya Colima                                                                                                                                                                              |
+| Docker Compose | v2 (plugin)     | `docker compose version` | `docker-compose` v1 desteklenmiyor                                                                                                                                                                               |
+| Git            | 2.30+           | `git --version`          |                                                                                                                                                                                                                  |
 
 Yerel bir PostgreSQL veya Redis kurulumu gerekmiyor — ikisi de Docker içinde çalışır.
 
@@ -64,15 +64,15 @@ cp .env.example .env
 
 Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit edilmemelidir.
 
-| Değişken | Örnek | Amaç |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma bağlantı string'i |
-| `REDIS_URL` | `redis://localhost:6379` | Socket.io adapter'ı, caching |
-| `BETTER_AUTH_SECRET` | *(üret)* | Session imzalama secret'ı — zorunlu, varsayılan yok |
-| `BETTER_AUTH_URL` | `http://localhost:4000` | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir) |
-| `API_PORT` | `4000` | NestJS dinleme portu |
-| `WEB_URL` | `http://localhost:3000` | API için CORS origin'i |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000` | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir) |
+| Değişken              | Örnek                                                    | Amaç                                                                                                              |
+| --------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma bağlantı string'i                                                                                          |
+| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io adapter'ı, caching                                                                                      |
+| `BETTER_AUTH_SECRET`  | _(üret)_                                                 | Session imzalama secret'ı — zorunlu, varsayılan yok                                                               |
+| `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir)                                                 |
+| `API_PORT`            | `4000`                                                   | NestJS dinleme portu                                                                                              |
+| `WEB_URL`             | `http://localhost:3000`                                  | API için CORS origin'i                                                                                            |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                  | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir) |
 
 Bir secret üretmek için:
 
@@ -98,10 +98,10 @@ pnpm db:migrate                                  # migration'ları uygula
 pnpm dev                                         # api + web paralel, hot reload
 ```
 
-| URL | Ne |
-|---|---|
-| http://localhost:3000 | Web uygulaması (Next.js) |
-| http://localhost:4000 | API (NestJS) |
+| URL                          | Ne                            |
+| ---------------------------- | ----------------------------- |
+| http://localhost:3000        | Web uygulaması (Next.js)      |
+| http://localhost:4000        | API (NestJS)                  |
 | http://localhost:4000/health | Health check — 200 dönmelidir |
 
 Container'ları `docker compose -f docker-compose.dev.yml down` ile durdurun (veritabanı
@@ -116,28 +116,28 @@ doğrulamak için, veya Kurultay'ı geliştirmek değil sadece çalıştırmak i
 docker compose up --build
 ```
 
-| | Geliştirme döngüsü | Tam Docker |
-|---|---|---|
-| Hot reload | Evet | Hayır — rebuild gerekir |
-| Kod değişikliği sonrası başlama | saniyeler | onlarca saniye |
-| Production'a benzerlik | Kısmen | Evet |
-| Kullanım amacı | Günlük geliştirme | Image'ları doğrulama, release kontrolleri, uygulamayı çalıştırma |
+|                                 | Geliştirme döngüsü | Tam Docker                                                       |
+| ------------------------------- | ------------------ | ---------------------------------------------------------------- |
+| Hot reload                      | Evet               | Hayır — rebuild gerekir                                          |
+| Kod değişikliği sonrası başlama | saniyeler          | onlarca saniye                                                   |
+| Production'a benzerlik          | Kısmen             | Evet                                                             |
+| Kullanım amacı                  | Günlük geliştirme  | Image'ları doğrulama, release kontrolleri, uygulamayı çalıştırma |
 
 ## pnpm script'leri
 
 Repository kökünden çalıştırın.
 
-| Script | Komut | Ne yapar |
-|---|---|---|
-| `dev` | `pnpm dev` | `apps/api` ve `apps/web`'i hot reload ile paralel çalıştırır |
-| `build` | `pnpm build` | Her workspace paketini build eder |
-| `lint` | `pnpm lint` | Tüm paketlerde ESLint + Prettier kontrolü |
-| `test` | `pnpm test` | Tüm workspace paketlerinin test suite'lerini çalıştırır |
-| `db:generate` | `pnpm db:generate` | `prisma generate`'i çalıştırır: Prisma client'ı şemadan (yeniden) üretir. Migration'lara veya veritabanına dokunmaz. Klonlama sonrasında ve başkasının yaptığı şema/migration değişikliklerini pull'ladıktan sonra gereklidir |
-| `db:migrate` | `pnpm db:migrate` | `prisma migrate deploy`'u çalıştırır: var olan, zaten commit edilmiş migration'ları uygular. Asla migration oluşturmaz ve client'ı asla yeniden üretmez — CI/production için güvenlidir. Bunu yalnızca yeni migration'ları pull'ladıktan sonra çalıştırdıysanız, ardından `pnpm db:generate` çalıştırın |
-| `db:migrate:dev` | `pnpm db:migrate:dev` | `prisma migrate dev`'i çalıştırır: yerel şemanızı diff'ler, **yeni bir migration dosyası oluşturur**, uygular ve client'ı yeniden üretir. `schema.prisma`'yı düzenledikten sonra yerelde çalıştırmanız gereken komut budur — `db:migrate` tek başına onu oluşturmaz |
-| `db:seed` | `pnpm db:seed` | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır |
-| `db:studio` | `pnpm db:studio` | http://localhost:5555 adresinde Prisma Studio'yu açar |
+| Script           | Komut                 | Ne yapar                                                                                                                                                                                                                                                                                                |
+| ---------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dev`            | `pnpm dev`            | `apps/api` ve `apps/web`'i hot reload ile paralel çalıştırır                                                                                                                                                                                                                                            |
+| `build`          | `pnpm build`          | Her workspace paketini build eder                                                                                                                                                                                                                                                                       |
+| `lint`           | `pnpm lint`           | Tüm paketlerde ESLint + Prettier kontrolü                                                                                                                                                                                                                                                               |
+| `test`           | `pnpm test`           | Tüm workspace paketlerinin test suite'lerini çalıştırır                                                                                                                                                                                                                                                 |
+| `db:generate`    | `pnpm db:generate`    | `prisma generate`'i çalıştırır: Prisma client'ı şemadan (yeniden) üretir. Migration'lara veya veritabanına dokunmaz. Klonlama sonrasında ve başkasının yaptığı şema/migration değişikliklerini pull'ladıktan sonra gereklidir                                                                           |
+| `db:migrate`     | `pnpm db:migrate`     | `prisma migrate deploy`'u çalıştırır: var olan, zaten commit edilmiş migration'ları uygular. Asla migration oluşturmaz ve client'ı asla yeniden üretmez — CI/production için güvenlidir. Bunu yalnızca yeni migration'ları pull'ladıktan sonra çalıştırdıysanız, ardından `pnpm db:generate` çalıştırın |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | `prisma migrate dev`'i çalıştırır: yerel şemanızı diff'ler, **yeni bir migration dosyası oluşturur**, uygular ve client'ı yeniden üretir. `schema.prisma`'yı düzenledikten sonra yerelde çalıştırmanız gereken komut budur — `db:migrate` tek başına onu oluşturmaz                                     |
+| `db:seed`        | `pnpm db:seed`        | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır                                                                         |
+| `db:studio`      | `pnpm db:studio`      | http://localhost:5555 adresinde Prisma Studio'yu açar                                                                                                                                                                                                                                                   |
 
 Tek bir workspace'i hedeflemek için pnpm'in filter flag'ini kullanın:
 
@@ -247,14 +247,14 @@ PR/release süreci [git-strategy.md](git-strategy.md)'de belirtilmiştir.
 
 ## Sorun giderme
 
-| Belirti | Sebep | Çözüm |
-|---|---|---|
-| `ECONNREFUSED 127.0.0.1:5432` | Postgres container'ı ayakta değil | `docker compose -f docker-compose.dev.yml up -d` |
-| `Environment variable not found: DATABASE_URL` | `.env` eksik | `cp .env.example .env` ve doldur |
-| 3000/4000/5432 portu zaten kullanımda | Başka bir process veya eski bir container | `docker compose down`, veya `.env`'de portu değiştir |
-| Pull sonrası Prisma tipleri güncel değil | Client yeniden üretilmedi — `pnpm db:migrate` onu yeniden üretmez | `pnpm db:generate` (yeni migration'ları `pnpm db:migrate` ile uyguladıktan sonra) |
-| Yeni üretilen client devreye girmiyor | Çalışan `pnpm dev` `dist`'teki eski client'ı tutar | `pnpm db:generate` sonrası `pnpm dev`'i yeniden başlatın — asset'ler (yeniden) başlangıçta kopyalanır |
-| `pnpm install` bir workspace hatasıyla başarısız oluyor | Bir alt-paket içinde çalıştırıldı | Repository kökünden çalıştırın |
+| Belirti                                                 | Sebep                                                             | Çözüm                                                                                                 |
+| ------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `ECONNREFUSED 127.0.0.1:5432`                           | Postgres container'ı ayakta değil                                 | `docker compose -f docker-compose.dev.yml up -d`                                                      |
+| `Environment variable not found: DATABASE_URL`          | `.env` eksik                                                      | `cp .env.example .env` ve doldur                                                                      |
+| 3000/4000/5432 portu zaten kullanımda                   | Başka bir process veya eski bir container                         | `docker compose down`, veya `.env`'de portu değiştir                                                  |
+| Pull sonrası Prisma tipleri güncel değil                | Client yeniden üretilmedi — `pnpm db:migrate` onu yeniden üretmez | `pnpm db:generate` (yeni migration'ları `pnpm db:migrate` ile uyguladıktan sonra)                     |
+| Yeni üretilen client devreye girmiyor                   | Çalışan `pnpm dev` `dist`'teki eski client'ı tutar                | `pnpm db:generate` sonrası `pnpm dev`'i yeniden başlatın — asset'ler (yeniden) başlangıçta kopyalanır |
+| `pnpm install` bir workspace hatasıyla başarısız oluyor | Bir alt-paket içinde çalıştırıldı                                 | Repository kökünden çalıştırın                                                                        |
 
 ## Ayrıca bakınız
 
