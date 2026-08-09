@@ -1,0 +1,160 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import type { BoardDto, DashboardSummaryDto } from '@kurultay/shared-types';
+import { api } from '@/lib/api';
+import { useWorkspaceContext } from '@/components/layout/workspace-provider';
+import { DamgaMark } from '@/components/brand/damga-mark';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { AssigneeChart } from './assignee-chart';
+import { ColumnChart } from './column-chart';
+import { PriorityChart } from './priority-chart';
+import { StatTile } from './stat-tile';
+
+export function DashboardSummary(): React.ReactElement {
+  const t = useTranslations('app.dashboard');
+  const { activeId } = useWorkspaceContext();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const boardIdParam = searchParams.get('boardId') ?? '';
+
+  const [boards, setBoards] = useState<BoardDto[]>([]);
+  const [summary, setSummary] = useState<DashboardSummaryDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const selectedBoardId = useMemo(() => {
+    if (!boardIdParam) return '';
+    return boards.some((board) => board.id === boardIdParam) ? boardIdParam : '';
+  }, [boardIdParam, boards]);
+
+  useEffect(() => {
+    if (!activeId) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const list = await api.get<BoardDto[]>(`/workspaces/${activeId}/boards`, {
+          signal: controller.signal,
+        });
+        if (!controller.signal.aborted) setBoards(list);
+      } catch {
+        if (!controller.signal.aborted) setBoards([]);
+      }
+    })();
+    return () => controller.abort();
+  }, [activeId]);
+
+  useEffect(() => {
+    if (!activeId) return;
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    void (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (selectedBoardId) params.set('boardId', selectedBoardId);
+        const qs = params.toString();
+        const next = await api.get<DashboardSummaryDto>(
+          `/workspaces/${activeId}/dashboard/summary${qs ? `?${qs}` : ''}`,
+          { signal: controller.signal },
+        );
+        if (!controller.signal.aborted) setSummary(next);
+      } catch {
+        if (!controller.signal.aborted) {
+          setError(t('loadError'));
+          setSummary(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [activeId, selectedBoardId, t]);
+
+  function onBoardChange(nextBoardId: string): void {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextBoardId) params.set('boardId', nextBoardId);
+    else params.delete('boardId');
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
+  if (loading && !summary) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-24 w-full rounded-[var(--radius-lg)]" />
+          <Skeleton className="h-24 w-full rounded-[var(--radius-lg)]" />
+        </div>
+        <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <p className="text-body text-destructive">{error}</p>;
+  }
+
+  if (!summary) {
+    return <p className="text-body text-muted-foreground">{t('loadError')}</p>;
+  }
+
+  if (summary.totalTasks === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+        <DamgaMark size={64} />
+        <h2 className="font-display text-title-lg font-semibold">{t('emptyTitle')}</h2>
+        <p className="max-w-md text-body text-muted-foreground">{t('emptyBody')}</p>
+        {boards[0] ? (
+          <Button asChild>
+            <Link href={`/board/${boards[0].id}`}>{t('openBoard')}</Link>
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-title">{t('overviewTitle')}</h2>
+          <p className="text-small text-muted-foreground">{t('overviewBody')}</p>
+        </div>
+        <label className="flex flex-col gap-1 text-small">
+          <span className="text-muted-foreground">{t('boardFilter')}</span>
+          <select
+            className="h-9 min-w-[12rem] rounded-md border border-input bg-transparent px-3 text-body outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            value={selectedBoardId}
+            onChange={(event) => onBoardChange(event.target.value)}
+            aria-label={t('boardFilter')}
+          >
+            <option value="">{t('allBoards')}</option>
+            {boards.map((board) => (
+              <option key={board.id} value={board.id}>
+                {board.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <StatTile label={t('totalTasks')} value={summary.totalTasks} />
+        <StatTile label={t('overdue')} value={summary.overdueCount} emphasize />
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        <PriorityChart data={summary.byPriority} />
+        <AssigneeChart data={summary.byAssignee} />
+      </div>
+
+      {summary.byColumn ? <ColumnChart data={summary.byColumn} /> : null}
+    </div>
+  );
+}

@@ -55,8 +55,27 @@
       "error": "Could not create workspace."
     },
     "dashboard": {
-      "title": "Boards",
-      "placeholder": "Charts and aggregations arrive in Phase 7."
+      "title": "Dashboard",
+      "boardsTitle": "Boards",
+      "overviewTitle": "Overview",
+      "overviewBody": "Workspace load at a glance.",
+      "boardFilter": "Board",
+      "allBoards": "All boards",
+      "totalTasks": "Total tasks",
+      "overdue": "Overdue",
+      "priorityTitle": "Tasks by priority",
+      "assigneeTitle": "Tasks by assignee",
+      "columnTitle": "Tasks by column",
+      "viewTable": "View as table",
+      "viewChart": "View as chart",
+      "tableName": "Name",
+      "tableCount": "Count",
+      "unassigned": "Unassigned",
+      "other": "Other",
+      "loadError": "Could not load dashboard charts.",
+      "emptyTitle": "Nothing to chart yet",
+      "emptyBody": "Charts fill in as tasks are created and moved.",
+      "openBoard": "Open a board"
     },
     "board": {
       "listTitle": "Boards",

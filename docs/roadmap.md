@@ -257,13 +257,18 @@ tenant-safely until this exists.
 ## Phase 7 — Dashboard
 
 **Goal:** aggregate view across a workspace.
-**Status:** not started
+**Reference:** [design.md](design.md#8-charts-and-dashboard);
+[spec](specs/2026-08-09-phase-7-dashboard-design.md)
+**Status:** done
 
-- [ ] Aggregation endpoints: tasks by status, by assignee, by priority; overdue count;
+- [x] Aggregation endpoints: tasks by status, by assignee, by priority; overdue count;
       completion over time
-- [ ] Query performance pass on the aggregations
-- [ ] Web: dashboard page with Recharts visualizations
-- [ ] Empty and loading states
+- [x] Query performance pass on the aggregations
+- [x] Web: dashboard page with Recharts visualizations
+- [x] Empty and loading states
+
+> Completion-over-time is deferred to Phase 8 (Activity). Column (“status”) chart requires
+> optional `?boardId=`. See the Phase 7 spec.
 
 ---
 

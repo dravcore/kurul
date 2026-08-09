@@ -271,13 +271,18 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 ## Faz 7 — Dashboard
 
 **Hedef:** bir workspace genelinde agregat görünüm.
-**Durum:** başlanmadı
+**Referans:** [design.md](../design.md#8-charts-and-dashboard);
+[spec](../specs/2026-08-09-phase-7-dashboard-design.md)
+**Durum:** tamam
 
-- [ ] Agregasyon endpoint'leri: statüye göre task'lar, atanana göre, priority'ye göre;
+- [x] Agregasyon endpoint'leri: statüye göre task'lar, atanana göre, priority'ye göre;
       gecikmiş sayısı; zaman içinde tamamlanma
-- [ ] Agregasyonlar üzerinde sorgu performansı geçişi
-- [ ] Web: Recharts görselleştirmeleriyle dashboard sayfası
-- [ ] Boş ve yükleniyor durumları
+- [x] Agregasyonlar üzerinde sorgu performansı geçişi
+- [x] Web: Recharts görselleştirmeleriyle dashboard sayfası
+- [x] Boş ve yükleniyor durumları
+
+> Zaman içinde tamamlanma Phase 8'e (Activity) ertelendi. Kolon (“status”) grafiği opsiyonel
+> `?boardId=` ister. Phase 7 spec'ine bakın.
 
 ---
 
