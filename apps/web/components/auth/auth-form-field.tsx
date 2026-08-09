@@ -1,4 +1,9 @@
+'use client';
+
+import { useId } from 'react';
 import type { ChangeEventHandler, HTMLInputTypeAttribute } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export function AuthFormField({
   label,
@@ -17,18 +22,19 @@ export function AuthFormField({
   required?: boolean;
   minLength?: number;
 }>): React.ReactElement {
+  const id = useId();
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span>{label}</span>
-      <input
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
         type={type}
         required={required}
         minLength={minLength}
         autoComplete={autoComplete}
         value={value}
         onChange={onChange}
-        className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2"
       />
-    </label>
+    </div>
   );
 }
