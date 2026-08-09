@@ -38,8 +38,7 @@ export function TaskCard({
 }: TaskCardProps): React.ReactElement {
   const t = useTranslations('app.board.task');
   const assigneeNames = task.assignees.map((assignee) => assignee.name).join(', ');
-  const overdue =
-    task.dueDate !== null && utcCalendarDay(task.dueDate) < todayUtcCalendarDay();
+  const overdue = task.dueDate !== null && utcCalendarDay(task.dueDate) < todayUtcCalendarDay();
 
   return (
     <Link
