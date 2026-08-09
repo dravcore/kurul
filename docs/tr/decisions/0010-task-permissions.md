@@ -17,12 +17,12 @@ yapar, admin'ler board şekline sahiptir**.
 
 Task yetkilendirmesi Nest'te `@Roles` ile şu matris üzerinden uygulanır:
 
-| İşlem                                            | OWNER | ADMIN | MEMBER | GUEST |
-| ------------------------------------------------ | :---: | :---: | :----: | :---: |
-| Task okuma                                       |   ✓   |   ✓   |   ✓    |   ✓   |
-| Task oluştur; başlık / açıklama güncelle         |   ✓   |   ✓   |   ✓    |   —   |
-| Task taşı (column içinde veya column'lar arası)  |   ✓   |   ✓   |   ✓    |   —   |
-| Task sil                                         |   ✓   |   ✓   |   ✓    |   —   |
+| İşlem                                           | OWNER | ADMIN | MEMBER | GUEST |
+| ----------------------------------------------- | :---: | :---: | :----: | :---: |
+| Task okuma                                      |   ✓   |   ✓   |   ✓    |   ✓   |
+| Task oluştur; başlık / açıklama güncelle        |   ✓   |   ✓   |   ✓    |   —   |
+| Task taşı (column içinde veya column'lar arası) |   ✓   |   ✓   |   ✓    |   —   |
+| Task sil                                        |   ✓   |   ✓   |   ✓    |   —   |
 
 Column oluştur / yeniden adlandır / sırala / sil OWNER/ADMIN'te kalır (ADR 0009).
 
@@ -46,8 +46,8 @@ Column oluştur / yeniden adlandır / sırala / sil OWNER/ADMIN'te kalır (ADR 0
 
 ## Değerlendirilen Alternatifler
 
-| Alternatif                                                    | Neden değil                                                              |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Yalnızca Admin task taşıyabilir                               | MEMBER için günlük kanban'ı bozar; column yapı kurallarına fazla yaklaşır |
-| MEMBER düzenleyip taşıyabilir; silme yalnızca OWNER/ADMIN     | Soft-delete'siz MVP'de az güvenlik için ekstra zihinsel model            |
-| Yalnızca yazar düzenleyip silebilir                           | Her yolda `createdById` kontrolü; Faz 4 için aşırı                       |
+| Alternatif                                                | Neden değil                                                               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Yalnızca Admin task taşıyabilir                           | MEMBER için günlük kanban'ı bozar; column yapı kurallarına fazla yaklaşır |
+| MEMBER düzenleyip taşıyabilir; silme yalnızca OWNER/ADMIN | Soft-delete'siz MVP'de az güvenlik için ekstra zihinsel model             |
+| Yalnızca yazar düzenleyip silebilir                       | Her yolda `createdById` kontrolü; Faz 4 için aşırı                        |
