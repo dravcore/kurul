@@ -11,7 +11,7 @@ import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import type { AddAssigneeDto } from './dto/add-assignee.dto';
-import { emitTaskUpdated, findTask, isPrismaUniqueViolation } from './task.mapper';
+import { emitTaskUpdated, findTask, findTaskBasic, isPrismaUniqueViolation } from './task.mapper';
 
 @Injectable()
 export class TaskAssigneeService {
@@ -28,7 +28,7 @@ export class TaskAssigneeService {
     actorId: string,
     dto: AddAssigneeDto,
   ): Promise<TaskDto> {
-    const task = await findTask(this.prisma, workspaceId, taskId);
+    const task = await findTaskBasic(this.prisma, workspaceId, taskId);
     const member = await this.prisma.workspaceMember.findFirst({
       where: { workspaceId, userId: dto.userId },
     });
@@ -87,7 +87,7 @@ export class TaskAssigneeService {
     actorId: string,
     assigneeUserId: string,
   ): Promise<TaskDto> {
-    const task = await findTask(this.prisma, workspaceId, taskId);
+    const task = await findTaskBasic(this.prisma, workspaceId, taskId);
     await this.prisma.$transaction(async (tx) => {
       const result = await tx.taskAssignee.deleteMany({
         where: { taskId, userId: assigneeUserId },

@@ -122,7 +122,7 @@ describe('Task metadata (e2e)', () => {
     const comments = await owner.agent
       .get(`/workspaces/${workspace.id}/tasks/${taskId}/comments`)
       .expect(200);
-    expect(comments.body).toHaveLength(1);
+    expect(comments.body.items).toHaveLength(1);
 
     await member.agent
       .delete(`/workspaces/${workspace.id}/tasks/${taskId}/assignees/${memberMe.body.id}`)

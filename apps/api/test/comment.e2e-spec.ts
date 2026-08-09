@@ -54,16 +54,43 @@ describe('Comments (e2e)', () => {
     await member.agent.post(url).send({ body: 'Second' }).expect(201);
 
     const listed = await member.agent.get(url).expect(200);
-    expect(listed.body).toHaveLength(2);
-    expect(listed.body[0]).toMatchObject({
+    expect(listed.body.items).toHaveLength(2);
+    expect(listed.body.hasMore).toBe(false);
+    expect(listed.body.items[0]).toMatchObject({
       body: 'First',
       taskId,
       author: expect.objectContaining({ name: 'Owner' }),
     });
-    expect(listed.body[1]).toMatchObject({
+    expect(listed.body.items[1]).toMatchObject({
       body: 'Second',
       author: expect.objectContaining({ name: 'Member', avatarUrl: null }),
     });
+  });
+
+  it('paginates comments by cursor when more than `limit` exist', async () => {
+    const owner = await signUp(app, { name: 'Owner' });
+    const workspace = await createWorkspace(owner.agent, 'CmtPage', `cp-${Date.now()}`);
+    const { taskId } = await boardWithTask(owner.agent, workspace.id);
+    const url = `/workspaces/${workspace.id}/tasks/${taskId}/comments`;
+
+    for (let i = 0; i < 3; i += 1) {
+      await owner.agent
+        .post(url)
+        .send({ body: `Comment ${i}` })
+        .expect(201);
+    }
+
+    const firstPage = await owner.agent.get(`${url}?limit=2`).expect(200);
+    expect(firstPage.body.items).toHaveLength(2);
+    expect(firstPage.body.hasMore).toBe(true);
+    expect(firstPage.body.nextCursor).not.toBeNull();
+
+    const secondPage = await owner.agent
+      .get(`${url}?limit=2&cursor=${firstPage.body.nextCursor}`)
+      .expect(200);
+    expect(secondPage.body.items).toHaveLength(1);
+    expect(secondPage.body.hasMore).toBe(false);
+    expect(secondPage.body.items[0]).toMatchObject({ body: 'Comment 2' });
   });
 
   it('allows a member to delete another member’s comment (ADR 0011 flat delete)', async () => {
@@ -86,7 +113,7 @@ describe('Comments (e2e)', () => {
     const listed = await owner.agent
       .get(`/workspaces/${workspace.id}/tasks/${taskId}/comments`)
       .expect(200);
-    expect(listed.body).toHaveLength(1);
+    expect(listed.body.items).toHaveLength(1);
 
     await owner.agent.delete(`/workspaces/${workspace.id}/comments/${comment.body.id}`).expect(204);
   });
@@ -123,7 +150,7 @@ describe('Comments (e2e)', () => {
     await owner.agent.post(url).send({ body: 'ok', extra: 'field' }).expect(400);
 
     const listed = await owner.agent.get(url).expect(200);
-    expect(listed.body).toHaveLength(0);
+    expect(listed.body.items).toHaveLength(0);
   });
 
   it('returns 404 for comments on a task the caller cannot see', async () => {

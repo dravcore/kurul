@@ -1,6 +1,16 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { MemberRole } from '@kurultay/shared-types';
-import type { CommentDto } from '@kurultay/shared-types';
+import type { CommentDto, CursorPage } from '@kurultay/shared-types';
 import { CurrentMembership } from '../common/decorators/current-membership.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -8,6 +18,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { WorkspaceGuard } from '../common/guards/workspace.guard';
 import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
 import type { AuthenticatedUser, WorkspaceMembership } from '../common/types/request-context';
+import { CommentQueryDto } from './dto/comment-query.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CommentService } from './comment.service';
 
@@ -20,8 +31,9 @@ export class CommentController {
   list(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('taskId', ParseUuidV7Pipe) taskId: string,
-  ): Promise<CommentDto[]> {
-    return this.commentService.list(workspaceId, taskId);
+    @Query() query: CommentQueryDto,
+  ): Promise<CursorPage<CommentDto>> {
+    return this.commentService.list(workspaceId, taskId, query);
   }
 
   @Post('tasks/:taskId/comments')

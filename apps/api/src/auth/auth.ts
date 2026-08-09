@@ -36,6 +36,14 @@ export const auth = betterAuth({
   baseURL: betterAuthUrl,
   basePath: '/auth',
   trustedOrigins: [webUrl],
+  session: {
+    // Avoids a database round trip on every authenticated request; the signed cookie
+    // is re-validated against the DB once it expires.
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
   advanced: {
     database: {
       generateId: () => uuidv7(),

@@ -191,6 +191,10 @@ model Task {
   @@index([dueDate])
   @@index([boardId, id])
   @@index([createdById])
+  // Trigram GIN indexes back the `q` free-text search (title/description `contains`,
+  // insensitive) in task.service.ts — requires `pg_trgm`, enabled in the matching migration.
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model TaskAssignee {

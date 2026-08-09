@@ -1,12 +1,17 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ActivityType, MemberRole, SocketEvents } from '@kurultay/shared-types';
-import type { CommentDto } from '@kurultay/shared-types';
+import type { CommentDto, CursorPage } from '@kurultay/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { parseMentions } from '../common/mentions/parse-mentions';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import type { CreateCommentDto } from './dto/create-comment.dto';
+
+export type CommentCursorQuery = {
+  cursor?: string;
+  limit?: number;
+};
 
 type CommentRow = {
   id: string;
@@ -41,14 +46,34 @@ export class CommentService {
     };
   }
 
-  async list(workspaceId: string, taskId: string): Promise<CommentDto[]> {
+  /** Cursor-paginated, oldest first — id is UUIDv7 so `id asc` matches `createdAt asc`. */
+  async list(
+    workspaceId: string,
+    taskId: string,
+    query: CommentCursorQuery = {},
+  ): Promise<CursorPage<CommentDto>> {
     await this.findTask(workspaceId, taskId);
-    const comments = await this.prisma.comment.findMany({
-      where: { taskId },
+    const limit = query.limit ?? 100;
+
+    const rows = await this.prisma.comment.findMany({
+      where: {
+        taskId,
+        ...(query.cursor ? { id: { gt: query.cursor } } : {}),
+      },
       include: { user: { select: { id: true, name: true, avatarUrl: true } } },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      orderBy: { id: 'asc' },
+      take: limit + 1,
     });
-    return comments.map((comment) => this.toDto(comment));
+
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore ? page[page.length - 1]!.id : null;
+
+    return {
+      items: page.map((comment) => this.toDto(comment)),
+      nextCursor,
+      hasMore,
+    };
   }
 
   async create(
@@ -91,13 +116,13 @@ export class CommentService {
         },
       });
 
-      for (const recipientId of memberIds) {
-        await this.notificationService.createMention(tx, {
+      if (memberIds.length > 0) {
+        await this.notificationService.createMentionBatch(tx, {
           workspaceId,
-          userId: recipientId,
           actorId: userId,
           taskId,
           activityId: activity.id,
+          userIds: memberIds,
           payload: {
             commentId: created.id,
             taskId,
