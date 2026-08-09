@@ -138,6 +138,73 @@ describe('Workspace isolation and roles (e2e)', () => {
       });
   });
 
+  it('resends the same invitation when the role is unchanged', async () => {
+    const owner = await signUp(app, { name: 'Inviter' });
+    const workspace = await createWorkspace(owner.agent, 'Resend WS', `resend-${Date.now()}`);
+    const email = `resend-${Date.now()}@test.kurultay.dev`;
+
+    const first = await owner.agent
+      .post(`/workspaces/${workspace.id}/invitations`)
+      .send({ email, role: MemberRole.MEMBER })
+      .expect(201);
+
+    const second = await owner.agent
+      .post(`/workspaces/${workspace.id}/invitations`)
+      .send({ email, role: MemberRole.MEMBER })
+      .expect(201);
+
+    expect(second.body.id).toBe(first.body.id as string);
+    expect(second.body.role).toBe(MemberRole.MEMBER);
+
+    const rows = await prisma.workspaceInvitation.findMany({
+      where: { workspaceId: workspace.id, email },
+    });
+    expect(rows).toHaveLength(1);
+  });
+
+  it('revokes and reissues when the same email is re-invited at a different role', async () => {
+    const owner = await signUp(app, { name: 'Inviter' });
+    const workspace = await createWorkspace(owner.agent, 'Reinvite WS', `reinvite-${Date.now()}`);
+    const email = `reinvite-${Date.now()}@test.kurultay.dev`;
+
+    const asGuest = await owner.agent
+      .post(`/workspaces/${workspace.id}/invitations`)
+      .send({ email, role: MemberRole.GUEST })
+      .expect(201);
+
+    const asAdmin = await owner.agent
+      .post(`/workspaces/${workspace.id}/invitations`)
+      .send({ email, role: MemberRole.ADMIN })
+      .expect(201);
+
+    // The admin's intent wins: a new invitation, at the requested role, with an accept URL
+    // pointing at it — not a silent resend of the GUEST one.
+    expect(asAdmin.body.role).toBe(MemberRole.ADMIN);
+    expect(asAdmin.body.id).not.toBe(asGuest.body.id as string);
+    expect(asAdmin.body.acceptUrl).toContain(asAdmin.body.id as string);
+
+    const superseded = await prisma.workspaceInvitation.findUnique({
+      where: { id: asGuest.body.id as string },
+    });
+    expect(superseded?.status).not.toBe('pending');
+
+    const pending = await prisma.workspaceInvitation.findMany({
+      where: { workspaceId: workspace.id, email, status: 'pending' },
+    });
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.role).toBe(MemberRole.ADMIN);
+  });
+
+  it('rejects an OWNER invitation', async () => {
+    const owner = await signUp(app, { name: 'Inviter' });
+    const workspace = await createWorkspace(owner.agent, 'Owner WS', `owner-${Date.now()}`);
+
+    await owner.agent
+      .post(`/workspaces/${workspace.id}/invitations`)
+      .send({ email: `owner-invite-${Date.now()}@test.kurultay.dev`, role: MemberRole.OWNER })
+      .expect(400);
+  });
+
   it('demotes OWNER only through explicit role writes in setup (ADMIN cannot delete)', async () => {
     const owner = await signUp(app);
     const workspace = await createWorkspace(owner.agent, 'Solo', `solo-${Date.now()}`);

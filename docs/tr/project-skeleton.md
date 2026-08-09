@@ -137,6 +137,8 @@ bölme seçeneği buna bağlı. Modül haritası ve aşamalı runtime planı iç
 
 ### Prisma şeması — ilk tablolar
 
+*Aşağıdaki şema Faz 1'in başlangıç noktasıdır; canlı doğruluk kaynağı `apps/api/prisma/schema.prisma`'dır; daha sonraki fazlar bunu genişletir (Faz 2, `Session`, `Account`, `Verification`, `WorkspaceInvitation` ekledi).*
+
 ```
 User            id, email, name, avatarUrl, createdAt
 Workspace       id, name, slug, createdAt

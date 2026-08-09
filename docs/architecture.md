@@ -166,6 +166,8 @@ Invitations persist as `WorkspaceInvitation`, mapped from Better Auth's organiza
 plugin tables (Kurultay names, plugin `schema` config). Product language and REST
 paths use **Workspace** — see [ADR 0004](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
 
+Better Auth also manages the auth infrastructure tables `Session`, `Account`, and `Verification`, which are plugin-managed and deliberately omitted from the domain model table above.
+
 ### Critical field rules
 
 These are non-negotiable; they are also recorded in `CLAUDE.md`.
