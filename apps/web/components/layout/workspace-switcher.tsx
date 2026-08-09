@@ -51,10 +51,7 @@ export function WorkspaceSwitcher({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuRadioGroup
-          value={activeId}
-          onValueChange={(value) => void onSwitch(value)}
-        >
+        <DropdownMenuRadioGroup value={activeId} onValueChange={(value) => void onSwitch(value)}>
           {workspaces.map((workspace) => (
             <DropdownMenuRadioItem key={workspace.id} value={workspace.id}>
               <span className="min-w-0 flex-1 truncate">{workspace.name}</span>

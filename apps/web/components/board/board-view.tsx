@@ -52,10 +52,7 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
 
   useEffect(() => {
     if (loading || entranceDone) return;
-    const timeout = window.setTimeout(
-      () => setEntranceDone(true),
-      columns.length * 40 + 250,
-    );
+    const timeout = window.setTimeout(() => setEntranceDone(true), columns.length * 40 + 250);
     return () => window.clearTimeout(timeout);
   }, [loading, entranceDone, columns.length]);
 
@@ -260,7 +257,9 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
               onMoveLeft={() => void moveColumn(column, -1)}
               onMoveRight={() => void moveColumn(column, 1)}
               className={entranceDone ? undefined : 'board-column-enter'}
-              style={entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)}
+              style={
+                entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)
+              }
             />
           ))}
           {canMutate ? (
