@@ -156,7 +156,9 @@ insanlar tarafından okunur.
 1. Güncel bir `develop`'tan dallanın.
 2. PR'ı **`develop`'a karşı** açın (`hotfix/*` ve `release/*` dışında, asla `main`'e karşı
    değil).
-3. PR başlığı Conventional Commits'i takip eder — squash-merge commit mesajı olur.
+3. PR başlığı Conventional Commits'i takip eder — merge'ler merge commit (`--no-ff`) ile
+   yapılır, yani branch'teki commit'ler history'de tek tek kalır; PR açmadan önce onları
+   temiz tutun.
 4. PR'ları küçük ve tek sorumluluklu tutun: bir konu, tercihen lockfile'lar ve üretilen
    çıktı hariç ~500 değişen satırın altında. Mümkün olduğunda şema değişikliklerini logic
    değişikliklerinden, backend'i frontend'den ayırın.
@@ -174,12 +176,16 @@ olduğu anda tekrar devreye girer** ve bu paragraf o zaman silinir.
 
 ### Merge stratejisi
 
-| Merge                                                 | Strateji                     | Sebep                                                                          |
-| ----------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------ |
-| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Squash merge**             | İş birimi başına tek temiz commit; branch'in fixup gürültüsü history'ye girmez |
-| `release/*` → `main`                                  | **Merge commit** (`--no-ff`) | Release'i history'de ayrı, geri alınabilir bir nokta olarak korur              |
-| `hotfix/*` → `main`                                   | **Merge commit** (`--no-ff`) | Aynı sebep                                                                     |
-| `main` → `develop` (geri-merge)                       | **Merge commit** (`--no-ff`) | Release/hotfix commit'lerini yeniden yazmadan geri taşır                       |
+| Merge                                                 | Strateji                     | Sebep                                                                           |
+| ----------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------- |
+| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Merge commit** (`--no-ff`) | Tek tek, incelenebilir commit'leri (ör. bir tech-debt dalgası) history'de korur |
+| `release/*` → `main`                                  | **Merge commit** (`--no-ff`) | Release'i history'de ayrı, geri alınabilir bir nokta olarak korur               |
+| `hotfix/*` → `main`                                   | **Merge commit** (`--no-ff`) | Aynı sebep                                                                      |
+| `main` → `develop` (geri-merge)                       | **Merge commit** (`--no-ff`) | Release/hotfix commit'lerini yeniden yazmadan geri taşır                        |
+
+`develop` veya `main`'e her merge bir merge commit'tir — hiçbir şey squash edilmez. Fixup
+gürültüsünü PR açmadan **önce** branch üzerinde temizleyin (interactive rebase veya amend);
+history okunabilir hale geldiğinde onu squash etmek yerine olduğu gibi merge edin.
 
 Merge sonrası branch'i silin. GitHub'ın "delete branch on merge" ayarı bunu hallediyor.
 
@@ -308,7 +314,7 @@ API versiyonlama duruşu (1.0 öncesi `/v1` öneki yok)
 | PR hedef branch'i                    | `develop` (`main`'e giden `release/*` ve `hotfix/*` hariç) |
 | Commit dili                          | İngilizce                                                  |
 | Commit formatı                       | Conventional Commits                                       |
-| Feature merge'i                      | Squash                                                     |
+| Feature merge'i                      | Merge commit (`--no-ff`)                                   |
 | Release/hotfix merge'i               | `--no-ff` + `develop`'a geri-merge                         |
 | Tag formatı                          | `vX.Y.Z`                                                   |
 | Changelog                            | Release zamanında değil, PR'da güncellenir                 |

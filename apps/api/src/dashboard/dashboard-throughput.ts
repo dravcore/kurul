@@ -21,38 +21,6 @@ export function emptyThroughputSeries(now: Date = new Date()): DashboardThroughp
   return days;
 }
 
-export function isDoneColumnName(name: unknown): boolean {
-  return typeof name === 'string' && name.trim().toLowerCase() === 'done';
-}
-
-/** Prefer payload `toColumnName`; fall back to Done column ids for older rows. */
-export function isCompletedMove(
-  payload: Record<string, unknown>,
-  doneColumnIds: ReadonlySet<string>,
-): boolean {
-  if (isDoneColumnName(payload.toColumnName)) return true;
-  const toColumnId = payload.toColumnId;
-  return typeof toColumnId === 'string' && doneColumnIds.has(toColumnId);
-}
-
-export function applyThroughputCounts(
-  series: DashboardThroughputDay[],
-  createdAts: Date[],
-  completedAts: Date[],
-): DashboardThroughputDay[] {
-  const created = new Map<string, number>();
-  for (const at of createdAts) {
-    const key = utcDateKey(at);
-    created.set(key, (created.get(key) ?? 0) + 1);
-  }
-  const completed = new Map<string, number>();
-  for (const at of completedAts) {
-    const key = utcDateKey(at);
-    completed.set(key, (completed.get(key) ?? 0) + 1);
-  }
-  return applyThroughputDayCounts(series, created, completed);
-}
-
 /** Apply pre-aggregated per-day counts onto a zero-filled series. */
 export function applyThroughputDayCounts(
   series: DashboardThroughputDay[],

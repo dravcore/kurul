@@ -1,6 +1,7 @@
 # 0011. Label and Task-Metadata Permissions
 
-**Status:** Accepted
+**Status:** Accepted (comment-delete row superseded by
+[ADR 0012](0012-comment-delete-authorship.md); all other rows still apply)
 **Date:** 2026-08-09
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0011-label-task-metadata-permissions.md)
@@ -23,6 +24,9 @@ Labels are board-scoped taxonomy (like columns), so they need a distinct gate fr
 | Update `priority`, `dueDate`, `estimatedMinutes`          |   ✓   |   ✓   |   ✓    |   —   |
 | Create comments; delete any comment on an accessible task |   ✓   |   ✓   |   ✓    |   —   |
 
+> **Superseded:** the "delete any comment" half of the row above no longer holds. Comment
+> delete requires authorship or OWNER/ADMIN — see [ADR 0012](0012-comment-delete-authorship.md).
+
 `Label.color` is a `LabelColorSlot` (`slot-1`…`slot-8`), never a raw hex.
 
 ## Rationale
@@ -40,7 +44,7 @@ Labels are board-scoped taxonomy (like columns), so they need a distinct gate fr
 
 ## Alternatives considered
 
-| Alternative                | Why not                                              |
-| -------------------------- | ---------------------------------------------------- |
-| MEMBER may create labels   | Pollutes board taxonomy; conflicts with column Admin |
-| Author-only comment delete | Extra checks; defer until abuse appears              |
+| Alternative                | Why not                                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| MEMBER may create labels   | Pollutes board taxonomy; conflicts with column Admin                                                                 |
+| Author-only comment delete | Extra checks; defer until abuse appears — **revisited and adopted in [ADR 0012](0012-comment-delete-authorship.md)** |

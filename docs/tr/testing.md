@@ -33,23 +33,25 @@ Testler, bu maliyetin gerçek güven satın aldığı yerlerde yazılır.
 
 ## Piramit
 
-| Katman          | Araç                      | Kapsam                                                                                         | Durum                                                             |
-| --------------- | ------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **Unit**        | Jest (NestJS varsayılanı) | Servisler, guard'lar, saf fonksiyonlar. Bağımlılıklar mock'lanır.                              | Baştan itibaren zorunlu                                           |
-| **Integration** | Jest + Supertest          | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden) | Her endpoint için zorunlu                                         |
-| **E2E**         | Playwright                | Tam stack üzerinde browser akışları                                                            | **MVP'de kurulu değil** — ileride kritik akışlar için ayrılmıştır |
+| Katman          | Araç                                   | Kapsam                                                                                               | Durum                                                             |
+| --------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Servisler, guard'lar, saf fonksiyonlar, board/izin logic'i, DnD hook'ları. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu                                           |
+| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden)       | Her endpoint için zorunlu                                         |
+| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | **MVP'de kurulu değil** — ileride kritik akışlar için ayrılmıştır |
 
 ```
         /\        e2e — ertelendi (Playwright)
        /  \
       /────\      integration — her endpoint (Supertest + gerçek Postgres)
      /      \
-    /────────\    unit — servisler, guard'lar, saf logic (Jest)
+    /────────\    unit — servisler, guard'lar, saf logic (Jest), web logic/hook'ları (Vitest)
 ```
 
-Frontend component testleri de MVP'nin parçası değil. Yapılan takas, tip güvenliği artı
-API'nin integration coverage'ı; board UI'ı oturduğunda, onu parçalar halinde component
-testleri değil, uçtan uca Playwright kapsar.
+Tam component-tree render testleri MVP'nin parçası değil. Web unit testleri saf logic'i
+(`lib/*.test.ts` — izinler, position matematiği, mention'lar, query parametreleri) ve board
+drag-and-drop hook'unu izole şekilde kapsar; geri kalan her şey için yapılan takas tip
+güvenliği artı API'nin integration coverage'ı, ve board UI'ı oturduğunda onu daha fazla
+component testi değil, uçtan uca Playwright kapsar.
 
 ## Neler test edilmeli
 
@@ -117,10 +119,13 @@ korunuyor.
 # Integration testler için servisler ayakta olmalı
 docker compose -f docker-compose.dev.yml up -d
 
-pnpm --filter @kurultay/api test          # unit
-pnpm --filter @kurultay/api test:watch    # unit, watch modu
+pnpm --filter @kurultay/api test          # api unit
+pnpm --filter @kurultay/api test:watch    # api unit, watch modu
 pnpm --filter @kurultay/api test:e2e      # integration (Postgres gerektirir)
-pnpm --filter @kurultay/api test:cov      # coverage raporu
+pnpm --filter @kurultay/api test:cov      # api coverage raporu
+
+pnpm --filter @kurultay/web test          # web unit (Vitest)
+pnpm --filter @kurultay/web test:watch    # web unit, watch modu
 ```
 
 Integration testler, test setup'ı tarafından oluşturulan ve migrate edilen **ayrı bir
@@ -169,8 +174,9 @@ Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalı
 | Lint                | `pnpm lint`                                                                               |
 | Format kontrolü     | `pnpm format:check`                                                                       |
 | Typecheck           | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                 |
-| Unit testler        | `pnpm --filter @kurultay/api test`                                                        |
-| Integration testler | Bir Postgres service container'ına karşı `pnpm --filter @kurultay/api test:e2e`           |
+| Unit testler (api)  | `pnpm --filter @kurultay/api test:cov`                                                    |
+| Unit testler (web)  | `pnpm --filter @kurultay/web exec vitest run --coverage`                                  |
+| Integration testler | Postgres ve Redis service container'larına karşı `pnpm --filter @kurultay/api test:e2e`   |
 | Build               | `pnpm build`                                                                              |
 
 Merge öncesi tüm adımlar geçmelidir. Bkz.

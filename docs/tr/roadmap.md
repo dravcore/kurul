@@ -292,7 +292,8 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 
 **Hedef:** kullanıcılar neyin değiştiğini görebilir ve bunun hakkında bilgilendirilebilir.
 **Referans:** [spec](../specs/2026-08-09-phase-8-activity-notifications-design.md);
-[deferred](../specs/2026-08-09-phase-8-deferred.md)
+[deferred](../archive/specs/2026-08-09-phase-8-deferred.md) (arşivlendi; açık kalan
+maddeler aşağıda [MVP ötesi](#mvp-ötesi)'nde)
 **Durum:** tamam
 
 - [x] Task oluşturma/taşıma/güncelleme/yorum/atama üzerinde `Activity` yazımı (yeni
@@ -346,6 +347,9 @@ Planlanmadı. Mimarinin bunlarla uyumlu kalması için listelendi, taahhüt olar
 | `[-]` Trello / Jira'dan import                             |                                                                                                                                                                                |
 | `[-]` Ek UI dil paketleri                                  | next-intl katmanının kendisi Faz 1'de gelir ve MVP yalnız İngilizce'dir; bu satır ek dillerin (önce Türkçe) paketlenmesiyle ilgilidir — bkz. [design.md](design.md#7-ui-metni) |
 | `[-]` Docker Compose ötesinde self-host deployment rehberi |                                                                                                                                                                                |
+| `[-]` Due-soon teslim alternatifleri                       | In-process Nest interval scanner (daha basit ops, tek-replica fallback'i) veya OS cron → internal HTTP (BullMQ/Redis yerine cron tercih eden self-hoster'lar için)             |
+| `[-]` Member picker olmadan mention'lar                    | Düz `@DisplayName` regex, veya API-only `mentionedUserIds[]` — yalnızca yapılandırılmış `@[Name](userId)` picker UX'i tıkanırsa                                                |
+| `[-]` Notification/activity'nin realtime push'u            | Faz 9 sadece board sync'i (task/column/comment event'leri) shipped etti; notification bell ve activity feed hâlâ bir socket event'e subscribe olmak yerine polling yapıyor     |
 
 **1.0.0**, Faz 1–9 tamamlandığında ve REST API geriye dönük uyumluluk vaat edecek kadar
 kararlı olduğunda kesilir.

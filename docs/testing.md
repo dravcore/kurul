@@ -33,23 +33,25 @@ are written where that cost buys real confidence.
 
 ## The pyramid
 
-| Layer           | Tool                  | Scope                                                                                  | Status                                                    |
-| --------------- | --------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **Unit**        | Jest (NestJS default) | Services, guards, pure functions. Dependencies mocked.                                 | Required from day one                                     |
-| **Integration** | Jest + Supertest      | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`) | Required for every endpoint                               |
-| **E2E**         | Playwright            | Browser flows across the full stack                                                    | **Not set up in MVP** — reserved for critical flows later |
+| Layer           | Tool                                   | Scope                                                                                     | Status                                                    |
+| --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Services, guards, pure functions, board/permission logic, DnD hooks. Dependencies mocked. | Required from day one                                     |
+| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`)    | Required for every endpoint                               |
+| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | **Not set up in MVP** — reserved for critical flows later |
 
 ```
         /\        e2e — deferred (Playwright)
        /  \
       /────\      integration — every endpoint (Supertest + real Postgres)
      /      \
-    /────────\    unit — services, guards, pure logic (Jest)
+    /────────\    unit — services, guards, pure logic (Jest), web logic/hooks (Vitest)
 ```
 
-Frontend component tests are not part of the MVP either. Type safety plus integration
-coverage of the API is the trade-off being made; when the board UI stabilizes, Playwright
-covers it end to end rather than component tests covering it in pieces.
+Full component-tree rendering tests are not part of the MVP. Web unit tests cover pure logic
+(`lib/*.test.ts` — permissions, position math, mentions, query params) and the board
+drag-and-drop hook in isolation; type safety plus integration coverage of the API is the
+trade-off for everything else, and when the board UI stabilizes, Playwright covers it end to
+end rather than more component tests covering it in pieces.
 
 ## What must be tested
 
@@ -116,10 +118,13 @@ compatibility even though these are API integration tests, not browser e2e.
 # Services must be up for integration tests
 docker compose -f docker-compose.dev.yml up -d
 
-pnpm --filter @kurultay/api test          # unit
-pnpm --filter @kurultay/api test:watch    # unit, watch mode
+pnpm --filter @kurultay/api test          # api unit
+pnpm --filter @kurultay/api test:watch    # api unit, watch mode
 pnpm --filter @kurultay/api test:e2e      # integration (needs Postgres)
-pnpm --filter @kurultay/api test:cov      # coverage report
+pnpm --filter @kurultay/api test:cov      # api coverage report
+
+pnpm --filter @kurultay/web test          # web unit (Vitest)
+pnpm --filter @kurultay/web test:watch    # web unit, watch mode
 ```
 
 Integration tests run against a **separate database** (`kurultay_test`), created and
@@ -165,8 +170,9 @@ Every pull request runs, on `develop` and `main` as well:
 | Lint              | `pnpm lint`                                                                               |
 | Format check      | `pnpm format:check`                                                                       |
 | Typecheck         | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                       |
-| Unit tests        | `pnpm --filter @kurultay/api test`                                                        |
-| Integration tests | `pnpm --filter @kurultay/api test:e2e` against a Postgres service container               |
+| Unit tests (api)  | `pnpm --filter @kurultay/api test:cov`                                                    |
+| Unit tests (web)  | `pnpm --filter @kurultay/web exec vitest run --coverage`                                  |
+| Integration tests | `pnpm --filter @kurultay/api test:e2e` against Postgres and Redis service containers      |
 | Build             | `pnpm build`                                                                              |
 
 All steps must pass before merge. See [git-strategy.md](git-strategy.md#pull-request-process).

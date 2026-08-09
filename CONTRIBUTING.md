@@ -59,12 +59,14 @@ Test expectations: [docs/testing.md](docs/testing.md).
 - Link the issue the PR addresses.
 - Fill in the PR template checklist (conventional title, docs updated where relevant,
   lint/typecheck/tests once CI exists).
-- Expect **one approving review** before merge; maintainers squash-merge into `develop`.
+- Expect **one approving review** before merge; maintainers merge into `develop` with a merge
+  commit (`--no-ff`) — nothing is squashed, so keep the branch's own commit history readable.
   While Kurultay has a single maintainer there is nobody to review _their_ PRs, so
   maintainer-authored PRs are self-reviewed and self-merged once CI is green. Your PRs are
   reviewed as normal, and the review requirement applies to everyone again as soon as a
   second maintainer exists.
-- Keep commit history readable; squash noisy fixup commits before requesting review.
+- Clean up noisy fixup commits (interactive rebase or amend) before requesting review — they
+  land in `develop` as-is.
 
 ## Need help?
 

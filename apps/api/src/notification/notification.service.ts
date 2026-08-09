@@ -139,29 +139,6 @@ export class NotificationService {
     return existing !== null;
   }
 
-  async createDueSoon(
-    db: NotificationDb,
-    input: Omit<CreateNotificationInput, 'type' | 'actorId'> & {
-      actorId?: string;
-    },
-  ) {
-    if (!input.taskId) return null;
-    if (await this.shouldSkipDueSoon(db, input.userId, input.taskId)) return null;
-    // due_soon has no human actor; use a sentinel that never equals recipient
-    const actorId = input.actorId ?? '';
-    if (actorId && actorId === input.userId) return null;
-    return db.notification.create({
-      data: {
-        workspaceId: input.workspaceId,
-        userId: input.userId,
-        type: NotificationType.DueSoon,
-        taskId: input.taskId,
-        activityId: input.activityId ?? null,
-        payload: input.payload as Prisma.InputJsonValue,
-      },
-    });
-  }
-
   async list(
     workspaceId: string,
     userId: string,

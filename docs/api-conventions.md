@@ -88,12 +88,25 @@ DELETE /workspaces/:workspaceId/tasks/:taskId/labels/:labelId
 GET    /workspaces/:workspaceId/tasks/:taskId/comments
 POST   /workspaces/:workspaceId/tasks/:taskId/comments
 DELETE /workspaces/:workspaceId/comments/:commentId
+
+GET    /workspaces/:workspaceId/activities                 # workspace activity feed
+GET    /workspaces/:workspaceId/tasks/:taskId/activities    # task activity feed
+
+GET    /workspaces/:workspaceId/dashboard/summary
+
+GET    /workspaces/:workspaceId/notifications
+GET    /workspaces/:workspaceId/notifications/unread-count
+POST   /workspaces/:workspaceId/notifications/read-all
+POST   /workspaces/:workspaceId/notifications/:notificationId/read
 ```
 
 Board and column role gates:
 [ADR 0009](decisions/0009-board-column-permissions.md). Task gates:
 [ADR 0010](decisions/0010-task-permissions.md). Label and metadata gates:
-[ADR 0011](decisions/0011-label-task-metadata-permissions.md).
+[ADR 0011](decisions/0011-label-task-metadata-permissions.md). Comment delete authorship:
+[ADR 0012](decisions/0012-comment-delete-authorship.md). Activity, dashboard, and notification
+routes are read-only aggregations/feeds over the same data and inherit the workspace member
+gate (`WorkspaceGuard`) — no separate role matrix.
 
 Invitations are workspace-scoped in the public API. Persistence is the
 `WorkspaceInvitation` table, mapped from Better Auth's organization plugin.

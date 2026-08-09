@@ -1,6 +1,7 @@
 # 0011. Label ve Task-Metadata İzinleri
 
-**Durum:** Kabul edildi
+**Durum:** Kabul edildi (yorum-silme satırının yerini
+[ADR 0012](0012-comment-delete-authorship.md) aldı; diğer tüm satırlar geçerliliğini korur)
 **Tarih:** 2026-08-09
 
 > 🌐 [English (canonical)](../../decisions/0011-label-task-metadata-permissions.md) | Türkçe
@@ -22,6 +23,10 @@ board-scoped taksonomidir (column gibi); kart düzenlemeden ayrı bir kapı gere
 | `priority`, `dueDate`, `estimatedMinutes` güncelle            |   ✓   |   ✓   |   ✓    |   —   |
 | Yorum oluştur; erişilebilir task'taki herhangi bir yorumu sil |   ✓   |   ✓   |   ✓    |   —   |
 
+> **Yerini aldı:** yukarıdaki satırın "herhangi bir yorumu sil" kısmı artık geçerli değil.
+> Yorum silme, yazarlık veya OWNER/ADMIN gerektirir — bkz.
+> [ADR 0012](0012-comment-delete-authorship.md).
+
 `Label.color` bir `LabelColorSlot` (`slot-1`…`slot-8`), asla ham hex değildir.
 
 ## Gerekçe
@@ -38,7 +43,7 @@ board-scoped taksonomidir (column gibi); kart düzenlemeden ayrı bir kapı gere
 
 ## Alternatifler
 
-| Alternatif                     | Neden değil                                         |
-| ------------------------------ | --------------------------------------------------- |
-| MEMBER label oluşturabilir     | Taksonomiyi kirletir; column Admin ile çelişir      |
-| Yalnızca yazar yorum silebilir | Ekstra kontrol; kötüye kullanım çıkana kadar ertele |
+| Alternatif                     | Neden değil                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| MEMBER label oluşturabilir     | Taksonomiyi kirletir; column Admin ile çelişir                                                                                              |
+| Yalnızca yazar yorum silebilir | Ekstra kontrol; kötüye kullanım çıkana kadar ertele — **[ADR 0012](0012-comment-delete-authorship.md)'de yeniden ele alındı ve benimsendi** |
