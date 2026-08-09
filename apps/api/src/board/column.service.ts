@@ -8,6 +8,7 @@ import { SocketEvents, type ColumnDto } from '@kurultay/shared-types';
 import { assertBoard } from '../common/board-access';
 import { resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
+import { batchUpdateColumnPositions } from '../common/position/rebalance-sql';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import type { CreateColumnDto } from './dto/create-column.dto';
@@ -89,14 +90,11 @@ export class ColumnService {
       created = await this.prisma.$transaction(async (tx) => {
         const positions = rebalancePositions(columns.length + 1);
         const insertionIndex = after ? afterIndex + 1 : 0;
-        await Promise.all(
-          columns.map((column, index) =>
-            tx.column.updateMany({
-              where: { id: column.id, boardId },
-              data: { position: positions[index < insertionIndex ? index : index + 1]! },
-            }),
-          ),
-        );
+        const updates = columns.map((column, index) => ({
+          id: column.id,
+          position: positions[index < insertionIndex ? index : index + 1]!,
+        }));
+        await batchUpdateColumnPositions(tx, boardId, updates);
         const row = await tx.column.create({
           data: {
             boardId,
@@ -180,19 +178,23 @@ export class ColumnService {
         const reordered = [...remaining];
         reordered.splice(insertionIndex, 0, column);
         const positions = rebalancePositions(reordered.length);
-        await Promise.all(
-          reordered.map((item, index) =>
-            tx.column.updateMany({
-              where: { id: item.id, boardId: column.boardId },
-              data: { position: positions[index]! },
-            }),
-          ),
-        );
+        const otherUpdates = reordered
+          .map((item, index) => ({ item, index }))
+          .filter(({ item }) => item.id !== columnId)
+          .map(({ item, index }) => ({ id: item.id, position: positions[index]! }));
+
+        await Promise.all([
+          tx.column.update({
+            where: { id: columnId },
+            data: { position: positions[insertionIndex]! },
+          }),
+          batchUpdateColumnPositions(tx, column.boardId, otherUpdates),
+        ]);
         const refreshed = await tx.column.findFirstOrThrow({
           where: { id: columnId, board: { workspaceId } },
           include: { _count: { select: { tasks: true } } },
         });
-        return this.toDto({ ...refreshed, position: positions[insertionIndex]! });
+        return this.toDto(refreshed);
       }
 
       const updated = await tx.column.update({

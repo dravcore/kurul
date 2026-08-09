@@ -14,6 +14,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import type { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 
+/**
+ * Hard cap on `listMembers` — the endpoint returns a plain array (no cursor contract), so
+ * this bounds worst-case row count for very large workspaces instead of full pagination.
+ */
+const MAX_MEMBERS = 1000;
+
 @Injectable()
 export class WorkspaceService {
   constructor(private readonly prisma: PrismaService) {}
@@ -159,6 +165,7 @@ export class WorkspaceService {
       where: { workspaceId },
       include: { user: { select: { name: true, avatarUrl: true } } },
       orderBy: { createdAt: 'asc' },
+      take: MAX_MEMBERS,
     });
 
     return members.map((m) => ({

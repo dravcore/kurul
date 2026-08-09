@@ -128,13 +128,14 @@ describe('ColumnService', () => {
         column: {
           findFirst: jest.fn().mockResolvedValue(column),
           findMany: jest.fn().mockResolvedValue([beforeNeighbor, afterNeighbor, column]),
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          update: jest.fn().mockResolvedValue({ ...column, position: 2000 }),
           findFirstOrThrow: jest.fn().mockResolvedValue({
             ...column,
             position: 2000,
             _count: { tasks: 7 },
           }),
         },
+        $executeRaw: jest.fn().mockResolvedValue(2),
       }),
     );
 

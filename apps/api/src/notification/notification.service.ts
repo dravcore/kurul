@@ -91,6 +91,37 @@ export class NotificationService {
   }
 
   /**
+   * Bulk-inserts mention notifications for a comment in a single `createMany` instead of
+   * one `create` per mentioned user — mirrors the due-soon worker's batch insert.
+   */
+  async createMentionBatch(
+    db: NotificationDb,
+    input: {
+      workspaceId: string;
+      actorId: string;
+      taskId: string;
+      activityId?: string | null;
+      userIds: string[];
+      payload: Record<string, unknown>;
+    },
+  ): Promise<number> {
+    const recipients = [...new Set(input.userIds)].filter((userId) => userId !== input.actorId);
+    if (recipients.length === 0) return 0;
+
+    const result = await db.notification.createMany({
+      data: recipients.map((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        type: NotificationType.Mention,
+        taskId: input.taskId,
+        activityId: input.activityId ?? null,
+        payload: input.payload as Prisma.InputJsonValue,
+      })),
+    });
+    return result.count;
+  }
+
+  /**
    * App-level due_soon idempotency: skip when an unread due_soon already exists
    * for the same user+task, or one was created in the last 24h.
    */
