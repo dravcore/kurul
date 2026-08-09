@@ -139,6 +139,14 @@ register UI'ının bizim yazmamız gerektiğini unutma.
 `@dnd-kit` ve Recharts bunun üstünde oturur; ayrıntılar ve trade-off'lar
 [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)'de.
 
+### i18n — next-intl
+
+`next-intl`, Faz 1'den beri kurulu — her kullanıcıya görünen metin hardcode edilmek yerine
+`useTranslations()` / `messages/en.json` üzerinden geçiyor — yani locale şu an `en` olarak
+sabitlenmiş ve henüz bir locale switcher olmasa da (MVP İngilizce-only, bkz.
+[roadmap.md — MVP ötesi](roadmap.md#mvp-ötesi)) uygulama çeviriye hazır. Alternatif, string'ler
+component ağacına zaten yayıldıktan sonra i18n'i sonradan eklemekti; bu daha pahalı bir sıra.
+
 ### Deployment — Docker Compose
 
 Dört servis — `api`, `web`, `postgres`, `redis` — mevcut self-managed Linux sunucu
@@ -180,15 +188,19 @@ Mimari ve veri modelleme için incelemeye değer projeler:
 Tam argümanlar ve sonuçlar burada tekrarlanmak yerine [`decisions/`](decisions/) altında
 yaşıyor:
 
-| ADR                                                                                | Konu                                                    |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modüler monolit                              |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                         | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                       | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                   | Organization plugin'i ile Better Auth (→ Workspace)     |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                 | Socket.io + Redis adapter                               |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)             | Sıralama için Float position'lar                        |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                           | AGPL-3.0                                                |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                     | Git Flow + SemVer                                       |
+| ADR                                                                                            | Konu                                                    |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modüler monolit                              |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Organization plugin'i ile Better Auth (→ Workspace)     |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                               |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Sıralama için Float position'lar                        |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                       |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board ve column rol matrisi (OWNER/ADMIN yapısı)        |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task rol matrisi (MEMBER+ içerik işi)                   |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label ve task-metadata rol matrisi                      |
+| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Yorum silme: yazarlık veya OWNER/ADMIN                  |
 
 İlgili: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)

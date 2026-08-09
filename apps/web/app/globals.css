@@ -47,8 +47,6 @@
   --label-slot-8: #e34948;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
   --elevation-drag: 0 12px 32px rgb(0 0 0 / 0.18), 0 4px 8px rgb(0 0 0 / 0.1);

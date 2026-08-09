@@ -1,6 +1,13 @@
 # Phase 8 — Deferred follow-ups
 
-**Date:** 2026-08-09 · **Status:** open · **Parent:** [phase-8 design](2026-08-09-phase-8-activity-notifications-design.md) (when written)
+**Date:** 2026-08-09 · **Status:** archived · **Parent:**
+[phase-8 design](../../specs/2026-08-09-phase-8-activity-notifications-design.md)
+
+> **Archived.** The MVP shipped and every still-open row below has been folded into
+> [roadmap.md — Beyond MVP](../../roadmap.md#beyond-mvp) (due-soon delivery alternatives,
+> mentions without the picker, realtime push of notifications/activity). This file is kept for
+> the historical record and for the `CHANGELOG.md` links that point at it; do not add new rows
+> here — open an issue or extend the roadmap table instead.
 
 Decisions locked for Phase 8 MVP, with explicitly deferred alternatives so they are not
 re-litigated mid-implementation. Pick these up only when the MVP is shipped and a need appears.
@@ -42,5 +49,6 @@ re-litigated mid-implementation. Pick these up only when the MVP is shipped and 
 
 ## How to use this file
 
-When opening a follow-up issue or PR, link here and strike through rows as they ship. Do not
-expand Phase 8 scope mid-PR to absorb deferred rows without an explicit decision.
+This file is archived — see the banner at the top. It is kept for historical context and
+stable `CHANGELOG.md` links, not as a place to track new follow-up work; use
+[roadmap.md — Beyond MVP](../../roadmap.md#beyond-mvp) or a GitHub issue instead.

@@ -278,7 +278,8 @@ tenant-safely until this exists.
 
 **Goal:** users can see what changed and be told about it.
 **Reference:** [spec](specs/2026-08-09-phase-8-activity-notifications-design.md);
-[deferred](specs/2026-08-09-phase-8-deferred.md)
+[deferred](archive/specs/2026-08-09-phase-8-deferred.md) (archived; open items below in
+[Beyond MVP](#beyond-mvp))
 **Status:** done
 
 - [x] `Activity` writes on task create/move/update/comment/assign (`payload` as JSON so new
@@ -329,6 +330,9 @@ Not scheduled. Listed so the architecture stays compatible with them, not as com
 | `[-]` Import from Trello / Jira                        |                                                                                                                                                                     |
 | `[-]` Further UI language packs                        | The next-intl layer itself ships in Phase 1 and MVP is English-only; this row is about additional locales (Turkish first) — see [design.md](design.md#7-ui-writing) |
 | `[-]` Self-host deployment guide beyond Docker Compose |                                                                                                                                                                     |
+| `[-]` Due-soon delivery alternatives                   | In-process Nest interval scanner (simpler ops, single-replica fallback) or OS cron → internal HTTP (for self-hosters who prefer cron over BullMQ/Redis)             |
+| `[-]` Mentions without the member picker               | Plain `@DisplayName` regex, or an API-only `mentionedUserIds[]` — only if the structured `@[Name](userId)` picker UX turns out to be blocked                        |
+| `[-]` Realtime push of notifications / activity        | Phase 9 shipped board sync (task/column/comment events) only; the notification bell and activity feed still poll rather than subscribing to a socket event          |
 
 **1.0.0** is cut when Phases 1–9 are complete and the REST API is stable enough to promise
 backwards compatibility.

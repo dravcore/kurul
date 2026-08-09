@@ -2,7 +2,8 @@
 
 > **For agentic workers:** Use executing-plans or subagent-driven-development. Spec:
 > [docs/specs/2026-08-09-phase-8-activity-notifications-design.md](../specs/2026-08-09-phase-8-activity-notifications-design.md).
-> Deferred: [docs/specs/2026-08-09-phase-8-deferred.md](../specs/2026-08-09-phase-8-deferred.md).
+> Deferred: [docs/archive/specs/2026-08-09-phase-8-deferred.md](../specs/2026-08-09-phase-8-deferred.md)
+> (archived).
 
 **Goal:** Append-only activity on task mutations; in-app notifications for assignment, mention, and due-soon (BullMQ); panel timeline + shell bell.
 

@@ -2,10 +2,8 @@ import { NotFoundException } from '@nestjs/common';
 import { Priority } from '@kurultay/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  applyThroughputCounts,
   applyThroughputDayCounts,
   emptyThroughputSeries,
-  isCompletedMove,
   THROUGHPUT_DAYS,
 } from './dashboard-throughput';
 import { DashboardService } from './dashboard.service';
@@ -23,26 +21,6 @@ describe('dashboard-throughput helpers', () => {
       created: 0,
       completed: 0,
     });
-  });
-
-  it('detects Done via toColumnName or toColumnId', () => {
-    const doneIds = new Set(['col-done']);
-    expect(isCompletedMove({ toColumnName: 'Done' }, doneIds)).toBe(true);
-    expect(isCompletedMove({ toColumnName: 'done' }, doneIds)).toBe(true);
-    expect(isCompletedMove({ toColumnId: 'col-done' }, doneIds)).toBe(true);
-    expect(isCompletedMove({ toColumnId: 'col-todo', toColumnName: 'To Do' }, doneIds)).toBe(false);
-  });
-
-  it('buckets created and completed into the series window', () => {
-    const series = emptyThroughputSeries(new Date('2026-08-09T12:00:00.000Z'));
-    const result = applyThroughputCounts(
-      series,
-      [new Date('2026-08-09T01:00:00.000Z'), new Date('2026-07-20T01:00:00.000Z')],
-      [new Date('2026-08-08T23:00:00.000Z')],
-    );
-    expect(result.find((day) => day.date === '2026-08-09')!.created).toBe(1);
-    expect(result.find((day) => day.date === '2026-08-08')!.completed).toBe(1);
-    expect(result.reduce((sum, day) => sum + day.created, 0)).toBe(1);
   });
 
   it('applies pre-aggregated day counts', () => {

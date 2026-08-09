@@ -153,7 +153,8 @@ why it was wrong before. Commits are read months later by people without the con
 1. Branch from an up-to-date `develop`.
 2. Open the PR **against `develop`** (never against `main`, except `hotfix/*` and
    `release/*`).
-3. PR title follows Conventional Commits — it becomes the squash-merge commit message.
+3. PR title follows Conventional Commits — merges use a merge commit (`--no-ff`), so the
+   individual commits on the branch stay in history; keep them clean before opening the PR.
 4. Keep PRs small and single-responsibility: one concern, ideally under ~500 changed lines
    excluding lockfiles and generated output. Split schema changes from logic changes, and
    backend from frontend, where possible.
@@ -170,12 +171,16 @@ maintainer exists**, and this paragraph is deleted then.
 
 ### Merge strategy
 
-| Merge                                                 | Strategy                     | Reason                                                                             |
-| ----------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------- |
-| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Squash merge**             | One clean commit per unit of work; the branch's fixup noise does not enter history |
-| `release/*` → `main`                                  | **Merge commit** (`--no-ff`) | Preserves the release as a distinct, revertible point in history                   |
-| `hotfix/*` → `main`                                   | **Merge commit** (`--no-ff`) | Same reason                                                                        |
-| `main` → `develop` (back-merge)                       | **Merge commit** (`--no-ff`) | Carries the release/hotfix commits back without rewriting them                     |
+| Merge                                                 | Strategy                     | Reason                                                                         |
+| ----------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------ |
+| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Merge commit** (`--no-ff`) | Keeps individual, reviewable commits (e.g. a tech-debt wave) intact in history |
+| `release/*` → `main`                                  | **Merge commit** (`--no-ff`) | Preserves the release as a distinct, revertible point in history               |
+| `hotfix/*` → `main`                                   | **Merge commit** (`--no-ff`) | Same reason                                                                    |
+| `main` → `develop` (back-merge)                       | **Merge commit** (`--no-ff`) | Carries the release/hotfix commits back without rewriting them                 |
+
+Every merge into `develop` or `main` is a merge commit — nothing is squashed. Clean up fixup
+noise on the branch (interactive rebase, or amend) **before** opening the PR; once the history
+is readable, merge it as-is instead of squashing it away.
 
 Delete the branch after merge. GitHub's "delete branch on merge" setting handles this.
 
@@ -299,7 +304,7 @@ API versioning stance (no `/v1` prefix before 1.0) is covered in
 | PR target branch                     | `develop` (except `release/*` and `hotfix/*` → `main`) |
 | Commit language                      | English                                                |
 | Commit format                        | Conventional Commits                                   |
-| Feature merge                        | Squash                                                 |
+| Feature merge                        | Merge commit (`--no-ff`)                               |
 | Release/hotfix merge                 | `--no-ff` + back-merge to `develop`                    |
 | Tag format                           | `vX.Y.Z`                                               |
 | Changelog                            | Updated in the PR, not at release time                 |
