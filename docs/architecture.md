@@ -80,8 +80,8 @@ The buildable step-by-step version of this tree lives in [project-skeleton.md](p
 
 Every module has the same skeleton: `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`. Module boundaries are kept clean from day one — the ability to split process roles later depends entirely on that.
 
-**Current vs planned:** after Phase 4, `auth`, `workspace`, `board`, `task`, `health`,
-`common`, and `prisma` have real handlers. `label`, `comment`, `activity`, `dashboard`,
+**Current vs planned:** after Phase 5, `auth`, `workspace`, `board`, `task`, `label`,
+`comment`, `health`, `common`, and `prisma` have real handlers. `activity`, `dashboard`,
 `notification`, and `realtime` remain route scaffolds nested under
 `/workspaces/:workspaceId/...` awaiting their roadmap phases. Treat the table below as the
 target map, not a claim that every module is implemented.
@@ -127,7 +127,7 @@ apps/web/
 │   ├── brand/             # DamgaMark and other brand marks
 │   ├── ui/                # shadcn/ui primitives (landed Phase 3)
 │   ├── board/             # BoardList, BoardView, BoardColumn, dialogs
-│   ├── task/              # TaskCard, TaskPanel, DnD helpers (metadata UI in Phase 5+)
+│   ├── task/              # TaskCard, TaskPanel, metadata editors, DnD helpers
 │   └── dashboard/         # chart components (Phase 7+)
 └── lib/
     ├── api.ts             # typed REST client
@@ -136,7 +136,7 @@ apps/web/
     └── auth.ts            # Better Auth client
 ```
 
-Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Next.js middleware checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run; the client shell still bootstraps workspaces once the session is present. Board interaction will be client-side (`@dnd-kit`) from Phase 4, with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events.
+Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Next.js middleware checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run; the client shell still bootstraps workspaces once the session is present. Board interaction uses `@dnd-kit` with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events (Phase 9).
 
 ---
 

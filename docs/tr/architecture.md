@@ -92,8 +92,8 @@ Her modül aynı iskelete sahip: `*.module.ts`, `*.controller.ts`, `*.service.ts
 Modül sınırları en baştan temiz tutulur — process rollerini daha sonra bölme imkânı tamamen
 buna bağlıdır.
 
-**Mevcut vs planlanan:** Faz 4 sonrası `auth`, `workspace`, `board`, `task`, `health`,
-`common` ve `prisma` gerçek handler'lara sahip. `label`, `comment`, `activity`, `dashboard`,
+**Mevcut vs planlanan:** Faz 5 sonrası `auth`, `workspace`, `board`, `task`, `label`,
+`comment`, `health`, `common` ve `prisma` gerçek handler'lara sahip. `activity`, `dashboard`,
 `notification` ve `realtime` route iskeleti olarak kalır; path'ler
 `/workspaces/:workspaceId/...` altında yuvalanmıştır ve roadmap fazlarını bekler. Aşağıdaki
 tabloyu hedef harita olarak okuyun — her modülün uygulandığı iddiası değildir.
@@ -141,7 +141,7 @@ apps/web/
 │   ├── brand/             # DamgaMark ve diğer marka işaretleri
 │   ├── ui/                # shadcn/ui primitive'leri (Faz 3'te landed)
 │   ├── board/             # BoardList, BoardView, BoardColumn, dialog'lar
-│   ├── task/              # TaskCard, TaskPanel, DnD yardımcıları (metadata UI Faz 5+)
+│   ├── task/              # TaskCard, TaskPanel, metadata editörleri, DnD yardımcıları
 │   └── dashboard/         # grafik component'leri (Faz 7+)
 └── lib/
     ├── api.ts             # typed REST client
@@ -153,9 +153,9 @@ apps/web/
 İki route group layout ağacını böler: `(auth)` sade bir kabuk render eder, `(app)` workspace
 chrome'unu render eder ve bir session olduğunu varsayar. Next.js middleware, `(app)`
 route'larından önce Better Auth session cookie'sini `/auth/get-session` ile doğrular; client
-shell session varken workspace bootstrap'ını yapar. Board etkileşimi Faz 4'ten itibaren
-client-side olacaktır (`@dnd-kit`), doğruluk kaynağı olarak sunucu ile birlikte — optimistic
-bir taşıma hem API yanıtına hem de gelen socket event'lerine karşı uzlaştırılır.
+shell session varken workspace bootstrap'ını yapar. Board etkileşimi `@dnd-kit` kullanır;
+doğruluk kaynağı sunucudur — optimistic bir taşıma hem API yanıtına hem de gelen socket
+event'lerine (Faz 9) karşı uzlaştırılır.
 
 ---
 

@@ -237,14 +237,17 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 ## Faz 5 — Task metadata'sı
 
 **Hedef:** task'lar yalnızca listelenmek için değil, planlanmak için yeterli bilgiyi taşır.
-**Durum:** başlanmadı
+**Durum:** tamam
 
-- [ ] Çoklu atanan (`TaskAssignee`)
-- [ ] Label'lar: board-scoped CRUD, task'lara atama/kaldırma
-- [ ] Priority (`LOW`/`MEDIUM`/`HIGH`/`URGENT`) — label'lardan ayrı tutulur
-- [ ] `dueDate` ve `estimatedMinutes` — ayrı alanlar, ayrı UI
-- [ ] Task'larda yorumlar
-- [ ] Web: atanan seçici, label seçici, priority badge'i, tarih seçici, yorum thread'i
+- [x] Çoklu atanan (`TaskAssignee`)
+- [x] Label'lar: board-scoped CRUD, task'lara atama/kaldırma
+- [x] Priority (`LOW`/`MEDIUM`/`HIGH`/`URGENT`) — label'lardan ayrı tutulur
+- [x] `dueDate` ve `estimatedMinutes` — ayrı alanlar, ayrı UI
+- [x] Task'larda yorumlar
+- [x] Web: atanan seçici, label seçici, priority kontrolü, tarih/tahmin alanları, yorum thread'i
+- [x] [ADR 0011](decisions/0011-label-task-metadata-permissions.md) — label CRUD Admin+;
+      metadata/assignee/comment mutate MEMBER+
+- [x] Spec: [`specs/2026-08-09-phase-5-task-metadata-design.md`](../specs/2026-08-09-phase-5-task-metadata-design.md)
 
 ---
 

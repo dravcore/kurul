@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core';
 import type { BoardDto, ColumnDto, TaskDto } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
-import { canMutateColumns, canMutateTasks } from '@/lib/board-permissions';
+import { canMutateColumns, canMutateLabels, canMutateTasks } from '@/lib/board-permissions';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { Button } from '@/components/ui/button';
 import {
@@ -72,6 +72,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
 
   const canEditColumns = canMutateColumns(activeRole);
   const canEditTasks = canMutateTasks(activeRole);
+  const canEditLabels = canMutateLabels(activeRole);
 
   const selectedTask = useMemo(
     () => (selectedTaskId ? (tasks.find((task) => task.id === selectedTaskId) ?? null) : null),
@@ -420,6 +421,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             boardId={boardId}
             task={selectedTask}
             canMutate={canEditTasks}
+            canManageLabels={canEditLabels}
             loadError={panelError}
             onUpdated={(task) =>
               setTasks((current) =>

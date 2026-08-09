@@ -20,6 +20,8 @@ export interface WorkspaceMemberDto {
   workspaceId: string;
   userId: string;
   role: MemberRole;
+  name: string;
+  avatarUrl: string | null;
 }
 
 export interface InvitationDto {
@@ -63,6 +65,14 @@ export interface TaskDto {
   createdById: string;
   createdAt: string;
   updatedAt: string;
+  assignees: TaskAssigneeDto[];
+  labels: LabelDto[];
+}
+
+export interface TaskAssigneeDto {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
 }
 
 export interface LabelDto {
@@ -78,6 +88,11 @@ export interface CommentDto {
   userId: string;
   body: string;
   createdAt: string;
+  author: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+  };
 }
 
 export interface ActivityDto {

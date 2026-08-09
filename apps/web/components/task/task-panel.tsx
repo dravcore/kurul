@@ -11,12 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { TaskMetadataPanel } from './task-metadata-panel';
 
 interface TaskPanelProps {
   workspaceId: string;
   boardId: string;
   task: TaskDto | null;
   canMutate: boolean;
+  canManageLabels: boolean;
   loadError?: string | null;
   onUpdated: (task: TaskDto) => void;
   onRequestDelete: () => void;
@@ -27,6 +29,7 @@ export function TaskPanel({
   boardId,
   task,
   canMutate,
+  canManageLabels,
   loadError = null,
   onUpdated,
   onRequestDelete,
@@ -146,6 +149,14 @@ export function TaskPanel({
                 className="min-h-32 w-full rounded-md border border-input bg-transparent px-3 py-2 text-body outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
               />
             </div>
+            <TaskMetadataPanel
+              workspaceId={workspaceId}
+              boardId={boardId}
+              task={task}
+              canMutate={canMutate}
+              canManageLabels={canManageLabels}
+              onUpdated={onUpdated}
+            />
             {canMutate ? (
               <div className="mt-auto flex justify-end border-t border-border pt-4">
                 <Button type="button" variant="destructive" onClick={onRequestDelete}>
