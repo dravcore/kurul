@@ -92,9 +92,9 @@ Her modül aynı iskelete sahip: `*.module.ts`, `*.controller.ts`, `*.service.ts
 Modül sınırları en baştan temiz tutulur — process rollerini daha sonra bölme imkânı tamamen
 buna bağlıdır.
 
-**Mevcut vs planlanan:** Faz 2 sonrası yalnızca `auth`, `workspace`, `health`, `common` ve
-`prisma` gerçek handler'lara sahip. `board`, `task`, `label`, `comment`, `activity`,
-`dashboard`, `notification` ve `realtime` route iskeletleridir; path'ler
+**Mevcut vs planlanan:** Faz 3 sonrası `auth`, `workspace`, `board`, `health`, `common` ve
+`prisma` gerçek handler'lara sahip. `task`, `label`, `comment`, `activity`, `dashboard`,
+`notification` ve `realtime` route iskeleti olarak kalır; path'ler
 `/workspaces/:workspaceId/...` altında yuvalanmıştır ve roadmap fazlarını bekler. Aşağıdaki
 tabloyu hedef harita olarak okuyun — her modülün uygulandığı iddiası değildir.
 
@@ -115,7 +115,7 @@ Cross-cutting altyapı:
 
 | Modül    | Sorumluluk                                                                                                                      |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `common` | Guard'lar, exception filter'lar, decorator'lar, paylaşılan Nest bootstrap — workspace scoping; interceptor'lar Faz 3+ ile gelir |
+| `common` | Guard'lar, exception filter'lar, decorator'lar, paylaşılan Nest bootstrap — workspace scoping (bugün guard ile; request-scoped Prisma Client Extensions ertelendi) |
 | `prisma` | Paylaşılan `pg` pool + Nest `PrismaService`; Better Auth aynı pool'u kullanır                                                   |
 
 Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdır, asla tersi değil.
@@ -129,16 +129,18 @@ böylece iş kurallarını beraberinde sürüklemeden kendi process rolüne çı
 ```
 apps/web/
 ├── app/
-│   ├── (auth)/            # login, register — kimliksiz kabuk
+│   ├── (auth)/            # login, register, invite — kimliksiz kabuk
 │   ├── (app)/             # kimlikli kabuk: sidebar + workspace switcher
 │   │   ├── dashboard/
+│   │   ├── workspaces/new/
 │   │   └── board/[boardId]/
 │   └── layout.tsx
 ├── components/
-│   ├── layout/            # AppShell, WorkspaceProvider, AppSidebar
+│   ├── layout/            # AppShell, Topbar, WorkspaceProvider, AppSidebar, SancakRail
 │   ├── auth/              # paylaşılan auth form primitive'leri
-│   ├── ui/                # shadcn/ui primitive'leri (Faz 3+)
-│   ├── board/             # KanbanBoard, Column, TaskCard (Faz 3+)
+│   ├── brand/             # DamgaMark ve diğer marka işaretleri
+│   ├── ui/                # shadcn/ui primitive'leri (Faz 3'te landed)
+│   ├── board/             # BoardList, BoardView, BoardColumn, dialog'lar (TaskCard Faz 4)
 │   ├── task/              # TaskDetailPanel (Faz 5+)
 │   └── dashboard/         # grafik component'leri (Faz 7+)
 └── lib/
@@ -151,9 +153,9 @@ apps/web/
 İki route group layout ağacını böler: `(auth)` sade bir kabuk render eder, `(app)` workspace
 chrome'unu render eder ve bir session olduğunu varsayar. Next.js middleware, `(app)`
 route'larından önce Better Auth session cookie'sini `/auth/get-session` ile doğrular; client
-shell session varken workspace bootstrap'ını yapar. Board etkileşimi client-side'dır
-(`@dnd-kit`), doğruluk kaynağı olarak sunucu ile birlikte — optimistic bir taşıma hem API
-yanıtına hem de gelen socket event'lerine karşı uzlaştırılır.
+shell session varken workspace bootstrap'ını yapar. Board etkileşimi Faz 4'ten itibaren
+client-side olacaktır (`@dnd-kit`), doğruluk kaynağı olarak sunucu ile birlikte — optimistic
+bir taşıma hem API yanıtına hem de gelen socket event'lerine karşı uzlaştırılır.
 
 ---
 
@@ -244,8 +246,8 @@ kasıtlı bir operasyon olmalıdır.
 Her workspace bir tenant'tır ve izolasyon kuralı mutlaktır: **her sorgu `workspaceId` ile
 scope'lanır.**
 
-Bu kural bugün guard seviyesinde zorlanır (request-scoped Prisma Client Extension /
-interceptor'lar Faz 3+ ile gelir); her serviste yeniden uygulanmaz:
+Bu kural bugün guard seviyesinde zorlanır (request-scoped Prisma Client Extensions ertelenmiş
+durumda kalır); her serviste yeniden uygulanmaz:
 
 1. Bir guard, mevcut kullanıcının istenen workspace'teki üyeliğini çözümler ve üyelik yoksa
    isteği reddeder (üye olmayanlara 404 — anti-enumeration).

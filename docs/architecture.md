@@ -80,7 +80,11 @@ The buildable step-by-step version of this tree lives in [project-skeleton.md](p
 
 Every module has the same skeleton: `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`. Module boundaries are kept clean from day one — the ability to split process roles later depends entirely on that.
 
-**Current vs planned:** after Phase 2, only `auth`, `workspace`, `health`, `common`, and `prisma` have real handlers. `board`, `task`, `label`, `comment`, `activity`, `dashboard`, `notification`, and `realtime` are route scaffolds nested under `/workspaces/:workspaceId/...` awaiting their roadmap phases. Treat the table below as the target map, not a claim that every module is implemented.
+**Current vs planned:** after Phase 3, `auth`, `workspace`, `board`, `health`, `common`, and
+`prisma` have real handlers. `task`, `label`, `comment`, `activity`, `dashboard`,
+`notification`, and `realtime` remain route scaffolds nested under
+`/workspaces/:workspaceId/...` awaiting their roadmap phases. Treat the table below as the
+target map, not a claim that every module is implemented.
 
 | Module         | Responsibility                                                     |
 | -------------- | ------------------------------------------------------------------ |
@@ -99,7 +103,7 @@ Cross-cutting infrastructure:
 
 | Module   | Responsibility                                                                                                    |
 | -------- | ----------------------------------------------------------------------------------------------------------------- |
-| `common` | Guards, exception filters, decorators, shared Nest bootstrap — workspace scoping; interceptors land with Phase 3+ |
+| `common` | Guards, exception filters, decorators, shared Nest bootstrap — workspace scoping (guard-enforced today; request-scoped Prisma Client Extensions deferred) |
 | `prisma` | Shared `pg` pool + Nest `PrismaService`; Better Auth uses the same pool                                           |
 
 Dependency direction: feature modules depend on `common` and `prisma`, never the reverse. `realtime` is a consumer of domain events, not a place where domain logic lives — so it can be lifted into its own process role without dragging business rules with it.
@@ -111,16 +115,18 @@ Dependency direction: feature modules depend on `common` and `prisma`, never the
 ```
 apps/web/
 ├── app/
-│   ├── (auth)/            # login, register — unauthenticated shell
+│   ├── (auth)/            # login, register, invite — unauthenticated shell
 │   ├── (app)/             # authenticated shell: sidebar + workspace switcher
 │   │   ├── dashboard/
+│   │   ├── workspaces/new/
 │   │   └── board/[boardId]/
 │   └── layout.tsx
 ├── components/
-│   ├── layout/            # AppShell, WorkspaceProvider, AppSidebar
+│   ├── layout/            # AppShell, Topbar, WorkspaceProvider, AppSidebar, SancakRail
 │   ├── auth/              # shared auth form primitives
-│   ├── ui/                # shadcn/ui primitives (Phase 3+)
-│   ├── board/             # KanbanBoard, Column, TaskCard (Phase 3+)
+│   ├── brand/             # DamgaMark and other brand marks
+│   ├── ui/                # shadcn/ui primitives (landed Phase 3)
+│   ├── board/             # BoardList, BoardView, BoardColumn, dialogs (TaskCard in Phase 4)
 │   ├── task/              # TaskDetailPanel (Phase 5+)
 │   └── dashboard/         # chart components (Phase 7+)
 └── lib/
@@ -130,7 +136,7 @@ apps/web/
     └── auth.ts            # Better Auth client
 ```
 
-Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Next.js middleware checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run; the client shell still bootstraps workspaces once the session is present. Board interaction is client-side (`@dnd-kit`), with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events.
+Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Next.js middleware checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run; the client shell still bootstraps workspaces once the session is present. Board interaction will be client-side (`@dnd-kit`) from Phase 4, with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events.
 
 ---
 
@@ -212,7 +218,7 @@ deleting a user has to be a deliberate operation rather than a silent erasure.
 
 Every workspace is a tenant, and the isolation rule is absolute: **every query is scoped by `workspaceId`.**
 
-That rule is enforced at the guard level today (request-scoped Prisma Client Extensions / interceptors land with Phase 3+), not re-implemented in each service:
+That rule is enforced at the guard level today (request-scoped Prisma Client Extensions remain deferred), not re-implemented in each service:
 
 1. A guard resolves the current user's membership in the requested workspace and rejects the request if there is none (404 for non-members — anti-enumeration).
 2. The resolved `workspaceId` / membership role is attached to the request context.

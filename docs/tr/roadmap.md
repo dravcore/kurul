@@ -86,7 +86,7 @@ dökülmesi.
 - [x] `docs/architecture.md` — modüler monolit, modül haritası, veri modeli özeti
 - [x] `docs/tech-stack.md` — İngilizce kanonik versiyon
 - [x] `docs/project-skeleton.md` — İngilizce kanonik versiyon
-- [x] `docs/decisions/` — ADR 0001–0008 + indeks
+- [x] `docs/decisions/` — ADR 0001–0009 + indeks
 
 ### Lokalizasyon
 
@@ -202,6 +202,9 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 - [x] Board oluşturmada varsayılan column'lar (Yapılacak / Devam Ediyor / Tamamlandı)
 - [x] Web: board listesi, board sayfası kabuğu, column render'ı,
       oluştur/yeniden adlandır/sil dialog'ları
+- [x] Design.md §3–§4'ün gerçek ekranlarda doğrulanması — visual-debt stack ile kapandı
+      ([spec](../specs/2026-08-09-visual-debt-design.md)): type scale, toast, topbar,
+      workspace switcher, sancak rail, auth kimlik tedavisi, board polish
 
 ---
 

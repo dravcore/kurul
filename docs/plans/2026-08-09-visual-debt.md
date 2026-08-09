@@ -1,6 +1,10 @@
 # Visual Debt and Phase 4 Groundwork — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status: shipped** — all four layers merged to `develop` (PRs #11, #15, #13, #14).
+> Spec: `docs/specs/2026-08-09-visual-debt-design.md`. Task checkboxes below are retained
+> as a historical record and marked complete.
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Bring every shipped `apps/web` screen into conformance with `docs/design.md` and land the primitives Phase 4 needs (type scale, toast, elevation tokens, sliding sancak rail, reduced-motion policy).
 
@@ -32,13 +36,13 @@
 
 - Produces: utilities `text-display`, `text-title-lg`, `text-title`, `text-body`, `text-small`, `text-micro`, `font-strong` — consumed by Tasks 7, 8, 14.
 
-- [ ] **Step 1: Create the branch**
+- [x] **Step 1: Create the branch**
 
 ```bash
 git checkout develop && git pull && git checkout -b feat/design-primitives
 ```
 
-- [ ] **Step 2: Add font-size tokens to the `@theme inline` block**
+- [x] **Step 2: Add font-size tokens to the `@theme inline` block**
 
 In `apps/web/app/globals.css`, inside `@theme inline { … }`, after the `--radius: 6px;` line, add:
 
@@ -63,12 +67,12 @@ In `apps/web/app/globals.css`, inside `@theme inline { … }`, after the `--radi
 
 These are the design.md §3 steps. Tailwind v4 derives `text-<name>` utilities (size + line-height + weight) and `font-strong` from these names. Do not remove the existing default utilities; migration happens screen by screen in later tasks.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build`
 Expected: both pass (tokens are additive; nothing consumes them yet).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/web/app/globals.css
@@ -85,7 +89,7 @@ git commit -m "feat(web): add design.md type-scale tokens"
 
 - Produces: the global rule that movement transitions drop while color/opacity transitions stay. Task 16's stagger defines its own reduced-motion fallback on top of this.
 
-- [ ] **Step 1: Replace the blanket rule**
+- [x] **Step 1: Replace the blanket rule**
 
 Replace the existing block:
 
@@ -118,12 +122,12 @@ with:
 
 This keeps the skeleton's opacity pulse and color fades (per design.md §5 "fewer and gentler, not zero") while transform/width transitions (sidebar collapse, sancak rail slide) snap instantly.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `pnpm --filter @kurultay/web build`
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/web/app/globals.css
@@ -141,7 +145,7 @@ git commit -m "feat(web): keep color and opacity under prefers-reduced-motion"
 
 - Produces: `DamgaMark({ size?: number; className?: string })` — default size 96; consumed by Tasks 3 (board files) and 14 (auth layout).
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `apps/web/components/brand/damga-mark.tsx`:
 
@@ -180,16 +184,16 @@ export function DamgaMark({
 }
 ```
 
-- [ ] **Step 2: Replace the two local copies**
+- [x] **Step 2: Replace the two local copies**
 
 In `board-list.tsx` and `board-view.tsx`: delete the local `function DamgaMark(…) { … }` declarations, add `import { DamgaMark } from '@/components/brand/damga-mark';`, and change the call sites from `<DamgaMark size={96} />` to `<DamgaMark />` (96 is now the default).
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
 Expected: PASS, no unused imports.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/web/components/brand/damga-mark.tsx apps/web/components/board/board-list.tsx apps/web/components/board/board-view.tsx
@@ -207,13 +211,13 @@ git commit -m "refactor(web): extract shared DamgaMark brand component"
 
 - Produces: `<Toaster />` mounted globally; `toast` from `'sonner'` callable anywhere client-side. `toast.error(message, { action: { label, onClick } })` is the retry pattern Task 18 uses.
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 ```bash
 pnpm --filter @kurultay/web add sonner
 ```
 
-- [ ] **Step 2: Create the themed wrapper**
+- [x] **Step 2: Create the themed wrapper**
 
 Create `apps/web/components/ui/sonner.tsx` (shadcn's sonner component, themed with Kurultay tokens):
 
@@ -246,7 +250,7 @@ function Toaster(props: ToasterProps) {
 export { Toaster };
 ```
 
-- [ ] **Step 3: Mount it**
+- [x] **Step 3: Mount it**
 
 In `apps/web/app/layout.tsx`, add `import { Toaster } from '@/components/ui/sonner';` and render it inside `ThemeProvider`, after the intl provider:
 
@@ -257,12 +261,12 @@ In `apps/web/app/layout.tsx`, add `import { Toaster } from '@/components/ui/sonn
 </ThemeProvider>
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web build`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/package.json pnpm-lock.yaml apps/web/components/ui/sonner.tsx apps/web/app/layout.tsx
@@ -279,7 +283,7 @@ git commit -m "feat(web): add token-themed sonner toast infrastructure"
 
 - Produces: utilities `shadow-overlay` (dialogs, popovers) and `shadow-drag` (Phase 4 drag preview). Per design.md §3, shadows exist nowhere else.
 
-- [ ] **Step 1: Define the tokens**
+- [x] **Step 1: Define the tokens**
 
 In `globals.css` `:root`, after the `--ease-*` block, add (values shared by both themes — dark depth comes from surface steps, not bigger shadows):
 
@@ -295,18 +299,18 @@ In the `@theme inline` block add:
 --shadow-drag: var(--elevation-drag);
 ```
 
-- [ ] **Step 2: Swap the hardcoded shadows**
+- [x] **Step 2: Swap the hardcoded shadows**
 
 - `dialog.tsx:56` — replace `shadow-lg` with `shadow-overlay`.
 - `dropdown-menu.tsx:36` — replace `shadow-md` with `shadow-overlay`.
 - `dropdown-menu.tsx:204` (the sub-menu content) — replace `shadow-lg` with `shadow-overlay`.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `pnpm --filter @kurultay/web build && grep -rn "shadow-lg\|shadow-md" apps/web/components apps/web/app --include='*.tsx'`
 Expected: build PASS; grep finds nothing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/web/app/globals.css apps/web/components/ui/dialog.tsx apps/web/components/ui/dropdown-menu.tsx
@@ -317,7 +321,7 @@ git commit -m "feat(web): add elevation tokens, route overlay shadows through th
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Full verification**
+- [x] **Step 1: Full verification**
 
 ```bash
 pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build
@@ -325,7 +329,7 @@ pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnp
 
 Expected: all PASS.
 
-- [ ] **Step 2: Grep gate**
+- [x] **Step 2: Grep gate**
 
 ```bash
 grep -rnE "text-(red|green|blue|yellow|orange|gray|slate|zinc)-[0-9]|#[0-9a-fA-F]{3,8}\b" apps/web/components apps/web/app --include='*.tsx'
@@ -333,7 +337,7 @@ grep -rnE "text-(red|green|blue|yellow|orange|gray|slate|zinc)-[0-9]|#[0-9a-fA-F
 
 Expected: no matches in files this layer touched (auth files still match until Layer 3).
 
-- [ ] **Step 3: Push and open the PR**
+- [x] **Step 3: Push and open the PR**
 
 ```bash
 git push -u origin feat/design-primitives
@@ -359,7 +363,7 @@ EOF
 
 - Produces: `Topbar({ title, leading?, actions? })` — `title: string` renders as the route's single `h1`; consumed by Task 8.
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 ```tsx
 export function Topbar({
@@ -383,7 +387,7 @@ export function Topbar({
 
 (`text-title` = 16/24/600 from Task 1 — `title-lg` is for panel titles on taller surfaces; the 48px bar takes the 16px step.)
 
-- [ ] **Step 2: Verify and commit**
+- [x] **Step 2: Verify and commit**
 
 Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS.
 
@@ -404,7 +408,7 @@ git commit -m "feat(web): add shared 48px sticky topbar"
 - Consumes: `Topbar` (Task 7).
 - Produces: every `(app)` route renders exactly one `Topbar` with the route's `h1`; the shell no longer injects padding.
 
-- [ ] **Step 1: Board view**
+- [x] **Step 1: Board view**
 
 In `board-view.tsx`, replace the `<header>…</header>` block (lines 182–204) with a `Topbar` usage — same children, new frame:
 
@@ -440,7 +444,7 @@ In `board-view.tsx`, replace the `<header>…</header>` block (lines 182–204) 
 
 Also apply `Topbar` to the loading branch (lines 156–159): replace the skeleton header `<div>` with `<div className="flex h-[var(--topbar-height)] items-center border-b border-border px-3"><Skeleton className="h-5 w-40" /></div>` unchanged — the loading state keeps its plain frame (a `Topbar` needs a real title).
 
-- [ ] **Step 2: Dashboard**
+- [x] **Step 2: Dashboard**
 
 `app/(app)/dashboard/page.tsx` becomes:
 
@@ -479,7 +483,7 @@ In `board-list.tsx` (lines 100–111), the `Topbar` now owns the route's `h1`, s
 
 (`listTitle` stays in `en.json`; it is still unused only if nothing references it — leave the key, `dashboard.title` covers the heading.)
 
-- [ ] **Step 3: Shell**
+- [x] **Step 3: Shell**
 
 In `app-shell.tsx`, replace
 
@@ -495,16 +499,16 @@ with
 
 and remove the now-unused `isBoardRoute`, `usePathname`, and `cn` imports if nothing else uses them.
 
-- [ ] **Step 4: Workspaces/new page**
+- [x] **Step 4: Workspaces/new page**
 
 `app/(app)/workspaces/new/page.tsx` previously relied on the shell's `p-6`. Change its root `<main>` className from `"mx-auto flex max-w-md flex-col gap-4"` to `"mx-auto flex w-full max-w-md flex-col gap-4 p-6"` (max-w-md is within design.md §4's 720px form ceiling; the token cleanup of this file happens in Task 14 Step 5).
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build`
 Expected: PASS. Manual: dashboard and board both show one 48px sticky topbar; workspaces/new is padded.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/web/components/board/board-view.tsx apps/web/app/\(app\)/dashboard/page.tsx apps/web/components/board/board-list.tsx apps/web/components/layout/app-shell.tsx apps/web/app/\(app\)/workspaces/new/page.tsx
@@ -523,7 +527,7 @@ git commit -m "feat(web): adopt shared topbar on board and dashboard routes"
 - Consumes: `useWorkspaceContext()` — `workspaces: WorkspaceDto[]`, `activeId: string`, `onSwitch(id): Promise<void>`.
 - Produces: `WorkspaceSwitcher({ collapsed: boolean })`, rendered pinned at the sidebar top in both expanded and collapsed states.
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 ```tsx
 'use client';
@@ -596,11 +600,11 @@ export function WorkspaceSwitcher({
 }
 ```
 
-- [ ] **Step 2: Add the string**
+- [x] **Step 2: Add the string**
 
 In `messages/en.json` under `app.shell`, add: `"switchWorkspace": "Switch workspace"`.
 
-- [ ] **Step 3: Wire into the sidebar**
+- [x] **Step 3: Wire into the sidebar**
 
 In `app-sidebar.tsx`:
 
@@ -609,12 +613,12 @@ In `app-sidebar.tsx`:
 - Delete the "New workspace" `<Link>` from the nav (lines 104–111) — it now lives in the switcher menu.
 - Drop the now-unused `onSwitch` destructuring if the sidebar no longer references it.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
 Expected: PASS. Manual: switcher opens in both sidebar widths; active workspace shows a check; "New workspace" navigates.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/components/layout/workspace-switcher.tsx apps/web/components/layout/app-sidebar.tsx apps/web/messages/en.json
@@ -632,7 +636,7 @@ git commit -m "feat(web): replace native select with workspace switcher dropdown
 
 - Produces: `useSancakRail(containerRef, deps)` returning `{ top, height } | null` measured from the element marked `data-rail-active="true"`, and `SancakRail({ box })` rendering the 2px copper rule. Phase 4 reuses both for focused columns / selected cards.
 
-- [ ] **Step 1: Create hook and component**
+- [x] **Step 1: Create hook and component**
 
 ```tsx
 'use client';
@@ -682,7 +686,7 @@ export function SancakRail({
 
 (Under reduced motion the Task 2 rule strips the transform transition — the rail jumps, per spec.)
 
-- [ ] **Step 2: Wire into the sidebar nav**
+- [x] **Step 2: Wire into the sidebar nav**
 
 In `app-sidebar.tsx`:
 
@@ -696,12 +700,12 @@ const railBox = useSancakRail(navRef, [pathname, collapsed]);
 - On the dashboard `<Link>`, add `data-rail-active={dashboardActive || undefined}` and **delete** the per-item static rail `<span>` (the `absolute … bg-signature` element).
 - Add `useRef` to the React import.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
 Expected: PASS (the exhaustive-deps disable comment is required for zero warnings). Manual: rail sits beside the active item and repositions when the sidebar collapses.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/web/components/layout/sancak-rail.tsx apps/web/components/layout/app-sidebar.tsx
@@ -714,7 +718,7 @@ git commit -m "feat(web): sliding sancak rail for the sidebar nav"
 
 - Modify: `apps/web/components/layout/app-shell.tsx:21-27`
 
-- [ ] **Step 1: Replace the centered text**
+- [x] **Step 1: Replace the centered text**
 
 Replace the loading branch with a skeleton that matches the final layout (sidebar strip + topbar + card grid), keeping the string for screen readers:
 
@@ -745,7 +749,7 @@ if (sessionPending || !hasSession || !bootstrapped) {
 
 Add `import { Skeleton } from '@/components/ui/skeleton';`.
 
-- [ ] **Step 2: Verify and commit**
+- [x] **Step 2: Verify and commit**
 
 Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS.
 
@@ -758,9 +762,9 @@ git commit -m "feat(web): shell loading skeleton matching final layout"
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Full verification** — same three commands as Task 6, all PASS.
-- [ ] **Step 2: Manual pass** — both themes: topbar on dashboard + board, switcher in rail mode, rail slide, shell skeleton (throttle network to see it).
-- [ ] **Step 3: PR**
+- [x] **Step 1: Full verification** — same three commands as Task 6, all PASS.
+- [x] **Step 2: Manual pass** — both themes: topbar on dashboard + board, switcher in rail mode, rail slide, shell skeleton (throttle network to see it).
+- [x] **Step 3: PR**
 
 ```bash
 git push -u origin feat/shell-chrome
@@ -786,7 +790,7 @@ EOF
 
 - Produces: same props as today (`label, type?, value, onChange, autoComplete?, required?, minLength?`) — call sites in login/register need no changes.
 
-- [ ] **Step 1: Rewrite on Input + Label**
+- [x] **Step 1: Rewrite on Input + Label**
 
 ```tsx
 'use client';
@@ -831,7 +835,7 @@ export function AuthFormField({
 }
 ```
 
-- [ ] **Step 2: Verify and commit**
+- [x] **Step 2: Verify and commit**
 
 Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS.
 
@@ -852,7 +856,7 @@ git commit -m "refactor(web): AuthFormField on ui Input and Label"
 
 - Consumes: `DamgaMark` (Task 3), `Button` variants, type-scale utilities (Task 1).
 
-- [ ] **Step 1: Shared auth frame**
+- [x] **Step 1: Shared auth frame**
 
 Create `apps/web/app/(auth)/layout.tsx`:
 
@@ -871,7 +875,7 @@ export default function AuthLayout({
 }
 ```
 
-- [ ] **Step 2: Login page**
+- [x] **Step 2: Login page**
 
 In `login/page.tsx`, the page returns a fragment (the layout owns `<main>`):
 
@@ -916,11 +920,11 @@ return (
 
 Add `import { Button } from '@/components/ui/button';`. Logic (state, `onSubmit`) is unchanged.
 
-- [ ] **Step 3: Register page**
+- [x] **Step 3: Register page**
 
 Same transformation as Step 2 applied to `register/page.tsx`: fragment root, `font-display text-display tracking-tight` `h1`, `text-body text-muted-foreground` subtitle and footer, `text-body text-destructive` error, submit as `<Button type="submit" disabled={pending}>{t('submit')}</Button>`, footer link classes `text-signature underline underline-offset-4`. The three `AuthFormField`s and all logic stay as-is.
 
-- [ ] **Step 4: Invite page**
+- [x] **Step 4: Invite page**
 
 In `invite/[invitationId]/page.tsx`, all three returns become fragments (layout owns the frame):
 
@@ -932,7 +936,7 @@ In `invite/[invitationId]/page.tsx`, all three returns become fragments (layout 
 
 Add the `Button` import; remove every `text-[var(--color-…)]` and `bg-[var(--color-…)]` class from this file.
 
-- [ ] **Step 5: Workspace create form**
+- [x] **Step 5: Workspace create form**
 
 `app/(app)/workspaces/new/page.tsx` carries the same non-token styling (raw `<label>`/`<input>`/`<button>`, `text-red-600`, `text-[var(--color-…)]`). It renders inside the app shell, so it gets **no** Fraunces or damga — only the primitive swap:
 
@@ -963,7 +967,7 @@ Add the `Button` import; remove every `text-[var(--color-…)]` and `bg-[var(--c
 - `h1` className becomes `text-title-lg tracking-tight`; subtitle `text-body text-muted-foreground`; error `text-body text-destructive`.
 - The raw submit `<button>` becomes `<Button type="submit" disabled={pending}>{t('submit')}</Button>` (import `Button`).
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 ```bash
 pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && \
@@ -972,7 +976,7 @@ grep -rnE "text-red-|text-\[var\(|bg-\[var\(--color" "apps/web/app/(auth)" apps/
 
 Expected: lint/typecheck PASS; grep finds nothing.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add "apps/web/app/(auth)" apps/web/components/auth "apps/web/app/(app)/workspaces/new/page.tsx"
@@ -983,9 +987,9 @@ git commit -m "feat(web): auth and workspace forms on the identity system"
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Build** — `pnpm --filter @kurultay/web build`, PASS.
-- [ ] **Step 2: Manual pass** — login, register, invite in both themes; keyboard-only submit; exactly one copper element per screen (the primary button; the damga and the footer link are the sanctioned exceptions per design.md §2).
-- [ ] **Step 3: PR**
+- [x] **Step 1: Build** — `pnpm --filter @kurultay/web build`, PASS.
+- [x] **Step 2: Manual pass** — login, register, invite in both themes; keyboard-only submit; exactly one copper element per screen (the primary button; the damga and the footer link are the sanctioned exceptions per design.md §2).
+- [x] **Step 3: PR**
 
 ```bash
 git push -u origin feat/auth-visual
@@ -1011,7 +1015,7 @@ EOF
 
 - Produces: `BoardColumn` accepts optional `className?: string` and `style?: React.CSSProperties`, merged onto its root `<section>`.
 
-- [ ] **Step 1: Keyframes**
+- [x] **Step 1: Keyframes**
 
 At the end of `globals.css` add:
 
@@ -1049,7 +1053,7 @@ At the end of `globals.css` add:
 }
 ```
 
-- [ ] **Step 2: BoardColumn accepts className/style**
+- [x] **Step 2: BoardColumn accepts className/style**
 
 In `board-column.tsx`, add to the props interface:
 
@@ -1060,7 +1064,7 @@ style?: React.CSSProperties;
 
 and on the root `<section>`: `className={cn('flex w-[var(--column-width)] … bg-muted/60', className)}` with `style={style}` (add the `cn` import).
 
-- [ ] **Step 3: Gate to first paint in BoardView**
+- [x] **Step 3: Gate to first paint in BoardView**
 
 In `board-view.tsx`:
 
@@ -1083,7 +1087,7 @@ style={entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProp
 
 Columns created after the first paint mount with `entranceDone === true` and get no animation — this is the view's one orchestrated moment (design.md §5).
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS. Manual: columns cascade in once on load; adding a column later does not re-animate.
 
@@ -1099,7 +1103,7 @@ git commit -m "feat(web): stagger columns on first board paint"
 
 - Modify: `apps/web/components/board/board-list.tsx:85-93,125-138`
 
-- [ ] **Step 1: Card hover and focus**
+- [x] **Step 1: Card hover and focus**
 
 On the `<li>` (line 127–130) extend the className:
 
@@ -1110,11 +1114,11 @@ className =
 
 (The global `:focus-visible` ring already covers keyboard focus on the inner link; `transition-colors` reduces to nothing under reduced motion via Task 2 — color transitions are the kept kind, so it simply stays.)
 
-- [ ] **Step 2: Skeleton fidelity**
+- [x] **Step 2: Skeleton fidelity**
 
 Replace the loading grid's `<Skeleton className="h-24 w-full" />` with `<Skeleton className="h-[88px] w-full rounded-[var(--radius-lg)]" />` — real card height and radius.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 Run: `pnpm --filter @kurultay/web lint` — expected PASS.
 
@@ -1133,11 +1137,11 @@ git commit -m "feat(web): board card hover and focus states, truer skeletons"
 
 - Consumes: `toast` from `'sonner'` (Task 4).
 
-- [ ] **Step 1: Add the retry string**
+- [x] **Step 1: Add the retry string**
 
 In `en.json` under `app.board.column`, add: `"retryAction": "Try again"`.
 
-- [ ] **Step 2: Replace inline action errors**
+- [x] **Step 2: Replace inline action errors**
 
 In `board-view.tsx`:
 
@@ -1162,12 +1166,12 @@ In `board-view.tsx`:
 
 - In `seedDefaults`'s catch, same shape: `403` → plain `toast.error(t('errors.forbiddenColumns'))` (permissions do not change on retry); otherwise `toast.error(t('column.defaultsError'), { action: { label: t('column.retryAction'), onClick: () => void seedDefaults() } })`.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
 Expected: PASS, no unused-variable warnings from the removed state.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/web/components/board/board-view.tsx apps/web/messages/en.json
@@ -1178,7 +1182,7 @@ git commit -m "feat(web): surface column action failures as toasts with retry"
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Full verification**
+- [x] **Step 1: Full verification**
 
 ```bash
 pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build
@@ -1186,7 +1190,7 @@ pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnp
 
 Expected: all PASS.
 
-- [ ] **Step 2: Repo-wide grep gate (now must be clean everywhere)**
+- [x] **Step 2: Repo-wide grep gate (now must be clean everywhere)**
 
 ```bash
 grep -rnE "text-(red|green|blue|yellow|orange|gray|slate|zinc)-[0-9]|-\[var\(--color" apps/web/components apps/web/app --include='*.tsx'
@@ -1194,9 +1198,9 @@ grep -rnE "text-(red|green|blue|yellow|orange|gray|slate|zinc)-[0-9]|-\[var\(--c
 
 Expected: no matches.
 
-- [ ] **Step 3: Manual pass** — both themes: stagger, card hover, toast with working retry (kill the API to trigger one), keyboard tour of dashboard + board.
+- [x] **Step 3: Manual pass** — both themes: stagger, card hover, toast with working retry (kill the API to trigger one), keyboard tour of dashboard + board.
 
-- [ ] **Step 4: PR**
+- [x] **Step 4: PR**
 
 ```bash
 git push -u origin feat/board-polish

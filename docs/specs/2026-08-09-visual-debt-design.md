@@ -1,10 +1,14 @@
 # Visual debt and Phase 4 groundwork — design
 
-**Date:** 2026-08-09 · **Status:** approved · **Scope:** `apps/web`
+**Date:** 2026-08-09 · **Status:** shipped · **Scope:** `apps/web`
 
 Closes the gaps between the Phase 3 UI and [design.md](../design.md), and lays the visual
 groundwork Phase 4 (tasks and drag-and-drop) will build on. Phase 4's own UI — task cards,
 the detail panel, drag interactions — is out of scope and belongs to the Phase 4 plan.
+
+> **Shipped** to `develop` via PRs #11 (primitives), #15 (shell chrome), #13 (auth),
+> #14 (board polish). Implementation checklist:
+> [plans/2026-08-09-visual-debt.md](../plans/2026-08-09-visual-debt.md).
 
 ## Context
 
