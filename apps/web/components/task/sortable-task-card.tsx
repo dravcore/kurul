@@ -1,6 +1,8 @@
 'use client';
 
 import { memo } from 'react';
+import { GripVertical } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { TaskDto } from '@kurultay/shared-types';
@@ -22,10 +24,20 @@ export const SortableTaskCard = memo(function SortableTaskCard({
   selected = false,
   disabled = false,
 }: SortableTaskCardProps): React.ReactElement {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const t = useTranslations('app.board.task');
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: task.id,
     data: { type: 'task', task },
     disabled,
+    attributes: { roleDescription: t('dnd.roleDescription') },
   });
 
   return (
@@ -35,16 +47,28 @@ export const SortableTaskCard = memo(function SortableTaskCard({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={cn(isDragging && 'opacity-40')}
-      {...attributes}
+      className={cn('relative', isDragging && 'opacity-40')}
+      // Pointer drags start anywhere on the card, but the keyboard sensor only reacts when
+      // the event comes from the activator below — so Enter on the link still opens the task.
       {...listeners}
     >
       <TaskCard
         task={task}
         boardId={boardId}
         selected={selected}
-        className={cn(isDragging && 'shadow-drag')}
+        className={cn('pr-8', isDragging && 'shadow-drag')}
       />
+      {disabled ? null : (
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          aria-label={t('dragHandle', { title: task.title })}
+          className="absolute top-1.5 right-1.5 flex size-6 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          {...attributes}
+        >
+          <GripVertical className="size-3.5" aria-hidden />
+        </button>
+      )}
     </div>
   );
 });

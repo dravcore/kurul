@@ -6,8 +6,9 @@ import type {
   DashboardCountByPriority,
   DashboardSummaryDto,
 } from '@kurultay/shared-types';
-import type { Prisma } from '../generated/prisma';
+import { Prisma } from '../generated/prisma';
 import { assertBoard } from '../common/board-access';
+import { DONE_COLUMN_NAME_NORMALIZED, doneColumnNameFilter } from '../common/board-defaults';
 import { PrismaService } from '../prisma/prisma.service';
 import type { DashboardQueryDto } from './dto/dashboard-query.dto';
 import {
@@ -20,6 +21,17 @@ const ALL_PRIORITIES = Object.values(Priority);
 const ASSIGNEE_TOP_N = 8;
 
 type DayCountRow = { day: Date; count: number | bigint };
+
+/**
+ * One row per UTC day. `date_trunc` is applied to the timestamp cast into UTC so the
+ * bucket boundaries match the `YYYY-MM-DD` keys the throughput series is built from,
+ * whatever the server's local zone happens to be.
+ */
+const DAY_COUNT_SELECT = Prisma.sql`
+  SELECT date_trunc('day', a."createdAt" AT TIME ZONE 'UTC') AS day,
+         COUNT(*)::int AS count
+  FROM "Activity" a
+`;
 
 @Injectable()
 export class DashboardService {
@@ -43,7 +55,7 @@ export class DashboardService {
       where: {
         board: { workspaceId },
         ...(query.boardId ? { boardId: query.boardId } : {}),
-        name: { equals: 'Done', mode: 'insensitive' },
+        name: doneColumnNameFilter,
       },
       select: { id: true },
     });
@@ -138,72 +150,58 @@ export class DashboardService {
     };
   }
 
-  private async countActivitiesByDay(
+  /**
+   * Day buckets for one activity type, optionally narrowed to a single board.
+   *
+   * The board filter needs the `Task` join, so it is the join and the predicate that vary
+   * together — everything else is shared, which is why both callers go through here rather
+   * than each carrying a with-board and a without-board copy of the same query.
+   */
+  private countActivitiesByDay(
     workspaceId: string,
     type: string,
     since: Date,
-    boardId?: string,
+    boardId: string | undefined,
+    extraFilter: Prisma.Sql = Prisma.empty,
   ): Promise<DayCountRow[]> {
-    if (boardId) {
-      return this.prisma.$queryRaw<DayCountRow[]>`
-        SELECT date_trunc('day', a."createdAt" AT TIME ZONE 'UTC') AS day,
-               COUNT(*)::int AS count
-        FROM "Activity" a
-        INNER JOIN "Task" t ON t."id" = a."taskId"
-        WHERE a."workspaceId" = ${workspaceId}
-          AND a."type" = ${type}
-          AND a."createdAt" >= ${since}
-          AND t."boardId" = ${boardId}
-        GROUP BY 1
-      `;
-    }
+    const boardJoin = boardId
+      ? Prisma.sql`INNER JOIN "Task" t ON t."id" = a."taskId"`
+      : Prisma.empty;
+    const boardFilter = boardId ? Prisma.sql`AND t."boardId" = ${boardId}` : Prisma.empty;
+
     return this.prisma.$queryRaw<DayCountRow[]>`
-      SELECT date_trunc('day', "createdAt" AT TIME ZONE 'UTC') AS day,
-             COUNT(*)::int AS count
-      FROM "Activity"
-      WHERE "workspaceId" = ${workspaceId}
-        AND "type" = ${type}
-        AND "createdAt" >= ${since}
+      ${DAY_COUNT_SELECT}
+      ${boardJoin}
+      WHERE a."workspaceId" = ${workspaceId}
+        AND a."type" = ${type}
+        AND a."createdAt" >= ${since}
+        ${boardFilter}
+        ${extraFilter}
       GROUP BY 1
     `;
   }
 
-  private async countCompletedMovesByDay(
+  /**
+   * A task counts as completed when it was moved into a Done column. The recorded column
+   * id is checked first, with the recorded column *name* as a fallback so moves into a
+   * column that has since been deleted or renamed still show up in history.
+   */
+  private countCompletedMovesByDay(
     workspaceId: string,
     since: Date,
     doneColumnIds: string[],
     boardId?: string,
   ): Promise<DayCountRow[]> {
-    if (boardId) {
-      return this.prisma.$queryRaw<DayCountRow[]>`
-        SELECT date_trunc('day', a."createdAt" AT TIME ZONE 'UTC') AS day,
-               COUNT(*)::int AS count
-        FROM "Activity" a
-        INNER JOIN "Task" t ON t."id" = a."taskId"
-        WHERE a."workspaceId" = ${workspaceId}
-          AND a."type" = ${ActivityType.TaskMoved}
-          AND a."createdAt" >= ${since}
-          AND t."boardId" = ${boardId}
-          AND (
-            lower(trim(both from COALESCE(a."payload"->>'toColumnName', ''))) = 'done'
-            OR a."payload"->>'toColumnId' = ANY(${doneColumnIds})
-          )
-        GROUP BY 1
-      `;
-    }
-    return this.prisma.$queryRaw<DayCountRow[]>`
-      SELECT date_trunc('day', "createdAt" AT TIME ZONE 'UTC') AS day,
-             COUNT(*)::int AS count
-      FROM "Activity"
-      WHERE "workspaceId" = ${workspaceId}
-        AND "type" = ${ActivityType.TaskMoved}
-        AND "createdAt" >= ${since}
-        AND (
-          lower(trim(both from COALESCE("payload"->>'toColumnName', ''))) = 'done'
-          OR "payload"->>'toColumnId' = ANY(${doneColumnIds})
-        )
-      GROUP BY 1
-    `;
+    return this.countActivitiesByDay(
+      workspaceId,
+      ActivityType.TaskMoved,
+      since,
+      boardId,
+      Prisma.sql`AND (
+        lower(trim(both from COALESCE(a."payload"->>'toColumnName', ''))) = ${DONE_COLUMN_NAME_NORMALIZED}
+        OR a."payload"->>'toColumnId' = ANY(${doneColumnIds})
+      )`,
+    );
   }
 
   private async buildAssigneeBuckets(

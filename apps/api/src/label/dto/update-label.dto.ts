@@ -1,17 +1,15 @@
 import { LabelColorSlot } from '@kurultay/shared-types';
-import { IsEnum, IsNotEmpty, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsEnum, IsString, MaxLength, MinLength } from 'class-validator';
+import { OptionalNonNullable } from '../../common/validation/optional';
 
 export class UpdateLabelDto {
-  /** Omitted = leave unchanged; explicit null is rejected (non-nullable column). */
-  @ValidateIf((_, value) => value !== undefined)
-  @IsNotEmpty()
+  @OptionalNonNullable()
   @IsString()
   @MinLength(1)
   @MaxLength(50)
   name?: string;
 
-  @ValidateIf((_, value) => value !== undefined)
-  @IsNotEmpty()
+  @OptionalNonNullable()
   @IsEnum(LabelColorSlot)
   color?: LabelColorSlot;
 }

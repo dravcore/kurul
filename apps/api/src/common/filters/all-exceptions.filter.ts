@@ -9,6 +9,7 @@ import {
 import type { Request, Response } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { Prisma } from '../../generated/prisma';
+import { isProductionEnv } from '../env';
 import type { ValidationDetail } from '../validation/validation-exception.factory';
 
 interface ProblemDetails {
@@ -149,13 +150,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = mapped.message;
       } else {
         this.logger.error(prismaError.message, prismaError.stack);
-        if (process.env.NODE_ENV !== 'production') {
+        if (!isProductionEnv()) {
           message = prismaError.message;
         }
       }
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);
-      if (process.env.NODE_ENV !== 'production') {
+      if (!isProductionEnv()) {
         message = exception.message;
       }
     } else {
@@ -163,7 +164,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // this branch a `throw 'boom'` becomes a completely silent 500.
       const described = describe(exception);
       this.logger.error(`Non-Error exception thrown: ${described}`);
-      if (process.env.NODE_ENV !== 'production') {
+      if (!isProductionEnv()) {
         message = described;
       }
     }

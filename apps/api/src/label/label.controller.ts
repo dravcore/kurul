@@ -1,20 +1,11 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Patch,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post } from '@nestjs/common';
 import type { LabelDto } from '@kurultay/shared-types';
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { WorkspaceGuard } from '../common/guards/workspace.guard';
-import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
+import { UuidParam } from '../common/decorators/uuid-param.decorator';
+import {
+  ADMIN_ROLES,
+  WorkspaceRoles,
+  WorkspaceScoped,
+} from '../common/decorators/workspace-roles.decorator';
 import { CreateLabelDto } from './dto/create-label.dto';
 import { UpdateLabelDto } from './dto/update-label.dto';
 import { LabelService } from './label.service';
@@ -24,31 +15,29 @@ export class LabelController {
   constructor(private readonly labelService: LabelService) {}
 
   @Get('boards/:boardId/labels')
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   list(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('boardId', ParseUuidV7Pipe) boardId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('boardId') boardId: string,
   ): Promise<LabelDto[]> {
     return this.labelService.list(workspaceId, boardId);
   }
 
   @Post('boards/:boardId/labels')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   create(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('boardId', ParseUuidV7Pipe) boardId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('boardId') boardId: string,
     @Body() dto: CreateLabelDto,
   ): Promise<LabelDto> {
     return this.labelService.create(workspaceId, boardId, dto);
   }
 
   @Patch('labels/:labelId')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   update(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('labelId', ParseUuidV7Pipe) labelId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('labelId') labelId: string,
     @Body() dto: UpdateLabelDto,
   ): Promise<LabelDto> {
     return this.labelService.update(workspaceId, labelId, dto);
@@ -56,11 +45,10 @@ export class LabelController {
 
   @Delete('labels/:labelId')
   @HttpCode(204)
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   async remove(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('labelId', ParseUuidV7Pipe) labelId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('labelId') labelId: string,
   ): Promise<void> {
     await this.labelService.remove(workspaceId, labelId);
   }

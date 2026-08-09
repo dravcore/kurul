@@ -1,7 +1,7 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import type { ActivityDto, CursorPage } from '@kurultay/shared-types';
-import { WorkspaceGuard } from '../common/guards/workspace.guard';
-import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
+import { UuidParam } from '../common/decorators/uuid-param.decorator';
+import { WorkspaceScoped } from '../common/decorators/workspace-roles.decorator';
 import { ActivityQueryDto } from './dto/activity-query.dto';
 import { ActivityService } from './activity.service';
 
@@ -11,19 +11,19 @@ export class ActivityController {
   constructor(private readonly activityService: ActivityService) {}
 
   @Get('activities')
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   listWorkspace(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @UuidParam('workspaceId') workspaceId: string,
     @Query() query: ActivityQueryDto,
   ): Promise<CursorPage<ActivityDto>> {
     return this.activityService.listWorkspace(workspaceId, query);
   }
 
   @Get('tasks/:taskId/activities')
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   listForTask(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
     @Query() query: ActivityQueryDto,
   ): Promise<CursorPage<ActivityDto>> {
     return this.activityService.listForTask(workspaceId, taskId, query);

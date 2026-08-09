@@ -1,12 +1,12 @@
-import { Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import type {
   CursorPage,
   NotificationDto,
   NotificationUnreadCountDto,
 } from '@kurultay/shared-types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { WorkspaceGuard } from '../common/guards/workspace.guard';
-import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
+import { UuidParam } from '../common/decorators/uuid-param.decorator';
+import { WorkspaceScoped } from '../common/decorators/workspace-roles.decorator';
 import type { AuthenticatedUser } from '../common/types/request-context';
 import { NotificationQueryDto } from './dto/notification-query.dto';
 import { NotificationService } from './notification.service';
@@ -17,9 +17,9 @@ export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @Get()
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   list(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: NotificationQueryDto,
   ): Promise<CursorPage<NotificationDto>> {
@@ -27,9 +27,9 @@ export class NotificationController {
   }
 
   @Get('unread-count')
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   unreadCount(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<NotificationUnreadCountDto> {
     return this.notificationService.unreadCount(workspaceId, user.id);
@@ -37,9 +37,9 @@ export class NotificationController {
 
   @Post('read-all')
   @HttpCode(200)
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   markAllRead(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<{ updated: number }> {
     return this.notificationService.markAllRead(workspaceId, user.id);
@@ -47,10 +47,10 @@ export class NotificationController {
 
   @Post(':notificationId/read')
   @HttpCode(200)
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   markRead(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('notificationId', ParseUuidV7Pipe) notificationId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('notificationId') notificationId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<NotificationDto> {
     return this.notificationService.markRead(workspaceId, user.id, notificationId);

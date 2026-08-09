@@ -1,22 +1,13 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { Body, Controller, Delete, Get, HttpCode, Post, Query } from '@nestjs/common';
 import type { CommentDto, CursorPage } from '@kurultay/shared-types';
 import { CurrentMembership } from '../common/decorators/current-membership.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { WorkspaceGuard } from '../common/guards/workspace.guard';
-import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
+import { UuidParam } from '../common/decorators/uuid-param.decorator';
+import {
+  CONTENT_ROLES,
+  WorkspaceRoles,
+  WorkspaceScoped,
+} from '../common/decorators/workspace-roles.decorator';
 import type { AuthenticatedUser, WorkspaceMembership } from '../common/types/request-context';
 import { CommentQueryDto } from './dto/comment-query.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
@@ -27,21 +18,20 @@ export class CommentController {
   constructor(private readonly commentService: CommentService) {}
 
   @Get('tasks/:taskId/comments')
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   list(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
     @Query() query: CommentQueryDto,
   ): Promise<CursorPage<CommentDto>> {
     return this.commentService.list(workspaceId, taskId, query);
   }
 
   @Post('tasks/:taskId/comments')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   create(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateCommentDto,
   ): Promise<CommentDto> {
@@ -50,11 +40,10 @@ export class CommentController {
 
   @Delete('comments/:commentId')
   @HttpCode(204)
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   async remove(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('commentId', ParseUuidV7Pipe) commentId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('commentId') commentId: string,
     @CurrentUser() user: AuthenticatedUser,
     @CurrentMembership() membership: WorkspaceMembership,
   ): Promise<void> {

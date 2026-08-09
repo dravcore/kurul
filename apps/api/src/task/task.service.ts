@@ -9,7 +9,7 @@ import type { CursorPage, TaskDto } from '@kurultay/shared-types';
 import type { Prisma } from '../generated/prisma';
 import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
-import { resolveMoveNeighbors } from '../common/position/apply-insertion';
+import { resolveCreateNeighbors, resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { batchUpdateTaskPositions } from '../common/position/rebalance-sql';
 import { PrismaService } from '../prisma/prisma.service';
@@ -20,6 +20,7 @@ import type { CreateTaskDto } from './dto/create-task.dto';
 import type { MoveTaskDto } from './dto/move-task.dto';
 import type { TaskQueryDto } from './dto/task-query.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
+import { createTaskAttributes, planTaskUpdate } from './task-fields';
 import { TaskAssigneeService } from './task-assignee.service';
 import { taskInclude, type TaskWithRelations } from './task.include';
 import { TaskLabelService } from './task-label.service';
@@ -136,49 +137,41 @@ export class TaskService {
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
     });
 
-    const after = dto.afterTaskId
-      ? siblings.find((task) => task.id === dto.afterTaskId)
-      : siblings.at(-1);
-    if (dto.afterTaskId && !after) throw new NotFoundException('Task not found');
-
-    const afterIndex = after ? siblings.indexOf(after) : -1;
-    const before = after ? siblings[afterIndex + 1] : siblings[0];
-    const beforePos = after?.position ?? null;
-    const afterPos = before?.position ?? null;
+    const { insertionIndex, before, after } = resolveCreateNeighbors(
+      siblings,
+      dto.afterTaskId,
+      'Task not found',
+    );
+    const beforePos = before?.position ?? null;
+    const afterPos = after?.position ?? null;
+    const attributes = createTaskAttributes(dto);
 
     const result = await this.prisma.$transaction(async (tx) => {
-      let created: Omit<TaskWithRelations, 'assignees' | 'labels'>;
+      let position: number;
 
       if (needsRebalance(beforePos, afterPos)) {
+        // The gap is too small to split, so the whole column is respread and the new task
+        // takes the slot the siblings were shifted around.
         const positions = rebalancePositions(siblings.length + 1);
-        const insertionIndex = after ? afterIndex + 1 : 0;
         const updates = siblings.map((task, index) => ({
           id: task.id,
           position: positions[index < insertionIndex ? index : index + 1]!,
         }));
         await batchUpdateTaskPositions(tx, column.id, updates);
-        created = await tx.task.create({
-          data: {
-            boardId,
-            columnId: column.id,
-            title: dto.title,
-            description: dto.description ?? null,
-            position: positions[insertionIndex]!,
-            createdById: userId,
-          },
-        });
+        position = positions[insertionIndex]!;
       } else {
-        created = await tx.task.create({
-          data: {
-            boardId,
-            columnId: column.id,
-            title: dto.title,
-            description: dto.description ?? null,
-            position: midpoint(beforePos, afterPos),
-            createdById: userId,
-          },
-        });
+        position = midpoint(beforePos, afterPos);
       }
+
+      const created: Omit<TaskWithRelations, 'assignees' | 'labels'> = await tx.task.create({
+        data: {
+          boardId,
+          columnId: column.id,
+          ...attributes,
+          position,
+          createdById: userId,
+        },
+      });
 
       await this.activityService.record(tx, {
         workspaceId,
@@ -215,38 +208,12 @@ export class TaskService {
     dto: UpdateTaskDto,
   ): Promise<TaskDto> {
     const existing = await findTask(this.prisma, workspaceId, taskId);
-
-    let dueDate: Date | null | undefined;
-    if (dto.dueDate !== undefined) {
-      if (dto.dueDate === null) {
-        dueDate = null;
-      } else {
-        const due = new Date(dto.dueDate);
-        if (Number.isNaN(due.getTime())) {
-          throw new BadRequestException('dueDate must be a valid ISO 8601 timestamp');
-        }
-        dueDate = due;
-      }
-    }
-
-    const changes: Record<string, unknown> = {};
-    if (dto.title !== undefined && dto.title !== existing.title) changes.title = dto.title;
-    if (dto.description !== undefined && dto.description !== existing.description) {
-      changes.description = dto.description;
-    }
-    if (dto.priority !== undefined && dto.priority !== existing.priority) {
-      changes.priority = dto.priority;
-    }
-    if (dueDate !== undefined) {
-      const prev = existing.dueDate?.toISOString() ?? null;
-      const next = dueDate?.toISOString() ?? null;
-      if (prev !== next) changes.dueDate = next;
-    }
-    if (dto.estimatedMinutes !== undefined && dto.estimatedMinutes !== existing.estimatedMinutes) {
-      changes.estimatedMinutes = dto.estimatedMinutes;
-    }
+    const { data, changes } = planTaskUpdate(existing, dto);
+    const changed = Object.keys(changes).length > 0;
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Re-read inside the transaction: the row could have been deleted, or moved out of
+      // the workspace, between the read above and the write.
       const scoped = await tx.task.findFirst({
         where: { id: taskId, board: { workspaceId } },
         select: { id: true },
@@ -255,17 +222,11 @@ export class TaskService {
 
       const updated = await tx.task.update({
         where: { id: taskId },
-        data: {
-          ...(dto.title !== undefined ? { title: dto.title } : {}),
-          ...(dto.description !== undefined ? { description: dto.description } : {}),
-          ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
-          ...(dueDate !== undefined ? { dueDate } : {}),
-          ...(dto.estimatedMinutes !== undefined ? { estimatedMinutes: dto.estimatedMinutes } : {}),
-        },
+        data,
         include: taskInclude,
       });
 
-      if (Object.keys(changes).length > 0) {
+      if (changed) {
         await this.activityService.record(tx, {
           workspaceId,
           taskId,
@@ -281,7 +242,7 @@ export class TaskService {
       return toTaskDto(updated);
     });
 
-    if (Object.keys(changes).length > 0) {
+    if (changed) {
       this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_UPDATED, {
         workspaceId,
         boardId: result.boardId,
