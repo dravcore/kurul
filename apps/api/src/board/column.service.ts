@@ -60,8 +60,8 @@ export class ColumnService {
         const insertionIndex = after ? afterIndex + 1 : 0;
         await Promise.all(
           columns.map((column, index) =>
-            tx.column.update({
-              where: { id: column.id },
+            tx.column.updateMany({
+              where: { id: column.id, boardId },
               data: { position: positions[index < insertionIndex ? index : index + 1]! },
             }),
           ),
@@ -145,7 +145,10 @@ export class ColumnService {
         const positions = rebalancePositions(reordered.length);
         await Promise.all(
           reordered.map((item, index) =>
-            tx.column.update({ where: { id: item.id }, data: { position: positions[index] } }),
+            tx.column.updateMany({
+              where: { id: item.id, boardId: column.boardId },
+              data: { position: positions[index]! },
+            }),
           ),
         );
         return this.toDto({ ...column, position: positions[insertionIndex]! });

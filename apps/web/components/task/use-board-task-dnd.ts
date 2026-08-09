@@ -49,8 +49,7 @@ function applyMove(
       insertionIndex = overIndex;
       if (
         moving.columnId === targetColumnId &&
-        tasks.findIndex((task) => task.id === taskId) <
-          tasks.findIndex((task) => task.id === overTaskId)
+        moving.position < columnTasks[overIndex]!.position
       ) {
         insertionIndex = overIndex + 1;
       }
@@ -77,6 +76,7 @@ export function useBoardTaskDnd(
   tasks: TaskDto[],
   canMutate: boolean,
   onMove: (payload: TaskMovePayload) => Promise<void>,
+  formatMovedAnnouncement: (title: string) => string = (title) => `Moved ${title}`,
 ): {
   sensors: ReturnType<typeof useSensors>;
   activeTask: TaskDto | null;
@@ -132,7 +132,7 @@ export function useBoardTaskDnd(
       return;
     }
 
-    setAnnouncement(`Moved ${moving.title}`);
+    setAnnouncement(formatMovedAnnouncement(moving.title));
     void onMove({
       taskId,
       columnId: targetColumnId,

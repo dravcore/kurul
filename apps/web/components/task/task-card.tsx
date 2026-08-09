@@ -15,7 +15,19 @@ interface TaskCardProps {
 }
 
 function formatDueDate(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(new Date(iso));
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(iso));
+}
+
+function utcCalendarDay(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+function todayUtcCalendarDay(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 export function TaskCard({
@@ -26,7 +38,8 @@ export function TaskCard({
 }: TaskCardProps): React.ReactElement {
   const t = useTranslations('app.board.task');
   const assigneeNames = task.assignees.map((assignee) => assignee.name).join(', ');
-  const overdue = task.dueDate !== null && new Date(task.dueDate).getTime() < Date.now();
+  const overdue =
+    task.dueDate !== null && utcCalendarDay(task.dueDate) < todayUtcCalendarDay();
 
   return (
     <Link

@@ -126,8 +126,8 @@ export class TaskService {
         const insertionIndex = after ? afterIndex + 1 : 0;
         await Promise.all(
           siblings.map((task, index) =>
-            tx.task.update({
-              where: { id: task.id },
+            tx.task.updateMany({
+              where: { id: task.id, columnId: column.id },
               data: { position: positions[index < insertionIndex ? index : index + 1]! },
             }),
           ),
@@ -165,15 +165,27 @@ export class TaskService {
 
   async update(workspaceId: string, taskId: string, dto: UpdateTaskDto): Promise<TaskDto> {
     await this.findTask(workspaceId, taskId);
+
+    let dueDate: Date | null | undefined;
+    if (dto.dueDate !== undefined) {
+      if (dto.dueDate === null) {
+        dueDate = null;
+      } else {
+        const due = new Date(dto.dueDate);
+        if (Number.isNaN(due.getTime())) {
+          throw new BadRequestException('dueDate must be a valid ISO 8601 timestamp');
+        }
+        dueDate = due;
+      }
+    }
+
     const updated = await this.prisma.task.update({
       where: { id: taskId },
       data: {
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
-        ...(dto.dueDate !== undefined
-          ? { dueDate: dto.dueDate === null ? null : new Date(dto.dueDate) }
-          : {}),
+        ...(dueDate !== undefined ? { dueDate } : {}),
         ...(dto.estimatedMinutes !== undefined ? { estimatedMinutes: dto.estimatedMinutes } : {}),
       },
       include: taskInclude,
@@ -239,15 +251,22 @@ export class TaskService {
         reordered.splice(insertionIndex, 0, { ...task, columnId: targetColumn.id });
         const positions = rebalancePositions(reordered.length);
         await Promise.all(
-          reordered.map((item, index) =>
-            tx.task.update({
-              where: { id: item.id },
-              data: {
-                position: positions[index]!,
-                ...(item.id === taskId ? { columnId: targetColumn.id } : {}),
-              },
-            }),
-          ),
+          reordered.map(async (item, index) => {
+            if (item.id === taskId) {
+              await tx.task.update({
+                where: { id: item.id },
+                data: {
+                  position: positions[index]!,
+                  columnId: targetColumn.id,
+                },
+              });
+              return;
+            }
+            await tx.task.updateMany({
+              where: { id: item.id, columnId: targetColumn.id },
+              data: { position: positions[index]! },
+            });
+          }),
         );
         return this.toDto({
           ...task,
@@ -294,11 +313,10 @@ export class TaskService {
 
   async removeAssignee(workspaceId: string, taskId: string, userId: string): Promise<TaskDto> {
     await this.findTask(workspaceId, taskId);
-    const assignment = await this.prisma.taskAssignee.findFirst({
+    const result = await this.prisma.taskAssignee.deleteMany({
       where: { taskId, userId },
     });
-    if (!assignment) throw new NotFoundException('Assignee not found');
-    await this.prisma.taskAssignee.delete({ where: { id: assignment.id } });
+    if (result.count === 0) throw new NotFoundException('Assignee not found');
     return this.toDto(await this.findTask(workspaceId, taskId));
   }
 
@@ -327,11 +345,10 @@ export class TaskService {
 
   async removeLabel(workspaceId: string, taskId: string, labelId: string): Promise<TaskDto> {
     await this.findTask(workspaceId, taskId);
-    const link = await this.prisma.taskLabel.findFirst({
+    const result = await this.prisma.taskLabel.deleteMany({
       where: { taskId, labelId },
     });
-    if (!link) throw new NotFoundException('Task label not found');
-    await this.prisma.taskLabel.delete({ where: { id: link.id } });
+    if (result.count === 0) throw new NotFoundException('Task label not found');
     return this.toDto(await this.findTask(workspaceId, taskId));
   }
 

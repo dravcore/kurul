@@ -155,6 +155,7 @@
         "saveError": "Could not save this task.",
         "missing": "This task no longer exists. Someone may have deleted it.",
         "moveError": "Could not move this task.",
+        "movedAnnouncement": "Moved {title}",
         "retryAction": "Try again",
         "cancel": "Cancel",
         "forbidden": "You need to be a workspace member to change tasks."

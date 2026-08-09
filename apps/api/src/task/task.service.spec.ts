@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -55,17 +56,20 @@ describe('TaskService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         delete: jest.fn(),
       },
       taskAssignee: {
         create: jest.fn(),
         findFirst: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
       },
       taskLabel: {
         create: jest.fn(),
         findFirst: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
       },
       label: {
         findFirst: jest.fn(),
@@ -203,6 +207,10 @@ describe('TaskService', () => {
             updates.push({ id: where.id as string, ...data });
             return Promise.resolve({ ...moving, ...data, id: where.id });
           }),
+          updateMany: jest.fn().mockImplementation(({ where, data }) => {
+            updates.push({ id: where.id as string, ...data });
+            return Promise.resolve({ count: 1 });
+          }),
         },
         column: {
           findFirst: jest.fn().mockResolvedValue({ id: COLUMN_ID, boardId: BOARD_ID }),
@@ -219,5 +227,287 @@ describe('TaskService', () => {
     expect(updates.map((row) => row.position)).toEqual([1000, 2000, 3000]);
     expect(result.position).toBe(2000);
     expect(result.columnId).toBe(COLUMN_ID);
+  });
+
+  /** Wire up the $transaction mock the way move() consumes it. */
+  function mockMoveTx(
+    prisma: ReturnType<typeof buildService>['prisma'],
+    options: {
+      task?: ReturnType<typeof taskRow> | null;
+      siblings?: Array<ReturnType<typeof taskRow>>;
+      column?: { id: string; boardId: string } | null;
+    } = {},
+  ): { updates: Array<{ id: string; position?: number; columnId?: string }> } {
+    const updates: Array<{ id: string; position?: number; columnId?: string }> = [];
+    const movedTask = options.task === undefined ? taskRow({ id: 't1' }) : options.task;
+    prisma.$transaction.mockImplementation(async (callback) =>
+      callback({
+        task: {
+          findFirst: jest.fn().mockResolvedValue(movedTask),
+          findMany: jest.fn().mockResolvedValue(options.siblings ?? []),
+          update: jest.fn().mockImplementation(({ where, data }) => {
+            updates.push({ id: where.id as string, ...data });
+            return Promise.resolve({ ...(movedTask ?? taskRow({ id: 't1' })), ...data });
+          }),
+          updateMany: jest.fn().mockImplementation(({ where, data }) => {
+            updates.push({ id: where.id as string, ...data });
+            return Promise.resolve({ count: 1 });
+          }),
+        },
+        column: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue(
+              options.column === undefined ? { id: COLUMN_ID, boardId: BOARD_ID } : options.column,
+            ),
+        },
+      }),
+    );
+    return { updates };
+  }
+
+  it('returns 404 on create when afterTaskId does not exist in the target column', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findMany.mockResolvedValue([taskRow({ id: 'a', position: 1000 })]);
+
+    await expect(
+      service.create(WORKSPACE_ID, BOARD_ID, USER_ID, {
+        title: 'Orphan',
+        columnId: COLUMN_ID,
+        afterTaskId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d99',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.task.create).not.toHaveBeenCalled();
+  });
+
+  it('rebalances the whole column when a create hits an exhausted gap', async () => {
+    const { service, prisma } = buildService();
+    const a = taskRow({ id: 'a', position: 1000 });
+    const b = taskRow({ id: 'b', position: 1000 + MIN_GAP / 2 });
+    prisma.task.findMany.mockResolvedValue([a, b]);
+
+    const updates: Array<{ id: string; position: number }> = [];
+    let createdPosition: number | undefined;
+    prisma.$transaction.mockImplementation(async (callback) =>
+      callback({
+        task: {
+          updateMany: jest.fn().mockImplementation(({ where, data }) => {
+            updates.push({ id: where.id as string, position: data.position as number });
+            return Promise.resolve({ count: 1 });
+          }),
+          create: jest.fn().mockImplementation(({ data }) => {
+            createdPosition = data.position as number;
+            return Promise.resolve(taskRow({ id: 'new', position: data.position as number }));
+          }),
+        },
+      }),
+    );
+
+    const result = await service.create(WORKSPACE_ID, BOARD_ID, USER_ID, {
+      title: 'Wedge',
+      columnId: COLUMN_ID,
+      afterTaskId: 'a',
+    });
+
+    expect(updates).toEqual([
+      { id: 'a', position: 1000 },
+      { id: 'b', position: 3000 },
+    ]);
+    expect(createdPosition).toBe(2000);
+    expect(result.position).toBe(2000);
+  });
+
+  it('appends to the end of the target column when no neighbors are given', async () => {
+    const { service, prisma } = buildService();
+    const moving = taskRow({ id: 'moving', position: 500, columnId: 'other' });
+    const { updates } = mockMoveTx(prisma, {
+      task: moving,
+      siblings: [taskRow({ id: 'a', position: 1000 })],
+    });
+
+    const result = await service.move(WORKSPACE_ID, 'moving', { columnId: COLUMN_ID });
+
+    expect(updates).toEqual([{ id: 'moving', columnId: COLUMN_ID, position: 2000 }]);
+    expect(result.position).toBe(2000);
+  });
+
+  it('moves into an empty column at the base gap', async () => {
+    const { service, prisma } = buildService();
+    const moving = taskRow({ id: 'moving', position: 500, columnId: 'other' });
+    const { updates } = mockMoveTx(prisma, { task: moving, siblings: [] });
+
+    const result = await service.move(WORKSPACE_ID, 'moving', { columnId: COLUMN_ID });
+
+    expect(updates).toEqual([{ id: 'moving', columnId: COLUMN_ID, position: 1000 }]);
+    expect(result.position).toBe(1000);
+  });
+
+  it('inserts between the before neighbor and its successor without touching siblings', async () => {
+    const { service, prisma } = buildService();
+    const moving = taskRow({ id: 'moving', position: 9000 });
+    const { updates } = mockMoveTx(prisma, {
+      task: moving,
+      siblings: [
+        taskRow({ id: 'a', position: 1000 }),
+        taskRow({ id: 'b', position: 2000 }),
+        moving,
+      ],
+    });
+
+    const result = await service.move(WORKSPACE_ID, 'moving', {
+      columnId: COLUMN_ID,
+      beforeTaskId: 'a',
+      afterTaskId: 'b',
+    });
+
+    expect(updates).toEqual([{ id: 'moving', columnId: COLUMN_ID, position: 1500 }]);
+    expect(result.position).toBe(1500);
+  });
+
+  it('returns 404 on move when the task is outside the workspace', async () => {
+    const { service, prisma } = buildService();
+    mockMoveTx(prisma, { task: null });
+
+    await expect(
+      service.move(WORKSPACE_ID, 'ghost', { columnId: COLUMN_ID }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns 404 on move when the target column is outside the workspace', async () => {
+    const { service, prisma } = buildService();
+    mockMoveTx(prisma, { column: null });
+
+    await expect(service.move(WORKSPACE_ID, 't1', { columnId: COLUMN_ID })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('returns 404 on move when a neighbor id is not in the target column', async () => {
+    const { service, prisma } = buildService();
+    mockMoveTx(prisma, {
+      task: taskRow({ id: 't1' }),
+      siblings: [taskRow({ id: 't1' }), taskRow({ id: 'a', position: 2000 })],
+    });
+
+    await expect(
+      service.move(WORKSPACE_ID, 't1', { columnId: COLUMN_ID, beforeTaskId: 'foreign' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns 404 on move when beforeTaskId and afterTaskId are not adjacent', async () => {
+    const { service, prisma } = buildService();
+    mockMoveTx(prisma, {
+      task: taskRow({ id: 'moving', position: 9000 }),
+      siblings: [
+        taskRow({ id: 'a', position: 1000 }),
+        taskRow({ id: 'b', position: 2000 }),
+        taskRow({ id: 'c', position: 3000 }),
+      ],
+    });
+
+    await expect(
+      service.move(WORKSPACE_ID, 'moving', {
+        columnId: COLUMN_ID,
+        beforeTaskId: 'a',
+        afterTaskId: 'c',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('clears dueDate and estimatedMinutes when the payload sets them to null', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.task.update.mockResolvedValue(taskRow({ id: 't1' }));
+
+    await service.update(WORKSPACE_ID, 't1', { dueDate: null, estimatedMinutes: null });
+
+    expect(prisma.task.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 't1' },
+        data: { dueDate: null, estimatedMinutes: null },
+      }),
+    );
+  });
+
+  it('leaves omitted fields out of the update payload entirely', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.task.update.mockResolvedValue(taskRow({ id: 't1', title: 'Renamed' }));
+
+    await service.update(WORKSPACE_ID, 't1', { title: 'Renamed' });
+
+    expect(prisma.task.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { title: 'Renamed' } }),
+    );
+  });
+
+  it('rejects assigning a user who is not a workspace member with 422', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.workspaceMember.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.addAssignee(WORKSPACE_ID, 't1', { userId: USER_ID }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(prisma.taskAssignee.create).not.toHaveBeenCalled();
+  });
+
+  it('maps a duplicate assignee to 409', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.workspaceMember.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.taskAssignee.create.mockRejectedValue({ code: 'P2002' });
+
+    await expect(
+      service.addAssignee(WORKSPACE_ID, 't1', { userId: USER_ID }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('returns 404 when removing an assignee who is not assigned', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.taskAssignee.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.removeAssignee(WORKSPACE_ID, 't1', USER_ID)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prisma.taskAssignee.deleteMany).toHaveBeenCalledWith({
+      where: { taskId: 't1', userId: USER_ID },
+    });
+  });
+
+  it('rejects attaching a label from another board with 422', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.label.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.addLabel(WORKSPACE_ID, 't1', { labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80' }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(prisma.taskLabel.create).not.toHaveBeenCalled();
+  });
+
+  it('maps a duplicate task label to 409', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.label.findFirst.mockResolvedValue({ id: 'l1', boardId: BOARD_ID });
+    prisma.taskLabel.create.mockRejectedValue({ code: 'P2002' });
+
+    await expect(
+      service.addLabel(WORKSPACE_ID, 't1', { labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('returns 404 when removing a label that is not attached to the task', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.taskLabel.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.removeLabel(WORKSPACE_ID, 't1', '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.taskLabel.deleteMany).toHaveBeenCalledWith({
+      where: { taskId: 't1', labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80' },
+    });
   });
 });

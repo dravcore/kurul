@@ -19,12 +19,15 @@ interface LabelDotsProps {
 
 export function LabelDots({ labels, className }: LabelDotsProps): React.ReactElement | null {
   if (labels.length === 0) return null;
+  const names = labels.map((label) => label.name).join(', ');
   return (
-    <ul className={cn('flex flex-wrap gap-1', className)} aria-hidden>
+    <ul className={cn('flex flex-wrap gap-1', className)}>
+      <li className="sr-only">{names}</li>
       {labels.map((label) => (
         <li
           key={label.id}
           title={label.name}
+          aria-hidden
           className={cn('size-1.5 rounded-full', SLOT_CLASS[label.color])}
         />
       ))}
