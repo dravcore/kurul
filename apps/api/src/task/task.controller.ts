@@ -17,6 +17,8 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { WorkspaceGuard } from '../common/guards/workspace.guard';
 import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
 import type { AuthenticatedUser } from '../common/types/request-context';
+import { AddAssigneeDto } from './dto/add-assignee.dto';
+import { AddTaskLabelDto } from './dto/add-task-label.dto';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { MoveTaskDto } from './dto/move-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -91,5 +93,49 @@ export class TaskController {
     @Body() dto: MoveTaskDto,
   ): Promise<TaskDto> {
     return this.taskService.move(workspaceId, taskId, dto);
+  }
+
+  @Post('tasks/:taskId/assignees')
+  @UseGuards(WorkspaceGuard, RolesGuard)
+  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  addAssignee(
+    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @Body() dto: AddAssigneeDto,
+  ): Promise<TaskDto> {
+    return this.taskService.addAssignee(workspaceId, taskId, dto);
+  }
+
+  @Delete('tasks/:taskId/assignees/:userId')
+  @UseGuards(WorkspaceGuard, RolesGuard)
+  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  removeAssignee(
+    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @Param('userId', ParseUuidV7Pipe) userId: string,
+  ): Promise<TaskDto> {
+    return this.taskService.removeAssignee(workspaceId, taskId, userId);
+  }
+
+  @Post('tasks/:taskId/labels')
+  @UseGuards(WorkspaceGuard, RolesGuard)
+  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  addLabel(
+    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @Body() dto: AddTaskLabelDto,
+  ): Promise<TaskDto> {
+    return this.taskService.addLabel(workspaceId, taskId, dto);
+  }
+
+  @Delete('tasks/:taskId/labels/:labelId')
+  @UseGuards(WorkspaceGuard, RolesGuard)
+  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  removeLabel(
+    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @Param('labelId', ParseUuidV7Pipe) labelId: string,
+  ): Promise<TaskDto> {
+    return this.taskService.removeLabel(workspaceId, taskId, labelId);
   }
 }

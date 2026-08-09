@@ -4,6 +4,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { TaskDto } from '@kurultay/shared-types';
 import { cn } from '@/lib/utils';
+import { LabelDots } from './label-chip';
+import { PriorityIcon } from './priority-icon';
 import { TaskCard } from './task-card';
 
 interface SortableTaskCardProps {
@@ -50,7 +52,11 @@ export function SortableTaskCard({
 export function TaskDragPreview({ task }: { task: TaskDto }): React.ReactElement {
   return (
     <div className="w-[min(280px,80vw)] scale-[1.02] rotate-[1deg] rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 shadow-drag motion-reduce:rotate-0 motion-reduce:scale-100">
-      <span className="line-clamp-2 text-body text-foreground">{task.title}</span>
+      <div className="flex items-start gap-1.5">
+        <PriorityIcon priority={task.priority} className="mt-0.5" />
+        <span className="line-clamp-2 min-w-0 flex-1 text-body text-foreground">{task.title}</span>
+      </div>
+      <LabelDots labels={task.labels} className="mt-1.5" />
     </div>
   );
 }

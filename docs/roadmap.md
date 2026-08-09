@@ -223,14 +223,17 @@ tenant-safely until this exists.
 ## Phase 5 — Task metadata
 
 **Goal:** tasks carry enough information to be planned, not just listed.
-**Status:** not started
+**Status:** done
 
-- [ ] Multiple assignees (`TaskAssignee`)
-- [ ] Labels: board-scoped CRUD, assign/unassign to tasks
-- [ ] Priority (`LOW`/`MEDIUM`/`HIGH`/`URGENT`) — kept separate from labels
-- [ ] `dueDate` and `estimatedMinutes` — separate fields, separate UI
-- [ ] Comments on tasks
-- [ ] Web: assignee picker, label picker, priority badge, date picker, comment thread
+- [x] Multiple assignees (`TaskAssignee`)
+- [x] Labels: board-scoped CRUD, assign/unassign to tasks
+- [x] Priority (`LOW`/`MEDIUM`/`HIGH`/`URGENT`) — kept separate from labels
+- [x] `dueDate` and `estimatedMinutes` — separate fields, separate UI
+- [x] Comments on tasks
+- [x] Web: assignee picker, label picker, priority control, date/estimate fields, comment thread
+- [x] [ADR 0011](decisions/0011-label-task-metadata-permissions.md) — label CRUD Admin+;
+      metadata/assignee/comment mutate MEMBER+
+- [x] Spec: [`specs/2026-08-09-phase-5-task-metadata-design.md`](specs/2026-08-09-phase-5-task-metadata-design.md)
 
 ---
 

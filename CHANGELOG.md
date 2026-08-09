@@ -9,6 +9,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Phase 5 task metadata
+  ([spec](docs/specs/2026-08-09-phase-5-task-metadata-design.md)): board label CRUD with
+  `LabelColorSlot` colors, task assignees/labels, priority/`dueDate`/`estimatedMinutes`
+  on `PATCH` tasks, comments, [ADR 0011](docs/decisions/0011-label-task-metadata-permissions.md),
+  enriched `TaskDto`/`CommentDto`/`WorkspaceMemberDto`, and panel/card UI for metadata.
 - Phase 4 tasks and drag-and-drop
   ([spec](docs/specs/2026-08-09-phase-4-tasks-design.md)): workspace-scoped task CRUD,
   fractional `Task.position` moves with on-demand rebalance,

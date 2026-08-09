@@ -36,6 +36,8 @@ function taskRow(
     createdById: USER_ID,
     createdAt: now,
     updatedAt: now,
+    assignees: [] as Array<{ user: { id: string; name: string; avatarUrl: string | null } }>,
+    labels: [] as Array<{ label: { id: string; boardId: string; name: string; color: string } }>,
   };
 }
 
@@ -54,6 +56,22 @@ describe('TaskService', () => {
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+      },
+      taskAssignee: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        delete: jest.fn(),
+      },
+      taskLabel: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        delete: jest.fn(),
+      },
+      label: {
+        findFirst: jest.fn(),
+      },
+      workspaceMember: {
+        findFirst: jest.fn(),
       },
       $transaction: jest.fn(),
     };

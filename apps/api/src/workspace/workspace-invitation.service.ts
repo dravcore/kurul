@@ -178,11 +178,18 @@ export class WorkspaceInvitationService {
           ? member.organizationId
           : workspaceId;
 
+      const user = await this.prisma.user.findUniqueOrThrow({
+        where: { id: member.userId },
+        select: { name: true, avatarUrl: true },
+      });
+
       return {
         id: member.id,
         workspaceId: memberWorkspaceId,
         userId: member.userId,
         role: member.role as MemberRole,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
       };
     } catch (error) {
       rethrowBetterAuthError(error, 'Failed to accept invitation', {

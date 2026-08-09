@@ -73,13 +73,27 @@ POST   /workspaces/:workspaceId/boards/:boardId/tasks     # create in a board
 GET    /workspaces/:workspaceId/tasks/:taskId
 PATCH  /workspaces/:workspaceId/tasks/:taskId
 DELETE /workspaces/:workspaceId/tasks/:taskId
+PATCH  /workspaces/:workspaceId/tasks/:taskId/position
+
+GET    /workspaces/:workspaceId/boards/:boardId/labels
+POST   /workspaces/:workspaceId/boards/:boardId/labels
+PATCH  /workspaces/:workspaceId/labels/:labelId
+DELETE /workspaces/:workspaceId/labels/:labelId
+
+POST   /workspaces/:workspaceId/tasks/:taskId/assignees
+DELETE /workspaces/:workspaceId/tasks/:taskId/assignees/:userId
+POST   /workspaces/:workspaceId/tasks/:taskId/labels
+DELETE /workspaces/:workspaceId/tasks/:taskId/labels/:labelId
 
 GET    /workspaces/:workspaceId/tasks/:taskId/comments
 POST   /workspaces/:workspaceId/tasks/:taskId/comments
+DELETE /workspaces/:workspaceId/comments/:commentId
 ```
 
 Board and column role gates:
-[ADR 0009](decisions/0009-board-column-permissions.md).
+[ADR 0009](decisions/0009-board-column-permissions.md). Task gates:
+[ADR 0010](decisions/0010-task-permissions.md). Label and metadata gates:
+[ADR 0011](decisions/0011-label-task-metadata-permissions.md).
 
 Invitations are workspace-scoped in the public API. Persistence is the
 `WorkspaceInvitation` table, mapped from Better Auth's organization plugin.
@@ -109,6 +123,9 @@ PATCH /workspaces/:workspaceId/columns/:columnId/position
 PATCH /workspaces/:workspaceId/tasks/:taskId/position
 POST  /workspaces/:workspaceId/invitations/:invitationId/accept
 POST  /workspaces/:workspaceId/tasks/:taskId/assignees
+DELETE /workspaces/:workspaceId/tasks/:taskId/assignees/:userId
+POST  /workspaces/:workspaceId/tasks/:taskId/labels
+DELETE /workspaces/:workspaceId/tasks/:taskId/labels/:labelId
 ```
 
 Action segments are the exception and each one needs a reason. Do not invent
@@ -163,8 +180,15 @@ flag, no envelope.
   "position": 1024.5,
   "dueDate": "2026-09-01T00:00:00.000Z",
   "estimatedMinutes": 240,
-  "assignees": [{ "id": "usr_1", "name": "Doğan", "avatarUrl": null }],
-  "labels": [{ "id": "lbl_1", "name": "backend", "color": "#00C896" }],
+  "assignees": [{ "userId": "usr_1", "name": "Doğan", "avatarUrl": null }],
+  "labels": [
+    {
+      "id": "lbl_1",
+      "boardId": "0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f",
+      "name": "backend",
+      "color": "slot-1",
+    },
+  ],
   "createdById": "usr_1",
   "createdAt": "2026-08-08T09:12:31.114Z",
   "updatedAt": "2026-08-08T09:12:31.114Z",

@@ -157,6 +157,7 @@ export class WorkspaceService {
   async listMembers(workspaceId: string): Promise<WorkspaceMemberDto[]> {
     const members = await this.prisma.workspaceMember.findMany({
       where: { workspaceId },
+      include: { user: { select: { name: true, avatarUrl: true } } },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -165,6 +166,8 @@ export class WorkspaceService {
       workspaceId: m.workspaceId,
       userId: m.userId,
       role: m.role as MemberRole,
+      name: m.user.name,
+      avatarUrl: m.user.avatarUrl,
     }));
   }
 }

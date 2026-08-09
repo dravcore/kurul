@@ -1,17 +1,31 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { LabelColorSlot, LabelDto, TaskAssigneeDto, TaskDto } from '@kurultay/shared-types';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { PrismaService } from '../prisma/prisma.service';
+import type { AddAssigneeDto } from './dto/add-assignee.dto';
+import type { AddTaskLabelDto } from './dto/add-task-label.dto';
 import type { CreateTaskDto } from './dto/create-task.dto';
 import type { MoveTaskDto } from './dto/move-task.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
 
-type TaskRow = {
+const taskInclude = {
+  assignees: {
+    include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+    orderBy: { id: 'asc' as const },
+  },
+  labels: {
+    include: { label: true },
+    orderBy: { id: 'asc' as const },
+  },
+};
+
+type TaskWithRelations = {
   id: string;
   boardId: string;
   columnId: string;
@@ -24,13 +38,30 @@ type TaskRow = {
   createdById: string;
   createdAt: Date;
   updatedAt: Date;
+  assignees: Array<{
+    user: { id: string; name: string; avatarUrl: string | null };
+  }>;
+  labels: Array<{
+    label: { id: string; boardId: string; name: string; color: string };
+  }>;
 };
 
 @Injectable()
 export class TaskService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private toDto(row: TaskRow): TaskDto {
+  private toDto(row: TaskWithRelations): TaskDto {
+    const assignees: TaskAssigneeDto[] = row.assignees.map((entry) => ({
+      userId: entry.user.id,
+      name: entry.user.name,
+      avatarUrl: entry.user.avatarUrl,
+    }));
+    const labels: LabelDto[] = row.labels.map((entry) => ({
+      id: entry.label.id,
+      boardId: entry.label.boardId,
+      name: entry.label.name,
+      color: entry.label.color as LabelColorSlot,
+    }));
     return {
       id: row.id,
       boardId: row.boardId,
@@ -44,13 +75,22 @@ export class TaskService {
       createdById: row.createdById,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
+      assignees,
+      labels,
     };
+  }
+
+  private emptyRelations<T extends Omit<TaskWithRelations, 'assignees' | 'labels'>>(
+    row: T,
+  ): TaskWithRelations {
+    return { ...row, assignees: [], labels: [] };
   }
 
   async list(workspaceId: string, boardId: string): Promise<TaskDto[]> {
     await this.findBoard(workspaceId, boardId);
     const tasks = await this.prisma.task.findMany({
       where: { boardId },
+      include: taskInclude,
       orderBy: [{ columnId: 'asc' }, { position: 'asc' }, { id: 'asc' }],
     });
     return tasks.map((task) => this.toDto(task));
@@ -102,7 +142,7 @@ export class TaskService {
             createdById: userId,
           },
         });
-        return this.toDto(created);
+        return this.toDto(this.emptyRelations(created));
       });
     }
 
@@ -116,7 +156,7 @@ export class TaskService {
         createdById: userId,
       },
     });
-    return this.toDto(created);
+    return this.toDto(this.emptyRelations(created));
   }
 
   async get(workspaceId: string, taskId: string): Promise<TaskDto> {
@@ -130,7 +170,13 @@ export class TaskService {
       data: {
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
+        ...(dto.dueDate !== undefined
+          ? { dueDate: dto.dueDate === null ? null : new Date(dto.dueDate) }
+          : {}),
+        ...(dto.estimatedMinutes !== undefined ? { estimatedMinutes: dto.estimatedMinutes } : {}),
       },
+      include: taskInclude,
     });
     return this.toDto(updated);
   }
@@ -144,6 +190,7 @@ export class TaskService {
     return this.prisma.$transaction(async (tx) => {
       const task = await tx.task.findFirst({
         where: { id: taskId, board: { workspaceId } },
+        include: taskInclude,
       });
       if (!task) throw new NotFoundException('Task not found');
 
@@ -216,9 +263,85 @@ export class TaskService {
           columnId: targetColumn.id,
           position: midpoint(before?.position ?? null, after?.position ?? null),
         },
+        include: taskInclude,
       });
       return this.toDto(updated);
     });
+  }
+
+  async addAssignee(workspaceId: string, taskId: string, dto: AddAssigneeDto): Promise<TaskDto> {
+    const task = await this.findTask(workspaceId, taskId);
+    const member = await this.prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId: dto.userId },
+    });
+    if (!member) {
+      throw new UnprocessableEntityException('User is not a member of this workspace');
+    }
+
+    try {
+      await this.prisma.taskAssignee.create({
+        data: { taskId: task.id, userId: dto.userId },
+      });
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        throw new ConflictException('User is already assigned to this task');
+      }
+      throw error;
+    }
+
+    return this.toDto(await this.findTask(workspaceId, taskId));
+  }
+
+  async removeAssignee(workspaceId: string, taskId: string, userId: string): Promise<TaskDto> {
+    await this.findTask(workspaceId, taskId);
+    const assignment = await this.prisma.taskAssignee.findFirst({
+      where: { taskId, userId },
+    });
+    if (!assignment) throw new NotFoundException('Assignee not found');
+    await this.prisma.taskAssignee.delete({ where: { id: assignment.id } });
+    return this.toDto(await this.findTask(workspaceId, taskId));
+  }
+
+  async addLabel(workspaceId: string, taskId: string, dto: AddTaskLabelDto): Promise<TaskDto> {
+    const task = await this.findTask(workspaceId, taskId);
+    const label = await this.prisma.label.findFirst({
+      where: { id: dto.labelId, boardId: task.boardId },
+    });
+    if (!label) {
+      throw new UnprocessableEntityException('Label does not belong to this task board');
+    }
+
+    try {
+      await this.prisma.taskLabel.create({
+        data: { taskId: task.id, labelId: label.id },
+      });
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        throw new ConflictException('Label is already assigned to this task');
+      }
+      throw error;
+    }
+
+    return this.toDto(await this.findTask(workspaceId, taskId));
+  }
+
+  async removeLabel(workspaceId: string, taskId: string, labelId: string): Promise<TaskDto> {
+    await this.findTask(workspaceId, taskId);
+    const link = await this.prisma.taskLabel.findFirst({
+      where: { taskId, labelId },
+    });
+    if (!link) throw new NotFoundException('Task label not found');
+    await this.prisma.taskLabel.delete({ where: { id: link.id } });
+    return this.toDto(await this.findTask(workspaceId, taskId));
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code: string }).code === 'P2002'
+    );
   }
 
   private async findBoard(workspaceId: string, boardId: string) {
@@ -235,9 +358,10 @@ export class TaskService {
     return column;
   }
 
-  private async findTask(workspaceId: string, taskId: string) {
+  private async findTask(workspaceId: string, taskId: string): Promise<TaskWithRelations> {
     const task = await this.prisma.task.findFirst({
       where: { id: taskId, board: { workspaceId } },
+      include: taskInclude,
     });
     if (!task) throw new NotFoundException('Task not found');
     return task;
