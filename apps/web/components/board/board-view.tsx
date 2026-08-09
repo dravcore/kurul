@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import type { BoardDto, ColumnDto } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
 import { canMutateColumns } from '@/lib/board-permissions';
@@ -40,7 +41,6 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
   const [renameColumn, setRenameColumn] = useState<ColumnDto | null>(null);
   const [deleteColumn, setDeleteColumn] = useState<ColumnDto | null>(null);
   const [defaultsPending, setDefaultsPending] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [entranceDone, setEntranceDone] = useState(false);
 
   const canMutate = canMutateColumns(activeRole);
@@ -94,7 +94,6 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
     const without = columns.filter((item) => item.id !== column.id);
     const before = without[targetIndex - 1] ?? null;
     const after = without[targetIndex] ?? null;
-    setActionError(null);
     try {
       const updated = await api.patch<ColumnDto>(
         `/workspaces/${activeId}/columns/${column.id}/position`,
@@ -108,9 +107,14 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
       setColumns(next);
     } catch (caught) {
       if (caught instanceof ApiError && caught.statusCode === 403) {
-        setActionError(t('errors.forbiddenColumns'));
+        toast.error(t('errors.forbiddenColumns'));
       } else {
-        setActionError(t('column.moveError'));
+        toast.error(t('column.moveError'), {
+          action: {
+            label: t('column.retryAction'),
+            onClick: () => void moveColumn(column, direction),
+          },
+        });
       }
     }
   }
@@ -118,7 +122,6 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
   async function seedDefaults(): Promise<void> {
     if (!activeId) return;
     setDefaultsPending(true);
-    setActionError(null);
     try {
       let afterColumnId: string | undefined;
       const created: ColumnDto[] = [];
@@ -136,9 +139,14 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
       setColumns(created);
     } catch (caught) {
       if (caught instanceof ApiError && caught.statusCode === 403) {
-        setActionError(t('errors.forbiddenColumns'));
+        toast.error(t('errors.forbiddenColumns'));
       } else {
-        setActionError(t('column.defaultsError'));
+        toast.error(t('column.defaultsError'), {
+          action: {
+            label: t('column.retryAction'),
+            onClick: () => void seedDefaults(),
+          },
+        });
       }
     } finally {
       setDefaultsPending(false);
@@ -200,10 +208,6 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
           ) : undefined
         }
       />
-
-      {actionError ? (
-        <p className="border-b border-border px-4 py-2 text-sm text-destructive">{actionError}</p>
-      ) : null}
 
       {columns.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
