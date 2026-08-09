@@ -49,8 +49,8 @@ export function BoardColumn({
       aria-label={column.name}
     >
       <header className="sticky top-0 z-10 flex h-10 items-center gap-2 border-b border-border bg-muted/90 px-3 backdrop-blur-sm">
-        <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{column.name}</h2>
-        <span className="font-mono text-xs text-muted-foreground tabular-nums">
+        <h2 className="min-w-0 flex-1 truncate text-body font-medium">{column.name}</h2>
+        <span className="font-mono text-small text-muted-foreground tabular-nums">
           {column.taskCount}
         </span>
         {canMutate ? (
@@ -78,7 +78,7 @@ export function BoardColumn({
         ) : null}
       </header>
       <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
-        <div className="flex h-14 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-border-strong text-xs text-muted-foreground">
+        <div className="flex h-14 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-border-strong text-small text-muted-foreground">
           {t('emptyDrop')}
         </div>
       </div>

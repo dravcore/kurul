@@ -128,9 +128,9 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
   async function seedDefaults(): Promise<void> {
     if (!activeId) return;
     setDefaultsPending(true);
+    const created: ColumnDto[] = [];
     try {
       let afterColumnId: string | undefined;
-      const created: ColumnDto[] = [];
       for (const name of DEFAULT_COLUMNS) {
         const column = await api.post<ColumnDto>(
           `/workspaces/${activeId}/boards/${boardId}/columns`,
@@ -146,6 +146,14 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
     } catch (caught) {
       if (caught instanceof ApiError && caught.statusCode === 403) {
         toast.error(t('errors.forbiddenColumns'));
+      } else if (created.length > 0) {
+        setColumns(created);
+        try {
+          await reload();
+        } catch {
+          // ignore reload failure — a plain error toast still shows
+        }
+        toast.error(t('column.defaultsError'));
       } else {
         toast.error(t('column.defaultsError'), {
           action: {
@@ -177,7 +185,7 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
   if (error || !board) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-        <p className="text-sm text-destructive">{error ?? t('loadError')}</p>
+        <h1 className="text-title text-destructive">{error ?? t('loadError')}</h1>
         <Button asChild variant="outline">
           <Link href="/dashboard">{t('backToBoards')}</Link>
         </Button>
@@ -218,8 +226,8 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
       {columns.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
           <DamgaMark />
-          <h2 className="font-display text-xl font-semibold">{t('column.emptyTitle')}</h2>
-          <p className="max-w-md text-sm text-muted-foreground">{t('column.emptyBody')}</p>
+          <h2 className="font-display text-title-lg font-semibold">{t('column.emptyTitle')}</h2>
+          <p className="max-w-md text-body text-muted-foreground">{t('column.emptyBody')}</p>
           {canMutate ? (
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Button type="button" onClick={() => setCreateOpen(true)}>
@@ -235,7 +243,7 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
               </Button>
             </div>
           ) : (
-            <p className="text-sm text-destructive">{t('errors.forbiddenColumns')}</p>
+            <p className="text-body text-destructive">{t('errors.forbiddenColumns')}</p>
           )}
         </div>
       ) : (
