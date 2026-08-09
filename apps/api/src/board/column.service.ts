@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SocketEvents, type ColumnDto } from '@kurultay/shared-types';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { PrismaService } from '../prisma/prisma.service';
@@ -135,6 +140,10 @@ export class ColumnService {
 
   async remove(workspaceId: string, columnId: string, actorId: string): Promise<void> {
     const column = await this.findColumn(workspaceId, columnId);
+    const taskCount = await this.prisma.task.count({ where: { columnId } });
+    if (taskCount > 0) {
+      throw new ConflictException('Column has tasks; move or delete them first');
+    }
     await this.prisma.column.delete({ where: { id: columnId } });
     this.emitChanged(workspaceId, actorId, column.boardId, column.id);
   }

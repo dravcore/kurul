@@ -528,6 +528,7 @@ export function TaskMetadataPanel({
               onKeyDown={(event) => {
                 if (event.key === 'Escape' && mentionQuery !== null) {
                   event.preventDefault();
+                  event.stopPropagation();
                   setMentionQuery(null);
                 }
               }}

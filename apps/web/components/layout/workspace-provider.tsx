@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import type { MemberRole, UserDto, WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
+import { disconnectSocket } from '@/lib/socket';
 
 interface WorkspaceContextValue {
   workspaces: WorkspaceDto[];
@@ -148,6 +149,7 @@ export function WorkspaceProvider({
   );
 
   const onSignOut = useCallback(async (): Promise<void> => {
+    disconnectSocket();
     await authClient.signOut();
     router.replace('/login');
     router.refresh();

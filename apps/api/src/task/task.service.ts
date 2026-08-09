@@ -360,7 +360,7 @@ export class TaskService {
   async remove(workspaceId: string, taskId: string, userId: string): Promise<void> {
     const task = await this.findTask(workspaceId, taskId);
     await this.prisma.$transaction(async (tx) => {
-      // Activity.taskId cascades on task delete — keep the row via null FK + payload.
+      // Activity.task onDelete SetNull — prior rows keep workspace history; stub carries payload.
       await this.activityService.record(tx, {
         workspaceId,
         taskId: null,

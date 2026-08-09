@@ -33,8 +33,11 @@ export function DeleteColumnDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const taskCount = column?.taskCount ?? 0;
+  const blocked = taskCount > 0;
+
   async function onConfirm(): Promise<void> {
-    if (!column) return;
+    if (!column || blocked) return;
     setPending(true);
     setError(null);
     try {
@@ -44,6 +47,8 @@ export function DeleteColumnDialog({
     } catch (caught) {
       if (caught instanceof ApiError && caught.statusCode === 403) {
         setError(t('forbidden'));
+      } else if (caught instanceof ApiError && caught.statusCode === 409) {
+        setError(t('deleteBlocked'));
       } else {
         setError(t('deleteError'));
       }
@@ -52,15 +57,13 @@ export function DeleteColumnDialog({
     }
   }
 
-  const taskCount = column?.taskCount ?? 0;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('deleteTitle')}</DialogTitle>
           <DialogDescription>
-            {taskCount > 0
+            {blocked
               ? t('deleteBodyWithTasks', { name: column?.name ?? '', count: taskCount })
               : t('deleteBody', { name: column?.name ?? '' })}
           </DialogDescription>
@@ -73,7 +76,7 @@ export function DeleteColumnDialog({
           <Button
             type="button"
             variant="destructive"
-            disabled={pending}
+            disabled={pending || blocked}
             onClick={() => void onConfirm()}
           >
             {t('deleteAction')}

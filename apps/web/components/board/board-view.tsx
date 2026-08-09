@@ -143,21 +143,25 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     return () => window.clearTimeout(timeout);
   }, [loading, entranceDone, columns.length]);
 
-  const reload = useCallback(async (): Promise<void> => {
-    if (!activeId) return;
-    const [nextBoard, nextColumns, nextTasks, nextMembers, nextLabels] = await Promise.all([
-      api.get<BoardDto>(`/workspaces/${activeId}/boards/${boardId}`),
-      api.get<ColumnDto[]>(`/workspaces/${activeId}/boards/${boardId}/columns`),
-      fetchAllBoardTasks(activeId, boardId, filters),
-      api.get<WorkspaceMemberDto[]>(`/workspaces/${activeId}/members`),
-      api.get<LabelDto[]>(`/workspaces/${activeId}/boards/${boardId}/labels`),
-    ]);
-    setBoard(nextBoard);
-    setColumns(nextColumns);
-    setTasks(nextTasks);
-    setMembers(nextMembers);
-    setLabels(nextLabels);
-  }, [activeId, boardId, filters]);
+  const reload = useCallback(
+    async (signal?: AbortSignal): Promise<void> => {
+      if (!activeId) return;
+      const [nextBoard, nextColumns, nextTasks, nextMembers, nextLabels] = await Promise.all([
+        api.get<BoardDto>(`/workspaces/${activeId}/boards/${boardId}`, { signal }),
+        api.get<ColumnDto[]>(`/workspaces/${activeId}/boards/${boardId}/columns`, { signal }),
+        fetchAllBoardTasks(activeId, boardId, filters, { signal }),
+        api.get<WorkspaceMemberDto[]>(`/workspaces/${activeId}/members`, { signal }),
+        api.get<LabelDto[]>(`/workspaces/${activeId}/boards/${boardId}/labels`, { signal }),
+      ]);
+      if (signal?.aborted) return;
+      setBoard(nextBoard);
+      setColumns(nextColumns);
+      setTasks(nextTasks);
+      setMembers(nextMembers);
+      setLabels(nextLabels);
+    },
+    [activeId, boardId, filters],
+  );
 
   const applyFilters = useCallback(
     (next: BoardTaskFilters): void => {
@@ -179,7 +183,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     setError(null);
     void (async () => {
       try {
-        await reload();
+        await reload(controller.signal);
         if (!controller.signal.aborted) {
           loadedBoardIdRef.current = boardId;
         }
