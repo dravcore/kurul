@@ -5,3 +5,5 @@ coverage
 apps/api/src/generated
 pnpm-lock.yaml
 CHANGELOG.md
+apps/web/next-env.d.ts
+.claude/
