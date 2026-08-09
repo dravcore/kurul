@@ -11,7 +11,6 @@ import { UpdateBoardDto } from './dto/update-board.dto';
 
 /**
  * Nested under workspace for tenant scoping. WorkspaceGuard reads `params.workspaceId`.
- * Handlers land in Phase 3.
  */
 @Controller('workspaces/:workspaceId/boards')
 export class BoardController {
