@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AssigneeChart } from './assignee-chart';
 import { ColumnChart } from './column-chart';
+import { CompletionChart } from './completion-chart';
 import { PriorityChart } from './priority-chart';
 import { StatTile } from './stat-tile';
 
@@ -155,6 +156,8 @@ export function DashboardSummary(): React.ReactElement {
       </div>
 
       {summary.byColumn ? <ColumnChart data={summary.byColumn} /> : null}
+
+      <CompletionChart data={summary.throughput} />
     </div>
   );
 }

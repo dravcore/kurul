@@ -1,10 +1,49 @@
 import { NotFoundException } from '@nestjs/common';
 import { Priority } from '@kurultay/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  applyThroughputCounts,
+  emptyThroughputSeries,
+  isCompletedMove,
+  THROUGHPUT_DAYS,
+} from './dashboard-throughput';
 import { DashboardService } from './dashboard.service';
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
 const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
+
+describe('dashboard-throughput helpers', () => {
+  it('fills 14 UTC days ending today with zeros', () => {
+    const series = emptyThroughputSeries(new Date('2026-08-09T15:30:00.000Z'));
+    expect(series).toHaveLength(THROUGHPUT_DAYS);
+    expect(series[0]).toEqual({ date: '2026-07-27', created: 0, completed: 0 });
+    expect(series[THROUGHPUT_DAYS - 1]).toEqual({
+      date: '2026-08-09',
+      created: 0,
+      completed: 0,
+    });
+  });
+
+  it('detects Done via toColumnName or toColumnId', () => {
+    const doneIds = new Set(['col-done']);
+    expect(isCompletedMove({ toColumnName: 'Done' }, doneIds)).toBe(true);
+    expect(isCompletedMove({ toColumnName: 'done' }, doneIds)).toBe(true);
+    expect(isCompletedMove({ toColumnId: 'col-done' }, doneIds)).toBe(true);
+    expect(isCompletedMove({ toColumnId: 'col-todo', toColumnName: 'To Do' }, doneIds)).toBe(false);
+  });
+
+  it('buckets created and completed into the series window', () => {
+    const series = emptyThroughputSeries(new Date('2026-08-09T12:00:00.000Z'));
+    const result = applyThroughputCounts(
+      series,
+      [new Date('2026-08-09T01:00:00.000Z'), new Date('2026-07-20T01:00:00.000Z')],
+      [new Date('2026-08-08T23:00:00.000Z')],
+    );
+    expect(result.find((day) => day.date === '2026-08-09')!.created).toBe(1);
+    expect(result.find((day) => day.date === '2026-08-08')!.completed).toBe(1);
+    expect(result.reduce((sum, day) => sum + day.created, 0)).toBe(1);
+  });
+});
 
 describe('DashboardService', () => {
   function buildService() {
@@ -20,7 +59,10 @@ describe('DashboardService', () => {
         groupBy: jest.fn().mockResolvedValue([]),
       },
       column: {
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      activity: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       user: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -29,7 +71,7 @@ describe('DashboardService', () => {
     return { service: new DashboardService(prisma as unknown as PrismaService), prisma };
   }
 
-  it('returns zero-filled priorities and null byColumn without boardId', async () => {
+  it('returns zero-filled priorities, throughput, and null byColumn without boardId', async () => {
     const { service, prisma } = buildService();
     prisma.task.count.mockResolvedValueOnce(3).mockResolvedValueOnce(1).mockResolvedValueOnce(0);
     prisma.task.groupBy.mockResolvedValue([{ priority: Priority.HIGH, _count: { _all: 2 } }]);
@@ -39,6 +81,8 @@ describe('DashboardService', () => {
     expect(summary.totalTasks).toBe(3);
     expect(summary.overdueCount).toBe(1);
     expect(summary.byColumn).toBeNull();
+    expect(summary.throughput).toHaveLength(THROUGHPUT_DAYS);
+    expect(summary.throughput.every((day) => day.created === 0 && day.completed === 0)).toBe(true);
     expect(summary.byPriority).toEqual([
       { priority: Priority.LOW, count: 0 },
       { priority: Priority.MEDIUM, count: 0 },
@@ -54,10 +98,12 @@ describe('DashboardService', () => {
     prisma.task.groupBy
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ columnId: 'c1', _count: { _all: 4 } }]);
-    prisma.column.findMany.mockResolvedValue([
-      { id: 'c1', name: 'To Do', position: 1000 },
-      { id: 'c2', name: 'Done', position: 2000 },
-    ]);
+    prisma.column.findMany
+      .mockResolvedValueOnce([
+        { id: 'c1', name: 'To Do', position: 1000 },
+        { id: 'c2', name: 'Done', position: 2000 },
+      ])
+      .mockResolvedValueOnce([{ id: 'c2' }]);
 
     const summary = await service.summary(WORKSPACE_ID, { boardId: BOARD_ID });
 
@@ -65,6 +111,31 @@ describe('DashboardService', () => {
       { columnId: 'c1', name: 'To Do', position: 1000, count: 4 },
       { columnId: 'c2', name: 'Done', position: 2000, count: 0 },
     ]);
+  });
+
+  it('counts throughput created and completed moves into Done', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.count.mockResolvedValue(0);
+    prisma.task.groupBy.mockResolvedValue([]);
+    prisma.column.findMany.mockResolvedValue([{ id: 'done-id' }]);
+    const today = emptyThroughputSeries()[THROUGHPUT_DAYS - 1]!.date;
+    prisma.activity.findMany
+      .mockResolvedValueOnce([{ createdAt: new Date(`${today}T10:00:00.000Z`) }])
+      .mockResolvedValueOnce([
+        {
+          createdAt: new Date(`${today}T11:00:00.000Z`),
+          payload: { toColumnName: 'Done', toColumnId: 'done-id' },
+        },
+        {
+          createdAt: new Date(`${today}T12:00:00.000Z`),
+          payload: { toColumnId: 'other' },
+        },
+      ]);
+
+    const summary = await service.summary(WORKSPACE_ID, {});
+    const todayRow = summary.throughput.find((day) => day.date === today)!;
+    expect(todayRow.created).toBe(1);
+    expect(todayRow.completed).toBe(1);
   });
 
   it('keeps top 8 assignees and folds the rest into Other', async () => {

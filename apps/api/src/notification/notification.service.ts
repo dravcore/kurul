@@ -26,6 +26,7 @@ export type NotificationCursorQuery = {
   cursor?: string;
   limit?: number;
   unreadOnly?: boolean;
+  type?: string;
 };
 
 const DUE_SOON_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -141,6 +142,7 @@ export class NotificationService {
         workspaceId,
         userId,
         ...(query.unreadOnly ? { readAt: null } : {}),
+        ...(query.type ? { type: query.type } : {}),
         ...(query.cursor ? { id: { lt: query.cursor } } : {}),
       },
       orderBy: { id: 'desc' },
