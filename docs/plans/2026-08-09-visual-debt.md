@@ -4,7 +4,8 @@
 > Spec: `docs/specs/2026-08-09-visual-debt-design.md`. Task checkboxes below are retained
 > as a historical record and marked complete.
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
+> **For agentic workers:** Historical plan — do not re-execute. Steps used checkbox
+> (`- [x]`) syntax for tracking; all tasks are complete.
 
 **Goal:** Bring every shipped `apps/web` screen into conformance with `docs/design.md` and land the primitives Phase 4 needs (type scale, toast, elevation tokens, sliding sancak rail, reduced-motion policy).
 
