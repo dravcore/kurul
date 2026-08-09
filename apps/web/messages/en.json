@@ -174,6 +174,27 @@
         "addComment": "Add a comment",
         "postComment": "Post comment",
         "deleteComment": "Delete",
+        "mentions": {
+          "pickerLabel": "Mention a member",
+          "empty": "No members match",
+          "hint": "Type @ to mention someone"
+        },
+        "activity": {
+          "title": "History",
+          "empty": "No activity yet",
+          "loadError": "Could not load activity.",
+          "types": {
+            "taskCreated": "Created “{title}”",
+            "taskUpdated": "Updated “{title}”",
+            "taskUpdatedFields": "Updated {fields} on “{title}”",
+            "taskMoved": "Moved “{title}”",
+            "taskDeleted": "Deleted “{title}”",
+            "taskAssigned": "Assigned someone to “{title}”",
+            "taskUnassigned": "Unassigned someone from “{title}”",
+            "commentCreated": "Commented on “{title}”",
+            "unknown": "{type}"
+          }
+        },
         "metaLoadError": "Could not load task details.",
         "openTask": "Open task",
         "panelLabel": "Task details",
@@ -193,6 +214,23 @@
         "retryAction": "Try again",
         "cancel": "Cancel",
         "forbidden": "You need to be a workspace member to change tasks."
+      }
+    },
+    "notifications": {
+      "open": "Notifications",
+      "title": "Notifications",
+      "empty": "You're caught up",
+      "loading": "Loading…",
+      "loadError": "Could not load notifications.",
+      "markAllRead": "Mark all read",
+      "markReadError": "Could not update notification.",
+      "openTaskError": "Could not open this task.",
+      "badgeOverflow": "99+",
+      "types": {
+        "assignment": "Assigned to “{title}”",
+        "mention": "Mentioned on “{title}”",
+        "dueSoon": "Due soon: “{title}”",
+        "unknown": "{type}"
       }
     }
   }

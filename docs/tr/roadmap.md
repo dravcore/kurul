@@ -289,16 +289,18 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 ## Faz 8 — Aktivite log'u ve bildirimler
 
 **Hedef:** kullanıcılar neyin değiştiğini görebilir ve bunun hakkında bilgilendirilebilir.
-**Durum:** başlanmadı
+**Referans:** [spec](../specs/2026-08-09-phase-8-activity-notifications-design.md);
+[deferred](../specs/2026-08-09-phase-8-deferred.md)
+**Durum:** tamam
 
-- [ ] Task oluşturma/taşıma/güncelleme/yorum/atama üzerinde `Activity` yazımı (yeni
+- [x] Task oluşturma/taşıma/güncelleme/yorum/atama üzerinde `Activity` yazımı (yeni
       aktivite tiplerinin migration gerektirmemesi için `payload` JSON olarak)
-- [ ] Aktivite feed endpoint'i (task seviyesi ve workspace seviyesi), cursor-paginated
-- [ ] `Notification` modeli (yeni migration): mention, atama, yaklaşan due date —
+- [x] Aktivite feed endpoint'i (task seviyesi ve workspace seviyesi), cursor-paginated
+- [x] `Notification` modeli (yeni migration): mention, atama, yaklaşan due date —
       Faz 1 şemasında yok
-- [ ] Okundu işaretle / tümünü okundu işaretle
-- [ ] Web: task panelinde aktivite zaman çizelgesi, bildirim merkezi
-- [ ] `[-]` E-posta gönderimi — MVP ötesine ertelendi
+- [x] Okundu işaretle / tümünü okundu işaretle
+- [x] Web: task panelinde aktivite zaman çizelgesi, bildirim merkezi
+- [x] `[-]` E-posta gönderimi — MVP ötesine ertelendi
 
 ---
 

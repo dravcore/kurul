@@ -1,20 +1,26 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   LabelColorSlot,
   Priority,
+  type ActivityDto,
   type CommentDto,
+  type CursorPage,
   type LabelDto,
   type TaskDto,
   type WorkspaceMemberDto,
 } from '@kurultay/shared-types';
+import { formatActivitySummary } from '@/lib/activity-summary';
 import { ApiError, api } from '@/lib/api';
+import { getActiveMentionQuery, insertMentionMarkup } from '@/lib/mentions';
+import { formatRelativeTime } from '@/lib/relative-time';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CommentBody } from './comment-body';
 import { LabelChip, labelSlotClass } from './label-chip';
 import { PriorityIcon } from './priority-icon';
 import { cn } from '@/lib/utils';
@@ -40,16 +46,20 @@ export function TaskMetadataPanel({
   onUpdated,
 }: TaskMetadataPanelProps): React.ReactElement {
   const t = useTranslations('app.board.task');
+  const tActivity = useTranslations('app.board.task.activity');
   const priorityId = useId();
   const dueId = useId();
   const estimateId = useId();
   const commentId = useId();
   const labelNameId = useId();
+  const commentRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [members, setMembers] = useState<WorkspaceMemberDto[]>([]);
   const [boardLabels, setBoardLabels] = useState<LabelDto[]>([]);
   const [comments, setComments] = useState<CommentDto[]>([]);
+  const [activities, setActivities] = useState<ActivityDto[]>([]);
   const [commentBody, setCommentBody] = useState('');
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [estimateDraft, setEstimateDraft] = useState(
     task.estimatedMinutes !== null ? String(task.estimatedMinutes) : '',
   );
@@ -67,7 +77,7 @@ export function TaskMetadataPanel({
     setLoadingMeta(true);
     void (async () => {
       try {
-        const [nextMembers, nextLabels, nextComments] = await Promise.all([
+        const [nextMembers, nextLabels, nextComments, nextActivities] = await Promise.all([
           api.get<WorkspaceMemberDto[]>(`/workspaces/${workspaceId}/members`, {
             signal: controller.signal,
           }),
@@ -77,11 +87,16 @@ export function TaskMetadataPanel({
           api.get<CommentDto[]>(`/workspaces/${workspaceId}/tasks/${task.id}/comments`, {
             signal: controller.signal,
           }),
+          api.get<CursorPage<ActivityDto>>(
+            `/workspaces/${workspaceId}/tasks/${task.id}/activities?limit=50`,
+            { signal: controller.signal },
+          ),
         ]);
         if (!controller.signal.aborted) {
           setMembers(nextMembers);
           setBoardLabels(nextLabels);
           setComments(nextComments);
+          setActivities(nextActivities.items);
         }
       } catch {
         if (!controller.signal.aborted) {
@@ -95,6 +110,26 @@ export function TaskMetadataPanel({
     })();
     return () => controller.abort();
   }, [workspaceId, boardId, task.id, t]);
+
+  function syncMentionQuery(value: string, cursor: number): void {
+    const active = getActiveMentionQuery(value, cursor);
+    setMentionQuery(active ? active.query : null);
+  }
+
+  function applyMention(member: WorkspaceMemberDto): void {
+    const el = commentRef.current;
+    const start = el?.selectionStart ?? commentBody.length;
+    const end = el?.selectionEnd ?? start;
+    const next = insertMentionMarkup(commentBody, start, end, member.name, member.userId);
+    setCommentBody(next.value);
+    setMentionQuery(null);
+    requestAnimationFrame(() => {
+      const textarea = commentRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(next.cursor, next.cursor);
+    });
+  }
 
   async function patchTask(body: Record<string, unknown>): Promise<void> {
     setPending(true);
@@ -137,6 +172,7 @@ export function TaskMetadataPanel({
             userId,
           });
       onUpdated(updated);
+      await refreshActivities();
     } catch (caught) {
       toastMetaError(caught);
     } finally {
@@ -209,6 +245,17 @@ export function TaskMetadataPanel({
     }
   }
 
+  async function refreshActivities(): Promise<void> {
+    try {
+      const page = await api.get<CursorPage<ActivityDto>>(
+        `/workspaces/${workspaceId}/tasks/${task.id}/activities?limit=50`,
+      );
+      setActivities(page.items);
+    } catch {
+      toast.error(tActivity('loadError'));
+    }
+  }
+
   async function submitComment(): Promise<void> {
     if (!canMutate) return;
     const body = commentBody.trim();
@@ -221,6 +268,8 @@ export function TaskMetadataPanel({
       );
       setComments((current) => [...current, created]);
       setCommentBody('');
+      setMentionQuery(null);
+      await refreshActivities();
     } catch (caught) {
       toastMetaError(caught);
     } finally {
@@ -244,6 +293,12 @@ export function TaskMetadataPanel({
   const assignedIds = new Set(task.assignees.map((assignee) => assignee.userId));
   const taskLabelIds = new Set(task.labels.map((label) => label.id));
   const dueValue = task.dueDate ? task.dueDate.slice(0, 10) : '';
+  const mentionCandidates =
+    mentionQuery === null
+      ? []
+      : members.filter((member) =>
+          member.name.toLocaleLowerCase('en-US').includes(mentionQuery.toLocaleLowerCase('en-US')),
+        );
 
   return (
     <div className="flex flex-col gap-5 border-t border-border pt-4">
@@ -442,7 +497,7 @@ export function TaskMetadataPanel({
                   </Button>
                 ) : null}
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-body text-foreground">{comment.body}</p>
+              <CommentBody body={comment.body} className="mt-1" />
             </li>
           ))}
           {comments.length === 0 && !loadingMeta ? (
@@ -450,16 +505,61 @@ export function TaskMetadataPanel({
           ) : null}
         </ul>
         {canMutate ? (
-          <div className="flex flex-col gap-2">
+          <div className="relative flex flex-col gap-2">
             <Label htmlFor={commentId}>{t('addComment')}</Label>
             <textarea
+              ref={commentRef}
               id={commentId}
               value={commentBody}
               disabled={pending}
               rows={3}
-              onChange={(event) => setCommentBody(event.target.value)}
+              aria-describedby={`${commentId}-hint`}
+              onChange={(event) => {
+                const value = event.target.value;
+                setCommentBody(value);
+                syncMentionQuery(value, event.target.selectionStart);
+              }}
+              onSelect={(event) => {
+                syncMentionQuery(commentBody, event.currentTarget.selectionStart);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && mentionQuery !== null) {
+                  event.preventDefault();
+                  setMentionQuery(null);
+                }
+              }}
               className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-body outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
             />
+            <p id={`${commentId}-hint`} className="text-micro text-muted-foreground">
+              {t('mentions.hint')}
+            </p>
+            {mentionQuery !== null ? (
+              <ul
+                role="listbox"
+                aria-label={t('mentions.pickerLabel')}
+                className="absolute right-0 bottom-[calc(100%-0.5rem)] left-0 z-20 max-h-40 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-overlay"
+              >
+                {mentionCandidates.length === 0 ? (
+                  <li className="px-2 py-1.5 text-small text-muted-foreground">
+                    {t('mentions.empty')}
+                  </li>
+                ) : (
+                  mentionCandidates.map((member) => (
+                    <li key={member.id}>
+                      <button
+                        type="button"
+                        role="option"
+                        className="flex w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-body hover:bg-accent"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => applyMention(member)}
+                      >
+                        {member.name}
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            ) : null}
             <div className="flex justify-end">
               <Button
                 type="button"
@@ -472,6 +572,32 @@ export function TaskMetadataPanel({
             </div>
           </div>
         ) : null}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <p className="text-small font-medium text-foreground">{tActivity('title')}</p>
+        <ul className="flex flex-col gap-2">
+          {activities.map((activity) => (
+            <li key={activity.id} className="rounded-md border border-border px-3 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-small font-medium text-foreground">{activity.author.name}</p>
+                <time
+                  className="shrink-0 text-micro text-muted-foreground"
+                  dateTime={activity.createdAt}
+                  title={new Date(activity.createdAt).toISOString()}
+                >
+                  {formatRelativeTime(activity.createdAt)}
+                </time>
+              </div>
+              <p className="mt-1 text-body text-foreground-secondary">
+                {formatActivitySummary(activity, tActivity)}
+              </p>
+            </li>
+          ))}
+          {activities.length === 0 && !loadingMeta ? (
+            <li className="text-small text-muted-foreground">{tActivity('empty')}</li>
+          ) : null}
+        </ul>
       </div>
     </div>
   );

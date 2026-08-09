@@ -9,6 +9,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Phase 8 activity log and notifications
+  ([spec](docs/specs/2026-08-09-phase-8-activity-notifications-design.md)): activity writes
+  on task create/update/move/delete/assign/comment; workspace and task feeds; `Notification`
+  model (assignment, mention, due-soon via BullMQ); shell bell + task History; comment
+  `@[Name](userId)` mentions. Email and full `/notifications` page deferred
+  ([notes](docs/specs/2026-08-09-phase-8-deferred.md)).
 - Phase 7 dashboard
   ([spec](docs/specs/2026-08-09-phase-7-dashboard-design.md)):
   `GET .../dashboard/summary?boardId?` with total/overdue tiles, priority and assignee

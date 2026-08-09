@@ -71,9 +71,10 @@ export class TaskController {
   update(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateTaskDto,
   ): Promise<TaskDto> {
-    return this.taskService.update(workspaceId, taskId, dto);
+    return this.taskService.update(workspaceId, taskId, user.id, dto);
   }
 
   @Delete('tasks/:taskId')
@@ -83,8 +84,9 @@ export class TaskController {
   async remove(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
-    await this.taskService.remove(workspaceId, taskId);
+    await this.taskService.remove(workspaceId, taskId, user.id);
   }
 
   @Patch('tasks/:taskId/position')
@@ -93,9 +95,10 @@ export class TaskController {
   move(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: MoveTaskDto,
   ): Promise<TaskDto> {
-    return this.taskService.move(workspaceId, taskId, dto);
+    return this.taskService.move(workspaceId, taskId, user.id, dto);
   }
 
   @Post('tasks/:taskId/assignees')
@@ -104,9 +107,10 @@ export class TaskController {
   addAssignee(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AddAssigneeDto,
   ): Promise<TaskDto> {
-    return this.taskService.addAssignee(workspaceId, taskId, dto);
+    return this.taskService.addAssignee(workspaceId, taskId, user.id, dto);
   }
 
   @Delete('tasks/:taskId/assignees/:userId')
@@ -116,8 +120,9 @@ export class TaskController {
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('taskId', ParseUuidV7Pipe) taskId: string,
     @Param('userId', ParseUuidV7Pipe) userId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<TaskDto> {
-    return this.taskService.removeAssignee(workspaceId, taskId, userId);
+    return this.taskService.removeAssignee(workspaceId, taskId, user.id, userId);
   }
 
   @Post('tasks/:taskId/labels')

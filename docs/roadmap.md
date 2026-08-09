@@ -275,16 +275,18 @@ tenant-safely until this exists.
 ## Phase 8 — Activity log and notifications
 
 **Goal:** users can see what changed and be told about it.
-**Status:** not started
+**Reference:** [spec](specs/2026-08-09-phase-8-activity-notifications-design.md);
+[deferred](specs/2026-08-09-phase-8-deferred.md)
+**Status:** done
 
-- [ ] `Activity` writes on task create/move/update/comment/assign (`payload` as JSON so new
+- [x] `Activity` writes on task create/move/update/comment/assign (`payload` as JSON so new
       activity types need no migration)
-- [ ] Activity feed endpoint (task-level and workspace-level), cursor-paginated
-- [ ] `Notification` model (new migration): mention, assignment, due-soon — not present in
+- [x] Activity feed endpoint (task-level and workspace-level), cursor-paginated
+- [x] `Notification` model (new migration): mention, assignment, due-soon — not present in
       the Phase 1 schema
-- [ ] Mark read / mark all read
-- [ ] Web: activity timeline in the task panel, notification centre
-- [ ] `[-]` Email delivery — deferred beyond MVP
+- [x] Mark read / mark all read
+- [x] Web: activity timeline in the task panel, notification centre
+- [x] `[-]` Email delivery — deferred beyond MVP
 
 ---
 

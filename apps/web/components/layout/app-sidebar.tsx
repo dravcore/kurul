@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SancakRail, useSancakRail } from './sancak-rail';
+import { NotificationBell } from '@/components/notification/notification-bell';
 import { ThemeToggle } from './theme-toggle';
 import { useWorkspaceContext } from './workspace-provider';
 import { WorkspaceSwitcher } from './workspace-switcher';
@@ -52,6 +53,7 @@ export function AppSidebar(): React.ReactElement {
           </p>
         ) : null}
         <div className="flex items-center gap-1">
+          <NotificationBell />
           {!collapsed ? <ThemeToggle /> : null}
           <Button
             type="button"

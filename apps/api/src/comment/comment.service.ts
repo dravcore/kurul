@@ -1,5 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ActivityType } from '@kurultay/shared-types';
 import type { CommentDto } from '@kurultay/shared-types';
+import { ActivityService } from '../activity/activity.service';
+import { parseMentions } from '../common/mentions/parse-mentions';
+import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateCommentDto } from './dto/create-comment.dto';
 
@@ -14,7 +18,11 @@ type CommentRow = {
 
 @Injectable()
 export class CommentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
   private toDto(row: CommentRow): CommentDto {
     return {
@@ -47,16 +55,58 @@ export class CommentService {
     userId: string,
     dto: CreateCommentDto,
   ): Promise<CommentDto> {
-    await this.findTask(workspaceId, taskId);
-    const created = await this.prisma.comment.create({
-      data: {
+    const task = await this.findTask(workspaceId, taskId);
+    const mentionIds = parseMentions(dto.body).filter((id) => id !== userId);
+
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.comment.create({
+        data: {
+          taskId,
+          userId,
+          body: dto.body,
+        },
+        include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+      });
+
+      let memberIds: string[] = [];
+      if (mentionIds.length > 0) {
+        const members = await tx.workspaceMember.findMany({
+          where: { workspaceId, userId: { in: mentionIds } },
+          select: { userId: true },
+        });
+        memberIds = members.map((m) => m.userId);
+      }
+
+      const activity = await this.activityService.record(tx, {
+        workspaceId,
         taskId,
         userId,
-        body: dto.body,
-      },
-      include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+        type: ActivityType.CommentCreated,
+        payload: {
+          commentId: created.id,
+          title: task.title,
+          mentionedUserIds: memberIds,
+        },
+      });
+
+      for (const recipientId of memberIds) {
+        await this.notificationService.createMention(tx, {
+          workspaceId,
+          userId: recipientId,
+          actorId: userId,
+          taskId,
+          activityId: activity.id,
+          payload: {
+            commentId: created.id,
+            taskId,
+            title: task.title,
+            actorId: userId,
+          },
+        });
+      }
+
+      return this.toDto(created);
     });
-    return this.toDto(created);
   }
 
   async remove(workspaceId: string, commentId: string): Promise<void> {

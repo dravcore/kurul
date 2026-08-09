@@ -103,6 +103,27 @@ export interface ActivityDto {
   type: string;
   payload: Record<string, unknown>;
   createdAt: string;
+  author: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+  };
+}
+
+export interface NotificationDto {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  type: string;
+  taskId: string | null;
+  activityId: string | null;
+  payload: Record<string, unknown>;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationUnreadCountDto {
+  count: number;
 }
 
 /** Default list pagination shape (keyed on `id`, never `position`). */

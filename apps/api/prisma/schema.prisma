@@ -38,6 +38,7 @@ model User {
   assignees        TaskAssignee[]
   comments         Comment[]
   activities       Activity[]
+  notifications    Notification[]
 }
 
 model Session {
@@ -97,6 +98,7 @@ model Workspace {
   invitations WorkspaceInvitation[]
   boards      Board[]
   activities  Activity[]
+  notifications Notification[]
 }
 
 model WorkspaceMember {
@@ -180,6 +182,7 @@ model Task {
   labels     TaskLabel[]
   comments   Comment[]
   activities Activity[]
+  notifications Notification[]
 
   @@index([boardId, columnId, position])
   @@index([columnId, position])
@@ -250,11 +253,35 @@ model Activity {
   payload     Json
   createdAt   DateTime @default(now())
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  task      Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task          Task?          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  notifications Notification[]
 
   @@index([workspaceId, createdAt])
+  @@index([workspaceId, id])
   @@index([taskId])
   @@index([userId])
+}
+
+model Notification {
+  id          String    @id @default(uuid(7))
+  workspaceId String
+  userId      String
+  type        String
+  taskId      String?
+  activityId  String?
+  payload     Json
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task      Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  activity  Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@index([workspaceId])
+  @@index([userId, type, taskId])
 }

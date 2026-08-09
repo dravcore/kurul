@@ -4,7 +4,9 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { ActivityService } from '../activity/activity.service';
 import { MIN_GAP } from '../common/position/fractional-index';
+import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskService } from './task.service';
 
@@ -13,6 +15,7 @@ const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
 const COLUMN_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51';
 const OTHER_BOARD_COLUMN = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d52';
 const USER_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d53';
+const ACTOR_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d54';
 
 function taskRow(
   overrides: Partial<{
@@ -44,6 +47,13 @@ function taskRow(
 
 describe('TaskService', () => {
   function buildService() {
+    const activityService = {
+      record: jest.fn().mockResolvedValue({ id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80' }),
+    };
+    const notificationService = {
+      createAssignment: jest.fn().mockResolvedValue(null),
+      createMention: jest.fn().mockResolvedValue(null),
+    };
     const prisma = {
       board: {
         findFirst: jest.fn().mockResolvedValue({ id: BOARD_ID, workspaceId: WORKSPACE_ID }),
@@ -79,7 +89,19 @@ describe('TaskService', () => {
       },
       $transaction: jest.fn(),
     };
-    return { service: new TaskService(prisma as unknown as PrismaService), prisma };
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
+      callback(prisma),
+    );
+    return {
+      service: new TaskService(
+        prisma as unknown as PrismaService,
+        activityService as unknown as ActivityService,
+        notificationService as unknown as NotificationService,
+      ),
+      prisma,
+      activityService,
+      notificationService,
+    };
   }
 
   it('appends a created task after the final existing position', async () => {
@@ -164,7 +186,7 @@ describe('TaskService', () => {
     );
 
     await expect(
-      service.move(WORKSPACE_ID, 't1', { columnId: OTHER_BOARD_COLUMN }),
+      service.move(WORKSPACE_ID, 't1', ACTOR_ID, { columnId: OTHER_BOARD_COLUMN }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
@@ -185,7 +207,7 @@ describe('TaskService', () => {
     );
 
     await expect(
-      service.move(WORKSPACE_ID, 't1', { columnId: COLUMN_ID, afterTaskId: 't1' }),
+      service.move(WORKSPACE_ID, 't1', ACTOR_ID, { columnId: COLUMN_ID, afterTaskId: 't1' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -218,7 +240,7 @@ describe('TaskService', () => {
       }),
     );
 
-    const result = await service.move(WORKSPACE_ID, 'c', {
+    const result = await service.move(WORKSPACE_ID, 'c', ACTOR_ID, {
       columnId: COLUMN_ID,
       beforeTaskId: 'a',
     });
@@ -325,7 +347,7 @@ describe('TaskService', () => {
       siblings: [taskRow({ id: 'a', position: 1000 })],
     });
 
-    const result = await service.move(WORKSPACE_ID, 'moving', { columnId: COLUMN_ID });
+    const result = await service.move(WORKSPACE_ID, 'moving', ACTOR_ID, { columnId: COLUMN_ID });
 
     expect(updates).toEqual([{ id: 'moving', columnId: COLUMN_ID, position: 2000 }]);
     expect(result.position).toBe(2000);
@@ -336,7 +358,7 @@ describe('TaskService', () => {
     const moving = taskRow({ id: 'moving', position: 500, columnId: 'other' });
     const { updates } = mockMoveTx(prisma, { task: moving, siblings: [] });
 
-    const result = await service.move(WORKSPACE_ID, 'moving', { columnId: COLUMN_ID });
+    const result = await service.move(WORKSPACE_ID, 'moving', ACTOR_ID, { columnId: COLUMN_ID });
 
     expect(updates).toEqual([{ id: 'moving', columnId: COLUMN_ID, position: 1000 }]);
     expect(result.position).toBe(1000);
@@ -354,7 +376,7 @@ describe('TaskService', () => {
       ],
     });
 
-    const result = await service.move(WORKSPACE_ID, 'moving', {
+    const result = await service.move(WORKSPACE_ID, 'moving', ACTOR_ID, {
       columnId: COLUMN_ID,
       beforeTaskId: 'a',
       afterTaskId: 'b',
@@ -369,7 +391,7 @@ describe('TaskService', () => {
     mockMoveTx(prisma, { task: null });
 
     await expect(
-      service.move(WORKSPACE_ID, 'ghost', { columnId: COLUMN_ID }),
+      service.move(WORKSPACE_ID, 'ghost', ACTOR_ID, { columnId: COLUMN_ID }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -377,9 +399,9 @@ describe('TaskService', () => {
     const { service, prisma } = buildService();
     mockMoveTx(prisma, { column: null });
 
-    await expect(service.move(WORKSPACE_ID, 't1', { columnId: COLUMN_ID })).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.move(WORKSPACE_ID, 't1', ACTOR_ID, { columnId: COLUMN_ID }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('returns 404 on move when a neighbor id is not in the target column', async () => {
@@ -390,7 +412,7 @@ describe('TaskService', () => {
     });
 
     await expect(
-      service.move(WORKSPACE_ID, 't1', { columnId: COLUMN_ID, beforeTaskId: 'foreign' }),
+      service.move(WORKSPACE_ID, 't1', ACTOR_ID, { columnId: COLUMN_ID, beforeTaskId: 'foreign' }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -406,7 +428,7 @@ describe('TaskService', () => {
     });
 
     await expect(
-      service.move(WORKSPACE_ID, 'moving', {
+      service.move(WORKSPACE_ID, 'moving', ACTOR_ID, {
         columnId: COLUMN_ID,
         beforeTaskId: 'a',
         afterTaskId: 'c',
@@ -419,7 +441,7 @@ describe('TaskService', () => {
     prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
     prisma.task.update.mockResolvedValue(taskRow({ id: 't1' }));
 
-    await service.update(WORKSPACE_ID, 't1', { dueDate: null, estimatedMinutes: null });
+    await service.update(WORKSPACE_ID, 't1', ACTOR_ID, { dueDate: null, estimatedMinutes: null });
 
     expect(prisma.task.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -434,7 +456,7 @@ describe('TaskService', () => {
     prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
     prisma.task.update.mockResolvedValue(taskRow({ id: 't1', title: 'Renamed' }));
 
-    await service.update(WORKSPACE_ID, 't1', { title: 'Renamed' });
+    await service.update(WORKSPACE_ID, 't1', ACTOR_ID, { title: 'Renamed' });
 
     expect(prisma.task.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { title: 'Renamed' } }),
@@ -447,7 +469,7 @@ describe('TaskService', () => {
     prisma.workspaceMember.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.addAssignee(WORKSPACE_ID, 't1', { userId: USER_ID }),
+      service.addAssignee(WORKSPACE_ID, 't1', ACTOR_ID, { userId: USER_ID }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(prisma.taskAssignee.create).not.toHaveBeenCalled();
   });
@@ -459,7 +481,7 @@ describe('TaskService', () => {
     prisma.taskAssignee.create.mockRejectedValue({ code: 'P2002' });
 
     await expect(
-      service.addAssignee(WORKSPACE_ID, 't1', { userId: USER_ID }),
+      service.addAssignee(WORKSPACE_ID, 't1', ACTOR_ID, { userId: USER_ID }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -468,9 +490,9 @@ describe('TaskService', () => {
     prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
     prisma.taskAssignee.deleteMany.mockResolvedValue({ count: 0 });
 
-    await expect(service.removeAssignee(WORKSPACE_ID, 't1', USER_ID)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.removeAssignee(WORKSPACE_ID, 't1', ACTOR_ID, USER_ID),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.taskAssignee.deleteMany).toHaveBeenCalledWith({
       where: { taskId: 't1', userId: USER_ID },
     });

@@ -1,0 +1,90 @@
+import { NotFoundException } from '@nestjs/common';
+import { ActivityType } from '@kurultay/shared-types';
+import { PrismaService } from '../prisma/prisma.service';
+import { ActivityService } from './activity.service';
+
+const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
+const TASK_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60';
+const USER_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d53';
+
+function activityRow(id: string) {
+  return {
+    id,
+    workspaceId: WORKSPACE_ID,
+    taskId: TASK_ID,
+    userId: USER_ID,
+    type: ActivityType.TaskCreated,
+    payload: { title: 'Card' },
+    createdAt: new Date('2026-01-01'),
+    user: { id: USER_ID, name: 'Owner', avatarUrl: null },
+  };
+}
+
+describe('ActivityService', () => {
+  function buildService() {
+    const prisma = {
+      activity: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+      },
+      task: {
+        findFirst: jest.fn(),
+      },
+    };
+    return { service: new ActivityService(prisma as unknown as PrismaService), prisma };
+  }
+
+  it('records via the provided db client', async () => {
+    const { service, prisma } = buildService();
+    prisma.activity.create.mockResolvedValue({ id: 'a1' });
+
+    await service.record(prisma as unknown as PrismaService, {
+      workspaceId: WORKSPACE_ID,
+      taskId: TASK_ID,
+      userId: USER_ID,
+      type: ActivityType.TaskCreated,
+      payload: { title: 'Card' },
+    });
+
+    expect(prisma.activity.create).toHaveBeenCalledWith({
+      data: {
+        workspaceId: WORKSPACE_ID,
+        taskId: TASK_ID,
+        userId: USER_ID,
+        type: ActivityType.TaskCreated,
+        payload: { title: 'Card' },
+      },
+    });
+  });
+
+  it('lists workspace activities newest-first with author and cursor', async () => {
+    const { service, prisma } = buildService();
+    const a = activityRow('0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d70');
+    const b = activityRow('0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d69');
+    const c = activityRow('0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d68');
+    prisma.activity.findMany.mockResolvedValue([a, b, c]);
+
+    const page = await service.listWorkspace(WORKSPACE_ID, { limit: 2 });
+
+    expect(page.items).toHaveLength(2);
+    expect(page.items[0]!.author).toEqual({ id: USER_ID, name: 'Owner', avatarUrl: null });
+    expect(page.nextCursor).toBe(b.id);
+    expect(page.hasMore).toBe(true);
+    expect(prisma.activity.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { workspaceId: WORKSPACE_ID },
+        orderBy: { id: 'desc' },
+        take: 3,
+      }),
+    );
+  });
+
+  it('returns 404 when listing activities for a missing task', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue(null);
+
+    await expect(service.listForTask(WORKSPACE_ID, TASK_ID, {})).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});
