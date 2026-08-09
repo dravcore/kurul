@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { MIN_GAP } from '../common/position/fractional-index';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskService } from './task.service';
@@ -38,7 +42,9 @@ function taskRow(
 describe('TaskService', () => {
   function buildService() {
     const prisma = {
-      board: { findFirst: jest.fn().mockResolvedValue({ id: BOARD_ID, workspaceId: WORKSPACE_ID }) },
+      board: {
+        findFirst: jest.fn().mockResolvedValue({ id: BOARD_ID, workspaceId: WORKSPACE_ID }),
+      },
       column: {
         findFirst: jest.fn().mockResolvedValue({ id: COLUMN_ID, boardId: BOARD_ID }),
       },
@@ -111,9 +117,9 @@ describe('TaskService', () => {
   it('returns 404 when a task is outside the workspace', async () => {
     const { service, prisma } = buildService();
     prisma.task.findFirst.mockResolvedValue(null);
-    await expect(service.get(WORKSPACE_ID, '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d99')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.get(WORKSPACE_ID, '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d99'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('rejects moving a task onto a column from another board', async () => {
