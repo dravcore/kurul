@@ -41,8 +41,18 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
   const [deleteColumn, setDeleteColumn] = useState<ColumnDto | null>(null);
   const [defaultsPending, setDefaultsPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [entranceDone, setEntranceDone] = useState(false);
 
   const canMutate = canMutateColumns(activeRole);
+
+  useEffect(() => {
+    if (loading || entranceDone) return;
+    const timeout = window.setTimeout(
+      () => setEntranceDone(true),
+      columns.length * 40 + 250,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [loading, entranceDone, columns.length]);
 
   const reload = useCallback(async (): Promise<void> => {
     if (!activeId) return;
@@ -231,6 +241,8 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
               onDelete={() => setDeleteColumn(column)}
               onMoveLeft={() => void moveColumn(column, -1)}
               onMoveRight={() => void moveColumn(column, 1)}
+              className={entranceDone ? undefined : 'board-column-enter'}
+              style={entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)}
             />
           ))}
           {canMutate ? (
