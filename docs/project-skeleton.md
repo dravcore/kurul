@@ -128,6 +128,8 @@ Keep module boundaries clean from the start — the option to split a module int
 
 ### Prisma schema — initial tables
 
+*The schema below is the Phase 1 starting point; the live source of truth is `apps/api/prisma/schema.prisma`, which later phases extend (Phase 2 added `Session`, `Account`, `Verification`, `WorkspaceInvitation`).*
+
 ```
 User            id, email, name, avatarUrl, createdAt
 Workspace       id, name, slug, createdAt

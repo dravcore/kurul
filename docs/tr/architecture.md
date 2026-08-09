@@ -192,6 +192,8 @@ Davetler `WorkspaceInvitation` olarak saklanır; Better Auth organization plugin
 tablolarından Kurultay adlarına map edilir. Ürün dili ve REST path'leri
 **Workspace** kullanır — bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
 
+Better Auth ayrıca auth altyapısı tablolarını `Session`, `Account` ve `Verification` yönetir; bunlar plugin tarafından yönetilir ve yukarıdaki domain model tablosundan bilerek hariç tutulur.
+
 ### Kritik alan kuralları
 
 Bunlar pazarlığa açık değildir; ayrıca `CLAUDE.md` içinde de kayıtlıdır.

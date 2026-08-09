@@ -13,6 +13,7 @@ import type {
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
 import { auth } from '../auth/auth';
+import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { envString } from '../common/env';
 import type { CreateInvitationDto } from './dto/create-invitation.dto';
@@ -80,14 +81,13 @@ export class WorkspaceService {
         createdAt: new Date(created.createdAt),
       });
     } catch (error) {
-      if (error instanceof ConflictException || error instanceof BadRequestException) {
-        throw error;
-      }
-      const message = error instanceof Error ? error.message : 'Failed to create workspace';
-      if (/slug|unique|already/i.test(message)) {
+      // The Prisma pre-check above catches the ordinary case; this covers the race where
+      // the slug is taken between that read and the write. Better Auth reports it as a
+      // `400`, but `docs/api-conventions.md` makes a uniqueness violation a `409`.
+      if (betterAuthErrorCode(error) === 'ORGANIZATION_ALREADY_EXISTS') {
         throw new ConflictException('Workspace slug already taken');
       }
-      throw new BadRequestException(message);
+      rethrowBetterAuthError(error, 'Failed to create workspace');
     }
   }
 
@@ -138,11 +138,12 @@ export class WorkspaceService {
         createdAt: new Date(updated.createdAt),
       });
     } catch (error) {
-      if (error instanceof ConflictException || error instanceof NotFoundException) {
-        throw error;
+      if (betterAuthErrorCode(error) === 'ORGANIZATION_ALREADY_EXISTS') {
+        throw new ConflictException('Workspace slug already taken');
       }
-      const message = error instanceof Error ? error.message : 'Failed to update workspace';
-      throw new BadRequestException(message);
+      rethrowBetterAuthError(error, 'Failed to update workspace', {
+        404: 'Workspace not found',
+      });
     }
   }
 
@@ -153,8 +154,9 @@ export class WorkspaceService {
         headers: this.headersFrom(request),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete workspace';
-      throw new BadRequestException(message);
+      rethrowBetterAuthError(error, 'Failed to delete workspace', {
+        404: 'Workspace not found',
+      });
     }
   }
 
@@ -172,6 +174,40 @@ export class WorkspaceService {
     }));
   }
 
+  /**
+   * Pending, unexpired invitations for an email in a workspace.
+   *
+   * Mirrors the organization plugin's own lookup exactly — same lower-cased email, same
+   * `pending` status, same expiry filter — so the decision made in `createInvitation` is
+   * taken over the same rows the plugin would act on.
+   */
+  private async findPendingInvitations(
+    workspaceId: string,
+    email: string,
+  ): Promise<{ id: string; role: string | null }[]> {
+    return this.prisma.workspaceInvitation.findMany({
+      where: {
+        workspaceId,
+        email,
+        status: 'pending',
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true, role: true },
+    });
+  }
+
+  /**
+   * Invites an email to the workspace, or re-issues the pending invitation it already has.
+   *
+   * `resend: true` tells the organization plugin to return the existing pending invitation
+   * with a refreshed expiry instead of creating a second one — but it returns it *unchanged
+   * otherwise*, including its role. Re-inviting someone at a different role would therefore
+   * report success while quietly keeping the old role. So the two cases are separated here:
+   *
+   * - **Same role** — resend, which is exactly what the admin asked for.
+   * - **Different role** — revoke the pending invitation first, so the plugin issues a fresh
+   *   one at the requested role and the response (id, `acceptUrl`, role) describes it.
+   */
   async createInvitation(
     workspaceId: string,
     dto: CreateInvitationDto,
@@ -181,38 +217,64 @@ export class WorkspaceService {
       throw new BadRequestException('Cannot invite someone as OWNER');
     }
 
+    const headers = this.headersFrom(request);
+    // Better Auth stores and matches invitation emails lower-cased.
+    const email = dto.email.toLowerCase();
+
+    const pending = await this.findPendingInvitations(workspaceId, email);
+    if (pending.some((invitation) => invitation.role !== dto.role)) {
+      for (const invitation of pending) {
+        try {
+          await auth.api.cancelInvitation({
+            body: { invitationId: invitation.id },
+            headers,
+          });
+        } catch (error) {
+          rethrowBetterAuthError(error, 'Failed to replace the pending invitation');
+        }
+      }
+    }
+
     try {
       const invitation = await auth.api.createInvitation({
         body: {
-          email: dto.email,
+          email,
           role: dto.role,
           organizationId: workspaceId,
           resend: true,
         },
-        headers: this.headersFrom(request),
+        headers,
       });
 
       if (!invitation?.id || !invitation.email || !invitation.status || !invitation.expiresAt) {
         throw new BadRequestException('Failed to create invitation');
       }
 
+      // Closes the remaining race: if another admin created a pending invitation between
+      // the lookup above and this call, `resend: true` returned *theirs*, at their role.
+      // Reporting that as the requested role is the exact silent loss this method prevents.
+      const grantedRole = invitation.role as MemberRole | undefined;
+      if (grantedRole !== undefined && grantedRole !== dto.role) {
+        throw new ConflictException('Invitation was changed concurrently, please try again');
+      }
+
       const webUrl = envString('WEB_URL', 'http://localhost:3000');
-      const role = (invitation.role as MemberRole | undefined) ?? dto.role;
       return {
         id: invitation.id,
         workspaceId,
         email: invitation.email,
-        role,
+        role: dto.role,
         status: invitation.status,
         expiresAt: new Date(invitation.expiresAt).toISOString(),
         acceptUrl: `${webUrl}/invite/${invitation.id}`,
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      const message = error instanceof Error ? error.message : 'Failed to create invitation';
-      throw new BadRequestException(message);
+      // Deliberately generic: the plugin distinguishes "already a member" from "already
+      // invited" from "no such user", and passing that through would turn this endpoint
+      // into an email-enumeration oracle.
+      rethrowBetterAuthError(error, 'Failed to create invitation', {
+        403: 'You are not allowed to send this invitation',
+      });
     }
   }
 
@@ -234,8 +296,9 @@ export class WorkspaceService {
         headers: this.headersFrom(request),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to revoke invitation';
-      throw new BadRequestException(message);
+      rethrowBetterAuthError(error, 'Failed to revoke invitation', {
+        404: 'Invitation not found',
+      });
     }
   }
 
@@ -274,11 +337,9 @@ export class WorkspaceService {
         role: member.role as MemberRole,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      const message = error instanceof Error ? error.message : 'Failed to accept invitation';
-      throw new BadRequestException(message);
+      rethrowBetterAuthError(error, 'Failed to accept invitation', {
+        404: 'Invitation not found',
+      });
     }
   }
 }
