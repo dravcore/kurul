@@ -1,16 +1,14 @@
-import { IsNotEmpty, IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { OptionalNonNullable } from '../../common/validation/optional';
 
 export class UpdateWorkspaceDto {
-  /** Omitted = leave unchanged; explicit null is rejected (non-nullable column). */
-  @ValidateIf((_, value) => value !== undefined)
-  @IsNotEmpty()
+  @OptionalNonNullable()
   @IsString()
   @MinLength(1)
   @MaxLength(80)
   name?: string;
 
-  @ValidateIf((_, value) => value !== undefined)
-  @IsNotEmpty()
+  @OptionalNonNullable()
   @IsString()
   @MinLength(2)
   @MaxLength(48)

@@ -1,12 +1,7 @@
-import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { NotificationType } from '@kurultay/shared-types';
-
-function clampLimit(value: unknown): number {
-  const n = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(n) || n < 1) return 50;
-  return Math.min(Math.trunc(n), 100);
-}
+import { DEFAULT_PAGE_LIMIT, PageLimit } from '../../common/pagination/page-limit';
 
 function toBoolean(value: unknown): boolean | undefined {
   if (value === undefined || value === null || value === '') return undefined;
@@ -21,13 +16,8 @@ const NOTIFICATION_TYPES = Object.values(NotificationType);
 
 /** Cursor page query for the current user's notifications. */
 export class NotificationQueryDto {
-  @IsOptional()
-  @Transform(({ value }) => clampLimit(value ?? 50))
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit: number = 50;
+  @PageLimit()
+  limit: number = DEFAULT_PAGE_LIMIT;
 
   @IsOptional()
   @IsUUID('7')

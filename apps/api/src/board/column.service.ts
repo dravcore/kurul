@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { SocketEvents, type ColumnDto } from '@kurultay/shared-types';
 import { assertBoard } from '../common/board-access';
-import { resolveMoveNeighbors } from '../common/position/apply-insertion';
+import { resolveCreateNeighbors, resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { batchUpdateColumnPositions } from '../common/position/rebalance-sql';
 import { PrismaService } from '../prisma/prisma.service';
@@ -77,19 +77,17 @@ export class ColumnService {
       where: { boardId },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
     });
-    const after = dto.afterColumnId
-      ? columns.find((column) => column.id === dto.afterColumnId)
-      : columns.at(-1);
-    if (dto.afterColumnId && !after) throw new NotFoundException('Column not found');
-    const afterIndex = after ? columns.indexOf(after) : -1;
-    const before = after ? columns[afterIndex + 1] : columns[0];
-    const position = midpoint(after?.position ?? null, before?.position ?? null);
+    const { insertionIndex, before, after } = resolveCreateNeighbors(
+      columns,
+      dto.afterColumnId,
+      'Column not found',
+    );
+    const position = midpoint(before?.position ?? null, after?.position ?? null);
 
     let created: ColumnDto;
-    if (needsRebalance(after?.position ?? null, before?.position ?? null)) {
+    if (needsRebalance(before?.position ?? null, after?.position ?? null)) {
       created = await this.prisma.$transaction(async (tx) => {
         const positions = rebalancePositions(columns.length + 1);
-        const insertionIndex = after ? afterIndex + 1 : 0;
         const updates = columns.map((column, index) => ({
           id: column.id,
           position: positions[index < insertionIndex ? index : index + 1]!,

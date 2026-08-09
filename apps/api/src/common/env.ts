@@ -86,3 +86,19 @@ export function envString(name: string, fallback: string): string {
   const raw = process.env[name]?.trim();
   return raw === undefined || raw === '' ? fallback : raw;
 }
+
+/**
+ * True while the process is a Jest run.
+ *
+ * Production code should not branch on this — the one sanctioned use is refusing to open
+ * outbound connections (Redis) that a unit test never tears down. Keeping the check here
+ * means there is exactly one place to audit, instead of `JEST_WORKER_ID` sprinkled around.
+ */
+export function isTestEnv(): boolean {
+  return process.env.JEST_WORKER_ID !== undefined || process.env.NODE_ENV === 'test';
+}
+
+/** True only under `NODE_ENV=production`; gates leaking internals into error responses. */
+export function isProductionEnv(): boolean {
+  return process.env.NODE_ENV === 'production';
+}

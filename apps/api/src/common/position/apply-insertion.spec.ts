@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { resolveMoveNeighbors } from './apply-insertion';
+import { resolveCreateNeighbors, resolveMoveNeighbors } from './apply-insertion';
 
 type Item = { id: string; position: number };
 
@@ -70,5 +70,62 @@ describe('resolveMoveNeighbors', () => {
     const remaining = items(['a', 'b', 'c']);
 
     expect(() => resolveMoveNeighbors(remaining, 'a', 'c', 'moving')).toThrow(NotFoundException);
+  });
+});
+
+describe('resolveCreateNeighbors', () => {
+  it('appends when no afterId is given', () => {
+    const siblings = items(['a', 'b']);
+
+    expect(resolveCreateNeighbors(siblings, undefined, 'Task not found')).toEqual({
+      insertionIndex: 2,
+      before: siblings[1],
+      after: null,
+    });
+  });
+
+  it('opens the very first slot in an empty column', () => {
+    expect(resolveCreateNeighbors([], undefined, 'Task not found')).toEqual({
+      insertionIndex: 0,
+      before: null,
+      after: null,
+    });
+  });
+
+  it('inserts directly after the named sibling', () => {
+    const siblings = items(['a', 'b', 'c']);
+
+    expect(resolveCreateNeighbors(siblings, 'a', 'Task not found')).toEqual({
+      insertionIndex: 1,
+      before: siblings[0],
+      after: siblings[1],
+    });
+  });
+
+  it('treats an explicit null afterId as an append', () => {
+    const siblings = items(['a', 'b']);
+
+    expect(resolveCreateNeighbors(siblings, null, 'Task not found')).toEqual({
+      insertionIndex: 2,
+      before: siblings[1],
+      after: null,
+    });
+  });
+
+  // Same slot semantics as a move, so both rebalance paths can read `before`/`after` alike.
+  it('agrees with resolveMoveNeighbors on the resulting slot', () => {
+    const siblings = items(['a', 'b', 'c']);
+
+    expect(resolveCreateNeighbors(siblings, 'b', 'Task not found')).toEqual(
+      resolveMoveNeighbors(siblings, 'b', 'c', 'moving'),
+    );
+  });
+
+  it('throws NotFoundException with the caller message when afterId is missing', () => {
+    const siblings = items(['a', 'b']);
+
+    expect(() => resolveCreateNeighbors(siblings, 'foreign', 'Column not found')).toThrow(
+      'Column not found',
+    );
   });
 });

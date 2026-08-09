@@ -1,23 +1,20 @@
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   Equals,
   IsEnum,
-  IsInt,
   IsISO8601,
   IsOptional,
   IsString,
   IsUUID,
-  Max,
   MaxLength,
-  Min,
   Validate,
   ValidatorConstraint,
   ValidatorConstraintInterface,
   ValidationArguments,
 } from 'class-validator';
 import { Priority } from '@kurultay/shared-types';
-
-const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { DEFAULT_PAGE_LIMIT, PageLimit } from '../../common/pagination/page-limit';
+import { isUuidV7 } from '../../common/uuid';
 
 /** Split CSV or repeated query values into a flat string list. */
 function toStringList(value: unknown): string[] | undefined {
@@ -33,17 +30,11 @@ function toStringList(value: unknown): string[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
-function clampLimit(value: unknown): number {
-  const n = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(n) || n < 1) return 50;
-  return Math.min(Math.trunc(n), 100);
-}
-
 @ValidatorConstraint({ name: 'assigneeIdList', async: false })
 class AssigneeIdListConstraint implements ValidatorConstraintInterface {
   validate(values: unknown): boolean {
     if (!Array.isArray(values)) return false;
-    return values.every((value) => value === 'null' || UUID_V7.test(String(value)));
+    return values.every((value) => value === 'null' || isUuidV7(value));
   }
 
   defaultMessage(args: ValidationArguments): string {
@@ -56,13 +47,8 @@ class AssigneeIdListConstraint implements ValidatorConstraintInterface {
  * Bracket keys (`dueDate[gte]`) are real query param names per api-conventions.
  */
 export class TaskQueryDto {
-  @IsOptional()
-  @Transform(({ value }) => clampLimit(value ?? 50))
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit: number = 50;
+  @PageLimit()
+  limit: number = DEFAULT_PAGE_LIMIT;
 
   @IsOptional()
   @IsUUID('7')

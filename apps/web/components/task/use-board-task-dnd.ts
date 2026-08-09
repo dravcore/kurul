@@ -76,11 +76,9 @@ export function useBoardTaskDnd(
   tasks: TaskDto[],
   canMutate: boolean,
   onMove: (payload: TaskMovePayload) => Promise<void>,
-  formatMovedAnnouncement: (title: string) => string = (title) => `Moved ${title}`,
 ): {
   sensors: ReturnType<typeof useSensors>;
   activeTask: TaskDto | null;
-  announcement: string;
   onDragStart: (event: DragStartEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
   onDragCancel: () => void;
@@ -89,7 +87,6 @@ export function useBoardTaskDnd(
   collisionDetection: typeof closestCorners;
 } {
   const [activeTask, setActiveTask] = useState<TaskDto | null>(null);
-  const [announcement, setAnnouncement] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -134,7 +131,8 @@ export function useBoardTaskDnd(
       return;
     }
 
-    setAnnouncement(formatMovedAnnouncement(moving.title));
+    // The move itself is announced by the DndContext accessibility config, which owns the
+    // only live region on the board.
     void onMove({
       taskId,
       columnId: targetColumnId,
@@ -148,7 +146,6 @@ export function useBoardTaskDnd(
   return {
     sensors,
     activeTask,
-    announcement,
     onDragStart,
     onDragEnd,
     onDragCancel,

@@ -3,10 +3,11 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BoardDto, DashboardSummaryDto } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
+import { useApiResource } from '@/lib/use-api-resource';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { DamgaMark } from '@/components/brand/damga-mark';
@@ -39,58 +40,29 @@ export function DashboardSummary(): React.ReactElement {
   const searchParams = useSearchParams();
   const boardIdParam = searchParams.get('boardId') ?? '';
 
-  const [boards, setBoards] = useState<BoardDto[]>([]);
-  const [summary, setSummary] = useState<DashboardSummaryDto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const fetchBoards = useMemo(
+    () => (activeId ? (signal: AbortSignal) => fetchWorkspaceBoards(activeId, { signal }) : null),
+    [activeId],
+  );
+  // The board picker degrades to "all boards" rather than surfacing its own error row.
+  const { data: boards } = useApiResource<BoardDto[]>(fetchBoards, [], '');
 
   const selectedBoardId = useMemo(() => {
     if (!boardIdParam) return '';
     return boards.some((board) => board.id === boardIdParam) ? boardIdParam : '';
   }, [boardIdParam, boards]);
 
-  useEffect(() => {
-    if (!activeId) return;
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const list = await fetchWorkspaceBoards(activeId, {
-          signal: controller.signal,
-        });
-        if (!controller.signal.aborted) setBoards(list);
-      } catch {
-        if (!controller.signal.aborted) setBoards([]);
-      }
-    })();
-    return () => controller.abort();
-  }, [activeId]);
-
-  useEffect(() => {
-    if (!activeId) return;
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    void (async () => {
-      try {
-        const params = new URLSearchParams();
-        if (selectedBoardId) params.set('boardId', selectedBoardId);
-        const qs = params.toString();
-        const next = await api.get<DashboardSummaryDto>(
-          `/workspaces/${activeId}/dashboard/summary${qs ? `?${qs}` : ''}`,
-          { signal: controller.signal },
-        );
-        if (!controller.signal.aborted) setSummary(next);
-      } catch {
-        if (!controller.signal.aborted) {
-          setError(t('loadError'));
-          setSummary(null);
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    })();
-    return () => controller.abort();
-  }, [activeId, selectedBoardId, t]);
+  const fetchSummary = useMemo(() => {
+    if (!activeId) return null;
+    const qs = selectedBoardId ? `?${new URLSearchParams({ boardId: selectedBoardId })}` : '';
+    return (signal: AbortSignal) =>
+      api.get<DashboardSummaryDto>(`/workspaces/${activeId}/dashboard/summary${qs}`, { signal });
+  }, [activeId, selectedBoardId]);
+  const {
+    data: summary,
+    loading,
+    error,
+  } = useApiResource<DashboardSummaryDto | null>(fetchSummary, null, t('loadError'));
 
   function onBoardChange(nextBoardId: string): void {
     const params = new URLSearchParams(searchParams.toString());

@@ -1,22 +1,12 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Query } from '@nestjs/common';
 import type { CursorPage, TaskDto } from '@kurultay/shared-types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { WorkspaceGuard } from '../common/guards/workspace.guard';
-import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
+import { UuidParam } from '../common/decorators/uuid-param.decorator';
+import {
+  CONTENT_ROLES,
+  WorkspaceRoles,
+  WorkspaceScoped,
+} from '../common/decorators/workspace-roles.decorator';
 import type { AuthenticatedUser } from '../common/types/request-context';
 import { AddAssigneeDto } from './dto/add-assignee.dto';
 import { AddTaskLabelDto } from './dto/add-task-label.dto';
@@ -35,21 +25,20 @@ export class TaskController {
   constructor(private readonly taskService: TaskService) {}
 
   @Get('boards/:boardId/tasks')
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   list(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('boardId', ParseUuidV7Pipe) boardId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('boardId') boardId: string,
     @Query() query: TaskQueryDto,
   ): Promise<CursorPage<TaskDto>> {
     return this.taskService.list(workspaceId, boardId, query);
   }
 
   @Post('boards/:boardId/tasks')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   create(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('boardId', ParseUuidV7Pipe) boardId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('boardId') boardId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateTaskDto,
   ): Promise<TaskDto> {
@@ -57,20 +46,19 @@ export class TaskController {
   }
 
   @Get('tasks/:taskId')
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   get(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
   ): Promise<TaskDto> {
     return this.taskService.get(workspaceId, taskId);
   }
 
   @Patch('tasks/:taskId')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   update(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateTaskDto,
   ): Promise<TaskDto> {
@@ -79,22 +67,20 @@ export class TaskController {
 
   @Delete('tasks/:taskId')
   @HttpCode(204)
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   async remove(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
     await this.taskService.remove(workspaceId, taskId, user.id);
   }
 
   @Patch('tasks/:taskId/position')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   move(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: MoveTaskDto,
   ): Promise<TaskDto> {
@@ -102,11 +88,10 @@ export class TaskController {
   }
 
   @Post('tasks/:taskId/assignees')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   addAssignee(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AddAssigneeDto,
   ): Promise<TaskDto> {
@@ -114,23 +99,21 @@ export class TaskController {
   }
 
   @Delete('tasks/:taskId/assignees/:userId')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   removeAssignee(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
-    @Param('userId', ParseUuidV7Pipe) userId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
+    @UuidParam('userId') userId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<TaskDto> {
     return this.taskService.removeAssignee(workspaceId, taskId, user.id, userId);
   }
 
   @Post('tasks/:taskId/labels')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   addLabel(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AddTaskLabelDto,
   ): Promise<TaskDto> {
@@ -138,12 +121,11 @@ export class TaskController {
   }
 
   @Delete('tasks/:taskId/labels/:labelId')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   removeLabel(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('taskId', ParseUuidV7Pipe) taskId: string,
-    @Param('labelId', ParseUuidV7Pipe) labelId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('taskId') taskId: string,
+    @UuidParam('labelId') labelId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<TaskDto> {
     return this.taskService.removeLabel(workspaceId, taskId, user.id, labelId);

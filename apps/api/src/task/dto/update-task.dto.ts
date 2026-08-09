@@ -3,45 +3,38 @@ import {
   IsEnum,
   IsInt,
   IsISO8601,
-  IsNotEmpty,
-  IsOptional,
   IsString,
   Max,
   MaxLength,
   Min,
   MinLength,
-  ValidateIf,
 } from 'class-validator';
+import { OptionalNonNullable, OptionalNullable } from '../../common/validation/optional';
+import { MAX_ESTIMATED_MINUTES } from './task-limits';
 
 export class UpdateTaskDto {
-  /** Omitted = leave unchanged; explicit null is rejected (non-nullable column). */
-  @ValidateIf((_, value) => value !== undefined)
-  @IsNotEmpty()
+  @OptionalNonNullable()
   @IsString()
   @MinLength(1)
   @MaxLength(500)
   title?: string;
 
-  @IsOptional()
-  @ValidateIf((_, value) => value !== null)
+  @OptionalNullable()
   @IsString()
   @MaxLength(20_000)
   description?: string | null;
 
-  @ValidateIf((_, value) => value !== undefined)
-  @IsNotEmpty()
+  @OptionalNonNullable()
   @IsEnum(Priority)
   priority?: Priority;
 
-  @IsOptional()
-  @ValidateIf((_, value) => value !== null)
+  @OptionalNullable()
   @IsISO8601({ strict: true, strictSeparator: true })
   dueDate?: string | null;
 
-  @IsOptional()
-  @ValidateIf((_, value) => value !== null)
+  @OptionalNullable()
   @IsInt()
   @Min(0)
-  @Max(60 * 24 * 365)
+  @Max(MAX_ESTIMATED_MINUTES)
   estimatedMinutes?: number | null;
 }

@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { SocketEvents } from '@kurultay/shared-types';
-import type { LabelColorSlot, LabelDto, TaskAssigneeDto, TaskDto } from '@kurultay/shared-types';
+import type { LabelDto, TaskAssigneeDto, TaskDto } from '@kurultay/shared-types';
+import { toLabelColorSlot } from '../common/label-color';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { RealtimeService } from '../realtime/realtime.service';
 import { taskInclude, type TaskWithRelations } from './task.include';
@@ -15,7 +16,7 @@ export function toTaskDto(row: TaskWithRelations): TaskDto {
     id: entry.label.id,
     boardId: entry.label.boardId,
     name: entry.label.name,
-    color: entry.label.color as LabelColorSlot,
+    color: toLabelColorSlot(entry.label.color),
   }));
   return {
     id: row.id,

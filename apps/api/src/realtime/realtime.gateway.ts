@@ -19,7 +19,7 @@ import {
 } from '@kurultay/shared-types';
 import type { Server, Socket } from 'socket.io';
 import { auth } from '../auth/auth';
-import { envString } from '../common/env';
+import { envString, isTestEnv } from '../common/env';
 import { parseRedisUrl } from '../common/redis-url';
 import { PrismaService } from '../prisma/prisma.service';
 import { boardRoom, RealtimeService } from './realtime.service';
@@ -120,7 +120,9 @@ export class RealtimeGateway
   }
 
   private async attachRedisAdapter(server: Server): Promise<void> {
-    if (process.env.JEST_WORKER_ID || process.env.NODE_ENV === 'test') {
+    if (isTestEnv()) {
+      // A unit test that instantiates the gateway must not open a Redis connection it
+      // will never close — the suite would hang on an open handle.
       this.logger.debug('Skipping Socket.io Redis adapter in test environment');
       return;
     }

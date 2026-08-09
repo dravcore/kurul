@@ -1,21 +1,12 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Patch,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post } from '@nestjs/common';
 import type { ColumnDto } from '@kurultay/shared-types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { WorkspaceGuard } from '../common/guards/workspace.guard';
-import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
+import { UuidParam } from '../common/decorators/uuid-param.decorator';
+import {
+  ADMIN_ROLES,
+  WorkspaceRoles,
+  WorkspaceScoped,
+} from '../common/decorators/workspace-roles.decorator';
 import type { AuthenticatedUser } from '../common/types/request-context';
 import { ColumnService } from './column.service';
 import { CreateColumnDto } from './dto/create-column.dto';
@@ -27,20 +18,19 @@ export class ColumnController {
   constructor(private readonly columnService: ColumnService) {}
 
   @Get('boards/:boardId/columns')
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   list(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('boardId', ParseUuidV7Pipe) boardId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('boardId') boardId: string,
   ): Promise<ColumnDto[]> {
     return this.columnService.list(workspaceId, boardId);
   }
 
   @Post('boards/:boardId/columns')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   create(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('boardId', ParseUuidV7Pipe) boardId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('boardId') boardId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateColumnDto,
   ): Promise<ColumnDto> {
@@ -48,11 +38,10 @@ export class ColumnController {
   }
 
   @Patch('columns/:columnId')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   update(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('columnId', ParseUuidV7Pipe) columnId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('columnId') columnId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateColumnDto,
   ): Promise<ColumnDto> {
@@ -61,22 +50,20 @@ export class ColumnController {
 
   @Delete('columns/:columnId')
   @HttpCode(204)
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   async remove(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('columnId', ParseUuidV7Pipe) columnId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('columnId') columnId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
     await this.columnService.remove(workspaceId, columnId, user.id);
   }
 
   @Patch('columns/:columnId/position')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   move(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('columnId', ParseUuidV7Pipe) columnId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('columnId') columnId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: MoveColumnDto,
   ): Promise<ColumnDto> {

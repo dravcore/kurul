@@ -1,20 +1,12 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Patch,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post } from '@nestjs/common';
 import type { BoardDto } from '@kurultay/shared-types';
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { WorkspaceGuard } from '../common/guards/workspace.guard';
-import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
+import { UuidParam } from '../common/decorators/uuid-param.decorator';
+import {
+  ADMIN_ROLES,
+  CONTENT_ROLES,
+  WorkspaceRoles,
+  WorkspaceScoped,
+} from '../common/decorators/workspace-roles.decorator';
 import { BoardService } from './board.service';
 import { CreateBoardDto } from './dto/create-board.dto';
 import { UpdateBoardDto } from './dto/update-board.dto';
@@ -27,36 +19,34 @@ export class BoardController {
   constructor(private readonly boardService: BoardService) {}
 
   @Get()
-  @UseGuards(WorkspaceGuard)
-  list(@Param('workspaceId', ParseUuidV7Pipe) workspaceId: string): Promise<BoardDto[]> {
+  @WorkspaceScoped()
+  list(@UuidParam('workspaceId') workspaceId: string): Promise<BoardDto[]> {
     return this.boardService.list(workspaceId);
   }
 
   @Post()
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   create(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @UuidParam('workspaceId') workspaceId: string,
     @Body() dto: CreateBoardDto,
   ): Promise<BoardDto> {
     return this.boardService.create(workspaceId, dto);
   }
 
   @Get(':boardId')
-  @UseGuards(WorkspaceGuard)
+  @WorkspaceScoped()
   get(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('boardId', ParseUuidV7Pipe) boardId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('boardId') boardId: string,
   ): Promise<BoardDto> {
     return this.boardService.get(workspaceId, boardId);
   }
 
   @Patch(':boardId')
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER)
+  @WorkspaceRoles(...CONTENT_ROLES)
   update(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('boardId', ParseUuidV7Pipe) boardId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('boardId') boardId: string,
     @Body() dto: UpdateBoardDto,
   ): Promise<BoardDto> {
     return this.boardService.update(workspaceId, boardId, dto);
@@ -64,11 +54,10 @@ export class BoardController {
 
   @Delete(':boardId')
   @HttpCode(204)
-  @UseGuards(WorkspaceGuard, RolesGuard)
-  @Roles(MemberRole.OWNER, MemberRole.ADMIN)
+  @WorkspaceRoles(...ADMIN_ROLES)
   async remove(
-    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
-    @Param('boardId', ParseUuidV7Pipe) boardId: string,
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('boardId') boardId: string,
   ): Promise<void> {
     await this.boardService.remove(workspaceId, boardId);
   }

@@ -136,15 +136,6 @@ describe('useBoardTaskDnd', () => {
     expect(moved.position).toBeLessThan(1000);
   });
 
-  it('announces the move for screen readers', () => {
-    const tasks = [task('a', COLUMN_A, 1000)];
-    const { rendered } = setup(tasks);
-
-    act(() => rendered.result.current.onDragEnd(dragEnd('a', columnDroppableId(COLUMN_B))));
-
-    expect(rendered.result.current.announcement).toBe('Moved Task a');
-  });
-
   it('does nothing when the card is dropped on itself', () => {
     const tasks = [task('a', COLUMN_A, 1000), task('b', COLUMN_A, 2000)];
     const { onMove, rendered } = setup(tasks);
