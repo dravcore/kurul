@@ -1,24 +1,16 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ActivityType, SocketEvents } from '@kurultay/shared-types';
-import type {
-  CursorPage,
-  LabelColorSlot,
-  LabelDto,
-  TaskAssigneeDto,
-  TaskDto,
-} from '@kurultay/shared-types';
+import type { CursorPage, TaskDto } from '@kurultay/shared-types';
 import type { Prisma } from '../generated/prisma';
 import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
 import { resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
-import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import type { AddAssigneeDto } from './dto/add-assignee.dto';
@@ -27,83 +19,20 @@ import type { CreateTaskDto } from './dto/create-task.dto';
 import type { MoveTaskDto } from './dto/move-task.dto';
 import type { TaskQueryDto } from './dto/task-query.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
-
-const taskInclude = {
-  assignees: {
-    include: { user: { select: { id: true, name: true, avatarUrl: true } } },
-    orderBy: { id: 'asc' as const },
-  },
-  labels: {
-    include: { label: true },
-    orderBy: { id: 'asc' as const },
-  },
-};
-
-type TaskWithRelations = {
-  id: string;
-  boardId: string;
-  columnId: string;
-  title: string;
-  description: string | null;
-  priority: TaskDto['priority'];
-  position: number;
-  dueDate: Date | null;
-  estimatedMinutes: number | null;
-  createdById: string;
-  createdAt: Date;
-  updatedAt: Date;
-  assignees: Array<{
-    user: { id: string; name: string; avatarUrl: string | null };
-  }>;
-  labels: Array<{
-    label: { id: string; boardId: string; name: string; color: string };
-  }>;
-};
+import { TaskAssigneeService } from './task-assignee.service';
+import { taskInclude, type TaskWithRelations } from './task.include';
+import { TaskLabelService } from './task-label.service';
+import { emptyTaskRelations, findTask, toTaskDto } from './task.mapper';
 
 @Injectable()
 export class TaskService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
-    private readonly notificationService: NotificationService,
     private readonly realtime: RealtimeService,
+    private readonly assignees: TaskAssigneeService,
+    private readonly labels: TaskLabelService,
   ) {}
-
-  private toDto(row: TaskWithRelations): TaskDto {
-    const assignees: TaskAssigneeDto[] = row.assignees.map((entry) => ({
-      userId: entry.user.id,
-      name: entry.user.name,
-      avatarUrl: entry.user.avatarUrl,
-    }));
-    const labels: LabelDto[] = row.labels.map((entry) => ({
-      id: entry.label.id,
-      boardId: entry.label.boardId,
-      name: entry.label.name,
-      color: entry.label.color as LabelColorSlot,
-    }));
-    return {
-      id: row.id,
-      boardId: row.boardId,
-      columnId: row.columnId,
-      title: row.title,
-      description: row.description,
-      priority: row.priority,
-      position: row.position,
-      dueDate: row.dueDate?.toISOString() ?? null,
-      estimatedMinutes: row.estimatedMinutes,
-      createdById: row.createdById,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-      assignees,
-      labels,
-    };
-  }
-
-  private emptyRelations<T extends Omit<TaskWithRelations, 'assignees' | 'labels'>>(
-    row: T,
-  ): TaskWithRelations {
-    return { ...row, assignees: [], labels: [] };
-  }
 
   async list(
     workspaceId: string,
@@ -128,7 +57,7 @@ export class TaskService {
     const nextCursor = hasMore ? page[page.length - 1]!.id : null;
 
     return {
-      items: page.map((task) => this.toDto(task)),
+      items: page.map((task) => toTaskDto(task)),
       nextCursor,
       hasMore,
     };
@@ -265,7 +194,7 @@ export class TaskService {
         },
       });
 
-      return this.toDto(this.emptyRelations(created));
+      return toTaskDto(emptyTaskRelations(created));
     });
 
     this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_CREATED, {
@@ -278,7 +207,7 @@ export class TaskService {
   }
 
   async get(workspaceId: string, taskId: string): Promise<TaskDto> {
-    return this.toDto(await this.findTask(workspaceId, taskId));
+    return toTaskDto(await findTask(this.prisma, workspaceId, taskId));
   }
 
   async update(
@@ -287,7 +216,7 @@ export class TaskService {
     userId: string,
     dto: UpdateTaskDto,
   ): Promise<TaskDto> {
-    const existing = await this.findTask(workspaceId, taskId);
+    const existing = await findTask(this.prisma, workspaceId, taskId);
 
     let dueDate: Date | null | undefined;
     if (dto.dueDate !== undefined) {
@@ -345,7 +274,7 @@ export class TaskService {
         });
       }
 
-      return this.toDto(updated);
+      return toTaskDto(updated);
     });
 
     if (Object.keys(changes).length > 0) {
@@ -360,7 +289,7 @@ export class TaskService {
   }
 
   async remove(workspaceId: string, taskId: string, userId: string): Promise<void> {
-    const task = await this.findTask(workspaceId, taskId);
+    const task = await findTask(this.prisma, workspaceId, taskId);
     await this.prisma.$transaction(async (tx) => {
       // Activity.task onDelete SetNull — prior rows keep workspace history; stub carries payload.
       await this.activityService.record(tx, {
@@ -453,7 +382,7 @@ export class TaskService {
             });
           }),
         );
-        result = this.toDto({
+        result = toTaskDto({
           ...task,
           columnId: targetColumn.id,
           position: positions[insertionIndex]!,
@@ -468,7 +397,7 @@ export class TaskService {
           },
           include: taskInclude,
         });
-        result = this.toDto(updated);
+        result = toTaskDto(updated);
       }
 
       await this.activityService.record(tx, {
@@ -499,147 +428,40 @@ export class TaskService {
     return result;
   }
 
-  async addAssignee(
+  addAssignee(
     workspaceId: string,
     taskId: string,
     actorId: string,
     dto: AddAssigneeDto,
   ): Promise<TaskDto> {
-    const task = await this.findTask(workspaceId, taskId);
-    const member = await this.prisma.workspaceMember.findFirst({
-      where: { workspaceId, userId: dto.userId },
-    });
-    if (!member) {
-      throw new UnprocessableEntityException('User is not a member of this workspace');
-    }
-
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.taskAssignee.create({
-          data: { taskId: task.id, userId: dto.userId },
-        });
-
-        const activity = await this.activityService.record(tx, {
-          workspaceId,
-          taskId: task.id,
-          userId: actorId,
-          type: ActivityType.TaskAssigned,
-          payload: {
-            title: task.title,
-            assigneeUserId: dto.userId,
-          },
-        });
-
-        await this.notificationService.createAssignment(tx, {
-          workspaceId,
-          userId: dto.userId,
-          actorId,
-          taskId: task.id,
-          activityId: activity.id,
-          payload: {
-            title: task.title,
-            assigneeUserId: dto.userId,
-            actorId,
-          },
-        });
-      });
-    } catch (error) {
-      if (this.isUniqueViolation(error)) {
-        throw new ConflictException('User is already assigned to this task');
-      }
-      throw error;
-    }
-
-    return this.emitTaskUpdated(workspaceId, actorId, await this.findTask(workspaceId, taskId));
+    return this.assignees.addAssignee(workspaceId, taskId, actorId, dto);
   }
 
-  async removeAssignee(
+  removeAssignee(
     workspaceId: string,
     taskId: string,
     actorId: string,
     assigneeUserId: string,
   ): Promise<TaskDto> {
-    const task = await this.findTask(workspaceId, taskId);
-    await this.prisma.$transaction(async (tx) => {
-      const result = await tx.taskAssignee.deleteMany({
-        where: { taskId, userId: assigneeUserId },
-      });
-      if (result.count === 0) throw new NotFoundException('Assignee not found');
-
-      await this.activityService.record(tx, {
-        workspaceId,
-        taskId,
-        userId: actorId,
-        type: ActivityType.TaskUnassigned,
-        payload: {
-          title: task.title,
-          assigneeUserId,
-        },
-      });
-    });
-    return this.emitTaskUpdated(workspaceId, actorId, await this.findTask(workspaceId, taskId));
+    return this.assignees.removeAssignee(workspaceId, taskId, actorId, assigneeUserId);
   }
 
-  async addLabel(
+  addLabel(
     workspaceId: string,
     taskId: string,
     actorId: string,
     dto: AddTaskLabelDto,
   ): Promise<TaskDto> {
-    const task = await this.findTask(workspaceId, taskId);
-    const label = await this.prisma.label.findFirst({
-      where: { id: dto.labelId, boardId: task.boardId },
-    });
-    if (!label) {
-      throw new UnprocessableEntityException('Label does not belong to this task board');
-    }
-
-    try {
-      await this.prisma.taskLabel.create({
-        data: { taskId: task.id, labelId: label.id },
-      });
-    } catch (error) {
-      if (this.isUniqueViolation(error)) {
-        throw new ConflictException('Label is already assigned to this task');
-      }
-      throw error;
-    }
-
-    return this.emitTaskUpdated(workspaceId, actorId, await this.findTask(workspaceId, taskId));
+    return this.labels.addLabel(workspaceId, taskId, actorId, dto);
   }
 
-  async removeLabel(
+  removeLabel(
     workspaceId: string,
     taskId: string,
     actorId: string,
     labelId: string,
   ): Promise<TaskDto> {
-    await this.findTask(workspaceId, taskId);
-    const result = await this.prisma.taskLabel.deleteMany({
-      where: { taskId, labelId },
-    });
-    if (result.count === 0) throw new NotFoundException('Task label not found');
-    return this.emitTaskUpdated(workspaceId, actorId, await this.findTask(workspaceId, taskId));
-  }
-
-  private emitTaskUpdated(workspaceId: string, actorId: string, task: TaskWithRelations): TaskDto {
-    const dto = this.toDto(task);
-    this.realtime.emitToBoard(dto.boardId, SocketEvents.TASK_UPDATED, {
-      workspaceId,
-      boardId: dto.boardId,
-      actorId,
-      taskId: dto.id,
-    });
-    return dto;
-  }
-
-  private isUniqueViolation(error: unknown): boolean {
-    return (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      (error as { code: string }).code === 'P2002'
-    );
+    return this.labels.removeLabel(workspaceId, taskId, actorId, labelId);
   }
 
   private async findColumnOnBoard(workspaceId: string, boardId: string, columnId: string) {
@@ -648,14 +470,5 @@ export class TaskService {
     });
     if (!column) throw new NotFoundException('Column not found');
     return column;
-  }
-
-  private async findTask(workspaceId: string, taskId: string): Promise<TaskWithRelations> {
-    const task = await this.prisma.task.findFirst({
-      where: { id: taskId, board: { workspaceId } },
-      include: taskInclude,
-    });
-    if (!task) throw new NotFoundException('Task not found');
-    return task;
   }
 }

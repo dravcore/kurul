@@ -8,6 +8,8 @@ import { ActivityService } from '../activity/activity.service';
 import { MIN_GAP } from '../common/position/fractional-index';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TaskAssigneeService } from './task-assignee.service';
+import { TaskLabelService } from './task-label.service';
 import { TaskService } from './task.service';
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
@@ -92,14 +94,16 @@ describe('TaskService', () => {
     prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
       callback(prisma),
     );
-    const realtime = { emitToBoard: jest.fn() };
+    const realtime = {
+      emitToBoard: jest.fn(),
+    } as unknown as import('../realtime/realtime.service').RealtimeService;
+    const prismaService = prisma as unknown as PrismaService;
+    const activity = activityService as unknown as ActivityService;
+    const notifications = notificationService as unknown as NotificationService;
+    const assignees = new TaskAssigneeService(prismaService, activity, notifications, realtime);
+    const labels = new TaskLabelService(prismaService, realtime);
     return {
-      service: new TaskService(
-        prisma as unknown as PrismaService,
-        activityService as unknown as ActivityService,
-        notificationService as unknown as NotificationService,
-        realtime as unknown as import('../realtime/realtime.service').RealtimeService,
-      ),
+      service: new TaskService(prismaService, activity, realtime, assignees, labels),
       prisma,
       activityService,
       notificationService,
