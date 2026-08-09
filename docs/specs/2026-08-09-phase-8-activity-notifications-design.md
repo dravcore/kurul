@@ -1,6 +1,6 @@
 # Phase 8 — Activity log and notifications — design
 
-**Date:** 2026-08-09 · **Status:** approved · **Scope:** activity writes/feeds, Notification model, BullMQ due-soon, panel timeline, mention picker, shell bell
+**Date:** 2026-08-09 · **Status:** shipped · **Scope:** activity writes/feeds, Notification model, BullMQ due-soon, panel timeline, mention picker, shell bell
 
 **Deferred alternatives:** [2026-08-09-phase-8-deferred.md](2026-08-09-phase-8-deferred.md)
 

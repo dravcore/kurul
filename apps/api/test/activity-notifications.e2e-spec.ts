@@ -134,9 +134,9 @@ describe('Activity & notifications (e2e)', () => {
     const activities = await owner.agent
       .get(`/workspaces/${workspace.id}/tasks/${taskId}/activities`)
       .expect(200);
-    expect(activities.body.items.some((a: { type: string }) => a.type === ActivityType.CommentCreated)).toBe(
-      true,
-    );
+    expect(
+      activities.body.items.some((a: { type: string }) => a.type === ActivityType.CommentCreated),
+    ).toBe(true);
 
     await member.agent.post(`/workspaces/${workspace.id}/notifications/read-all`).expect(200);
     const unread = await member.agent

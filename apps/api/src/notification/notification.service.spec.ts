@@ -66,14 +66,14 @@ describe('NotificationService', () => {
     const { service, prisma } = buildService();
     prisma.notification.findFirst.mockResolvedValue({ id: 'existing' });
 
-    await expect(service.shouldSkipDueSoon(prisma as unknown as PrismaService, RECIPIENT_ID, TASK_ID)).resolves.toBe(
-      true,
-    );
+    await expect(
+      service.shouldSkipDueSoon(prisma as unknown as PrismaService, RECIPIENT_ID, TASK_ID),
+    ).resolves.toBe(true);
 
     prisma.notification.findFirst.mockResolvedValue(null);
-    await expect(service.shouldSkipDueSoon(prisma as unknown as PrismaService, RECIPIENT_ID, TASK_ID)).resolves.toBe(
-      false,
-    );
+    await expect(
+      service.shouldSkipDueSoon(prisma as unknown as PrismaService, RECIPIENT_ID, TASK_ID),
+    ).resolves.toBe(false);
   });
 
   it('marks a notification read only for the owner', async () => {

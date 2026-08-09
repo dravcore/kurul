@@ -10,8 +10,7 @@ describe('parseMentions', () => {
   });
 
   it('ignores non-UUIDv7 and bare @names', () => {
-    const body =
-      '@Alice @[Bob](not-a-uuid) @[Carol](0198e2c0-9a1b-4f04-8c3d-2b5e7a9c1d55) hi';
+    const body = '@Alice @[Bob](not-a-uuid) @[Carol](0198e2c0-9a1b-4f04-8c3d-2b5e7a9c1d55) hi';
     expect(parseMentions(body)).toEqual([]);
   });
 

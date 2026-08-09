@@ -303,10 +303,7 @@ export class TaskService {
       const next = dueDate?.toISOString() ?? null;
       if (prev !== next) changes.dueDate = next;
     }
-    if (
-      dto.estimatedMinutes !== undefined &&
-      dto.estimatedMinutes !== existing.estimatedMinutes
-    ) {
+    if (dto.estimatedMinutes !== undefined && dto.estimatedMinutes !== existing.estimatedMinutes) {
       changes.estimatedMinutes = dto.estimatedMinutes;
     }
 
@@ -318,9 +315,7 @@ export class TaskService {
           ...(dto.description !== undefined ? { description: dto.description } : {}),
           ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
           ...(dueDate !== undefined ? { dueDate } : {}),
-          ...(dto.estimatedMinutes !== undefined
-            ? { estimatedMinutes: dto.estimatedMinutes }
-            : {}),
+          ...(dto.estimatedMinutes !== undefined ? { estimatedMinutes: dto.estimatedMinutes } : {}),
         },
         include: taskInclude,
       });

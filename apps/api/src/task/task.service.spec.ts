@@ -399,9 +399,9 @@ describe('TaskService', () => {
     const { service, prisma } = buildService();
     mockMoveTx(prisma, { column: null });
 
-    await expect(service.move(WORKSPACE_ID, 't1', ACTOR_ID, { columnId: COLUMN_ID })).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.move(WORKSPACE_ID, 't1', ACTOR_ID, { columnId: COLUMN_ID }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('returns 404 on move when a neighbor id is not in the target column', async () => {
@@ -490,9 +490,9 @@ describe('TaskService', () => {
     prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
     prisma.taskAssignee.deleteMany.mockResolvedValue({ count: 0 });
 
-    await expect(service.removeAssignee(WORKSPACE_ID, 't1', ACTOR_ID, USER_ID)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.removeAssignee(WORKSPACE_ID, 't1', ACTOR_ID, USER_ID),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.taskAssignee.deleteMany).toHaveBeenCalledWith({
       where: { taskId: 't1', userId: USER_ID },
     });

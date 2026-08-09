@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationType } from '@kurultay/shared-types';
-import type { CursorPage, NotificationDto, NotificationUnreadCountDto } from '@kurultay/shared-types';
+import type {
+  CursorPage,
+  NotificationDto,
+  NotificationUnreadCountDto,
+} from '@kurultay/shared-types';
 import type { Prisma } from '../generated/prisma';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -89,11 +93,7 @@ export class NotificationService {
    * App-level due_soon idempotency: skip when an unread due_soon already exists
    * for the same user+task, or one was created in the last 24h.
    */
-  async shouldSkipDueSoon(
-    db: NotificationDb,
-    userId: string,
-    taskId: string,
-  ): Promise<boolean> {
+  async shouldSkipDueSoon(db: NotificationDb, userId: string, taskId: string): Promise<boolean> {
     const since = new Date(Date.now() - DUE_SOON_WINDOW_MS);
     const existing = await db.notification.findFirst({
       where: {

@@ -3,8 +3,7 @@ const MENTION_RE =
   /@\[([^\]]*)\]\(([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\)/gi;
 
 export type MentionToken =
-  | { kind: 'text'; text: string }
-  | { kind: 'mention'; name: string; userId: string };
+  { kind: 'text'; text: string } | { kind: 'mention'; name: string; userId: string };
 
 /**
  * Extract unique user ids from `@[Name](uuid)` mention tokens in comment bodies.

@@ -28,7 +28,10 @@ import { toast } from 'sonner';
 
 const POLL_MS = 60_000;
 
-function notificationTitle(n: NotificationDto, t: (key: string, values?: Record<string, string>) => string): string {
+function notificationTitle(
+  n: NotificationDto,
+  t: (key: string, values?: Record<string, string>) => string,
+): string {
   const title = typeof n.payload.title === 'string' ? n.payload.title : '';
   switch (n.type) {
     case NotificationType.Assignment:
@@ -68,20 +71,23 @@ export function NotificationBell(): React.ReactElement {
   const [items, setItems] = useState<NotificationDto[]>([]);
   const [loadingList, setLoadingList] = useState(false);
 
-  const refreshUnread = useCallback(async (signal?: AbortSignal): Promise<void> => {
-    if (!workspaceId) return;
-    try {
-      const result = await api.get<NotificationUnreadCountDto>(
-        `/workspaces/${workspaceId}/notifications/unread-count`,
-        { signal },
-      );
-      if (!signal?.aborted) {
-        setUnreadCount(result.count);
+  const refreshUnread = useCallback(
+    async (signal?: AbortSignal): Promise<void> => {
+      if (!workspaceId) return;
+      try {
+        const result = await api.get<NotificationUnreadCountDto>(
+          `/workspaces/${workspaceId}/notifications/unread-count`,
+          { signal },
+        );
+        if (!signal?.aborted) {
+          setUnreadCount(result.count);
+        }
+      } catch {
+        // Keep last known count; avoid toast spam on poll.
       }
-    } catch {
-      // Keep last known count; avoid toast spam on poll.
-    }
-  }, [workspaceId]);
+    },
+    [workspaceId],
+  );
 
   useEffect(() => {
     if (!bootstrapped || !workspaceId) return;
@@ -142,9 +148,7 @@ export function NotificationBell(): React.ReactElement {
         const updated = await api.post<NotificationDto>(
           `/workspaces/${workspaceId}/notifications/${notification.id}/read`,
         );
-        setItems((current) =>
-          current.map((item) => (item.id === updated.id ? updated : item)),
-        );
+        setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
         setUnreadCount((count) => Math.max(0, count - 1));
       }
     } catch {
@@ -156,11 +160,7 @@ export function NotificationBell(): React.ReactElement {
       return;
     }
 
-    const boardId = await resolveBoardId(
-      workspaceId,
-      notification.taskId,
-      notification.payload,
-    );
+    const boardId = await resolveBoardId(workspaceId, notification.taskId, notification.payload);
     setOpen(false);
     if (!boardId) {
       toast.error(t('openTaskError'));
@@ -175,7 +175,13 @@ export function NotificationBell(): React.ReactElement {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('open')} className="relative">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('open')}
+          className="relative"
+        >
           <Bell className="size-4" />
           {badgeLabel ? (
             <span
