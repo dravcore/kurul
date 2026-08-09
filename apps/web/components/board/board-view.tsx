@@ -6,6 +6,12 @@ import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
+import {
+  DndContext,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
+  type DropAnimation,
+} from '@dnd-kit/core';
 import type { BoardDto, ColumnDto, TaskDto } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
 import { canMutateColumns, canMutateTasks } from '@/lib/board-permissions';
@@ -22,6 +28,8 @@ import { Topbar } from '@/components/layout/topbar';
 import { CreateTaskDialog } from '@/components/task/create-task-dialog';
 import { DeleteTaskDialog } from '@/components/task/delete-task-dialog';
 import { TaskPanel } from '@/components/task/task-panel';
+import { TaskDragPreview } from '@/components/task/sortable-task-card';
+import { useBoardTaskDnd, type TaskMovePayload } from '@/components/task/use-board-task-dnd';
 import { BoardColumn } from './board-column';
 import { CreateColumnDialog } from './create-column-dialog';
 import { DeleteColumnDialog } from './delete-column-dialog';
@@ -29,6 +37,12 @@ import { RenameColumnDialog } from './rename-column-dialog';
 import { DamgaMark } from '@/components/brand/damga-mark';
 
 const DEFAULT_COLUMNS = ['To Do', 'In Progress', 'Done'] as const;
+
+const dropAnimation: DropAnimation = {
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: '0.4' } },
+  }),
+};
 
 interface BoardViewProps {
   boardId: string;
@@ -154,6 +168,36 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     })();
     return () => controller.abort();
   }, [activeId, selectedTaskId, loading, tTask]);
+
+  async function commitTaskMove(payload: TaskMovePayload): Promise<void> {
+    if (!activeId) return;
+    setTasks(payload.nextTasks);
+    try {
+      const updated = await api.patch<TaskDto>(
+        `/workspaces/${activeId}/tasks/${payload.taskId}/position`,
+        {
+          columnId: payload.columnId,
+          beforeTaskId: payload.beforeTaskId,
+          afterTaskId: payload.afterTaskId,
+        },
+      );
+      setTasks((current) => current.map((task) => (task.id === updated.id ? updated : task)));
+    } catch (caught) {
+      setTasks(payload.previousTasks);
+      if (caught instanceof ApiError && caught.statusCode === 403) {
+        toast.error(t('errors.forbiddenTasks'));
+      } else {
+        toast.error(tTask('moveError'), {
+          action: {
+            label: tTask('retryAction'),
+            onClick: () => void commitTaskMove(payload),
+          },
+        });
+      }
+    }
+  }
+
+  const dnd = useBoardTaskDnd(tasks, canEditTasks, commitTaskMove);
 
   async function moveColumn(column: ColumnDto, direction: -1 | 1): Promise<void> {
     if (!activeId) return;
@@ -316,41 +360,57 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
               )}
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
-              {columns.map((column, index) => (
-                <BoardColumn
-                  key={column.id}
-                  column={column}
-                  tasks={tasksByColumn.get(column.id) ?? []}
-                  boardId={boardId}
-                  selectedTaskId={selectedTaskId}
-                  canMutateColumns={canEditColumns}
-                  canMutateTasks={canEditTasks}
-                  canMoveLeft={index > 0}
-                  canMoveRight={index < columns.length - 1}
-                  onRename={() => setRenameColumn(column)}
-                  onDelete={() => setDeleteColumn(column)}
-                  onMoveLeft={() => void moveColumn(column, -1)}
-                  onMoveRight={() => void moveColumn(column, 1)}
-                  onAddTask={() => setCreateTaskColumnId(column.id)}
-                  className={entranceDone ? undefined : 'board-column-enter'}
-                  style={
-                    entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)
-                  }
-                />
-              ))}
-              {canEditColumns ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-10 w-[var(--column-width)] min-w-[280px] shrink-0"
-                  onClick={() => setCreateColumnOpen(true)}
-                >
-                  <Plus />
-                  {t('column.createAction')}
-                </Button>
-              ) : null}
-            </div>
+            <DndContext
+              sensors={dnd.sensors}
+              collisionDetection={dnd.collisionDetection}
+              onDragStart={dnd.onDragStart}
+              onDragEnd={dnd.onDragEnd}
+              onDragCancel={dnd.onDragCancel}
+            >
+              <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+                {columns.map((column, index) => (
+                  <BoardColumn
+                    key={column.id}
+                    column={column}
+                    tasks={tasksByColumn.get(column.id) ?? []}
+                    boardId={boardId}
+                    selectedTaskId={selectedTaskId}
+                    canMutateColumns={canEditColumns}
+                    canMutateTasks={canEditTasks}
+                    canMoveLeft={index > 0}
+                    canMoveRight={index < columns.length - 1}
+                    onRename={() => setRenameColumn(column)}
+                    onDelete={() => setDeleteColumn(column)}
+                    onMoveLeft={() => void moveColumn(column, -1)}
+                    onMoveRight={() => void moveColumn(column, 1)}
+                    onAddTask={() => setCreateTaskColumnId(column.id)}
+                    className={entranceDone ? undefined : 'board-column-enter'}
+                    style={
+                      entranceDone
+                        ? undefined
+                        : ({ '--stagger-index': index } as React.CSSProperties)
+                    }
+                  />
+                ))}
+                {canEditColumns ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 w-[var(--column-width)] min-w-[280px] shrink-0"
+                    onClick={() => setCreateColumnOpen(true)}
+                  >
+                    <Plus />
+                    {t('column.createAction')}
+                  </Button>
+                ) : null}
+              </div>
+              <DragOverlay dropAnimation={dropAnimation}>
+                {dnd.activeTask ? <TaskDragPreview task={dnd.activeTask} /> : null}
+              </DragOverlay>
+              <div className="sr-only" aria-live="polite">
+                {dnd.announcement}
+              </div>
+            </DndContext>
           )}
         </div>
 
