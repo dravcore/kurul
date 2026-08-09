@@ -34,7 +34,7 @@ Bare `ws` ve yönetilen realtime servisleri (Ably, Pusher, Liveblocks) yerine, *
 
 ## Değerlendirilen Alternatifler
 
-| Alternatif | Neden değil |
-|---|---|
-| Bare `ws` | Daha düşük overhead, ama zaten gerekli olan oda ve yeniden bağlanma mantığının elle yazılması gerekirdi |
+| Alternatif                             | Neden değil                                                                                                                                  |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bare `ws`                              | Daha düşük overhead, ama zaten gerekli olan oda ve yeniden bağlanma mantığının elle yazılması gerekirdi                                      |
 | Ably / Pusher / Liveblocks (yönetilen) | Sahip olmadığımız serverless ölçekleme sorunlarını çözüyor; self-hosted altyapının gereksiz kıldığı maliyet ve harici bir bağımlılık ekliyor |

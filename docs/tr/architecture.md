@@ -24,10 +24,10 @@ Kurultay bir **modüler monolit** içeren bir **monorepo**'dur.
 
 Bu iki bağımsız eksendir ve ikisini ayrı tutmak önemlidir:
 
-| Eksen | Hangi soruyu yanıtlar | Kurultay'ın cevabı |
-|---|---|---|
-| Monorepo vs. polyrepo | Kod nasıl *saklanır*? | Monorepo (tek pnpm workspace) |
-| Monolit vs. mikroservis | Kod nasıl *çalışır*? | Modüler monolit (tek deploy edilebilir birim) |
+| Eksen                   | Hangi soruyu yanıtlar | Kurultay'ın cevabı                            |
+| ----------------------- | --------------------- | --------------------------------------------- |
+| Monorepo vs. polyrepo   | Kod nasıl _saklanır_? | Monorepo (tek pnpm workspace)                 |
+| Monolit vs. mikroservis | Kod nasıl _çalışır_?  | Modüler monolit (tek deploy edilebilir birim) |
 
 **Neden monorepo**
 
@@ -51,11 +51,11 @@ Bu iki bağımsız eksendir ve ikisini ayrı tutmak önemlidir:
 
 **Referans projeler ne yapıyor**
 
-| Proje | Yaklaşım |
-|---|---|
-| Plane | Çekirdekte monolit, artı iki destek servisi (Gateway = DB proxy, Pilot = entegrasyon yüzeyi) |
+| Proje  | Yaklaşım                                                                                                                                                                            |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plane  | Çekirdekte monolit, artı iki destek servisi (Gateway = DB proxy, Pilot = entegrasyon yüzeyi)                                                                                        |
 | Linear | Tek kod tabanı, farklı rollerde birkaç workload olarak deploy edilir: WebSocket sunucuları, public/private GraphQL API, arka plan iş çalıştırıcıları — her biri bağımsız ölçeklenir |
-| Huly | Kendi Rush-tabanlı build sistemini kurmak pahasına, çok servisli monorepo |
+| Huly   | Kendi Rush-tabanlı build sistemini kurmak pahasına, çok servisli monorepo                                                                                                           |
 
 Kurultay'ın izlediği model Linear'ınki: **tek kod tabanı, gerektiğinde birkaç process rolü.**
 WebSocket sunucusunu kendi container'ında çalıştırmak kodu değil, deployment'ı bölmek
@@ -91,25 +91,25 @@ Her modül aynı iskelete sahip: `*.module.ts`, `*.controller.ts`, `*.service.ts
 Modül sınırları en baştan temiz tutulur — process rollerini daha sonra bölme imkânı tamamen
 buna bağlıdır.
 
-| Modül | Sorumluluk |
-|---|---|
-| `auth` | Better Auth entegrasyonu, session yönetimi, request user çözümlemesi |
-| `workspace` | Workspace CRUD, üyelik, davetler, rol'ler |
-| `board` | Board ve column yönetimi, column sıralaması |
-| `task` | Task CRUD, column'lar arası taşıma, fractional-index ile yeniden sıralama |
-| `label` | Board-scoped label'lar ve task-label ataması |
-| `comment` | Task yorumları |
-| `activity` | Yalnızca-ekleme (append-only) aktivite log'u (`payload` Json) |
-| `dashboard` | Grafikleri besleyen agregasyon sorguları |
-| `notification` | Bildirim dağıtımı, Redis destekli kuyruk |
-| `realtime` | Socket.io gateway + `@socket.io/redis-adapter` |
+| Modül          | Sorumluluk                                                                |
+| -------------- | ------------------------------------------------------------------------- |
+| `auth`         | Better Auth entegrasyonu, session yönetimi, request user çözümlemesi      |
+| `workspace`    | Workspace CRUD, üyelik, davetler, rol'ler                                 |
+| `board`        | Board ve column yönetimi, column sıralaması                               |
+| `task`         | Task CRUD, column'lar arası taşıma, fractional-index ile yeniden sıralama |
+| `label`        | Board-scoped label'lar ve task-label ataması                              |
+| `comment`      | Task yorumları                                                            |
+| `activity`     | Yalnızca-ekleme (append-only) aktivite log'u (`payload` Json)             |
+| `dashboard`    | Grafikleri besleyen agregasyon sorguları                                  |
+| `notification` | Bildirim dağıtımı, Redis destekli kuyruk                                  |
+| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                            |
 
 Cross-cutting altyapı:
 
-| Modül | Sorumluluk |
-|---|---|
+| Modül    | Sorumluluk                                                                                |
+| -------- | ----------------------------------------------------------------------------------------- |
 | `common` | Guard'lar, interceptor'lar, exception filter'lar, decorator'lar — workspace scoping dahil |
-| `prisma` | Global modül olarak `PrismaService`; DB client'ının kurulduğu tek yer |
+| `prisma` | Global modül olarak `PrismaService`; DB client'ının kurulduğu tek yer                     |
 
 Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdır, asla tersi değil.
 `realtime`, domain event'lerinin tüketicisidir, domain logic'in yaşadığı bir yer değil —
@@ -151,11 +151,11 @@ Telden geçen her şey için tek doğruluk kaynağı. Backend ve frontend aynı 
 import eder, böylece aralarındaki bir sapma runtime sürprizi yerine bir type hatasına
 dönüşür.
 
-| İçerik | Örnekler |
-|---|---|
-| Enum'lar | `Priority` (`LOW \| MEDIUM \| HIGH \| URGENT`), `MemberRole` (`OWNER \| ADMIN \| MEMBER \| GUEST`) |
-| DTO tipleri | Workspace, Board, Column, Task, Label request/response şekilleri |
-| Socket kontratı | Event isim sabitleri ve payload tipleri |
+| İçerik          | Örnekler                                                                                           |
+| --------------- | -------------------------------------------------------------------------------------------------- |
+| Enum'lar        | `Priority` (`LOW \| MEDIUM \| HIGH \| URGENT`), `MemberRole` (`OWNER \| ADMIN \| MEMBER \| GUEST`) |
+| DTO tipleri     | Workspace, Board, Column, Task, Label request/response şekilleri                                   |
+| Socket kontratı | Event isim sabitleri ve payload tipleri                                                            |
 
 En kritik olan socket kontratıdır: event isimlerinin tek bir yerde tanımlanması, sunucunun
 `task:moved` yaydığı, client'ın ise `taskMoved` dinlediği klasik hatayı ortadan kaldırır.
@@ -172,19 +172,19 @@ Bu türetmenin Prisma 7 altında somut bir ön koşulu var: client artık `node_
 
 ## 6. Veri modeli
 
-| Model | Anahtar alanlar | Notlar |
-|---|---|---|
-| `User` | `id`, `email`, `name`, `avatarUrl`, `createdAt` | Kimlik, Better Auth'a ait |
-| `Workspace` | `id`, `name`, `slug`, `createdAt` | Tenant kökü — her şey buna bağlanır |
-| `WorkspaceMember` | `id`, `workspaceId`, `userId`, `role` | Join tablosu; `role` yetkileri belirler |
-| `Board` | `id`, `workspaceId`, `name`, `description`, `createdAt` | Board'lar bir workspace'e ait |
-| `Column` | `id`, `boardId`, `name`, `position`, `color` | `position` bir board içindeki column'ları sıralar |
-| `Task` | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt` | Çekirdek entity — kurallar aşağıda |
-| `TaskAssignee` | `id`, `taskId`, `userId` | Join tablosu; task başına birden fazla atanan |
-| `Label` | `id`, `boardId`, `name`, `color` | Board-scoped. `color`, bir design-token slot adı saklar (`slot-1`…`slot-8`), temaya göre resolve edilir — ham bir hex değil; bkz. [design.md](design.md) |
-| `TaskLabel` | `id`, `taskId`, `labelId` | Join tablosu |
-| `Comment` | `id`, `taskId`, `userId`, `body`, `createdAt` | |
-| `Activity` | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt` | Yalnızca-ekleme log. `workspaceId` zorunlu ve `taskId` opsiyonel, böylece task'ı olmayan workspace seviyesi olaylar — "board yeniden adlandırıldı", "üye katıldı" — temsil edilebilir; Faz 8 feed'inin vaat ettiği de bu |
+| Model             | Anahtar alanlar                                                                                                                                     | Notlar                                                                                                                                                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `User`            | `id`, `email`, `name`, `avatarUrl`, `createdAt`                                                                                                     | Kimlik, Better Auth'a ait                                                                                                                                                                                                |
+| `Workspace`       | `id`, `name`, `slug`, `createdAt`                                                                                                                   | Tenant kökü — her şey buna bağlanır                                                                                                                                                                                      |
+| `WorkspaceMember` | `id`, `workspaceId`, `userId`, `role`                                                                                                               | Join tablosu; `role` yetkileri belirler                                                                                                                                                                                  |
+| `Board`           | `id`, `workspaceId`, `name`, `description`, `createdAt`                                                                                             | Board'lar bir workspace'e ait                                                                                                                                                                                            |
+| `Column`          | `id`, `boardId`, `name`, `position`, `color`                                                                                                        | `position` bir board içindeki column'ları sıralar                                                                                                                                                                        |
+| `Task`            | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt` | Çekirdek entity — kurallar aşağıda                                                                                                                                                                                       |
+| `TaskAssignee`    | `id`, `taskId`, `userId`                                                                                                                            | Join tablosu; task başına birden fazla atanan                                                                                                                                                                            |
+| `Label`           | `id`, `boardId`, `name`, `color`                                                                                                                    | Board-scoped. `color`, bir design-token slot adı saklar (`slot-1`…`slot-8`), temaya göre resolve edilir — ham bir hex değil; bkz. [design.md](design.md)                                                                 |
+| `TaskLabel`       | `id`, `taskId`, `labelId`                                                                                                                           | Join tablosu                                                                                                                                                                                                             |
+| `Comment`         | `id`, `taskId`, `userId`, `body`, `createdAt`                                                                                                       |                                                                                                                                                                                                                          |
+| `Activity`        | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt`                                                           | Yalnızca-ekleme log. `workspaceId` zorunlu ve `taskId` opsiyonel, böylece task'ı olmayan workspace seviyesi olaylar — "board yeniden adlandırıldı", "üye katıldı" — temsil edilebilir; Faz 8 feed'inin vaat ettiği de bu |
 
 `Notification` Phase 1 şemasında **yok**. [Roadmap Faz 8](roadmap.md#faz-8--aktivite-logu-ve-bildirimler) ile activity feed ve uygulama içi bildirimler gelince eklenir. O zamana kadar `notification` Nest modül klasörü yalnızca stub'dır.
 
@@ -198,29 +198,29 @@ Better Auth ayrıca auth altyapısı tablolarını `Session`, `Account` ve `Veri
 
 Bunlar pazarlığa açık değildir; ayrıca `CLAUDE.md` içinde de kayıtlıdır.
 
-| Kural | Sebep |
-|---|---|
-| Her `id` **UUIDv7**'dir (`@default(uuid(7))`) | Zaman-sıralı, dolayısıyla ekleme-yoğun tablolarda key'ler index-local kalır ve kararlı bir pagination cursor'ı olarak hizmet eder. Bkz. [api-conventions.md](api-conventions.md#veri-tipleri) |
+| Kural                                                              | Sebep                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Her `id` **UUIDv7**'dir (`@default(uuid(7))`)                      | Zaman-sıralı, dolayısıyla ekleme-yoğun tablolarda key'ler index-local kalır ve kararlı bir pagination cursor'ı olarak hizmet eder. Bkz. [api-conventions.md](api-conventions.md#veri-tipleri)                                                                               |
 | `Task.position` ve `Column.position` **Float**'tır, asla Int değil | Fractional indexing. `1` ve `2` position'ları arasına eklemek `1.5` yazar — tüm listeyi yeniden numaralamak yerine tek satır güncellenir. Hem kartlar hem column'lar için geçerlidir. Bkz. [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) |
-| `dueDate` ve `estimatedMinutes` **ayrı alanlardır** | "Ne zamana kadar" ve "ne kadar sürer" farklı kavramlardır; ileride bir Gantt görünümü ikisine de ihtiyaç duyar |
-| `priority` label'lardan **ayrı tutulur** | Filtreleme ve dashboard agregasyonunu temiz tutar — priority sıralı bir skaler, label'lar ise sırasız bir küme |
-| `Activity.payload` **Json**'dır | Şema migration'ı gerektirmeden yeni aktivite tipleri eklenebilir |
+| `dueDate` ve `estimatedMinutes` **ayrı alanlardır**                | "Ne zamana kadar" ve "ne kadar sürer" farklı kavramlardır; ileride bir Gantt görünümü ikisine de ihtiyaç duyar                                                                                                                                                              |
+| `priority` label'lardan **ayrı tutulur**                           | Filtreleme ve dashboard agregasyonunu temiz tutar — priority sıralı bir skaler, label'lar ise sırasız bir küme                                                                                                                                                              |
+| `Activity.payload` **Json**'dır                                    | Şema migration'ı gerektirmeden yeni aktivite tipleri eklenebilir                                                                                                                                                                                                            |
 
 ### Kısıtlar ve referans aksiyonları
 
 Join tabloları kullanım kolaylığı için bir surrogate `id` taşır, ama veritabanının
 zorladığı şey doğal anahtardır:
 
-| Kısıt | Neyi önler |
-|---|---|
-| `WorkspaceMember @@unique([workspaceId, userId])` | Bir kullanıcının aynı workspace'te iki rol taşıması |
-| `TaskAssignee @@unique([taskId, userId])` | Aynı atananın listelerde, bildirimlerde ve activity payload'larında iki kez sayılması |
-| `TaskLabel @@unique([taskId, labelId])` | Aynı label'ın iki kez eklenmesi |
-| `Column @@unique([boardId, id])` | Yalnızca `Task`'ın bir composite foreign key `(boardId, columnId) → Column(boardId, id)` deklare edebilmesi için var — "bir task'ın column'u kendi board'undadır" kuralını uygulama-seviyesi bir kontrol yerine bir veritabanı garantisi yapar |
+| Kısıt                                             | Neyi önler                                                                                                                                                                                                                                     |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WorkspaceMember @@unique([workspaceId, userId])` | Bir kullanıcının aynı workspace'te iki rol taşıması                                                                                                                                                                                            |
+| `TaskAssignee @@unique([taskId, userId])`         | Aynı atananın listelerde, bildirimlerde ve activity payload'larında iki kez sayılması                                                                                                                                                          |
+| `TaskLabel @@unique([taskId, labelId])`           | Aynı label'ın iki kez eklenmesi                                                                                                                                                                                                                |
+| `Column @@unique([boardId, id])`                  | Yalnızca `Task`'ın bir composite foreign key `(boardId, columnId) → Column(boardId, id)` deklare edebilmesi için var — "bir task'ın column'u kendi board'undadır" kuralını uygulama-seviyesi bir kontrol yerine bir veritabanı garantisi yapar |
 
 **Silmeler kasıtlı olarak cascade eder.** Prisma'nın zorunlu bir ilişki üzerindeki
 varsayılan aksiyonu `Restrict`'tir, dolayısıyla burayı belirtmeden bırakmak board
-silmenin *başarısız olması* anlamına gelir — iki varsayılandan daha şaşırtıcı olanı.
+silmenin _başarısız olması_ anlamına gelir — iki varsayılandan daha şaşırtıcı olanı.
 Sahiplenilen çocuklar cascade eder
 (`Workspace → Board → Column, Task → Comment, Activity, TaskAssignee, TaskLabel`).
 `User`'a referanslar cascade etmez: yazarından daha uzun yaşayan bir yorum veya
@@ -256,11 +256,11 @@ edilir.
 Aşamalı yol bilinçli bir tercihtir: mikroservis kapısı açık kalır, bedeli sadece baştan
 ödenmez.
 
-| Aşama | Tetikleyici | Runtime |
-|---|---|---|
-| MVP | Şimdi | Tek bir NestJS process (`api`) + `web` + `postgres` + `redis` |
-| Rolleri bölme | Trafik artışı | Aynı kod tabanı, aynı image, farklı roller: `api`, `ws` (Socket.io), `worker` (kuyruk) — Compose'da üç servis |
-| Ayırma | Kanıtlanmış bir darboğaz | *Sadece* o modülü kendi servisine çıkar |
+| Aşama         | Tetikleyici              | Runtime                                                                                                       |
+| ------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| MVP           | Şimdi                    | Tek bir NestJS process (`api`) + `web` + `postgres` + `redis`                                                 |
+| Rolleri bölme | Trafik artışı            | Aynı kod tabanı, aynı image, farklı roller: `api`, `ws` (Socket.io), `worker` (kuyruk) — Compose'da üç servis |
+| Ayırma        | Kanıtlanmış bir darboğaz | _Sadece_ o modülü kendi servisine çıkar                                                                       |
 
 2. aşamaya ulaşmak mimari bir değişiklik gerektirmez — temiz NestJS modül sınırları tek ön
    koşuldur. 3. aşamaya yalnızca kanıt karşısında girilir, asla spekülasyonla değil.
@@ -271,15 +271,15 @@ Aşamalı yol bilinçli bir tercihtir: mikroservis kapısı açık kalır, bedel
 
 Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 
-| ADR | Konu |
-|---|---|
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modüler monolit |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Organization plugin'i ile Better Auth (→ Workspace) |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md) | Socket.io + Redis adapter |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) | Sıralama için Float position'lar |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md) | AGPL-3.0 |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md) | Git Flow + SemVer |
+| ADR                                                                                | Konu                                                    |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modüler monolit                              |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                         | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                       | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                   | Organization plugin'i ile Better Auth (→ Workspace)     |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                 | Socket.io + Redis adapter                               |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)             | Sıralama için Float position'lar                        |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                           | AGPL-3.0                                                |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                     | Git Flow + SemVer                                       |
 
 İlgili: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)

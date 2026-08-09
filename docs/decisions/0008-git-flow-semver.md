@@ -54,8 +54,8 @@ Changelog** format.
 
 ## Alternatives considered
 
-| Alternative | Why not |
-|---|---|
-| GitHub Flow | Fits continuously-deployed SaaS; doesn't fit a versioned self-hosted product needing stable release lines and hotfixes |
-| Trunk-based development | Same mismatch — no natural home for release stabilization or hotfixes against older versions |
+| Alternative                            | Why not                                                                                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| GitHub Flow                            | Fits continuously-deployed SaaS; doesn't fit a versioned self-hosted product needing stable release lines and hotfixes                     |
+| Trunk-based development                | Same mismatch — no natural home for release stabilization or hotfixes against older versions                                               |
 | GitHub Releases only (no CHANGELOG.md) | Common peer pattern, but less accessible to self-hosters browsing the repo directly; rejected per the deliberate-deviation rationale above |

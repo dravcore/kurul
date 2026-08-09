@@ -3,7 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, type FormEvent } from 'react';
-import { apiFetch } from '@/lib/api';
+import type { WorkspaceDto } from '@kurultay/shared-types';
+import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 
 function slugify(value: string): string {
@@ -29,25 +30,19 @@ export default function NewWorkspacePage(): React.ReactElement {
     setPending(true);
     setError(null);
 
-    const response = await apiFetch('/workspaces', {
-      method: 'POST',
-      body: JSON.stringify({ name, slug }),
-    });
+    try {
+      const workspace = await api.post<WorkspaceDto>('/workspaces', { name, slug });
+      await authClient.organization.setActive({
+        organizationId: workspace.id,
+      });
 
-    setPending(false);
-
-    if (!response.ok) {
+      router.replace('/dashboard');
+      router.refresh();
+    } catch {
       setError(t('error'));
-      return;
+    } finally {
+      setPending(false);
     }
-
-    const workspace = (await response.json()) as { id: string };
-    await authClient.organization.setActive({
-      organizationId: workspace.id,
-    });
-
-    router.replace('/dashboard');
-    router.refresh();
   }
 
   return (

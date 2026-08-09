@@ -1,5 +1,5 @@
 import { MemberRole } from '@kurultay/shared-types';
-import { IsEmail, IsEnum, IsNotEmpty } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsNotIn } from 'class-validator';
 
 export class CreateInvitationDto {
   @IsEmail()
@@ -7,5 +7,8 @@ export class CreateInvitationDto {
   email!: string;
 
   @IsEnum(MemberRole)
+  @IsNotIn([MemberRole.OWNER], {
+    message: 'OWNER cannot be invited; transfer ownership instead',
+  })
   role!: MemberRole;
 }

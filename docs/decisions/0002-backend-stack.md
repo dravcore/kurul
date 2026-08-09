@@ -93,8 +93,8 @@ share types cleanly with the Next.js frontend.
 
 ## Alternatives considered
 
-| Alternative | Why not |
-|---|---|
-| Fastify | Lighter, but lacks Nest's built-in modular DI structure — more to hand-roll for a multi-module product |
-| Django | Fast CRUD + free admin panel (why Plane, Taiga chose it), but breaks end-to-end TS type sharing and fits a realtime-heavy product less well |
-| Drizzle | Smaller footprint, closer to SQL, but less guided migration tooling for solo development |
+| Alternative | Why not                                                                                                                                     |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fastify     | Lighter, but lacks Nest's built-in modular DI structure — more to hand-roll for a multi-module product                                      |
+| Django      | Fast CRUD + free admin panel (why Plane, Taiga chose it), but breaks end-to-end TS type sharing and fits a realtime-heavy product less well |
+| Drizzle     | Smaller footprint, closer to SQL, but less guided migration tooling for solo development                                                    |

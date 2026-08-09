@@ -1,4 +1,4 @@
-import type { MemberRole, Priority } from './enums.js';
+import type { InvitationStatus, LabelColorSlot, MemberRole, Priority } from './enums.js';
 
 export interface UserDto {
   id: string;
@@ -27,8 +27,9 @@ export interface InvitationDto {
   workspaceId: string;
   email: string;
   role: MemberRole;
-  status: string;
+  status: InvitationStatus;
   expiresAt: string;
+  /** Computed client convenience URL — not a database column. */
   acceptUrl: string;
 }
 
@@ -67,7 +68,7 @@ export interface LabelDto {
   id: string;
   boardId: string;
   name: string;
-  color: string;
+  color: LabelColorSlot;
 }
 
 export interface CommentDto {
@@ -88,7 +89,9 @@ export interface ActivityDto {
   createdAt: string;
 }
 
+/** Default list pagination shape (keyed on `id`, never `position`). */
 export interface CursorPage<T> {
   items: T[];
   nextCursor: string | null;
+  hasMore?: boolean;
 }

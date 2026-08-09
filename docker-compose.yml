@@ -52,7 +52,7 @@ services:
       WEB_URL: ${WEB_URL:-http://localhost:3000}
       # No baked-in default: compose fails loudly instead of booting with a known secret.
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env — see docs/development.md#environment-variables}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:4000}
     ports:
       - '4000:4000'
     depends_on:

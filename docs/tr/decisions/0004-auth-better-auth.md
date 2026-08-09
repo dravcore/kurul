@@ -25,16 +25,16 @@ Auth.js/NextAuth ve Clerk yerine, **organization plugin**'ini kullanan **Better 
 
 ## Alan eşlemesi: organization → Workspace
 
-Better Auth organization plugin'i *organization*, *member* ve *invitation* dilini
+Better Auth organization plugin'i _organization_, _member_ ve _invitation_ dilini
 konuşur. Kurultay'ın ürün dili ve REST API'si **Workspace**, **WorkspaceMember**
 ve workspace-scoped davet route'larını kullanır
 (`POST /workspaces/:workspaceId/invitations`, …). Eşleme 1:1 kabul edilir:
 
-| Better Auth (plugin) | Kurultay (ürün / API) |
-|---|---|
-| Organization | Workspace |
-| Member | WorkspaceMember |
-| Invitation | Invitation (Faz 1'de ayrı Prisma modeli yok) |
+| Better Auth (plugin) | Kurultay (ürün / API)                        |
+| -------------------- | -------------------------------------------- |
+| Organization         | Workspace                                    |
+| Member               | WorkspaceMember                              |
+| Invitation           | Invitation (Faz 1'de ayrı Prisma modeli yok) |
 
 Davet persistence'ı Better Auth'un organization tablolarında yaşar. Faz 1 bir
 Kurultay `Invitation` modeli **eklemedi**.
@@ -51,7 +51,7 @@ yanıtları "organization" kelimesini asla göstermez.
 
 ## Entegrasyon riski
 
-Kütüphane seçimi iyi desteklenmiş; *eşleştirme* Better Auth'un sunduğu en az geçilmiş yol, ve bu keşfedilmek yerine baştan bütçelenmeye değer.
+Kütüphane seçimi iyi desteklenmiş; _eşleştirme_ Better Auth'un sunduğu en az geçilmiş yol, ve bu keşfedilmek yerine baştan bütçelenmeye değer.
 
 - **NestJS entegrasyonu topluluk bakımlı**, birinci taraf değil. Better Auth'un kendi birinci sınıf hedefleri Next.js, Hono ve Elysia; NestJS üçüncü taraf bir modül olan `@thallesp/nestjs-better-auth` tarafından karşılanıyor. Gereksinimleri dışa sızıyor: auth route'ları için NestJS'in **uygulama seviyesi bodyParser'ının devre dışı bırakılmasını** istiyor, bu da her controller'ın body'sini nasıl aldığını etkileyen global bir değişiklik. Bu sürtünme ısırırsa, çıkış yolu Better Auth'un framework-agnostik Node handler'ını doğrudan Express instance'ına monte edip wrapper modülü tamamen atlamak.
 - **Better Auth, 1.x içinde kırıcı değişiklikler yapıyor.** 2.0 öncesi ve minor'lar hızlı ilerliyor. Organization plugin, teams şemasını bir kez zaten yeniden yapılandırdı — `member.teamId` kaldırıldı ve yerine bir `teamMembers` tablosu geldi, mevcut kullanıcılar için bir migration gerektirdi. `workspaceId` izolasyon modelimiz ([architecture.md §7](../architecture.md#7-multi-tenant-izolasyonu)) bu tabloların üzerinde oturuyor, dolayısıyla bu çalkantı auth modülünün içinde kalmıyor.
@@ -68,7 +68,7 @@ Kütüphane seçimi iyi desteklenmiş; *eşleştirme* Better Auth'un sunduğu en
 
 ## Değerlendirilen Alternatifler
 
-| Alternatif | Neden değil |
-|---|---|
-| Auth.js / NextAuth | Bakım modunda, azalan özellik hızı |
-| Clerk | Yönetilen servis — entegre etmesi hızlı ama veri egemenliğinden feragat ettiriyor ve tekrarlayan maliyet ekliyor, self-hosted bir AGPL ürünüyle çelişiyor |
+| Alternatif         | Neden değil                                                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth.js / NextAuth | Bakım modunda, azalan özellik hızı                                                                                                                        |
+| Clerk              | Yönetilen servis — entegre etmesi hızlı ama veri egemenliğinden feragat ettiriyor ve tekrarlayan maliyet ekliyor, self-hosted bir AGPL ürünüyle çelişiyor |

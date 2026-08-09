@@ -26,11 +26,14 @@ describe('Auth (e2e)', () => {
   it('registers, returns session on /me, and rejects unauthenticated /me', async () => {
     const user = await signUp(app);
 
-    await user.agent.get('/me').expect(200).expect(({ body }) => {
-      expect(body.email).toBe(user.email);
-      expect(body.name).toBe(user.name);
-      expect(body.id).toEqual(expect.any(String));
-    });
+    await user.agent
+      .get('/me')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.email).toBe(user.email);
+        expect(body.name).toBe(user.name);
+        expect(body.id).toEqual(expect.any(String));
+      });
 
     await request(app.getHttpServer()).get('/me').expect(401);
   });

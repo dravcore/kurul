@@ -30,8 +30,8 @@ Kurultay, üçüncü bir tarafça alınıp katkıda bulunma zorunluluğu olmadan
 
 ## Değerlendirilen Alternatifler
 
-| Alternatif | Neden değil |
-|---|---|
-| MIT / Apache-2.0 (permissive) | Katkıda bulunma zorunluluğu olmadan kapalı kaynak SaaS yeniden satışına izin veriyor — açık kaynak sürdürülebilirlik hedefini baltalıyor |
-| Düz GPL-3.0 | Network-use/SaaS boşluğunu açık bırakıyor — hosted bir fork kaynağını yayınlamak zorunda kalmazdı |
-| Proprietary / source-available (örn. BSL) | Daha ilk günden gerçek bir açık kaynak topluluk katkı modelini dışlıyor |
+| Alternatif                                | Neden değil                                                                                                                              |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| MIT / Apache-2.0 (permissive)             | Katkıda bulunma zorunluluğu olmadan kapalı kaynak SaaS yeniden satışına izin veriyor — açık kaynak sürdürülebilirlik hedefini baltalıyor |
+| Düz GPL-3.0                               | Network-use/SaaS boşluğunu açık bırakıyor — hosted bir fork kaynağını yayınlamak zorunda kalmazdı                                        |
+| Proprietary / source-available (örn. BSL) | Daha ilk günden gerçek bir açık kaynak topluluk katkı modelini dışlıyor                                                                  |

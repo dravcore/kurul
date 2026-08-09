@@ -20,16 +20,16 @@ Branch model, commit convention, PR process, and release procedure for Kurultay.
 Kurultay uses **Git Flow**. Two branches are permanent; everything else is short-lived and
 deleted after merge.
 
-| Branch | Lifetime | Branches from | Merges into | Purpose |
-|---|---|---|---|---|
-| `main` | permanent | — | — | Released code only. Every commit is a tagged release. |
-| `develop` | permanent | `main` | — | Integration branch. Always deployable to staging. |
-| `feature/*` | short-lived | `develop` | `develop` | New functionality |
-| `fix/*` | short-lived | `develop` | `develop` | Bug fixes that are not urgent |
-| `docs/*` | short-lived | `develop` | `develop` | Documentation-only changes |
-| `chore/*` | short-lived | `develop` | `develop` | Tooling, deps, config, CI |
-| `release/*` | short-lived | `develop` | `main` + `develop` | Version bump, changelog finalization, release hardening |
-| `hotfix/*` | short-lived | `main` | `main` + `develop` | Urgent production fix |
+| Branch      | Lifetime    | Branches from | Merges into        | Purpose                                                 |
+| ----------- | ----------- | ------------- | ------------------ | ------------------------------------------------------- |
+| `main`      | permanent   | —             | —                  | Released code only. Every commit is a tagged release.   |
+| `develop`   | permanent   | `main`        | —                  | Integration branch. Always deployable to staging.       |
+| `feature/*` | short-lived | `develop`     | `develop`          | New functionality                                       |
+| `fix/*`     | short-lived | `develop`     | `develop`          | Bug fixes that are not urgent                           |
+| `docs/*`    | short-lived | `develop`     | `develop`          | Documentation-only changes                              |
+| `chore/*`   | short-lived | `develop`     | `develop`          | Tooling, deps, config, CI                               |
+| `release/*` | short-lived | `develop`     | `main` + `develop` | Version bump, changelog finalization, release hardening |
+| `hotfix/*`  | short-lived | `main`        | `main` + `develop` | Urgent production fix                                   |
 
 ```
 main     ──●───────────────────────●──────────────●──  tags: v0.1.0, v0.1.1, v0.2.0
@@ -60,13 +60,13 @@ Format: `type/kebab-short-description`
   number, ticket alias, or your name
 - `release/*` and `hotfix/*` carry the version instead of a description: `release/0.2.0`
 
-| Good | Bad | Why |
-|---|---|---|
-| `feature/board-drag-and-drop` | `feature/phase3` | Phase numbers say nothing about the change |
-| `fix/task-position-collision` | `fix/bug` | Not identifiable in a branch list |
-| `docs/api-conventions` | `docs/update-docs` | Redundant, no information |
-| `chore/bump-prisma-7` | `dogan-work` | No type prefix, not scannable |
-| `release/0.2.0` | `release/v0.2.0` | The `v` prefix belongs to tags, not branches |
+| Good                          | Bad                | Why                                          |
+| ----------------------------- | ------------------ | -------------------------------------------- |
+| `feature/board-drag-and-drop` | `feature/phase3`   | Phase numbers say nothing about the change   |
+| `fix/task-position-collision` | `fix/bug`          | Not identifiable in a branch list            |
+| `docs/api-conventions`        | `docs/update-docs` | Redundant, no information                    |
+| `chore/bump-prisma-7`         | `dogan-work`       | No type prefix, not scannable                |
+| `release/0.2.0`               | `release/v0.2.0`   | The `v` prefix belongs to tags, not branches |
 
 Commit types and branch types share the same vocabulary deliberately — a `feat:`-heavy
 branch is a `feature/*` branch.
@@ -86,16 +86,16 @@ All commit messages are written in **English** and follow
 
 ### Types
 
-| Type | Use for | SemVer effect (post-1.0) |
-|---|---|---|
-| `feat` | A new user-visible capability | MINOR |
-| `fix` | A bug fix | PATCH |
-| `docs` | Documentation only | none |
-| `chore` | Tooling, deps, config, repo housekeeping | none |
-| `refactor` | Code change that neither fixes a bug nor adds a feature | none |
-| `test` | Adding or correcting tests | none |
-| `ci` | CI/CD pipeline and workflow changes | none |
-| `perf` | Performance improvement without behavior change | PATCH |
+| Type       | Use for                                                 | SemVer effect (post-1.0) |
+| ---------- | ------------------------------------------------------- | ------------------------ |
+| `feat`     | A new user-visible capability                           | MINOR                    |
+| `fix`      | A bug fix                                               | PATCH                    |
+| `docs`     | Documentation only                                      | none                     |
+| `chore`    | Tooling, deps, config, repo housekeeping                | none                     |
+| `refactor` | Code change that neither fixes a bug nor adds a feature | none                     |
+| `test`     | Adding or correcting tests                              | none                     |
+| `ci`       | CI/CD pipeline and workflow changes                     | none                     |
+| `perf`     | Performance improvement without behavior change         | PATCH                    |
 
 A commit with a `BREAKING CHANGE:` footer (or `type!:`) is MAJOR post-1.0. See
 [Versioning policy](#versioning-policy-semver) for what this means before 1.0.
@@ -104,14 +104,14 @@ A commit with a `BREAKING CHANGE:` footer (or `type!:`) is MAJOR post-1.0. See
 
 Scope is optional but strongly preferred. It names the part of the monorepo affected.
 
-| Scope | Meaning |
-|---|---|
-| `api` | `apps/api` — NestJS backend |
-| `web` | `apps/web` — Next.js frontend |
-| `shared` | `packages/shared-types` |
-| `deps` | Dependency bumps |
-| `docs` | The `docs/` set (when the commit type is not already `docs`) |
-| `ci` | Workflows and pipeline config |
+| Scope    | Meaning                                                      |
+| -------- | ------------------------------------------------------------ |
+| `api`    | `apps/api` — NestJS backend                                  |
+| `web`    | `apps/web` — Next.js frontend                                |
+| `shared` | `packages/shared-types`                                      |
+| `deps`   | Dependency bumps                                             |
+| `docs`   | The `docs/` set (when the commit type is not already `docs`) |
+| `ci`     | Workflows and pipeline config                                |
 
 Narrower module scopes are fine when they add clarity: `feat(api/task)`, `fix(web/board)`.
 
@@ -169,12 +169,12 @@ maintainer exists**, and this paragraph is deleted then.
 
 ### Merge strategy
 
-| Merge | Strategy | Reason |
-|---|---|---|
-| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Squash merge** | One clean commit per unit of work; the branch's fixup noise does not enter history |
-| `release/*` → `main` | **Merge commit** (`--no-ff`) | Preserves the release as a distinct, revertible point in history |
-| `hotfix/*` → `main` | **Merge commit** (`--no-ff`) | Same reason |
-| `main` → `develop` (back-merge) | **Merge commit** (`--no-ff`) | Carries the release/hotfix commits back without rewriting them |
+| Merge                                                 | Strategy                     | Reason                                                                             |
+| ----------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------- |
+| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Squash merge**             | One clean commit per unit of work; the branch's fixup noise does not enter history |
+| `release/*` → `main`                                  | **Merge commit** (`--no-ff`) | Preserves the release as a distinct, revertible point in history                   |
+| `hotfix/*` → `main`                                   | **Merge commit** (`--no-ff`) | Same reason                                                                        |
+| `main` → `develop` (back-merge)                       | **Merge commit** (`--no-ff`) | Carries the release/hotfix commits back without rewriting them                     |
 
 Delete the branch after merge. GitHub's "delete branch on merge" setting handles this.
 
@@ -215,12 +215,12 @@ git push origin develop
 # 8. Delete release/0.2.0.
 ```
 
-| Artifact | Format | Example |
-|---|---|---|
-| Branch | `release/x.y.z` | `release/0.2.0` |
-| Version in `package.json` | `x.y.z` | `0.2.0` |
-| Git tag | `vX.Y.Z` | `v0.2.0` |
-| Changelog heading | `## [x.y.z] - YYYY-MM-DD` | `## [0.2.0] - 2026-09-14` |
+| Artifact                  | Format                    | Example                   |
+| ------------------------- | ------------------------- | ------------------------- |
+| Branch                    | `release/x.y.z`           | `release/0.2.0`           |
+| Version in `package.json` | `x.y.z`                   | `0.2.0`                   |
+| Git tag                   | `vX.Y.Z`                  | `v0.2.0`                  |
+| Changelog heading         | `## [x.y.z] - YYYY-MM-DD` | `## [0.2.0] - 2026-09-14` |
 
 `CHANGELOG.md` is maintained continuously under `[Unreleased]`, not reconstructed from git
 log at release time. If a PR is user-visible, it updates the changelog.
@@ -292,16 +292,16 @@ API versioning stance (no `/v1` prefix before 1.0) is covered in
 
 ## Rules summary
 
-| Rule | |
-|---|---|
-| Direct commits to `main` / `develop` | Never |
-| PR target branch | `develop` (except `release/*` and `hotfix/*` → `main`) |
-| Commit language | English |
-| Commit format | Conventional Commits |
-| Feature merge | Squash |
-| Release/hotfix merge | `--no-ff` + back-merge to `develop` |
-| Tag format | `vX.Y.Z` |
-| Changelog | Updated in the PR, not at release time |
+| Rule                                 |                                                        |
+| ------------------------------------ | ------------------------------------------------------ |
+| Direct commits to `main` / `develop` | Never                                                  |
+| PR target branch                     | `develop` (except `release/*` and `hotfix/*` → `main`) |
+| Commit language                      | English                                                |
+| Commit format                        | Conventional Commits                                   |
+| Feature merge                        | Squash                                                 |
+| Release/hotfix merge                 | `--no-ff` + back-merge to `develop`                    |
+| Tag format                           | `vX.Y.Z`                                               |
+| Changelog                            | Updated in the PR, not at release time                 |
 
 ## See also
 

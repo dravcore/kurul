@@ -11,25 +11,26 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { MemberRole } from '@kurultay/shared-types';
-import type {
-  InvitationDto,
-  WorkspaceDto,
-  WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+import type { InvitationDto, WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import type { Request } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { WorkspaceGuard } from '../common/guards/workspace.guard';
+import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
 import type { AuthenticatedUser } from '../common/types/request-context';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import { WorkspaceInvitationService } from './workspace-invitation.service';
 import { WorkspaceService } from './workspace.service';
 
 @Controller('workspaces')
 export class WorkspaceController {
-  constructor(private readonly workspaceService: WorkspaceService) {}
+  constructor(
+    private readonly workspaceService: WorkspaceService,
+    private readonly invitationService: WorkspaceInvitationService,
+  ) {}
 
   @Get()
   list(@CurrentUser() user: AuthenticatedUser): Promise<WorkspaceDto[]> {
@@ -47,7 +48,7 @@ export class WorkspaceController {
 
   @Get(':workspaceId')
   @UseGuards(WorkspaceGuard)
-  get(@Param('workspaceId') workspaceId: string): Promise<WorkspaceDto> {
+  get(@Param('workspaceId', ParseUuidV7Pipe) workspaceId: string): Promise<WorkspaceDto> {
     return this.workspaceService.getById(workspaceId);
   }
 
@@ -55,7 +56,7 @@ export class WorkspaceController {
   @UseGuards(WorkspaceGuard, RolesGuard)
   @Roles(MemberRole.OWNER, MemberRole.ADMIN)
   update(
-    @Param('workspaceId') workspaceId: string,
+    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Body() dto: UpdateWorkspaceDto,
     @Req() request: Request,
   ): Promise<WorkspaceDto> {
@@ -67,7 +68,7 @@ export class WorkspaceController {
   @UseGuards(WorkspaceGuard, RolesGuard)
   @Roles(MemberRole.OWNER)
   async remove(
-    @Param('workspaceId') workspaceId: string,
+    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Req() request: Request,
   ): Promise<void> {
     await this.workspaceService.remove(workspaceId, request);
@@ -75,7 +76,9 @@ export class WorkspaceController {
 
   @Get(':workspaceId/members')
   @UseGuards(WorkspaceGuard)
-  listMembers(@Param('workspaceId') workspaceId: string): Promise<WorkspaceMemberDto[]> {
+  listMembers(
+    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+  ): Promise<WorkspaceMemberDto[]> {
     return this.workspaceService.listMembers(workspaceId);
   }
 
@@ -83,11 +86,11 @@ export class WorkspaceController {
   @UseGuards(WorkspaceGuard, RolesGuard)
   @Roles(MemberRole.OWNER, MemberRole.ADMIN)
   createInvitation(
-    @Param('workspaceId') workspaceId: string,
+    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Body() dto: CreateInvitationDto,
     @Req() request: Request,
   ): Promise<InvitationDto> {
-    return this.workspaceService.createInvitation(workspaceId, dto, request);
+    return this.invitationService.createInvitation(workspaceId, dto, request);
   }
 
   @Delete(':workspaceId/invitations/:invitationId')
@@ -95,11 +98,11 @@ export class WorkspaceController {
   @UseGuards(WorkspaceGuard, RolesGuard)
   @Roles(MemberRole.OWNER, MemberRole.ADMIN)
   async revokeInvitation(
-    @Param('workspaceId') workspaceId: string,
-    @Param('invitationId') invitationId: string,
+    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @Param('invitationId', ParseUuidV7Pipe) invitationId: string,
     @Req() request: Request,
   ): Promise<void> {
-    await this.workspaceService.revokeInvitation(workspaceId, invitationId, request);
+    await this.invitationService.revokeInvitation(workspaceId, invitationId, request);
   }
 
   /**
@@ -108,10 +111,10 @@ export class WorkspaceController {
    */
   @Post(':workspaceId/invitations/:invitationId/accept')
   acceptInvitation(
-    @Param('workspaceId') workspaceId: string,
-    @Param('invitationId') invitationId: string,
+    @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
+    @Param('invitationId', ParseUuidV7Pipe) invitationId: string,
     @Req() request: Request,
   ): Promise<WorkspaceMemberDto> {
-    return this.workspaceService.acceptInvitation(workspaceId, invitationId, request);
+    return this.invitationService.acceptInvitation(workspaceId, invitationId, request);
   }
 }

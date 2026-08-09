@@ -12,13 +12,13 @@ opening an issue or PR.
 
 ## Ways to contribute
 
-| Type | How |
-|---|---|
-| Bug report | [Open a bug report issue](.github/ISSUE_TEMPLATE/bug_report.yml) |
-| Feature idea | [Open a feature request issue](.github/ISSUE_TEMPLATE/feature_request.yml) |
-| Code | Claim an approved issue, then open a PR (see below) |
-| Docs | PRs against `docs/` follow the same process as code |
-| Translation | Turkish docs live under `docs/tr/`; README's Turkish sibling is `README.tr.md` |
+| Type         | How                                                                            |
+| ------------ | ------------------------------------------------------------------------------ |
+| Bug report   | [Open a bug report issue](.github/ISSUE_TEMPLATE/bug_report.yml)               |
+| Feature idea | [Open a feature request issue](.github/ISSUE_TEMPLATE/feature_request.yml)     |
+| Code         | Claim an approved issue, then open a PR (see below)                            |
+| Docs         | PRs against `docs/` follow the same process as code                            |
+| Translation  | Turkish docs live under `docs/tr/`; README's Turkish sibling is `README.tr.md` |
 
 ## Issue-first rule
 
@@ -59,7 +59,7 @@ Test expectations: [docs/testing.md](docs/testing.md).
 - Fill in the PR template checklist (conventional title, docs updated where relevant,
   lint/typecheck/tests once CI exists).
 - Expect **one approving review** before merge; maintainers squash-merge into `develop`.
-  While Kurultay has a single maintainer there is nobody to review *their* PRs, so
+  While Kurultay has a single maintainer there is nobody to review _their_ PRs, so
   maintainer-authored PRs are self-reviewed and self-merged once CI is green. Your PRs are
   reviewed as normal, and the review requirement applies to everyone again as soon as a
   second maintainer exists.

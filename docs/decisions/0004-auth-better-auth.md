@@ -35,16 +35,16 @@ invite-acceptance screens are ours to design and build.
 
 ## Domain mapping: organization → Workspace
 
-Better Auth's organization plugin speaks *organization*, *member*, and
-*invitation*. Kurultay's product language and REST API use **Workspace**,
+Better Auth's organization plugin speaks _organization_, _member_, and
+_invitation_. Kurultay's product language and REST API use **Workspace**,
 **WorkspaceMember**, and workspace-scoped invitation routes
 (`POST /workspaces/:workspaceId/invitations`, …). Treat the mapping as 1:1:
 
-| Better Auth (plugin) | Kurultay (product / API) |
-|---|---|
-| Organization | Workspace |
-| Member | WorkspaceMember |
-| Invitation | Invitation (no separate Prisma model in Phase 1) |
+| Better Auth (plugin) | Kurultay (product / API)                         |
+| -------------------- | ------------------------------------------------ |
+| Organization         | Workspace                                        |
+| Member               | WorkspaceMember                                  |
+| Invitation           | Invitation (no separate Prisma model in Phase 1) |
 
 Invite persistence lives in Better Auth's organization tables. Phase 1 did
 **not** add a Kurultay `Invitation` model.
@@ -61,7 +61,7 @@ word "organization".
 
 ## Integration risk
 
-The library choice is well-supported; the *pairing* is the least-travelled path
+The library choice is well-supported; the _pairing_ is the least-travelled path
 Better Auth offers, and that is worth budgeting for rather than discovering.
 
 - **The NestJS integration is community-maintained**, not first-party.
@@ -96,7 +96,7 @@ Better Auth offers, and that is worth budgeting for rather than discovering.
 
 ## Alternatives considered
 
-| Alternative | Why not |
-|---|---|
-| Auth.js / NextAuth | In maintenance mode, reduced feature velocity |
-| Clerk | Managed service — fast to integrate but cedes data sovereignty and adds recurring cost, at odds with a self-hosted AGPL product |
+| Alternative        | Why not                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Auth.js / NextAuth | In maintenance mode, reduced feature velocity                                                                                   |
+| Clerk              | Managed service — fast to integrate but cedes data sovereignty and adds recurring cost, at odds with a self-hosted AGPL product |

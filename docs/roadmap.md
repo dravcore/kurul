@@ -27,11 +27,11 @@ Phased delivery plan for Kurultay, from documentation to MVP and beyond.
 **This file holds high-level phases only.** Task-level tracking lives in GitHub Issues:
 [github.com/dravcore/kurultay/issues](https://github.com/dravcore/kurultay/issues).
 
-| Level | Where | Granularity |
-|---|---|---|
-| Phase | This file | "Boards and columns" — weeks of work, one coherent capability |
-| Task | GitHub Issues | "Column reorder endpoint returns 409 on cross-board move" — one PR |
-| Decision | [decisions/](decisions/) | Why a phase is built the way it is |
+| Level    | Where                    | Granularity                                                        |
+| -------- | ------------------------ | ------------------------------------------------------------------ |
+| Phase    | This file                | "Boards and columns" — weeks of work, one coherent capability      |
+| Task     | GitHub Issues            | "Column reorder endpoint returns 409 on cross-board move" — one PR |
+| Decision | [decisions/](decisions/) | Why a phase is built the way it is                                 |
 
 Phases ship in order. Each one ends in a working, merged, demonstrable state — no phase
 leaves half-wired code on `develop`. A phase may map to a `0.y.0` release; see
@@ -42,11 +42,11 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 
 ## Status legend
 
-| Mark | Meaning |
-|---|---|
-| `[x]` | Done — merged to `develop` |
-| `[~]` | In progress |
-| `[ ]` | Not started |
+| Mark  | Meaning                         |
+| ----- | ------------------------------- |
+| `[x]` | Done — merged to `develop`      |
+| `[~]` | In progress                     |
+| `[ ]` | Not started                     |
 | `[-]` | Deferred / out of scope for now |
 
 ---
@@ -294,18 +294,18 @@ schema is one pass of work; building it early is a tax on all eight phases befor
 
 Not scheduled. Listed so the architecture stays compatible with them, not as commitments.
 
-| Item | Note |
-|---|---|
-| `[-]` E2E test suite (Playwright) | Once the UI stops changing shape — [testing.md](testing.md) |
-| `[-]` Gantt / timeline view | `dueDate` + `estimatedMinutes` are kept separate for this |
-| `[-]` Task attachments | Needs an object-storage decision (ADR) |
-| `[-]` Board templates | |
-| `[-]` Public API tokens + `/v1` prefix | Post-1.0 — [api-conventions.md](api-conventions.md#versioning) |
-| `[-]` Webhooks | |
-| `[-]` Email notifications | |
-| `[-]` Import from Trello / Jira | |
-| `[-]` Further UI language packs | The next-intl layer itself ships in Phase 1 and MVP is English-only; this row is about additional locales (Turkish first) — see [design.md](design.md#7-ui-writing) |
-| `[-]` Self-host deployment guide beyond Docker Compose | |
+| Item                                                   | Note                                                                                                                                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[-]` E2E test suite (Playwright)                      | Once the UI stops changing shape — [testing.md](testing.md)                                                                                                         |
+| `[-]` Gantt / timeline view                            | `dueDate` + `estimatedMinutes` are kept separate for this                                                                                                           |
+| `[-]` Task attachments                                 | Needs an object-storage decision (ADR)                                                                                                                              |
+| `[-]` Board templates                                  |                                                                                                                                                                     |
+| `[-]` Public API tokens + `/v1` prefix                 | Post-1.0 — [api-conventions.md](api-conventions.md#versioning)                                                                                                      |
+| `[-]` Webhooks                                         |                                                                                                                                                                     |
+| `[-]` Email notifications                              |                                                                                                                                                                     |
+| `[-]` Import from Trello / Jira                        |                                                                                                                                                                     |
+| `[-]` Further UI language packs                        | The next-intl layer itself ships in Phase 1 and MVP is English-only; this row is about additional locales (Turkish first) — see [design.md](design.md#7-ui-writing) |
+| `[-]` Self-host deployment guide beyond Docker Compose |                                                                                                                                                                     |
 
 **1.0.0** is cut when Phases 1–9 are complete and the REST API is stable enough to promise
 backwards compatibility.

@@ -28,14 +28,14 @@ Geliştirmede base URL: `http://localhost:4000`.
 
 ## Kaynak adlandırma
 
-| Kural | |
-|---|---|
-| Fiil değil isim | `/tasks`, asla `/getTasks` değil |
-| Çoğul koleksiyonlar | `/boards`, `/tasks`, `/workspaces` |
-| Path'lerde kebab-case | `/workspace-members`, `/workspaceMembers` değil |
-| camelCase path param'ları | `:workspaceId`, `:boardId`, `:taskId` |
-| İç içelik sahipliği ifade eder | Bir koleksiyona kendi sahibi üzerinden ulaşılır: bir board'un task'ları, bir task'ın yorumları |
-| İç içelik, workspace kökünün 2 seviye altında durur | `:workspaceId` her route'ta zorunludur ve limite dahil edilmez — o bir hiyerarşi seviyesi değil, tenant scope'udur. Daha derin hiyerarşiler yerine query filtreleri kullanılır |
+| Kural                                                            |                                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fiil değil isim                                                  | `/tasks`, asla `/getTasks` değil                                                                                                                                                                                                                                                  |
+| Çoğul koleksiyonlar                                              | `/boards`, `/tasks`, `/workspaces`                                                                                                                                                                                                                                                |
+| Path'lerde kebab-case                                            | `/workspace-members`, `/workspaceMembers` değil                                                                                                                                                                                                                                   |
+| camelCase path param'ları                                        | `:workspaceId`, `:boardId`, `:taskId`                                                                                                                                                                                                                                             |
+| İç içelik sahipliği ifade eder                                   | Bir koleksiyona kendi sahibi üzerinden ulaşılır: bir board'un task'ları, bir task'ın yorumları                                                                                                                                                                                    |
+| İç içelik, workspace kökünün 2 seviye altında durur              | `:workspaceId` her route'ta zorunludur ve limite dahil edilmez — o bir hiyerarşi seviyesi değil, tenant scope'udur. Daha derin hiyerarşiler yerine query filtreleri kullanılır                                                                                                    |
 | Bir kaynağın id'si olduğunda, ona sığ (shallow) biçimde ulaşılır | `/workspaces/:workspaceId/tasks/:taskId`, asla `/workspaces/:workspaceId/boards/:boardId/tasks/:taskId` değil. Id zaten satırı tanımlıyor; workspace guard'ı zaten onu scope'luyor. Ebeveyn segmenti, sunucunun doğrulaması gereken ama hiçbir fayda sağlamayan bir değer ekliyor |
 
 ### Workspace scoping
@@ -109,32 +109,32 @@ Aksiyon segmentleri istisnadır ve her birinin bir sebebi olmalıdır.
 
 ## HTTP verb'leri ve status kodları
 
-| Verb | Semantik | Idempotent | Body | Başarı |
-|---|---|---|---|---|
-| `GET` | Bir kaynağı veya koleksiyonu oku | Evet | Hayır | `200` |
-| `POST` | Oluştur, ya da idempotent olmayan bir aksiyonu tetikle | Hayır | Evet | `201` (oluşturma), `200` (aksiyon) |
-| `PATCH` | Kısmi güncelleme — yalnızca gönderilen alanlar değişir | Hayır | Evet | `200` |
-| `PUT` | Tam değiştirme | Evet | Evet | `200` |
-| `DELETE` | Kaldır | Evet | Hayır | `204` |
+| Verb     | Semantik                                               | Idempotent | Body  | Başarı                             |
+| -------- | ------------------------------------------------------ | ---------- | ----- | ---------------------------------- |
+| `GET`    | Bir kaynağı veya koleksiyonu oku                       | Evet       | Hayır | `200`                              |
+| `POST`   | Oluştur, ya da idempotent olmayan bir aksiyonu tetikle | Hayır      | Evet  | `201` (oluşturma), `200` (aksiyon) |
+| `PATCH`  | Kısmi güncelleme — yalnızca gönderilen alanlar değişir | Hayır      | Evet  | `200`                              |
+| `PUT`    | Tam değiştirme                                         | Evet       | Evet  | `200`                              |
+| `DELETE` | Kaldır                                                 | Evet       | Hayır | `204`                              |
 
 **Güncellemeler için varsayılan `PATCH`'tir.** `PUT`, yalnızca tam bir değiştirmenin
 gerçekten operasyon olduğu yerde kullanılır (örneğin bir column'un tamamını yeniden
 sıralamak). Bir alanı atlayan bir `PATCH` onu dokunulmamış bırakır; açıkça `null` göndermek
 nullable bir alanı temizler.
 
-| Status | Ne zaman |
-|---|---|
-| `200 OK` | Başarılı okuma, güncelleme veya aksiyon |
-| `201 Created` | Kaynak oluşturuldu; body oluşturulan kaynaktır |
-| `204 No Content` | Başarılı silme; boş body |
-| `400 Bad Request` | Bozuk request veya validation hatası |
-| `401 Unauthorized` | Eksik veya geçersiz session |
-| `403 Forbidden` | Kimlikli, workspace üyesi, ama rol yetersiz |
-| `404 Not Found` | Kaynak yok **veya** başka bir workspace'e ait |
-| `409 Conflict` | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik |
-| `422 Unprocessable Entity` | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak) |
-| `429 Too Many Requests` | Rate limit uygulandı |
-| `500 Internal Server Error` | Ele alınmamış hata. Asla bir stack trace sızdırmaz. |
+| Status                      | Ne zaman                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `200 OK`                    | Başarılı okuma, güncelleme veya aksiyon                                                                       |
+| `201 Created`               | Kaynak oluşturuldu; body oluşturulan kaynaktır                                                                |
+| `204 No Content`            | Başarılı silme; boş body                                                                                      |
+| `400 Bad Request`           | Bozuk request veya validation hatası                                                                          |
+| `401 Unauthorized`          | Eksik veya geçersiz session                                                                                   |
+| `403 Forbidden`             | Kimlikli, workspace üyesi, ama rol yetersiz                                                                   |
+| `404 Not Found`             | Kaynak yok **veya** başka bir workspace'e ait                                                                 |
+| `409 Conflict`              | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                   |
+| `422 Unprocessable Entity`  | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak) |
+| `429 Too Many Requests`     | Rate limit uygulandı                                                                                          |
+| `500 Internal Server Error` | Ele alınmamış hata. Asla bir stack trace sızdırmaz.                                                           |
 
 **Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
 doğrulardı, ki bu tenant sınırının ötesine bilgi sızdırır. `403`, rolü çok düşük meşru bir
@@ -161,7 +161,7 @@ flag'i, bir zarf (envelope) yoktur.
   "labels": [{ "id": "lbl_1", "name": "backend", "color": "#00C896" }],
   "createdById": "usr_1",
   "createdAt": "2026-08-08T09:12:31.114Z",
-  "updatedAt": "2026-08-08T09:12:31.114Z"
+  "updatedAt": "2026-08-08T09:12:31.114Z",
 }
 ```
 
@@ -190,21 +190,25 @@ isimleriyle):
   "message": "Validation failed",
   "details": [
     { "field": "title", "constraint": "isNotEmpty", "message": "title should not be empty" },
-    { "field": "estimatedMinutes", "constraint": "min", "message": "estimatedMinutes must not be less than 0" }
+    {
+      "field": "estimatedMinutes",
+      "constraint": "min",
+      "message": "estimatedMinutes must not be less than 0",
+    },
   ],
   "path": "/workspaces/w_1/boards/b_1/tasks",
-  "timestamp": "2026-08-08T09:12:31.114Z"
+  "timestamp": "2026-08-08T09:12:31.114Z",
 }
 ```
 
-| Alan | Tip | Zorunlu | Anlam |
-|---|---|---|---|
-| `statusCode` | number | evet | HTTP status'ünü yansıtır |
-| `error` | string | evet | Kararlı, makine tarafından okunabilir sebep ifadesi (`Bad Request`, `Not Found`) |
-| `message` | string | evet | İnsan tarafından okunabilir, tek cümle, loglanması güvenli |
-| `details` | array | hayır | Alan bazlı validation problemleri; yalnızca `400`/`422`'de mevcut |
-| `path` | string | evet | Request path'i |
-| `timestamp` | string | evet | ISO 8601 UTC |
+| Alan         | Tip    | Zorunlu | Anlam                                                                            |
+| ------------ | ------ | ------- | -------------------------------------------------------------------------------- |
+| `statusCode` | number | evet    | HTTP status'ünü yansıtır                                                         |
+| `error`      | string | evet    | Kararlı, makine tarafından okunabilir sebep ifadesi (`Bad Request`, `Not Found`) |
+| `message`    | string | evet    | İnsan tarafından okunabilir, tek cümle, loglanması güvenli                       |
+| `details`    | array  | hayır   | Alan bazlı validation problemleri; yalnızca `400`/`422`'de mevcut                |
+| `path`       | string | evet    | Request path'i                                                                   |
+| `timestamp`  | string | evet    | ISO 8601 UTC                                                                     |
 
 - Tek bir global exception filter, ele alınmamışlar dahil **her** hata için bu şekli
   üretir. API'nin hiçbir yerinde ikinci bir hata formatı yoktur.
@@ -230,11 +234,11 @@ Neden varsayılan olarak cursor:
 
 **Bu bir tercih değil, doğruluk kuralıdır.** Bir keyset cursor'ın hiçbir satırı
 düşürmemeyi garanti etmesi, ancak üzerine key'lendiği alan client'ın henüz görmediği
-satırlar için *değişmez (immutable)* ise mümkündür. `Task.position` değişmezliğin tam
+satırlar için _değişmez (immutable)_ ise mümkündür. `Task.position` değişmezliğin tam
 tersidir: fractional indexing onu her drag-and-drop'ta yeniden yazar
 ([`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)).
 Client'ın cursor'ının ötesinde oturan bir task, biri onu column'un en üstüne sürüklediğinde
-artık cursor değerinin *altında* bir `position`'a sahip oluyor — `WHERE position > :cursor`
+artık cursor değerinin _altında_ bir `position`'a sahip oluyor — `WHERE position > :cursor`
 onu bir daha asla döndürmeyecek ve satır sessizce düşecek. Eşzamanlı yeniden sıralama, tam
 olarak `position`'ın neden cursor anahtarı olamayacağının nedenidir.
 
@@ -243,8 +247,8 @@ olarak `position`'ın neden cursor anahtarı olamayacağının nedenidir.
 zamanına göre monotonik ve index-local — rastgele bir seek değil, gerçek bir keyset.
 
 Board rendering hâlâ task'ları `position`'a göre sıralıyor; bu ikisi ayrı kaygılar.
-`position` bir kartın *nerede göründüğüne* karar verir, `id` *sayfa sınırının nerede
-düştüğüne* karar verir. Büyük bir task listesini sayfalayan bir client, her satırı tam
+`position` bir kartın _nerede göründüğüne_ karar verir, `id` _sayfa sınırının nerede
+düştüğüne_ karar verir. Büyük bir task listesini sayfalayan bir client, her satırı tam
 olarak bir kez alır ve gösterim için biriktirilmiş kümeyi `position`'a göre sıralar.
 
 ### Cursor request ve response
@@ -253,16 +257,16 @@ olarak bir kez alır ve gösterim için biriktirilmiş kümeyi `position`'a gör
 GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d
 ```
 
-| Param | Varsayılan | Maks | Notlar |
-|---|---|---|---|
-| `limit` | 50 | 100 | Maksimumun üzerindeki değerler reddedilmez, kırpılır (clamp) |
-| `cursor` | — | — | Opak. Önceki sayfanın son item'ının `id`'si. Client'lar onu parse etmemelidir. |
+| Param    | Varsayılan | Maks | Notlar                                                                         |
+| -------- | ---------- | ---- | ------------------------------------------------------------------------------ |
+| `limit`  | 50         | 100  | Maksimumun üzerindeki değerler reddedilmez, kırpılır (clamp)                   |
+| `cursor` | —          | —    | Opak. Önceki sayfanın son item'ının `id`'si. Client'lar onu parse etmemelidir. |
 
 ```jsonc
 {
-  "items": [ /* … kaynaklar … */ ],
-  "nextCursor": "0198e2c1-8b6d-7e93-a015-4c2f8d1e6b70",  // son sayfada null
-  "hasMore": true
+  "items": [/* … kaynaklar … */],
+  "nextCursor": "0198e2c1-8b6d-7e93-a015-4c2f8d1e6b70", // son sayfada null
+  "hasMore": true,
 }
 ```
 
@@ -274,29 +278,31 @@ GET /workspaces/w_1/members?page=1&perPage=25
 
 ```jsonc
 {
-  "items": [ /* … */ ],
+  "items": [/* … */],
   "page": 1,
   "perPage": 25,
   "total": 7,
-  "totalPages": 1
+  "totalPages": 1,
 }
 ```
 
-Her iki şekil de `@kurultay/shared-types`'ta (`CursorPage<T>`, `OffsetPage<T>`) tiplenmiştir,
-böylece client'lar bunları genel olarak ele alabilir.
+Liste yanıtları `@kurultay/shared-types` içindeki `CursorPage<T>` ile tiplenir. Küçük
+sayfa tabanlı koleksiyonlar (üyeler) şimdilik satır içi
+`{ items, page, perPage, total, totalPages }` şeklini kullanabilir — ikinci bir varsayılan
+paylaşılan sayfalama tipi eklemeyin.
 
 ## Filtreleme, sıralama, alan seçimi
 
-| Kaygı | Konvansiyon | Örnek |
-|---|---|---|
-| Eşitlik filtresi | `?field=value` | `?priority=HIGH` |
-| Çoklu değer (OR) | Tekrarlanan veya virgülle ayrılmış | `?priority=HIGH,URGENT` |
-| İlişki filtresi | `?relationId=value` | `?assigneeId=usr_1&labelId=lbl_2` |
-| Aralık | `?field[gte]=`, `?field[lte]=` | `?dueDate[lte]=2026-09-01T00:00:00Z` |
-| Null kontrolü | `?field=null` | `?dueDate=null` |
-| Serbest metin arama | `?q=` | `?q=indexing` |
-| Sıralama | `?sort=field` / azalan için `?sort=-field` | `?sort=-createdAt` |
-| Çoklu sıralama | Virgülle ayrılmış, önceliği soldan sağa | `?sort=priority,-dueDate` |
+| Kaygı               | Konvansiyon                                | Örnek                                |
+| ------------------- | ------------------------------------------ | ------------------------------------ |
+| Eşitlik filtresi    | `?field=value`                             | `?priority=HIGH`                     |
+| Çoklu değer (OR)    | Tekrarlanan veya virgülle ayrılmış         | `?priority=HIGH,URGENT`              |
+| İlişki filtresi     | `?relationId=value`                        | `?assigneeId=usr_1&labelId=lbl_2`    |
+| Aralık              | `?field[gte]=`, `?field[lte]=`             | `?dueDate[lte]=2026-09-01T00:00:00Z` |
+| Null kontrolü       | `?field=null`                              | `?dueDate=null`                      |
+| Serbest metin arama | `?q=`                                      | `?q=indexing`                        |
+| Sıralama            | `?sort=field` / azalan için `?sort=-field` | `?sort=-createdAt`                   |
+| Çoklu sıralama      | Virgülle ayrılmış, önceliği soldan sağa    | `?sort=priority,-dueDate`            |
 
 - Birleşik filtreler **AND**'dir; bir filtre içindeki tekrarlanan değerler **OR**'dur.
 - Yalnızca query DTO'sunda deklare edilen whitelist'lenmiş alanlar filtrelenebilir ve
@@ -304,7 +310,7 @@ böylece client'lar bunları genel olarak ele alabilir.
   düşürülen bir filtre kullanıcıya görmemesi gereken veriyi gösterir.
 - Task'lar için varsayılan **gösterim** sıralaması artan `position`'dır; geri kalan her şey
   için `-createdAt`. Dikkat: sayfalı bir task listesi, istenen sıralamadan bağımsız olarak
-  her zaman `id`'ye göre *dolaşılır* — bkz.
+  her zaman `id`'ye göre _dolaşılır_ — bkz.
   [Pagination](#cursor-anahtarı-her-zaman-iddir-asla-position-değil).
 - `?fields=` sparse-fieldset desteği yok. Response şekilleri DTO'ları tarafından
   sabitlenmiştir; bir client daha azına ihtiyaç duyuyorsa, bu caching ve tipleme
@@ -312,14 +318,14 @@ böylece client'lar bunları genel olarak ele alabilir.
 
 ## DTO adlandırma
 
-| Amaç | Desen | Örnek |
-|---|---|---|
-| Oluşturma request'i | `Create<Entity>Dto` | `CreateTaskDto` |
-| Tam/kısmi güncelleme | `Update<Entity>Dto` | `UpdateTaskDto` |
-| Aksiyon request'i | `<Verb><Entity>Dto` | `MoveTaskDto`, `InviteMemberDto` |
-| Liste query param'ları | `<Entity>QueryDto` | `TaskQueryDto` |
-| Tekil kaynak response'u | `<Entity>ResponseDto` | `TaskResponseDto` |
-| Liste response'u | `<Entity>ListResponseDto` | `TaskListResponseDto` |
+| Amaç                    | Desen                     | Örnek                            |
+| ----------------------- | ------------------------- | -------------------------------- |
+| Oluşturma request'i     | `Create<Entity>Dto`       | `CreateTaskDto`                  |
+| Tam/kısmi güncelleme    | `Update<Entity>Dto`       | `UpdateTaskDto`                  |
+| Aksiyon request'i       | `<Verb><Entity>Dto`       | `MoveTaskDto`, `InviteMemberDto` |
+| Liste query param'ları  | `<Entity>QueryDto`        | `TaskQueryDto`                   |
+| Tekil kaynak response'u | `<Entity>ResponseDto`     | `TaskResponseDto`                |
+| Liste response'u        | `<Entity>ListResponseDto` | `TaskListResponseDto`            |
 
 - Dosya başına bir DTO, modülün `dto/` klasöründe, kebab-case adlandırılmış:
   `create-task.dto.ts`.
@@ -332,15 +338,15 @@ Tam DTO/validation kuralları: [coding-standards.md](coding-standards.md#dtolar-
 
 ## Veri tipleri
 
-| Tip | Gösterim | Örnek |
-|---|---|---|
-| Identifier | **UUIDv7**, Prisma'nın `@default(uuid(7))`'i tarafından üretilir (Prisma 5.18'den beri mevcut). Client'lara opak: asla parse edilmez, asla sıralanmaz, asla client tarafında üretilmez. | `"0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d"` |
-| Tarih/saat | **ISO 8601, her zaman UTC, her zaman `Z` ile** | `"2026-08-08T09:12:31.114Z"` |
-| Yalnızca tarih değeri | Yine de `T00:00:00.000Z`'de tam bir ISO 8601 timestamp'i | `"2026-09-01T00:00:00.000Z"` |
-| Süre | Tam sayı dakika (`estimatedMinutes`) — asla formatlanmış bir string değil | `240` |
-| Position | `Float` (fractional indexing) — asla tam sayı veya bitişiklik varsaymayın | `1024.5` |
-| Enum | Shared types'ta tanımlanmış UPPER_SNAKE string | `"HIGH"`, `"OWNER"` |
-| Para | Henüz kullanılmıyor. Kullanıldığında: tam sayı minor unit + para birimi kodu. | — |
+| Tip                   | Gösterim                                                                                                                                                                                | Örnek                                    |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Identifier            | **UUIDv7**, Prisma'nın `@default(uuid(7))`'i tarafından üretilir (Prisma 5.18'den beri mevcut). Client'lara opak: asla parse edilmez, asla sıralanmaz, asla client tarafında üretilmez. | `"0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d"` |
+| Tarih/saat            | **ISO 8601, her zaman UTC, her zaman `Z` ile**                                                                                                                                          | `"2026-08-08T09:12:31.114Z"`             |
+| Yalnızca tarih değeri | Yine de `T00:00:00.000Z`'de tam bir ISO 8601 timestamp'i                                                                                                                                | `"2026-09-01T00:00:00.000Z"`             |
+| Süre                  | Tam sayı dakika (`estimatedMinutes`) — asla formatlanmış bir string değil                                                                                                               | `240`                                    |
+| Position              | `Float` (fractional indexing) — asla tam sayı veya bitişiklik varsaymayın                                                                                                               | `1024.5`                                 |
+| Enum                  | Shared types'ta tanımlanmış UPPER_SNAKE string                                                                                                                                          | `"HIGH"`, `"OWNER"`                      |
+| Para                  | Henüz kullanılmıyor. Kullanıldığında: tam sayı minor unit + para birimi kodu.                                                                                                           | —                                        |
 
 API asla lokal saat veya bir timezone offset'i döndürmez. Kullanıcının locale'ine göre
 formatlamak frontend'in işidir.

@@ -32,11 +32,11 @@ are written where that cost buys real confidence.
 
 ## The pyramid
 
-| Layer | Tool | Scope | Status |
-|---|---|---|---|
-| **Unit** | Jest (NestJS default) | Services, guards, pure functions. Dependencies mocked. | Required from day one |
-| **Integration** | Jest + Supertest | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`) | Required for every endpoint |
-| **E2E** | Playwright | Browser flows across the full stack | **Not set up in MVP** — reserved for critical flows later |
+| Layer           | Tool                  | Scope                                                                                  | Status                                                    |
+| --------------- | --------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **Unit**        | Jest (NestJS default) | Services, guards, pure functions. Dependencies mocked.                                 | Required from day one                                     |
+| **Integration** | Jest + Supertest      | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`) | Required for every endpoint                               |
+| **E2E**         | Playwright            | Browser flows across the full stack                                                    | **Not set up in MVP** — reserved for critical flows later |
 
 ```
         /\        e2e — deferred (Playwright)
@@ -59,16 +59,16 @@ These three areas are non-negotiable. A PR touching them without tests does not 
 `Task.position` is a `Float` and the entire drag-and-drop ordering model depends on it. Cases
 that must be covered:
 
-| Case | Expectation |
-|---|---|
-| Insert between two cards | New position is strictly between the neighbours |
-| Insert at the top of a column | Position is less than the current first |
-| Insert at the bottom | Position is greater than the current last |
-| Insert into an empty column | A valid starting position is produced |
-| Move within the same column | Only the moved row is updated |
-| Move across columns | `columnId` and `position` both update; no other row changes |
-| Repeated inserts in the same gap | Float precision is not exhausted; if the gap becomes too small, the column rebalances |
-| Concurrent moves into the same gap | No two tasks end up with the same position, or the tie is resolved deterministically |
+| Case                               | Expectation                                                                           |
+| ---------------------------------- | ------------------------------------------------------------------------------------- |
+| Insert between two cards           | New position is strictly between the neighbours                                       |
+| Insert at the top of a column      | Position is less than the current first                                               |
+| Insert at the bottom               | Position is greater than the current last                                             |
+| Insert into an empty column        | A valid starting position is produced                                                 |
+| Move within the same column        | Only the moved row is updated                                                         |
+| Move across columns                | `columnId` and `position` both update; no other row changes                           |
+| Repeated inserts in the same gap   | Float precision is not exhausted; if the gap becomes too small, the column rebalances |
+| Concurrent moves into the same gap | No two tasks end up with the same position, or the tie is resolved deterministically  |
 
 The precision-exhaustion and concurrency cases are the ones that actually break in
 production. Test them explicitly, not by implication.
@@ -99,12 +99,12 @@ tests are the only mechanical enforcement it has.
 
 ## File conventions
 
-| Kind | Location | Pattern |
-|---|---|---|
-| Unit | Colocated with the source file | `apps/api/src/task/task.service.spec.ts` |
-| Integration | Separate test root | `apps/api/test/task.e2e-spec.ts` |
-| Test helpers/factories | Shared under the test root | `apps/api/test/helpers/`, `apps/api/test/factories/` |
-| Playwright (later) | Repository-level | `e2e/` |
+| Kind                   | Location                       | Pattern                                              |
+| ---------------------- | ------------------------------ | ---------------------------------------------------- |
+| Unit                   | Colocated with the source file | `apps/api/src/task/task.service.spec.ts`             |
+| Integration            | Separate test root             | `apps/api/test/task.e2e-spec.ts`                     |
+| Test helpers/factories | Shared under the test root     | `apps/api/test/helpers/`, `apps/api/test/factories/` |
+| Playwright (later)     | Repository-level               | `e2e/`                                               |
 
 Nest's generator calls integration tests `*.e2e-spec.ts`; that name is kept for tooling
 compatibility even though these are API integration tests, not browser e2e.
@@ -146,7 +146,7 @@ migrated by the test setup. They never touch the development database.
 coverage.
 
 - Use the report to find code that no test exercises, then decide whether that code
-  *deserves* a test.
+  _deserves_ a test.
 - Low coverage on a positioning algorithm is a problem. Low coverage on a DTO or a barrel
   file is not.
 - Gaming a threshold with assertion-free tests is worse than having no threshold, which is
@@ -158,13 +158,13 @@ This stance is revisited at 1.0, when the API is stable enough for a floor to be
 
 Every pull request runs, on `develop` and `main` as well:
 
-| Step | Command |
-|---|---|
-| Lint | `pnpm lint` |
-| Typecheck | `tsc --noEmit` across workspaces |
-| Unit tests | `pnpm --filter @kurultay/api test` |
+| Step              | Command                                                                     |
+| ----------------- | --------------------------------------------------------------------------- |
+| Lint              | `pnpm lint`                                                                 |
+| Typecheck         | `tsc --noEmit` across workspaces                                            |
+| Unit tests        | `pnpm --filter @kurultay/api test`                                          |
 | Integration tests | `pnpm --filter @kurultay/api test:e2e` against a Postgres service container |
-| Build | `pnpm build` |
+| Build             | `pnpm build`                                                                |
 
 All steps must pass before merge. See [git-strategy.md](git-strategy.md#pull-request-process).
 

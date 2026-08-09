@@ -48,8 +48,8 @@ leaving a realistic path to a sustainable business model for the maintainers.
 
 ## Alternatives considered
 
-| Alternative | Why not |
-|---|---|
-| MIT / Apache-2.0 (permissive) | Allows closed-source SaaS resale with no obligation to contribute back — undermines the open-source sustainability goal |
-| Plain GPL-3.0 | Leaves the network-use/SaaS loophole open — a hosted fork wouldn't have to release its source |
-| Proprietary / source-available (e.g., BSL) | Forecloses a genuine open-source community contribution model from day one |
+| Alternative                                | Why not                                                                                                                 |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| MIT / Apache-2.0 (permissive)              | Allows closed-source SaaS resale with no obligation to contribute back — undermines the open-source sustainability goal |
+| Plain GPL-3.0                              | Leaves the network-use/SaaS loophole open — a hosted fork wouldn't have to release its source                           |
+| Proprietary / source-available (e.g., BSL) | Forecloses a genuine open-source community contribution model from day one                                              |

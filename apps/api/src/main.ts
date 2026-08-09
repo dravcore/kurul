@@ -1,10 +1,8 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { mountBetterAuth } from './auth/mount-better-auth';
+import { configureApp } from './common/configure-app';
 import { loadRootEnv, envPort, envString } from './common/env';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { validationExceptionFactory } from './common/validation/validation-exception.factory';
 
 loadRootEnv();
 
@@ -15,25 +13,7 @@ async function bootstrap(): Promise<void> {
   const webUrl = envString('WEB_URL', 'http://localhost:3000');
 
   const app = await NestFactory.create(AppModule);
-
-  app.enableCors({
-    origin: webUrl,
-    credentials: true,
-  });
-
-  mountBetterAuth(app);
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      exceptionFactory: validationExceptionFactory,
-    }),
-  );
-
-  app.useGlobalFilters(new AllExceptionsFilter());
-
+  configureApp(app, { corsOrigin: webUrl });
   await app.listen(port);
 }
 

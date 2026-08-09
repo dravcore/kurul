@@ -17,21 +17,21 @@ alternatif.
 
 ## 1. Özet
 
-| Katman | Seçim | Değerlendirilen alternatif |
-|---|---|---|
-| Backend | NestJS 11 + TypeScript | Fastify (daha hafif), Django |
-| Veritabanı | PostgreSQL 18 | — |
-| Cache / PubSub / Queue | Redis 8 (AGPLv3) | Valkey (BSD-3, Linux Foundation fork'u) |
-| ORM | Prisma 7 | Drizzle ORM |
-| API | REST (başlangıçta) | GraphQL (sonradan) |
-| Realtime | Socket.io + `@socket.io/redis-adapter` | `ws` (daha hafif, özellik yok) |
-| Frontend | Next.js 16 + React + TypeScript | — |
-| Stil | Tailwind CSS | — |
-| UI kit | shadcn/ui | Radix UI (ham) |
-| Drag & drop | @dnd-kit | pragmatic-drag-and-drop |
-| Grafik | Recharts | Chart.js, Apache ECharts |
-| Auth | Better Auth (organization plugin) | Auth.js / NextAuth (bakım modunda) |
-| Deployment | Docker Compose | Kubernetes (ölçek gerektirdiğinde) |
+| Katman                 | Seçim                                  | Değerlendirilen alternatif              |
+| ---------------------- | -------------------------------------- | --------------------------------------- |
+| Backend                | NestJS 11 + TypeScript                 | Fastify (daha hafif), Django            |
+| Veritabanı             | PostgreSQL 18                          | —                                       |
+| Cache / PubSub / Queue | Redis 8 (AGPLv3)                       | Valkey (BSD-3, Linux Foundation fork'u) |
+| ORM                    | Prisma 7                               | Drizzle ORM                             |
+| API                    | REST (başlangıçta)                     | GraphQL (sonradan)                      |
+| Realtime               | Socket.io + `@socket.io/redis-adapter` | `ws` (daha hafif, özellik yok)          |
+| Frontend               | Next.js 16 + React + TypeScript        | —                                       |
+| Stil                   | Tailwind CSS                           | —                                       |
+| UI kit                 | shadcn/ui                              | Radix UI (ham)                          |
+| Drag & drop            | @dnd-kit                               | pragmatic-drag-and-drop                 |
+| Grafik                 | Recharts                               | Chart.js, Apache ECharts                |
+| Auth                   | Better Auth (organization plugin)      | Auth.js / NextAuth (bakım modunda)      |
+| Deployment             | Docker Compose                         | Kubernetes (ölçek gerektirdiğinde)      |
 
 Mimari (monorepo + modüler monolit) ayrı olarak [architecture.md](architecture.md)'de ele
 alınıyor.
@@ -150,14 +150,14 @@ büyüklük.
 
 ## 3. Bilinçli olarak dahil edilmeyenler
 
-| Teknoloji | Neden şimdi değil |
-|---|---|
-| Kafka | ClickUp kullanıyor, ama 20M+ kullanıcı ölçeğinde. Redis pub/sub MVP için fazlasıyla yeterli; sonradan eklenebilir |
-| GraphQL | Linear kullanıyor. REST'le başlamak daha hızlı; API tüketicileri çeşitlendiğinde yeniden değerlendirilir |
-| Elasticsearch | Tam metin arama PostgreSQL'in yerleşik FTS'iyle başlayabilir |
-| Kubernetes | Tek bir host'ta Docker Compose yeterli. Trafik gerektirdiğinde geçiş yapılır |
-| MinIO / S3 | Dosya ekleri MVP kapsamı dışında. Eklendiğinde S3-uyumlu bir store seçilir |
-| Local-first sync engine | Linear'ın en büyük teknik yatırımı. Çok yüksek karmaşıklık — server-first ile başla |
+| Teknoloji               | Neden şimdi değil                                                                                                 |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Kafka                   | ClickUp kullanıyor, ama 20M+ kullanıcı ölçeğinde. Redis pub/sub MVP için fazlasıyla yeterli; sonradan eklenebilir |
+| GraphQL                 | Linear kullanıyor. REST'le başlamak daha hızlı; API tüketicileri çeşitlendiğinde yeniden değerlendirilir          |
+| Elasticsearch           | Tam metin arama PostgreSQL'in yerleşik FTS'iyle başlayabilir                                                      |
+| Kubernetes              | Tek bir host'ta Docker Compose yeterli. Trafik gerektirdiğinde geçiş yapılır                                      |
+| MinIO / S3              | Dosya ekleri MVP kapsamı dışında. Eklendiğinde S3-uyumlu bir store seçilir                                        |
+| Local-first sync engine | Linear'ın en büyük teknik yatırımı. Çok yüksek karmaşıklık — server-first ile başla                               |
 
 ---
 
@@ -165,13 +165,13 @@ büyüklük.
 
 Mimari ve veri modelleme için incelemeye değer projeler:
 
-| Proje | Backend | Frontend | Not |
-|---|---|---|---|
-| Plane | Django | Next.js | En popüler OSS PM aracı, AGPL-3.0 |
-| Huly | TypeScript / Node.js | Svelte | Tam TS, ama Rush monorepo karmaşıklığını taşıyor |
-| Taiga | Django | React | Agile/Scrum odaklı, MPL-2.0 |
-| OpenProject | Ruby on Rails | Angular | En eski / enterprise, GPL-3.0 |
-| Focalboard | Go | React | Basit Kanban, artık aktif bakımda değil |
+| Proje       | Backend              | Frontend | Not                                              |
+| ----------- | -------------------- | -------- | ------------------------------------------------ |
+| Plane       | Django               | Next.js  | En popüler OSS PM aracı, AGPL-3.0                |
+| Huly        | TypeScript / Node.js | Svelte   | Tam TS, ama Rush monorepo karmaşıklığını taşıyor |
+| Taiga       | Django               | React    | Agile/Scrum odaklı, MPL-2.0                      |
+| OpenProject | Ruby on Rails        | Angular  | En eski / enterprise, GPL-3.0                    |
+| Focalboard  | Go                   | React    | Basit Kanban, artık aktif bakımda değil          |
 
 ---
 
@@ -180,15 +180,15 @@ Mimari ve veri modelleme için incelemeye değer projeler:
 Tam argümanlar ve sonuçlar burada tekrarlanmak yerine [`decisions/`](decisions/) altında
 yaşıyor:
 
-| ADR | Konu |
-|---|---|
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modüler monolit |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md) | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md) | Organization plugin'i ile Better Auth (→ Workspace) |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md) | Socket.io + Redis adapter |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md) | Sıralama için Float position'lar |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md) | AGPL-3.0 |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md) | Git Flow + SemVer |
+| ADR                                                                                | Konu                                                    |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modüler monolit                              |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                         | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                       | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                   | Organization plugin'i ile Better Auth (→ Workspace)     |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                 | Socket.io + Redis adapter                               |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)             | Sıralama için Float position'lar                        |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                           | AGPL-3.0                                                |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                     | Git Flow + SemVer                                       |
 
 İlgili: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)

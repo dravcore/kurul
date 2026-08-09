@@ -10,6 +10,5 @@ process.env.DATABASE_URL =
 
 process.env.BETTER_AUTH_SECRET =
   process.env.BETTER_AUTH_SECRET?.trim() || 'test-secret-not-for-production';
-process.env.BETTER_AUTH_URL =
-  process.env.BETTER_AUTH_URL?.trim() || 'http://localhost:4000';
+process.env.BETTER_AUTH_URL = process.env.BETTER_AUTH_URL?.trim() || 'http://localhost:4000';
 process.env.WEB_URL = process.env.WEB_URL?.trim() || 'http://localhost:3000';

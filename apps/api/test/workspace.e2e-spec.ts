@@ -3,12 +3,7 @@ import { MemberRole } from '@kurultay/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';
-import {
-  addMember,
-  createWorkspace,
-  setMemberRole,
-  signUp,
-} from './helpers/auth';
+import { addMember, createWorkspace, setMemberRole, signUp } from './helpers/auth';
 import { resetDatabase } from './helpers/db';
 
 describe('Workspace isolation and roles (e2e)', () => {
@@ -213,5 +208,31 @@ describe('Workspace isolation and roles (e2e)', () => {
     await setMemberRole(prisma, workspace.id, me.body.id as string, MemberRole.ADMIN);
 
     await owner.agent.delete(`/workspaces/${workspace.id}`).expect(403);
+  });
+
+  it('blocks Better Auth organization mutation HTTP so Nest remains the public API', async () => {
+    const owner = await signUp(app, { name: 'BA Firewall' });
+
+    await owner.agent
+      .post('/auth/organization/create')
+      .send({ name: 'Bypass', slug: `bypass-${Date.now()}` })
+      .expect(403);
+
+    const workspace = await createWorkspace(owner.agent, 'Nest WS', `nest-ws-${Date.now()}`);
+
+    await owner.agent
+      .post('/auth/organization/invite-member')
+      .send({
+        email: `ba-invite-${Date.now()}@test.kurultay.dev`,
+        role: MemberRole.MEMBER,
+        organizationId: workspace.id,
+      })
+      .expect(403);
+
+    // Session UX path remains open.
+    await owner.agent
+      .post('/auth/organization/set-active')
+      .send({ organizationId: workspace.id })
+      .expect(200);
   });
 });

@@ -1,7 +1,7 @@
 import { createAuthClient } from 'better-auth/react';
 import { organizationClient } from 'better-auth/client/plugins';
+import { ac as sharedAc, organizationRoles as sharedRoles } from '@kurultay/auth-access';
 import { getApiBaseUrl } from './api';
-import { ac, organizationRoles } from './permissions';
 
 export const authClient = createAuthClient({
   baseURL: getApiBaseUrl(),
@@ -9,8 +9,9 @@ export const authClient = createAuthClient({
   basePath: '/auth',
   plugins: [
     organizationClient({
-      ac,
-      roles: organizationRoles,
+      // Peer better-auth; cast avoids pnpm duplicate-type identity friction.
+      ac: sharedAc as never,
+      roles: sharedRoles as never,
     }),
   ],
 });
