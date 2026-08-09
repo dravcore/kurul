@@ -34,7 +34,9 @@ export function useBoardSocket(
 ): { connected: boolean } {
   const [connected, setConnected] = useState(false);
   const handlersRef = useRef(handlers);
-  handlersRef.current = handlers;
+  useEffect(() => {
+    handlersRef.current = handlers;
+  }, [handlers]);
 
   useEffect(() => {
     if (!enabled || !boardId) return;

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { STATUS_CODES } from 'node:http';
+import { Prisma } from '../../generated/prisma';
 import type { ValidationDetail } from '../validation/validation-exception.factory';
 
 interface ProblemDetails {
@@ -81,6 +82,22 @@ function detailsFromMessages(messages: readonly unknown[]): ValidationDetail[] {
   });
 }
 
+function mapPrismaError(error: Prisma.PrismaClientKnownRequestError): {
+  statusCode: number;
+  message: string;
+} | null {
+  switch (error.code) {
+    case 'P2002':
+      return { statusCode: HttpStatus.CONFLICT, message: 'Resource already exists' };
+    case 'P2025':
+      return { statusCode: HttpStatus.NOT_FOUND, message: 'Resource not found' };
+    case 'P2003':
+      return { statusCode: HttpStatus.CONFLICT, message: 'Related resource conflict' };
+    default:
+      return null;
+  }
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -119,6 +136,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
       if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
         this.logger.error(exception.message, exception.stack);
+      }
+    } else if (
+      exception instanceof Prisma.PrismaClientKnownRequestError ||
+      (isRecord(exception) && typeof exception.code === 'string' && 'clientVersion' in exception)
+    ) {
+      const prismaError = exception as Prisma.PrismaClientKnownRequestError;
+      const mapped = mapPrismaError(prismaError);
+      if (mapped) {
+        statusCode = mapped.statusCode;
+        error = reasonPhrase(statusCode);
+        message = mapped.message;
+      } else {
+        this.logger.error(prismaError.message, prismaError.stack);
+        if (process.env.NODE_ENV !== 'production') {
+          message = prismaError.message;
+        }
       }
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);

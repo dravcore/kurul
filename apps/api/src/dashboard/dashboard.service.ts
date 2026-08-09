@@ -77,7 +77,6 @@ export class DashboardService {
         where: { task: taskWhere },
         _count: { _all: true },
         orderBy: { _count: { userId: 'desc' } },
-        take: ASSIGNEE_TOP_N + 20,
       }),
       this.prisma.task.count({
         where: { ...taskWhere, assignees: { none: {} } },
@@ -206,11 +205,7 @@ export class DashboardService {
     rows: Array<{ userId: string; _count: { _all: number } }>,
     unassignedCount: number,
   ): Promise<DashboardCountByAssignee[]> {
-    const buckets: DashboardCountByAssignee[] = [];
-
-    if (unassignedCount > 0) {
-      buckets.push({ userId: null, name: 'Unassigned', count: unassignedCount });
-    }
+    const assigned: DashboardCountByAssignee[] = [];
 
     if (rows.length > 0) {
       const users = await this.prisma.user.findMany({
@@ -219,7 +214,7 @@ export class DashboardService {
       });
       const nameById = new Map(users.map((user) => [user.id, user.name] as const));
       for (const row of rows) {
-        buckets.push({
+        assigned.push({
           userId: row.userId,
           name: nameById.get(row.userId) ?? row.userId,
           count: row._count._all,
@@ -227,18 +222,24 @@ export class DashboardService {
       }
     }
 
-    buckets.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    assigned.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
-    if (buckets.length <= ASSIGNEE_TOP_N) {
+    const buckets: DashboardCountByAssignee[] = [];
+    if (unassignedCount > 0) {
+      buckets.push({ userId: null, name: 'Unassigned', count: unassignedCount });
+    }
+
+    if (assigned.length <= ASSIGNEE_TOP_N) {
+      buckets.push(...assigned);
       return buckets;
     }
 
-    const top = buckets.slice(0, ASSIGNEE_TOP_N);
-    const otherCount = buckets.slice(ASSIGNEE_TOP_N).reduce((sum, row) => sum + row.count, 0);
+    buckets.push(...assigned.slice(0, ASSIGNEE_TOP_N));
+    const otherCount = assigned.slice(ASSIGNEE_TOP_N).reduce((sum, row) => sum + row.count, 0);
     if (otherCount > 0) {
-      top.push({ userId: null, name: 'Other', count: otherCount });
+      buckets.push({ userId: null, name: 'Other', count: otherCount });
     }
-    return top;
+    return buckets;
   }
 }
 

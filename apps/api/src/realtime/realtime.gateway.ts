@@ -99,12 +99,8 @@ export class RealtimeGateway
       select: { id: true },
     });
     if (!board) {
-      // Distinguish missing board vs forbidden without leaking membership.
-      const exists = await this.prisma.board.findFirst({
-        where: { id: boardId },
-        select: { id: true },
-      });
-      return { ok: false, error: exists ? 'forbidden' : 'board not found' };
+      // Opaque deny — do not distinguish missing vs cross-tenant board.
+      return { ok: false, error: 'board not found' };
     }
 
     await client.join(boardRoom(boardId));
