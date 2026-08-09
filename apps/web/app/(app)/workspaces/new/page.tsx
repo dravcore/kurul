@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, type FormEvent } from 'react';
-import type { WorkspaceDto } from '@kurultay/shared-types';
+import type { CreateWorkspaceRequest, WorkspaceDto } from '@kurultay/shared-types';
 import { AuthFormField } from '@/components/auth/auth-form-field';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
@@ -33,7 +33,8 @@ export default function NewWorkspacePage(): React.ReactElement {
     setError(null);
 
     try {
-      const workspace = await api.post<WorkspaceDto>('/workspaces', { name, slug });
+      const body: CreateWorkspaceRequest = { name, slug };
+      const workspace = await api.post<WorkspaceDto>('/workspaces', body);
       await authClient.organization.setActive({
         organizationId: workspace.id,
       });

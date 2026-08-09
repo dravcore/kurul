@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { BoardDto } from '@kurultay/shared-types';
+import type { BoardDto, CreateBoardRequest } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,10 +39,11 @@ export function CreateBoardDialog({
     setPending(true);
     setError(null);
     try {
-      const board = await api.post<BoardDto>(`/workspaces/${workspaceId}/boards`, {
+      const body: CreateBoardRequest = {
         name: name.trim(),
         description: description.trim() || null,
-      });
+      };
+      const board = await api.post<BoardDto>(`/workspaces/${workspaceId}/boards`, body);
       onCreated(board);
       setName('');
       setDescription('');

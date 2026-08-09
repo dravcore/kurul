@@ -72,11 +72,7 @@ function applyMove(
   };
 }
 
-export function useBoardTaskDnd(
-  tasks: TaskDto[],
-  canMutate: boolean,
-  onMove: (payload: TaskMovePayload) => Promise<void>,
-): {
+export interface BoardTaskDndController {
   sensors: ReturnType<typeof useSensors>;
   activeTask: TaskDto | null;
   onDragStart: (event: DragStartEvent) => void;
@@ -85,7 +81,13 @@ export function useBoardTaskDnd(
   cancelDrag: () => void;
   isDragging: boolean;
   collisionDetection: typeof closestCorners;
-} {
+}
+
+export function useBoardTaskDnd(
+  tasks: TaskDto[],
+  canMutate: boolean,
+  onMove: (payload: TaskMovePayload) => Promise<void>,
+): BoardTaskDndController {
   const [activeTask, setActiveTask] = useState<TaskDto | null>(null);
 
   const sensors = useSensors(
