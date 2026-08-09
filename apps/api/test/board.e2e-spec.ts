@@ -68,9 +68,7 @@ describe('Boards and columns (e2e)', () => {
       .expect(200);
 
     await ownerB.agent.get(`/workspaces/${workspaceA.id}/boards/${boardA.body.id}`).expect(404);
-    await ownerB.agent
-      .get(`/workspaces/${workspaceB.id}/boards/${boardA.body.id}`)
-      .expect(404);
+    await ownerB.agent.get(`/workspaces/${workspaceB.id}/boards/${boardA.body.id}`).expect(404);
     await ownerB.agent
       .patch(`/workspaces/${workspaceB.id}/columns/${columnsA.body[0].id}`)
       .send({ name: 'Hijacked' })

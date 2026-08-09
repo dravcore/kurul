@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { MemberRole } from '@kurultay/shared-types';
 import type { BoardDto } from '@kurultay/shared-types';
 import { Roles } from '../common/decorators/roles.decorator';

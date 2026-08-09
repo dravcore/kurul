@@ -33,10 +33,12 @@ describe('ColumnService', () => {
       _count: { tasks: 0 },
     });
 
-    await expect(service.create(WORKSPACE_ID, BOARD_ID, { name: 'Review' })).resolves.toMatchObject({
-      position: 4000,
-      taskCount: 0,
-    });
+    await expect(service.create(WORKSPACE_ID, BOARD_ID, { name: 'Review' })).resolves.toMatchObject(
+      {
+        position: 4000,
+        taskCount: 0,
+      },
+    );
     expect(prisma.column.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ position: 4000 }) }),
     );
@@ -45,8 +47,8 @@ describe('ColumnService', () => {
   it('returns 404 when the requested column is outside the workspace', async () => {
     const { service, prisma } = buildService();
     prisma.column.findFirst.mockResolvedValue(null);
-    await expect(service.remove(WORKSPACE_ID, '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.remove(WORKSPACE_ID, '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

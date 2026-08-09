@@ -21,12 +21,12 @@ the board/column debate.
 Board and column authorization is enforced in Nest with `@Roles`, using this
 matrix:
 
-| Action                                         | OWNER | ADMIN | MEMBER | GUEST |
-| ---------------------------------------------- | :---: | :---: | :----: | :---: |
-| Read boards and columns                        |  ✓    |  ✓    |   ✓    |  ✓    |
-| Create board; update board name / description  |  ✓    |  ✓    |   ✓    |  —    |
-| Delete board                                   |  ✓    |  ✓    |   —    |  —    |
-| Column create / rename / reorder / delete      |  ✓    |  ✓    |   —    |  —    |
+| Action                                        | OWNER | ADMIN | MEMBER | GUEST |
+| --------------------------------------------- | :---: | :---: | :----: | :---: |
+| Read boards and columns                       |   ✓   |   ✓   |   ✓    |   ✓   |
+| Create board; update board name / description |   ✓   |   ✓   |   ✓    |   —   |
+| Delete board                                  |   ✓   |   ✓   |   —    |   —   |
+| Column create / rename / reorder / delete     |   ✓   |   ✓   |   —    |   —   |
 
 ## Rationale
 
@@ -55,8 +55,8 @@ matrix:
 
 ## Alternatives considered
 
-| Alternative                                                         | Why not                                                                                                                                      |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Admin-only for all board and column mutations                       | Too strict for small teams; board create is content work, not structure admin                                                                |
-| MEMBER may create/rename columns; only delete/reorder need Admin    | Conflicts with design.md Admin copy for “change columns”; splits column UX into two mental models                                            |
-| Encode board/column statements in Better Auth organization AC       | Org plugin surface is workspace membership, not product resources; Nest already owns workspace-scoped product guards                         |
+| Alternative                                                      | Why not                                                                                                              |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Admin-only for all board and column mutations                    | Too strict for small teams; board create is content work, not structure admin                                        |
+| MEMBER may create/rename columns; only delete/reorder need Admin | Conflicts with design.md Admin copy for “change columns”; splits column UX into two mental models                    |
+| Encode board/column statements in Better Auth organization AC    | Org plugin surface is workspace membership, not product resources; Nest already owns workspace-scoped product guards |

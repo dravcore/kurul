@@ -21,12 +21,12 @@ tartışmasını yeniden açmadan genişletebilir.
 Board ve column yetkilendirmesi Nest'te `@Roles` ile şu matris üzerinden
 uygulanır:
 
-| İşlem                                                 | OWNER | ADMIN | MEMBER | GUEST |
-| ----------------------------------------------------- | :---: | :---: | :----: | :---: |
-| Board ve column okuma                                 |  ✓    |  ✓    |   ✓    |  ✓    |
-| Board oluştur; board adı / açıklama güncelle          |  ✓    |  ✓    |   ✓    |  —    |
-| Board sil                                             |  ✓    |  ✓    |   —    |  —    |
-| Column oluştur / yeniden adlandır / sırala / sil      |  ✓    |  ✓    |   —    |  —    |
+| İşlem                                            | OWNER | ADMIN | MEMBER | GUEST |
+| ------------------------------------------------ | :---: | :---: | :----: | :---: |
+| Board ve column okuma                            |   ✓   |   ✓   |   ✓    |   ✓   |
+| Board oluştur; board adı / açıklama güncelle     |   ✓   |   ✓   |   ✓    |   —   |
+| Board sil                                        |   ✓   |   ✓   |   —    |   —   |
+| Column oluştur / yeniden adlandır / sırala / sil |   ✓   |   ✓   |   —    |   —   |
 
 ## Gerekçe
 
@@ -54,8 +54,8 @@ uygulanır:
 
 ## Değerlendirilen Alternatifler
 
-| Alternatif                                                              | Neden değil                                                                                                                                      |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Tüm board ve column mutasyonları yalnızca Admin                         | Küçük ekipler için çok katı; board oluşturma içerik işidir, yapı yönetimi değil                                                                  |
-| MEMBER column oluşturup yeniden adlandırabilir; silme/sıralama Admin    | design.md'nin “column değiştir” Admin metniyle çelişir; column UX'ini iki zihinsel modele böler                                                  |
-| Board/column statement'larını Better Auth organization AC'ye kodlamak   | Org plugin yüzeyi workspace üyeliğidir, ürün kaynakları değil; Nest zaten workspace-scoped ürün guard'larını sahipleniyor                        |
+| Alternatif                                                            | Neden değil                                                                                                               |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Tüm board ve column mutasyonları yalnızca Admin                       | Küçük ekipler için çok katı; board oluşturma içerik işidir, yapı yönetimi değil                                           |
+| MEMBER column oluşturup yeniden adlandırabilir; silme/sıralama Admin  | design.md'nin “column değiştir” Admin metniyle çelişir; column UX'ini iki zihinsel modele böler                           |
+| Board/column statement'larını Better Auth organization AC'ye kodlamak | Org plugin yüzeyi workspace üyeliğidir, ürün kaynakları değil; Nest zaten workspace-scoped ürün guard'larını sahipleniyor |
