@@ -30,6 +30,7 @@ export function useSancakRail(
     }
     setBox({ top: active.offsetTop + 6, height: active.offsetHeight - 12 });
     // Positions depend on layout, not props; callers pass what changes layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional external deps list
   }, deps);
 
   return box;

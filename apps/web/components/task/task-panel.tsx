@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -58,9 +58,9 @@ export function TaskPanel({
     headingRef.current?.focus();
   }, [task?.id]);
 
-  function close(): void {
+  const close = useCallback((): void => {
     router.push(`/board/${boardId}`);
-  }
+  }, [boardId, router]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
@@ -70,7 +70,7 @@ export function TaskPanel({
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [boardId, router]);
+  }, [close]);
 
   async function save(): Promise<void> {
     if (!task || !canMutate) return;

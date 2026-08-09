@@ -20,13 +20,27 @@
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,mjs,cjs,js,json,md,yml,yaml,css}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@next/eslint-plugin-next": "^16.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "dotenv": "^16.6.1",
     "eslint": "^9.22.0",
     "eslint-config-prettier": "^10.1.1",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.0",
     "prettier": "^3.5.3",
     "prisma": "^7.0.0",
     "tsx": "^4.19.3",

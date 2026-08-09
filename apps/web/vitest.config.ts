@@ -17,5 +17,10 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['**/*.test.{ts,tsx}'],
     exclude: ['node_modules/**', '.next/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary'],
+      exclude: ['node_modules/**', '.next/**', '**/*.test.{ts,tsx}', '**/*.config.*'],
+    },
   },
 });
