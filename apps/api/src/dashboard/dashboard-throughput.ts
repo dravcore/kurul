@@ -40,14 +40,28 @@ export function applyThroughputCounts(
   createdAts: Date[],
   completedAts: Date[],
 ): DashboardThroughputDay[] {
-  const map = new Map<string, DashboardThroughputDay>(series.map((day) => [day.date, { ...day }]));
+  const created = new Map<string, number>();
   for (const at of createdAts) {
-    const row = map.get(utcDateKey(at));
-    if (row) row.created += 1;
+    const key = utcDateKey(at);
+    created.set(key, (created.get(key) ?? 0) + 1);
   }
+  const completed = new Map<string, number>();
   for (const at of completedAts) {
-    const row = map.get(utcDateKey(at));
-    if (row) row.completed += 1;
+    const key = utcDateKey(at);
+    completed.set(key, (completed.get(key) ?? 0) + 1);
   }
-  return series.map((day) => map.get(day.date)!);
+  return applyThroughputDayCounts(series, created, completed);
+}
+
+/** Apply pre-aggregated per-day counts onto a zero-filled series. */
+export function applyThroughputDayCounts(
+  series: DashboardThroughputDay[],
+  createdByDay: ReadonlyMap<string, number>,
+  completedByDay: ReadonlyMap<string, number>,
+): DashboardThroughputDay[] {
+  return series.map((day) => ({
+    date: day.date,
+    created: createdByDay.get(day.date) ?? 0,
+    completed: completedByDay.get(day.date) ?? 0,
+  }));
 }

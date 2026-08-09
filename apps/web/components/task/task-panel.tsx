@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { TaskDto, LabelDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,8 @@ interface TaskPanelProps {
   task: TaskDto | null;
   canMutate: boolean;
   canManageLabels: boolean;
+  members?: WorkspaceMemberDto[];
+  labels?: LabelDto[];
   loadError?: string | null;
   metaRefreshKey?: number;
   onUpdated: (patch: Partial<TaskDto> & Pick<TaskDto, 'id'>) => void;
@@ -31,6 +33,8 @@ export function TaskPanel({
   task,
   canMutate,
   canManageLabels,
+  members,
+  labels,
   loadError = null,
   metaRefreshKey = 0,
   onUpdated,
@@ -172,6 +176,8 @@ export function TaskPanel({
               task={task}
               canMutate={canMutate}
               canManageLabels={canManageLabels}
+              members={members}
+              labels={labels}
               metaRefreshKey={metaRefreshKey}
               onUpdated={onUpdated}
             />

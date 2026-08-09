@@ -5,8 +5,8 @@ import { MoreHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BoardDto } from '@kurultay/shared-types';
-import { api } from '@/lib/api';
 import { canCreateOrUpdateBoard, canDeleteBoard } from '@/lib/board-permissions';
+import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,7 +42,7 @@ export function BoardList(): React.ReactElement {
     setError(null);
     void (async () => {
       try {
-        const list = await api.get<BoardDto[]>(`/workspaces/${activeId}/boards`, {
+        const list = await fetchWorkspaceBoards(activeId, {
           signal: controller.signal,
         });
         if (!controller.signal.aborted) {

@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ArrowLeft, ArrowRight, MoreHorizontal, Plus } from 'lucide-react';
@@ -41,7 +42,7 @@ interface BoardColumnProps {
   style?: React.CSSProperties;
 }
 
-export function BoardColumn({
+export const BoardColumn = memo(function BoardColumn({
   column,
   tasks,
   boardId,
@@ -141,4 +142,4 @@ export function BoardColumn({
       </div>
     </section>
   );
-}
+});
