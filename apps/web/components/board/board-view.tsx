@@ -20,29 +20,12 @@ import { BoardColumn } from './board-column';
 import { CreateColumnDialog } from './create-column-dialog';
 import { DeleteColumnDialog } from './delete-column-dialog';
 import { RenameColumnDialog } from './rename-column-dialog';
+import { DamgaMark } from '@/components/brand/damga-mark';
 
 const DEFAULT_COLUMNS = ['To Do', 'In Progress', 'Done'] as const;
 
 interface BoardViewProps {
   boardId: string;
-}
-
-function DamgaMark({ size }: { size: number }): React.ReactElement {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className="text-signature"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 3v18M3 12h18M7.5 7.5l9 9M16.5 7.5l-9 9" />
-    </svg>
-  );
 }
 
 export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
@@ -209,7 +192,7 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
 
       {columns.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-          <DamgaMark size={96} />
+          <DamgaMark />
           <h2 className="font-display text-xl font-semibold">{t('column.emptyTitle')}</h2>
           <p className="max-w-md text-sm text-muted-foreground">{t('column.emptyBody')}</p>
           {canMutate ? (
