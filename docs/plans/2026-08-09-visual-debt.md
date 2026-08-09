@@ -25,9 +25,11 @@
 ### Task 1: Type-scale tokens
 
 **Files:**
+
 - Modify: `apps/web/app/globals.css` (the `@theme inline` block, after `--radius`)
 
 **Interfaces:**
+
 - Produces: utilities `text-display`, `text-title-lg`, `text-title`, `text-body`, `text-small`, `text-micro`, `font-strong` — consumed by Tasks 7, 8, 14.
 
 - [ ] **Step 1: Create the branch**
@@ -41,22 +43,22 @@ git checkout develop && git pull && git checkout -b feat/design-primitives
 In `apps/web/app/globals.css`, inside `@theme inline { … }`, after the `--radius: 6px;` line, add:
 
 ```css
-  --text-display: 40px;
-  --text-display--line-height: 44px;
-  --text-display--font-weight: 600;
-  --text-title-lg: 20px;
-  --text-title-lg--line-height: 28px;
-  --text-title-lg--font-weight: 600;
-  --text-title: 16px;
-  --text-title--line-height: 24px;
-  --text-title--font-weight: 600;
-  --text-body: 13px;
-  --text-body--line-height: 18px;
-  --text-small: 12px;
-  --text-small--line-height: 16px;
-  --text-micro: 11px;
-  --text-micro--line-height: 14px;
-  --font-weight-strong: 550;
+--text-display: 40px;
+--text-display--line-height: 44px;
+--text-display--font-weight: 600;
+--text-title-lg: 20px;
+--text-title-lg--line-height: 28px;
+--text-title-lg--font-weight: 600;
+--text-title: 16px;
+--text-title--line-height: 24px;
+--text-title--font-weight: 600;
+--text-body: 13px;
+--text-body--line-height: 18px;
+--text-small: 12px;
+--text-small--line-height: 16px;
+--text-micro: 11px;
+--text-micro--line-height: 14px;
+--font-weight-strong: 550;
 ```
 
 These are the design.md §3 steps. Tailwind v4 derives `text-<name>` utilities (size + line-height + weight) and `font-strong` from these names. Do not remove the existing default utilities; migration happens screen by screen in later tasks.
@@ -76,9 +78,11 @@ git commit -m "feat(web): add design.md type-scale tokens"
 ### Task 2: Reduced-motion policy
 
 **Files:**
+
 - Modify: `apps/web/app/globals.css:179-187` (the `prefers-reduced-motion` block)
 
 **Interfaces:**
+
 - Produces: the global rule that movement transitions drop while color/opacity transitions stay. Task 16's stagger defines its own reduced-motion fallback on top of this.
 
 - [ ] **Step 1: Replace the blanket rule**
@@ -129,10 +133,12 @@ git commit -m "feat(web): keep color and opacity under prefers-reduced-motion"
 ### Task 3: Shared DamgaMark
 
 **Files:**
+
 - Create: `apps/web/components/brand/damga-mark.tsx`
 - Modify: `apps/web/components/board/board-list.tsx:23-39` (delete local `DamgaMark`), `apps/web/components/board/board-view.tsx:30-46` (delete local `DamgaMark`)
 
 **Interfaces:**
+
 - Produces: `DamgaMark({ size?: number; className?: string })` — default size 96; consumed by Tasks 3 (board files) and 14 (auth layout).
 
 - [ ] **Step 1: Create the component**
@@ -193,10 +199,12 @@ git commit -m "refactor(web): extract shared DamgaMark brand component"
 ### Task 4: Toast infrastructure (sonner)
 
 **Files:**
+
 - Create: `apps/web/components/ui/sonner.tsx`
 - Modify: `apps/web/package.json` (dependency), `apps/web/app/layout.tsx:39-47` (mount)
 
 **Interfaces:**
+
 - Produces: `<Toaster />` mounted globally; `toast` from `'sonner'` callable anywhere client-side. `toast.error(message, { action: { label, onClick } })` is the retry pattern Task 18 uses.
 
 - [ ] **Step 1: Install**
@@ -264,9 +272,11 @@ git commit -m "feat(web): add token-themed sonner toast infrastructure"
 ### Task 5: Elevation tokens
 
 **Files:**
+
 - Modify: `apps/web/app/globals.css` (`:root` and `@theme inline`), `apps/web/components/ui/dialog.tsx:56`, `apps/web/components/ui/dropdown-menu.tsx:36,204`
 
 **Interfaces:**
+
 - Produces: utilities `shadow-overlay` (dialogs, popovers) and `shadow-drag` (Phase 4 drag preview). Per design.md §3, shadows exist nowhere else.
 
 - [ ] **Step 1: Define the tokens**
@@ -274,15 +284,15 @@ git commit -m "feat(web): add token-themed sonner toast infrastructure"
 In `globals.css` `:root`, after the `--ease-*` block, add (values shared by both themes — dark depth comes from surface steps, not bigger shadows):
 
 ```css
-  --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
-  --elevation-drag: 0 12px 32px rgb(0 0 0 / 0.18), 0 4px 8px rgb(0 0 0 / 0.1);
+--elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
+--elevation-drag: 0 12px 32px rgb(0 0 0 / 0.18), 0 4px 8px rgb(0 0 0 / 0.1);
 ```
 
 In the `@theme inline` block add:
 
 ```css
-  --shadow-overlay: var(--elevation-overlay);
-  --shadow-drag: var(--elevation-drag);
+--shadow-overlay: var(--elevation-overlay);
+--shadow-drag: var(--elevation-drag);
 ```
 
 - [ ] **Step 2: Swap the hardcoded shadows**
@@ -342,9 +352,11 @@ EOF
 ### Task 7: Topbar component
 
 **Files:**
+
 - Create: `apps/web/components/layout/topbar.tsx`
 
 **Interfaces:**
+
 - Produces: `Topbar({ title, leading?, actions? })` — `title: string` renders as the route's single `h1`; consumed by Task 8.
 
 - [ ] **Step 1: Create the component**
@@ -384,9 +396,11 @@ git commit -m "feat(web): add shared 48px sticky topbar"
 ### Task 8: Adopt the topbar; drop the shell padding special case
 
 **Files:**
+
 - Modify: `apps/web/components/board/board-view.tsx:182-204`, `apps/web/app/(app)/dashboard/page.tsx`, `apps/web/components/board/board-list.tsx:100-111`, `apps/web/components/layout/app-shell.tsx:40-45`, `apps/web/app/(app)/workspaces/new/page.tsx`
 
 **Interfaces:**
+
 - Consumes: `Topbar` (Task 7).
 - Produces: every `(app)` route renders exactly one `Topbar` with the route's `h1`; the shell no longer injects padding.
 
@@ -500,10 +514,12 @@ git commit -m "feat(web): adopt shared topbar on board and dashboard routes"
 ### Task 9: Workspace switcher dropdown
 
 **Files:**
+
 - Create: `apps/web/components/layout/workspace-switcher.tsx`
 - Modify: `apps/web/components/layout/app-sidebar.tsx:64-79,104-111`, `apps/web/messages/en.json` (`app.shell`)
 
 **Interfaces:**
+
 - Consumes: `useWorkspaceContext()` — `workspaces: WorkspaceDto[]`, `activeId: string`, `onSwitch(id): Promise<void>`.
 - Produces: `WorkspaceSwitcher({ collapsed: boolean })`, rendered pinned at the sidebar top in both expanded and collapsed states.
 
@@ -587,6 +603,7 @@ In `messages/en.json` under `app.shell`, add: `"switchWorkspace": "Switch worksp
 - [ ] **Step 3: Wire into the sidebar**
 
 In `app-sidebar.tsx`:
+
 - Delete the `<label>…<select>…</label>` block (lines 64–79).
 - Render `<WorkspaceSwitcher collapsed={collapsed} />` directly under the title row, above the `<Separator />`, wrapped in `<div className={cn('mb-3', collapsed ? 'px-2' : 'px-3')}>`. It renders in **both** collapsed and expanded states — this fixes switching being impossible from the 56px rail.
 - Delete the "New workspace" `<Link>` from the nav (lines 104–111) — it now lives in the switcher menu.
@@ -607,10 +624,12 @@ git commit -m "feat(web): replace native select with workspace switcher dropdown
 ### Task 10: Sliding sancak rail
 
 **Files:**
+
 - Create: `apps/web/components/layout/sancak-rail.tsx`
 - Modify: `apps/web/components/layout/app-sidebar.tsx` (nav block, lines 83–112 after Task 9)
 
 **Interfaces:**
+
 - Produces: `useSancakRail(containerRef, deps)` returning `{ top, height } | null` measured from the element marked `data-rail-active="true"`, and `SancakRail({ box })` rendering the 2px copper rule. Phase 4 reuses both for focused columns / selected cards.
 
 - [ ] **Step 1: Create hook and component**
@@ -692,6 +711,7 @@ git commit -m "feat(web): sliding sancak rail for the sidebar nav"
 ### Task 11: Shell loading skeleton
 
 **Files:**
+
 - Modify: `apps/web/components/layout/app-shell.tsx:21-27`
 
 - [ ] **Step 1: Replace the centered text**
@@ -759,9 +779,11 @@ EOF
 ### Task 13: AuthFormField on ui primitives
 
 **Files:**
+
 - Modify: `apps/web/components/auth/auth-form-field.tsx`
 
 **Interfaces:**
+
 - Produces: same props as today (`label, type?, value, onChange, autoComplete?, required?, minLength?`) — call sites in login/register need no changes.
 
 - [ ] **Step 1: Rewrite on Input + Label**
@@ -822,10 +844,12 @@ git commit -m "refactor(web): AuthFormField on ui Input and Label"
 ### Task 14: Auth identity treatment
 
 **Files:**
+
 - Create: `apps/web/app/(auth)/layout.tsx`
 - Modify: `apps/web/app/(auth)/login/page.tsx`, `apps/web/app/(auth)/register/page.tsx`, `apps/web/app/(auth)/invite/[invitationId]/page.tsx`, `apps/web/app/(app)/workspaces/new/page.tsx`
 
 **Interfaces:**
+
 - Consumes: `DamgaMark` (Task 3), `Button` variants, type-scale utilities (Task 1).
 
 - [ ] **Step 1: Shared auth frame**
@@ -899,6 +923,7 @@ Same transformation as Step 2 applied to `register/page.tsx`: fragment root, `fo
 - [ ] **Step 4: Invite page**
 
 In `invite/[invitationId]/page.tsx`, all three returns become fragments (layout owns the frame):
+
 - Loading: `<p className="text-body text-muted-foreground">{t('loading')}</p>`
 - Signed-out: `h1` and subtitle as in Step 2; the sign-in link becomes
   `<Button asChild><Link href={`/login?next=/invite/${invitationId}`}>{t('signInCta')}</Link></Button>`
@@ -979,9 +1004,11 @@ EOF
 ### Task 16: Column stagger on first paint
 
 **Files:**
+
 - Modify: `apps/web/app/globals.css`, `apps/web/components/board/board-view.tsx`, `apps/web/components/board/board-column.tsx`
 
 **Interfaces:**
+
 - Produces: `BoardColumn` accepts optional `className?: string` and `style?: React.CSSProperties`, merged onto its root `<section>`.
 
 - [ ] **Step 1: Keyframes**
@@ -1042,10 +1069,7 @@ const [entranceDone, setEntranceDone] = useState(false);
 
 useEffect(() => {
   if (loading || entranceDone) return;
-  const timeout = window.setTimeout(
-    () => setEntranceDone(true),
-    columns.length * 40 + 250,
-  );
+  const timeout = window.setTimeout(() => setEntranceDone(true), columns.length * 40 + 250);
   return () => window.clearTimeout(timeout);
 }, [loading, entranceDone, columns.length]);
 ```
@@ -1072,6 +1096,7 @@ git commit -m "feat(web): stagger columns on first board paint"
 ### Task 17: Board-list card hover, focus, skeleton fidelity
 
 **Files:**
+
 - Modify: `apps/web/components/board/board-list.tsx:85-93,125-138`
 
 - [ ] **Step 1: Card hover and focus**
@@ -1079,7 +1104,8 @@ git commit -m "feat(web): stagger columns on first board paint"
 On the `<li>` (line 127–130) extend the className:
 
 ```tsx
-className="group relative rounded-[var(--radius-lg)] border border-border bg-card p-4 transition-colors hover:border-border-strong hover:bg-muted/40 focus-within:border-border-strong"
+className =
+  'group relative rounded-[var(--radius-lg)] border border-border bg-card p-4 transition-colors hover:border-border-strong hover:bg-muted/40 focus-within:border-border-strong';
 ```
 
 (The global `:focus-visible` ring already covers keyboard focus on the inner link; `transition-colors` reduces to nothing under reduced motion via Task 2 — color transitions are the kept kind, so it simply stays.)
@@ -1100,9 +1126,11 @@ git commit -m "feat(web): board card hover and focus states, truer skeletons"
 ### Task 18: Action errors become toasts with retry
 
 **Files:**
+
 - Modify: `apps/web/components/board/board-view.tsx`, `apps/web/messages/en.json` (`app.board.column`)
 
 **Interfaces:**
+
 - Consumes: `toast` from `'sonner'` (Task 4).
 
 - [ ] **Step 1: Add the retry string**
@@ -1112,6 +1140,7 @@ In `en.json` under `app.board.column`, add: `"retryAction": "Try again"`.
 - [ ] **Step 2: Replace inline action errors**
 
 In `board-view.tsx`:
+
 - Delete the `actionError` state, its `setActionError` calls, and the `{actionError ? <p …>…</p> : null}` block.
 - Add `import { toast } from 'sonner';`.
 - In `moveColumn`'s catch:
