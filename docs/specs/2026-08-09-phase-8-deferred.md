@@ -9,10 +9,10 @@ re-litigated mid-implementation. Pick these up only when the MVP is shipped and 
 
 **Shipped in Phase 8:** shell bell + popover (unread badge, mark all read, deep-link to task).
 
-| Deferred                         | Notes                                         |
-| -------------------------------- | --------------------------------------------- |
-| ~~Full `/notifications` page~~   | **Shipped** — cursor list, unread/type filters, mark read |
-| ~~Popover + “View all” → full page~~ | **Shipped** — hybrid bell + `/notifications` |
+| Deferred                             | Notes                                                     |
+| ------------------------------------ | --------------------------------------------------------- |
+| ~~Full `/notifications` page~~       | **Shipped** — cursor list, unread/type filters, mark read |
+| ~~Popover + “View all” → full page~~ | **Shipped** — hybrid bell + `/notifications`              |
 
 ## Due-soon job runner
 
@@ -34,11 +34,11 @@ re-litigated mid-implementation. Pick these up only when the MVP is shipped and 
 
 ## Out of Phase 8 entirely (already on roadmap)
 
-| Item                                          | Where                                                                                       |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Email delivery of notifications               | Roadmap Phase 8 `[-]` / Beyond MVP                                                          |
-| Realtime push of new notifications / activity | Phase 9 Socket.io                                                                           |
-| ~~Completion-over-time dashboard series~~     | **Shipped** — 14-day created vs completed (Done column) on dashboard summary / Recharts     |
+| Item                                          | Where                                                                                   |
+| --------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Email delivery of notifications               | Roadmap Phase 8 `[-]` / Beyond MVP                                                      |
+| Realtime push of new notifications / activity | Phase 9 Socket.io                                                                       |
+| ~~Completion-over-time dashboard series~~     | **Shipped** — 14-day created vs completed (Done column) on dashboard summary / Recharts |
 
 ## How to use this file
 

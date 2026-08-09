@@ -175,8 +175,6 @@ describe('Activity & notifications (e2e)', () => {
     expect(mentions.body.items).toHaveLength(1);
     expect(mentions.body.items[0].type).toBe(NotificationType.Mention);
 
-    await member.agent
-      .get(`/workspaces/${workspace.id}/notifications?type=not-a-type`)
-      .expect(400);
+    await member.agent.get(`/workspaces/${workspace.id}/notifications?type=not-a-type`).expect(400);
   });
 });
