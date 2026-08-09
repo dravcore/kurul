@@ -1,11 +1,9 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AppSidebar } from './app-sidebar';
 import { useWorkspaceContext, WorkspaceProvider } from './workspace-provider';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 function AppShellFrame({
   children,
@@ -13,10 +11,8 @@ function AppShellFrame({
   children: React.ReactNode;
 }>): React.ReactElement {
   const t = useTranslations('app');
-  const pathname = usePathname();
   const { sessionPending, hasSession, bootstrapped, loadError, retryBootstrap } =
     useWorkspaceContext();
-  const isBoardRoute = pathname.startsWith('/board/');
 
   if (sessionPending || !hasSession || !bootstrapped) {
     return (
@@ -40,7 +36,7 @@ function AppShellFrame({
   return (
     <div className="flex min-h-screen bg-background">
       <AppSidebar />
-      <div className={cn('flex min-w-0 flex-1 flex-col', !isBoardRoute && 'p-6')}>{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>
   );
 }
