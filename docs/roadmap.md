@@ -201,21 +201,22 @@ tenant-safely until this exists.
 ## Phase 4 — Tasks and drag-and-drop
 
 **Goal:** the core interaction of the product.
-**Status:** not started
+**Reference:** [design.md](design.md) §4–§5; [ADR 0010](decisions/0010-task-permissions.md);
+[spec](specs/2026-08-09-phase-4-tasks-design.md)
+**Status:** done
 
-- [ ] Task CRUD
-- [ ] **Fractional indexing** for `Task.position` — insert between, top, bottom, empty column
-- [ ] `PATCH .../tasks/:taskId/position` — move within and across columns
-- [ ] On-demand rebalancing: reflow a column when the gap between neighbours falls below the
+- [x] Task CRUD
+- [x] **Fractional indexing** for `Task.position` — insert between, top, bottom, empty column
+- [x] `PATCH .../tasks/:taskId/position` — move within and across columns
+- [x] On-demand rebalancing: reflow a column when the gap between neighbours falls below the
       precision threshold, in the same transaction as the move (no scheduled job — see
       [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md))
-- [ ] Concurrent-move handling (no duplicate positions)
-- [ ] Web: `@dnd-kit` board, optimistic reorder with rollback on failure
-- [ ] Web: task detail panel
-- [ ] **Re-evaluate `@dnd-kit`** now that the board interaction actually exists: the classic
-      line is frozen and the ADR's fallback is `pragmatic-drag-and-drop`. Record the outcome
-      in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) either way
-- [ ] Tests: the full positioning matrix in [testing.md](testing.md#1-fractional-indexing-taskposition)
+- [x] Concurrent-move handling (deterministic `position, id` tie-break; rebalance on exhausted gaps)
+- [x] Web: `@dnd-kit` board, optimistic reorder with rollback on failure
+- [x] Web: task detail panel (title + description; metadata UI is Phase 5)
+- [x] **Re-evaluate `@dnd-kit`** — kept classic pinned line; recorded in
+      [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)
+- [x] Tests: the full positioning matrix in [testing.md](testing.md#1-fractional-indexing-taskposition)
 
 ---
 

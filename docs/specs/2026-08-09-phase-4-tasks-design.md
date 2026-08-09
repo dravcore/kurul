@@ -1,6 +1,6 @@
 # Phase 4 — Tasks and drag-and-drop — design
 
-**Date:** 2026-08-09 · **Status:** approved · **Scope:** `apps/api` task module, `apps/web` board/task UI
+**Date:** 2026-08-09 · **Status:** shipped · **Scope:** `apps/api` task module, `apps/web` board/task UI
 
 ## Goals
 

@@ -80,8 +80,8 @@ The buildable step-by-step version of this tree lives in [project-skeleton.md](p
 
 Every module has the same skeleton: `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`. Module boundaries are kept clean from day one — the ability to split process roles later depends entirely on that.
 
-**Current vs planned:** after Phase 3, `auth`, `workspace`, `board`, `health`, `common`, and
-`prisma` have real handlers. `task`, `label`, `comment`, `activity`, `dashboard`,
+**Current vs planned:** after Phase 4, `auth`, `workspace`, `board`, `task`, `health`,
+`common`, and `prisma` have real handlers. `label`, `comment`, `activity`, `dashboard`,
 `notification`, and `realtime` remain route scaffolds nested under
 `/workspaces/:workspaceId/...` awaiting their roadmap phases. Treat the table below as the
 target map, not a claim that every module is implemented.
@@ -126,8 +126,8 @@ apps/web/
 │   ├── auth/              # shared auth form primitives
 │   ├── brand/             # DamgaMark and other brand marks
 │   ├── ui/                # shadcn/ui primitives (landed Phase 3)
-│   ├── board/             # BoardList, BoardView, BoardColumn, dialogs (TaskCard in Phase 4)
-│   ├── task/              # TaskDetailPanel (Phase 5+)
+│   ├── board/             # BoardList, BoardView, BoardColumn, dialogs
+│   ├── task/              # TaskCard, TaskPanel, DnD helpers (metadata UI in Phase 5+)
 │   └── dashboard/         # chart components (Phase 7+)
 └── lib/
     ├── api.ts             # typed REST client
