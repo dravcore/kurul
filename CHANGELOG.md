@@ -9,6 +9,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Visual debt closure and Phase 4 groundwork
+  ([spec](docs/specs/2026-08-09-visual-debt-design.md)): design.md type-scale tokens,
+  reduced-motion policy that keeps color/opacity, shared `DamgaMark`, token-themed sonner
+  toasts with retry actions, elevation tokens, shared 48px topbar, workspace switcher
+  dropdown (usable from the collapsed rail), sliding sancak rail, shell loading skeleton,
+  auth screens on the identity system (Fraunces display + damga + ui primitives), board
+  column stagger on first paint, board card hover/focus states, and a11y fixes
+  (`aria-current`, `menuitemradio` switcher, `main` landmark).
 - Phase 3 boards and columns: workspace-scoped board/column CRUD, default columns on
   board create, Float fractional column reordering with on-demand rebalance helper,
   [ADR 0009](docs/decisions/0009-board-column-permissions.md) role matrix, design tokens
