@@ -59,14 +59,14 @@ Tam stack Docker: `docker compose up --build`. Günlük detaylar:
 
 ## Stack
 
-| Katman            | Seçim                                                                     |
-| ----------------- | ------------------------------------------------------------------------- |
-| Backend           | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                |
-| Frontend          | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts  |
-| Auth              | Better Auth (organization plugin → Workspace)                             |
+| Katman            | Seçim                                                                          |
+| ----------------- | ------------------------------------------------------------------------------ |
+| Backend           | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                     |
+| Frontend          | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts       |
+| Auth              | Better Auth (organization plugin → Workspace)                                  |
 | Paylaşılan tipler | `packages/shared-types` + `packages/auth-access` (DTO'lar / BA org AC rolleri) |
-| Deployment        | Docker Compose                                                            |
-| Mimari            | Monorepo, modüler monolit — mikroservis yok                               |
+| Deployment        | Docker Compose                                                                 |
+| Mimari            | Monorepo, modüler monolit — mikroservis yok                                    |
 
 Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
 [docs/tr/decisions/](docs/tr/decisions/).

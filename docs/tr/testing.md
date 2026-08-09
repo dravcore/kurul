@@ -162,15 +162,15 @@ gözden geçirilir.
 
 Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalıştırır:
 
-| Adım                | Komut                                                                                           |
-| ------------------- | ----------------------------------------------------------------------------------------------- |
-| Shared paket build  | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build`       |
-| Lint                | `pnpm lint`                                                                                     |
-| Format kontrolü     | `pnpm format:check`                                                                             |
-| Typecheck           | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                       |
-| Unit testler        | `pnpm --filter @kurultay/api test`                                                              |
-| Integration testler | Bir Postgres service container'ına karşı `pnpm --filter @kurultay/api test:e2e`                 |
-| Build               | `pnpm build`                                                                                    |
+| Adım                | Komut                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| Shared paket build  | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build` |
+| Lint                | `pnpm lint`                                                                               |
+| Format kontrolü     | `pnpm format:check`                                                                       |
+| Typecheck           | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                 |
+| Unit testler        | `pnpm --filter @kurultay/api test`                                                        |
+| Integration testler | Bir Postgres service container'ına karşı `pnpm --filter @kurultay/api test:e2e`           |
+| Build               | `pnpm build`                                                                              |
 
 Merge öncesi tüm adımlar geçmelidir. Bkz.
 [git-strategy.md](git-strategy.md#pull-request-süreci).

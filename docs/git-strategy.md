@@ -104,15 +104,15 @@ A commit with a `BREAKING CHANGE:` footer (or `type!:`) is MAJOR post-1.0. See
 
 Scope is optional but strongly preferred. It names the part of the monorepo affected.
 
-| Scope         | Meaning                                                              |
-| ------------- | -------------------------------------------------------------------- |
-| `api`         | `apps/api` — NestJS backend                                          |
-| `web`         | `apps/web` — Next.js frontend                                        |
-| `shared`      | `packages/shared-types`                                              |
-| `auth-access` | `packages/auth-access` — Better Auth organization AC roles           |
-| `deps`        | Dependency bumps                                                     |
-| `docs`        | The `docs/` set (when the commit type is not already `docs`)         |
-| `ci`          | Workflows and pipeline config                                        |
+| Scope         | Meaning                                                      |
+| ------------- | ------------------------------------------------------------ |
+| `api`         | `apps/api` — NestJS backend                                  |
+| `web`         | `apps/web` — Next.js frontend                                |
+| `shared`      | `packages/shared-types`                                      |
+| `auth-access` | `packages/auth-access` — Better Auth organization AC roles   |
+| `deps`        | Dependency bumps                                             |
+| `docs`        | The `docs/` set (when the commit type is not already `docs`) |
+| `ci`          | Workflows and pipeline config                                |
 
 Narrower module scopes are fine when they add clarity: `feat(api/task)`, `fix(web/board)`.
 

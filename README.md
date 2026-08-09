@@ -57,14 +57,14 @@ Full stack in Docker: `docker compose up --build`. Day-to-day details:
 
 ## Stack
 
-| Layer        | Choice                                                                   |
-| ------------ | ------------------------------------------------------------------------ |
-| Backend      | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io               |
-| Frontend     | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts |
-| Auth         | Better Auth (organization plugin → Workspace)                            |
+| Layer        | Choice                                                                    |
+| ------------ | ------------------------------------------------------------------------- |
+| Backend      | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                |
+| Frontend     | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts  |
+| Auth         | Better Auth (organization plugin → Workspace)                             |
 | Shared types | `packages/shared-types` + `packages/auth-access` (DTOs / BA org AC roles) |
-| Deployment   | Docker Compose                                                           |
-| Architecture | Monorepo, modular monolith — no microservices                            |
+| Deployment   | Docker Compose                                                            |
+| Architecture | Monorepo, modular monolith — no microservices                             |
 
 Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 [docs/decisions/](docs/decisions/).

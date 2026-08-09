@@ -87,15 +87,15 @@ Root `package.json` scripts:
 TypeScript types shared between frontend and backend — hand-maintained DTOs/enums aligned with
 the Prisma schema (codegen remains aspirational), plus the socket contract.
 
-| Content              | Detail                                                                              |
-| -------------------- | ----------------------------------------------------------------------------------- |
-| `Priority` enum      | `LOW \| MEDIUM \| HIGH \| URGENT`                                                   |
-| `MemberRole` enum    | `OWNER \| ADMIN \| MEMBER \| GUEST`                                                 |
-| `InvitationStatus`   | `pending \| accepted \| canceled \| rejected`                                       |
-| `LabelColorSlot`     | `slot-1`…`slot-8` (never raw hex)                                                   |
-| DTO types            | Task, Board, Column, Label, Workspace, Invitation                                   |
-| `CursorPage<T>`      | Default list pagination shape                                                       |
-| Socket events        | Event name constants and payload types                                              |
+| Content            | Detail                                            |
+| ------------------ | ------------------------------------------------- |
+| `Priority` enum    | `LOW \| MEDIUM \| HIGH \| URGENT`                 |
+| `MemberRole` enum  | `OWNER \| ADMIN \| MEMBER \| GUEST`               |
+| `InvitationStatus` | `pending \| accepted \| canceled \| rejected`     |
+| `LabelColorSlot`   | `slot-1`…`slot-8` (never raw hex)                 |
+| DTO types          | Task, Board, Column, Label, Workspace, Invitation |
+| `CursorPage<T>`    | Default list pagination shape                     |
+| Socket events      | Event name constants and payload types            |
 
 ### packages/auth-access
 
@@ -209,13 +209,13 @@ Prisma 7 dropped the Rust query engine, which is why it was chosen
 ([`decisions/0002-backend-stack.md`](decisions/0002-backend-stack.md)). It is not a free
 upgrade, and each of these shapes the skeleton rather than being a detail discovered later:
 
-| Requirement                           | Effect on the skeleton                                                                                                                                                                                                                                                                        |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A driver adapter is mandatory         | `@prisma/adapter-pg` is a dependency of `apps/api`, and `PrismaService` owns a `pg` Pool's lifecycle in `OnModuleInit`/`OnModuleDestroy` — not just a connection string                                                                                                                       |
-| `prisma.config.ts` at the repo root   | Replaces env-var config inside `schema.prisma`, and declares the seed entry point (`db:seed` above)                                                                                                                                                                                           |
+| Requirement                           | Effect on the skeleton                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A driver adapter is mandatory         | `@prisma/adapter-pg` is a dependency of `apps/api`, and `PrismaService` owns a `pg` Pool's lifecycle in `OnModuleInit`/`OnModuleDestroy` — not just a connection string                                                                                                                                                               |
+| `prisma.config.ts` at the repo root   | Replaces env-var config inside `schema.prisma`, and declares the seed entry point (`db:seed` above)                                                                                                                                                                                                                                   |
 | Generator `output` is required        | The client is no longer emitted into `node_modules`. It goes to `apps/api/src/generated/prisma` for Nest and the Better Auth adapter. Shared DTO/enums in `@kurultay/shared-types` are hand-maintained to match the schema today; mechanical codegen remains aspirational ([architecture.md](architecture.md#5-packagesshared-types)) |
-| Client middleware (`$use`) is removed | Any query-level cross-cutting concern — the `workspaceId` scoping helper, a compare-and-swap guard on `position` — is a **Client Extension** now. Design for extensions from the start; there is no middleware to fall back to                                                                |
-| Env vars are not auto-loaded          | `dotenv` is called explicitly. `.env.example` below still describes the same variables; only the loading is manual                                                                                                                                                                            |
+| Client middleware (`$use`) is removed | Any query-level cross-cutting concern — the `workspaceId` scoping helper, a compare-and-swap guard on `position` — is a **Client Extension** now. Design for extensions from the start; there is no middleware to fall back to                                                                                                        |
+| Env vars are not auto-loaded          | `dotenv` is called explicitly. `.env.example` below still describes the same variables; only the loading is manual                                                                                                                                                                                                                    |
 
 Minimum versions that follow from this: Node ≥ 20.19.0 (the project's floor is higher — see
 [development.md](development.md#prerequisites)) and TypeScript 5.4.

@@ -113,10 +113,10 @@ tabloyu hedef harita olarak okuyun — her modülün uygulandığı iddiası de�
 
 Cross-cutting altyapı:
 
-| Modül    | Sorumluluk                                                                                                                         |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `common` | Guard'lar, exception filter'lar, decorator'lar, paylaşılan Nest bootstrap — workspace scoping; interceptor'lar Faz 3+ ile gelir   |
-| `prisma` | Paylaşılan `pg` pool + Nest `PrismaService`; Better Auth aynı pool'u kullanır                                                     |
+| Modül    | Sorumluluk                                                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `common` | Guard'lar, exception filter'lar, decorator'lar, paylaşılan Nest bootstrap — workspace scoping; interceptor'lar Faz 3+ ile gelir |
+| `prisma` | Paylaşılan `pg` pool + Nest `PrismaService`; Better Auth aynı pool'u kullanır                                                   |
 
 Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdır, asla tersi değil.
 `realtime`, domain event'lerinin tüketicisidir, domain logic'in yaşadığı bir yer değil —
@@ -163,12 +163,12 @@ Telden geçen her şey için tek doğruluk kaynağı. Backend ve frontend aynı 
 import eder, böylece aralarındaki bir sapma runtime sürprizi yerine bir type hatasına
 dönüşür.
 
-| İçerik          | Örnekler                                                                            |
-| --------------- | ----------------------------------------------------------------------------------- |
+| İçerik          | Örnekler                                                                           |
+| --------------- | ---------------------------------------------------------------------------------- |
 | Enum'lar        | `Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot` (`slot-1`…`slot-8`) |
-| DTO tipleri     | Workspace, Board, Column, Task, Label, Invitation request/response şekilleri        |
-| Sayfalama       | `CursorPage<T>` (varsayılan liste şekli; anahtar `id`)                              |
-| Socket kontratı | Event isim sabitleri ve payload tipleri                                             |
+| DTO tipleri     | Workspace, Board, Column, Task, Label, Invitation request/response şekilleri       |
+| Sayfalama       | `CursorPage<T>` (varsayılan liste şekli; anahtar `id`)                             |
+| Socket kontratı | Event isim sabitleri ve payload tipleri                                            |
 
 Better Auth organization **rol / access-control** tanımları `@kurultay/auth-access` içindedir
 (bu pakette değil); böylece api ve web tek AC tanımını paylaşır, types paketine Better Auth

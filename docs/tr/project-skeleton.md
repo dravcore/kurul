@@ -93,14 +93,14 @@ Kök `package.json` script'leri:
 Frontend ve backend arasında paylaşılan TypeScript tipleri — Prisma şemasıyla hizalı,
 elle tutulan DTO/enum'lar (codegen hâlâ aspirasyonel), artı socket kontratı.
 
-| İçerik             | Detay                                            |
-| ------------------ | ------------------------------------------------ |
-| `Priority` enum    | `LOW \| MEDIUM \| HIGH \| URGENT`                |
-| `MemberRole` enum  | `OWNER \| ADMIN \| MEMBER \| GUEST`              |
-| `InvitationStatus` | `pending \| accepted \| canceled \| rejected`    |
-| `LabelColorSlot`   | `slot-1`…`slot-8` (ham hex değil)                |
+| İçerik             | Detay                                             |
+| ------------------ | ------------------------------------------------- |
+| `Priority` enum    | `LOW \| MEDIUM \| HIGH \| URGENT`                 |
+| `MemberRole` enum  | `OWNER \| ADMIN \| MEMBER \| GUEST`               |
+| `InvitationStatus` | `pending \| accepted \| canceled \| rejected`     |
+| `LabelColorSlot`   | `slot-1`…`slot-8` (ham hex değil)                 |
 | DTO tipleri        | Task, Board, Column, Label, Workspace, Invitation |
-| `CursorPage<T>`    | Varsayılan liste sayfalama şekli                 |
+| `CursorPage<T>`    | Varsayılan liste sayfalama şekli                  |
 | Socket event'leri  | Event isim sabitleri ve payload tipleri           |
 
 ### packages/auth-access
@@ -221,13 +221,13 @@ Prisma 7, Rust query engine'i kaldırdı, bu da seçilme sebebi
 değil, ve aşağıdakilerin her biri sonradan keşfedilen bir detay olmak yerine iskeleti
 şekillendiriyor:
 
-| Gereklilik                            | İskelet üzerindeki etki                                                                                                                                                                                                                                                                               |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bir driver adapter zorunlu            | `@prisma/adapter-pg`, `apps/api`'nin bir bağımlılığı, ve `PrismaService`, `OnModuleInit`/`OnModuleDestroy` içinde bir `pg` Pool'un yaşam döngüsünü sahipleniyor — yalnızca bir connection string değil                                                                                                |
-| Kök dizinde `prisma.config.ts`        | `schema.prisma` içindeki env-var yapılandırmasının yerini alır ve seed giriş noktasını deklare eder (yukarıdaki `db:seed`)                                                                                                                                                                            |
+| Gereklilik                            | İskelet üzerindeki etki                                                                                                                                                                                                                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Bir driver adapter zorunlu            | `@prisma/adapter-pg`, `apps/api`'nin bir bağımlılığı, ve `PrismaService`, `OnModuleInit`/`OnModuleDestroy` içinde bir `pg` Pool'un yaşam döngüsünü sahipleniyor — yalnızca bir connection string değil                                                                                           |
+| Kök dizinde `prisma.config.ts`        | `schema.prisma` içindeki env-var yapılandırmasının yerini alır ve seed giriş noktasını deklare eder (yukarıdaki `db:seed`)                                                                                                                                                                       |
 | Generator `output`'u zorunlu          | Client artık `node_modules`'a üretilmiyor. Nest ve Better Auth adapter için `apps/api/src/generated/prisma`'ya gider. `@kurultay/shared-types` içindeki DTO/enum'lar bugün şemayla elle hizalanır; mekanik codegen hâlâ aspirasyonel ([architecture.md](architecture.md#5-packagesshared-types)) |
-| Client middleware (`$use`) kaldırıldı | Herhangi bir sorgu-seviyesi cross-cutting kaygı — `workspaceId` scoping helper'ı, `position` üzerinde bir compare-and-swap guard'ı — artık bir **Client Extension**. Baştan extension'lar için tasarlayın; geri düşülecek bir middleware yok                                                          |
-| Env değişkenleri otomatik yüklenmiyor | `dotenv` açıkça çağrılıyor. Aşağıdaki `.env.example` aynı değişkenleri tarif etmeye devam ediyor; yalnızca yükleme elle yapılıyor                                                                                                                                                                     |
+| Client middleware (`$use`) kaldırıldı | Herhangi bir sorgu-seviyesi cross-cutting kaygı — `workspaceId` scoping helper'ı, `position` üzerinde bir compare-and-swap guard'ı — artık bir **Client Extension**. Baştan extension'lar için tasarlayın; geri düşülecek bir middleware yok                                                     |
+| Env değişkenleri otomatik yüklenmiyor | `dotenv` açıkça çağrılıyor. Aşağıdaki `.env.example` aynı değişkenleri tarif etmeye devam ediyor; yalnızca yükleme elle yapılıyor                                                                                                                                                                |
 
 Bundan doğan asgari sürümler: Node ≥ 20.19.0 (projenin taban çizgisi daha yüksek — bkz.
 [development.md](development.md#ön-koşullar)) ve TypeScript 5.4.

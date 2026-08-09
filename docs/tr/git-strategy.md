@@ -105,15 +105,15 @@ bölümüne bakın.
 
 Scope opsiyoneldir ama kuvvetle tercih edilir. Monorepo'nun etkilenen kısmını adlandırır.
 
-| Scope         | Anlam                                                                |
-| ------------- | -------------------------------------------------------------------- |
-| `api`         | `apps/api` — NestJS backend                                          |
-| `web`         | `apps/web` — Next.js frontend                                        |
-| `shared`      | `packages/shared-types`                                              |
-| `auth-access` | `packages/auth-access` — Better Auth organization AC rolleri         |
-| `deps`        | Dependency bump'ları                                                 |
-| `docs`        | `docs/` seti (commit type'ı zaten `docs` değilse)                    |
-| `ci`          | Workflow'lar ve pipeline config'i                                    |
+| Scope         | Anlam                                                        |
+| ------------- | ------------------------------------------------------------ |
+| `api`         | `apps/api` — NestJS backend                                  |
+| `web`         | `apps/web` — Next.js frontend                                |
+| `shared`      | `packages/shared-types`                                      |
+| `auth-access` | `packages/auth-access` — Better Auth organization AC rolleri |
+| `deps`        | Dependency bump'ları                                         |
+| `docs`        | `docs/` seti (commit type'ı zaten `docs` değilse)            |
+| `ci`          | Workflow'lar ve pipeline config'i                            |
 
 Daha dar modül scope'ları netlik kattığında sorun değildir: `feat(api/task)`,
 `fix(web/board)`.

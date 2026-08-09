@@ -138,12 +138,12 @@ Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` r
 
 The single source of truth for anything that crosses the wire. Backend and frontend import the same declarations, so a drift between them becomes a type error rather than a runtime surprise.
 
-| Content         | Examples                                                                                           |
-| --------------- | -------------------------------------------------------------------------------------------------- |
-| Enums           | `Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot` (`slot-1`…`slot-8`)                 |
-| DTO types       | Workspace, Board, Column, Task, Label, Invitation request/response shapes                          |
-| Pagination      | `CursorPage<T>` (default list shape; keyed on `id`)                                                |
-| Socket contract | Event name constants and their payload types                                                       |
+| Content         | Examples                                                                           |
+| --------------- | ---------------------------------------------------------------------------------- |
+| Enums           | `Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot` (`slot-1`…`slot-8`) |
+| DTO types       | Workspace, Board, Column, Task, Label, Invitation request/response shapes          |
+| Pagination      | `CursorPage<T>` (default list shape; keyed on `id`)                                |
+| Socket contract | Event name constants and their payload types                                       |
 
 Better Auth organization **roles / access-control** live in `@kurultay/auth-access` (not in this package), so api and web share one AC definition without pulling Better Auth into the types package.
 
