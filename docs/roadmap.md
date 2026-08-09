@@ -83,7 +83,7 @@ recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase be
 - [x] `docs/architecture.md` — modular monolith, module map, data model summary
 - [x] `docs/tech-stack.md` — English canonical version
 - [x] `docs/project-skeleton.md` — English canonical version
-- [x] `docs/decisions/` — ADRs 0001–0008 + index
+- [x] `docs/decisions/` — ADRs 0001–0009 + index
 
 ### Localization
 
@@ -192,6 +192,9 @@ tenant-safely until this exists.
 - [x] Column reordering (`position`)
 - [x] Default columns on board creation (To Do / In Progress / Done)
 - [x] Web: board list, board page shell, column rendering, create/rename/delete dialogs
+- [x] Design.md §3–§4 validation on real screens — closed by the visual-debt stack
+      ([spec](specs/2026-08-09-visual-debt-design.md)): type scale, toast, topbar, workspace
+      switcher, sancak rail, auth identity treatment, board polish
 
 ---
 
