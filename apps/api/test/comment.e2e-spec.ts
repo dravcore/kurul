@@ -81,12 +81,14 @@ describe('Comments (e2e)', () => {
 
     await member.agent
       .delete(`/workspaces/${workspace.id}/comments/${comment.body.id}`)
-      .expect(204);
+      .expect(403);
 
     const listed = await owner.agent
       .get(`/workspaces/${workspace.id}/tasks/${taskId}/comments`)
       .expect(200);
-    expect(listed.body).toHaveLength(0);
+    expect(listed.body).toHaveLength(1);
+
+    await owner.agent.delete(`/workspaces/${workspace.id}/comments/${comment.body.id}`).expect(204);
   });
 
   it('denies GUEST comment deletion', async () => {

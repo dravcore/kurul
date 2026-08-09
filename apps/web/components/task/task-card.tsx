@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { TaskDto } from '@kurultay/shared-types';
 import { cn } from '@/lib/utils';
 import { LabelDots } from './label-chip';
@@ -37,13 +37,14 @@ export function TaskCard({
   className,
 }: TaskCardProps): React.ReactElement {
   const t = useTranslations('app.board.task');
+  const locale = useLocale();
   const assigneeNames = task.assignees.map((assignee) => assignee.name).join(', ');
   const overdue = task.dueDate !== null && utcCalendarDay(task.dueDate) < todayUtcCalendarDay();
 
   return (
     <Link
       href={`/board/${boardId}/task/${task.id}`}
-      data-rail-active={selected || undefined}
+      data-selected={selected || undefined}
       className={cn(
         'block rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 text-left transition-colors',
         'hover:border-border-strong hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
@@ -66,7 +67,7 @@ export function TaskCard({
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro text-muted-foreground">
           {task.dueDate ? (
             <span className={cn(overdue && 'text-status-danger')}>
-              {formatDueDate(task.dueDate, 'en')}
+              {formatDueDate(task.dueDate, locale)}
             </span>
           ) : null}
           {task.estimatedMinutes !== null ? (

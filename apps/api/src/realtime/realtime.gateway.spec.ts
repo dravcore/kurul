@@ -8,13 +8,10 @@ describe('RealtimeGateway board join', () => {
   it('rejects join when the user is not a workspace member', async () => {
     const prisma = {
       board: {
-        findFirst: jest.fn().mockResolvedValue({
-          id: 'board-1',
-          workspaceId: 'ws-1',
-        }),
-      },
-      workspaceMember: {
-        findFirst: jest.fn().mockResolvedValue(null),
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(null) // membership-scoped lookup
+          .mockResolvedValueOnce({ id: 'board-1' }), // exists check
       },
     };
     const moduleRef = await Test.createTestingModule({

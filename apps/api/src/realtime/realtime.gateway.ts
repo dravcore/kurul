@@ -92,19 +92,19 @@ export class RealtimeGateway
     }
 
     const board = await this.prisma.board.findFirst({
-      where: { id: boardId },
-      select: { id: true, workspaceId: true },
-    });
-    if (!board) {
-      return { ok: false, error: 'board not found' };
-    }
-
-    const member = await this.prisma.workspaceMember.findFirst({
-      where: { workspaceId: board.workspaceId, userId },
+      where: {
+        id: boardId,
+        workspace: { members: { some: { userId } } },
+      },
       select: { id: true },
     });
-    if (!member) {
-      return { ok: false, error: 'forbidden' };
+    if (!board) {
+      // Distinguish missing board vs forbidden without leaking membership.
+      const exists = await this.prisma.board.findFirst({
+        where: { id: boardId },
+        select: { id: true },
+      });
+      return { ok: false, error: exists ? 'forbidden' : 'board not found' };
     }
 
     await client.join(boardRoom(boardId));

@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { ActivityType, SocketEvents } from '@kurultay/shared-types';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ActivityType, MemberRole, SocketEvents } from '@kurultay/shared-types';
 import type { CommentDto } from '@kurultay/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { parseMentions } from '../common/mentions/parse-mentions';
@@ -120,11 +120,23 @@ export class CommentService {
     return comment;
   }
 
-  async remove(workspaceId: string, commentId: string): Promise<void> {
+  async remove(
+    workspaceId: string,
+    commentId: string,
+    actorId: string,
+    actorRole: MemberRole,
+  ): Promise<void> {
     const comment = await this.prisma.comment.findFirst({
       where: { id: commentId, task: { board: { workspaceId } } },
     });
     if (!comment) throw new NotFoundException('Comment not found');
+
+    const isAuthor = comment.userId === actorId;
+    const isElevated = actorRole === MemberRole.OWNER || actorRole === MemberRole.ADMIN;
+    if (!isAuthor && !isElevated) {
+      throw new ForbiddenException('Only the author or an admin can delete this comment');
+    }
+
     await this.prisma.comment.delete({ where: { id: commentId } });
   }
 
