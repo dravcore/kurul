@@ -82,7 +82,8 @@
       "boardMenu": "Board actions",
       "errors": {
         "forbiddenDelete": "You need Admin access to delete boards. Ask a workspace owner.",
-        "forbiddenColumns": "You need Admin access to change columns. Ask a workspace owner."
+        "forbiddenColumns": "You need Admin access to change columns. Ask a workspace owner.",
+        "forbiddenTasks": "You need to be a workspace member to change tasks."
       },
       "column": {
         "name": "Name",
@@ -109,6 +110,27 @@
         "emptyDrop": "Drop a task here",
         "cancel": "Cancel",
         "forbidden": "You need Admin access to change columns. Ask a workspace owner."
+      },
+      "task": {
+        "title": "Title",
+        "description": "Description",
+        "openTask": "Open task",
+        "panelLabel": "Task details",
+        "close": "Close task panel",
+        "backToBoard": "Back to board",
+        "createTitle": "Add task",
+        "createAction": "Add task",
+        "createError": "Could not create this task.",
+        "deleteTitle": "Delete this task?",
+        "deleteBody": "Delete “{title}”? This cannot be undone.",
+        "deleteAction": "Delete task",
+        "deleteError": "Could not delete this task.",
+        "saveError": "Could not save this task.",
+        "missing": "This task no longer exists. Someone may have deleted it.",
+        "moveError": "Could not move this task.",
+        "retryAction": "Try again",
+        "cancel": "Cancel",
+        "forbidden": "You need to be a workspace member to change tasks."
       }
     }
   }

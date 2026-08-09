@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type { BoardDto, ColumnDto } from '@kurultay/shared-types';
+import type { BoardDto, ColumnDto, TaskDto } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
-import { canMutateColumns } from '@/lib/board-permissions';
+import { canMutateColumns, canMutateTasks } from '@/lib/board-permissions';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +19,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Topbar } from '@/components/layout/topbar';
+import { CreateTaskDialog } from '@/components/task/create-task-dialog';
+import { DeleteTaskDialog } from '@/components/task/delete-task-dialog';
+import { TaskPanel } from '@/components/task/task-panel';
 import { BoardColumn } from './board-column';
 import { CreateColumnDialog } from './create-column-dialog';
 import { DeleteColumnDialog } from './delete-column-dialog';
@@ -28,27 +32,61 @@ const DEFAULT_COLUMNS = ['To Do', 'In Progress', 'Done'] as const;
 
 interface BoardViewProps {
   boardId: string;
+  selectedTaskId?: string | null;
 }
 
-export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
+export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): React.ReactElement {
   const t = useTranslations('app.board');
+  const tTask = useTranslations('app.board.task');
+  const router = useRouter();
   const { activeId, activeRole } = useWorkspaceContext();
   const [board, setBoard] = useState<BoardDto | null>(null);
   const [columns, setColumns] = useState<ColumnDto[]>([]);
+  const [tasks, setTasks] = useState<TaskDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [panelError, setPanelError] = useState<string | null>(null);
+  const [createColumnOpen, setCreateColumnOpen] = useState(false);
+  const [createTaskColumnId, setCreateTaskColumnId] = useState<string | null>(null);
   const [renameColumn, setRenameColumn] = useState<ColumnDto | null>(null);
   const [deleteColumn, setDeleteColumn] = useState<ColumnDto | null>(null);
+  const [deleteTask, setDeleteTask] = useState<TaskDto | null>(null);
   const [defaultsPending, setDefaultsPending] = useState(false);
   const [entranceDone, setEntranceDone] = useState(false);
   const columnsRef = useRef<ColumnDto[]>([]);
+  const tasksRef = useRef<TaskDto[]>([]);
 
-  const canMutate = canMutateColumns(activeRole);
+  const canEditColumns = canMutateColumns(activeRole);
+  const canEditTasks = canMutateTasks(activeRole);
+
+  const selectedTask = useMemo(
+    () => (selectedTaskId ? (tasks.find((task) => task.id === selectedTaskId) ?? null) : null),
+    [selectedTaskId, tasks],
+  );
+
+  const tasksByColumn = useMemo(() => {
+    const map = new Map<string, TaskDto[]>();
+    for (const column of columns) {
+      map.set(column.id, []);
+    }
+    for (const task of tasks) {
+      const list = map.get(task.columnId);
+      if (list) list.push(task);
+      else map.set(task.columnId, [task]);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
+    }
+    return map;
+  }, [columns, tasks]);
 
   useEffect(() => {
     columnsRef.current = columns;
   }, [columns]);
+
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   useEffect(() => {
     if (loading || entranceDone) return;
@@ -58,12 +96,14 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
 
   const reload = useCallback(async (): Promise<void> => {
     if (!activeId) return;
-    const [nextBoard, nextColumns] = await Promise.all([
+    const [nextBoard, nextColumns, nextTasks] = await Promise.all([
       api.get<BoardDto>(`/workspaces/${activeId}/boards/${boardId}`),
       api.get<ColumnDto[]>(`/workspaces/${activeId}/boards/${boardId}/columns`),
+      api.get<TaskDto[]>(`/workspaces/${activeId}/boards/${boardId}/tasks`),
     ]);
     setBoard(nextBoard);
     setColumns(nextColumns);
+    setTasks(nextTasks);
   }, [activeId, boardId]);
 
   useEffect(() => {
@@ -86,6 +126,34 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
     })();
     return () => controller.abort();
   }, [activeId, boardId, reload, t]);
+
+  useEffect(() => {
+    if (!activeId || !selectedTaskId || loading) {
+      setPanelError(null);
+      return;
+    }
+    if (tasksRef.current.some((task) => task.id === selectedTaskId)) {
+      setPanelError(null);
+      return;
+    }
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const task = await api.get<TaskDto>(`/workspaces/${activeId}/tasks/${selectedTaskId}`);
+        if (!controller.signal.aborted) {
+          setTasks((current) =>
+            current.some((item) => item.id === task.id) ? current : [...current, task],
+          );
+          setPanelError(null);
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setPanelError(tTask('missing'));
+        }
+      }
+    })();
+    return () => controller.abort();
+  }, [activeId, selectedTaskId, loading, tTask]);
 
   async function moveColumn(column: ColumnDto, direction: -1 | 1): Promise<void> {
     if (!activeId) return;
@@ -190,6 +258,8 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
     );
   }
 
+  const panelOpen = selectedTaskId !== null;
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <Topbar
@@ -202,7 +272,7 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
           </Button>
         }
         actions={
-          canMutate ? (
+          canEditColumns ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button type="button" variant="ghost" size="icon-sm" aria-label={t('boardMenu')}>
@@ -210,7 +280,7 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setCreateOpen(true)}>
+                <DropdownMenuItem onClick={() => setCreateColumnOpen(true)}>
                   <Plus />
                   {t('column.createAction')}
                 </DropdownMenuItem>
@@ -220,67 +290,96 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
         }
       />
 
-      {columns.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-          <DamgaMark />
-          <h2 className="font-display text-title-lg font-semibold">{t('column.emptyTitle')}</h2>
-          <p className="max-w-md text-body text-muted-foreground">{t('column.emptyBody')}</p>
-          {canMutate ? (
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <Button type="button" onClick={() => setCreateOpen(true)}>
-                {t('column.createAction')}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={defaultsPending}
-                onClick={() => void seedDefaults()}
-              >
-                {t('column.useDefaults')}
-              </Button>
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {columns.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+              <DamgaMark />
+              <h2 className="font-display text-title-lg font-semibold">{t('column.emptyTitle')}</h2>
+              <p className="max-w-md text-body text-muted-foreground">{t('column.emptyBody')}</p>
+              {canEditColumns ? (
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button type="button" onClick={() => setCreateColumnOpen(true)}>
+                    {t('column.createAction')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={defaultsPending}
+                    onClick={() => void seedDefaults()}
+                  >
+                    {t('column.useDefaults')}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-body text-destructive">{t('errors.forbiddenColumns')}</p>
+              )}
             </div>
           ) : (
-            <p className="text-body text-destructive">{t('errors.forbiddenColumns')}</p>
+            <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+              {columns.map((column, index) => (
+                <BoardColumn
+                  key={column.id}
+                  column={column}
+                  tasks={tasksByColumn.get(column.id) ?? []}
+                  boardId={boardId}
+                  selectedTaskId={selectedTaskId}
+                  canMutateColumns={canEditColumns}
+                  canMutateTasks={canEditTasks}
+                  canMoveLeft={index > 0}
+                  canMoveRight={index < columns.length - 1}
+                  onRename={() => setRenameColumn(column)}
+                  onDelete={() => setDeleteColumn(column)}
+                  onMoveLeft={() => void moveColumn(column, -1)}
+                  onMoveRight={() => void moveColumn(column, 1)}
+                  onAddTask={() => setCreateTaskColumnId(column.id)}
+                  className={entranceDone ? undefined : 'board-column-enter'}
+                  style={
+                    entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)
+                  }
+                />
+              ))}
+              {canEditColumns ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 w-[var(--column-width)] min-w-[280px] shrink-0"
+                  onClick={() => setCreateColumnOpen(true)}
+                >
+                  <Plus />
+                  {t('column.createAction')}
+                </Button>
+              ) : null}
+            </div>
           )}
         </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
-          {columns.map((column, index) => (
-            <BoardColumn
-              key={column.id}
-              column={column}
-              canMutate={canMutate}
-              canMoveLeft={index > 0}
-              canMoveRight={index < columns.length - 1}
-              onRename={() => setRenameColumn(column)}
-              onDelete={() => setDeleteColumn(column)}
-              onMoveLeft={() => void moveColumn(column, -1)}
-              onMoveRight={() => void moveColumn(column, 1)}
-              className={entranceDone ? undefined : 'board-column-enter'}
-              style={
-                entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)
-              }
-            />
-          ))}
-          {canMutate ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 w-[var(--column-width)] min-w-[280px] shrink-0"
-              onClick={() => setCreateOpen(true)}
-            >
-              <Plus />
-              {t('column.createAction')}
-            </Button>
-          ) : null}
-        </div>
-      )}
+
+        {panelOpen && activeId ? (
+          <TaskPanel
+            workspaceId={activeId}
+            boardId={boardId}
+            task={selectedTask}
+            canMutate={canEditTasks}
+            loadError={panelError}
+            onUpdated={(task) =>
+              setTasks((current) =>
+                current.some((item) => item.id === task.id)
+                  ? current.map((item) => (item.id === task.id ? task : item))
+                  : [...current, task],
+              )
+            }
+            onRequestDelete={() => {
+              if (selectedTask) setDeleteTask(selectedTask);
+            }}
+          />
+        ) : null}
+      </div>
 
       {activeId ? (
         <>
           <CreateColumnDialog
-            open={createOpen}
-            onOpenChange={setCreateOpen}
+            open={createColumnOpen}
+            onOpenChange={setCreateColumnOpen}
             workspaceId={activeId}
             boardId={boardId}
             afterColumnId={columns.at(-1)?.id}
@@ -306,9 +405,34 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
             }}
             workspaceId={activeId}
             column={deleteColumn}
-            onDeleted={(columnId) =>
-              setColumns((current) => current.filter((item) => item.id !== columnId))
-            }
+            onDeleted={(columnId) => {
+              setColumns((current) => current.filter((item) => item.id !== columnId));
+              setTasks((current) => current.filter((task) => task.columnId !== columnId));
+            }}
+          />
+          <CreateTaskDialog
+            open={createTaskColumnId !== null}
+            onOpenChange={(open) => {
+              if (!open) setCreateTaskColumnId(null);
+            }}
+            workspaceId={activeId}
+            boardId={boardId}
+            columnId={createTaskColumnId ?? ''}
+            onCreated={(task) => setTasks((current) => [...current, task])}
+          />
+          <DeleteTaskDialog
+            open={deleteTask !== null}
+            onOpenChange={(open) => {
+              if (!open) setDeleteTask(null);
+            }}
+            workspaceId={activeId}
+            task={deleteTask}
+            onDeleted={(taskId) => {
+              setTasks((current) => current.filter((task) => task.id !== taskId));
+              if (selectedTaskId === taskId) {
+                router.push(`/board/${boardId}`);
+              }
+            }}
           />
         </>
       ) : null}
