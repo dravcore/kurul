@@ -188,7 +188,11 @@ export class ColumnService {
             }),
           ),
         );
-        return this.toDto({ ...column, position: positions[insertionIndex]! });
+        const refreshed = await tx.column.findFirstOrThrow({
+          where: { id: columnId, board: { workspaceId } },
+          include: { _count: { select: { tasks: true } } },
+        });
+        return this.toDto({ ...refreshed, position: positions[insertionIndex]! });
       }
 
       const updated = await tx.column.update({

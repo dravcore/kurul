@@ -1,13 +1,23 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpdateBoardDto {
-  @IsOptional()
+  /** Omitted = leave unchanged; explicit null is rejected (non-nullable column). */
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNotEmpty()
   @IsString()
   @MinLength(1)
   @MaxLength(120)
   name?: string;
 
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsString()
   @MaxLength(2000)
   description?: string | null;

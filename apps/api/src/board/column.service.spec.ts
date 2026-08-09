@@ -99,4 +99,51 @@ describe('ColumnService', () => {
     expect(prisma.column.delete).toHaveBeenCalledWith({ where: { id: COLUMN_ID } });
     expect(realtime.emitToBoard).toHaveBeenCalled();
   });
+
+  it('preserves taskCount when move rebalances positions', async () => {
+    const { service, prisma, realtime } = buildService();
+    const column = {
+      id: COLUMN_ID,
+      boardId: BOARD_ID,
+      name: 'Todo',
+      position: 3000,
+      color: null,
+    };
+    const beforeNeighbor = {
+      id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d52',
+      boardId: BOARD_ID,
+      name: 'Doing',
+      position: 1000,
+      color: null,
+    };
+    const afterNeighbor = {
+      id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d53',
+      boardId: BOARD_ID,
+      name: 'Done',
+      position: 1000 + 1e-9,
+      color: null,
+    };
+    prisma.$transaction.mockImplementation(async (callback) =>
+      callback({
+        column: {
+          findFirst: jest.fn().mockResolvedValue(column),
+          findMany: jest.fn().mockResolvedValue([beforeNeighbor, afterNeighbor, column]),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findFirstOrThrow: jest.fn().mockResolvedValue({
+            ...column,
+            position: 2000,
+            _count: { tasks: 7 },
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.move(WORKSPACE_ID, COLUMN_ID, ACTOR_ID, {
+        beforeColumnId: beforeNeighbor.id,
+        afterColumnId: afterNeighbor.id,
+      }),
+    ).resolves.toMatchObject({ id: COLUMN_ID, taskCount: 7 });
+    expect(realtime.emitToBoard).toHaveBeenCalled();
+  });
 });

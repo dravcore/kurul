@@ -181,13 +181,48 @@ describe('AllExceptionsFilter', () => {
       expect(logError).toHaveBeenCalledWith(expect.stringContaining('boom'));
     });
 
+    it('maps Prisma unique violations to 409', () => {
+      const { host, response } = createHost();
+      const error = Object.assign(new Error('Unique constraint failed'), {
+        code: 'P2002',
+        clientVersion: '7.0.0',
+        name: 'PrismaClientKnownRequestError',
+      });
+
+      filter.catch(error, host);
+
+      expect(response.status).toHaveBeenCalledWith(409);
+      expect(body(response)).toMatchObject({
+        statusCode: 409,
+        error: 'Conflict',
+        message: 'Resource already exists',
+      });
+    });
+
+    it('maps Prisma not-found to 404', () => {
+      const { host, response } = createHost();
+      const error = Object.assign(new Error('Record to update not found'), {
+        code: 'P2025',
+        clientVersion: '7.0.0',
+        name: 'PrismaClientKnownRequestError',
+      });
+
+      filter.catch(error, host);
+
+      expect(response.status).toHaveBeenCalledWith(404);
+      expect(body(response)).toMatchObject({
+        statusCode: 404,
+        message: 'Resource not found',
+      });
+    });
+
     it('logs a thrown plain object before responding 500', () => {
       const { host, response } = createHost();
 
-      filter.catch({ code: 'P2002', meta: { target: ['slug'] } }, host);
+      filter.catch({ unexpected: true }, host);
 
       expect(response.status).toHaveBeenCalledWith(500);
-      expect(logError).toHaveBeenCalledWith(expect.stringContaining('P2002'));
+      expect(logError).toHaveBeenCalledWith(expect.stringContaining('unexpected'));
     });
 
     it('logs thrown Errors with their stack', () => {

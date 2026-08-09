@@ -249,6 +249,12 @@ export class TaskService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const scoped = await tx.task.findFirst({
+        where: { id: taskId, board: { workspaceId } },
+        select: { id: true },
+      });
+      if (!scoped) throw new NotFoundException('Task not found');
+
       const updated = await tx.task.update({
         where: { id: taskId },
         data: {
