@@ -59,7 +59,7 @@ export function DeleteBoardDialog({
           <DialogTitle>{t('deleteTitle')}</DialogTitle>
           <DialogDescription>{t('deleteBody', { name: board?.name ?? '' })}</DialogDescription>
         </DialogHeader>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? <p className="text-body text-destructive">{error}</p> : null}
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             {t('cancel')}

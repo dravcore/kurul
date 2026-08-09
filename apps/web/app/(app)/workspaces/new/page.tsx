@@ -48,7 +48,7 @@ export default function NewWorkspacePage(): React.ReactElement {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-6">
       <h1 className="text-title-lg tracking-tight">{t('createTitle')}</h1>
       <p className="text-body text-muted-foreground">{t('createSubtitle')}</p>
 
@@ -77,6 +77,6 @@ export default function NewWorkspacePage(): React.ReactElement {
           {t('submit')}
         </Button>
       </form>
-    </main>
+    </div>
   );
 }

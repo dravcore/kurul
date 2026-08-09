@@ -41,7 +41,7 @@ function AppShellFrame({
   if (loadError) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="text-sm text-destructive">{loadError}</p>
+        <p className="text-body text-destructive">{loadError}</p>
         <Button type="button" onClick={retryBootstrap}>
           {t('shell.retry')}
         </Button>
@@ -52,7 +52,7 @@ function AppShellFrame({
   return (
     <div className="flex min-h-screen bg-background">
       <AppSidebar />
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
     </div>
   );
 }

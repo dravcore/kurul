@@ -80,7 +80,7 @@ export function CreateColumnDialog({
               autoFocus
             />
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error ? <p className="text-body text-destructive">{error}</p> : null}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               {t('cancel')}

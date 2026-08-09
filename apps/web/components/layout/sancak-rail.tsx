@@ -2,6 +2,13 @@
 
 import { useEffect, useState, type RefObject } from 'react';
 
+/**
+ * SancakRail draws a purely visual, `aria-hidden` position indicator that
+ * tracks whichever element in the container is marked `data-rail-active="true"`.
+ * Callers must pair `data-rail-active` with `aria-current` (or an equivalent
+ * programmatic active state) and guarantee at most one active element per
+ * container.
+ */
 export interface SancakRailBox {
   top: number;
   height: number;

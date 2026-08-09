@@ -207,3 +207,35 @@ body {
     transition-property: color, background-color, border-color, opacity !important;
   }
 }
+
+@keyframes board-column-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes board-column-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.board-column-enter {
+  animation: board-column-enter 200ms var(--ease-out) both;
+  animation-delay: calc(var(--stagger-index) * 40ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-column-enter {
+    animation-name: board-column-fade;
+    animation-delay: 0ms;
+  }
+}

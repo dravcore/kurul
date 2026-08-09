@@ -47,7 +47,7 @@ export function AppSidebar(): React.ReactElement {
         )}
       >
         {!collapsed ? (
-          <p className="font-display text-base font-semibold tracking-tight text-foreground">
+          <p className="font-display text-title font-semibold tracking-tight text-foreground">
             {t('shell.title')}
           </p>
         ) : null}
@@ -76,10 +76,11 @@ export function AppSidebar(): React.ReactElement {
         <Link
           href="/dashboard"
           data-rail-active={dashboardActive || undefined}
+          aria-current={dashboardActive ? 'page' : undefined}
           className={cn(
-            'relative flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-2 text-sm transition-colors',
+            'relative flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-2 text-body transition-colors',
             dashboardActive
-              ? 'bg-signature-subtle font-medium text-foreground'
+              ? 'bg-signature-subtle font-strong text-foreground'
               : 'text-foreground-secondary hover:bg-muted',
             collapsed && 'justify-center px-0',
           )}

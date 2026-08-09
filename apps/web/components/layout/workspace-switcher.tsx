@@ -1,13 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { ChevronsUpDown, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -28,7 +30,7 @@ export function WorkspaceSwitcher({
         <Button
           type="button"
           variant="ghost"
-          aria-label={t('switchWorkspace')}
+          aria-label={collapsed ? t('switchWorkspace') : undefined}
           className={cn(
             'h-10 justify-start gap-2 px-2',
             collapsed ? 'w-10 justify-center px-0' : 'w-full',
@@ -49,12 +51,13 @@ export function WorkspaceSwitcher({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
-        {workspaces.map((workspace) => (
-          <DropdownMenuItem key={workspace.id} onClick={() => void onSwitch(workspace.id)}>
-            <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
-            {workspace.id === activeId ? <Check /> : null}
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuRadioGroup value={activeId} onValueChange={(value) => void onSwitch(value)}>
+          {workspaces.map((workspace) => (
+            <DropdownMenuRadioItem key={workspace.id} value={workspace.id}>
+              <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/workspaces/new">
