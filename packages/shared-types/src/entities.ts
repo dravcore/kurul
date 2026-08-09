@@ -111,3 +111,32 @@ export interface CursorPage<T> {
   nextCursor: string | null;
   hasMore?: boolean;
 }
+
+export interface DashboardCountByPriority {
+  priority: Priority;
+  count: number;
+}
+
+export interface DashboardCountByAssignee {
+  /** `null` for Unassigned or Other aggregate buckets. */
+  userId: string | null;
+  name: string;
+  count: number;
+}
+
+export interface DashboardCountByColumn {
+  columnId: string;
+  name: string;
+  position: number;
+  count: number;
+}
+
+/** Workspace (or board-scoped) dashboard aggregates — Phase 7. */
+export interface DashboardSummaryDto {
+  totalTasks: number;
+  overdueCount: number;
+  byPriority: DashboardCountByPriority[];
+  byAssignee: DashboardCountByAssignee[];
+  /** Present only when `boardId` query is set. */
+  byColumn: DashboardCountByColumn[] | null;
+}
