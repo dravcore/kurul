@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { BoardDto, ColumnDto } from '@kurultay/shared-types';
@@ -42,8 +42,13 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
   const [deleteColumn, setDeleteColumn] = useState<ColumnDto | null>(null);
   const [defaultsPending, setDefaultsPending] = useState(false);
   const [entranceDone, setEntranceDone] = useState(false);
+  const columnsRef = useRef<ColumnDto[]>([]);
 
   const canMutate = canMutateColumns(activeRole);
+
+  useEffect(() => {
+    columnsRef.current = columns;
+  }, [columns]);
 
   useEffect(() => {
     if (loading || entranceDone) return;
@@ -87,11 +92,12 @@ export function BoardView({ boardId }: BoardViewProps): React.ReactElement {
 
   async function moveColumn(column: ColumnDto, direction: -1 | 1): Promise<void> {
     if (!activeId) return;
-    const index = columns.findIndex((item) => item.id === column.id);
+    const current = columnsRef.current;
+    const index = current.findIndex((item) => item.id === column.id);
     const targetIndex = index + direction;
-    if (index < 0 || targetIndex < 0 || targetIndex >= columns.length) return;
+    if (index < 0 || targetIndex < 0 || targetIndex >= current.length) return;
 
-    const without = columns.filter((item) => item.id !== column.id);
+    const without = current.filter((item) => item.id !== column.id);
     const before = without[targetIndex - 1] ?? null;
     const after = without[targetIndex] ?? null;
     try {
