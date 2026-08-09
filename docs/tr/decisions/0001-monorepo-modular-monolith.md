@@ -11,7 +11,11 @@ Kurultay henüz iskelet öncesi aşamada: henüz hiç kod yok, dolayısıyla ilk
 
 ## Karar
 
-Kod organizasyonu için **monorepo** (pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`), runtime için **modüler monolit**: temiz modül sınırlarına (auth, workspace, board, task, dashboard, notification, …) sahip tek bir NestJS process'i. Bu aşamada mikroservis yok.
+Kod organizasyonu için **monorepo** (pnpm workspace: `apps/api`, `apps/web`,
+`packages/shared-types`, ve sonradan Better Auth organization AC için
+`packages/auth-access`), runtime için **modüler monolit**: temiz modül sınırlarına
+(auth, workspace, board, task, dashboard, notification, …) sahip tek bir NestJS
+process'i. Bu aşamada mikroservis yok.
 
 ## Gerekçe
 

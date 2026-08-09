@@ -238,12 +238,17 @@ API sınırını geçen her şey **bir kez**, `@kurultay/shared-types` içinde d
 her iki taraftan da import edilir:
 
 - DTO/response şekilleri
-- Enum'lar (`Priority`, `MemberRole`)
+- Enum'lar (`Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot`)
 - Socket.io event isimleri ve payload tipleri
+
+Better Auth organization **access-control rolleri** `@kurultay/auth-access` içindedir
+(`better-auth` peer dependency). Rolleri oradan import edin — `permissions`
+açıklamalarını `apps/api` ile `apps/web` arasında kopyalamayın.
 
 ```ts
 // Doğru
 import type { TaskResponse, Priority } from '@kurultay/shared-types';
+import { ac, roles } from '@kurultay/auth-access';
 
 // Yanlış — sessizce sapacak yeniden deklare edilmiş bir şekil
 interface Task {
@@ -285,8 +290,8 @@ import { CreateTaskDto } from './dto/create-task.dto';
 
 Bunları ölçülü kullanın.
 
-- **Kabul edilebilir:** `packages/shared-types`'ın tek public giriş noktası; bir modülün
-  `dto/index.ts`'i.
+- **Kabul edilebilir:** `packages/shared-types` veya `packages/auth-access`'in tek public
+  giriş noktası; bir modülün `dto/index.ts`'i.
 - **Kaçının:** `apps/api` modül klasörleri içinde ve `components/` genelinde barrel'lar.
   Import döngüleri yaratırlar, tree-shaking'i bozarlar, TypeScript sunucusunu
   yavaşlatırlar ve farkına varmadan bir modül sınırının ötesine import etmeyi
@@ -304,12 +309,15 @@ Bunları ölçülü kullanın.
 | `tsc --noEmit` | Typecheck, CI'da lint'ten ayrı çalışır                                                                                                                                                  |
 
 ```bash
-pnpm lint          # kontrol
-pnpm lint --fix    # otomatik düzeltme
+pnpm lint          # ESLint kontrol
+pnpm lint --fix    # ESLint otomatik düzeltme
+pnpm format        # Prettier write
+pnpm format:check  # Prettier check (CI kapısı)
+pnpm typecheck     # shared paket build + tsc --noEmit
 ```
 
-- CI, lint hatalarında ve type hatalarında başarısız olur. Uyarıların birikmesine izin
-  verilmez: bir kural ya bir hatadır ya da kaldırılır.
+- CI, lint hatalarında, format sapmasında (`format:check`) ve type hatalarında başarısız
+  olur. Uyarıların birikmesine izin verilmez: bir kural ya bir hatadır ya da kaldırılır.
 - **Stil insanlar tarafından review edilmez.** Bir reviewer bir formatting değişikliği
   istiyorsa, düzeltme bir review yorumu değil bir lint kuralı PR'ıdır.
 - Üretilen çıktıyı (`dist/`, `.next/`, Prisma client) commit etmeyin veya nedeni açıklayan

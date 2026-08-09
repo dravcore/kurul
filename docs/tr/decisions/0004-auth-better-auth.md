@@ -2,7 +2,9 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-08
-**Güncellendi:** 2026-08-08 — topluluk bakımlı NestJS entegrasyonunun ve Better Auth'un 2.0 öncesi sürüm temposunun taşıdığı entegrasyon riskini ekler.
+**Güncellendi:** 2026-08-09 — Faz 2 kalite sertleştirmesi: yalnızca Nest üzerinden org
+mutation'ları, Better Auth organization yazıları için HTTP firewall, paylaşılan
+`@kurultay/auth-access` rolleri.
 
 > 🌐 [English (canonical)](../../decisions/0004-auth-better-auth.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
@@ -44,10 +46,13 @@ korur (`Workspace`, `WorkspaceMember`, `WorkspaceInvitation`); Better Auth
 organization plugin'i `schema.modelName` / alan eşlemeleriyle
 (`organizationId` → `workspaceId`) bu tablolara bağlanır. Sync katmanı yok.
 Roller `MemberRole` enum değerleridir (`OWNER` / `ADMIN` / `MEMBER` / `GUEST`)
-ve Better Auth access control'de 1:1 kayıtlıdır (`creatorRole: "OWNER"`). Nest,
+ve Better Auth access control'de 1:1 kayıtlıdır (`creatorRole: "OWNER"`). Access-control
+rol tanımları `@kurultay/auth-access` içindedir; api ve web buradan import eder. Nest,
 framework-agnostik Node handler'ı Express üzerinde `/auth/{*splat}` olarak
-monte eder (çıkış yolu — topluluk Nest wrapper'ı kullanılmaz). Public API
-yanıtları "organization" kelimesini asla göstermez.
+monte eder (çıkış yolu — topluluk Nest wrapper'ı kullanılmaz). **Workspace/org
+mutation'ları yalnızca Nest `/workspaces/*` üzerinden gider.** Better Auth
+`/auth/organization/*` mutation HTTP yolları firewall'lanır (list/get okumaları ve
+`set-active` kalır). Public API yanıtları "organization" kelimesini asla göstermez.
 
 ## Entegrasyon riski
 

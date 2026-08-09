@@ -14,7 +14,8 @@ is _stored_ is not how it _runs_ — and both need an explicit answer.
 
 ## Decision
 
-**Monorepo** (pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`) for
+**Monorepo** (pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, and
+later `packages/auth-access` for Better Auth organization AC) for
 code organization, and a **modular monolith** for runtime: one NestJS process with
 clean module boundaries (auth, workspace, board, task, dashboard, notification, …).
 No microservices at this stage.

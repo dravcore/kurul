@@ -172,6 +172,9 @@ tenant-safely until this exists.
 - [x] Web: login/register pages, session provider, workspace switcher, app shell layout
 - [x] Tests: auth flows, workspace isolation, role matrix
       ([testing.md](testing.md#what-must-be-tested))
+- [x] Phase 2 quality hardening (pre-boards): Nest-only workspace mutations (BA org HTTP
+      firewall), shared `pg` pool, query indexes, `@kurultay/auth-access`, typed web API
+      client + middleware session gate, workspace-nested scaffold routes, `format:check` in CI
 
 ---
 

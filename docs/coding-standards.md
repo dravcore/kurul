@@ -233,12 +233,17 @@ Anything that crosses the API boundary is declared **once**, in
 `@kurultay/shared-types`, and imported by both sides:
 
 - DTO/response shapes
-- Enums (`Priority`, `MemberRole`)
+- Enums (`Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot`)
 - Socket.io event names and payload types
+
+Better Auth organization **access-control roles** live in `@kurultay/auth-access`
+(peer-depends on `better-auth`). Import roles from there — do not copy
+`permissions` statements between `apps/api` and `apps/web`.
 
 ```ts
 // Right
 import type { TaskResponse, Priority } from '@kurultay/shared-types';
+import { ac, roles } from '@kurultay/auth-access';
 
 // Wrong — a redeclared shape that will silently drift
 interface Task {
@@ -279,8 +284,8 @@ import { CreateTaskDto } from './dto/create-task.dto';
 
 Use them sparingly.
 
-- **Acceptable:** the single public entry point of `packages/shared-types`; a module's
-  `dto/index.ts`.
+- **Acceptable:** the single public entry point of `packages/shared-types` or
+  `packages/auth-access`; a module's `dto/index.ts`.
 - **Avoid:** barrels inside `apps/api` module folders and across `components/`. They create
   import cycles, defeat tree-shaking, slow down the TypeScript server, and make it easy to
   import past a module boundary without noticing.
@@ -296,12 +301,15 @@ Use them sparingly.
 | `tsc --noEmit` | Typecheck, run in CI separately from lint                                                                                                                                      |
 
 ```bash
-pnpm lint          # check
-pnpm lint --fix    # autofix
+pnpm lint          # ESLint check
+pnpm lint --fix    # ESLint autofix
+pnpm format        # Prettier write
+pnpm format:check  # Prettier check (CI gate)
+pnpm typecheck     # shared package builds + tsc --noEmit
 ```
 
-- CI fails on lint errors and on type errors. Warnings are not allowed to accumulate: a
-  rule is either an error or it is removed.
+- CI fails on lint errors, format drift (`format:check`), and type errors. Warnings are not
+  allowed to accumulate: a rule is either an error or it is removed.
 - **Style is not reviewed by humans.** If a reviewer wants a formatting change, the fix is a
   lint rule PR, not a review comment.
 - Do not commit generated output (`dist/`, `.next/`, Prisma client) or disable rules

@@ -74,9 +74,10 @@ share types cleanly with the Next.js frontend.
     `schema.prisma`, and it owns the **seed entry point** — automatic seeding
     was removed, so `db:seed` is always explicit.
   - The generator **`output` path is required** and must sit outside
-    `node_modules`. `packages/shared-types` derives its DTO types from the
-    generated models, so that path has to resolve from both `apps/api` and
-    `packages/shared-types` in the pnpm workspace.
+    `node_modules`. The client emits to `apps/api/src/generated/prisma` for Nest
+    and the Better Auth adapter. `@kurultay/shared-types` DTOs/enums are
+    hand-maintained against the schema today; mechanical Prisma→shared-types
+    codegen remains aspirational.
   - **Client middleware (`$use`) is removed.** Query-level cross-cutting
     guards — the `workspaceId` scoping helper of
     [architecture.md §7](../architecture.md#7-multi-tenant-isolation), a

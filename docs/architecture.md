@@ -64,7 +64,8 @@ kurultay/
 │   ├── api/               # NestJS backend (modular monolith)
 │   └── web/               # Next.js App Router frontend
 ├── packages/
-│   └── shared-types/      # TS types shared by api and web
+│   ├── shared-types/      # TS types / DTOs shared by api and web
+│   └── auth-access/       # Better Auth organization AC roles (api + web)
 ├── pnpm-workspace.yaml
 ├── docker-compose.yml
 ├── docker-compose.dev.yml
@@ -129,7 +130,7 @@ apps/web/
     └── auth.ts            # Better Auth client
 ```
 
-Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Board interaction is client-side (`@dnd-kit`), with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events.
+Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Next.js middleware checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run; the client shell still bootstraps workspaces once the session is present. Board interaction is client-side (`@dnd-kit`), with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events.
 
 ---
 
@@ -139,13 +140,14 @@ The single source of truth for anything that crosses the wire. Backend and front
 
 | Content         | Examples                                                                                           |
 | --------------- | -------------------------------------------------------------------------------------------------- |
-| Enums           | `Priority` (`LOW \| MEDIUM \| HIGH \| URGENT`), `MemberRole` (`OWNER \| ADMIN \| MEMBER \| GUEST`) |
-| DTO types       | Workspace, Board, Column, Task, Label request/response shapes                                      |
+| Enums           | `Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot` (`slot-1`…`slot-8`)                 |
+| DTO types       | Workspace, Board, Column, Task, Label, Invitation request/response shapes                          |
+| Pagination      | `CursorPage<T>` (default list shape; keyed on `id`)                                                |
 | Socket contract | Event name constants and their payload types                                                       |
 
-The socket contract matters most: event names defined in one place remove the classic failure where the server emits `task:moved` and the client listens for `taskMoved`. Types are derived from the Prisma-generated model types where that is useful, but the package stays free of runtime dependencies on Prisma.
+Better Auth organization **roles / access-control** live in `@kurultay/auth-access` (not in this package), so api and web share one AC definition without pulling Better Auth into the types package.
 
-That derivation has a concrete prerequisite under Prisma 7: the client is no longer emitted into `node_modules`, and the generator's `output` path is mandatory. It is a repo path — `apps/api/src/generated/prisma` — which must resolve from both `apps/api` and `packages/shared-types` in the pnpm workspace. See [`decisions/0002-backend-stack.md`](decisions/0002-backend-stack.md) for the rest of what Prisma 7 requires.
+Enums and DTOs are **hand-maintained** to match the Prisma schema today; a mechanical Prisma→shared-types codegen path remains an aspiration (see ADR 0002). The package stays free of a runtime Prisma dependency. The Prisma 7 client still emits to `apps/api/src/generated/prisma` for Nest and the Better Auth adapter.
 
 ---
 
@@ -210,14 +212,15 @@ deleting a user has to be a deliberate operation rather than a silent erasure.
 
 Every workspace is a tenant, and the isolation rule is absolute: **every query is scoped by `workspaceId`.**
 
-That rule is enforced at the guard/interceptor level, not re-implemented in each service:
+That rule is enforced at the guard level today (request-scoped Prisma Client Extensions / interceptors land with Phase 3+), not re-implemented in each service:
 
-1. A guard resolves the current user's membership in the requested workspace and rejects the request if there is none.
-2. The resolved `workspaceId` is attached to the request context.
+1. A guard resolves the current user's membership in the requested workspace and rejects the request if there is none (404 for non-members — anti-enumeration).
+2. The resolved `workspaceId` / membership role is attached to the request context.
 3. Services read the scope from that context; repository access paths always filter on it.
 4. Nested resources are validated through their parent chain (task → board → workspace) so a valid id from another tenant cannot be smuggled in.
+5. Workspace/org **mutations** go through Nest `/workspaces/*` only — Better Auth `/auth/organization/*` mutation HTTP is firewalled so Nest policy cannot be bypassed.
 
-Placing this in one layer means a new module inherits isolation by default. A module that reaches around it is a bug, not a variation in style. Membership `role` (`OWNER`/`ADMIN`/`MEMBER`/`GUEST`) is checked in the same layer for permission decisions.
+Placing this in one layer means a new module inherits isolation by default. A module that reaches around it is a bug, not a variation in style. Membership `role` (`OWNER`/`ADMIN`/`MEMBER`/`GUEST`) is checked in the same layer for permission decisions. Scaffold controllers use `/workspaces/:workspaceId/...` so `WorkspaceGuard` can read `params.workspaceId` when handlers arrive.
 
 ---
 

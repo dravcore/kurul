@@ -160,8 +160,10 @@ Every pull request runs, on `develop` and `main` as well:
 
 | Step              | Command                                                                     |
 | ----------------- | --------------------------------------------------------------------------- |
+| Build shared pkgs | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build` |
 | Lint              | `pnpm lint`                                                                 |
-| Typecheck         | `tsc --noEmit` across workspaces                                            |
+| Format check      | `pnpm format:check`                                                         |
+| Typecheck         | `pnpm typecheck` (`tsc --noEmit` across workspaces)                         |
 | Unit tests        | `pnpm --filter @kurultay/api test`                                          |
 | Integration tests | `pnpm --filter @kurultay/api test:e2e` against a Postgres service container |
 | Build             | `pnpm build`                                                                |

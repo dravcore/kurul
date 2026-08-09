@@ -104,14 +104,15 @@ A commit with a `BREAKING CHANGE:` footer (or `type!:`) is MAJOR post-1.0. See
 
 Scope is optional but strongly preferred. It names the part of the monorepo affected.
 
-| Scope    | Meaning                                                      |
-| -------- | ------------------------------------------------------------ |
-| `api`    | `apps/api` — NestJS backend                                  |
-| `web`    | `apps/web` — Next.js frontend                                |
-| `shared` | `packages/shared-types`                                      |
-| `deps`   | Dependency bumps                                             |
-| `docs`   | The `docs/` set (when the commit type is not already `docs`) |
-| `ci`     | Workflows and pipeline config                                |
+| Scope         | Meaning                                                              |
+| ------------- | -------------------------------------------------------------------- |
+| `api`         | `apps/api` — NestJS backend                                          |
+| `web`         | `apps/web` — Next.js frontend                                        |
+| `shared`      | `packages/shared-types`                                              |
+| `auth-access` | `packages/auth-access` — Better Auth organization AC roles           |
+| `deps`        | Dependency bumps                                                     |
+| `docs`        | The `docs/` set (when the commit type is not already `docs`)         |
+| `ci`          | Workflows and pipeline config                                        |
 
 Narrower module scopes are fine when they add clarity: `feat(api/task)`, `fix(web/board)`.
 
@@ -270,7 +271,7 @@ that SemVer's guarantees are weaker before 1.0.
 
 **Pre-1.0 (`0.y.z`) — where the project is now:**
 
-- The public API (REST endpoints, `@kurultay/shared-types`, database schema, env var names)
+- The public API (REST endpoints, `@kurultay/shared-types`, `@kurultay/auth-access`, database schema, env var names)
   is **not stable**. Breaking changes can ship in any `0.y.0`.
 - `0.y.0` (MINOR): new features **and** breaking changes.
 - `0.0.z` / `0.y.z` (PATCH): bug fixes and non-breaking changes only.

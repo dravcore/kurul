@@ -84,14 +84,24 @@ Root `package.json` scripts:
 
 ## 2. packages/shared-types
 
-TypeScript types shared between frontend and backend — DTOs and enums derived from the Prisma-generated models, plus the socket contract.
+TypeScript types shared between frontend and backend — hand-maintained DTOs/enums aligned with
+the Prisma schema (codegen remains aspirational), plus the socket contract.
 
-| Content           | Detail                                                                                             |
-| ----------------- | -------------------------------------------------------------------------------------------------- |
-| `Priority` enum   | `LOW \| MEDIUM \| HIGH \| URGENT`                                                                  |
-| `MemberRole` enum | `OWNER \| ADMIN \| MEMBER \| GUEST`                                                                |
-| DTO types         | Task, Board, Column, Label, Workspace                                                              |
-| Socket events     | Event name constants and payload types — one source of truth, so frontend and backend cannot drift |
+| Content              | Detail                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| `Priority` enum      | `LOW \| MEDIUM \| HIGH \| URGENT`                                                   |
+| `MemberRole` enum    | `OWNER \| ADMIN \| MEMBER \| GUEST`                                                 |
+| `InvitationStatus`   | `pending \| accepted \| canceled \| rejected`                                       |
+| `LabelColorSlot`     | `slot-1`…`slot-8` (never raw hex)                                                   |
+| DTO types            | Task, Board, Column, Label, Workspace, Invitation                                   |
+| `CursorPage<T>`      | Default list pagination shape                                                       |
+| Socket events        | Event name constants and payload types                                              |
+
+### packages/auth-access
+
+Better Auth organization access-control roles (`OWNER` / `ADMIN` / `MEMBER` / `GUEST`) shared
+by `apps/api` and `apps/web`. Peer-depends on `better-auth`; keep role statements in sync here,
+not by copying `permissions.ts` between apps.
 
 ---
 
@@ -109,11 +119,11 @@ apps/api/
 │   ├── app.module.ts
 │   ├── generated/prisma/  # Prisma 7 client output — git-ignored, generated
 │   ├── common/            # guards, interceptors, filters, decorators
-│   ├── prisma/            # PrismaService (global module, owns the pg Pool)
-│   ├── auth/              # Better Auth integration
+│   ├── prisma/            # PrismaService + shared pg pool factory
+│   ├── auth/              # Better Auth integration (+ org HTTP firewall)
 │   ├── workspace/         # workspace CRUD + membership/invitations
-│   ├── board/             # board + column management
-│   ├── task/              # task CRUD, moving, ordering
+│   ├── board/             # scaffold: /workspaces/:workspaceId/boards
+│   ├── task/              # scaffold: /workspaces/:workspaceId/tasks
 │   ├── label/
 │   ├── comment/
 │   ├── activity/          # activity log
@@ -203,7 +213,7 @@ upgrade, and each of these shapes the skeleton rather than being a detail discov
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A driver adapter is mandatory         | `@prisma/adapter-pg` is a dependency of `apps/api`, and `PrismaService` owns a `pg` Pool's lifecycle in `OnModuleInit`/`OnModuleDestroy` — not just a connection string                                                                                                                       |
 | `prisma.config.ts` at the repo root   | Replaces env-var config inside `schema.prisma`, and declares the seed entry point (`db:seed` above)                                                                                                                                                                                           |
-| Generator `output` is required        | The client is no longer emitted into `node_modules`. It goes to `apps/api/src/generated/prisma`, which must resolve from both `apps/api` and `packages/shared-types` — the latter derives its DTO types from the generated models ([architecture.md](architecture.md#5-packagesshared-types)) |
+| Generator `output` is required        | The client is no longer emitted into `node_modules`. It goes to `apps/api/src/generated/prisma` for Nest and the Better Auth adapter. Shared DTO/enums in `@kurultay/shared-types` are hand-maintained to match the schema today; mechanical codegen remains aspirational ([architecture.md](architecture.md#5-packagesshared-types)) |
 | Client middleware (`$use`) is removed | Any query-level cross-cutting concern — the `workspaceId` scoping helper, a compare-and-swap guard on `position` — is a **Client Extension** now. Design for extensions from the start; there is no middleware to fall back to                                                                |
 | Env vars are not auto-loaded          | `dotenv` is called explicitly. `.env.example` below still describes the same variables; only the loading is manual                                                                                                                                                                            |
 
@@ -218,22 +228,25 @@ Bootstrap target: **Next.js 16** (App Router).
 
 ```
 apps/web/
+├── middleware.ts                # session gate for protected app routes
 ├── app/
 │   ├── (auth)/
 │   │   ├── login/
 │   │   └── register/
 │   ├── (app)/
-│   │   ├── layout.tsx           # sidebar + workspace switcher
+│   │   ├── layout.tsx           # AppShell + workspace switcher
 │   │   ├── dashboard/
 │   │   └── board/[boardId]/
 │   └── layout.tsx
 ├── components/
 │   ├── ui/                      # shadcn/ui
-│   ├── board/                   # KanbanBoard, Column, TaskCard
-│   ├── task/                    # TaskDetailPanel
-│   └── dashboard/               # chart components
+│   ├── layout/                  # AppShell, AppSidebar, WorkspaceProvider
+│   ├── auth/                    # shared auth form fields
+│   ├── board/                   # KanbanBoard, Column, TaskCard (Phase 3+)
+│   ├── task/                    # TaskDetailPanel (Phase 3+)
+│   └── dashboard/               # chart components (Phase 6+)
 ├── lib/
-│   ├── api.ts                   # backend client
+│   ├── api.ts                   # typed Nest API client
 │   ├── socket.ts                # Socket.io client
 │   └── auth.ts                  # Better Auth client
 └── package.json
