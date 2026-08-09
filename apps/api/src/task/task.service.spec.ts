@@ -510,4 +510,80 @@ describe('TaskService', () => {
       where: { taskId: 't1', labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80' },
     });
   });
+
+  describe('list filters and cursor', () => {
+    it('returns a cursor page and walks by id', async () => {
+      const { service, prisma } = buildService();
+      const a = taskRow({ id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d61' });
+      const b = taskRow({ id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d62' });
+      const c = taskRow({ id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d63' });
+      prisma.task.findMany.mockResolvedValue([a, b, c]);
+
+      const page = await service.list(WORKSPACE_ID, BOARD_ID, { limit: 2 });
+
+      expect(page.items).toHaveLength(2);
+      expect(page.hasMore).toBe(true);
+      expect(page.nextCursor).toBe(b.id);
+      expect(prisma.task.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { boardId: BOARD_ID },
+          orderBy: { id: 'asc' },
+          take: 3,
+        }),
+      );
+    });
+
+    it('builds AND filters for q, priority, assignee, label, and due range', async () => {
+      const { service, prisma } = buildService();
+      prisma.task.findMany.mockResolvedValue([]);
+
+      await service.list(WORKSPACE_ID, BOARD_ID, {
+        limit: 50,
+        q: 'login',
+        priority: ['HIGH', 'URGENT'],
+        assigneeId: ['null', USER_ID],
+        labelId: ['0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'],
+        dueDate: 'null',
+        'dueDate[gte]': '2026-01-01T00:00:00.000Z',
+        'dueDate[lte]': '2026-12-31T00:00:00.000Z',
+        cursor: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60',
+      });
+
+      expect(prisma.task.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            boardId: BOARD_ID,
+            AND: expect.arrayContaining([
+              { id: { gt: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60' } },
+              {
+                OR: [
+                  { title: { contains: 'login', mode: 'insensitive' } },
+                  { description: { contains: 'login', mode: 'insensitive' } },
+                ],
+              },
+              { priority: { in: ['HIGH', 'URGENT'] } },
+              {
+                OR: [
+                  { assignees: { none: {} } },
+                  { assignees: { some: { userId: { in: [USER_ID] } } } },
+                ],
+              },
+              {
+                labels: {
+                  some: { labelId: { in: ['0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'] } },
+                },
+              },
+              { dueDate: null },
+              {
+                dueDate: {
+                  gte: new Date('2026-01-01T00:00:00.000Z'),
+                  lte: new Date('2026-12-31T00:00:00.000Z'),
+                },
+              },
+            ]),
+          },
+        }),
+      );
+    });
+  });
 });

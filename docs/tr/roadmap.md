@@ -254,15 +254,17 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 ## Faz 6 — Filtreleme ve arama
 
 **Hedef:** board'lar birkaç düzine kartı geçtikten sonra da kullanılabilir kalır.
-**Durum:** başlanmadı
+**Referans:** [api-conventions.md](../api-conventions.md#filtering-sorting-field-selection);
+[spec](../specs/2026-08-09-phase-6-filtering-design.md)
+**Durum:** tamam
 
-- [ ] Whitelist'lenmiş filtre/sıralama alanlarına sahip Query DTO
+- [x] Whitelist'lenmiş filtre/sıralama alanlarına sahip Query DTO
       ([api-conventions.md](api-conventions.md#filtreleme-sıralama-alan-seçimi))
-- [ ] Filtreler: atanan, label, priority, due date aralığı, atanmamış/due-date'siz
-- [ ] Başlık ve açıklama üzerinde serbest metin arama
-- [ ] Task listelerinde cursor pagination
-- [ ] Filtrelenen/sıralanan kolonlar için index'ler
-- [ ] Web: filtre çubuğu, aktif-filtre chip'leri, URL'de filtre durumu
+- [x] Filtreler: atanan, label, priority, due date aralığı, atanmamış/due-date'siz
+- [x] Başlık ve açıklama üzerinde serbest metin arama
+- [x] Task listelerinde cursor pagination
+- [x] Filtrelenen/sıralanan kolonlar için index'ler
+- [x] Web: filtre çubuğu, aktif-filtre chip'leri, URL'de filtre durumu
 
 ---
 

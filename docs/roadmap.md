@@ -240,15 +240,17 @@ tenant-safely until this exists.
 ## Phase 6 — Filtering and search
 
 **Goal:** boards stay usable past a few dozen cards.
-**Status:** not started
+**Reference:** [api-conventions.md](api-conventions.md#filtering-sorting-field-selection);
+[spec](specs/2026-08-09-phase-6-filtering-design.md)
+**Status:** done
 
-- [ ] Query DTO with whitelisted filter/sort fields
+- [x] Query DTO with whitelisted filter/sort fields
       ([api-conventions.md](api-conventions.md#filtering-sorting-field-selection))
-- [ ] Filters: assignee, label, priority, due date range, unassigned/no-due-date
-- [ ] Free-text search over title and description
-- [ ] Cursor pagination on task lists
-- [ ] Indexes for the filtered/sorted columns
-- [ ] Web: filter bar, active-filter chips, filter state in the URL
+- [x] Filters: assignee, label, priority, due date range, unassigned/no-due-date
+- [x] Free-text search over title and description
+- [x] Cursor pagination on task lists
+- [x] Indexes for the filtered/sorted columns
+- [x] Web: filter bar, active-filter chips, filter state in the URL
 
 ---
 
