@@ -254,7 +254,7 @@ model Activity {
   createdAt   DateTime @default(now())
 
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  task          Task?          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task          Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
   user          User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   notifications Notification[]
 

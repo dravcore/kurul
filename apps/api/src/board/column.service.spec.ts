@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RealtimeService } from '../realtime/realtime.service';
 import { ColumnService } from './column.service';
@@ -6,6 +6,7 @@ import { ColumnService } from './column.service';
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
 const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
 const ACTOR_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60';
+const COLUMN_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51';
 
 describe('ColumnService', () => {
   function buildService() {
@@ -18,6 +19,7 @@ describe('ColumnService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      task: { count: jest.fn().mockResolvedValue(0) },
       $transaction: jest.fn(),
     };
     const realtime = { emitToBoard: jest.fn() };
@@ -58,8 +60,43 @@ describe('ColumnService', () => {
   it('returns 404 when the requested column is outside the workspace', async () => {
     const { service, prisma } = buildService();
     prisma.column.findFirst.mockResolvedValue(null);
-    await expect(
-      service.remove(WORKSPACE_ID, '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51', ACTOR_ID),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.remove(WORKSPACE_ID, COLUMN_ID, ACTOR_ID)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('rejects deleting a column that still has tasks', async () => {
+    const { service, prisma, realtime } = buildService();
+    prisma.column.findFirst.mockResolvedValue({
+      id: COLUMN_ID,
+      boardId: BOARD_ID,
+      name: 'Todo',
+      position: 1000,
+      color: null,
+    });
+    prisma.task.count.mockResolvedValue(2);
+
+    await expect(service.remove(WORKSPACE_ID, COLUMN_ID, ACTOR_ID)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prisma.column.delete).not.toHaveBeenCalled();
+    expect(realtime.emitToBoard).not.toHaveBeenCalled();
+  });
+
+  it('deletes an empty column', async () => {
+    const { service, prisma, realtime } = buildService();
+    prisma.column.findFirst.mockResolvedValue({
+      id: COLUMN_ID,
+      boardId: BOARD_ID,
+      name: 'Todo',
+      position: 1000,
+      color: null,
+    });
+    prisma.task.count.mockResolvedValue(0);
+
+    await service.remove(WORKSPACE_ID, COLUMN_ID, ACTOR_ID);
+
+    expect(prisma.column.delete).toHaveBeenCalledWith({ where: { id: COLUMN_ID } });
+    expect(realtime.emitToBoard).toHaveBeenCalled();
   });
 });

@@ -168,7 +168,7 @@ describe('Boards and columns (e2e)', () => {
     ).toBe(inProgress.position);
   });
 
-  it('cascades column delete to tasks', async () => {
+  it('rejects deleting a column that still has tasks', async () => {
     const owner = await signUp(app, { name: 'Owner' });
     const workspace = await createWorkspace(owner.agent, 'Cascade', `cascade-${Date.now()}`);
     const board = await owner.agent
@@ -187,17 +187,38 @@ describe('Boards and columns (e2e)', () => {
       data: {
         boardId: board.body.id as string,
         columnId: todo.id,
-        title: 'Will vanish',
+        title: 'Still here',
         position: 1000,
         createdById: me.body.id as string,
       },
     });
 
-    await owner.agent.delete(`/workspaces/${workspace.id}/columns/${todo.id}`).expect(204);
+    await owner.agent.delete(`/workspaces/${workspace.id}/columns/${todo.id}`).expect(409);
 
     const remainingTasks = await prisma.task.count({
       where: { boardId: board.body.id as string },
     });
-    expect(remainingTasks).toBe(0);
+    expect(remainingTasks).toBe(1);
+  });
+
+  it('deletes an empty column', async () => {
+    const owner = await signUp(app, { name: 'Owner' });
+    const workspace = await createWorkspace(owner.agent, 'EmptyCol', `empty-col-${Date.now()}`);
+    const board = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards`)
+      .send({ name: 'Empty Board' })
+      .expect(201);
+
+    const columns = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${board.body.id}/columns`)
+      .expect(200);
+    const todo = columns.body[0] as { id: string };
+
+    await owner.agent.delete(`/workspaces/${workspace.id}/columns/${todo.id}`).expect(204);
+
+    const remaining = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${board.body.id}/columns`)
+      .expect(200);
+    expect(remaining.body.some((column: { id: string }) => column.id === todo.id)).toBe(false);
   });
 });

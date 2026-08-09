@@ -60,10 +60,9 @@ export function TaskPanel({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        close();
-      }
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      event.preventDefault();
+      close();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

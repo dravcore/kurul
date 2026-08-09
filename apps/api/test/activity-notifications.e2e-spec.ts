@@ -67,6 +67,28 @@ describe('Activity & notifications (e2e)', () => {
     expect(taskFeed.body.items[0].type).toBe(ActivityType.TaskCreated);
   });
 
+  it('keeps prior activity rows after a task is deleted', async () => {
+    const owner = await signUp(app, { name: 'Owner' });
+    const workspace = await createWorkspace(owner.agent, 'KeepAct', `keep-act-${Date.now()}`);
+    const { taskId } = await boardWithTask(owner.agent, workspace.id);
+
+    await owner.agent.delete(`/workspaces/${workspace.id}/tasks/${taskId}`).expect(204);
+
+    const workspaceFeed = await owner.agent
+      .get(`/workspaces/${workspace.id}/activities`)
+      .expect(200);
+    const types = (workspaceFeed.body.items as Array<{ type: string; taskId: string | null }>).map(
+      (row) => row.type,
+    );
+    expect(types).toContain(ActivityType.TaskCreated);
+    expect(types).toContain(ActivityType.TaskDeleted);
+    expect(
+      (workspaceFeed.body.items as Array<{ type: string; taskId: string | null }>).every(
+        (row) => row.taskId === null,
+      ),
+    ).toBe(true);
+  });
+
   it('notifies the assignee (not the actor) and supports mark-read', async () => {
     const owner = await signUp(app, { name: 'Owner' });
     const member = await signUp(app, { name: 'Member' });

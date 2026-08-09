@@ -23,7 +23,7 @@ export function connectSocket(): Socket {
 }
 
 export function disconnectSocket(): void {
-  if (socket?.connected) {
-    socket.disconnect();
-  }
+  if (!socket) return;
+  socket.disconnect();
+  socket = null;
 }
