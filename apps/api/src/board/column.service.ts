@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SocketEvents, type ColumnDto } from '@kurultay/shared-types';
+import { assertBoard } from '../common/board-access';
+import { resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
@@ -54,7 +56,7 @@ export class ColumnService {
   }
 
   async list(workspaceId: string, boardId: string): Promise<ColumnDto[]> {
-    await this.findBoard(workspaceId, boardId);
+    await assertBoard(this.prisma, workspaceId, boardId);
     const columns = await this.prisma.column.findMany({
       where: { boardId },
       include: { _count: { select: { tasks: true } } },
@@ -69,7 +71,7 @@ export class ColumnService {
     actorId: string,
     dto: CreateColumnDto,
   ): Promise<ColumnDto> {
-    await this.findBoard(workspaceId, boardId);
+    await assertBoard(this.prisma, workspaceId, boardId);
     const columns = await this.prisma.column.findMany({
       where: { boardId },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
@@ -168,26 +170,12 @@ export class ColumnService {
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
       });
       const remaining = columns.filter((item) => item.id !== columnId);
-      const beforeIndex =
-        dto.beforeColumnId === null || dto.beforeColumnId === undefined
-          ? -1
-          : remaining.findIndex((item) => item.id === dto.beforeColumnId);
-      const afterIndex =
-        dto.afterColumnId === null || dto.afterColumnId === undefined
-          ? -1
-          : remaining.findIndex((item) => item.id === dto.afterColumnId);
-      if (
-        (dto.beforeColumnId && beforeIndex < 0) ||
-        (dto.afterColumnId && afterIndex < 0) ||
-        (beforeIndex >= 0 && afterIndex >= 0 && afterIndex !== beforeIndex + 1)
-      ) {
-        throw new NotFoundException('Column not found');
-      }
-
-      const insertionIndex =
-        beforeIndex >= 0 ? beforeIndex + 1 : afterIndex >= 0 ? afterIndex : remaining.length;
-      const before = remaining[insertionIndex - 1] ?? null;
-      const after = remaining[insertionIndex] ?? null;
+      const { insertionIndex, before, after } = resolveMoveNeighbors(
+        remaining,
+        dto.beforeColumnId,
+        dto.afterColumnId,
+        columnId,
+      );
       if (needsRebalance(before?.position ?? null, after?.position ?? null)) {
         const reordered = [...remaining];
         reordered.splice(insertionIndex, 0, column);
@@ -213,12 +201,6 @@ export class ColumnService {
 
     this.emitChanged(workspaceId, actorId, moved.boardId, moved.id);
     return moved;
-  }
-
-  private async findBoard(workspaceId: string, boardId: string) {
-    const board = await this.prisma.board.findFirst({ where: { id: boardId, workspaceId } });
-    if (!board) throw new NotFoundException('Board not found');
-    return board;
   }
 
   private async findColumn(workspaceId: string, columnId: string) {

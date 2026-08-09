@@ -15,6 +15,8 @@ import type {
 } from '@kurultay/shared-types';
 import type { Prisma } from '../generated/prisma';
 import { ActivityService } from '../activity/activity.service';
+import { assertBoard } from '../common/board-access';
+import { resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -108,7 +110,7 @@ export class TaskService {
     boardId: string,
     query: TaskQueryDto,
   ): Promise<CursorPage<TaskDto>> {
-    await this.findBoard(workspaceId, boardId);
+    await assertBoard(this.prisma, workspaceId, boardId);
 
     const where = this.buildListWhere(boardId, query);
     const limit = query.limit ?? 50;
@@ -196,7 +198,7 @@ export class TaskService {
     userId: string,
     dto: CreateTaskDto,
   ): Promise<TaskDto> {
-    await this.findBoard(workspaceId, boardId);
+    await assertBoard(this.prisma, workspaceId, boardId);
     const column = await this.findColumnOnBoard(workspaceId, boardId, dto.columnId);
 
     const siblings = await this.prisma.task.findMany({
@@ -420,28 +422,12 @@ export class TaskService {
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
       });
       const remaining = siblings.filter((item) => item.id !== taskId);
-
-      const beforeIndex =
-        dto.beforeTaskId === null || dto.beforeTaskId === undefined
-          ? -1
-          : remaining.findIndex((item) => item.id === dto.beforeTaskId);
-      const afterIndex =
-        dto.afterTaskId === null || dto.afterTaskId === undefined
-          ? -1
-          : remaining.findIndex((item) => item.id === dto.afterTaskId);
-
-      if (
-        (dto.beforeTaskId && beforeIndex < 0) ||
-        (dto.afterTaskId && afterIndex < 0) ||
-        (beforeIndex >= 0 && afterIndex >= 0 && afterIndex !== beforeIndex + 1)
-      ) {
-        throw new NotFoundException('Task not found');
-      }
-
-      const insertionIndex =
-        beforeIndex >= 0 ? beforeIndex + 1 : afterIndex >= 0 ? afterIndex : remaining.length;
-      const before = remaining[insertionIndex - 1] ?? null;
-      const after = remaining[insertionIndex] ?? null;
+      const { insertionIndex, before, after } = resolveMoveNeighbors(
+        remaining,
+        dto.beforeTaskId,
+        dto.afterTaskId,
+        taskId,
+      );
 
       let result: TaskDto;
 
@@ -654,12 +640,6 @@ export class TaskService {
       'code' in error &&
       (error as { code: string }).code === 'P2002'
     );
-  }
-
-  private async findBoard(workspaceId: string, boardId: string) {
-    const board = await this.prisma.board.findFirst({ where: { id: boardId, workspaceId } });
-    if (!board) throw new NotFoundException('Board not found');
-    return board;
   }
 
   private async findColumnOnBoard(workspaceId: string, boardId: string, columnId: string) {

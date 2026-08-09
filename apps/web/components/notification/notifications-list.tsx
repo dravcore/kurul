@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { NotificationType, type CursorPage, type NotificationDto } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
 import { notificationTitle } from '@/lib/notification-copy';
-import { resolveBoardIdForNotification } from '@/lib/notification-nav';
+import { markAllNotificationsRead, openNotificationTarget } from '@/lib/notification-actions';
 import { formatRelativeTime } from '@/lib/relative-time';
 import { cn } from '@/lib/utils';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
@@ -88,7 +88,7 @@ export function NotificationsList(): React.ReactElement {
   async function markAllRead(): Promise<void> {
     if (!workspaceId) return;
     try {
-      await api.post(`/workspaces/${workspaceId}/notifications/read-all`);
+      await markAllNotificationsRead(workspaceId);
       setItems((current) =>
         current.map((item) => (item.readAt ? item : { ...item, readAt: new Date().toISOString() })),
       );
@@ -100,28 +100,20 @@ export function NotificationsList(): React.ReactElement {
   async function openNotification(notification: NotificationDto): Promise<void> {
     if (!workspaceId) return;
     try {
-      if (!notification.readAt) {
-        const updated = await api.post<NotificationDto>(
-          `/workspaces/${workspaceId}/notifications/${notification.id}/read`,
-        );
+      const { navigated, updated } = await openNotificationTarget(
+        workspaceId,
+        notification,
+        router,
+      );
+      if (updated) {
         setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      }
+      if (notification.taskId && !navigated) {
+        toast.error(t('openTaskError'));
       }
     } catch {
       toast.error(t('markReadError'));
     }
-
-    if (!notification.taskId) return;
-
-    const boardId = await resolveBoardIdForNotification(
-      workspaceId,
-      notification.taskId,
-      notification.payload,
-    );
-    if (!boardId) {
-      toast.error(t('openTaskError'));
-      return;
-    }
-    router.push(`/board/${boardId}/task/${notification.taskId}`);
   }
 
   const hasUnread = items.some((item) => !item.readAt);
