@@ -13,6 +13,9 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    env:
+      # prisma.config.ts requires DATABASE_URL even for `prisma generate`.
+      DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_ci
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -97,6 +100,8 @@ jobs:
   build:
     needs: [lint, test]
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_ci
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
