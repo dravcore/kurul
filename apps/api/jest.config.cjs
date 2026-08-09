@@ -17,7 +17,8 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch)/)',
   ],
-  collectCoverageFrom: ['**/*.(t|j)s'],
+  collectCoverageFrom: ['**/*.(t|j)s', '!**/generated/**'],
+  coveragePathIgnorePatterns: ['/generated/'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
 };

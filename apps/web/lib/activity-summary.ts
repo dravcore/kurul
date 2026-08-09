@@ -9,7 +9,7 @@ function asString(value: unknown): string | null {
 function changedFields(payload: Record<string, unknown>): string {
   const changes = payload.changes;
   if (!changes || typeof changes !== 'object' || Array.isArray(changes)) return '';
-  return Object.keys(changes as Record<string, unknown>).join(', ');
+  return Object.keys(changes).join(', ');
 }
 
 /** Humanize an activity row using `app.board.task.activity` message keys. */

@@ -119,7 +119,7 @@ export function WorkspaceProvider({
     return () => {
       controller.abort();
     };
-  }, [session, isPending, router, reloadKey, t]);
+  }, [session, isPending, router, reloadKey, t, pathname]);
 
   useEffect(() => {
     if (!bootstrapped || loadError || workspaces.length > 0) {

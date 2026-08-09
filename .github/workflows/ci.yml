@@ -11,9 +11,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
+    env:
+      # prisma.config.ts requires DATABASE_URL even for `prisma generate`.
+      DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Build shared packages
+        run: pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build
+      - name: Lint
+        run: pnpm lint
+      - name: Format check
+        run: pnpm format:check
+      - name: Typecheck
+        run: pnpm typecheck
 
+  test:
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:18-alpine
@@ -28,7 +52,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-
       redis:
         image: redis:8-alpine
         ports:
@@ -38,7 +61,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-
     env:
       DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_test
       REDIS_URL: redis://localhost:6379
@@ -46,44 +68,50 @@ jobs:
       WEB_URL: http://localhost:3000
       BETTER_AUTH_SECRET: ci-test-secret
       BETTER_AUTH_URL: http://localhost:4000
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
-
       - name: Install
         run: pnpm install --frozen-lockfile
-
       - name: Generate Prisma client
         run: pnpm db:generate
-
-      # shared packages export from dist/; consumers need them before typecheck/test.
       - name: Build shared packages
         run: pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Format check
-        run: pnpm format:check
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Unit tests
-        run: pnpm --filter @kurultay/api test && pnpm --filter @kurultay/web test
-
+      - name: Unit tests with coverage
+        run: |
+          pnpm --filter @kurultay/api test:cov
+          pnpm --filter @kurultay/web exec vitest run --coverage
+      - name: Upload API coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: apps/api/coverage
+          if-no-files-found: ignore
       - name: Migrate test database
         run: pnpm db:migrate
-
       - name: Integration tests
         run: pnpm --filter @kurultay/api test:e2e
 
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
       - name: Build
         run: pnpm build

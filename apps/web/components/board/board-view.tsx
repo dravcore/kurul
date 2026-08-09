@@ -215,9 +215,10 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
   );
 
   useEffect(() => {
+    const timers = upsertTimersRef.current;
     return () => {
-      for (const timer of upsertTimersRef.current.values()) clearTimeout(timer);
-      upsertTimersRef.current.clear();
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
     };
   }, []);
 
