@@ -1,5 +1,8 @@
 # Project Skeleton
 
+> **Historical Phase 1 scaffold.** Prefer [architecture.md](architecture.md) and the live
+> repo for current layout. Kept for how the monorepo was first built.
+
 A step-by-step reference for building the Kurultay monorepo skeleton: workspace, apps, schema, containers, and the checks that say it is done.
 
 > 🌐 English (canonical) | [Türkçe](tr/project-skeleton.md)

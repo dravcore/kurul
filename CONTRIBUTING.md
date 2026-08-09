@@ -28,9 +28,10 @@ that won't be accepted. Trivial fixes (typos, broken links) can skip straight to
 
 ## Development setup
 
-Kurultay is pre-skeleton: `apps/api` and `apps/web` don't exist yet. The environment,
-commands, and daily workflow contract for when the skeleton lands is already documented in
-[docs/development.md](docs/development.md) — start there.
+Clone, install, and run the monorepo (`apps/api`, `apps/web`, Postgres, Redis) using
+[docs/development.md](docs/development.md) — start there for environment variables,
+Compose, migrations, and the day-to-day loop. Quick start is also in the root
+[README.md](README.md).
 
 ## Branching and commits
 
