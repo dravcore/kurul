@@ -69,7 +69,7 @@ export function BoardList(): React.ReactElement {
     return (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, index) => (
-          <Skeleton key={index} className="h-24 w-full" />
+          <Skeleton key={index} className="h-[88px] w-full rounded-[var(--radius-lg)]" />
         ))}
       </div>
     );
@@ -106,7 +106,7 @@ export function BoardList(): React.ReactElement {
           {boards.map((board) => (
             <li
               key={board.id}
-              className="group relative rounded-[var(--radius-lg)] border border-border bg-card p-4"
+              className="group relative rounded-[var(--radius-lg)] border border-border bg-card p-4 transition-colors hover:border-border-strong hover:bg-muted/40 focus-within:border-border-strong"
             >
               <Link href={`/board/${board.id}`} className="block pr-8">
                 <p className="text-sm font-medium text-foreground">{board.name}</p>
