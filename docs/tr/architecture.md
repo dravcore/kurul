@@ -113,10 +113,10 @@ tabloyu hedef harita olarak okuyun — her modülün uygulandığı iddiası de�
 
 Cross-cutting altyapı:
 
-| Modül    | Sorumluluk                                                                                                                      |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Modül    | Sorumluluk                                                                                                                                                         |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `common` | Guard'lar, exception filter'lar, decorator'lar, paylaşılan Nest bootstrap — workspace scoping (bugün guard ile; request-scoped Prisma Client Extensions ertelendi) |
-| `prisma` | Paylaşılan `pg` pool + Nest `PrismaService`; Better Auth aynı pool'u kullanır                                                   |
+| `prisma` | Paylaşılan `pg` pool + Nest `PrismaService`; Better Auth aynı pool'u kullanır                                                                                      |
 
 Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdır, asla tersi değil.
 `realtime`, domain event'lerinin tüketicisidir, domain logic'in yaşadığı bir yer değil —

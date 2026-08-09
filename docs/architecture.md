@@ -101,10 +101,10 @@ target map, not a claim that every module is implemented.
 
 Cross-cutting infrastructure:
 
-| Module   | Responsibility                                                                                                    |
-| -------- | ----------------------------------------------------------------------------------------------------------------- |
+| Module   | Responsibility                                                                                                                                            |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `common` | Guards, exception filters, decorators, shared Nest bootstrap — workspace scoping (guard-enforced today; request-scoped Prisma Client Extensions deferred) |
-| `prisma` | Shared `pg` pool + Nest `PrismaService`; Better Auth uses the same pool                                           |
+| `prisma` | Shared `pg` pool + Nest `PrismaService`; Better Auth uses the same pool                                                                                   |
 
 Dependency direction: feature modules depend on `common` and `prisma`, never the reverse. `realtime` is a consumer of domain events, not a place where domain logic lives — so it can be lifted into its own process role without dragging business rules with it.
 
