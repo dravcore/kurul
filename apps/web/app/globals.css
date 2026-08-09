@@ -192,12 +192,13 @@ body {
   outline-offset: 2px;
 }
 
+/* Reduced motion drops movement but keeps state changes visible:
+   transitions may only animate color and opacity; keyframe animations
+   declare their own reduced variants where they are defined. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-property: color, background-color, border-color, opacity !important;
   }
 }
