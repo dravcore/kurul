@@ -130,9 +130,7 @@ describe('Task metadata (e2e)', () => {
     await member.agent
       .delete(`/workspaces/${workspace.id}/tasks/${taskId}/labels/${label.body.id}`)
       .expect(200);
-    await member.agent
-      .delete(`/workspaces/${workspace.id}/comments/${comment.body.id}`)
-      .expect(204);
+    await owner.agent.delete(`/workspaces/${workspace.id}/comments/${comment.body.id}`).expect(204);
     await owner.agent.delete(`/workspaces/${workspace.id}/labels/${label.body.id}`).expect(204);
   });
 

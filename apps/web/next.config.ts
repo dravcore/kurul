@@ -5,7 +5,7 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  transpilePackages: ['@kurultay/shared-types'],
+  transpilePackages: ['@kurultay/shared-types', '@kurultay/auth-access'],
 };
 
 export default withNextIntl(nextConfig);
