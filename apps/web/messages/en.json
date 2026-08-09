@@ -36,6 +36,7 @@
       "title": "Kurultay",
       "workspaces": "Workspaces",
       "createWorkspace": "New workspace",
+      "switchWorkspace": "Switch workspace",
       "signOut": "Sign out",
       "loading": "Loading…",
       "loadError": "Could not load workspaces.",
