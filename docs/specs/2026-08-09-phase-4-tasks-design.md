@@ -19,11 +19,11 @@ Assignees, labels, priority UI, due date/estimate UI, comments (Phase 5). Filter
 
 Per [api-conventions.md](../api-conventions.md):
 
-| Method | Path | Roles |
-| ------ | ---- | ----- |
-| GET/POST | `/workspaces/:workspaceId/boards/:boardId/tasks` | read: members; write: MEMBER+ |
-| GET/PATCH/DELETE | `/workspaces/:workspaceId/tasks/:taskId` | read: members; write: MEMBER+ |
-| PATCH | `/workspaces/:workspaceId/tasks/:taskId/position` | MEMBER+ |
+| Method           | Path                                              | Roles                         |
+| ---------------- | ------------------------------------------------- | ----------------------------- |
+| GET/POST         | `/workspaces/:workspaceId/boards/:boardId/tasks`  | read: members; write: MEMBER+ |
+| GET/PATCH/DELETE | `/workspaces/:workspaceId/tasks/:taskId`          | read: members; write: MEMBER+ |
+| PATCH            | `/workspaces/:workspaceId/tasks/:taskId/position` | MEMBER+                       |
 
 `MoveTaskDto`: `{ columnId, beforeTaskId?, afterTaskId? }`. Cross-board column → `422`.
 Cross-tenant → `404`. Position helpers from `common/position/fractional-index`. Display
