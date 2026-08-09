@@ -65,9 +65,9 @@ describe('Dashboard (e2e)', () => {
     expect(summary.body.totalTasks).toBe(2);
     expect(summary.body.overdueCount).toBe(1);
     expect(summary.body.byColumn).toBeNull();
-    expect(summary.body.byPriority.find((row: { priority: string }) => row.priority === 'HIGH')).toEqual(
-      { priority: 'HIGH', count: 1 },
-    );
+    expect(
+      summary.body.byPriority.find((row: { priority: string }) => row.priority === 'HIGH'),
+    ).toEqual({ priority: 'HIGH', count: 1 });
     expect(summary.body.byAssignee.some((row: { name: string }) => row.name === 'Unassigned')).toBe(
       true,
     );
