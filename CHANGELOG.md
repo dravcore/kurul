@@ -9,6 +9,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Phase 7 dashboard
+  ([spec](docs/specs/2026-08-09-phase-7-dashboard-design.md)):
+  `GET .../dashboard/summary?boardId?` with total/overdue tiles, priority and assignee
+  charts, optional per-board column chart (Recharts), empty/loading states; completion
+  over time deferred to Phase 8.
 - Phase 6 filtering and search
   ([spec](docs/specs/2026-08-09-phase-6-filtering-design.md)): whitelisted `TaskQueryDto`
   on `GET .../boards/:boardId/tasks` (`q`, priority, assignee, label, due-date null/range,

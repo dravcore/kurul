@@ -1,6 +1,6 @@
 # Phase 7 — Dashboard — design
 
-**Date:** 2026-08-09 · **Status:** approved · **Scope:** workspace dashboard summary API + Recharts UI
+**Date:** 2026-08-09 · **Status:** shipped · **Scope:** workspace dashboard summary API + Recharts UI
 
 ## Goals
 
