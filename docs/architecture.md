@@ -79,6 +79,8 @@ The buildable step-by-step version of this tree lives in [project-skeleton.md](p
 
 Every module has the same skeleton: `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`. Module boundaries are kept clean from day one — the ability to split process roles later depends entirely on that.
 
+**Current vs planned:** after Phase 2, only `auth`, `workspace`, `health`, `common`, and `prisma` have real handlers. `board`, `task`, `label`, `comment`, `activity`, `dashboard`, `notification`, and `realtime` are route scaffolds nested under `/workspaces/:workspaceId/...` awaiting their roadmap phases. Treat the table below as the target map, not a claim that every module is implemented.
+
 | Module | Responsibility |
 |---|---|
 | `auth` | Better Auth integration, session handling, request user resolution |
@@ -96,8 +98,8 @@ Cross-cutting infrastructure:
 
 | Module | Responsibility |
 |---|---|
-| `common` | Guards, interceptors, exception filters, decorators — including workspace scoping |
-| `prisma` | `PrismaService` as a global module; the only place the DB client is constructed |
+| `common` | Guards, exception filters, decorators, shared Nest bootstrap — workspace scoping; interceptors land with Phase 3+ |
+| `prisma` | Shared `pg` pool + Nest `PrismaService`; Better Auth uses the same pool |
 
 Dependency direction: feature modules depend on `common` and `prisma`, never the reverse. `realtime` is a consumer of domain events, not a place where domain logic lives — so it can be lifted into its own process role without dragging business rules with it.
 
@@ -114,13 +116,16 @@ apps/web/
 │   │   └── board/[boardId]/
 │   └── layout.tsx
 ├── components/
-│   ├── ui/                # shadcn/ui primitives
-│   ├── board/             # KanbanBoard, Column, TaskCard
-│   ├── task/              # TaskDetailPanel
-│   └── dashboard/         # chart components
+│   ├── layout/            # AppShell, WorkspaceProvider, AppSidebar
+│   ├── auth/              # shared auth form primitives
+│   ├── ui/                # shadcn/ui primitives (Phase 3+)
+│   ├── board/             # KanbanBoard, Column, TaskCard (Phase 3+)
+│   ├── task/              # TaskDetailPanel (Phase 5+)
+│   └── dashboard/         # chart components (Phase 7+)
 └── lib/
-    ├── api.ts             # REST client
-    ├── socket.ts          # Socket.io client
+    ├── api.ts             # typed REST client
+    ├── socket.ts          # Socket.io client stub (Phase 9)
+    ├── permissions.ts     # re-exports `@kurultay/auth-access`
     └── auth.ts            # Better Auth client
 ```
 

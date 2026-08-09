@@ -53,12 +53,15 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
-      # shared-types exports point at dist/; consumers need it before typecheck/test.
-      - name: Build shared types
-        run: pnpm --filter @kurultay/shared-types build
+      # shared packages export from dist/; consumers need them before typecheck/test.
+      - name: Build shared packages
+        run: pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build
 
       - name: Lint
         run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
 
       - name: Typecheck
         run: pnpm typecheck

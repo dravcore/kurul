@@ -275,8 +275,9 @@ GET /workspaces/w_1/members?page=1&perPage=25
 }
 ```
 
-Both shapes are typed in `@kurultay/shared-types` (`CursorPage<T>`, `OffsetPage<T>`) so
-clients handle them generically.
+Both cursor lists use `@kurultay/shared-types` `CursorPage<T>`. Small page-based
+collections (members) may return an inline `{ items, page, perPage, total, totalPages }`
+shape until a dedicated type is needed — do not invent a second shared pagination default.
 
 ## Filtering, sorting, field selection
 

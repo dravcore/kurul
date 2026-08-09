@@ -26,6 +26,8 @@
       "subtitle": "Join the workspace you were invited to.",
       "submit": "Accept invite",
       "signInFirst": "Sign in with the invited email to accept.",
+      "signInCta": "Sign in",
+      "loading": "Loading invitation…",
       "error": "Could not accept this invitation."
     }
   },
@@ -35,7 +37,9 @@
       "workspaces": "Workspaces",
       "createWorkspace": "New workspace",
       "signOut": "Sign out",
-      "loading": "Loading…"
+      "loading": "Loading…",
+      "loadError": "Could not load workspaces.",
+      "retry": "Retry"
     },
     "workspace": {
       "createTitle": "Create a workspace",

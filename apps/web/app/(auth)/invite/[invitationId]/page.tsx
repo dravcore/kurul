@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/api';
+import type { WorkspaceMemberDto } from '@kurultay/shared-types';
+import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 
 export default function InviteAcceptPage(): React.ReactElement {
@@ -21,15 +23,23 @@ export default function InviteAcceptPage(): React.ReactElement {
       return;
     }
 
+    const controller = new AbortController();
+
     void (async () => {
-      // Better Auth getInvitation returns organization id; map via our list if needed.
       const invitation = await authClient.organization.getInvitation({
         query: { id: invitationId },
       });
+      if (controller.signal.aborted) {
+        return;
+      }
       if (invitation.data?.organizationId) {
         setWorkspaceId(invitation.data.organizationId);
       }
     })();
+
+    return () => {
+      controller.abort();
+    };
   }, [session, invitationId]);
 
   async function onAccept(): Promise<void> {
@@ -41,30 +51,28 @@ export default function InviteAcceptPage(): React.ReactElement {
     setPending(true);
     setError(null);
 
-    const response = await apiFetch(
-      `/workspaces/${workspaceId}/invitations/${invitationId}/accept`,
-      { method: 'POST' },
-    );
+    try {
+      await api.post<WorkspaceMemberDto>(
+        `/workspaces/${workspaceId}/invitations/${invitationId}/accept`,
+      );
 
-    setPending(false);
+      await authClient.organization.setActive({
+        organizationId: workspaceId,
+      });
 
-    if (!response.ok) {
+      router.replace('/dashboard');
+      router.refresh();
+    } catch {
       setError(t('error'));
-      return;
+    } finally {
+      setPending(false);
     }
-
-    await authClient.organization.setActive({
-      organizationId: workspaceId,
-    });
-
-    router.replace('/dashboard');
-    router.refresh();
   }
 
   if (isPending) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-        <p className="text-sm text-[var(--color-muted-foreground)]">…</p>
+        <p className="text-sm text-[var(--color-muted-foreground)]">{t('loading')}</p>
       </main>
     );
   }
@@ -74,12 +82,12 @@ export default function InviteAcceptPage(): React.ReactElement {
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-6">
         <h1 className="text-3xl font-semibold tracking-tight">{t('title')}</h1>
         <p className="text-sm text-[var(--color-muted-foreground)]">{t('signInFirst')}</p>
-        <a
-          href={`/login`}
+        <Link
+          href={`/login?next=/invite/${invitationId}`}
           className="rounded-[var(--radius-lg)] bg-[var(--color-primary)] px-4 py-2 text-center text-[var(--color-primary-foreground)]"
         >
-          Sign in
-        </a>
+          {t('signInCta')}
+        </Link>
       </main>
     );
   }

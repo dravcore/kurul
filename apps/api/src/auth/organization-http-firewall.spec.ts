@@ -1,0 +1,21 @@
+import { isBlockedOrganizationMutation } from './organization-http-firewall';
+
+describe('isBlockedOrganizationMutation', () => {
+  it('blocks organization create/invite/delete HTTP paths', () => {
+    expect(isBlockedOrganizationMutation('/auth/organization/create')).toBe(true);
+    expect(isBlockedOrganizationMutation('/auth/organization/invite-member')).toBe(true);
+    expect(isBlockedOrganizationMutation('/auth/organization/delete')).toBe(true);
+    expect(isBlockedOrganizationMutation('/auth/organization/accept-invitation')).toBe(
+      true,
+    );
+  });
+
+  it('allows set-active and read paths used by the web client', () => {
+    expect(isBlockedOrganizationMutation('/auth/organization/set-active')).toBe(false);
+    expect(isBlockedOrganizationMutation('/auth/organization/get-invitation')).toBe(
+      false,
+    );
+    expect(isBlockedOrganizationMutation('/auth/organization/list')).toBe(false);
+    expect(isBlockedOrganizationMutation('/auth/sign-in/email')).toBe(false);
+  });
+});

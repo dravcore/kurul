@@ -52,6 +52,8 @@ model Session {
   updatedAt            DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {
@@ -70,6 +72,8 @@ model Account {
   updatedAt             DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Verification {
@@ -106,6 +110,7 @@ model WorkspaceMember {
   user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([workspaceId, userId])
+  @@index([userId])
 }
 
 model WorkspaceInvitation {
@@ -120,6 +125,9 @@ model WorkspaceInvitation {
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   inviter   User      @relation(fields: [inviterId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, email, status])
+  @@index([inviterId])
 }
 
 model Board {
@@ -133,6 +141,8 @@ model Board {
   columns   Column[]
   tasks     Task[]
   labels    Label[]
+
+  @@index([workspaceId])
 }
 
 model Column {
@@ -146,6 +156,7 @@ model Column {
   tasks Task[]
 
   @@unique([boardId, id])
+  @@index([boardId])
 }
 
 model Task {
@@ -169,6 +180,10 @@ model Task {
   labels     TaskLabel[]
   comments   Comment[]
   activities Activity[]
+
+  @@index([boardId, columnId, position])
+  @@index([columnId, position])
+  @@index([createdById])
 }
 
 model TaskAssignee {
@@ -180,6 +195,8 @@ model TaskAssignee {
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([taskId, userId])
+  @@index([userId])
+  @@index([taskId])
 }
 
 model Label {
@@ -190,6 +207,8 @@ model Label {
 
   board Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
   tasks TaskLabel[]
+
+  @@index([boardId])
 }
 
 model TaskLabel {
@@ -201,6 +220,8 @@ model TaskLabel {
   label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, labelId])
+  @@index([labelId])
+  @@index([taskId])
 }
 
 model Comment {
@@ -212,6 +233,9 @@ model Comment {
 
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([taskId])
+  @@index([userId])
 }
 
 model Activity {
@@ -226,4 +250,8 @@ model Activity {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   task      Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt])
+  @@index([taskId])
+  @@index([userId])
 }

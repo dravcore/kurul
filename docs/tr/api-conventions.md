@@ -282,8 +282,10 @@ GET /workspaces/w_1/members?page=1&perPage=25
 }
 ```
 
-Her iki şekil de `@kurultay/shared-types`'ta (`CursorPage<T>`, `OffsetPage<T>`) tiplenmiştir,
-böylece client'lar bunları genel olarak ele alabilir.
+Liste yanıtları `@kurultay/shared-types` içindeki `CursorPage<T>` ile tiplenir. Küçük
+sayfa tabanlı koleksiyonlar (üyeler) şimdilik satır içi
+`{ items, page, perPage, total, totalPages }` şeklini kullanabilir — ikinci bir varsayılan
+paylaşılan sayfalama tipi eklemeyin.
 
 ## Filtreleme, sıralama, alan seçimi
 

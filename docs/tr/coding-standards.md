@@ -255,7 +255,7 @@ API değişikliğidir, lokal bir tip değil.
 
 ## Import'lar
 
-`eslint-plugin-import` tarafından zorlanan sıra, gruplar arasında boş bir satırla:
+Tercih edilen sıra (konvansiyon; şu an `eslint-plugin-import` ile makine zorlaması yok):
 
 ```ts
 // 1. Node built-in'leri
@@ -296,7 +296,7 @@ Bunları ölçülü kullanın.
 | Araç | Rol |
 |---|---|
 | Prettier | Tüm formatting. Config commit edilir; editor-local override yok. |
-| ESLint | Doğruluk ve konvansiyon kuralları (`@typescript-eslint`, `import`, Nest ve Next plugin'leri) |
+| ESLint | Flat config ile doğruluk kuralları (`@eslint/js`, `typescript-eslint`, `eslint-config-prettier`). Nest/Next/import plugin'leri henüz bağlı değil — import sırası konvansiyonla tutulur. |
 | `tsc --noEmit` | Typecheck, CI'da lint'ten ayrı çalışır |
 
 ```bash

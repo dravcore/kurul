@@ -249,7 +249,7 @@ needs a shape the backend does not return, that is an API change, not a local ty
 
 ## Imports
 
-Order, enforced by `eslint-plugin-import`, with a blank line between groups:
+Preferred order (convention; not currently machine-enforced by `eslint-plugin-import`):
 
 ```ts
 // 1. Node builtins
@@ -288,7 +288,7 @@ Use them sparingly.
 | Tool | Role |
 |---|---|
 | Prettier | All formatting. Config is committed; no editor-local overrides. |
-| ESLint | Correctness and convention rules (`@typescript-eslint`, `import`, Nest and Next plugins) |
+| ESLint | Correctness rules via flat config (`@eslint/js`, `typescript-eslint`, `eslint-config-prettier`). Nest/Next/import plugins are not wired yet — keep import order by convention. |
 | `tsc --noEmit` | Typecheck, run in CI separately from lint |
 
 ```bash

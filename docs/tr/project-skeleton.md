@@ -52,7 +52,8 @@ kurultay/
 │   ├── api/                 # NestJS backend
 │   └── web/                 # Next.js frontend
 ├── packages/
-│   └── shared-types/        # api ve web tarafından paylaşılan TS tipleri
+│   ├── shared-types/        # api ve web tarafından paylaşılan TS tipleri / DTO'lar
+│   └── auth-access/         # Better Auth organization AC rolleri (api + web)
 ├── pnpm-workspace.yaml
 ├── package.json
 ├── prisma.config.ts         # Prisma 7 tarafından gerektirilir — şema yolu, seed girişi, env yükleme
@@ -289,7 +290,7 @@ belirgin şekilde kısaltır.
 DATABASE_URL=postgresql://kurultay:kurultay@localhost:5432/kurultay
 REDIS_URL=redis://localhost:6379
 BETTER_AUTH_SECRET=
-BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_URL=http://localhost:4000
 API_PORT=4000
 WEB_URL=http://localhost:3000
 ```

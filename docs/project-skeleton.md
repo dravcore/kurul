@@ -46,7 +46,8 @@ kurultay/
 │   ├── api/                 # NestJS backend
 │   └── web/                 # Next.js frontend
 ├── packages/
-│   └── shared-types/        # TS types shared by api and web
+│   ├── shared-types/        # TS types / DTOs shared by api and web
+│   └── auth-access/         # Better Auth organization AC roles (api + web)
 ├── pnpm-workspace.yaml
 ├── package.json
 ├── prisma.config.ts         # required by Prisma 7 — schema path, seed entry, env loading
@@ -272,7 +273,7 @@ exists.
 DATABASE_URL=postgresql://kurultay:kurultay@localhost:5432/kurultay
 REDIS_URL=redis://localhost:6379
 BETTER_AUTH_SECRET=
-BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_URL=http://localhost:4000
 API_PORT=4000
 WEB_URL=http://localhost:3000
 ```
