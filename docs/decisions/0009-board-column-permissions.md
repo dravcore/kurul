@@ -48,8 +48,8 @@ matrix:
   board delete vs column mutations; a single “member can write” gate is wrong.
 - The web UI hides or disables Admin-only controls and surfaces the design.md
   `403` copy inline when a blocked control is still reachable.
-- Task create/edit/move permissions are **not** decided here; they land with
-  Phase 4+ and should follow the same Nest `@Roles` + ADR pattern.
+- Task create/edit/move permissions land in
+  [ADR 0010](0010-task-permissions.md) (MEMBER+ mutate; GUEST read-only).
 - Better Auth AC statements are not extended for `board`/`column` resources;
   product authorization stays Nest-side for these domains.
 
