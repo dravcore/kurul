@@ -3,8 +3,10 @@ import {
   IsEnum,
   IsInt,
   IsISO8601,
+  IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -12,7 +14,9 @@ import {
 } from 'class-validator';
 
 export class UpdateTaskDto {
-  @IsOptional()
+  /** Omitted = leave unchanged; explicit null is rejected (non-nullable column). */
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNotEmpty()
   @IsString()
   @MinLength(1)
   @MaxLength(500)
@@ -24,18 +28,20 @@ export class UpdateTaskDto {
   @MaxLength(20_000)
   description?: string | null;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNotEmpty()
   @IsEnum(Priority)
   priority?: Priority;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
-  @IsISO8601()
+  @IsISO8601({ strict: true, strictSeparator: true })
   dueDate?: string | null;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
   @IsInt()
   @Min(0)
+  @Max(60 * 24 * 365)
   estimatedMinutes?: number | null;
 }

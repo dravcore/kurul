@@ -20,7 +20,7 @@ interface TaskPanelProps {
   canMutate: boolean;
   canManageLabels: boolean;
   loadError?: string | null;
-  onUpdated: (task: TaskDto) => void;
+  onUpdated: (patch: Partial<TaskDto> & Pick<TaskDto, 'id'>) => void;
   onRequestDelete: () => void;
 }
 
@@ -56,6 +56,17 @@ export function TaskPanel({
     router.push(`/board/${boardId}`);
   }
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [boardId, router]);
+
   async function save(): Promise<void> {
     if (!task || !canMutate) return;
     const nextTitle = title.trim();
@@ -64,8 +75,9 @@ export function TaskPanel({
     if (nextTitle === task.title && nextDescription === task.description) return;
 
     setPending(true);
-    const previous = task;
-    onUpdated({ ...task, title: nextTitle, description: nextDescription });
+    const previousTitle = task.title;
+    const previousDescription = task.description;
+    onUpdated({ id: task.id, title: nextTitle, description: nextDescription });
     try {
       const updated = await api.patch<TaskDto>(`/workspaces/${workspaceId}/tasks/${task.id}`, {
         title: nextTitle,
@@ -73,7 +85,11 @@ export function TaskPanel({
       });
       onUpdated(updated);
     } catch (caught) {
-      onUpdated(previous);
+      onUpdated({
+        id: task.id,
+        title: previousTitle,
+        description: previousDescription,
+      });
       if (caught instanceof ApiError && caught.statusCode === 403) {
         toast.error(t('forbidden'));
       } else if (caught instanceof ApiError && caught.statusCode === 404) {

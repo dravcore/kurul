@@ -28,7 +28,7 @@ interface TaskMetadataPanelProps {
   task: TaskDto;
   canMutate: boolean;
   canManageLabels: boolean;
-  onUpdated: (task: TaskDto) => void;
+  onUpdated: (patch: Partial<TaskDto> & Pick<TaskDto, 'id'>) => void;
 }
 
 export function TaskMetadataPanel({
@@ -56,6 +56,7 @@ export function TaskMetadataPanel({
   const [newLabelName, setNewLabelName] = useState('');
   const [newLabelColor, setNewLabelColor] = useState<LabelColorSlot>(LabelColorSlot['slot-1']);
   const [pending, setPending] = useState(false);
+  const [loadingMeta, setLoadingMeta] = useState(true);
 
   useEffect(() => {
     setEstimateDraft(task.estimatedMinutes !== null ? String(task.estimatedMinutes) : '');
@@ -63,6 +64,7 @@ export function TaskMetadataPanel({
 
   useEffect(() => {
     const controller = new AbortController();
+    setLoadingMeta(true);
     void (async () => {
       try {
         const [nextMembers, nextLabels, nextComments] = await Promise.all([
@@ -85,6 +87,10 @@ export function TaskMetadataPanel({
         if (!controller.signal.aborted) {
           toast.error(t('metaLoadError'));
         }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingMeta(false);
+        }
       }
     })();
     return () => controller.abort();
@@ -97,7 +103,14 @@ export function TaskMetadataPanel({
       const updated = await api.patch<TaskDto>(`/workspaces/${workspaceId}/tasks/${task.id}`, body);
       onUpdated(updated);
     } catch (caught) {
-      onUpdated(previous);
+      const restore: Partial<TaskDto> & Pick<TaskDto, 'id'> = { id: previous.id };
+      for (const key of Object.keys(body) as Array<keyof TaskDto>) {
+        if (key === 'id') continue;
+        if (key in previous) {
+          (restore as Record<string, unknown>)[key] = previous[key];
+        }
+      }
+      onUpdated(restore);
       toastMetaError(caught);
     } finally {
       setPending(false);
@@ -432,7 +445,7 @@ export function TaskMetadataPanel({
               <p className="mt-1 whitespace-pre-wrap text-body text-foreground">{comment.body}</p>
             </li>
           ))}
-          {comments.length === 0 ? (
+          {comments.length === 0 && !loadingMeta ? (
             <li className="text-small text-muted-foreground">{t('noComments')}</li>
           ) : null}
         </ul>

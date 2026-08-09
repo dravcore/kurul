@@ -184,7 +184,12 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
       );
       setTasks((current) => current.map((task) => (task.id === updated.id ? updated : task)));
     } catch (caught) {
-      setTasks(payload.previousTasks);
+      setTasks((current) =>
+        current.map((task) => {
+          if (task.id !== payload.taskId) return task;
+          return payload.previousTasks.find((previous) => previous.id === payload.taskId) ?? task;
+        }),
+      );
       if (caught instanceof ApiError && caught.statusCode === 403) {
         toast.error(t('errors.forbiddenTasks'));
       } else {
@@ -198,7 +203,9 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     }
   }
 
-  const dnd = useBoardTaskDnd(tasks, canEditTasks, commitTaskMove);
+  const dnd = useBoardTaskDnd(tasks, canEditTasks, commitTaskMove, (title) =>
+    tTask('movedAnnouncement', { title }),
+  );
 
   async function moveColumn(column: ColumnDto, direction: -1 | 1): Promise<void> {
     if (!activeId) return;
@@ -423,11 +430,11 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             canMutate={canEditTasks}
             canManageLabels={canEditLabels}
             loadError={panelError}
-            onUpdated={(task) =>
+            onUpdated={(patch) =>
               setTasks((current) =>
-                current.some((item) => item.id === task.id)
-                  ? current.map((item) => (item.id === task.id ? task : item))
-                  : [...current, task],
+                current.some((item) => item.id === patch.id)
+                  ? current.map((item) => (item.id === patch.id ? { ...item, ...patch } : item))
+                  : [...current, patch as TaskDto],
               )
             }
             onRequestDelete={() => {

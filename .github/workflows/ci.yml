@@ -29,6 +29,16 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
       DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_test
       REDIS_URL: redis://localhost:6379
@@ -67,7 +77,7 @@ jobs:
         run: pnpm typecheck
 
       - name: Unit tests
-        run: pnpm --filter @kurultay/api test
+        run: pnpm --filter @kurultay/api test && pnpm --filter @kurultay/web test
 
       - name: Migrate test database
         run: pnpm db:migrate
