@@ -19,24 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CreateBoardDialog } from './create-board-dialog';
 import { DeleteBoardDialog } from './delete-board-dialog';
 import { RenameBoardDialog } from './rename-board-dialog';
-
-function DamgaMark({ size }: { size: number }): React.ReactElement {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className="text-signature"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 3v18M3 12h18M7.5 7.5l9 9M16.5 7.5l-9 9" />
-    </svg>
-  );
-}
+import { DamgaMark } from '@/components/brand/damga-mark';
 
 export function BoardList(): React.ReactElement {
   const t = useTranslations('app.board');
@@ -112,7 +95,7 @@ export function BoardList(): React.ReactElement {
 
       {boards.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-          <DamgaMark size={96} />
+          <DamgaMark />
           <h2 className="font-display text-xl font-semibold">{t('emptyTitle')}</h2>
           <p className="max-w-sm text-sm text-muted-foreground">{t('emptyBody')}</p>
           {canCreate ? (
