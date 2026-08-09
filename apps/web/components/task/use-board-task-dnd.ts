@@ -84,6 +84,8 @@ export function useBoardTaskDnd(
   onDragStart: (event: DragStartEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
   onDragCancel: () => void;
+  cancelDrag: () => void;
+  isDragging: boolean;
   collisionDetection: typeof closestCorners;
 } {
   const [activeTask, setActiveTask] = useState<TaskDto | null>(null);
@@ -150,6 +152,8 @@ export function useBoardTaskDnd(
     onDragStart,
     onDragEnd,
     onDragCancel,
+    cancelDrag: onDragCancel,
+    isDragging: activeTask !== null,
     collisionDetection: closestCorners,
   };
 }

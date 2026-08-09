@@ -80,11 +80,8 @@ The buildable step-by-step version of this tree lives in [project-skeleton.md](p
 
 Every module has the same skeleton: `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`. Module boundaries are kept clean from day one — the ability to split process roles later depends entirely on that.
 
-**Current vs planned:** after Phase 5, `auth`, `workspace`, `board`, `task`, `label`,
-`comment`, `health`, `common`, and `prisma` have real handlers. `activity`, `dashboard`,
-`notification`, and `realtime` remain route scaffolds nested under
-`/workspaces/:workspaceId/...` awaiting their roadmap phases. Treat the table below as the
-target map, not a claim that every module is implemented.
+**Current vs planned:** after Phase 9, feature modules including `realtime` are implemented.
+Treat the table below as the module map.
 
 | Module         | Responsibility                                                     |
 | -------------- | ------------------------------------------------------------------ |

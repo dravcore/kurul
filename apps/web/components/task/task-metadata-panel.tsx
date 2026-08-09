@@ -34,6 +34,8 @@ interface TaskMetadataPanelProps {
   task: TaskDto;
   canMutate: boolean;
   canManageLabels: boolean;
+  /** Bump to refetch comments/activity without remounting. */
+  metaRefreshKey?: number;
   onUpdated: (patch: Partial<TaskDto> & Pick<TaskDto, 'id'>) => void;
 }
 
@@ -43,6 +45,7 @@ export function TaskMetadataPanel({
   task,
   canMutate,
   canManageLabels,
+  metaRefreshKey = 0,
   onUpdated,
 }: TaskMetadataPanelProps): React.ReactElement {
   const t = useTranslations('app.board.task');
@@ -109,7 +112,7 @@ export function TaskMetadataPanel({
       }
     })();
     return () => controller.abort();
-  }, [workspaceId, boardId, task.id, t]);
+  }, [workspaceId, boardId, task.id, metaRefreshKey, t]);
 
   function syncMentionQuery(value: string, cursor: number): void {
     const active = getActiveMentionQuery(value, cursor);

@@ -20,6 +20,7 @@ interface TaskPanelProps {
   canMutate: boolean;
   canManageLabels: boolean;
   loadError?: string | null;
+  metaRefreshKey?: number;
   onUpdated: (patch: Partial<TaskDto> & Pick<TaskDto, 'id'>) => void;
   onRequestDelete: () => void;
 }
@@ -31,6 +32,7 @@ export function TaskPanel({
   canMutate,
   canManageLabels,
   loadError = null,
+  metaRefreshKey = 0,
   onUpdated,
   onRequestDelete,
 }: TaskPanelProps): React.ReactElement {
@@ -171,6 +173,7 @@ export function TaskPanel({
               task={task}
               canMutate={canMutate}
               canManageLabels={canManageLabels}
+              metaRefreshKey={metaRefreshKey}
               onUpdated={onUpdated}
             />
             {canMutate ? (

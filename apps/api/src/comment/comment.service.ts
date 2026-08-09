@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ActivityType } from '@kurultay/shared-types';
+import { ActivityType, SocketEvents } from '@kurultay/shared-types';
 import type { CommentDto } from '@kurultay/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { parseMentions } from '../common/mentions/parse-mentions';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import type { CreateCommentDto } from './dto/create-comment.dto';
 
 type CommentRow = {
@@ -22,6 +23,7 @@ export class CommentService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly notificationService: NotificationService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   private toDto(row: CommentRow): CommentDto {
@@ -58,7 +60,7 @@ export class CommentService {
     const task = await this.findTask(workspaceId, taskId);
     const mentionIds = parseMentions(dto.body).filter((id) => id !== userId);
 
-    return this.prisma.$transaction(async (tx) => {
+    const comment = await this.prisma.$transaction(async (tx) => {
       const created = await tx.comment.create({
         data: {
           taskId,
@@ -107,6 +109,15 @@ export class CommentService {
 
       return this.toDto(created);
     });
+
+    this.realtime.emitToBoard(task.boardId, SocketEvents.COMMENT_ADDED, {
+      workspaceId,
+      boardId: task.boardId,
+      actorId: userId,
+      taskId,
+      commentId: comment.id,
+    });
+    return comment;
   }
 
   async remove(workspaceId: string, commentId: string): Promise<void> {

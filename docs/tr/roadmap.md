@@ -308,22 +308,24 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 ## Faz 9 — Realtime
 
 **Hedef:** aynı board'daki iki kişi birbirlerinin değişikliklerini canlı görür.
-**Durum:** başlanmadı
+**Referans:** [spec](../specs/2026-08-09-phase-9-realtime-design.md);
+[ADR 0005](../decisions/0005-realtime-socketio.md)
+**Durum:** tamam
 
 **Realtime bilerek en sona bırakıldı.** Socket event'leri veri modelini yansıtır, bu
 yüzden model oturmadan önce yazılan her event onunla birlikte yeniden yazılmak zorunda
 kalır. Realtime'ı kararlı bir şema üzerine inşa etmek tek bir iş turu; onu erken inşa
 etmek ise ondan önceki sekiz fazın tümüne bir vergidir.
 
-- [ ] Redis adapter'lı Socket.io gateway'i (yatay ölçekleme)
-- [ ] Mevcut session'ı kullanan socket auth'u; **workspace/board başına scope'lanmış
+- [x] Redis adapter'lı Socket.io gateway'i (yatay ölçekleme)
+- [x] Mevcut session'ı kullanan socket auth'u; **workspace/board başına scope'lanmış
       oda'lar**
-- [ ] `@kurultay/shared-types`'ta event kontratı — her iki taraf için tek kaynak
-- [ ] Event'ler: task oluşturuldu/güncellendi/taşındı/silindi, column değişti, yorum
+- [x] `@kurultay/shared-types`'ta event kontratı — her iki taraf için tek kaynak
+- [x] Event'ler: task oluşturuldu/güncellendi/taşındı/silindi, column değişti, yorum
       eklendi
-- [ ] Web: board mount'ta subscribe olma, lokal optimistic state ile uzlaştırma,
+- [x] Web: board mount'ta subscribe olma, lokal optimistic state ile uzlaştırma,
       reconnect'te resync
-- [ ] Bir remote taşıma drag ortasında geldiğinde çakışma davranışı
+- [x] Bir remote taşıma drag ortasında geldiğinde çakışma davranışı
 
 ---
 
