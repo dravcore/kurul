@@ -85,6 +85,25 @@ describe('Dashboard (e2e)', () => {
       ]),
     );
 
+    expect(summary.body.throughput).toHaveLength(14);
+    const today = new Date().toISOString().slice(0, 10);
+    expect(summary.body.throughput.find((row: { date: string }) => row.date === today)).toEqual(
+      expect.objectContaining({ date: today, created: 2, completed: 0 }),
+    );
+
+    const done = columns.body.find((column: { name: string }) => column.name === 'Done')!;
+    await owner.agent
+      .patch(`/workspaces/${workspace.id}/tasks/${high.body.id}/position`)
+      .send({ columnId: done.id })
+      .expect(200);
+
+    const afterMove = await owner.agent
+      .get(`/workspaces/${workspace.id}/dashboard/summary`)
+      .expect(200);
+    expect(afterMove.body.throughput.find((row: { date: string }) => row.date === today)).toEqual(
+      expect.objectContaining({ date: today, created: 2, completed: 1 }),
+    );
+
     const other = await createWorkspace(owner.agent, 'Other', `other-${Date.now()}`);
     const foreignBoard = await owner.agent
       .post(`/workspaces/${other.id}/boards`)

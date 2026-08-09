@@ -9,17 +9,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Deferred follow-ups: `/notifications` page (unread + type filters, cursor Load more,
+  View all from the bell) and dashboard created-vs-completed throughput (14 UTC days;
+  `task.moved` payloads include column names). See
+  [deferred notes](docs/specs/2026-08-09-phase-8-deferred.md).
 - Phase 8 activity log and notifications
   ([spec](docs/specs/2026-08-09-phase-8-activity-notifications-design.md)): activity writes
   on task create/update/move/delete/assign/comment; workspace and task feeds; `Notification`
   model (assignment, mention, due-soon via BullMQ); shell bell + task History; comment
-  `@[Name](userId)` mentions. Email and full `/notifications` page deferred
+  `@[Name](userId)` mentions. Email deferred
   ([notes](docs/specs/2026-08-09-phase-8-deferred.md)).
 - Phase 7 dashboard
   ([spec](docs/specs/2026-08-09-phase-7-dashboard-design.md)):
   `GET .../dashboard/summary?boardId?` with total/overdue tiles, priority and assignee
   charts, optional per-board column chart (Recharts), empty/loading states; completion
-  over time deferred to Phase 8.
+  over time now on `throughput` (Activity-backed).
 - Phase 6 filtering and search
   ([spec](docs/specs/2026-08-09-phase-6-filtering-design.md)): whitelisted `TaskQueryDto`
   on `GET .../boards/:boardId/tasks` (`q`, priority, assignee, label, due-date null/range,

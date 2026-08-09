@@ -383,6 +383,11 @@ export class TaskService {
       }
 
       const fromColumnId = task.columnId;
+      const fromColumn =
+        fromColumnId === targetColumn.id
+          ? targetColumn
+          : await tx.column.findFirst({ where: { id: fromColumnId } });
+      const fromColumnName = fromColumn?.name ?? '';
 
       const siblings = await tx.task.findMany({
         where: { columnId: targetColumn.id },
@@ -462,7 +467,9 @@ export class TaskService {
         payload: {
           title: task.title,
           fromColumnId,
+          fromColumnName,
           toColumnId: targetColumn.id,
+          toColumnName: targetColumn.name,
         },
       });
 

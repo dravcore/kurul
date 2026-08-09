@@ -152,6 +152,14 @@ export interface DashboardCountByColumn {
   count: number;
 }
 
+/** One UTC calendar day in the created-vs-completed series. */
+export interface DashboardThroughputDay {
+  /** ISO date `YYYY-MM-DD` (UTC). */
+  date: string;
+  created: number;
+  completed: number;
+}
+
 /** Workspace (or board-scoped) dashboard aggregates — Phase 7. */
 export interface DashboardSummaryDto {
   totalTasks: number;
@@ -160,4 +168,6 @@ export interface DashboardSummaryDto {
   byAssignee: DashboardCountByAssignee[];
   /** Present only when `boardId` query is set. */
   byColumn: DashboardCountByColumn[] | null;
+  /** Last 14 UTC days: `task.created` vs moves into a Done-named column. */
+  throughput: DashboardThroughputDay[];
 }

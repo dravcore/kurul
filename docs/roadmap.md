@@ -267,8 +267,9 @@ tenant-safely until this exists.
 - [x] Web: dashboard page with Recharts visualizations
 - [x] Empty and loading states
 
-> Completion-over-time is deferred to Phase 8 (Activity). Column (“status”) chart requires
-> optional `?boardId=`. See the Phase 7 spec.
+> Completion-over-time shipped after Activity: `throughput` on
+> `GET .../dashboard/summary` (14 UTC days, created vs moves into a Done-named column).
+> Column (“status”) chart requires optional `?boardId=`. See the Phase 7 spec.
 
 ---
 

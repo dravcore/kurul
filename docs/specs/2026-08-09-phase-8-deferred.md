@@ -11,8 +11,8 @@ re-litigated mid-implementation. Pick these up only when the MVP is shipped and 
 
 | Deferred                         | Notes                                         |
 | -------------------------------- | --------------------------------------------- |
-| Full `/notifications` page       | Better for long history, search, type filters |
-| Popover + “View all” → full page | Hybrid once volume justifies a second surface |
+| ~~Full `/notifications` page~~   | **Shipped** — cursor list, unread/type filters, mark read |
+| ~~Popover + “View all” → full page~~ | **Shipped** — hybrid bell + `/notifications` |
 
 ## Due-soon job runner
 
@@ -38,7 +38,7 @@ re-litigated mid-implementation. Pick these up only when the MVP is shipped and 
 | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Email delivery of notifications               | Roadmap Phase 8 `[-]` / Beyond MVP                                                          |
 | Realtime push of new notifications / activity | Phase 9 Socket.io                                                                           |
-| Completion-over-time dashboard series         | Uses Activity data; chart work can follow once Activity writes land (Phase 7 deferred this) |
+| ~~Completion-over-time dashboard series~~     | **Shipped** — 14-day created vs completed (Done column) on dashboard summary / Recharts     |
 
 ## How to use this file
 

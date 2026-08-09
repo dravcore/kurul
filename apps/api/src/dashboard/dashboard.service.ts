@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Priority } from '@kurultay/shared-types';
+import { ActivityType, Priority } from '@kurultay/shared-types';
 import type {
   DashboardCountByAssignee,
   DashboardCountByColumn,
@@ -9,6 +9,11 @@ import type {
 import type { Prisma } from '../generated/prisma';
 import { PrismaService } from '../prisma/prisma.service';
 import type { DashboardQueryDto } from './dto/dashboard-query.dto';
+import {
+  applyThroughputCounts,
+  emptyThroughputSeries,
+  isCompletedMove,
+} from './dashboard-throughput';
 
 const ALL_PRIORITIES = Object.values(Priority);
 const ASSIGNEE_TOP_N = 8;
@@ -28,35 +33,68 @@ export class DashboardService {
     };
 
     const now = new Date();
+    const throughputSeries = emptyThroughputSeries(now);
+    const since = new Date(`${throughputSeries[0]!.date}T00:00:00.000Z`);
 
-    const [totalTasks, overdueCount, priorityGroups, assigneeRows, unassignedCount, columns] =
-      await Promise.all([
-        this.prisma.task.count({ where: taskWhere }),
-        this.prisma.task.count({
-          where: { ...taskWhere, dueDate: { not: null, lt: now } },
-        }),
-        this.prisma.task.groupBy({
-          by: ['priority'],
-          where: taskWhere,
-          _count: { _all: true },
-        }),
-        this.prisma.taskAssignee.groupBy({
-          by: ['userId'],
-          where: { task: taskWhere },
-          _count: { _all: true },
-          orderBy: { _count: { userId: 'desc' } },
-        }),
-        this.prisma.task.count({
-          where: { ...taskWhere, assignees: { none: {} } },
-        }),
-        query.boardId
-          ? this.prisma.column.findMany({
-              where: { boardId: query.boardId, board: { workspaceId } },
-              orderBy: [{ position: 'asc' }, { id: 'asc' }],
-              select: { id: true, name: true, position: true },
-            })
-          : Promise.resolve(null),
-      ]);
+    const activityWhere: Prisma.ActivityWhereInput = {
+      workspaceId,
+      createdAt: { gte: since },
+      ...(query.boardId ? { task: { boardId: query.boardId } } : {}),
+    };
+
+    const [
+      totalTasks,
+      overdueCount,
+      priorityGroups,
+      assigneeRows,
+      unassignedCount,
+      columns,
+      doneColumns,
+      createdActivities,
+      movedActivities,
+    ] = await Promise.all([
+      this.prisma.task.count({ where: taskWhere }),
+      this.prisma.task.count({
+        where: { ...taskWhere, dueDate: { not: null, lt: now } },
+      }),
+      this.prisma.task.groupBy({
+        by: ['priority'],
+        where: taskWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.taskAssignee.groupBy({
+        by: ['userId'],
+        where: { task: taskWhere },
+        _count: { _all: true },
+        orderBy: { _count: { userId: 'desc' } },
+      }),
+      this.prisma.task.count({
+        where: { ...taskWhere, assignees: { none: {} } },
+      }),
+      query.boardId
+        ? this.prisma.column.findMany({
+            where: { boardId: query.boardId, board: { workspaceId } },
+            orderBy: [{ position: 'asc' }, { id: 'asc' }],
+            select: { id: true, name: true, position: true },
+          })
+        : Promise.resolve(null),
+      this.prisma.column.findMany({
+        where: {
+          board: { workspaceId },
+          ...(query.boardId ? { boardId: query.boardId } : {}),
+          name: { equals: 'Done', mode: 'insensitive' },
+        },
+        select: { id: true },
+      }),
+      this.prisma.activity.findMany({
+        where: { ...activityWhere, type: ActivityType.TaskCreated },
+        select: { createdAt: true },
+      }),
+      this.prisma.activity.findMany({
+        where: { ...activityWhere, type: ActivityType.TaskMoved },
+        select: { createdAt: true, payload: true },
+      }),
+    ]);
 
     const byPriority: DashboardCountByPriority[] = ALL_PRIORITIES.map((priority) => ({
       priority,
@@ -83,12 +121,26 @@ export class DashboardService {
       }));
     }
 
+    const doneColumnIds = new Set(doneColumns.map((column) => column.id));
+    const completedAts = movedActivities
+      .filter((row) =>
+        isCompletedMove((row.payload ?? {}) as Record<string, unknown>, doneColumnIds),
+      )
+      .map((row) => row.createdAt);
+
+    const throughput = applyThroughputCounts(
+      throughputSeries,
+      createdActivities.map((row) => row.createdAt),
+      completedAts,
+    );
+
     return {
       totalTasks,
       overdueCount,
       byPriority,
       byAssignee,
       byColumn,
+      throughput,
     };
   }
 

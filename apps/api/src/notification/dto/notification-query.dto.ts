@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { NotificationType } from '@kurultay/shared-types';
 
 function clampLimit(value: unknown): number {
   const n = typeof value === 'number' ? value : Number(value);
@@ -15,6 +16,8 @@ function toBoolean(value: unknown): boolean | undefined {
   if (s === 'false' || s === '0') return false;
   return undefined;
 }
+
+const NOTIFICATION_TYPES = Object.values(NotificationType);
 
 /** Cursor page query for the current user's notifications. */
 export class NotificationQueryDto {
@@ -34,4 +37,8 @@ export class NotificationQueryDto {
   @Transform(({ value }) => toBoolean(value))
   @IsBoolean()
   unreadOnly?: boolean;
+
+  @IsOptional()
+  @IsIn(NOTIFICATION_TYPES)
+  type?: (typeof NOTIFICATION_TYPES)[number];
 }

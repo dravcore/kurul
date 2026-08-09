@@ -4,14 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Bell } from 'lucide-react';
-import {
-  NotificationType,
-  type CursorPage,
-  type NotificationDto,
-  type NotificationUnreadCountDto,
-  type TaskDto,
+import type {
+  CursorPage,
+  NotificationDto,
+  NotificationUnreadCountDto,
 } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
+import { notificationTitle } from '@/lib/notification-copy';
+import { resolveBoardIdForNotification } from '@/lib/notification-nav';
 import { formatRelativeTime } from '@/lib/relative-time';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -27,40 +27,6 @@ import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { toast } from 'sonner';
 
 const POLL_MS = 60_000;
-
-function notificationTitle(
-  n: NotificationDto,
-  t: (key: string, values?: Record<string, string>) => string,
-): string {
-  const title = typeof n.payload.title === 'string' ? n.payload.title : '';
-  switch (n.type) {
-    case NotificationType.Assignment:
-      return t('types.assignment', { title });
-    case NotificationType.Mention:
-      return t('types.mention', { title });
-    case NotificationType.DueSoon:
-      return t('types.dueSoon', { title });
-    default:
-      return t('types.unknown', { type: n.type });
-  }
-}
-
-async function resolveBoardId(
-  workspaceId: string,
-  taskId: string,
-  payload: Record<string, unknown>,
-): Promise<string | null> {
-  const fromPayload = payload.boardId;
-  if (typeof fromPayload === 'string' && fromPayload.length > 0) {
-    return fromPayload;
-  }
-  try {
-    const task = await api.get<TaskDto>(`/workspaces/${workspaceId}/tasks/${taskId}`);
-    return task.boardId;
-  } catch {
-    return null;
-  }
-}
 
 export function NotificationBell(): React.ReactElement {
   const t = useTranslations('app.notifications');
@@ -160,7 +126,11 @@ export function NotificationBell(): React.ReactElement {
       return;
     }
 
-    const boardId = await resolveBoardId(workspaceId, notification.taskId, notification.payload);
+    const boardId = await resolveBoardIdForNotification(
+      workspaceId,
+      notification.taskId,
+      notification.payload,
+    );
     setOpen(false);
     if (!boardId) {
       toast.error(t('openTaskError'));
@@ -237,6 +207,21 @@ export function NotificationBell(): React.ReactElement {
               </DropdownMenuItem>
             ))
           )}
+        </div>
+        <DropdownMenuSeparator className="m-0" />
+        <div className="px-2 py-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full justify-center"
+            onClick={() => {
+              setOpen(false);
+              router.push('/notifications');
+            }}
+          >
+            {t('viewAll')}
+          </Button>
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

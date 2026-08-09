@@ -144,4 +144,39 @@ describe('Activity & notifications (e2e)', () => {
       .expect(200);
     expect(unread.body).toEqual({ count: 0 });
   });
+
+  it('filters notifications by type', async () => {
+    const owner = await signUp(app, { name: 'Owner' });
+    const member = await signUp(app, { name: 'Member' });
+    const workspace = await createWorkspace(owner.agent, 'Filter', `flt-${Date.now()}`);
+    const memberMe = await member.agent.get('/me').expect(200);
+    const memberId = memberMe.body.id as string;
+    await addMember(prisma, workspace.id, memberId, MemberRole.MEMBER);
+    const { taskId } = await boardWithTask(owner.agent, workspace.id);
+
+    await owner.agent
+      .post(`/workspaces/${workspace.id}/tasks/${taskId}/assignees`)
+      .send({ userId: memberId })
+      .expect(201);
+    await owner.agent
+      .post(`/workspaces/${workspace.id}/tasks/${taskId}/comments`)
+      .send({ body: `Hey @[Member](${memberId})` })
+      .expect(201);
+
+    const assignments = await member.agent
+      .get(`/workspaces/${workspace.id}/notifications?type=assignment`)
+      .expect(200);
+    expect(assignments.body.items).toHaveLength(1);
+    expect(assignments.body.items[0].type).toBe(NotificationType.Assignment);
+
+    const mentions = await member.agent
+      .get(`/workspaces/${workspace.id}/notifications?type=mention`)
+      .expect(200);
+    expect(mentions.body.items).toHaveLength(1);
+    expect(mentions.body.items[0].type).toBe(NotificationType.Mention);
+
+    await member.agent
+      .get(`/workspaces/${workspace.id}/notifications?type=not-a-type`)
+      .expect(400);
+  });
 });

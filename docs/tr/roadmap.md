@@ -281,8 +281,9 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 - [x] Web: Recharts görselleştirmeleriyle dashboard sayfası
 - [x] Boş ve yükleniyor durumları
 
-> Zaman içinde tamamlanma Phase 8'e (Activity) ertelendi. Kolon (“status”) grafiği opsiyonel
-> `?boardId=` ister. Phase 7 spec'ine bakın.
+> Zaman içinde tamamlanma Activity sonrası geldi: `GET .../dashboard/summary` üzerinde
+> `throughput` (14 UTC gün, Created vs Done adlı kolona taşımalar). Kolon (“status”)
+> grafiği opsiyonel `?boardId=` ister. Phase 7 spec'ine bakın.
 
 ---
 
