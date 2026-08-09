@@ -92,8 +92,8 @@ Her modül aynı iskelete sahip: `*.module.ts`, `*.controller.ts`, `*.service.ts
 Modül sınırları en baştan temiz tutulur — process rollerini daha sonra bölme imkânı tamamen
 buna bağlıdır.
 
-**Mevcut vs planlanan:** Faz 3 sonrası `auth`, `workspace`, `board`, `health`, `common` ve
-`prisma` gerçek handler'lara sahip. `task`, `label`, `comment`, `activity`, `dashboard`,
+**Mevcut vs planlanan:** Faz 4 sonrası `auth`, `workspace`, `board`, `task`, `health`,
+`common` ve `prisma` gerçek handler'lara sahip. `label`, `comment`, `activity`, `dashboard`,
 `notification` ve `realtime` route iskeleti olarak kalır; path'ler
 `/workspaces/:workspaceId/...` altında yuvalanmıştır ve roadmap fazlarını bekler. Aşağıdaki
 tabloyu hedef harita olarak okuyun — her modülün uygulandığı iddiası değildir.
@@ -140,8 +140,8 @@ apps/web/
 │   ├── auth/              # paylaşılan auth form primitive'leri
 │   ├── brand/             # DamgaMark ve diğer marka işaretleri
 │   ├── ui/                # shadcn/ui primitive'leri (Faz 3'te landed)
-│   ├── board/             # BoardList, BoardView, BoardColumn, dialog'lar (TaskCard Faz 4)
-│   ├── task/              # TaskDetailPanel (Faz 5+)
+│   ├── board/             # BoardList, BoardView, BoardColumn, dialog'lar
+│   ├── task/              # TaskCard, TaskPanel, DnD yardımcıları (metadata UI Faz 5+)
 │   └── dashboard/         # grafik component'leri (Faz 7+)
 └── lib/
     ├── api.ts             # typed REST client

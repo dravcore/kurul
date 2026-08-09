@@ -9,6 +9,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Phase 4 tasks and drag-and-drop
+  ([spec](docs/specs/2026-08-09-phase-4-tasks-design.md)): workspace-scoped task CRUD,
+  fractional `Task.position` moves with on-demand rebalance,
+  [ADR 0010](docs/decisions/0010-task-permissions.md) (MEMBER+ mutate), `@dnd-kit`
+  multi-column board with optimistic move + toast rollback, and a title/description
+  detail panel at `/board/[boardId]/task/[taskId]`.
 - Visual debt closure and Phase 4 groundwork
   ([spec](docs/specs/2026-08-09-visual-debt-design.md)): design.md type-scale tokens,
   reduced-motion policy that keeps color/opacity, shared `DamgaMark`, token-themed sonner

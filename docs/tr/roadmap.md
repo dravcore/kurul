@@ -211,24 +211,25 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 ## Faz 4 — Task'lar ve drag-and-drop
 
 **Hedef:** ürünün çekirdek etkileşimi.
-**Durum:** başlanmadı
+**Referans:** [design.md](design.md) §4–§5; [ADR 0010](decisions/0010-task-permissions.md);
+[spec](../specs/2026-08-09-phase-4-tasks-design.md)
+**Durum:** tamamlandı
 
-- [ ] Task CRUD
-- [ ] `Task.position` için **fractional indexing** — arasına ekleme, üste, alta, boş
+- [x] Task CRUD
+- [x] `Task.position` için **fractional indexing** — arasına ekleme, üste, alta, boş
       column'a ekleme
-- [ ] `PATCH .../tasks/:taskId/position` — column içinde ve column'lar arası taşıma
-- [ ] Talep üzerine yeniden dengeleme: komşular arası boşluk hassasiyet eşiğinin altına
+- [x] `PATCH .../tasks/:taskId/position` — column içinde ve column'lar arası taşıma
+- [x] Talep üzerine yeniden dengeleme: komşular arası boşluk hassasiyet eşiğinin altına
       düştüğünde bir column'u taşımayla aynı transaction içinde yeniden akıtma (zamanlanmış
       job yok — bkz.
       [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md))
-- [ ] Eşzamanlı taşıma (concurrent-move) yönetimi (yinelenen position yok)
-- [ ] Web: `@dnd-kit` board'u, başarısızlıkta geri alınan (rollback) optimistic yeniden
-      sıralama
-- [ ] Web: task detay paneli
-- [ ] **`@dnd-kit`'i yeniden değerlendir**, artık board etkileşimi gerçekten var: klasik hat
-      donmuş ve ADR'nin fallback'i `pragmatic-drag-and-drop`. Sonucu her hâlükârda
-      [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)'e kaydet
-- [ ] Testler: [testing.md](testing.md#1-fractional-indexing-taskposition)'deki tam
+- [x] Eşzamanlı taşıma yönetimi (deterministik `position, id` tie-break; tükenen boşlukta
+      rebalance)
+- [x] Web: `@dnd-kit` board'u, başarısızlıkta geri alınan optimistic yeniden sıralama
+- [x] Web: task detay paneli (başlık + açıklama; metadata UI Faz 5)
+- [x] **`@dnd-kit` yeniden değerlendirme** — klasik pin'li hat korundu;
+      [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)'e kaydedildi
+- [x] Testler: [testing.md](testing.md#1-fractional-indexing-taskposition)'deki tam
       positioning matrisi
 
 ---
