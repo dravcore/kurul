@@ -3,6 +3,7 @@ import { Archivo, Fraunces, JetBrains_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import { ThemeProvider } from '@/components/layout/theme-provider';
+import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
 
 const archivo = Archivo({
@@ -41,6 +42,7 @@ export default async function RootLayout({
       <body className={`${archivo.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}>
         <ThemeProvider>
           <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
