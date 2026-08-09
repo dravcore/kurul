@@ -67,7 +67,7 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | Değişken              | Örnek                                                    | Amaç                                                                                                              |
 | --------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma bağlantı string'i                                                                                          |
-| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io adapter'ı, caching                                                                                      |
+| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io Redis adapter'ı, caching, BullMQ due-soon worker (`due-soon` kuyruğu)                                   |
 | `BETTER_AUTH_SECRET`  | _(üret)_                                                 | Session imzalama secret'ı — zorunlu, varsayılan yok                                                               |
 | `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir)                                                 |
 | `API_PORT`            | `4000`                                                   | NestJS dinleme portu                                                                                              |
@@ -81,8 +81,9 @@ openssl rand -base64 32
 ```
 
 **Yeni bir ortam değişkeni eklemek üç adımlı bir değişikliktir** ve üçü de aynı PR'a girer:
-tipli env şemasına ekle, güvenli bir placeholder ile `.env.example`'a ekle ve yukarıdaki
-tabloda belgele.
+`apps/api/src/common/env.ts` yardımcıları üzerinden bağla (veya `process.env` okuyan çağrı
+noktası — bugün ayrı bir Zod/tipli env şeması yok), güvenli bir placeholder ile
+`.env.example`'a ekle ve yukarıdaki tabloda belgele.
 
 ## Çalışma modları
 

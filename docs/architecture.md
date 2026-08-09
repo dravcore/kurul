@@ -72,7 +72,9 @@ kurultay/
 └── .env.example
 ```
 
-The buildable step-by-step version of this tree lives in [project-skeleton.md](project-skeleton.md); the technology choices behind it are in [tech-stack.md](tech-stack.md).
+Live layout is this document and the repo tree. [project-skeleton.md](project-skeleton.md)
+is the **historical Phase 1 scaffold** (how the monorepo was first built); it is not the
+day-to-day source of truth. Technology choices: [tech-stack.md](tech-stack.md).
 
 ---
 
@@ -115,6 +117,7 @@ apps/web/
 │   ├── (auth)/            # login, register, invite — unauthenticated shell
 │   ├── (app)/             # authenticated shell: sidebar + workspace switcher
 │   │   ├── dashboard/
+│   │   ├── notifications/
 │   │   ├── workspaces/new/
 │   │   └── board/[boardId]/
 │   └── layout.tsx
@@ -125,12 +128,13 @@ apps/web/
 │   ├── ui/                # shadcn/ui primitives (landed Phase 3)
 │   ├── board/             # BoardList, BoardView, BoardColumn, dialogs
 │   ├── task/              # TaskCard, TaskPanel, metadata editors, DnD helpers
-│   └── dashboard/         # chart components (Phase 7+)
+│   ├── dashboard/         # chart components (Phase 7+)
+│   └── notification/      # NotificationBell, NotificationsList
 └── lib/
     ├── api.ts             # typed REST client
     ├── socket.ts          # Socket.io client (board realtime)
-    ├── permissions.ts     # re-exports `@kurultay/auth-access`
-    └── auth.ts            # Better Auth client
+    ├── board-permissions.ts
+    └── auth.ts            # Better Auth client (`@kurultay/auth-access`)
 ```
 
 Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Next.js middleware checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run; the client shell still bootstraps workspaces once the session is present. Board interaction uses `@dnd-kit` with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events.
@@ -156,21 +160,20 @@ Enums and DTOs are **hand-maintained** to match the Prisma schema today; a mecha
 
 ## 6. Data model
 
-| Model             | Key fields                                                                                                                                          | Notes                                                                                                                                                                                                           |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `User`            | `id`, `email`, `name`, `avatarUrl`, `createdAt`                                                                                                     | Identity, owned by Better Auth                                                                                                                                                                                  |
-| `Workspace`       | `id`, `name`, `slug`, `createdAt`                                                                                                                   | Tenant root — everything hangs off this                                                                                                                                                                         |
-| `WorkspaceMember` | `id`, `workspaceId`, `userId`, `role`                                                                                                               | Join table; `role` drives permissions                                                                                                                                                                           |
-| `Board`           | `id`, `workspaceId`, `name`, `description`, `createdAt`                                                                                             | Boards belong to a workspace                                                                                                                                                                                    |
-| `Column`          | `id`, `boardId`, `name`, `position`, `color`                                                                                                        | `position` orders columns within a board                                                                                                                                                                        |
-| `Task`            | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt` | The core entity — see rules below                                                                                                                                                                               |
-| `TaskAssignee`    | `id`, `taskId`, `userId`                                                                                                                            | Join table; multiple assignees per task                                                                                                                                                                         |
-| `Label`           | `id`, `boardId`, `name`, `color`                                                                                                                    | Board-scoped. `color` stores a design-token slot name (`slot-1`…`slot-8`), resolved per theme — not a raw hex; see [design.md](design.md)                                                                       |
-| `TaskLabel`       | `id`, `taskId`, `labelId`                                                                                                                           | Join table                                                                                                                                                                                                      |
-| `Comment`         | `id`, `taskId`, `userId`, `body`, `createdAt`                                                                                                       |                                                                                                                                                                                                                 |
-| `Activity`        | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt`                                                           | Append-only log. `workspaceId` is required and `taskId` is optional so that workspace-level events with no task — "board renamed", "member joined" — are representable, which is what the Phase 8 feed promises |
-
-`Notification` is **not** in the Phase 1 schema. It is added in [roadmap Phase 8](roadmap.md#phase-8--activity-log-and-notifications) when the activity feed and in-app alerts land. Until then the `notification` Nest module folder exists as a stub only.
+| Model             | Key fields                                                                                                                                          | Notes                                                                                                                                                                                                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `User`            | `id`, `email`, `name`, `avatarUrl`, `createdAt`                                                                                                     | Identity, owned by Better Auth                                                                                                                                                                                                                                                         |
+| `Workspace`       | `id`, `name`, `slug`, `createdAt`                                                                                                                   | Tenant root — everything hangs off this                                                                                                                                                                                                                                                |
+| `WorkspaceMember` | `id`, `workspaceId`, `userId`, `role`                                                                                                               | Join table; `role` drives permissions                                                                                                                                                                                                                                                  |
+| `Board`           | `id`, `workspaceId`, `name`, `description`, `createdAt`                                                                                             | Boards belong to a workspace                                                                                                                                                                                                                                                           |
+| `Column`          | `id`, `boardId`, `name`, `position`, `color`                                                                                                        | `position` orders columns within a board                                                                                                                                                                                                                                               |
+| `Task`            | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt` | The core entity — see rules below                                                                                                                                                                                                                                                      |
+| `TaskAssignee`    | `id`, `taskId`, `userId`                                                                                                                            | Join table; multiple assignees per task                                                                                                                                                                                                                                                |
+| `Label`           | `id`, `boardId`, `name`, `color`                                                                                                                    | Board-scoped. `color` stores a design-token slot name (`slot-1`…`slot-8`), resolved per theme — not a raw hex; see [design.md](design.md)                                                                                                                                              |
+| `TaskLabel`       | `id`, `taskId`, `labelId`                                                                                                                           | Join table                                                                                                                                                                                                                                                                             |
+| `Comment`         | `id`, `taskId`, `userId`, `body`, `createdAt`                                                                                                       |                                                                                                                                                                                                                                                                                        |
+| `Activity`        | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt`                                                           | Append-only log. `workspaceId` is required and `taskId` is optional so that workspace-level events with no task — "board renamed", "member joined" — are representable, which is what the Phase 8 feed promises. `taskId` uses `ON DELETE SET NULL` so history survives task deletion. |
+| `Notification`    | `id`, `workspaceId`, `userId`, `type`, `taskId` (nullable), `activityId` (nullable), `payload` (Json), `readAt` (nullable), `createdAt`             | In-app alerts (assignment, mention, due-soon). Fan-out from activity writes; due-soon via BullMQ on `REDIS_URL`. See [roadmap Phase 8](roadmap.md#phase-8--activity-log-and-notifications)                                                                                             |
 
 Invitations persist as `WorkspaceInvitation`, mapped from Better Auth's organization
 plugin tables (Kurultay names, plugin `schema` config). Product language and REST
@@ -245,15 +248,19 @@ Reaching stage 2 requires no architectural change — clean NestJS module bounda
 
 The reasoning behind each of these choices is recorded as an ADR:
 
-| ADR                                                                                | Topic                                                   |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modular monolith                             |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                         | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                       | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                   | Better Auth with the organization plugin (→ Workspace)  |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                 | Socket.io + Redis adapter                               |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)             | Float positions for ordering                            |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                           | AGPL-3.0                                                |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                     | Git Flow + SemVer                                       |
+| ADR                                                                                            | Topic                                                   |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modular monolith                             |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Better Auth with the organization plugin (→ Workspace)  |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                               |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Float positions for ordering                            |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                       |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board and column Nest `@Roles` matrix                   |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task Nest `@Roles` matrix                               |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata Nest `@Roles` matrix            |
 
 Related: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
+(historical Phase 1 scaffold) · [docs/README.md](README.md) (docs map)

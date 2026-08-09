@@ -1,5 +1,8 @@
 # Proje İskeleti
 
+> **Tarihsel Faz 1 iskeleti.** Güncel yerleşim için [architecture.md](architecture.md) ve
+> canlı repo’yu tercih edin. Monorepo’nun ilk nasıl kurulduğunu belgelemek için tutulur.
+
 Kurultay monorepo iskeletini kurmak için adım adım bir referans: workspace, uygulamalar,
 şema, container'lar ve işin bittiğini söyleyen kontroller.
 

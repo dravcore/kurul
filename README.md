@@ -74,9 +74,10 @@ Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 
 | Doc                                                  | Covers                                                           |
 | ---------------------------------------------------- | ---------------------------------------------------------------- |
+| [docs/README.md](docs/README.md)                     | Docs map, EN/TR policy, archive policy                           |
 | [docs/architecture.md](docs/architecture.md)         | Module map, data model overview                                  |
 | [docs/tech-stack.md](docs/tech-stack.md)             | Stack choices and rationale                                      |
-| [docs/project-skeleton.md](docs/project-skeleton.md) | Planned repo layout, first Prisma schema                         |
+| [docs/project-skeleton.md](docs/project-skeleton.md) | Historical Phase 1 scaffold (how the monorepo was first built)   |
 | [docs/development.md](docs/development.md)           | Environment setup, daily workflow, commands                      |
 | [docs/coding-standards.md](docs/coding-standards.md) | TS/NestJS/Next.js conventions                                    |
 | [docs/design.md](docs/design.md)                     | UI/UX language: principles, tokens, layout, motion, states, copy |
@@ -85,10 +86,11 @@ Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 | [docs/api-conventions.md](docs/api-conventions.md)   | REST naming, error format, pagination                            |
 | [docs/roadmap.md](docs/roadmap.md)                   | Phases and progress                                              |
 | [docs/decisions/](docs/decisions/)                   | Lightweight architecture decision records                        |
+| [docs/archive/](docs/archive/)                       | Historical plans and meta-specs (not day-to-day reading)         |
 
 ## Contributing
 
-Kurultay is pre-skeleton and issue-first: propose before you implement. See
+Kurultay is issue-first: propose before you implement. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the process, and
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work together.
 

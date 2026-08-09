@@ -26,7 +26,7 @@ export const MEMBER = ac.newRole({
   ...memberAc.statements,
 });
 
-/** Same BA surface as MEMBER for Phase 2; Nest `@Roles` distinguishes later. */
+/** Read-only guest — empty BA mutation surface; Nest `@Roles` enforces product permissions. */
 export const GUEST = ac.newRole({
   organization: [],
   member: [],

@@ -7,7 +7,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
   Max,
   MaxLength,
   Min,
@@ -105,13 +104,4 @@ export class TaskQueryDto {
   @IsOptional()
   @IsISO8601()
   'dueDate[lte]'?: string;
-
-  /**
-   * Whitelisted sort tokens (`field` or `-field`, comma-separated).
-   * Pagination always walks by `id`; board clients ignore this for canvas order.
-   */
-  @IsOptional()
-  @IsString()
-  @Matches(/^-?(position|createdAt|dueDate|priority)(,-?(position|createdAt|dueDate|priority))*$/)
-  sort?: string;
 }

@@ -67,7 +67,7 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | Variable              | Example                                                  | Purpose                                                                                               |
 | --------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string                                                                              |
-| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io adapter, caching                                                                            |
+| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io Redis adapter, caching, BullMQ due-soon worker (`due-soon` queue)                           |
 | `BETTER_AUTH_SECRET`  | _(generate)_                                             | Session signing secret — required, no default                                                         |
 | `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | Public URL of the API (Better Auth is mounted at `/auth/*`)                                           |
 | `API_PORT`            | `4000`                                                   | NestJS listen port                                                                                    |
@@ -81,8 +81,9 @@ openssl rand -base64 32
 ```
 
 **Adding a new environment variable is a three-step change**, and all three go in the same
-PR: add it to the typed env schema, add it to `.env.example` with a safe placeholder, and
-document it in the table above.
+PR: wire it through the env helpers in `apps/api/src/common/env.ts` (or the call site that
+reads `process.env` — there is no separate Zod/typed env schema today), add it to
+`.env.example` with a safe placeholder, and document it in the table above.
 
 ## Run modes
 

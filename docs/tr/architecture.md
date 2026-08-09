@@ -81,8 +81,9 @@ kurultay/
 └── .env.example
 ```
 
-Bu ağacın adım adım kurulabilir versiyonu [project-skeleton.md](project-skeleton.md)'de;
-arkasındaki teknoloji seçimleri ise [tech-stack.md](tech-stack.md)'de.
+Canlı yerleşim bu doküman ve repo ağacıdır. [project-skeleton.md](project-skeleton.md)
+**tarihsel Faz 1 iskeletidir** (monorepo’nun ilk nasıl kurulduğu); gündelik doğruluk
+kaynağı değildir. Teknoloji seçimleri: [tech-stack.md](tech-stack.md).
 
 ---
 
@@ -129,6 +130,7 @@ apps/web/
 │   ├── (auth)/            # login, register, invite — kimliksiz kabuk
 │   ├── (app)/             # kimlikli kabuk: sidebar + workspace switcher
 │   │   ├── dashboard/
+│   │   ├── notifications/
 │   │   ├── workspaces/new/
 │   │   └── board/[boardId]/
 │   └── layout.tsx
@@ -139,12 +141,13 @@ apps/web/
 │   ├── ui/                # shadcn/ui primitive'leri (Faz 3'te landed)
 │   ├── board/             # BoardList, BoardView, BoardColumn, dialog'lar
 │   ├── task/              # TaskCard, TaskPanel, metadata editörleri, DnD yardımcıları
-│   └── dashboard/         # grafik component'leri (Faz 7+)
+│   ├── dashboard/         # grafik component'leri (Faz 7+)
+│   └── notification/      # NotificationBell, NotificationsList
 └── lib/
     ├── api.ts             # typed REST client
     ├── socket.ts          # Socket.io client (board realtime)
-    ├── permissions.ts     # `@kurultay/auth-access` re-export
-    └── auth.ts            # Better Auth client
+    ├── board-permissions.ts
+    └── auth.ts            # Better Auth client (`@kurultay/auth-access`)
 ```
 
 İki route group layout ağacını böler: `(auth)` sade bir kabuk render eder, `(app)` workspace
@@ -181,21 +184,20 @@ client hâlâ Nest ve Better Auth adapter için `apps/api/src/generated/prisma`'
 
 ## 6. Veri modeli
 
-| Model             | Anahtar alanlar                                                                                                                                     | Notlar                                                                                                                                                                                                                   |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `User`            | `id`, `email`, `name`, `avatarUrl`, `createdAt`                                                                                                     | Kimlik, Better Auth'a ait                                                                                                                                                                                                |
-| `Workspace`       | `id`, `name`, `slug`, `createdAt`                                                                                                                   | Tenant kökü — her şey buna bağlanır                                                                                                                                                                                      |
-| `WorkspaceMember` | `id`, `workspaceId`, `userId`, `role`                                                                                                               | Join tablosu; `role` yetkileri belirler                                                                                                                                                                                  |
-| `Board`           | `id`, `workspaceId`, `name`, `description`, `createdAt`                                                                                             | Board'lar bir workspace'e ait                                                                                                                                                                                            |
-| `Column`          | `id`, `boardId`, `name`, `position`, `color`                                                                                                        | `position` bir board içindeki column'ları sıralar                                                                                                                                                                        |
-| `Task`            | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt` | Çekirdek entity — kurallar aşağıda                                                                                                                                                                                       |
-| `TaskAssignee`    | `id`, `taskId`, `userId`                                                                                                                            | Join tablosu; task başına birden fazla atanan                                                                                                                                                                            |
-| `Label`           | `id`, `boardId`, `name`, `color`                                                                                                                    | Board-scoped. `color`, bir design-token slot adı saklar (`slot-1`…`slot-8`), temaya göre resolve edilir — ham bir hex değil; bkz. [design.md](design.md)                                                                 |
-| `TaskLabel`       | `id`, `taskId`, `labelId`                                                                                                                           | Join tablosu                                                                                                                                                                                                             |
-| `Comment`         | `id`, `taskId`, `userId`, `body`, `createdAt`                                                                                                       |                                                                                                                                                                                                                          |
-| `Activity`        | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt`                                                           | Yalnızca-ekleme log. `workspaceId` zorunlu ve `taskId` opsiyonel, böylece task'ı olmayan workspace seviyesi olaylar — "board yeniden adlandırıldı", "üye katıldı" — temsil edilebilir; Faz 8 feed'inin vaat ettiği de bu |
-
-`Notification` Phase 1 şemasında **yok**. [Roadmap Faz 8](roadmap.md#faz-8--aktivite-logu-ve-bildirimler) ile activity feed ve uygulama içi bildirimler gelince eklenir. O zamana kadar `notification` Nest modül klasörü yalnızca stub'dır.
+| Model             | Anahtar alanlar                                                                                                                                     | Notlar                                                                                                                                                                                                                                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `User`            | `id`, `email`, `name`, `avatarUrl`, `createdAt`                                                                                                     | Kimlik, Better Auth'a ait                                                                                                                                                                                                                                                                     |
+| `Workspace`       | `id`, `name`, `slug`, `createdAt`                                                                                                                   | Tenant kökü — her şey buna bağlanır                                                                                                                                                                                                                                                           |
+| `WorkspaceMember` | `id`, `workspaceId`, `userId`, `role`                                                                                                               | Join tablosu; `role` yetkileri belirler                                                                                                                                                                                                                                                       |
+| `Board`           | `id`, `workspaceId`, `name`, `description`, `createdAt`                                                                                             | Board'lar bir workspace'e ait                                                                                                                                                                                                                                                                 |
+| `Column`          | `id`, `boardId`, `name`, `position`, `color`                                                                                                        | `position` bir board içindeki column'ları sıralar                                                                                                                                                                                                                                             |
+| `Task`            | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt` | Çekirdek entity — kurallar aşağıda                                                                                                                                                                                                                                                            |
+| `TaskAssignee`    | `id`, `taskId`, `userId`                                                                                                                            | Join tablosu; task başına birden fazla atanan                                                                                                                                                                                                                                                 |
+| `Label`           | `id`, `boardId`, `name`, `color`                                                                                                                    | Board-scoped. `color`, bir design-token slot adı saklar (`slot-1`…`slot-8`), temaya göre resolve edilir — ham bir hex değil; bkz. [design.md](design.md)                                                                                                                                      |
+| `TaskLabel`       | `id`, `taskId`, `labelId`                                                                                                                           | Join tablosu                                                                                                                                                                                                                                                                                  |
+| `Comment`         | `id`, `taskId`, `userId`, `body`, `createdAt`                                                                                                       |                                                                                                                                                                                                                                                                                               |
+| `Activity`        | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt`                                                           | Yalnızca-ekleme log. `workspaceId` zorunlu ve `taskId` opsiyonel, böylece task'ı olmayan workspace seviyesi olaylar — "board yeniden adlandırıldı", "üye katıldı" — temsil edilebilir; Faz 8 feed'inin vaat ettiği de bu. `taskId` için `ON DELETE SET NULL` — geçmiş task silinince korunur. |
+| `Notification`    | `id`, `workspaceId`, `userId`, `type`, `taskId` (nullable), `activityId` (nullable), `payload` (Json), `readAt` (nullable), `createdAt`             | Uygulama içi bildirimler (atama, mention, due-soon). Activity yazımlarından fan-out; due-soon BullMQ ile `REDIS_URL` üzerinde. Bkz. [roadmap Faz 8](roadmap.md#faz-8--aktivite-logu-ve-bildirimler)                                                                                           |
 
 Davetler `WorkspaceInvitation` olarak saklanır; Better Auth organization plugin
 tablolarından Kurultay adlarına map edilir. Ürün dili ve REST path'leri
@@ -284,15 +286,19 @@ Aşamalı yol bilinçli bir tercihtir: mikroservis kapısı açık kalır, bedel
 
 Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 
-| ADR                                                                                | Konu                                                    |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md) | Monorepo + modüler monolit                              |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                         | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                       | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                   | Organization plugin'i ile Better Auth (→ Workspace)     |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                 | Socket.io + Redis adapter                               |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)             | Sıralama için Float position'lar                        |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                           | AGPL-3.0                                                |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                     | Git Flow + SemVer                                       |
+| ADR                                                                                            | Konu                                                    |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modüler monolit                              |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Organization plugin'i ile Better Auth (→ Workspace)     |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                               |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Sıralama için Float position'lar                        |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                       |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board ve column Nest `@Roles` matrisi                   |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task Nest `@Roles` matrisi                              |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label ve task-metadata Nest `@Roles` matrisi            |
 
 İlgili: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
+(tarihsel Faz 1 iskeleti) · [docs/README.md](../README.md) (docs haritası)

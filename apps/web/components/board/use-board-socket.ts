@@ -11,7 +11,7 @@ import {
   type TaskMovedPayload,
   type TaskUpdatedPayload,
 } from '@kurultay/shared-types';
-import { connectSocket, getSocket } from '@/lib/socket';
+import { connectSocket } from '@/lib/socket';
 
 export type BoardSocketHandlers = {
   onTaskCreated: (payload: TaskCreatedPayload) => void;
@@ -114,13 +114,6 @@ export function useBoardSocket(
       setConnected(false);
     };
   }, [boardId, enabled]);
-
-  useEffect(() => {
-    return () => {
-      // Keep the singleton for other boards in the SPA; only leave room above.
-      void getSocket();
-    };
-  }, []);
 
   return { connected };
 }
