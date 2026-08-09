@@ -97,7 +97,7 @@ describe('Workspace isolation and roles (e2e)', () => {
 
     await invitee.agent
       .post(`/workspaces/${workspace.id}/invitations/${invitationId}/accept`)
-      .expect(201)
+      .expect(200)
       .expect(({ body }) => {
         expect(body.role).toBe(MemberRole.GUEST);
         expect(body.workspaceId).toBe(workspace.id);
