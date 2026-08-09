@@ -256,7 +256,7 @@ Neden varsayılan olarak cursor:
 
 - `OFFSET`, büyük tablolarda doğrusal olarak bozulur; keyset lookup'lar sabit kalır.
 - Satırlar session ortasında client'ın altına ekleniyor — başka bir kullanıcı tarafından,
-  ve realtime katmanı devreye girdiğinde görünür biçimde. Offset pagination bunu en kötü
+  ve realtime katmanı üzerinden görünür biçimde. Offset pagination bunu en kötü
   ele alan yöntem: client'ın penceresinden önceki her ekleme tüm listeyi kaydırır ve
   sonraki sayfa satırları ya tekrarlar ya da atlar.
 

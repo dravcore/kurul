@@ -6,7 +6,7 @@ How to set up a Kurultay development environment and work in it day to day.
 
 ## Contents
 
-- [Status: skeleton is live](#status-skeleton-is-live)
+- [Status](#status)
 - [Prerequisites](#prerequisites)
 - [Clone and install](#clone-and-install)
 - [Environment variables](#environment-variables)
@@ -17,14 +17,14 @@ How to set up a Kurultay development environment and work in it day to day.
 - [Day-to-day loop](#day-to-day-loop)
 - [Troubleshooting](#troubleshooting)
 
-## Status: skeleton is live
+## Status
 
-The monorepo skeleton described below **exists** in the repository. Commands on this page
-are the day-to-day contract — if reality and this document diverge, one of the two is a bug
-and gets fixed in the same PR.
+The monorepo and MVP feature set (Phases 1–9) **exist** in the repository. Commands on this
+page are the day-to-day contract — if reality and this document diverge, one of the two is a
+bug and gets fixed in the same PR.
 
-- Layout, Prisma models, and acceptance criteria: [project-skeleton.md](project-skeleton.md)
-- Phase progress: [roadmap.md](roadmap.md)
+- Layout, Prisma models, and early acceptance criteria: [project-skeleton.md](project-skeleton.md)
+- Phase progress (MVP complete): [roadmap.md](roadmap.md)
 - Why each tool was chosen: [tech-stack.md](tech-stack.md)
 
 ## Prerequisites

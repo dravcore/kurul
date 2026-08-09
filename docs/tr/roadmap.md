@@ -1,6 +1,7 @@
 # Roadmap
 
-Kurultay için dokümantasyondan MVP'ye ve ötesine uzanan, fazlara ayrılmış teslimat planı.
+Kurultay için dokümantasyondan MVP’ye (Faz 1–9, tamam) ve ötesine uzanan, fazlara ayrılmış
+teslimat planı.
 
 > 🌐 [English (canonical)](../roadmap.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 

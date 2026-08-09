@@ -1,6 +1,7 @@
 # Roadmap
 
-Phased delivery plan for Kurultay, from documentation to MVP and beyond.
+Phased delivery plan for Kurultay, from documentation through MVP (Phases 1–9, complete) and
+beyond.
 
 > 🌐 English (canonical) | [Türkçe](tr/roadmap.md)
 

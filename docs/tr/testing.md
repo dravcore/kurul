@@ -17,7 +17,8 @@ Kurultay'ın neyi, hangi araçlarla test ettiği ve CI'ın neyi zorunlu kıldı�
 
 ## Strateji
 
-Kurultay MVP öncesi. Test stratejisi bilinçli olarak **kapsamlı değil, pragmatik**:
+Kurultay’ın MVP özellik seti tamamlandı; test stratejisi bilinçli olarak **kapsamlı değil,
+pragmatik** kalır:
 
 - **Doğru yapması zor** ve **yanlış yapması pahalı** olan mantığı test edin — sıralama,
   tenant izolasyonu, auth.

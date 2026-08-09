@@ -253,8 +253,8 @@ naturally small and stable.
 Why cursor by default:
 
 - `OFFSET` degrades linearly on large tables; keyset lookups stay flat.
-- Rows are inserted underneath the client mid-session — by another user, and once the
-  realtime layer lands, visibly. Offset pagination handles that worst: every insert before
+- Rows are inserted underneath the client mid-session — by another user, and via the
+  realtime layer, visibly. Offset pagination handles that worst: every insert before
   the client's window shifts the whole list and the next page repeats or skips rows.
 
 ### The cursor key is always `id`, never `position`

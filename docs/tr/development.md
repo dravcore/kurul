@@ -6,7 +6,7 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 
 ## İçindekiler
 
-- [Durum: iskelet ayakta](#durum-iskelet-ayakta)
+- [Durum](#durum)
 - [Ön koşullar](#ön-koşullar)
 - [Klonlama ve kurulum](#klonlama-ve-kurulum)
 - [Ortam değişkenleri](#ortam-değişkenleri)
@@ -17,14 +17,14 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 - [Günlük döngü](#günlük-döngü)
 - [Sorun giderme](#sorun-giderme)
 
-## Durum: iskelet ayakta
+## Durum
 
-Aşağıda anlatılan monorepo iskeleti repository'de **mevcuttur**. Bu sayfadaki komutlar
+Monorepo ve MVP özellik seti (Faz 1–9) repository’de **mevcuttur**. Bu sayfadaki komutlar
 gündelik kontrattır — gerçeklik bu dokümandan sapıyorsa ikisinden biri buglıdır ve aynı
-PR'da düzeltilir.
+PR’da düzeltilir.
 
-- Yerleşim, Prisma modelleri ve kabul kriterleri: [project-skeleton.md](project-skeleton.md)
-- Faz ilerlemesi: [roadmap.md](roadmap.md)
+- Yerleşim, Prisma modelleri ve erken kabul kriterleri: [project-skeleton.md](project-skeleton.md)
+- Faz ilerlemesi (MVP tamam): [roadmap.md](roadmap.md)
 - Her aracın neden seçildiği: [tech-stack.md](tech-stack.md)
 
 ## Ön koşullar

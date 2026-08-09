@@ -6,10 +6,10 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 ## Durum
 
-Kurultay **MVP öncesi** aşamada. Faz 0–1 (dokümantasyon + monorepo iskeleti) ve Faz 2
-auth/workspace'ler yerinde — `apps/api`, `apps/web`, `packages/shared-types` ve
-`packages/auth-access` yerelde çalışır. Board ve ürün özellikleri Faz 3'ten devam eder —
-bkz. [docs/roadmap.md](docs/tr/roadmap.md).
+Kurultay’ın **MVP özellik seti (Faz 1–9) tamamlandı** — auth/workspace’ler, board ve
+task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Bkz.
+[docs/roadmap.md](docs/tr/roadmap.md). MVP ötesi maddeler (e-posta bildirimleri, presence,
+Playwright e2e, ek diller, …) hâlâ MVP ötesi altında listelenir.
 
 ## Kurultay nedir?
 
@@ -25,7 +25,7 @@ alternatif olmayı hedefliyor.
 
 ## Özellikler
 
-İlk sürüm için planlananlar — sıralama için [docs/roadmap.md](docs/tr/roadmap.md)'ye bakın:
+MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadmap.md):
 
 - **Board'lar ve kolonlar** — sürükle-bırakla yeniden sıralanabilen klasik Kanban düzeni
 - **Task'lar** — çoklu atanan kişi, label'lar, (label'lardan bağımsız tutulan) priority,
@@ -33,9 +33,10 @@ alternatif olmayı hedefliyor.
 - **Fractional-indexed sıralama** — bir kartı yeniden sıralamak yalnızca o kartın position'ına
   dokunur, tüm listeyi yeniden numaralandırmaz
 - **Workspace'ler** — temelden itibaren multi-tenant; her sorgu workspace'e göre scope'lanır
-- **Dashboard** — task/board aktivitesi üzerinde agregasyon görünümleri ve grafikler
+- **Filtreleme ve arama** — board task filtreleri, cursor pagination
+- **Dashboard** — agregasyon görünümleri ve grafikler (created vs completed dahil)
+- **Aktivite log'u ve bildirimler** — uygulama içi atama, mention, due-soon; `/notifications`
 - **Realtime senkronizasyon** — board değişiklikleri Socket.io üzerinden canlı yayılır
-- **Aktivite log'u ve bildirimler**
 
 ## Hızlı başlangıç
 
