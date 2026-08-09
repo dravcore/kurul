@@ -21,6 +21,7 @@ Kurultay, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğun
 | [0007](0007-license-agpl.md)              | Lisans: AGPL-3.0                                                     | Kabul edildi | 2026-08-08 |
 | [0008](0008-git-flow-semver.md)           | Git Flow + Conventional Commits + SemVer                             | Kabul edildi | 2026-08-08 |
 | [0009](0009-board-column-permissions.md)  | Board ve Column İzinleri                                             | Kabul edildi | 2026-08-09 |
+| [0010](0010-task-permissions.md)          | Task İzinleri                                                        | Kabul edildi | 2026-08-09 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 

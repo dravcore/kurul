@@ -47,8 +47,8 @@ uygulanır:
   ayrı `@Roles` setleri uygulamalıdır; tek bir “member yazabilir” kapısı yanlıştır.
 - Web UI Admin-only kontrolleri gizler veya disable eder; engellenmiş bir kontrol
   hâlâ erişilebilirse design.md `403` metnini satır içi gösterir.
-- Task create/edit/move izinleri **burada kararlaştırılmaz**; Faz 4+ ile gelir ve
-  aynı Nest `@Roles` + ADR kalıbını izlemelidir.
+- Task create/edit/move izinleri
+  [ADR 0010](0010-task-permissions.md) ile gelir (MEMBER+ mutasyon; GUEST salt okuma).
 - Better Auth AC statement'ları `board`/`column` kaynakları için genişletilmez;
   bu domain'lerde ürün yetkilendirmesi Nest tarafında kalır.
 
