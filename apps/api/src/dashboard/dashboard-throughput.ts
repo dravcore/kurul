@@ -40,7 +40,9 @@ export function applyThroughputCounts(
   createdAts: Date[],
   completedAts: Date[],
 ): DashboardThroughputDay[] {
-  const map = new Map(series.map((day) => [day.date, { ...day }] as const));
+  const map = new Map<string, DashboardThroughputDay>(
+    series.map((day) => [day.date, { ...day }]),
+  );
   for (const at of createdAts) {
     const row = map.get(utcDateKey(at));
     if (row) row.created += 1;
