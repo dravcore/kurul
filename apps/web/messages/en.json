@@ -54,11 +54,60 @@
       "error": "Could not create workspace."
     },
     "dashboard": {
-      "title": "Dashboard",
+      "title": "Boards",
       "placeholder": "Charts and aggregations arrive in Phase 7."
     },
     "board": {
-      "placeholder": "Board canvas arrives in Phase 3."
+      "listTitle": "Boards",
+      "listSubtitle": "Open a board to divide the work.",
+      "listError": "Could not load boards.",
+      "loadError": "The board couldn't load.",
+      "backToBoards": "Back to boards",
+      "emptyTitle": "No boards yet",
+      "emptyBody": "A board is where the work gets divided. Start with one.",
+      "createTitle": "Create board",
+      "createAction": "Create board",
+      "createError": "Could not create this board.",
+      "renameTitle": "Rename board",
+      "renameAction": "Rename",
+      "renameError": "Could not rename this board.",
+      "deleteTitle": "Delete this board?",
+      "deleteBody": "Deleting {name} removes its columns and tasks. This cannot be undone.",
+      "deleteAction": "Delete board",
+      "deleteError": "Could not delete this board.",
+      "cancel": "Cancel",
+      "name": "Name",
+      "description": "Description",
+      "boardMenu": "Board actions",
+      "errors": {
+        "forbiddenDelete": "You need Admin access to delete boards. Ask a workspace owner.",
+        "forbiddenColumns": "You need Admin access to change columns. Ask a workspace owner."
+      },
+      "column": {
+        "name": "Name",
+        "menu": "Column actions",
+        "createTitle": "Add column",
+        "createAction": "Add column",
+        "createError": "Could not create this column.",
+        "renameTitle": "Rename column",
+        "renameAction": "Rename",
+        "renameError": "Could not rename this column.",
+        "deleteTitle": "Delete this column?",
+        "deleteBody": "Delete {name}? This cannot be undone.",
+        "deleteBodyWithTasks": "Delete {name}? {count} tasks in this column will also be deleted.",
+        "deleteAction": "Delete column",
+        "deleteError": "Could not delete this column.",
+        "moveLeft": "Move left",
+        "moveRight": "Move right",
+        "moveError": "Could not reorder this column.",
+        "emptyTitle": "This board has no columns",
+        "emptyBody": "Columns are the stages work moves through. Start with To Do, In Progress, and Done, or name your own.",
+        "useDefaults": "Use default columns",
+        "defaultsError": "Could not create the default columns.",
+        "emptyDrop": "Drop a task here",
+        "cancel": "Cancel",
+        "forbidden": "You need Admin access to change columns. Ask a workspace owner."
+      }
     }
   }
 }

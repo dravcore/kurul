@@ -182,16 +182,16 @@ tenant-safely until this exists.
 
 **Goal:** the container the Kanban actually lives in.
 **Reference:** [design.md](design.md) — the binding reference for all board UI work from here on
-**Status:** not started
+**Status:** done
 
-- [ ] Web: design tokens (light + dark), typography, and app shell chrome per
+- [x] Web: design tokens (light + dark), typography, and app shell chrome per
       [design.md](design.md) §3–§4 — validate the proposed values on real screens and record
       any change back into that document
-- [ ] Board CRUD, scoped to workspace
-- [ ] Column CRUD
-- [ ] Column reordering (`position`)
-- [ ] Default columns on board creation (To Do / In Progress / Done)
-- [ ] Web: board list, board page shell, column rendering, create/rename/delete dialogs
+- [x] Board CRUD, scoped to workspace
+- [x] Column CRUD
+- [x] Column reordering (`position`)
+- [x] Default columns on board creation (To Do / In Progress / Done)
+- [x] Web: board list, board page shell, column rendering, create/rename/delete dialogs
 
 ---
 

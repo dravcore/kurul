@@ -1,14 +1,7 @@
-import { getTranslations } from 'next-intl/server';
+'use client';
 
-export default async function DashboardPage(): Promise<React.ReactElement> {
-  const t = await getTranslations();
+import { BoardList } from '@/components/board/board-list';
 
-  return (
-    <section className="space-y-2">
-      <h1 className="text-2xl font-semibold">{t('app.dashboard.title')}</h1>
-      <p className="text-sm text-[var(--color-muted-foreground)]">
-        {t('app.dashboard.placeholder')}
-      </p>
-    </section>
-  );
+export default function DashboardPage(): React.ReactElement {
+  return <BoardList />;
 }
