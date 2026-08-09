@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import type { WorkspaceMemberDto } from '@kurultay/shared-types';
+import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 
@@ -70,41 +71,33 @@ export default function InviteAcceptPage(): React.ReactElement {
   }
 
   if (isPending) {
-    return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-        <p className="text-sm text-[var(--color-muted-foreground)]">{t('loading')}</p>
-      </main>
-    );
+    return <p className="text-body text-muted-foreground">{t('loading')}</p>;
   }
 
   if (!session) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-6">
-        <h1 className="text-3xl font-semibold tracking-tight">{t('title')}</h1>
-        <p className="text-sm text-[var(--color-muted-foreground)]">{t('signInFirst')}</p>
-        <Link
-          href={`/login?next=/invite/${invitationId}`}
-          className="rounded-[var(--radius-lg)] bg-[var(--color-primary)] px-4 py-2 text-center text-[var(--color-primary-foreground)]"
-        >
-          {t('signInCta')}
-        </Link>
-      </main>
+      <>
+        <div className="flex flex-col gap-2">
+          <h1 className="font-display text-display tracking-tight">{t('title')}</h1>
+          <p className="text-body text-muted-foreground">{t('signInFirst')}</p>
+        </div>
+        <Button asChild>
+          <Link href={`/login?next=/invite/${invitationId}`}>{t('signInCta')}</Link>
+        </Button>
+      </>
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-6">
-      <h1 className="text-3xl font-semibold tracking-tight">{t('title')}</h1>
-      <p className="text-sm text-[var(--color-muted-foreground)]">{t('subtitle')}</p>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <button
-        type="button"
-        disabled={pending || !workspaceId}
-        onClick={() => void onAccept()}
-        className="rounded-[var(--radius-lg)] bg-[var(--color-primary)] px-4 py-2 text-[var(--color-primary-foreground)] disabled:opacity-60"
-      >
+    <>
+      <div className="flex flex-col gap-2">
+        <h1 className="font-display text-display tracking-tight">{t('title')}</h1>
+        <p className="text-body text-muted-foreground">{t('subtitle')}</p>
+      </div>
+      {error ? <p className="text-body text-destructive">{error}</p> : null}
+      <Button type="button" disabled={pending || !workspaceId} onClick={() => void onAccept()}>
         {t('submit')}
-      </button>
-    </main>
+      </Button>
+    </>
   );
 }
