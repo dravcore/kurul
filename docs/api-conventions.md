@@ -58,9 +58,14 @@ DELETE /workspaces/:workspaceId/invitations/:invitationId
 GET    /workspaces/:workspaceId/boards
 POST   /workspaces/:workspaceId/boards
 GET    /workspaces/:workspaceId/boards/:boardId
+PATCH  /workspaces/:workspaceId/boards/:boardId
+DELETE /workspaces/:workspaceId/boards/:boardId
 
 GET    /workspaces/:workspaceId/boards/:boardId/columns
 POST   /workspaces/:workspaceId/boards/:boardId/columns
+PATCH  /workspaces/:workspaceId/columns/:columnId
+DELETE /workspaces/:workspaceId/columns/:columnId
+PATCH  /workspaces/:workspaceId/columns/:columnId/position
 
 GET    /workspaces/:workspaceId/boards/:boardId/tasks     # list, scoped to a board
 POST   /workspaces/:workspaceId/boards/:boardId/tasks     # create in a board
@@ -72,6 +77,9 @@ DELETE /workspaces/:workspaceId/tasks/:taskId
 GET    /workspaces/:workspaceId/tasks/:taskId/comments
 POST   /workspaces/:workspaceId/tasks/:taskId/comments
 ```
+
+Board and column role gates:
+[ADR 0009](decisions/0009-board-column-permissions.md).
 
 Invitations are workspace-scoped in the public API. Persistence is the
 `WorkspaceInvitation` table, mapped from Better Auth's organization plugin.
@@ -97,6 +105,7 @@ is accepted rather than edited. Model these as a **sub-resource with a verb-free
 possible, and as an explicit action segment where not:
 
 ```
+PATCH /workspaces/:workspaceId/columns/:columnId/position
 PATCH /workspaces/:workspaceId/tasks/:taskId/position
 POST  /workspaces/:workspaceId/invitations/:invitationId/accept
 POST  /workspaces/:workspaceId/tasks/:taskId/assignees

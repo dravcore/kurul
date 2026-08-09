@@ -191,16 +191,16 @@ olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
 
 **Hedef:** Kanban'ın gerçekten yaşadığı konteyner.
 **Referans:** [design.md](design.md) — buradan itibaren tüm board UI çalışmaları için bağlayıcı referans
-**Durum:** başlanmadı
+**Durum:** tamamlandı
 
-- [ ] Web: [design.md](design.md) §3–§4'e göre design token'ları (açık + koyu), tipografi ve
+- [x] Web: [design.md](design.md) §3–§4'e göre design token'ları (açık + koyu), tipografi ve
       app shell chrome'u — önerilen değerleri gerçek ekranlarda doğrula ve her değişikliği o
       dokümana geri kaydet
-- [ ] Board CRUD, workspace'e scope'lanmış
-- [ ] Column CRUD
-- [ ] Column yeniden sıralama (`position`)
-- [ ] Board oluşturmada varsayılan column'lar (Yapılacak / Devam Ediyor / Tamamlandı)
-- [ ] Web: board listesi, board sayfası kabuğu, column render'ı,
+- [x] Board CRUD, workspace'e scope'lanmış
+- [x] Column CRUD
+- [x] Column yeniden sıralama (`position`)
+- [x] Board oluşturmada varsayılan column'lar (Yapılacak / Devam Ediyor / Tamamlandı)
+- [x] Web: board listesi, board sayfası kabuğu, column render'ı,
       oluştur/yeniden adlandır/sil dialog'ları
 
 ---

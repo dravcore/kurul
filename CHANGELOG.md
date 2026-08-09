@@ -9,6 +9,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Phase 3 boards and columns: workspace-scoped board/column CRUD, default columns on
+  board create, Float fractional column reordering with on-demand rebalance helper,
+  [ADR 0009](docs/decisions/0009-board-column-permissions.md) role matrix, design tokens
+  (light/dark), Archivo/Fraunces/JetBrains typography, shadcn primitives, board list and
+  board page shell with column dialogs.
 - Phase 0 documentation and standards: governance files, process docs, architecture docs,
   ADRs 0001–0008, EN/TR mirrors, and repository branch protection / merge defaults.
 - Phase 1 monorepo skeleton: pnpm workspace (`apps/api`, `apps/web`,

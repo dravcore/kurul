@@ -135,7 +135,9 @@ edilen tek bir identity olur (§8).
 
 Open-source, self-hostable, komple Latin Extended-A: Turkish (`ı İ ğ ş ç ö ü`) doğru render
 edilmelidir çünkü ilk çeviri paketi budur — bu gereksinim, moda display font'larının çoğunu
-elemiştir. Üçü de `next/font/local` üzerinden self-hosted'dır.
+elemiştir. Üçü de build time'da `next/font/google` ile self-hosted'dır (Next font dosyalarını
+indirir ve gömer — binary font asset'lerini repoya commit etmeden `next/font/local` ile
+eşdeğer).
 
 | Rol       | Font                                                         | Nerede                                                                      | Neden bu                                                                                                                                                                                                                                          |
 | --------- | ------------------------------------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

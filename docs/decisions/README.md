@@ -26,6 +26,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0006](0006-fractional-indexing.md)       | Fractional Indexing for Task and Column Position                     | Accepted | 2026-08-08 |
 | [0007](0007-license-agpl.md)              | License: AGPL-3.0                                                    | Accepted | 2026-08-08 |
 | [0008](0008-git-flow-semver.md)           | Git Flow + Conventional Commits + SemVer                             | Accepted | 2026-08-08 |
+| [0009](0009-board-column-permissions.md)  | Board and Column Permissions                                         | Accepted | 2026-08-09 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).

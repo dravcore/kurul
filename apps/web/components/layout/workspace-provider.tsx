@@ -3,13 +3,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import type { WorkspaceDto } from '@kurultay/shared-types';
+import type { MemberRole, UserDto, WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 
 interface WorkspaceContextValue {
   workspaces: WorkspaceDto[];
   activeId: string;
+  activeRole: MemberRole | null;
   bootstrapped: boolean;
   loadError: string | null;
   sessionPending: boolean;
@@ -40,6 +41,7 @@ export function WorkspaceProvider({
   const { data: session, isPending } = authClient.useSession();
   const [workspaces, setWorkspaces] = useState<WorkspaceDto[]>([]);
   const [activeId, setActiveId] = useState<string>('');
+  const [activeRole, setActiveRole] = useState<MemberRole | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -74,6 +76,7 @@ export function WorkspaceProvider({
         setLoadError(null);
 
         if (list.length === 0) {
+          setActiveRole(null);
           setBootstrapped(true);
           if (pathname !== '/workspaces/new') {
             router.replace('/workspaces/new');
@@ -86,6 +89,22 @@ export function WorkspaceProvider({
         if (activeOrgId && activeOrgId !== session.session.activeOrganizationId) {
           await authClient.organization.setActive({ organizationId: activeOrgId });
         }
+
+        if (activeOrgId) {
+          const [me, members] = await Promise.all([
+            api.get<UserDto>('/me', { signal: controller.signal }),
+            api.get<WorkspaceMemberDto[]>(`/workspaces/${activeOrgId}/members`, {
+              signal: controller.signal,
+            }),
+          ]);
+          if (controller.signal.aborted) {
+            return;
+          }
+          setActiveRole(members.find((member) => member.userId === me.id)?.role ?? null);
+        } else {
+          setActiveRole(null);
+        }
+
         setBootstrapped(true);
       } catch {
         if (controller.signal.aborted) {
@@ -114,6 +133,15 @@ export function WorkspaceProvider({
     async (workspaceId: string): Promise<void> => {
       setActiveId(workspaceId);
       await authClient.organization.setActive({ organizationId: workspaceId });
+      try {
+        const [me, members] = await Promise.all([
+          api.get<UserDto>('/me'),
+          api.get<WorkspaceMemberDto[]>(`/workspaces/${workspaceId}/members`),
+        ]);
+        setActiveRole(members.find((member) => member.userId === me.id)?.role ?? null);
+      } catch {
+        setActiveRole(null);
+      }
       router.refresh();
     },
     [router],
@@ -129,6 +157,7 @@ export function WorkspaceProvider({
     (): WorkspaceContextValue => ({
       workspaces,
       activeId,
+      activeRole,
       bootstrapped,
       loadError,
       sessionPending: isPending,
@@ -140,6 +169,7 @@ export function WorkspaceProvider({
     [
       workspaces,
       activeId,
+      activeRole,
       bootstrapped,
       loadError,
       isPending,

@@ -47,6 +47,7 @@ export interface ColumnDto {
   name: string;
   position: number;
   color: string | null;
+  taskCount: number;
 }
 
 export interface TaskDto {

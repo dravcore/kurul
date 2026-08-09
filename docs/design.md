@@ -127,7 +127,9 @@ its bar in a chart are one identity resolved per theme (§8).
 
 Open-source, self-hostable, complete Latin Extended-A: Turkish (`ı İ ğ ş ç ö ü`) must render
 correctly since it is the first translation pack — a requirement that eliminated most of the
-fashionable display faces. All three are self-hosted via `next/font/local`.
+fashionable display faces. All three are self-hosted at build time via `next/font/google`
+(Next downloads and embeds the files — equivalent to `next/font/local` without committing
+binary font assets to the repo).
 
 | Role      | Face                                                       | Where                                                                     | Why this one                                                                                                                                                                                                                             |
 | --------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

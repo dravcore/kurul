@@ -59,9 +59,14 @@ POST   /workspaces/:workspaceId/invitations
 GET    /workspaces/:workspaceId/boards
 POST   /workspaces/:workspaceId/boards
 GET    /workspaces/:workspaceId/boards/:boardId
+PATCH  /workspaces/:workspaceId/boards/:boardId
+DELETE /workspaces/:workspaceId/boards/:boardId
 
 GET    /workspaces/:workspaceId/boards/:boardId/columns
 POST   /workspaces/:workspaceId/boards/:boardId/columns
+PATCH  /workspaces/:workspaceId/columns/:columnId
+DELETE /workspaces/:workspaceId/columns/:columnId
+PATCH  /workspaces/:workspaceId/columns/:columnId/position
 
 GET    /workspaces/:workspaceId/boards/:boardId/tasks     # listele, board'a scope'lu
 POST   /workspaces/:workspaceId/boards/:boardId/tasks     # bir board içinde oluştur
@@ -73,6 +78,9 @@ DELETE /workspaces/:workspaceId/tasks/:taskId
 GET    /workspaces/:workspaceId/tasks/:taskId/comments
 POST   /workspaces/:workspaceId/tasks/:taskId/comments
 ```
+
+Board ve column rol kapıları:
+[ADR 0009](decisions/0009-board-column-permissions.md).
 
 Davetler public API'de workspace-scoped'dır. Persistence Better Auth organization
 plugin'ine aittir (Faz 1'de Prisma `Invitation` modeli yok). Ürün isimleri
@@ -99,6 +107,7 @@ isimli bir alt-kaynak** olarak, mümkün olmadığında ise açık bir aksiyon s
 modelleyin:
 
 ```
+PATCH /workspaces/:workspaceId/columns/:columnId/position
 PATCH /workspaces/:workspaceId/tasks/:taskId/position
 POST  /workspaces/:workspaceId/invitations/:invitationId/accept
 POST  /workspaces/:workspaceId/tasks/:taskId/assignees
