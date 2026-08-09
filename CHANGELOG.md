@@ -9,6 +9,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Phase 9 realtime board sync
+  ([spec](docs/specs/2026-08-09-phase-9-realtime-design.md)): Socket.io gateway with Redis
+  adapter, session-cookie auth, `board:{id}` rooms, thin ID event contract (`actorId`),
+  emit-after-commit from task/column/comment mutations, web `useBoardSocket` with reconnect
+  resync and mid-drag cancel. Notification Socket push and presence remain out of MVP.
 - Deferred follow-ups: `/notifications` page (unread + type filters, cursor Load more,
   View all from the bell) and dashboard created-vs-completed throughput (14 UTC days;
   `task.moved` payloads include column names). See

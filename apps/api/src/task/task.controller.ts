@@ -131,9 +131,10 @@ export class TaskController {
   addLabel(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('taskId', ParseUuidV7Pipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AddTaskLabelDto,
   ): Promise<TaskDto> {
-    return this.taskService.addLabel(workspaceId, taskId, dto);
+    return this.taskService.addLabel(workspaceId, taskId, user.id, dto);
   }
 
   @Delete('tasks/:taskId/labels/:labelId')
@@ -143,7 +144,8 @@ export class TaskController {
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('taskId', ParseUuidV7Pipe) taskId: string,
     @Param('labelId', ParseUuidV7Pipe) labelId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<TaskDto> {
-    return this.taskService.removeLabel(workspaceId, taskId, labelId);
+    return this.taskService.removeLabel(workspaceId, taskId, user.id, labelId);
   }
 }

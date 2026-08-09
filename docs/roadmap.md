@@ -294,19 +294,21 @@ tenant-safely until this exists.
 ## Phase 9 — Realtime
 
 **Goal:** two people on the same board see each other's changes live.
-**Status:** not started
+**Reference:** [spec](specs/2026-08-09-phase-9-realtime-design.md);
+[ADR 0005](decisions/0005-realtime-socketio.md)
+**Status:** done
 
 **Realtime is deliberately last.** Socket events mirror the data model, so every event
 written before the model settles has to be rewritten with it. Building realtime on a stable
 schema is one pass of work; building it early is a tax on all eight phases before it.
 
-- [ ] Socket.io gateway with the Redis adapter (horizontal scaling)
-- [ ] Socket auth using the existing session; **rooms scoped per workspace/board**
-- [ ] Event contract in `@kurultay/shared-types` — single source for both sides
-- [ ] Events: task created/updated/moved/deleted, column changed, comment added
-- [ ] Web: subscribe on board mount, reconcile with local optimistic state, resync on
+- [x] Socket.io gateway with the Redis adapter (horizontal scaling)
+- [x] Socket auth using the existing session; **rooms scoped per workspace/board**
+- [x] Event contract in `@kurultay/shared-types` — single source for both sides
+- [x] Events: task created/updated/moved/deleted, column changed, comment added
+- [x] Web: subscribe on board mount, reconcile with local optimistic state, resync on
       reconnect
-- [ ] Conflict behavior when a remote move lands mid-drag
+- [x] Conflict behavior when a remote move lands mid-drag
 
 ---
 

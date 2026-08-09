@@ -20,6 +20,7 @@ import type {
   WorkspaceMemberDto,
 } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
+import { authClient } from '@/lib/auth';
 import { canMutateColumns, canMutateLabels, canMutateTasks } from '@/lib/board-permissions';
 import {
   countActiveFilters,
@@ -50,6 +51,7 @@ import { CreateColumnDialog } from './create-column-dialog';
 import { DeleteColumnDialog } from './delete-column-dialog';
 import { RenameColumnDialog } from './rename-column-dialog';
 import { DamgaMark } from '@/components/brand/damga-mark';
+import { useBoardSocket } from './use-board-socket';
 
 const DEFAULT_COLUMNS = ['To Do', 'In Progress', 'Done'] as const;
 
@@ -68,6 +70,8 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
   const t = useTranslations('app.board');
   const tTask = useTranslations('app.board.task');
   const tFilter = useTranslations('app.board.filter');
+  const { data: session } = authClient.useSession();
+  const currentUserId = session?.user?.id ?? null;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -87,8 +91,10 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
   const [deleteTask, setDeleteTask] = useState<TaskDto | null>(null);
   const [defaultsPending, setDefaultsPending] = useState(false);
   const [entranceDone, setEntranceDone] = useState(false);
+  const [metaRefreshKey, setMetaRefreshKey] = useState(0);
   const columnsRef = useRef<ColumnDto[]>([]);
   const tasksRef = useRef<TaskDto[]>([]);
+  const dndRef = useRef<{ cancelDrag: () => void; isDragging: boolean } | null>(null);
 
   const filterKey = searchParams.toString();
   const filters = useMemo(
@@ -254,6 +260,79 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
   const dnd = useBoardTaskDnd(tasks, canEditTasks, commitTaskMove, (title) =>
     tTask('movedAnnouncement', { title }),
   );
+  dndRef.current = { cancelDrag: dnd.cancelDrag, isDragging: dnd.isDragging };
+
+  const upsertRemoteTask = useCallback(
+    async (taskId: string): Promise<void> => {
+      if (!activeId) return;
+      try {
+        const remote = await api.get<TaskDto>(`/workspaces/${activeId}/tasks/${taskId}`);
+        setTasks((current) => {
+          const index = current.findIndex((task) => task.id === taskId);
+          if (index < 0) return [...current, remote];
+          const next = [...current];
+          next[index] = remote;
+          return next;
+        });
+      } catch {
+        // Task may have been deleted before fetch completed.
+      }
+    },
+    [activeId],
+  );
+
+  const refetchColumns = useCallback(async (): Promise<void> => {
+    if (!activeId) return;
+    try {
+      const nextColumns = await api.get<ColumnDto[]>(
+        `/workspaces/${activeId}/boards/${boardId}/columns`,
+      );
+      setColumns(nextColumns);
+    } catch {
+      // Keep last known columns.
+    }
+  }, [activeId, boardId]);
+
+  const { connected: socketConnected } = useBoardSocket(boardId, Boolean(activeId) && !loading, {
+    onResync: () => {
+      void reload();
+    },
+    onTaskCreated: (payload) => {
+      if (tasksRef.current.some((task) => task.id === payload.taskId)) return;
+      void upsertRemoteTask(payload.taskId);
+    },
+    onTaskUpdated: (payload) => {
+      void upsertRemoteTask(payload.taskId);
+    },
+    onTaskMoved: (payload) => {
+      const remoteActor = currentUserId !== null && payload.actorId === currentUserId;
+      if (!remoteActor && dndRef.current?.isDragging) {
+        dndRef.current.cancelDrag();
+        toast.message(t('realtime.dragCancelled'));
+      }
+      setTasks((current) =>
+        current.map((task) =>
+          task.id === payload.taskId
+            ? { ...task, columnId: payload.columnId, position: payload.position }
+            : task,
+        ),
+      );
+      if (!remoteActor && !tasksRef.current.some((task) => task.id === payload.taskId)) {
+        void upsertRemoteTask(payload.taskId);
+      }
+    },
+    onTaskDeleted: (payload) => {
+      setTasks((current) => current.filter((task) => task.id !== payload.taskId));
+    },
+    onColumnChanged: () => {
+      void refetchColumns();
+    },
+    onCommentAdded: (payload) => {
+      if (payload.taskId === selectedTaskId) {
+        setMetaRefreshKey((value) => value + 1);
+      }
+    },
+  });
 
   async function moveColumn(column: ColumnDto, direction: -1 | 1): Promise<void> {
     if (!activeId) return;
@@ -372,21 +451,28 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
           </Button>
         }
         actions={
-          canEditColumns ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="icon-sm" aria-label={t('boardMenu')}>
-                  <MoreHorizontal />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setCreateColumnOpen(true)}>
-                  <Plus />
-                  {t('column.createAction')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            {!socketConnected ? (
+              <span className="text-micro text-muted-foreground" aria-live="polite">
+                {t('realtime.reconnecting')}
+              </span>
+            ) : null}
+            {canEditColumns ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={t('boardMenu')}>
+                    <MoreHorizontal />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setCreateColumnOpen(true)}>
+                    <Plus />
+                    {t('column.createAction')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
         }
       />
 
@@ -492,6 +578,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             canMutate={canEditTasks}
             canManageLabels={canEditLabels}
             loadError={panelError}
+            metaRefreshKey={metaRefreshKey}
             onUpdated={(patch) =>
               setTasks((current) =>
                 current.some((item) => item.id === patch.id)

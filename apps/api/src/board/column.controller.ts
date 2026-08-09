@@ -11,10 +11,12 @@ import {
 } from '@nestjs/common';
 import { MemberRole } from '@kurultay/shared-types';
 import type { ColumnDto } from '@kurultay/shared-types';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { WorkspaceGuard } from '../common/guards/workspace.guard';
 import { ParseUuidV7Pipe } from '../common/pipes/parse-uuid-v7.pipe';
+import type { AuthenticatedUser } from '../common/types/request-context';
 import { ColumnService } from './column.service';
 import { CreateColumnDto } from './dto/create-column.dto';
 import { MoveColumnDto } from './dto/move-column.dto';
@@ -39,9 +41,10 @@ export class ColumnController {
   create(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('boardId', ParseUuidV7Pipe) boardId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateColumnDto,
   ): Promise<ColumnDto> {
-    return this.columnService.create(workspaceId, boardId, dto);
+    return this.columnService.create(workspaceId, boardId, user.id, dto);
   }
 
   @Patch('columns/:columnId')
@@ -50,9 +53,10 @@ export class ColumnController {
   update(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('columnId', ParseUuidV7Pipe) columnId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateColumnDto,
   ): Promise<ColumnDto> {
-    return this.columnService.update(workspaceId, columnId, dto);
+    return this.columnService.update(workspaceId, columnId, user.id, dto);
   }
 
   @Delete('columns/:columnId')
@@ -62,8 +66,9 @@ export class ColumnController {
   async remove(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('columnId', ParseUuidV7Pipe) columnId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
-    await this.columnService.remove(workspaceId, columnId);
+    await this.columnService.remove(workspaceId, columnId, user.id);
   }
 
   @Patch('columns/:columnId/position')
@@ -72,8 +77,9 @@ export class ColumnController {
   move(
     @Param('workspaceId', ParseUuidV7Pipe) workspaceId: string,
     @Param('columnId', ParseUuidV7Pipe) columnId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: MoveColumnDto,
   ): Promise<ColumnDto> {
-    return this.columnService.move(workspaceId, columnId, dto);
+    return this.columnService.move(workspaceId, columnId, user.id, dto);
   }
 }

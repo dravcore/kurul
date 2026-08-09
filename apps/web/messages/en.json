@@ -103,6 +103,11 @@
       "name": "Name",
       "description": "Description",
       "boardMenu": "Board actions",
+      "realtime": {
+        "reconnecting": "Reconnecting…",
+        "boardUpdated": "Board updated",
+        "dragCancelled": "Someone else moved this card"
+      },
       "errors": {
         "forbiddenDelete": "You need Admin access to delete boards. Ask a workspace owner.",
         "forbiddenColumns": "You need Admin access to change columns. Ask a workspace owner.",

@@ -37,7 +37,7 @@ re-litigated mid-implementation. Pick these up only when the MVP is shipped and 
 | Item                                          | Where                                                                                   |
 | --------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Email delivery of notifications               | Roadmap Phase 8 `[-]` / Beyond MVP                                                      |
-| Realtime push of new notifications / activity | Phase 9 Socket.io                                                                       |
+| Realtime push of new notifications / activity | Beyond MVP (Phase 9 shipped board sync only)                                            |
 | ~~Completion-over-time dashboard series~~     | **Shipped** — 14-day created vs completed (Done column) on dashboard summary / Recharts |
 
 ## How to use this file

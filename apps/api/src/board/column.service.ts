@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { ColumnDto } from '@kurultay/shared-types';
+import { SocketEvents, type ColumnDto } from '@kurultay/shared-types';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import type { CreateColumnDto } from './dto/create-column.dto';
 import type { MoveColumnDto } from './dto/move-column.dto';
 import type { UpdateColumnDto } from './dto/update-column.dto';
@@ -17,7 +18,10 @@ type ColumnRow = {
 
 @Injectable()
 export class ColumnService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeService,
+  ) {}
 
   private toDto(row: ColumnRow): ColumnDto {
     return {
@@ -30,6 +34,20 @@ export class ColumnService {
     };
   }
 
+  private emitChanged(
+    workspaceId: string,
+    actorId: string,
+    boardId: string,
+    columnId: string,
+  ): void {
+    this.realtime.emitToBoard(boardId, SocketEvents.COLUMN_CHANGED, {
+      workspaceId,
+      boardId,
+      actorId,
+      columnId,
+    });
+  }
+
   async list(workspaceId: string, boardId: string): Promise<ColumnDto[]> {
     await this.findBoard(workspaceId, boardId);
     const columns = await this.prisma.column.findMany({
@@ -40,7 +58,12 @@ export class ColumnService {
     return columns.map((column) => this.toDto(column));
   }
 
-  async create(workspaceId: string, boardId: string, dto: CreateColumnDto): Promise<ColumnDto> {
+  async create(
+    workspaceId: string,
+    boardId: string,
+    actorId: string,
+    dto: CreateColumnDto,
+  ): Promise<ColumnDto> {
     await this.findBoard(workspaceId, boardId);
     const columns = await this.prisma.column.findMany({
       where: { boardId },
@@ -54,8 +77,9 @@ export class ColumnService {
     const before = after ? columns[afterIndex + 1] : columns[0];
     const position = midpoint(after?.position ?? null, before?.position ?? null);
 
+    let created: ColumnDto;
     if (needsRebalance(after?.position ?? null, before?.position ?? null)) {
-      return this.prisma.$transaction(async (tx) => {
+      created = await this.prisma.$transaction(async (tx) => {
         const positions = rebalancePositions(columns.length + 1);
         const insertionIndex = after ? afterIndex + 1 : 0;
         await Promise.all(
@@ -66,7 +90,7 @@ export class ColumnService {
             }),
           ),
         );
-        const created = await tx.column.create({
+        const row = await tx.column.create({
           data: {
             boardId,
             name: dto.name,
@@ -75,18 +99,26 @@ export class ColumnService {
           },
           include: { _count: { select: { tasks: true } } },
         });
-        return this.toDto(created);
+        return this.toDto(row);
       });
+    } else {
+      const row = await this.prisma.column.create({
+        data: { boardId, name: dto.name, color: dto.color, position },
+        include: { _count: { select: { tasks: true } } },
+      });
+      created = this.toDto(row);
     }
 
-    const created = await this.prisma.column.create({
-      data: { boardId, name: dto.name, color: dto.color, position },
-      include: { _count: { select: { tasks: true } } },
-    });
-    return this.toDto(created);
+    this.emitChanged(workspaceId, actorId, created.boardId, created.id);
+    return created;
   }
 
-  async update(workspaceId: string, columnId: string, dto: UpdateColumnDto): Promise<ColumnDto> {
+  async update(
+    workspaceId: string,
+    columnId: string,
+    actorId: string,
+    dto: UpdateColumnDto,
+  ): Promise<ColumnDto> {
     await this.findColumn(workspaceId, columnId);
     const column = await this.prisma.column.update({
       where: { id: columnId },
@@ -96,16 +128,24 @@ export class ColumnService {
       },
       include: { _count: { select: { tasks: true } } },
     });
-    return this.toDto(column);
+    const dtoOut = this.toDto(column);
+    this.emitChanged(workspaceId, actorId, dtoOut.boardId, dtoOut.id);
+    return dtoOut;
   }
 
-  async remove(workspaceId: string, columnId: string): Promise<void> {
-    await this.findColumn(workspaceId, columnId);
+  async remove(workspaceId: string, columnId: string, actorId: string): Promise<void> {
+    const column = await this.findColumn(workspaceId, columnId);
     await this.prisma.column.delete({ where: { id: columnId } });
+    this.emitChanged(workspaceId, actorId, column.boardId, column.id);
   }
 
-  async move(workspaceId: string, columnId: string, dto: MoveColumnDto): Promise<ColumnDto> {
-    return this.prisma.$transaction(async (tx) => {
+  async move(
+    workspaceId: string,
+    columnId: string,
+    actorId: string,
+    dto: MoveColumnDto,
+  ): Promise<ColumnDto> {
+    const moved = await this.prisma.$transaction(async (tx) => {
       const column = await tx.column.findFirst({
         where: { id: columnId, board: { workspaceId } },
       });
@@ -161,6 +201,9 @@ export class ColumnService {
       });
       return this.toDto(updated);
     });
+
+    this.emitChanged(workspaceId, actorId, moved.boardId, moved.id);
+    return moved;
   }
 
   private async findBoard(workspaceId: string, boardId: string) {

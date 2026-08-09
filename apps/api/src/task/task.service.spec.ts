@@ -92,15 +92,18 @@ describe('TaskService', () => {
     prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
       callback(prisma),
     );
+    const realtime = { emitToBoard: jest.fn() };
     return {
       service: new TaskService(
         prisma as unknown as PrismaService,
         activityService as unknown as ActivityService,
         notificationService as unknown as NotificationService,
+        realtime as unknown as import('../realtime/realtime.service').RealtimeService,
       ),
       prisma,
       activityService,
       notificationService,
+      realtime,
     };
   }
 
@@ -504,7 +507,9 @@ describe('TaskService', () => {
     prisma.label.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.addLabel(WORKSPACE_ID, 't1', { labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80' }),
+      service.addLabel(WORKSPACE_ID, 't1', USER_ID, {
+        labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80',
+      }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(prisma.taskLabel.create).not.toHaveBeenCalled();
   });
@@ -516,7 +521,9 @@ describe('TaskService', () => {
     prisma.taskLabel.create.mockRejectedValue({ code: 'P2002' });
 
     await expect(
-      service.addLabel(WORKSPACE_ID, 't1', { labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80' }),
+      service.addLabel(WORKSPACE_ID, 't1', USER_ID, {
+        labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80',
+      }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -526,7 +533,7 @@ describe('TaskService', () => {
     prisma.taskLabel.deleteMany.mockResolvedValue({ count: 0 });
 
     await expect(
-      service.removeLabel(WORKSPACE_ID, 't1', '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'),
+      service.removeLabel(WORKSPACE_ID, 't1', USER_ID, '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.taskLabel.deleteMany).toHaveBeenCalledWith({
       where: { taskId: 't1', labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80' },

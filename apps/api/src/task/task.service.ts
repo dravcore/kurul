@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ActivityType } from '@kurultay/shared-types';
+import { ActivityType, SocketEvents } from '@kurultay/shared-types';
 import type {
   CursorPage,
   LabelColorSlot,
@@ -18,6 +18,7 @@ import { ActivityService } from '../activity/activity.service';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import type { AddAssigneeDto } from './dto/add-assignee.dto';
 import type { AddTaskLabelDto } from './dto/add-task-label.dto';
 import type { CreateTaskDto } from './dto/create-task.dto';
@@ -63,6 +64,7 @@ export class TaskService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly notificationService: NotificationService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   private toDto(row: TaskWithRelations): TaskDto {
@@ -212,7 +214,7 @@ export class TaskService {
     const beforePos = after?.position ?? null;
     const afterPos = before?.position ?? null;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       let created: Omit<TaskWithRelations, 'assignees' | 'labels'>;
 
       if (needsRebalance(beforePos, afterPos)) {
@@ -263,6 +265,14 @@ export class TaskService {
 
       return this.toDto(this.emptyRelations(created));
     });
+
+    this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_CREATED, {
+      workspaceId,
+      boardId: result.boardId,
+      actorId: userId,
+      taskId: result.id,
+    });
+    return result;
   }
 
   async get(workspaceId: string, taskId: string): Promise<TaskDto> {
@@ -307,7 +317,7 @@ export class TaskService {
       changes.estimatedMinutes = dto.estimatedMinutes;
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.task.update({
         where: { id: taskId },
         data: {
@@ -335,6 +345,16 @@ export class TaskService {
 
       return this.toDto(updated);
     });
+
+    if (Object.keys(changes).length > 0) {
+      this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_UPDATED, {
+        workspaceId,
+        boardId: result.boardId,
+        actorId: userId,
+        taskId: result.id,
+      });
+    }
+    return result;
   }
 
   async remove(workspaceId: string, taskId: string, userId: string): Promise<void> {
@@ -355,6 +375,12 @@ export class TaskService {
       });
       await tx.task.delete({ where: { id: taskId } });
     });
+    this.realtime.emitToBoard(task.boardId, SocketEvents.TASK_DELETED, {
+      workspaceId,
+      boardId: task.boardId,
+      actorId: userId,
+      taskId: task.id,
+    });
   }
 
   async move(
@@ -363,7 +389,7 @@ export class TaskService {
     userId: string,
     dto: MoveTaskDto,
   ): Promise<TaskDto> {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const task = await tx.task.findFirst({
         where: { id: taskId, board: { workspaceId } },
         include: taskInclude,
@@ -475,6 +501,16 @@ export class TaskService {
 
       return result;
     });
+
+    this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_MOVED, {
+      workspaceId,
+      boardId: result.boardId,
+      actorId: userId,
+      taskId: result.id,
+      columnId: result.columnId,
+      position: result.position,
+    });
+    return result;
   }
 
   async addAssignee(
@@ -528,7 +564,7 @@ export class TaskService {
       throw error;
     }
 
-    return this.toDto(await this.findTask(workspaceId, taskId));
+    return this.emitTaskUpdated(workspaceId, actorId, await this.findTask(workspaceId, taskId));
   }
 
   async removeAssignee(
@@ -555,10 +591,15 @@ export class TaskService {
         },
       });
     });
-    return this.toDto(await this.findTask(workspaceId, taskId));
+    return this.emitTaskUpdated(workspaceId, actorId, await this.findTask(workspaceId, taskId));
   }
 
-  async addLabel(workspaceId: string, taskId: string, dto: AddTaskLabelDto): Promise<TaskDto> {
+  async addLabel(
+    workspaceId: string,
+    taskId: string,
+    actorId: string,
+    dto: AddTaskLabelDto,
+  ): Promise<TaskDto> {
     const task = await this.findTask(workspaceId, taskId);
     const label = await this.prisma.label.findFirst({
       where: { id: dto.labelId, boardId: task.boardId },
@@ -578,16 +619,32 @@ export class TaskService {
       throw error;
     }
 
-    return this.toDto(await this.findTask(workspaceId, taskId));
+    return this.emitTaskUpdated(workspaceId, actorId, await this.findTask(workspaceId, taskId));
   }
 
-  async removeLabel(workspaceId: string, taskId: string, labelId: string): Promise<TaskDto> {
+  async removeLabel(
+    workspaceId: string,
+    taskId: string,
+    actorId: string,
+    labelId: string,
+  ): Promise<TaskDto> {
     await this.findTask(workspaceId, taskId);
     const result = await this.prisma.taskLabel.deleteMany({
       where: { taskId, labelId },
     });
     if (result.count === 0) throw new NotFoundException('Task label not found');
-    return this.toDto(await this.findTask(workspaceId, taskId));
+    return this.emitTaskUpdated(workspaceId, actorId, await this.findTask(workspaceId, taskId));
+  }
+
+  private emitTaskUpdated(workspaceId: string, actorId: string, task: TaskWithRelations): TaskDto {
+    const dto = this.toDto(task);
+    this.realtime.emitToBoard(dto.boardId, SocketEvents.TASK_UPDATED, {
+      workspaceId,
+      boardId: dto.boardId,
+      actorId,
+      taskId: dto.id,
+    });
+    return dto;
   }
 
   private isUniqueViolation(error: unknown): boolean {
