@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { LabelColorSlot, LabelDto } from '@kurultay/shared-types';
+import { assertBoard } from '../common/board-access';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateLabelDto } from './dto/create-label.dto';
 import type { UpdateLabelDto } from './dto/update-label.dto';
@@ -25,7 +26,7 @@ export class LabelService {
   }
 
   async list(workspaceId: string, boardId: string): Promise<LabelDto[]> {
-    await this.findBoard(workspaceId, boardId);
+    await assertBoard(this.prisma, workspaceId, boardId);
     const labels = await this.prisma.label.findMany({
       where: { boardId },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
@@ -34,7 +35,7 @@ export class LabelService {
   }
 
   async create(workspaceId: string, boardId: string, dto: CreateLabelDto): Promise<LabelDto> {
-    await this.findBoard(workspaceId, boardId);
+    await assertBoard(this.prisma, workspaceId, boardId);
     const created = await this.prisma.label.create({
       data: {
         boardId,
@@ -60,12 +61,6 @@ export class LabelService {
   async remove(workspaceId: string, labelId: string): Promise<void> {
     await this.findLabel(workspaceId, labelId);
     await this.prisma.label.delete({ where: { id: labelId } });
-  }
-
-  private async findBoard(workspaceId: string, boardId: string) {
-    const board = await this.prisma.board.findFirst({ where: { id: boardId, workspaceId } });
-    if (!board) throw new NotFoundException('Board not found');
-    return board;
   }
 
   private async findLabel(workspaceId: string, labelId: string) {

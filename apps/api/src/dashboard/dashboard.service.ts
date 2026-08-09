@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ActivityType, Priority } from '@kurultay/shared-types';
 import type {
   DashboardCountByAssignee,
@@ -7,6 +7,7 @@ import type {
   DashboardSummaryDto,
 } from '@kurultay/shared-types';
 import type { Prisma } from '../generated/prisma';
+import { assertBoard } from '../common/board-access';
 import { PrismaService } from '../prisma/prisma.service';
 import type { DashboardQueryDto } from './dto/dashboard-query.dto';
 import {
@@ -26,7 +27,7 @@ export class DashboardService {
 
   async summary(workspaceId: string, query: DashboardQueryDto): Promise<DashboardSummaryDto> {
     if (query.boardId) {
-      await this.findBoard(workspaceId, query.boardId);
+      await assertBoard(this.prisma, workspaceId, query.boardId);
     }
 
     const taskWhere: Prisma.TaskWhereInput = {
@@ -238,12 +239,6 @@ export class DashboardService {
       top.push({ userId: null, name: 'Other', count: otherCount });
     }
     return top;
-  }
-
-  private async findBoard(workspaceId: string, boardId: string) {
-    const board = await this.prisma.board.findFirst({ where: { id: boardId, workspaceId } });
-    if (!board) throw new NotFoundException('Board not found');
-    return board;
   }
 }
 

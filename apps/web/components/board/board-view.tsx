@@ -104,9 +104,9 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
   const filtersActive = hasActiveFilters(filters);
   const loadedBoardIdRef = useRef<string | null>(null);
 
-  const canEditColumns = canMutateColumns(activeRole);
-  const canEditTasks = canMutateTasks(activeRole);
-  const canEditLabels = canMutateLabels(activeRole);
+  const canMutateColumnsFlag = canMutateColumns(activeRole);
+  const canMutateTasksFlag = canMutateTasks(activeRole);
+  const canMutateLabelsFlag = canMutateLabels(activeRole);
 
   const selectedTask = useMemo(
     () => (selectedTaskId ? (tasks.find((task) => task.id === selectedTaskId) ?? null) : null),
@@ -280,7 +280,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     }
   }
 
-  const dnd = useBoardTaskDnd(tasks, canEditTasks, commitTaskMove, (title) =>
+  const dnd = useBoardTaskDnd(tasks, canMutateTasksFlag, commitTaskMove, (title) =>
     tTask('movedAnnouncement', { title }),
   );
   dndRef.current = { cancelDrag: dnd.cancelDrag, isDragging: dnd.isDragging };
@@ -497,7 +497,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
                 {t('realtime.reconnecting')}
               </span>
             ) : null}
-            {canEditColumns ? (
+            {canMutateColumnsFlag ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button type="button" variant="ghost" size="icon-sm" aria-label={t('boardMenu')}>
@@ -527,7 +527,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
               <DamgaMark />
               <h2 className="font-display text-title-lg font-semibold">{t('column.emptyTitle')}</h2>
               <p className="max-w-md text-body text-muted-foreground">{t('column.emptyBody')}</p>
-              {canEditColumns ? (
+              {canMutateColumnsFlag ? (
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   <Button type="button" onClick={() => setCreateColumnOpen(true)}>
                     {t('column.createAction')}
@@ -571,8 +571,8 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
                     tasks={tasksByColumn.get(column.id) ?? []}
                     boardId={boardId}
                     selectedTaskId={selectedTaskId}
-                    canMutateColumns={canEditColumns}
-                    canMutateTasks={canEditTasks}
+                    canMutateColumns={canMutateColumnsFlag}
+                    canMutateTasks={canMutateTasksFlag}
                     canMoveLeft={index > 0}
                     canMoveRight={index < columns.length - 1}
                     onRename={() => setRenameColumn(column)}
@@ -588,7 +588,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
                     }
                   />
                 ))}
-                {canEditColumns ? (
+                {canMutateColumnsFlag ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -615,8 +615,8 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             workspaceId={activeId}
             boardId={boardId}
             task={selectedTask}
-            canMutate={canEditTasks}
-            canManageLabels={canEditLabels}
+            canMutate={canMutateTasksFlag}
+            canManageLabels={canMutateLabelsFlag}
             members={members}
             labels={labels}
             loadError={panelError}

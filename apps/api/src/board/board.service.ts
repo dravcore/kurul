@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { BoardDto } from '@kurultay/shared-types';
+import { assertBoard } from '../common/board-access';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateBoardDto } from './dto/create-board.dto';
 import type { UpdateBoardDto } from './dto/update-board.dto';
@@ -53,11 +54,11 @@ export class BoardService {
   }
 
   async get(workspaceId: string, boardId: string): Promise<BoardDto> {
-    return this.toDto(await this.findBoard(workspaceId, boardId));
+    return this.toDto(await assertBoard(this.prisma, workspaceId, boardId));
   }
 
   async update(workspaceId: string, boardId: string, dto: UpdateBoardDto): Promise<BoardDto> {
-    await this.findBoard(workspaceId, boardId);
+    await assertBoard(this.prisma, workspaceId, boardId);
     const board = await this.prisma.board.update({
       where: { id: boardId },
       data: {
@@ -69,15 +70,7 @@ export class BoardService {
   }
 
   async remove(workspaceId: string, boardId: string): Promise<void> {
-    await this.findBoard(workspaceId, boardId);
+    await assertBoard(this.prisma, workspaceId, boardId);
     await this.prisma.board.delete({ where: { id: boardId } });
-  }
-
-  private async findBoard(workspaceId: string, boardId: string) {
-    const board = await this.prisma.board.findFirst({
-      where: { id: boardId, workspaceId },
-    });
-    if (!board) throw new NotFoundException('Board not found');
-    return board;
   }
 }
