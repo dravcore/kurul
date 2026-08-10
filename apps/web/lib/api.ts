@@ -22,6 +22,46 @@ export class ApiError extends Error {
   }
 }
 
+/** The HTTP status behind a failure, or `null` when it never reached one (network, abort). */
+export function apiStatus(caught: unknown): number | null {
+  return caught instanceof ApiError ? caught.statusCode : null;
+}
+
+/**
+ * The slice of a next-intl translator this module needs — narrowed to a plain function so
+ * the mapping stays testable without standing up an intl provider.
+ */
+export type ApiMessageTranslator = (key: string) => string;
+
+/** Translation keys explaining one failed request, keyed by the status that produced it. */
+export interface ApiMessageKeys {
+  /** Used when no status matches — including a network error, which carries no status. */
+  fallback: string;
+  /** HTTP status → translation key, e.g. `{ 403: 'forbidden' }`. */
+  byStatus?: Readonly<Partial<Record<number, string>>>;
+}
+
+/**
+ * Turns a caught request failure into the message shown to the user.
+ *
+ * Every screen was re-deriving the same thing from `caught instanceof ApiError &&
+ * caught.statusCode === 403`, which is how a permission failure ends up reported as a
+ * generic "could not save" on the one screen that forgot the check. Keys are resolved
+ * relative to whatever namespace `t` was created for.
+ *
+ * Callers that need more than wording out of the status — closing a panel on 404, offering
+ * a retry only for unexplained failures — should branch on {@link apiStatus} instead.
+ */
+export function resolveApiMessage(
+  caught: unknown,
+  t: ApiMessageTranslator,
+  keys: ApiMessageKeys,
+): string {
+  const status = apiStatus(caught);
+  const key = (status === null ? undefined : keys.byStatus?.[status]) ?? keys.fallback;
+  return t(key);
+}
+
 async function parseError(response: Response): Promise<ApiError> {
   let body: ApiErrorBody;
   try {

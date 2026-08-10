@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Bell } from 'lucide-react';
 import type {
   CursorPage,
@@ -13,6 +13,7 @@ import { api } from '@/lib/api';
 import { notificationTitle } from '@/lib/notification-copy';
 import { markAllNotificationsRead, openNotificationTarget } from '@/lib/notification-actions';
 import { formatRelativeTime } from '@/lib/relative-time';
+import { useApiResource } from '@/lib/use-api-resource';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,14 +33,37 @@ import { toast } from 'sonner';
 // and at a much longer interval since it is the sole source of truth for the badge.
 const POLL_MS = 120_000;
 
+/** Stable identity so the closed dropdown does not reset its rows on every render. */
+const EMPTY_ITEMS: NotificationDto[] = [];
+
 export function NotificationBell(): React.ReactElement {
   const t = useTranslations('app.notifications');
+  const locale = useLocale();
   const router = useRouter();
   const { activeId: workspaceId, bootstrapped } = useWorkspaceContext();
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [items, setItems] = useState<NotificationDto[]>([]);
-  const [loadingList, setLoadingList] = useState(false);
+
+  // Only fetched while the dropdown is open — a closed bell needs the badge, not the rows.
+  const fetchItems = useMemo(
+    () =>
+      open && workspaceId
+        ? (signal: AbortSignal) =>
+            api
+              .get<CursorPage<NotificationDto>>(
+                `/workspaces/${workspaceId}/notifications?limit=20`,
+                { signal },
+              )
+              .then((page) => page.items)
+        : null,
+    [open, workspaceId],
+  );
+  const {
+    data: items,
+    loading: loadingList,
+    error: listError,
+    setData: setItems,
+  } = useApiResource<NotificationDto[]>(fetchItems, EMPTY_ITEMS, t('loadError'));
 
   const refreshUnread = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -99,32 +123,6 @@ export function NotificationBell(): React.ReactElement {
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [bootstrapped, workspaceId, refreshUnread]);
-
-  useEffect(() => {
-    if (!open || !workspaceId) return;
-    const controller = new AbortController();
-    setLoadingList(true);
-    void (async () => {
-      try {
-        const page = await api.get<CursorPage<NotificationDto>>(
-          `/workspaces/${workspaceId}/notifications?limit=20`,
-          { signal: controller.signal },
-        );
-        if (!controller.signal.aborted) {
-          setItems(page.items);
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          toast.error(t('loadError'));
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoadingList(false);
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, [open, workspaceId, t]);
 
   async function markAllRead(): Promise<void> {
     if (!workspaceId) return;
@@ -203,6 +201,10 @@ export function NotificationBell(): React.ReactElement {
         <div className="max-h-80 overflow-y-auto py-1">
           {loadingList ? (
             <p className="px-3 py-4 text-small text-muted-foreground">{t('loading')}</p>
+          ) : listError ? (
+            // Reported here rather than as a toast: the load clears the rows, and an empty
+            // "You're caught up" is the one thing this must not say after a failure.
+            <p className="px-3 py-4 text-small text-destructive">{listError}</p>
           ) : items.length === 0 ? (
             <p className="px-3 py-6 text-center text-small text-muted-foreground">{t('empty')}</p>
           ) : (
@@ -224,7 +226,7 @@ export function NotificationBell(): React.ReactElement {
                   dateTime={item.createdAt}
                   title={new Date(item.createdAt).toISOString()}
                 >
-                  {formatRelativeTime(item.createdAt)}
+                  {formatRelativeTime(item.createdAt, locale)}
                 </time>
               </DropdownMenuItem>
             ))

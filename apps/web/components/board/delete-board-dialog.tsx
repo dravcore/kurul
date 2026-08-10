@@ -1,18 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BoardDto } from '@kurultay/shared-types';
-import { ApiError, api } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { api, resolveApiMessage } from '@/lib/api';
+import { ConfirmDialog } from '@/components/common/confirm-dialog';
 
 interface DeleteBoardDialogProps {
   open: boolean;
@@ -30,50 +21,29 @@ export function DeleteBoardDialog({
   onDeleted,
 }: DeleteBoardDialogProps): React.ReactElement {
   const t = useTranslations('app.board');
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function onConfirm(): Promise<void> {
     if (!board) return;
-    setPending(true);
-    setError(null);
-    try {
-      await api.delete(`/workspaces/${workspaceId}/boards/${board.id}`);
-      onDeleted(board.id);
-      onOpenChange(false);
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.statusCode === 403) {
-        setError(t('errors.forbiddenDelete'));
-      } else {
-        setError(t('deleteError'));
-      }
-    } finally {
-      setPending(false);
-    }
+    await api.delete(`/workspaces/${workspaceId}/boards/${board.id}`);
+    onDeleted(board.id);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t('deleteTitle')}</DialogTitle>
-          <DialogDescription>{t('deleteBody', { name: board?.name ?? '' })}</DialogDescription>
-        </DialogHeader>
-        {error ? <p className="text-body text-destructive">{error}</p> : null}
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            {t('cancel')}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={pending}
-            onClick={() => void onConfirm()}
-          >
-            {t('deleteAction')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t('deleteTitle')}
+      description={t('deleteBody', { name: board?.name ?? '' })}
+      cancelLabel={t('cancel')}
+      confirmLabel={t('deleteAction')}
+      destructive
+      onConfirm={onConfirm}
+      resolveError={(caught) =>
+        resolveApiMessage(caught, t, {
+          fallback: 'deleteError',
+          byStatus: { 403: 'errors.forbiddenDelete' },
+        })
+      }
+    />
   );
 }

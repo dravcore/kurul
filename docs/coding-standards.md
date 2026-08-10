@@ -213,12 +213,13 @@ components/
 └── layout/       # sidebar, workspace switcher
 ```
 
-| Rule                          |                                                                                                                                        |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `components/ui/`              | shadcn/ui output only. Do not put project components here, and do not hand-modify primitives beyond what the shadcn workflow produces. |
-| Domain folders                | Own their components; a board component belongs in `board/`, however small                                                             |
-| Shared cross-domain component | Only when used by 3+ domains; otherwise keep it local                                                                                  |
-| Page files                    | `page.tsx` composes components; it does not hold layout logic or markup of any size                                                    |
+| Rule                          |                                                                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `components/ui/`              | shadcn/ui output only. Do not put project components here, and do not hand-modify primitives beyond what the shadcn workflow produces.   |
+| Domain folders                | Own their components; a board component belongs in `board/`, however small                                                               |
+| `components/common/`          | Domain-free composites shared across domains — no DTOs, no API calls. `ConfirmDialog` / `FormDialog` live here, not in `ui/`             |
+| Shared cross-domain component | Prefer keeping it local. Promote to `common/` when 3+ domains use it, or when 2 domains would otherwise duplicate a non-trivial skeleton |
+| Page files                    | `page.tsx` composes components; it does not hold layout logic or markup of any size                                                      |
 
 ### Styling
 

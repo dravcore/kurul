@@ -20,6 +20,15 @@ export interface ApiResource<T> {
   setData: Dispatch<SetStateAction<T>>;
 }
 
+export interface UseApiResourceOptions {
+  /**
+   * Called on a failed load, in the same pass that sets `error` — for screens that report a
+   * failure as a toast rather than in place. Never called for an aborted request, and it
+   * does not have to be referentially stable.
+   */
+  onError?: (caught: unknown) => void;
+}
+
 /**
  * Loads a read-only API resource into component state.
  *
@@ -36,6 +45,7 @@ export function useApiResource<T>(
   fetcher: ((signal: AbortSignal) => Promise<T>) | null,
   initialData: T,
   errorMessage: string,
+  options?: UseApiResourceOptions,
 ): ApiResource<T> {
   const [data, setData] = useState<T>(initialData);
   const [loading, setLoading] = useState(true);
@@ -45,6 +55,13 @@ export function useApiResource<T>(
   // Captured once: callers pass a fresh `[]` every render, which would otherwise make the
   // reset-on-failure path a new dependency on every commit.
   const initialDataRef = useRef(initialData);
+
+  // Held in a ref rather than a dependency: an inline `onError` closure is a new function on
+  // every render, and depending on it would refetch the whole resource on every commit.
+  const onErrorRef = useRef(options?.onError);
+  useEffect(() => {
+    onErrorRef.current = options?.onError;
+  });
 
   useEffect(() => {
     if (!fetcher) return;
@@ -57,11 +74,12 @@ export function useApiResource<T>(
       try {
         const next = await fetcher(controller.signal);
         if (!controller.signal.aborted) setData(next);
-      } catch {
+      } catch (caught) {
         if (!controller.signal.aborted) {
           // Stale rows next to an error message read as current data — drop them.
           setData(initialDataRef.current);
           setError(errorMessage);
+          onErrorRef.current?.(caught);
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);

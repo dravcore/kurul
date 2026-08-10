@@ -1,18 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { ColumnDto } from '@kurultay/shared-types';
-import { ApiError, api } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { api, resolveApiMessage } from '@/lib/api';
+import { ConfirmDialog } from '@/components/common/confirm-dialog';
 
 interface DeleteColumnDialogProps {
   open: boolean;
@@ -30,59 +21,37 @@ export function DeleteColumnDialog({
   onDeleted,
 }: DeleteColumnDialogProps): React.ReactElement {
   const t = useTranslations('app.board.column');
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const taskCount = column?.taskCount ?? 0;
   const blocked = taskCount > 0;
 
   async function onConfirm(): Promise<void> {
     if (!column || blocked) return;
-    setPending(true);
-    setError(null);
-    try {
-      await api.delete(`/workspaces/${workspaceId}/columns/${column.id}`);
-      onDeleted(column.id);
-      onOpenChange(false);
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.statusCode === 403) {
-        setError(t('forbidden'));
-      } else if (caught instanceof ApiError && caught.statusCode === 409) {
-        setError(t('deleteBlocked'));
-      } else {
-        setError(t('deleteError'));
-      }
-    } finally {
-      setPending(false);
-    }
+    await api.delete(`/workspaces/${workspaceId}/columns/${column.id}`);
+    onDeleted(column.id);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t('deleteTitle')}</DialogTitle>
-          <DialogDescription>
-            {blocked
-              ? t('deleteBodyWithTasks', { name: column?.name ?? '', count: taskCount })
-              : t('deleteBody', { name: column?.name ?? '' })}
-          </DialogDescription>
-        </DialogHeader>
-        {error ? <p className="text-body text-destructive">{error}</p> : null}
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            {t('cancel')}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={pending || blocked}
-            onClick={() => void onConfirm()}
-          >
-            {t('deleteAction')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t('deleteTitle')}
+      description={
+        blocked
+          ? t('deleteBodyWithTasks', { name: column?.name ?? '', count: taskCount })
+          : t('deleteBody', { name: column?.name ?? '' })
+      }
+      cancelLabel={t('cancel')}
+      confirmLabel={t('deleteAction')}
+      destructive
+      confirmDisabled={blocked}
+      onConfirm={onConfirm}
+      resolveError={(caught) =>
+        resolveApiMessage(caught, t, {
+          fallback: 'deleteError',
+          byStatus: { 403: 'forbidden', 409: 'deleteBlocked' },
+        })
+      }
+    />
   );
 }

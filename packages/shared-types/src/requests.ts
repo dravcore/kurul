@@ -8,8 +8,13 @@
  *
  * An optional property means "omit to leave unchanged / fall back to the server default".
  * An explicit `null` means "clear this value" and is only allowed where the DTO accepts it.
+ *
+ * Only the endpoints the web client actually calls are mirrored here. A shape nothing imports
+ * buys no type safety and silently drifts from the DTO it claims to mirror, so the entry is
+ * added with the first caller — `PATCH /labels/:labelId`, `PATCH /workspaces/:workspaceId` and
+ * `POST /workspaces/:workspaceId/invitations` exist on the server but have no UI yet.
  */
-import type { LabelColorSlot, MemberRole, Priority } from './enums.js';
+import type { LabelColorSlot, Priority } from './enums.js';
 
 /** `POST /workspaces/:workspaceId/boards/:boardId/tasks` */
 export interface CreateTaskRequest {
@@ -99,26 +104,8 @@ export interface CreateLabelRequest {
   color: LabelColorSlot;
 }
 
-/** `PATCH /workspaces/:workspaceId/labels/:labelId` */
-export interface UpdateLabelRequest {
-  name?: string;
-  color?: LabelColorSlot;
-}
-
 /** `POST /workspaces` */
 export interface CreateWorkspaceRequest {
   name: string;
   slug: string;
-}
-
-/** `PATCH /workspaces/:workspaceId` */
-export interface UpdateWorkspaceRequest {
-  name?: string;
-  slug?: string;
-}
-
-/** `POST /workspaces/:workspaceId/invitations` — `OWNER` is rejected by the server. */
-export interface CreateInvitationRequest {
-  email: string;
-  role: MemberRole;
 }

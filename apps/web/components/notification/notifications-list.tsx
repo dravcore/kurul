@@ -1,13 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { NotificationType, type CursorPage, type NotificationDto } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
 import { notificationTitle } from '@/lib/notification-copy';
 import { markAllNotificationsRead, openNotificationTarget } from '@/lib/notification-actions';
 import { formatRelativeTime } from '@/lib/relative-time';
+import { useApiResource } from '@/lib/use-api-resource';
 import { cn } from '@/lib/utils';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { Button } from '@/components/ui/button';
@@ -16,16 +17,16 @@ import { toast } from 'sonner';
 
 const PAGE_LIMIT = 50;
 
+const EMPTY_PAGE: CursorPage<NotificationDto> = { items: [], nextCursor: null };
+
 type TypeFilter = '' | (typeof NotificationType)[keyof typeof NotificationType];
 
 export function NotificationsList(): React.ReactElement {
   const t = useTranslations('app.notifications');
+  const locale = useLocale();
   const router = useRouter();
   const { activeId: workspaceId } = useWorkspaceContext();
 
-  const [items, setItems] = useState<NotificationDto[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('');
@@ -42,42 +43,46 @@ export function NotificationsList(): React.ReactElement {
     [typeFilter, unreadOnly],
   );
 
-  useEffect(() => {
-    if (!workspaceId) return;
-    const controller = new AbortController();
-    setLoading(true);
-    void (async () => {
-      try {
-        const page = await api.get<CursorPage<NotificationDto>>(
-          `/workspaces/${workspaceId}/notifications?${buildQuery()}`,
-          { signal: controller.signal },
-        );
-        if (!controller.signal.aborted) {
-          setItems(page.items);
-          setNextCursor(page.nextCursor);
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          toast.error(t('loadError'));
-          setItems([]);
-          setNextCursor(null);
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    })();
-    return () => controller.abort();
-  }, [workspaceId, buildQuery, t]);
+  // The whole page is the resource, not just its rows: `nextCursor` has to move with the
+  // items it was issued for, or "load more" pages off a filter the user already changed.
+  const fetchPage = useMemo(
+    () =>
+      workspaceId
+        ? (signal: AbortSignal) =>
+            api.get<CursorPage<NotificationDto>>(
+              `/workspaces/${workspaceId}/notifications?${buildQuery()}`,
+              { signal },
+            )
+        : null,
+    [workspaceId, buildQuery],
+  );
+  const {
+    data: page,
+    loading,
+    setData: setPage,
+  } = useApiResource<CursorPage<NotificationDto>>(fetchPage, EMPTY_PAGE, t('loadError'), {
+    onError: () => toast.error(t('loadError')),
+  });
+  const { items, nextCursor } = page;
+
+  const setItems = useCallback(
+    (update: (current: NotificationDto[]) => NotificationDto[]): void => {
+      setPage((current) => ({ ...current, items: update(current.items) }));
+    },
+    [setPage],
+  );
 
   async function loadMore(): Promise<void> {
     if (!workspaceId || !nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await api.get<CursorPage<NotificationDto>>(
+      const next = await api.get<CursorPage<NotificationDto>>(
         `/workspaces/${workspaceId}/notifications?${buildQuery(nextCursor)}`,
       );
-      setItems((current) => [...current, ...page.items]);
-      setNextCursor(page.nextCursor);
+      setPage((current) => ({
+        items: [...current.items, ...next.items],
+        nextCursor: next.nextCursor,
+      }));
     } catch {
       toast.error(t('loadError'));
     } finally {
@@ -183,7 +188,7 @@ export function NotificationsList(): React.ReactElement {
                   dateTime={item.createdAt}
                   title={new Date(item.createdAt).toISOString()}
                 >
-                  {formatRelativeTime(item.createdAt)}
+                  {formatRelativeTime(item.createdAt, locale)}
                 </time>
               </button>
             </li>
