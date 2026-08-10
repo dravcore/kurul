@@ -11,7 +11,7 @@ import {
   type TaskMovedPayload,
   type TaskUpdatedPayload,
 } from '@kurultay/shared-types';
-import { connectSocket } from '@/lib/socket';
+import { connectSocket, getSocket } from '@/lib/socket';
 
 export type BoardSocketHandlers = {
   onTaskCreated: (payload: TaskCreatedPayload) => void;
@@ -41,7 +41,9 @@ export function useBoardSocket(
   useEffect(() => {
     if (!enabled || !boardId) return;
 
-    const socket = connectSocket();
+    // Listeners go on before the connection is opened, so a handshake that resolves between
+    // the two cannot slip past `onConnect`.
+    const socket = getSocket();
 
     function onConnect(): void {
       setConnected(true);
@@ -58,13 +60,6 @@ export function useBoardSocket(
 
     function onDisconnect(): void {
       setConnected(false);
-    }
-
-    function onReconnect(): void {
-      setConnected(true);
-      socket.emit(SocketClientEvents.BOARD_JOIN, { boardId }, () => {
-        handlersRef.current.onResync();
-      });
     }
 
     const onCreated = (payload: TaskCreatedPayload): void => {
@@ -86,9 +81,10 @@ export function useBoardSocket(
       if (payload.boardId === boardId) handlersRef.current.onCommentAdded(payload);
     };
 
+    // `connect` also fires on every reconnection, so a manager-level `reconnect` listener
+    // would only double the room join and the resync it acks with.
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
-    socket.io.on('reconnect', onReconnect);
     socket.on(SocketEvents.TASK_CREATED, onCreated);
     socket.on(SocketEvents.TASK_UPDATED, onUpdated);
     socket.on(SocketEvents.TASK_MOVED, onMoved);
@@ -99,14 +95,13 @@ export function useBoardSocket(
     if (socket.connected) {
       onConnect();
     } else {
-      socket.connect();
+      connectSocket();
     }
 
     return () => {
       socket.emit(SocketClientEvents.BOARD_LEAVE, { boardId });
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
-      socket.io.off('reconnect', onReconnect);
       socket.off(SocketEvents.TASK_CREATED, onCreated);
       socket.off(SocketEvents.TASK_UPDATED, onUpdated);
       socket.off(SocketEvents.TASK_MOVED, onMoved);

@@ -137,31 +137,68 @@ export function mergeFiltersIntoSearchParams(
 }
 
 /**
+ * Largest page the API will serve: `MAX_PAGE_LIMIT` in
+ * `apps/api/src/common/pagination/page-limit.ts` clamps `?limit=` to 100, so asking for
+ * more only wastes the round-trip it was supposed to save.
+ */
+export const BOARD_TASK_PAGE_LIMIT = 100;
+
+export interface BoardTaskPage {
+  /** Only the rows this page carried, not the running total. */
+  items: TaskDto[];
+  /** 0 for the first page of the drain. */
+  index: number;
+  /** Whether another request will follow. */
+  hasMore: boolean;
+}
+
+export interface FetchBoardTasksOptions {
+  init?: RequestInit;
+  /**
+   * Called as each page lands, before the next request goes out. Lets a caller paint the
+   * board on page 0 instead of waiting for the whole drain.
+   */
+  onPage?: (page: BoardTaskPage) => void;
+}
+
+/**
  * Drain cursor pages until exhausted. Display order is caller's job (`position, id`).
+ *
+ * Pages cannot be fetched in parallel: the cursor keys on `id` and is only known once the
+ * previous page returns. What `onPage` buys instead is that the caller does not have to
+ * wait for the tail — page 0 is enough to render a board, and the rest arrives behind it.
  */
 export async function fetchAllBoardTasks(
   workspaceId: string,
   boardId: string,
   filters: BoardTaskFilters = {},
-  init?: RequestInit,
+  options: FetchBoardTasksOptions = {},
 ): Promise<TaskDto[]> {
+  const { init, onPage } = options;
   const items: TaskDto[] = [];
   let cursor: string | undefined;
+  let index = 0;
   const filterParams = serializeFiltersToSearchParams(filters);
 
   for (;;) {
     const params = new URLSearchParams(filterParams.toString());
-    params.set('limit', '100');
+    params.set('limit', String(BOARD_TASK_PAGE_LIMIT));
     if (cursor) params.set('cursor', cursor);
 
     const page = await api.get<CursorPage<TaskDto>>(
       `/workspaces/${workspaceId}/boards/${boardId}/tasks?${params.toString()}`,
       init,
     );
+    if (init?.signal?.aborted) break;
 
     items.push(...page.items);
-    if (!page.hasMore || !page.nextCursor) break;
+    // A cursor that does not advance would loop forever, so it ends the drain instead.
+    const hasMore = Boolean(page.hasMore && page.nextCursor && page.nextCursor !== cursor);
+    onPage?.({ items: page.items, index, hasMore });
+    if (!hasMore || !page.nextCursor) break;
+
     cursor = page.nextCursor;
+    index += 1;
   }
 
   return items;

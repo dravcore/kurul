@@ -79,9 +79,9 @@ export function WorkspaceProvider({
         if (list.length === 0) {
           setActiveRole(null);
           setBootstrapped(true);
-          if (pathname !== '/workspaces/new') {
-            router.replace('/workspaces/new');
-          }
+          // The redirect belongs to the effect below, which watches the same state and
+          // already reacts to `pathname` — repeating it here would only force this effect
+          // to depend on `pathname` and refetch all three endpoints on every navigation.
           return;
         }
 
@@ -119,7 +119,7 @@ export function WorkspaceProvider({
     return () => {
       controller.abort();
     };
-  }, [session, isPending, router, reloadKey, t, pathname]);
+  }, [session, isPending, router, reloadKey, t]);
 
   useEffect(() => {
     if (!bootstrapped || loadError || workspaces.length > 0) {

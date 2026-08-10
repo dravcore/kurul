@@ -26,7 +26,11 @@ import {
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { toast } from 'sonner';
 
-const POLL_MS = 60_000;
+// No socket event carries the unread notification count (see packages/shared-types/src/socket.ts
+// and apps/api/src/realtime/realtime.gateway.ts — the only realtime channel is the per-board
+// room used for task/column/comment events). Polling stays, but only while the tab is visible,
+// and at a much longer interval since it is the sole source of truth for the badge.
+const POLL_MS = 120_000;
 
 export function NotificationBell(): React.ReactElement {
   const t = useTranslations('app.notifications');
@@ -59,12 +63,40 @@ export function NotificationBell(): React.ReactElement {
     if (!bootstrapped || !workspaceId) return;
     const controller = new AbortController();
     void refreshUnread(controller.signal);
-    const timer = window.setInterval(() => {
-      void refreshUnread();
-    }, POLL_MS);
+
+    let timer: number | null = null;
+    const startPolling = (): void => {
+      if (timer !== null) return;
+      timer = window.setInterval(() => {
+        void refreshUnread();
+      }, POLL_MS);
+    };
+    const stopPolling = (): void => {
+      if (timer !== null) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+    };
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'hidden') {
+        stopPolling();
+      } else {
+        // Refresh once immediately so a badge that went stale in a background tab is
+        // never shown for up to POLL_MS after the tab is looked at again.
+        void refreshUnread();
+        startPolling();
+      }
+    };
+
+    if (document.visibilityState === 'visible') {
+      startPolling();
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     return () => {
       controller.abort();
-      window.clearInterval(timer);
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [bootstrapped, workspaceId, refreshUnread]);
 

@@ -198,6 +198,34 @@ describe('TaskCommentsSection', () => {
     expect(onDelete).not.toHaveBeenCalled();
   });
 
+  it('offers to load the rest of the thread only while a page is left', () => {
+    renderSection({ comments: [comment('c1', 'First')] });
+    expect(screen.queryByRole('button', { name: 'Load more comments' })).toBeNull();
+
+    cleanup();
+    const onLoadMore = vi.fn();
+    renderSection({ comments: [comment('c1', 'First')], hasMore: true, onLoadMore });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load more comments' }));
+
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables the load-more button while the next page is in flight', () => {
+    const onLoadMore = vi.fn();
+    renderSection({
+      comments: [comment('c1', 'First')],
+      hasMore: true,
+      loadingMore: true,
+      onLoadMore,
+    });
+
+    const button = screen.getByRole('button', { name: 'Loading…' });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onLoadMore).not.toHaveBeenCalled();
+  });
+
   it('deletes the comment it was asked to delete', () => {
     const { onDelete } = renderSection({
       comments: [comment('c1', 'First'), comment('c2', 'Second')],

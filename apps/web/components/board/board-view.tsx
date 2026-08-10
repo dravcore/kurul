@@ -46,6 +46,24 @@ interface BoardViewProps {
   selectedTaskId?: string | null;
 }
 
+type TaskPatch = Partial<TaskDto> & Pick<TaskDto, 'id'>;
+
+/**
+ * Panel patches carry only the fields that changed, so one for a row the board never loaded
+ * is only safe to insert when it happens to be a whole task. `position` is what makes this
+ * matter: a row without it sorts as `NaN` and lands anywhere in its column.
+ */
+function isWholeTask(patch: TaskPatch): patch is TaskDto {
+  return (
+    typeof patch.title === 'string' &&
+    typeof patch.boardId === 'string' &&
+    typeof patch.columnId === 'string' &&
+    Number.isFinite(patch.position) &&
+    Array.isArray(patch.assignees) &&
+    Array.isArray(patch.labels)
+  );
+}
+
 /**
  * Board orchestrator: owns the URL-derived filters and the selected task, and wires the
  * data, realtime, mutation and dialog layers to the canvas.
@@ -77,6 +95,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     members,
     labels,
     loading,
+    tasksSyncing,
     error,
     panelError,
     metaRefreshKey,
@@ -129,6 +148,31 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
     [pathname, router, searchParams],
+  );
+
+  const applyTaskPatch = useCallback(
+    (patch: TaskPatch): void => {
+      if (!tasksRef.current.some((task) => task.id === patch.id)) {
+        // A patch too thin to stand on its own gets refetched instead of guessed at, so the
+        // board never holds a task row the API did not hand it whole.
+        if (!isWholeTask(patch)) {
+          void reload();
+          return;
+        }
+        setTasks((current) =>
+          current.some((task) => task.id === patch.id) ? current : [...current, patch],
+        );
+        return;
+      }
+      setTasks((current) => {
+        const index = current.findIndex((task) => task.id === patch.id);
+        if (index < 0) return current;
+        const next = [...current];
+        next[index] = { ...current[index]!, ...patch };
+        return next;
+      });
+    },
+    [reload, setTasks, tasksRef],
   );
 
   const { commitTaskMove, moveColumn, seedDefaults, defaultsPending } = useBoardMutations({
@@ -191,6 +235,12 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             {!socketConnected ? (
               <span className="text-micro text-muted-foreground" aria-live="polite">
                 {t('realtime.reconnecting')}
+              </span>
+            ) : null}
+            {/* The board paints on the first page; later pages stream in behind it. */}
+            {tasksSyncing ? (
+              <span className="text-micro text-muted-foreground" aria-live="polite">
+                {t('loadingMore')}
               </span>
             ) : null}
             {canMutateColumnsFlag ? (
@@ -261,19 +311,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             labels={labels}
             loadError={panelError}
             metaRefreshKey={metaRefreshKey}
-            onUpdated={(patch) =>
-              setTasks((current) => {
-                const index = current.findIndex((item) => item.id === patch.id);
-                if (index < 0) {
-                  // Partial panel patches must not invent list rows.
-                  if (!('title' in patch) || !('columnId' in patch)) return current;
-                  return [...current, patch as TaskDto];
-                }
-                const next = [...current];
-                next[index] = { ...current[index]!, ...patch };
-                return next;
-              })
-            }
+            onUpdated={applyTaskPatch}
             onRequestDelete={() => {
               if (selectedTask) dialogs.openDeleteTask(selectedTask);
             }}
