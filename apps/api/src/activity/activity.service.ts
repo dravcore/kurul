@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { ActivityDto, CursorPage } from '@kurultay/shared-types';
 import type { Prisma } from '../generated/prisma';
+import { toCursorPage } from '../common/pagination/cursor-page';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type ActivityDb = PrismaService | Prisma.TransactionClient;
@@ -105,14 +106,6 @@ export class ActivityService {
       take: limit + 1,
     });
 
-    const hasMore = rows.length > limit;
-    const page = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore ? page[page.length - 1]!.id : null;
-
-    return {
-      items: page.map((row) => this.toDto(row)),
-      nextCursor,
-      hasMore,
-    };
+    return toCursorPage(rows, limit, (row) => this.toDto(row));
   }
 }

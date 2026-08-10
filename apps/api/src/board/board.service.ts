@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { BoardDto } from '@kurultay/shared-types';
 import { DEFAULT_COLUMNS } from '../common/board-defaults';
 import { assertBoard } from '../common/board-access';
@@ -53,19 +53,42 @@ export class BoardService {
   }
 
   async update(workspaceId: string, boardId: string, dto: UpdateBoardDto): Promise<BoardDto> {
-    await assertBoard(this.prisma, workspaceId, boardId);
-    const board = await this.prisma.board.update({
-      where: { id: boardId },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
-      },
+    const board = await this.prisma.$transaction(async (tx) => {
+      // Read inside the transaction: a read outside it leaves a window in which the row can be
+      // deleted, or moved to another workspace, before the write runs.
+      const scoped = await tx.board.findFirst({
+        where: { id: boardId, workspaceId },
+        select: { id: true },
+      });
+      if (!scoped) throw new NotFoundException('Board not found');
+
+      // The write predicate repeats the tenant scope: the check above only proves the row was
+      // in the workspace when it ran, the predicate is what the database enforces.
+      return tx.board.update({
+        where: { id: boardId, workspaceId },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+        },
+      });
     });
     return this.toDto(board);
   }
 
   async remove(workspaceId: string, boardId: string): Promise<void> {
-    await assertBoard(this.prisma, workspaceId, boardId);
-    await this.prisma.board.delete({ where: { id: boardId } });
+    await this.prisma.$transaction(async (tx) => {
+      const scoped = await tx.board.findFirst({
+        where: { id: boardId, workspaceId },
+        select: { id: true },
+      });
+      if (!scoped) throw new NotFoundException('Board not found');
+
+      // deleteMany, not delete: it takes the same tenant predicate as the check above, so the
+      // scope travels with the write instead of resting on the read.
+      const { count } = await tx.board.deleteMany({ where: { id: boardId, workspaceId } });
+      // Cross-workspace access is 404, never 403 (docs/api-conventions.md) — a 403 would
+      // confirm the row exists.
+      if (count === 0) throw new NotFoundException('Board not found');
+    });
   }
 }

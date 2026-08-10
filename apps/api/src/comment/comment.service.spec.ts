@@ -21,6 +21,7 @@ describe('CommentService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
         delete: jest.fn().mockResolvedValue(undefined),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       task: {
         findFirst: jest.fn().mockResolvedValue({
@@ -155,7 +156,12 @@ describe('CommentService', () => {
     await expect(
       service.remove(WORKSPACE_ID, COMMENT_ID, AUTHOR_ID, MemberRole.MEMBER),
     ).resolves.toBeUndefined();
-    expect(prisma.comment.delete).toHaveBeenCalledWith({ where: { id: COMMENT_ID } });
+    // The delete predicate carries the tenant scope (comment → task → board → workspace),
+    // not just the id.
+    expect(prisma.comment.deleteMany).toHaveBeenCalledWith({
+      where: { id: COMMENT_ID, task: { board: { workspaceId: WORKSPACE_ID } } },
+    });
+    expect(prisma.comment.delete).not.toHaveBeenCalled();
   });
 
   it('allows OWNER to delete another member comment', async () => {
@@ -185,9 +191,52 @@ describe('CommentService', () => {
   });
 
   it('returns 404 when the comment is outside the workspace', async () => {
-    const { service } = buildService();
+    const { service, prisma } = buildService();
     await expect(
       service.remove(WORKSPACE_ID, COMMENT_ID, AUTHOR_ID, MemberRole.OWNER),
     ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.comment.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the scoped comment delete matches no row', async () => {
+    const { service, prisma } = buildService();
+    // The comment passed the in-transaction check but its task left the workspace before the
+    // write — the scoped predicate is what catches it, and 404 is the cross-tenant answer.
+    prisma.comment.findFirst.mockResolvedValue({
+      id: COMMENT_ID,
+      userId: AUTHOR_ID,
+      taskId: TASK_ID,
+    });
+    prisma.comment.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.remove(WORKSPACE_ID, COMMENT_ID, AUTHOR_ID, MemberRole.MEMBER),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('reads the comment inside the transaction, not before it', async () => {
+    const { service, prisma } = buildService();
+    const tx = {
+      comment: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: COMMENT_ID,
+          userId: AUTHOR_ID,
+          taskId: TASK_ID,
+        }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    prisma.$transaction.mockImplementation(async (callback: (client: typeof tx) => unknown) =>
+      callback(tx),
+    );
+
+    await service.remove(WORKSPACE_ID, COMMENT_ID, AUTHOR_ID, MemberRole.MEMBER);
+
+    // Reading outside the transaction reopens the window between the authorization check and
+    // the delete.
+    expect(prisma.comment.findFirst).not.toHaveBeenCalled();
+    expect(tx.comment.findFirst).toHaveBeenCalledWith({
+      where: { id: COMMENT_ID, task: { board: { workspaceId: WORKSPACE_ID } } },
+    });
   });
 });

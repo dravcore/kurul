@@ -1,17 +1,13 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { ActivityType } from '@kurultay/shared-types';
 import type { TaskDto } from '@kurultay/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { RealtimeService } from '../realtime/realtime.service';
 import type { AddAssigneeDto } from './dto/add-assignee.dto';
-import { emitTaskUpdated, findTask, findTaskBasic, isPrismaUniqueViolation } from './task.mapper';
+import { conflictOnUniqueViolation } from './prisma-unique-violation';
+import { TaskEventsService } from './task-events.service';
+import { TaskReadService } from './task-read.service';
 
 @Injectable()
 export class TaskAssigneeService {
@@ -19,7 +15,8 @@ export class TaskAssigneeService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly notificationService: NotificationService,
-    private readonly realtime: RealtimeService,
+    private readonly taskRead: TaskReadService,
+    private readonly taskEvents: TaskEventsService,
   ) {}
 
   async addAssignee(
@@ -28,7 +25,7 @@ export class TaskAssigneeService {
     actorId: string,
     dto: AddAssigneeDto,
   ): Promise<TaskDto> {
-    const task = await findTaskBasic(this.prisma, workspaceId, taskId);
+    const task = await this.taskRead.findTaskBasic(workspaceId, taskId);
     const member = await this.prisma.workspaceMember.findFirst({
       where: { workspaceId, userId: dto.userId },
     });
@@ -36,7 +33,7 @@ export class TaskAssigneeService {
       throw new UnprocessableEntityException('User is not a member of this workspace');
     }
 
-    try {
+    await conflictOnUniqueViolation(async () => {
       await this.prisma.$transaction(async (tx) => {
         await tx.taskAssignee.create({
           data: { taskId: task.id, userId: dto.userId },
@@ -66,19 +63,9 @@ export class TaskAssigneeService {
           },
         });
       });
-    } catch (error) {
-      if (isPrismaUniqueViolation(error)) {
-        throw new ConflictException('User is already assigned to this task');
-      }
-      throw error;
-    }
+    }, 'User is already assigned to this task');
 
-    return emitTaskUpdated(
-      this.realtime,
-      workspaceId,
-      actorId,
-      await findTask(this.prisma, workspaceId, taskId),
-    );
+    return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
   }
 
   async removeAssignee(
@@ -87,10 +74,12 @@ export class TaskAssigneeService {
     actorId: string,
     assigneeUserId: string,
   ): Promise<TaskDto> {
-    const task = await findTaskBasic(this.prisma, workspaceId, taskId);
+    const task = await this.taskRead.findTaskBasic(workspaceId, taskId);
     await this.prisma.$transaction(async (tx) => {
+      // The join row is reachable only through its task, so the tenant scope rides along the
+      // relation instead of resting on the check above.
       const result = await tx.taskAssignee.deleteMany({
-        where: { taskId, userId: assigneeUserId },
+        where: { taskId, userId: assigneeUserId, task: { board: { workspaceId } } },
       });
       if (result.count === 0) throw new NotFoundException('Assignee not found');
 
@@ -105,11 +94,6 @@ export class TaskAssigneeService {
         },
       });
     });
-    return emitTaskUpdated(
-      this.realtime,
-      workspaceId,
-      actorId,
-      await findTask(this.prisma, workspaceId, taskId),
-    );
+    return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
   }
 }

@@ -10,7 +10,9 @@ import { MIN_GAP } from '../common/position/fractional-index';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskAssigneeService } from './task-assignee.service';
+import { TaskEventsService } from './task-events.service';
 import { TaskLabelService } from './task-label.service';
+import { TaskReadService } from './task-read.service';
 import { TaskService } from './task.service';
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
@@ -71,6 +73,7 @@ describe('TaskService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       taskAssignee: {
         create: jest.fn(),
@@ -102,10 +105,18 @@ describe('TaskService', () => {
     const prismaService = prisma as unknown as PrismaService;
     const activity = activityService as unknown as ActivityService;
     const notifications = notificationService as unknown as NotificationService;
-    const assignees = new TaskAssigneeService(prismaService, activity, notifications, realtime);
-    const labels = new TaskLabelService(prismaService, realtime);
+    const taskRead = new TaskReadService(prismaService);
+    const taskEvents = new TaskEventsService(taskRead, realtime);
+    const assignees = new TaskAssigneeService(
+      prismaService,
+      activity,
+      notifications,
+      taskRead,
+      taskEvents,
+    );
+    const labels = new TaskLabelService(prismaService, taskRead, taskEvents);
     return {
-      service: new TaskService(prismaService, activity, realtime, assignees, labels),
+      service: new TaskService(prismaService, activity, realtime, assignees, labels, taskRead),
       prisma,
       activityService,
       notificationService,
@@ -216,9 +227,14 @@ describe('TaskService', () => {
       }),
     );
 
-    await expect(
-      service.move(WORKSPACE_ID, 't1', ACTOR_ID, { columnId: COLUMN_ID, afterTaskId: 't1' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    // The service owns this check — resolveMoveNeighbors never sees the case, because the
+    // moved task is filtered out of `remaining` before the helper is called.
+    const rejected = service.move(WORKSPACE_ID, 't1', ACTOR_ID, {
+      columnId: COLUMN_ID,
+      afterTaskId: 't1',
+    });
+    await expect(rejected).rejects.toBeInstanceOf(BadRequestException);
+    await expect(rejected).rejects.toThrow('A task cannot be its own neighbor');
   });
 
   it('rebalances when the insertion gap is exhausted', async () => {
@@ -254,8 +270,9 @@ describe('TaskService', () => {
       beforeTaskId: 'a',
     });
 
+    // The rebalance write carries the tenant scope too, not just the id.
     expect(updateCall).toEqual({
-      where: { id: 'c' },
+      where: { id: 'c', board: { workspaceId: WORKSPACE_ID } },
       data: { position: 2000, columnId: COLUMN_ID },
     });
     expect(executeRaw).toHaveBeenCalledTimes(1);
@@ -459,10 +476,24 @@ describe('TaskService', () => {
 
     expect(prisma.task.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 't1' },
+        where: { id: 't1', board: { workspaceId: WORKSPACE_ID } },
         data: { dueDate: null, estimatedMinutes: null },
       }),
     );
+  });
+
+  it('returns 404 and writes nothing when updating a task in another workspace', async () => {
+    const { service, prisma, realtimeMock } = buildService();
+    prisma.task.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.update(WORKSPACE_ID, '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d99', ACTOR_ID, {
+        title: 'Hijacked',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.task.update).not.toHaveBeenCalled();
+    expect(realtimeMock.emitToBoard).not.toHaveBeenCalled();
   });
 
   it('leaves omitted fields out of the update payload entirely', async () => {
@@ -508,7 +539,7 @@ describe('TaskService', () => {
       service.removeAssignee(WORKSPACE_ID, 't1', ACTOR_ID, USER_ID),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.taskAssignee.deleteMany).toHaveBeenCalledWith({
-      where: { taskId: 't1', userId: USER_ID },
+      where: { taskId: 't1', userId: USER_ID, task: { board: { workspaceId: WORKSPACE_ID } } },
     });
   });
 
@@ -547,7 +578,11 @@ describe('TaskService', () => {
       service.removeLabel(WORKSPACE_ID, 't1', USER_ID, '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.taskLabel.deleteMany).toHaveBeenCalledWith({
-      where: { taskId: 't1', labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80' },
+      where: {
+        taskId: 't1',
+        labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80',
+        task: { board: { workspaceId: WORKSPACE_ID } },
+      },
     });
   });
 
@@ -556,7 +591,7 @@ describe('TaskService', () => {
       const { service, prisma, activityService, realtimeMock } = buildService();
       const task = taskRow({ id: 't1', title: 'Doomed' });
       prisma.task.findFirst.mockResolvedValue(task);
-      prisma.task.delete.mockResolvedValue(task);
+      prisma.task.deleteMany.mockResolvedValue({ count: 1 });
 
       await expect(service.remove(WORKSPACE_ID, 't1', ACTOR_ID)).resolves.toBeUndefined();
 
@@ -573,7 +608,10 @@ describe('TaskService', () => {
           boardId: BOARD_ID,
         },
       });
-      expect(prisma.task.delete).toHaveBeenCalledWith({ where: { id: 't1' } });
+      // The delete predicate carries the tenant scope, not just the id.
+      expect(prisma.task.deleteMany).toHaveBeenCalledWith({
+        where: { id: 't1', board: { workspaceId: WORKSPACE_ID } },
+      });
       expect(realtimeMock.emitToBoard).toHaveBeenCalledWith(BOARD_ID, SocketEvents.TASK_DELETED, {
         workspaceId: WORKSPACE_ID,
         boardId: BOARD_ID,
@@ -598,7 +636,7 @@ describe('TaskService', () => {
           },
         }),
       );
-      expect(prisma.task.delete).not.toHaveBeenCalled();
+      expect(prisma.task.deleteMany).not.toHaveBeenCalled();
       expect(activityService.record).not.toHaveBeenCalled();
       expect(realtimeMock.emitToBoard).not.toHaveBeenCalled();
     });
@@ -606,12 +644,46 @@ describe('TaskService', () => {
     it('leaves the row in place and stays silent when the delete fails', async () => {
       const { service, prisma, realtimeMock } = buildService();
       prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
-      prisma.task.delete.mockRejectedValue(new Error('deadlock'));
+      prisma.task.deleteMany.mockRejectedValue(new Error('deadlock'));
 
       await expect(service.remove(WORKSPACE_ID, 't1', ACTOR_ID)).rejects.toThrow('deadlock');
 
       // The transaction rolled back, so no client may be told the task is gone.
       expect(realtimeMock.emitToBoard).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the scoped delete matches no row', async () => {
+      const { service, prisma, realtimeMock } = buildService();
+      // The row passed the in-transaction check but left the workspace before the write —
+      // the scoped predicate is what catches it, and 404 is the cross-tenant answer.
+      prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+      prisma.task.deleteMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.remove(WORKSPACE_ID, 't1', ACTOR_ID)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(realtimeMock.emitToBoard).not.toHaveBeenCalled();
+    });
+
+    it('reads the task inside the transaction, not before it', async () => {
+      const { service, prisma } = buildService();
+      const tx = {
+        task: {
+          findFirst: jest.fn().mockResolvedValue(taskRow({ id: 't1' })),
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+      prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+
+      await service.remove(WORKSPACE_ID, 't1', ACTOR_ID);
+
+      // Reading outside the transaction reopens the window between check and delete.
+      expect(prisma.task.findFirst).not.toHaveBeenCalled();
+      expect(tx.task.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 't1', board: { workspaceId: WORKSPACE_ID } },
+        }),
+      );
     });
   });
 

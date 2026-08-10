@@ -9,6 +9,7 @@ import type { CursorPage, TaskDto } from '@kurultay/shared-types';
 import type { Prisma } from '../generated/prisma';
 import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
+import { toCursorPage } from '../common/pagination/cursor-page';
 import { resolveCreateNeighbors, resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { batchUpdateTaskPositions } from '../common/position/rebalance-sql';
@@ -24,7 +25,8 @@ import { createTaskAttributes, planTaskUpdate } from './task-fields';
 import { TaskAssigneeService } from './task-assignee.service';
 import { taskInclude, type TaskWithRelations } from './task.include';
 import { TaskLabelService } from './task-label.service';
-import { emptyTaskRelations, findTask, toTaskDto } from './task.mapper';
+import { TaskReadService } from './task-read.service';
+import { emptyTaskRelations, toTaskDto } from './task.mapper';
 
 @Injectable()
 export class TaskService {
@@ -34,6 +36,7 @@ export class TaskService {
     private readonly realtime: RealtimeService,
     private readonly assignees: TaskAssigneeService,
     private readonly labels: TaskLabelService,
+    private readonly taskRead: TaskReadService,
   ) {}
 
   async list(
@@ -54,15 +57,7 @@ export class TaskService {
       take: limit + 1,
     });
 
-    const hasMore = rows.length > limit;
-    const page = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore ? page[page.length - 1]!.id : null;
-
-    return {
-      items: page.map((task) => toTaskDto(task)),
-      nextCursor,
-      hasMore,
-    };
+    return toCursorPage(rows, limit, (task) => toTaskDto(task));
   }
 
   private buildListWhere(boardId: string, query: TaskQueryDto): Prisma.TaskWhereInput {
@@ -137,19 +132,21 @@ export class TaskService {
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
     });
 
-    const { insertionIndex, before, after } = resolveCreateNeighbors(
+    // `afterTaskId` is the client's word for "insert after this task", which in position
+    // order makes that task the new row's `prev` — the DTO name is translated here, once.
+    const { insertionIndex, prev, next } = resolveCreateNeighbors(
       siblings,
       dto.afterTaskId,
       'Task not found',
     );
-    const beforePos = before?.position ?? null;
-    const afterPos = after?.position ?? null;
+    const prevPos = prev?.position ?? null;
+    const nextPos = next?.position ?? null;
     const attributes = createTaskAttributes(dto);
 
     const result = await this.prisma.$transaction(async (tx) => {
       let position: number;
 
-      if (needsRebalance(beforePos, afterPos)) {
+      if (needsRebalance(prevPos, nextPos)) {
         // The gap is too small to split, so the whole column is respread and the new task
         // takes the slot the siblings were shifted around.
         const positions = rebalancePositions(siblings.length + 1);
@@ -160,7 +157,7 @@ export class TaskService {
         await batchUpdateTaskPositions(tx, column.id, updates);
         position = positions[insertionIndex]!;
       } else {
-        position = midpoint(beforePos, afterPos);
+        position = midpoint(prevPos, nextPos);
       }
 
       const created: Omit<TaskWithRelations, 'assignees' | 'labels'> = await tx.task.create({
@@ -198,7 +195,7 @@ export class TaskService {
   }
 
   async get(workspaceId: string, taskId: string): Promise<TaskDto> {
-    return toTaskDto(await findTask(this.prisma, workspaceId, taskId));
+    return toTaskDto(await this.taskRead.findTask(workspaceId, taskId));
   }
 
   async update(
@@ -207,7 +204,7 @@ export class TaskService {
     userId: string,
     dto: UpdateTaskDto,
   ): Promise<TaskDto> {
-    const existing = await findTask(this.prisma, workspaceId, taskId);
+    const existing = await this.taskRead.findTask(workspaceId, taskId);
     const { data, changes } = planTaskUpdate(existing, dto);
     const changed = Object.keys(changes).length > 0;
 
@@ -220,8 +217,10 @@ export class TaskService {
       });
       if (!scoped) throw new NotFoundException('Task not found');
 
+      // The write predicate repeats the tenant scope: the check above only proves the row was
+      // in the workspace when it ran, the predicate is what the database enforces.
       const updated = await tx.task.update({
-        where: { id: taskId },
+        where: { id: taskId, board: { workspaceId } },
         data,
         include: taskInclude,
       });
@@ -254,8 +253,15 @@ export class TaskService {
   }
 
   async remove(workspaceId: string, taskId: string, userId: string): Promise<void> {
-    const task = await findTask(this.prisma, workspaceId, taskId);
-    await this.prisma.$transaction(async (tx) => {
+    const task = await this.prisma.$transaction(async (tx) => {
+      // Read inside the transaction: a read outside it leaves a window in which the row can be
+      // deleted, or moved to another workspace, before the delete runs.
+      const row = await tx.task.findFirst({
+        where: { id: taskId, board: { workspaceId } },
+        select: { id: true, title: true, columnId: true, boardId: true },
+      });
+      if (!row) throw new NotFoundException('Task not found');
+
       // Activity.task onDelete SetNull — prior rows keep workspace history; stub carries payload.
       await this.activityService.record(tx, {
         workspaceId,
@@ -263,13 +269,23 @@ export class TaskService {
         userId,
         type: ActivityType.TaskDeleted,
         payload: {
-          taskId: task.id,
-          title: task.title,
-          columnId: task.columnId,
-          boardId: task.boardId,
+          taskId: row.id,
+          title: row.title,
+          columnId: row.columnId,
+          boardId: row.boardId,
         },
       });
-      await tx.task.delete({ where: { id: taskId } });
+
+      // deleteMany, not delete: only deleteMany accepts a relation predicate, so the tenant
+      // scope travels with the write instead of resting on the read above.
+      const { count } = await tx.task.deleteMany({
+        where: { id: taskId, board: { workspaceId } },
+      });
+      // Cross-workspace access is 404, never 403 (docs/api-conventions.md) — a 403 would
+      // confirm the row exists. Throwing rolls the activity stub back with it.
+      if (count === 0) throw new NotFoundException('Task not found');
+
+      return row;
     });
     this.realtime.emitToBoard(task.boardId, SocketEvents.TASK_DELETED, {
       workspaceId,
@@ -316,16 +332,19 @@ export class TaskService {
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
       });
       const remaining = siblings.filter((item) => item.id !== taskId);
-      const { insertionIndex, before, after } = resolveMoveNeighbors(
+      // On a move the DTO fields line up with position order: `beforeTaskId` is the task that
+      // ends up before the moved one (`prev`), `afterTaskId` the one that ends up after
+      // (`next`). Note `afterTaskId` means the opposite of what it means on create — the
+      // client contract, not the ordering math, is where that ambiguity lives.
+      const { insertionIndex, prev, next } = resolveMoveNeighbors(
         remaining,
         dto.beforeTaskId,
         dto.afterTaskId,
-        taskId,
       );
 
       let result: TaskDto;
 
-      if (needsRebalance(before?.position ?? null, after?.position ?? null)) {
+      if (needsRebalance(prev?.position ?? null, next?.position ?? null)) {
         const reordered = [...remaining];
         reordered.splice(insertionIndex, 0, { ...task, columnId: targetColumn.id });
         const positions = rebalancePositions(reordered.length);
@@ -335,8 +354,10 @@ export class TaskService {
           .map(({ item, index }) => ({ id: item.id, position: positions[index]! }));
 
         await Promise.all([
+          // Scoped predicate on the write too — the transaction-local read above proves the
+          // task was in the workspace, the predicate is what the database enforces.
           tx.task.update({
-            where: { id: taskId },
+            where: { id: taskId, board: { workspaceId } },
             data: {
               position: positions[insertionIndex]!,
               columnId: targetColumn.id,
@@ -352,10 +373,10 @@ export class TaskService {
         });
       } else {
         const updated = await tx.task.update({
-          where: { id: taskId },
+          where: { id: taskId, board: { workspaceId } },
           data: {
             columnId: targetColumn.id,
-            position: midpoint(before?.position ?? null, after?.position ?? null),
+            position: midpoint(prev?.position ?? null, next?.position ?? null),
           },
           include: taskInclude,
         });

@@ -15,13 +15,18 @@ import type { CreateColumnDto } from './dto/create-column.dto';
 import type { MoveColumnDto } from './dto/move-column.dto';
 import type { UpdateColumnDto } from './dto/update-column.dto';
 
+/**
+ * A column row as `toDto` needs it. `_count` is required on purpose: when it was optional a
+ * query that forgot `include: { _count: … }` still compiled and silently reported
+ * `taskCount: 0`, which is indistinguishable from a genuinely empty column.
+ */
 type ColumnRow = {
   id: string;
   boardId: string;
   name: string;
   position: number;
   color: string | null;
-  _count?: { tasks: number };
+  _count: { tasks: number };
 };
 
 @Injectable()
@@ -38,7 +43,7 @@ export class ColumnService {
       name: row.name,
       position: row.position,
       color: row.color,
-      taskCount: row._count?.tasks ?? 0,
+      taskCount: row._count.tasks,
     };
   }
 
@@ -77,15 +82,17 @@ export class ColumnService {
       where: { boardId },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
     });
-    const { insertionIndex, before, after } = resolveCreateNeighbors(
+    // `afterColumnId` is the client's word for "insert after this column", which in position
+    // order makes that column the new row's `prev` — the DTO name is translated here, once.
+    const { insertionIndex, prev, next } = resolveCreateNeighbors(
       columns,
       dto.afterColumnId,
       'Column not found',
     );
-    const position = midpoint(before?.position ?? null, after?.position ?? null);
+    const position = midpoint(prev?.position ?? null, next?.position ?? null);
 
     let created: ColumnDto;
-    if (needsRebalance(before?.position ?? null, after?.position ?? null)) {
+    if (needsRebalance(prev?.position ?? null, next?.position ?? null)) {
       created = await this.prisma.$transaction(async (tx) => {
         const positions = rebalancePositions(columns.length + 1);
         const updates = columns.map((column, index) => ({
@@ -122,14 +129,25 @@ export class ColumnService {
     actorId: string,
     dto: UpdateColumnDto,
   ): Promise<ColumnDto> {
-    await this.findColumn(workspaceId, columnId);
-    const column = await this.prisma.column.update({
-      where: { id: columnId },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.color !== undefined ? { color: dto.color } : {}),
-      },
-      include: { _count: { select: { tasks: true } } },
+    const column = await this.prisma.$transaction(async (tx) => {
+      // Read inside the transaction: a read outside it leaves a window in which the column can
+      // be deleted, or its board moved to another workspace, before the write runs.
+      const scoped = await tx.column.findFirst({
+        where: { id: columnId, board: { workspaceId } },
+        select: { id: true },
+      });
+      if (!scoped) throw new NotFoundException('Column not found');
+
+      // The write predicate repeats the tenant scope: the check above only proves the row was
+      // in the workspace when it ran, the predicate is what the database enforces.
+      return tx.column.update({
+        where: { id: columnId, board: { workspaceId } },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.color !== undefined ? { color: dto.color } : {}),
+        },
+        include: { _count: { select: { tasks: true } } },
+      });
     });
     const dtoOut = this.toDto(column);
     this.emitChanged(workspaceId, actorId, dtoOut.boardId, dtoOut.id);
@@ -137,12 +155,31 @@ export class ColumnService {
   }
 
   async remove(workspaceId: string, columnId: string, actorId: string): Promise<void> {
-    const column = await this.findColumn(workspaceId, columnId);
-    const taskCount = await this.prisma.task.count({ where: { columnId } });
-    if (taskCount > 0) {
-      throw new ConflictException('Column has tasks; move or delete them first');
-    }
-    await this.prisma.column.delete({ where: { id: columnId } });
+    // Lookup, emptiness check and delete all run in one transaction: split across three
+    // statements, a task could be created into the column after the count and still be
+    // cascade-deleted by the delete, and the column could leave the workspace in between.
+    const column = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.column.findFirst({
+        where: { id: columnId, board: { workspaceId } },
+      });
+      if (!row) throw new NotFoundException('Column not found');
+
+      const taskCount = await tx.task.count({ where: { columnId } });
+      if (taskCount > 0) {
+        throw new ConflictException('Column has tasks; move or delete them first');
+      }
+
+      // deleteMany, not delete: it takes the same tenant predicate as the check above, so the
+      // scope travels with the write instead of resting on the read.
+      const { count } = await tx.column.deleteMany({
+        where: { id: columnId, board: { workspaceId } },
+      });
+      // Cross-workspace access is 404, never 403 (docs/api-conventions.md) — a 403 would
+      // confirm the row exists.
+      if (count === 0) throw new NotFoundException('Column not found');
+
+      return row;
+    });
     this.emitChanged(workspaceId, actorId, column.boardId, column.id);
   }
 
@@ -166,13 +203,16 @@ export class ColumnService {
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
       });
       const remaining = columns.filter((item) => item.id !== columnId);
-      const { insertionIndex, before, after } = resolveMoveNeighbors(
+      // On a move the DTO fields line up with position order: `beforeColumnId` is the column
+      // that ends up before the moved one (`prev`), `afterColumnId` the one that ends up after
+      // (`next`). Note `afterColumnId` means the opposite of what it means on create — the
+      // client contract, not the ordering math, is where that ambiguity lives.
+      const { insertionIndex, prev, next } = resolveMoveNeighbors(
         remaining,
         dto.beforeColumnId,
         dto.afterColumnId,
-        columnId,
       );
-      if (needsRebalance(before?.position ?? null, after?.position ?? null)) {
+      if (needsRebalance(prev?.position ?? null, next?.position ?? null)) {
         const reordered = [...remaining];
         reordered.splice(insertionIndex, 0, column);
         const positions = rebalancePositions(reordered.length);
@@ -182,8 +222,10 @@ export class ColumnService {
           .map(({ item, index }) => ({ id: item.id, position: positions[index]! }));
 
         await Promise.all([
+          // Scoped predicate on the write too — the transaction-local read above proves the
+          // column was in the workspace, the predicate is what the database enforces.
           tx.column.update({
-            where: { id: columnId },
+            where: { id: columnId, board: { workspaceId } },
             data: { position: positions[insertionIndex]! },
           }),
           batchUpdateColumnPositions(tx, column.boardId, otherUpdates),
@@ -196,8 +238,8 @@ export class ColumnService {
       }
 
       const updated = await tx.column.update({
-        where: { id: columnId },
-        data: { position: midpoint(before?.position ?? null, after?.position ?? null) },
+        where: { id: columnId, board: { workspaceId } },
+        data: { position: midpoint(prev?.position ?? null, next?.position ?? null) },
         include: { _count: { select: { tasks: true } } },
       });
       return this.toDto(updated);
@@ -205,13 +247,5 @@ export class ColumnService {
 
     this.emitChanged(workspaceId, actorId, moved.boardId, moved.id);
     return moved;
-  }
-
-  private async findColumn(workspaceId: string, columnId: string) {
-    const column = await this.prisma.column.findFirst({
-      where: { id: columnId, board: { workspaceId } },
-    });
-    if (!column) throw new NotFoundException('Column not found');
-    return column;
   }
 }

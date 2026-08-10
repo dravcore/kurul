@@ -265,6 +265,11 @@ model Activity {
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, id])
+  // Backs the dashboard throughput aggregates (dashboard.service.ts `countActivitiesByDay`:
+  // `workspaceId = ? AND type = ? AND createdAt >= ?`). Equality columns lead, the range
+  // column is last, so Postgres narrows to one workspace+type and then scans only the
+  // 14-day tail instead of every activity row the workspace has ever written.
+  @@index([workspaceId, type, createdAt])
   @@index([taskId])
   @@index([userId])
 }
@@ -285,8 +290,25 @@ model Notification {
   task      Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   activity  Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
 
+  // This table also carries a *partial* unique index that Prisma cannot express:
+  //   CREATE UNIQUE INDEX "Notification_due_soon_unread_uidx" ON "Notification"
+  //     ("userId", "taskId")
+  //     WHERE "type" = 'due_soon' AND "readAt" IS NULL AND "taskId" IS NOT NULL;
+  // It lives in migrations/20260809180000_due_soon_perf_indexes/migration.sql and is what
+  // gives `createMany({ skipDuplicates: true })` in due-soon.worker.ts something to conflict
+  // on. Scoping it to `due_soon` keeps legitimate repeats of other types (several mentions
+  // on one task) legal; scoping it to unread rows lets a task be re-notified once the
+  // previous reminder has been read. Do not let a generated migration drop it.
   @@index([userId, createdAt])
-  @@index([userId, readAt])
-  @@index([workspaceId])
+  // Backs notification.service.ts `list`: `workspaceId` and `userId` are always equality
+  // predicates, `id` carries both the cursor (`id < cursor`) and the sort (`orderBy: id
+  // desc`). Equality columns first, ordering column last, so a page is a backwards index
+  // range scan instead of "read every notification this user has, then sort".
+  @@index([workspaceId, userId, id])
+  // Same list with `unreadOnly`. `readAt: null` is an IS NULL equality match, so it sits
+  // between the equality columns and the ordering column. Its (workspaceId, userId, readAt)
+  // prefix also serves `unreadCount` and `markAllRead`, which is why the narrower
+  // (userId, readAt) index was dropped — every notification query is workspace-scoped.
+  @@index([workspaceId, userId, readAt, id])
   @@index([userId, type, taskId])
 }

@@ -39,18 +39,18 @@ describe('fractional-index', () => {
     });
 
     it('keeps producing strictly increasing values when repeatedly inserting in the same gap', () => {
-      let before = 1000;
-      const after = 2000;
+      let prev = 1000;
+      const next = 2000;
 
       // Halve the gap until the rebalance guard would fire; every midpoint must stay strict.
-      while (!needsRebalance(before, after)) {
-        const next = midpoint(before, after);
-        expect(next).toBeGreaterThan(before);
-        expect(next).toBeLessThan(after);
-        before = next;
+      while (!needsRebalance(prev, next)) {
+        const inserted = midpoint(prev, next);
+        expect(inserted).toBeGreaterThan(prev);
+        expect(inserted).toBeLessThan(next);
+        prev = inserted;
       }
 
-      expect(after - before).toBeLessThan(MIN_GAP);
+      expect(next - prev).toBeLessThan(MIN_GAP);
     });
   });
 
