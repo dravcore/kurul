@@ -50,6 +50,34 @@ export async function signIn(
   return agent;
 }
 
+/**
+ * Marks a test user's address as confirmed and re-signs them in.
+ *
+ * Accepting an invitation requires a verified email
+ * (`requireEmailVerificationOnInvitation` in `src/auth/organization-options.ts`), so every
+ * e2e that walks the invite flow has to put its invitee in that state.
+ *
+ * Flipping the column is not enough on its own: the session cookie caches the user for five
+ * minutes (`session.cookieCache`), so the agent would keep presenting `emailVerified: false`
+ * from the cookie it already holds. Signing in again mints a cookie that agrees with the
+ * database. The user's `agent` is replaced in place, so callers keep using `user.agent`.
+ *
+ * The real flow gets here by clicking the link in the verification email; this is the same
+ * end state without an SMTP server in the test environment.
+ */
+export async function confirmEmail(
+  app: INestApplication<App>,
+  prisma: PrismaService,
+  user: TestUser,
+): Promise<void> {
+  await prisma.user.update({
+    where: { email: user.email },
+    data: { emailVerified: true },
+  });
+
+  user.agent = await signIn(app, user.email, user.password);
+}
+
 export async function createWorkspace(
   agent: request.Agent,
   name = 'Workspace',

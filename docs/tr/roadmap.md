@@ -303,7 +303,10 @@ maddeler aşağıda [MVP ötesi](#mvp-ötesi)'nde)
       Faz 1 şemasında yok
 - [x] Okundu işaretle / tümünü okundu işaretle
 - [x] Web: task panelinde aktivite zaman çizelgesi, bildirim merkezi
-- [x] `[-]` E-posta gönderimi — MVP ötesine ertelendi
+- [x] `[-]` Bildirimler için e-posta gönderimi — MVP ötesine ertelendi. SMTP taşıyıcısının
+      kendisi artık işlemsel e-posta (doğrulama, davetler) için mevcut —
+      [ADR 0013](decisions/0013-invitation-email-verification.md); ertelenen kısım
+      `Notification` satırlarının bu taşıyıcıya yönlendirilmesi.
 
 ---
 
@@ -343,7 +346,7 @@ Planlanmadı. Mimarinin bunlarla uyumlu kalması için listelendi, taahhüt olar
 | `[-]` Board şablonları                                     |                                                                                                                                                                                |
 | `[-]` Public API token'ları + `/v1` öneki                  | 1.0 sonrası — [api-conventions.md](api-conventions.md#versiyonlama)                                                                                                            |
 | `[-]` Webhook'lar                                          |                                                                                                                                                                                |
-| `[-]` E-posta bildirimleri                                 |                                                                                                                                                                                |
+| `[-]` E-posta bildirimleri                                 | Taşıyıcı işlemsel e-posta için hâlihazırda mevcut ([ADR 0013](decisions/0013-invitation-email-verification.md)); bu satır `Notification` satırlarının ona yönlendirilmesi      |
 | `[-]` Trello / Jira'dan import                             |                                                                                                                                                                                |
 | `[-]` Ek UI dil paketleri                                  | next-intl katmanının kendisi Faz 1'de gelir ve MVP yalnız İngilizce'dir; bu satır ek dillerin (önce Türkçe) paketlenmesiyle ilgilidir — bkz. [design.md](design.md#7-ui-metni) |
 | `[-]` Docker Compose ötesinde self-host deployment rehberi |                                                                                                                                                                                |

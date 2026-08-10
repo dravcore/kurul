@@ -14,4 +14,11 @@ describe('isBlockedOrganizationMutation', () => {
     expect(isBlockedOrganizationMutation('/auth/organization/list')).toBe(false);
     expect(isBlockedOrganizationMutation('/auth/sign-in/email')).toBe(false);
   });
+
+  it('leaves the email verification endpoints reachable', () => {
+    // An invitation cannot be accepted from an unverified address, so blocking either of
+    // these would make invitations permanently unacceptable rather than merely inconvenient.
+    expect(isBlockedOrganizationMutation('/auth/send-verification-email')).toBe(false);
+    expect(isBlockedOrganizationMutation('/auth/verify-email')).toBe(false);
+  });
 });

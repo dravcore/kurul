@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { envInt, envPort, envString, loadRootEnv } from './env';
+import { envBool, envInt, envPort, envString, loadRootEnv } from './env';
 
 const NAME = 'KURULTAY_TEST_VAR';
 
@@ -50,6 +50,29 @@ describe('env helpers', () => {
     it('returns the trimmed value when set', () => {
       process.env[NAME] = ' http://example.test ';
       expect(envString(NAME, 'http://localhost:3000')).toBe('http://example.test');
+    });
+  });
+
+  describe('envBool', () => {
+    it('falls back when unset or blank', () => {
+      expect(envBool(NAME, true)).toBe(true);
+      process.env[NAME] = '   ';
+      expect(envBool(NAME, false)).toBe(false);
+    });
+
+    it.each(['true', 'TRUE', '1', 'yes', 'on'])('reads %j as true', (value) => {
+      process.env[NAME] = value;
+      expect(envBool(NAME, false)).toBe(true);
+    });
+
+    it.each(['false', 'False', '0', 'no', 'off'])('reads %j as false', (value) => {
+      process.env[NAME] = value;
+      expect(envBool(NAME, true)).toBe(false);
+    });
+
+    it.each(['maybe', '2', 'y'])('throws on an unrecognised value (%j)', (value) => {
+      process.env[NAME] = value;
+      expect(() => envBool(NAME, false)).toThrow(`Invalid ${NAME}`);
     });
   });
 

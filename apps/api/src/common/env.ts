@@ -87,6 +87,34 @@ export function envString(name: string, fallback: string): string {
   return raw === undefined || raw === '' ? fallback : raw;
 }
 
+const TRUE_VALUES = new Set(['true', '1', 'yes', 'on']);
+const FALSE_VALUES = new Set(['false', '0', 'no', 'off']);
+
+/**
+ * Reads a boolean environment variable.
+ *
+ * Unset or blank falls back to `fallback`; anything that is not a recognised spelling of
+ * true/false throws, for the same reason `envInt` does. `Boolean('false')` is `true`, so a
+ * lenient reading of `SMTP_SECURE=false` would silently enable implicit TLS and make every
+ * send fail against a STARTTLS relay — a configuration error is better raised at boot.
+ */
+export function envBool(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.trim();
+  if (raw === undefined || raw === '') {
+    return fallback;
+  }
+
+  const normalized = raw.toLowerCase();
+  if (TRUE_VALUES.has(normalized)) {
+    return true;
+  }
+  if (FALSE_VALUES.has(normalized)) {
+    return false;
+  }
+
+  throw new Error(`Invalid ${name}: expected a boolean, received "${raw}"`);
+}
+
 /**
  * True while the process is a Jest run.
  *

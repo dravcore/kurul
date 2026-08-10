@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { MailModule } from './mail/mail.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { BoardModule } from './board/board.module';
 import { TaskModule } from './task/task.module';
@@ -19,6 +20,7 @@ import { SessionAuthGuard } from './common/guards/session-auth.guard';
     PrismaModule,
     HealthModule,
     AuthModule,
+    MailModule,
     WorkspaceModule,
     BoardModule,
     TaskModule,

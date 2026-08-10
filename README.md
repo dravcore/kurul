@@ -53,6 +53,11 @@ pnpm dev
 - Web: http://localhost:3000
 - API health: http://localhost:4000/health
 
+The app boots without SMTP configured, but invitations cannot be accepted until it is — the
+dev compose file above already starts [Mailpit](https://mailpit.axllent.org/) so you can test
+that flow locally without a real mail provider; see
+[docs/development.md#smtp-and-mailpit](docs/development.md#smtp-and-mailpit).
+
 Full stack in Docker: `docker compose up --build`. Day-to-day details:
 [docs/development.md](docs/development.md).
 
@@ -63,6 +68,7 @@ Full stack in Docker: `docker compose up --build`. Day-to-day details:
 | Backend      | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                |
 | Frontend     | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts  |
 | Auth         | Better Auth (organization plugin → Workspace)                             |
+| Email        | `nodemailer` over SMTP (invitation verification)                          |
 | Shared types | `packages/shared-types` + `packages/auth-access` (DTOs / BA org AC roles) |
 | Deployment   | Docker Compose                                                            |
 | Architecture | Monorepo, modular monolith — no microservices                             |

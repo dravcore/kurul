@@ -289,7 +289,10 @@ tenant-safely until this exists.
       the Phase 1 schema
 - [x] Mark read / mark all read
 - [x] Web: activity timeline in the task panel, notification centre
-- [x] `[-]` Email delivery — deferred beyond MVP
+- [x] `[-]` Email delivery for notifications — deferred beyond MVP. The SMTP transport itself
+      now ships for transactional mail (verification, invitations) — see
+      [ADR 0013](decisions/0013-invitation-email-verification.md); what remains deferred is
+      routing `Notification` rows to it.
 
 ---
 
@@ -326,7 +329,7 @@ Not scheduled. Listed so the architecture stays compatible with them, not as com
 | `[-]` Board templates                                  |                                                                                                                                                                     |
 | `[-]` Public API tokens + `/v1` prefix                 | Post-1.0 — [api-conventions.md](api-conventions.md#versioning)                                                                                                      |
 | `[-]` Webhooks                                         |                                                                                                                                                                     |
-| `[-]` Email notifications                              |                                                                                                                                                                     |
+| `[-]` Email notifications                              | Transport already ships for transactional mail ([ADR 0013](decisions/0013-invitation-email-verification.md)); this row is routing `Notification` rows to it         |
 | `[-]` Import from Trello / Jira                        |                                                                                                                                                                     |
 | `[-]` Further UI language packs                        | The next-intl layer itself ships in Phase 1 and MVP is English-only; this row is about additional locales (Turkish first) — see [design.md](design.md#7-ui-writing) |
 | `[-]` Self-host deployment guide beyond Docker Compose |                                                                                                                                                                     |

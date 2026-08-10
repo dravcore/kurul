@@ -3,7 +3,7 @@ import { MemberRole } from '@kurultay/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';
-import { addMember, createWorkspace, setMemberRole, signUp } from './helpers/auth';
+import { addMember, confirmEmail, createWorkspace, setMemberRole, signUp } from './helpers/auth';
 import { resetDatabase } from './helpers/db';
 
 describe('Workspace isolation and roles (e2e)', () => {
@@ -86,6 +86,7 @@ describe('Workspace isolation and roles (e2e)', () => {
       email: `invitee-${Date.now()}@test.kurultay.dev`,
       name: 'Invitee',
     });
+    await confirmEmail(app, prisma, invitee);
     const workspace = await createWorkspace(owner.agent, 'Invite WS', `invite-${Date.now()}`);
 
     const createInvite = await owner.agent
@@ -131,6 +132,42 @@ describe('Workspace isolation and roles (e2e)', () => {
       .expect((res) => {
         expect([400, 404]).toContain(res.status);
       });
+  });
+
+  /**
+   * GHSA-fmh4-wcc4-5jm3. The account below holds the invited address without having proved
+   * it owns it — exactly what an attacker does by registering on an invited address before
+   * its real owner gets there. It must not be able to join the workspace.
+   */
+  it('refuses to accept an invitation from an unconfirmed email address', async () => {
+    const owner = await signUp(app, { name: 'Inviter' });
+    const squatter = await signUp(app, {
+      email: `unconfirmed-${Date.now()}@test.kurultay.dev`,
+      name: 'Unconfirmed',
+    });
+    const workspace = await createWorkspace(owner.agent, 'Guarded WS', `guarded-${Date.now()}`);
+
+    const invite = await owner.agent
+      .post(`/workspaces/${workspace.id}/invitations`)
+      .send({ email: squatter.email, role: MemberRole.MEMBER })
+      .expect(201);
+
+    const invitationId = invite.body.id as string;
+
+    await squatter.agent
+      .post(`/workspaces/${workspace.id}/invitations/${invitationId}/accept`)
+      .expect(403);
+
+    const members = await owner.agent.get(`/workspaces/${workspace.id}/members`).expect(200);
+    expect(members.body).toHaveLength(1);
+
+    // …and the same request succeeds once the address is confirmed, so the 403 above is the
+    // verification gate and not some unrelated failure.
+    await confirmEmail(app, prisma, squatter);
+
+    await squatter.agent
+      .post(`/workspaces/${workspace.id}/invitations/${invitationId}/accept`)
+      .expect(200);
   });
 
   it('resends the same invitation when the role is unchanged', async () => {

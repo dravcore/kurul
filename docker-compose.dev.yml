@@ -27,6 +27,26 @@ services:
       timeout: 5s
       retries: 10
 
+  # SMTP catch-all for local dev: nothing it receives ever leaves the container. Point
+  # SMTP_HOST=localhost / SMTP_PORT=1025 / SMTP_SECURE=false at it in .env, then read
+  # verification links and invitation mail from the web UI instead of a real inbox — see
+  # docs/development.md#smtp-and-mailpit.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '8025:8025' # Web UI
+      - '1025:1025' # SMTP
+    volumes:
+      - mailpit_data:/data
+    environment:
+      MP_DATABASE: /data/mailpit.db
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   postgres_data:
   redis_data:
+  mailpit_data:
