@@ -18,7 +18,9 @@ module.exports = {
       },
     ],
   },
+  // Keep in sync with `apps/api/jest.config.cjs`: better-auth >=1.6 and its dependency
+  // chain (better-call -> rou3, nanostores) are ESM-only and must go through ts-jest.
   transformIgnorePatterns: [
-    'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch)/)',
+    'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch|rou3|nanostores)/)',
   ],
 };
