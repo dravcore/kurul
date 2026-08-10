@@ -6,6 +6,7 @@ import type {
   NotificationUnreadCountDto,
 } from '@kurultay/shared-types';
 import type { Prisma } from '../generated/prisma';
+import { toCursorPage } from '../common/pagination/cursor-page';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type NotificationDb = PrismaService | Prisma.TransactionClient;
@@ -157,15 +158,7 @@ export class NotificationService {
       take: limit + 1,
     });
 
-    const hasMore = rows.length > limit;
-    const page = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore ? page[page.length - 1]!.id : null;
-
-    return {
-      items: page.map((row) => this.toDto(row)),
-      nextCursor,
-      hasMore,
-    };
+    return toCursorPage(rows, limit, (row) => this.toDto(row));
   }
 
   async unreadCount(workspaceId: string, userId: string): Promise<NotificationUnreadCountDto> {
@@ -180,18 +173,26 @@ export class NotificationService {
     userId: string,
     notificationId: string,
   ): Promise<NotificationDto> {
-    const existing = await this.prisma.notification.findFirst({
-      where: { id: notificationId, workspaceId, userId },
-    });
-    if (!existing) throw new NotFoundException('Notification not found');
+    const row = await this.prisma.$transaction(async (tx) => {
+      // Read inside the transaction: read and write split apart leave a window in which the row
+      // can be deleted (user removal cascades) between the idempotency check and the update.
+      const existing = await tx.notification.findFirst({
+        where: { id: notificationId, workspaceId, userId },
+      });
+      if (!existing) throw new NotFoundException('Notification not found');
 
-    if (existing.readAt) return this.toDto(existing);
+      if (existing.readAt) return existing;
 
-    const updated = await this.prisma.notification.update({
-      where: { id: notificationId },
-      data: { readAt: new Date() },
+      // The write predicate repeats both scopes. workspaceId is the tenant boundary, but userId
+      // is the tighter one that actually matters here: a notification is private to its
+      // recipient, so a workspace-only predicate would let any member of the same workspace
+      // mark someone else's row read. `markAllRead` already filters on the same pair.
+      return tx.notification.update({
+        where: { id: notificationId, workspaceId, userId },
+        data: { readAt: new Date() },
+      });
     });
-    return this.toDto(updated);
+    return this.toDto(row);
   }
 
   async markAllRead(workspaceId: string, userId: string): Promise<{ updated: number }> {

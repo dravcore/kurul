@@ -151,18 +151,29 @@ export class CommentService {
     actorId: string,
     actorRole: MemberRole,
   ): Promise<void> {
-    const comment = await this.prisma.comment.findFirst({
-      where: { id: commentId, task: { board: { workspaceId } } },
+    await this.prisma.$transaction(async (tx) => {
+      // Read inside the transaction: a read outside it leaves a window in which the comment's
+      // task can be moved to another workspace between the authorization check and the delete.
+      const comment = await tx.comment.findFirst({
+        where: { id: commentId, task: { board: { workspaceId } } },
+      });
+      if (!comment) throw new NotFoundException('Comment not found');
+
+      const isAuthor = comment.userId === actorId;
+      const isElevated = actorRole === MemberRole.OWNER || actorRole === MemberRole.ADMIN;
+      if (!isAuthor && !isElevated) {
+        throw new ForbiddenException('Only the author or an admin can delete this comment');
+      }
+
+      // deleteMany, not delete: only deleteMany accepts a relation predicate, so the tenant
+      // scope (comment → task → board → workspace) travels with the write.
+      const { count } = await tx.comment.deleteMany({
+        where: { id: commentId, task: { board: { workspaceId } } },
+      });
+      // Cross-workspace access is 404, never 403 (docs/api-conventions.md) — a 403 would
+      // confirm the row exists.
+      if (count === 0) throw new NotFoundException('Comment not found');
     });
-    if (!comment) throw new NotFoundException('Comment not found');
-
-    const isAuthor = comment.userId === actorId;
-    const isElevated = actorRole === MemberRole.OWNER || actorRole === MemberRole.ADMIN;
-    if (!isAuthor && !isElevated) {
-      throw new ForbiddenException('Only the author or an admin can delete this comment');
-    }
-
-    await this.prisma.comment.delete({ where: { id: commentId } });
   }
 
   private async findTask(workspaceId: string, taskId: string) {

@@ -1,20 +1,17 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { TaskDto } from '@kurultay/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
-import { RealtimeService } from '../realtime/realtime.service';
 import type { AddTaskLabelDto } from './dto/add-task-label.dto';
-import { emitTaskUpdated, findTask, findTaskBasic, isPrismaUniqueViolation } from './task.mapper';
+import { conflictOnUniqueViolation } from './prisma-unique-violation';
+import { TaskEventsService } from './task-events.service';
+import { TaskReadService } from './task-read.service';
 
 @Injectable()
 export class TaskLabelService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly realtime: RealtimeService,
+    private readonly taskRead: TaskReadService,
+    private readonly taskEvents: TaskEventsService,
   ) {}
 
   async addLabel(
@@ -23,7 +20,7 @@ export class TaskLabelService {
     actorId: string,
     dto: AddTaskLabelDto,
   ): Promise<TaskDto> {
-    const task = await findTaskBasic(this.prisma, workspaceId, taskId);
+    const task = await this.taskRead.findTaskBasic(workspaceId, taskId);
     const label = await this.prisma.label.findFirst({
       where: { id: dto.labelId, boardId: task.boardId },
     });
@@ -31,23 +28,12 @@ export class TaskLabelService {
       throw new UnprocessableEntityException('Label does not belong to this task board');
     }
 
-    try {
-      await this.prisma.taskLabel.create({
-        data: { taskId: task.id, labelId: label.id },
-      });
-    } catch (error) {
-      if (isPrismaUniqueViolation(error)) {
-        throw new ConflictException('Label is already assigned to this task');
-      }
-      throw error;
-    }
-
-    return emitTaskUpdated(
-      this.realtime,
-      workspaceId,
-      actorId,
-      await findTask(this.prisma, workspaceId, taskId),
+    await conflictOnUniqueViolation(
+      () => this.prisma.taskLabel.create({ data: { taskId: task.id, labelId: label.id } }),
+      'Label is already assigned to this task',
     );
+
+    return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
   }
 
   async removeLabel(
@@ -56,16 +42,13 @@ export class TaskLabelService {
     actorId: string,
     labelId: string,
   ): Promise<TaskDto> {
-    await findTaskBasic(this.prisma, workspaceId, taskId);
+    await this.taskRead.findTaskBasic(workspaceId, taskId);
+    // The join row is reachable only through its task, so the tenant scope rides along the
+    // relation instead of resting on the check above.
     const result = await this.prisma.taskLabel.deleteMany({
-      where: { taskId, labelId },
+      where: { taskId, labelId, task: { board: { workspaceId } } },
     });
     if (result.count === 0) throw new NotFoundException('Task label not found');
-    return emitTaskUpdated(
-      this.realtime,
-      workspaceId,
-      actorId,
-      await findTask(this.prisma, workspaceId, taskId),
-    );
+    return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
   }
 }

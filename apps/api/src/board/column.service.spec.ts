@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RealtimeService } from '../realtime/realtime.service';
 import { ColumnService } from './column.service';
@@ -18,10 +18,17 @@ describe('ColumnService', () => {
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       task: { count: jest.fn().mockResolvedValue(0) },
       $transaction: jest.fn(),
     };
+    // The default transaction hands the same mock back as `tx`, so assertions on
+    // `prisma.column.*` also cover the calls the service makes inside the transaction.
+    // The move tests override it with their own `tx`.
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
+      callback(prisma),
+    );
     const realtime = { emitToBoard: jest.fn() };
     return {
       service: new ColumnService(
@@ -76,10 +83,10 @@ describe('ColumnService', () => {
     });
     prisma.task.count.mockResolvedValue(2);
 
-    await expect(service.remove(WORKSPACE_ID, COLUMN_ID, ACTOR_ID)).rejects.toBeInstanceOf(
-      ConflictException,
-    );
-    expect(prisma.column.delete).not.toHaveBeenCalled();
+    const rejected = service.remove(WORKSPACE_ID, COLUMN_ID, ACTOR_ID);
+    await expect(rejected).rejects.toBeInstanceOf(ConflictException);
+    await expect(rejected).rejects.toThrow('Column has tasks; move or delete them first');
+    expect(prisma.column.deleteMany).not.toHaveBeenCalled();
     expect(realtime.emitToBoard).not.toHaveBeenCalled();
   });
 
@@ -96,8 +103,116 @@ describe('ColumnService', () => {
 
     await service.remove(WORKSPACE_ID, COLUMN_ID, ACTOR_ID);
 
-    expect(prisma.column.delete).toHaveBeenCalledWith({ where: { id: COLUMN_ID } });
+    // The delete predicate carries the tenant scope, not just the id.
+    expect(prisma.column.deleteMany).toHaveBeenCalledWith({
+      where: { id: COLUMN_ID, board: { workspaceId: WORKSPACE_ID } },
+    });
+    expect(prisma.column.delete).not.toHaveBeenCalled();
     expect(realtime.emitToBoard).toHaveBeenCalled();
+  });
+
+  it('returns 404 when the scoped column delete matches no row', async () => {
+    const { service, prisma, realtime } = buildService();
+    // The column passed the in-transaction check but left the workspace before the write —
+    // the scoped predicate is what catches it, and 404 is the cross-tenant answer.
+    prisma.column.findFirst.mockResolvedValue({
+      id: COLUMN_ID,
+      boardId: BOARD_ID,
+      name: 'Todo',
+      position: 1000,
+      color: null,
+    });
+    prisma.column.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.remove(WORKSPACE_ID, COLUMN_ID, ACTOR_ID)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(realtime.emitToBoard).not.toHaveBeenCalled();
+  });
+
+  it('counts tasks inside the delete transaction, not before it', async () => {
+    const { service, prisma } = buildService();
+    const tx = {
+      column: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: COLUMN_ID,
+          boardId: BOARD_ID,
+          name: 'Todo',
+          position: 1000,
+          color: null,
+        }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      task: { count: jest.fn().mockResolvedValue(0) },
+    };
+    prisma.$transaction.mockImplementation(async (callback: (client: typeof tx) => unknown) =>
+      callback(tx),
+    );
+
+    await service.remove(WORKSPACE_ID, COLUMN_ID, ACTOR_ID);
+
+    // Reading outside the transaction reopens the window between check and delete.
+    expect(prisma.column.findFirst).not.toHaveBeenCalled();
+    expect(prisma.task.count).not.toHaveBeenCalled();
+    expect(tx.column.findFirst).toHaveBeenCalledWith({
+      where: { id: COLUMN_ID, board: { workspaceId: WORKSPACE_ID } },
+    });
+    expect(tx.task.count).toHaveBeenCalledWith({ where: { columnId: COLUMN_ID } });
+  });
+
+  describe('update', () => {
+    it('carries the tenant scope on the write predicate, not just the check', async () => {
+      const { service, prisma } = buildService();
+      prisma.column.findFirst.mockResolvedValue({ id: COLUMN_ID });
+      prisma.column.update.mockResolvedValue({
+        id: COLUMN_ID,
+        boardId: BOARD_ID,
+        name: 'Renamed',
+        position: 1000,
+        color: null,
+        _count: { tasks: 0 },
+      });
+
+      await service.update(WORKSPACE_ID, COLUMN_ID, ACTOR_ID, { name: 'Renamed' });
+
+      expect(prisma.column.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: COLUMN_ID, board: { workspaceId: WORKSPACE_ID } },
+          data: { name: 'Renamed' },
+        }),
+      );
+    });
+
+    it('returns 404 and writes nothing for a column in another workspace', async () => {
+      const { service, prisma, realtime } = buildService();
+      prisma.column.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.update(WORKSPACE_ID, COLUMN_ID, ACTOR_ID, { name: 'Hijacked' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.column.update).not.toHaveBeenCalled();
+      expect(realtime.emitToBoard).not.toHaveBeenCalled();
+    });
+  });
+
+  // The service owns this check — resolveMoveNeighbors never sees the case, because the
+  // moved column is filtered out of `remaining` before the helper is called.
+  it('rejects a column as its own neighbor', async () => {
+    const { service, prisma } = buildService();
+    const column = { id: COLUMN_ID, boardId: BOARD_ID, name: 'Todo', position: 1000, color: null };
+    prisma.$transaction.mockImplementation(async (callback) =>
+      callback({
+        column: {
+          findFirst: jest.fn().mockResolvedValue(column),
+          findMany: jest.fn().mockResolvedValue([column]),
+          update: jest.fn(),
+        },
+      }),
+    );
+
+    const rejected = service.move(WORKSPACE_ID, COLUMN_ID, ACTOR_ID, { afterColumnId: COLUMN_ID });
+    await expect(rejected).rejects.toBeInstanceOf(BadRequestException);
+    await expect(rejected).rejects.toThrow('A column cannot be its own neighbor');
   });
 
   it('preserves taskCount when move rebalances positions', async () => {

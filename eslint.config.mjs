@@ -25,6 +25,25 @@ const reactHooksConfigs = (() => {
 })();
 
 /** @type {import('eslint').Linter.Config[]} */
+const jsxA11yConfigs = (() => {
+  try {
+    const jsxA11y = require('eslint-plugin-jsx-a11y');
+    const recommended = jsxA11y.flatConfigs?.recommended ?? jsxA11y.configs.recommended;
+    return [
+      {
+        files: ['apps/web/**/*.tsx'],
+        plugins: { 'jsx-a11y': jsxA11y },
+        rules: {
+          ...recommended.rules,
+        },
+      },
+    ];
+  } catch {
+    return [];
+  }
+})();
+
+/** @type {import('eslint').Linter.Config[]} */
 const nextConfigs = (() => {
   try {
     const nextPlugin = require('@next/eslint-plugin-next');
@@ -112,4 +131,5 @@ export default tseslint.config(
   },
   ...reactHooksConfigs,
   ...nextConfigs,
+  ...jsxA11yConfigs,
 );

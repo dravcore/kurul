@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { CreateTaskRequest, TaskDto } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
@@ -33,6 +33,7 @@ export function CreateTaskDialog({
   onCreated,
 }: CreateTaskDialogProps): React.ReactElement {
   const t = useTranslations('app.board.task');
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +64,14 @@ export function CreateTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        onOpenAutoFocus={(event) => {
+          // Radix focuses the content wrapper by default; take over so the title field
+          // gets focus instead, without racing Radix's own focus-management effect.
+          event.preventDefault();
+          titleInputRef.current?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t('createTitle')}</DialogTitle>
         </DialogHeader>
@@ -72,10 +80,10 @@ export function CreateTaskDialog({
             <Label htmlFor="task-title">{t('title')}</Label>
             <Input
               id="task-title"
+              ref={titleInputRef}
               required
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              autoFocus
             />
           </div>
           {error ? <p className="text-body text-destructive">{error}</p> : null}

@@ -27,6 +27,8 @@ export type UseBoardDataResult = {
   members: WorkspaceMemberDto[];
   labels: LabelDto[];
   loading: boolean;
+  /** True while task pages are still draining behind an already-painted board. */
+  tasksSyncing: boolean;
   error: string | null;
   panelError: string | null;
   metaRefreshKey: number;
@@ -61,6 +63,7 @@ export function useBoardData(
   const [members, setMembers] = useState<WorkspaceMemberDto[]>([]);
   const [labels, setLabels] = useState<LabelDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tasksSyncing, setTasksSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [metaRefreshKey, setMetaRefreshKey] = useState(0);
@@ -95,14 +98,44 @@ export function useBoardData(
     [activeId, boardId],
   );
 
-  const reloadTasks = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
+  /**
+   * Streams the task pages into state instead of waiting for the whole drain: page 0
+   * replaces the board (it is the fresh truth the caller asked for), later pages only add
+   * the ids they bring. Appending rather than replacing is what keeps an optimistic drag or
+   * a realtime patch applied mid-drain from being overwritten by a page that was already
+   * in flight when it happened.
+   */
+  const drainTasks = useCallback(
+    async (signal?: AbortSignal, onFirstPage?: () => void): Promise<void> => {
       if (!activeId) return;
-      const nextTasks = await fetchAllBoardTasks(activeId, boardId, filters, { signal });
-      if (signal?.aborted) return;
-      setTasks(nextTasks);
+      setTasksSyncing(true);
+      try {
+        await fetchAllBoardTasks(activeId, boardId, filters, {
+          init: { signal },
+          onPage: ({ items, index }) => {
+            if (signal?.aborted) return;
+            if (index === 0) {
+              setTasks(items);
+              onFirstPage?.();
+              return;
+            }
+            setTasks((current) => {
+              const known = new Set(current.map((task) => task.id));
+              const added = items.filter((task) => !known.has(task.id));
+              return added.length > 0 ? [...current, ...added] : current;
+            });
+          },
+        });
+      } finally {
+        if (!signal?.aborted) setTasksSyncing(false);
+      }
     },
     [activeId, boardId, filters],
+  );
+
+  const reloadTasks = useCallback(
+    (signal?: AbortSignal): Promise<void> => drainTasks(signal),
+    [drainTasks],
   );
 
   const reload = useCallback(
@@ -119,9 +152,23 @@ export function useBoardData(
     if (isInitial) setLoading(true);
     setError(null);
     void (async () => {
+      const reveal = (): void => {
+        if (!controller.signal.aborted) setLoading(false);
+      };
       try {
         if (isInitial) {
-          await reload(controller.signal);
+          let firstPageArrived = (): void => {};
+          const firstPage = new Promise<void>((resolve) => {
+            firstPageArrived = resolve;
+          });
+          const metaDone = reloadBoardMeta(controller.signal);
+          const tasksDone = drainTasks(controller.signal, firstPageArrived);
+          // The frame (columns) plus the first page is enough to paint the board; the
+          // remaining pages stream in behind it instead of holding the skeleton up.
+          void Promise.all([metaDone, firstPage]).then(reveal, () => {
+            // Failure is reported by the await below.
+          });
+          await Promise.all([metaDone, tasksDone]);
         } else {
           await reloadTasks(controller.signal);
         }
@@ -133,13 +180,11 @@ export function useBoardData(
           setError(t('loadError'));
         }
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+        reveal();
       }
     })();
     return () => controller.abort();
-  }, [activeId, boardId, filters, reload, reloadTasks, t]);
+  }, [activeId, boardId, filters, drainTasks, reloadBoardMeta, reloadTasks, t]);
 
   useEffect(() => {
     if (!activeId || !selectedTaskId || loading) {
@@ -176,6 +221,7 @@ export function useBoardData(
     members,
     labels,
     loading,
+    tasksSyncing,
     error,
     panelError,
     metaRefreshKey,

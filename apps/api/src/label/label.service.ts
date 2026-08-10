@@ -48,27 +48,45 @@ export class LabelService {
   }
 
   async update(workspaceId: string, labelId: string, dto: UpdateLabelDto): Promise<LabelDto> {
-    await this.findLabel(workspaceId, labelId);
-    const updated = await this.prisma.label.update({
-      where: { id: labelId },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.color !== undefined ? { color: dto.color } : {}),
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Read inside the transaction: a read outside it leaves a window in which the label can be
+      // deleted, or its board moved to another workspace, before the write runs.
+      const scoped = await tx.label.findFirst({
+        where: { id: labelId, board: { workspaceId } },
+        select: { id: true },
+      });
+      if (!scoped) throw new NotFoundException('Label not found');
+
+      // The write predicate repeats the tenant scope (label → board → workspace): the check
+      // above only proves the row was in the workspace when it ran, the predicate is what the
+      // database enforces.
+      return tx.label.update({
+        where: { id: labelId, board: { workspaceId } },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.color !== undefined ? { color: dto.color } : {}),
+        },
+      });
     });
     return this.toDto(updated);
   }
 
   async remove(workspaceId: string, labelId: string): Promise<void> {
-    await this.findLabel(workspaceId, labelId);
-    await this.prisma.label.delete({ where: { id: labelId } });
-  }
+    await this.prisma.$transaction(async (tx) => {
+      const scoped = await tx.label.findFirst({
+        where: { id: labelId, board: { workspaceId } },
+        select: { id: true },
+      });
+      if (!scoped) throw new NotFoundException('Label not found');
 
-  private async findLabel(workspaceId: string, labelId: string) {
-    const label = await this.prisma.label.findFirst({
-      where: { id: labelId, board: { workspaceId } },
+      // deleteMany, not delete: only deleteMany accepts a relation predicate, so the tenant
+      // scope travels with the write instead of resting on the read.
+      const { count } = await tx.label.deleteMany({
+        where: { id: labelId, board: { workspaceId } },
+      });
+      // Cross-workspace access is 404, never 403 (docs/api-conventions.md) — a 403 would
+      // confirm the row exists.
+      if (count === 0) throw new NotFoundException('Label not found');
     });
-    if (!label) throw new NotFoundException('Label not found');
-    return label;
   }
 }

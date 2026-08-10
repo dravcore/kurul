@@ -89,6 +89,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   0009–0012, web Vitest in CI, next-intl, and the develop merge-commit practice actually in use.
 - Tooling: type-aware ESLint (floating-promise, React hooks rules), Husky pre-commit, Dependabot,
   and CI coverage; added comment/label guardrail unit specs.
+- Tech-debt refactor (Wave 5): centralized UUID/pagination/optional-DTO validation helpers and
+  workspace-role decorators across API controllers, enriched `CreateTaskDto` label/assignee
+  handling, and fixed board a11y (drag-handle ARIA, localized DnD announcements, mention
+  combobox keyboard support).
+- Tech-debt refactor (Wave 6): shared request DTOs in `@kurultay/shared-types`
+  (`packages/shared-types/src/requests.ts`), split `board-view` and `task-metadata-panel` into
+  focused modules/hooks, and added test coverage for `TaskService.remove`, `WorkspaceGuard`,
+  notifications, and realtime edge cases.
 - **Breaking:** `GET /workspaces/:workspaceId/boards/:boardId/tasks` now returns
   `CursorPage<TaskDto>` (`{ items, nextCursor, hasMore }`) instead of a bare `TaskDto[]`.
   Clients must drain pages (or raise `limit`, max 100) to load a full board.
@@ -104,7 +112,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
-- Tech-debt cleanup: unused `@prisma/client` and `ts-node` from `apps/api`; dead
+- Tech-debt cleanup: unused `ts-node` from `apps/api` (`@prisma/client` was later restored —
+  Prisma 7 needs the package physically present for `prisma generate` even with a custom
+  `output` path); dead
   `NotificationService.createDueSoon` (the due-soon worker batches inserts directly) and the
   `dashboard-throughput` helpers (`isDoneColumnName`, `isCompletedMove`, `applyThroughputCounts`)
   that only specs exercised; stale `.gitkeep` placeholders in directories that now hold real

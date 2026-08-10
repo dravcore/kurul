@@ -62,6 +62,9 @@ export function TaskMetadataPanel({
     setBoardLabels,
     comments,
     setComments,
+    hasMoreComments,
+    loadingMoreComments,
+    loadMoreComments,
     activities,
     refreshActivities,
     loadingMeta,
@@ -255,6 +258,9 @@ export function TaskMetadataPanel({
         canMutate={canMutate}
         pending={pending}
         loading={loadingMeta}
+        hasMore={hasMoreComments}
+        loadingMore={loadingMoreComments}
+        onLoadMore={() => void loadMoreComments()}
         onSubmit={submitComment}
         onDelete={(commentId) => void removeComment(commentId)}
       />

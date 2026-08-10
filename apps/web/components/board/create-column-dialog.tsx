@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { ColumnDto, CreateColumnRequest } from '@kurultay/shared-types';
 import { ApiError, api } from '@/lib/api';
@@ -33,6 +33,7 @@ export function CreateColumnDialog({
   onCreated,
 }: CreateColumnDialogProps): React.ReactElement {
   const t = useTranslations('app.board.column');
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +67,14 @@ export function CreateColumnDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        onOpenAutoFocus={(event) => {
+          // Radix focuses the content wrapper by default; take over so the name field
+          // gets focus instead, without racing Radix's own focus-management effect.
+          event.preventDefault();
+          nameInputRef.current?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t('createTitle')}</DialogTitle>
         </DialogHeader>
@@ -75,10 +83,10 @@ export function CreateColumnDialog({
             <Label htmlFor="column-name">{t('name')}</Label>
             <Input
               id="column-name"
+              ref={nameInputRef}
               required
               value={name}
               onChange={(event) => setName(event.target.value)}
-              autoFocus
             />
           </div>
           {error ? <p className="text-body text-destructive">{error}</p> : null}

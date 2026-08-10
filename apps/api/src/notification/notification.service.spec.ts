@@ -36,7 +36,13 @@ describe('NotificationService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      $transaction: jest.fn(),
     };
+    // The default transaction hands the same mock back as `tx`, so assertions on
+    // `prisma.notification.*` also cover the calls made inside the transaction.
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
+      callback(prisma),
+    );
     return { service: new NotificationService(prisma as unknown as PrismaService), prisma };
   }
 
@@ -138,11 +144,38 @@ describe('NotificationService', () => {
       });
 
       const call = prisma.notification.update.mock.calls[0]![0] as {
-        where: { id: string };
+        where: Record<string, unknown>;
         data: { readAt: Date };
       };
-      expect(call.where).toEqual({ id: NOTIFICATION_ID });
+      // The write predicate repeats both scopes, so another member cannot mark this row read
+      // by racing the check above.
+      expect(call.where).toEqual({
+        id: NOTIFICATION_ID,
+        workspaceId: WORKSPACE_ID,
+        userId: RECIPIENT_ID,
+      });
       expect(call.data.readAt).toBeInstanceOf(Date);
+    });
+
+    it('reads the notification inside the transaction, not before it', async () => {
+      const { service, prisma } = buildService();
+      const tx = {
+        notification: {
+          findFirst: jest.fn().mockResolvedValue(notificationRow()),
+          update: jest.fn().mockResolvedValue(notificationRow({ readAt: new Date() })),
+        },
+      };
+      prisma.$transaction.mockImplementation(async (callback: (client: typeof tx) => unknown) =>
+        callback(tx),
+      );
+
+      await service.markRead(WORKSPACE_ID, RECIPIENT_ID, NOTIFICATION_ID);
+
+      // Reading outside the transaction reopens the window between check and write.
+      expect(prisma.notification.findFirst).not.toHaveBeenCalled();
+      expect(tx.notification.findFirst).toHaveBeenCalledWith({
+        where: { id: NOTIFICATION_ID, workspaceId: WORKSPACE_ID, userId: RECIPIENT_ID },
+      });
     });
 
     it('is idempotent — an already read notification is returned untouched', async () => {

@@ -16,6 +16,10 @@ interface TaskCommentsSectionProps {
   pending: boolean;
   /** Suppresses the empty message until the first fetch has settled. */
   loading: boolean;
+  /** The thread is cursor-paginated: older pages are on screen, newer ones may not be. */
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
   /** Resolves `true` once the comment is posted, which is when the draft is cleared. */
   onSubmit: (body: string) => Promise<boolean>;
   onDelete: (commentId: string) => void;
@@ -33,6 +37,9 @@ export function TaskCommentsSection({
   canMutate,
   pending,
   loading,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
   onSubmit,
   onDelete,
 }: TaskCommentsSectionProps): React.ReactElement {
@@ -163,12 +170,30 @@ export function TaskCommentsSection({
           <li className="text-small text-muted-foreground">{t('noComments')}</li>
         ) : null}
       </ul>
+      {hasMore && onLoadMore ? (
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loadingMore}
+            onClick={onLoadMore}
+          >
+            {loadingMore ? t('loadingComments') : t('loadMoreComments')}
+          </Button>
+        </div>
+      ) : null}
       {canMutate ? (
         <div className="relative flex flex-col gap-2">
           <Label htmlFor={commentId}>{t('addComment')}</Label>
           <textarea
             ref={commentRef}
             id={commentId}
+            // The implicit `textbox` role does not support `aria-expanded`; the mention
+            // picker turns this field into an editable combobox while it is open, so it
+            // needs the role that actually owns that state.
+            role="combobox"
+            aria-haspopup="listbox"
             value={commentBody}
             disabled={pending}
             rows={3}
@@ -215,6 +240,10 @@ export function TaskCommentsSection({
                     key={member.id}
                     id={mentionOptionId(index)}
                     role="option"
+                    // Never part of the tab order — the textarea keeps DOM focus and drives
+                    // selection via aria-activedescendant — but still a real keyboard target
+                    // so Enter/Space here match the click, not a no-op stub.
+                    tabIndex={-1}
                     aria-selected={index === activeMentionIndex}
                     data-active={index === activeMentionIndex || undefined}
                     className={cn(
@@ -225,6 +254,12 @@ export function TaskCommentsSection({
                     // mention is spliced into would be gone by the time the click lands.
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => applyMention(member)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        applyMention(member);
+                      }
+                    }}
                   >
                     {member.name}
                   </li>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BoardDto, CreateBoardRequest } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
@@ -29,6 +29,7 @@ export function CreateBoardDialog({
   onCreated,
 }: CreateBoardDialogProps): React.ReactElement {
   const t = useTranslations('app.board');
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [pending, setPending] = useState(false);
@@ -57,7 +58,14 @@ export function CreateBoardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        onOpenAutoFocus={(event) => {
+          // Radix focuses the content wrapper by default; take over so the name field
+          // gets focus instead, without racing Radix's own focus-management effect.
+          event.preventDefault();
+          nameInputRef.current?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t('createTitle')}</DialogTitle>
         </DialogHeader>
@@ -66,10 +74,10 @@ export function CreateBoardDialog({
             <Label htmlFor="board-name">{t('name')}</Label>
             <Input
               id="board-name"
+              ref={nameInputRef}
               required
               value={name}
               onChange={(event) => setName(event.target.value)}
-              autoFocus
             />
           </div>
           <div className="flex flex-col gap-1.5">

@@ -29,10 +29,18 @@ export type UseTaskMetadataResult = {
   setBoardLabels: Dispatch<SetStateAction<LabelDto[]>>;
   comments: CommentDto[];
   setComments: Dispatch<SetStateAction<CommentDto[]>>;
+  /** A page of comments is left on the server — the thread shown is not the whole thread. */
+  hasMoreComments: boolean;
+  loadingMoreComments: boolean;
+  loadMoreComments: () => Promise<void>;
   activities: ActivityDto[];
   refreshActivities: () => Promise<void>;
   loadingMeta: boolean;
 };
+
+const COMMENTS_PAGE_LIMIT = 100;
+/** Activity is capped at the newest page on purpose; the panel has no "older activity" view. */
+const ACTIVITIES_PAGE_LIMIT = 50;
 
 /**
  * Everything the task panel shows besides the task row itself. One aborted-on-unmount fetch
@@ -53,6 +61,8 @@ export function useTaskMetadata({
   const [members, setMembers] = useState<WorkspaceMemberDto[]>(membersProp ?? []);
   const [boardLabels, setBoardLabels] = useState<LabelDto[]>(labelsProp ?? []);
   const [comments, setComments] = useState<CommentDto[]>([]);
+  const [commentsCursor, setCommentsCursor] = useState<string | null>(null);
+  const [loadingMoreComments, setLoadingMoreComments] = useState(false);
   const [activities, setActivities] = useState<ActivityDto[]>([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
 
@@ -82,11 +92,11 @@ export function useTaskMetadata({
                 signal: controller.signal,
               }),
           api.get<CursorPage<CommentDto>>(
-            `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=100`,
+            `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=${COMMENTS_PAGE_LIMIT}`,
             { signal: controller.signal },
           ),
           api.get<CursorPage<ActivityDto>>(
-            `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=50`,
+            `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=${ACTIVITIES_PAGE_LIMIT}`,
             { signal: controller.signal },
           ),
         ]);
@@ -96,10 +106,12 @@ export function useTaskMetadata({
             setBoardLabels(nextLabels);
           }
           setComments(nextComments.items);
+          setCommentsCursor(nextComments.nextCursor);
           setActivities(nextActivities.items);
         }
       } catch {
         if (!controller.signal.aborted) {
+          setCommentsCursor(null);
           toast.error(t('metaLoadError'));
         }
       } finally {
@@ -111,10 +123,32 @@ export function useTaskMetadata({
     return () => controller.abort();
   }, [workspaceId, boardId, taskId, metaRefreshKey, membersProp, labelsProp, t]);
 
+  /** Comments come back oldest first, so the next page appends to the end of the thread. */
+  const loadMoreComments = useCallback(async (): Promise<void> => {
+    if (!commentsCursor || loadingMoreComments) return;
+    setLoadingMoreComments(true);
+    try {
+      const page = await api.get<CursorPage<CommentDto>>(
+        `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=${COMMENTS_PAGE_LIMIT}&cursor=${encodeURIComponent(commentsCursor)}`,
+      );
+      setComments((current) => {
+        // A comment posted from this panel also sits past the cursor, so the next page can
+        // repeat what is already on screen — the id is what decides, not the server slice.
+        const seen = new Set(current.map((comment) => comment.id));
+        return [...current, ...page.items.filter((comment) => !seen.has(comment.id))];
+      });
+      setCommentsCursor(page.nextCursor);
+    } catch {
+      toast.error(t('commentsLoadMoreError'));
+    } finally {
+      setLoadingMoreComments(false);
+    }
+  }, [workspaceId, taskId, commentsCursor, loadingMoreComments, t]);
+
   const refreshActivities = useCallback(async (): Promise<void> => {
     try {
       const page = await api.get<CursorPage<ActivityDto>>(
-        `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=50`,
+        `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=${ACTIVITIES_PAGE_LIMIT}`,
       );
       setActivities(page.items);
     } catch {
@@ -128,6 +162,9 @@ export function useTaskMetadata({
     setBoardLabels,
     comments,
     setComments,
+    hasMoreComments: commentsCursor !== null,
+    loadingMoreComments,
+    loadMoreComments,
     activities,
     refreshActivities,
     loadingMeta,

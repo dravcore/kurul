@@ -4,7 +4,7 @@ import { organization } from 'better-auth/plugins';
 import { uuidv7 } from 'uuidv7';
 import { PrismaClient } from '../generated/prisma';
 import { loadRootEnv, envString } from '../common/env';
-import { createSharedPrismaAdapter } from '../prisma/database';
+import { createSharedPrismaAdapter, registerPoolConsumer } from '../prisma/database';
 import { ac as sharedAc, organizationRoles as sharedRoles } from '@kurultay/auth-access';
 
 loadRootEnv();
@@ -16,10 +16,11 @@ if (!authSecret) {
 
 const prisma = new PrismaClient({ adapter: createSharedPrismaAdapter() });
 
-/** Close the Better Auth Prisma client (shared pool is ended by PrismaService). */
-export async function disconnectAuthDatabase(): Promise<void> {
-  await prisma.$disconnect();
-}
+// Better Auth's client borrows from the same pg pool as PrismaService. Hand its disconnect to
+// the pool's owner (`prisma/database.ts`) instead of tearing it down from AuthModule: Nest
+// does not order `onModuleDestroy` hooks, so a self-managed disconnect could land after the
+// pool had already been ended. `closeSharedDatabase` now drains this client first, always.
+registerPoolConsumer(() => prisma.$disconnect());
 
 const betterAuthUrl = envString('BETTER_AUTH_URL', 'http://localhost:4000');
 const webUrl = envString('WEB_URL', 'http://localhost:3000');

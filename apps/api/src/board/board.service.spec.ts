@@ -13,10 +13,26 @@ describe('BoardService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       $transaction: jest.fn(),
     };
+    // The default transaction hands the same mock back as `tx`, so assertions on
+    // `prisma.board.*` also cover the calls the service makes inside the transaction.
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
+      callback(prisma),
+    );
     return { service: new BoardService(prisma as unknown as PrismaService), prisma };
+  }
+
+  function boardRow() {
+    return {
+      id: BOARD_ID,
+      workspaceId: WORKSPACE_ID,
+      name: 'Roadmap',
+      description: null,
+      createdAt: new Date('2026-01-01'),
+    };
   }
 
   it('creates a board and its default columns in one transaction', async () => {
@@ -53,5 +69,65 @@ describe('BoardService', () => {
   it('returns 404 when a board is outside the workspace', async () => {
     const { service } = buildService();
     await expect(service.get(WORKSPACE_ID, BOARD_ID)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  describe('update', () => {
+    it('carries the tenant scope on the write predicate, not just the check', async () => {
+      const { service, prisma } = buildService();
+      prisma.board.findFirst.mockResolvedValue({ id: BOARD_ID });
+      prisma.board.update.mockResolvedValue(boardRow());
+
+      await service.update(WORKSPACE_ID, BOARD_ID, { name: 'Renamed' });
+
+      expect(prisma.board.update).toHaveBeenCalledWith({
+        where: { id: BOARD_ID, workspaceId: WORKSPACE_ID },
+        data: { name: 'Renamed' },
+      });
+    });
+
+    it('returns 404 and writes nothing for a board in another workspace', async () => {
+      const { service, prisma } = buildService();
+      prisma.board.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.update(WORKSPACE_ID, BOARD_ID, { name: 'Hijacked' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.board.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('remove', () => {
+    it('deletes with the tenant predicate rather than the bare id', async () => {
+      const { service, prisma } = buildService();
+      prisma.board.findFirst.mockResolvedValue({ id: BOARD_ID });
+
+      await expect(service.remove(WORKSPACE_ID, BOARD_ID)).resolves.toBeUndefined();
+      expect(prisma.board.deleteMany).toHaveBeenCalledWith({
+        where: { id: BOARD_ID, workspaceId: WORKSPACE_ID },
+      });
+      expect(prisma.board.delete).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 and writes nothing for a board in another workspace', async () => {
+      const { service, prisma } = buildService();
+      prisma.board.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove(WORKSPACE_ID, BOARD_ID)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.board.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the scoped delete matches no row', async () => {
+      const { service, prisma } = buildService();
+      // The row passed the in-transaction check but left the workspace before the write —
+      // the scoped predicate is what catches it, and 404 is the cross-tenant answer.
+      prisma.board.findFirst.mockResolvedValue({ id: BOARD_ID });
+      prisma.board.deleteMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.remove(WORKSPACE_ID, BOARD_ID)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
   });
 });
