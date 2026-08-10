@@ -21,4 +21,15 @@ module.exports = {
   coveragePathIgnorePatterns: ['/generated/'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
+  // Floor set a few points below the measured baseline (2026-08-09, `pnpm --filter
+  // @kurultay/api test:cov`: stmts 57.19 / branch 48.29 / funcs 59.68 / lines 58.12) so CI
+  // fails on real regressions without being so tight that routine refactors trip it.
+  coverageThreshold: {
+    global: {
+      statements: 55,
+      branches: 45,
+      functions: 57,
+      lines: 56,
+    },
+  },
 };
