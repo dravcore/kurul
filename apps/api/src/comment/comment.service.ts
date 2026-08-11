@@ -3,6 +3,7 @@ import { ActivityType, MemberRole, SocketEvents } from '@kurultay/shared-types';
 import type { CommentDto, CursorPage } from '@kurultay/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { parseMentions } from '../common/mentions/parse-mentions';
+import { toCursorPage } from '../common/pagination/cursor-page';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
@@ -65,15 +66,7 @@ export class CommentService {
       take: limit + 1,
     });
 
-    const hasMore = rows.length > limit;
-    const page = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore ? page[page.length - 1]!.id : null;
-
-    return {
-      items: page.map((comment) => this.toDto(comment)),
-      nextCursor,
-      hasMore,
-    };
+    return toCursorPage(rows, limit, (comment) => this.toDto(comment));
   }
 
   async create(

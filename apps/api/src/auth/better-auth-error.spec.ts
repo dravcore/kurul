@@ -44,10 +44,22 @@ describe('isBetterAuthApiError', () => {
 });
 
 describe('betterAuthErrorCode', () => {
-  it('derives the code Better Auth attaches to the body', () => {
-    const error = new APIError('BAD_REQUEST', { message: 'Organization already exists' });
+  it('reads the code Better Auth attaches to the body', () => {
+    // Shape produced by `APIError.from(status, ORGANIZATION_ERROR_CODES.*)`, which is how
+    // the organization plugin raises this since better-auth 1.6. Earlier versions derived
+    // `code` from the message inside the constructor; now it is carried explicitly.
+    const error = new APIError('BAD_REQUEST', {
+      message: 'Organization already exists',
+      code: 'ORGANIZATION_ALREADY_EXISTS',
+    });
 
     expect(betterAuthErrorCode(error)).toBe('ORGANIZATION_ALREADY_EXISTS');
+  });
+
+  it('returns undefined when the body carries only a message', () => {
+    expect(
+      betterAuthErrorCode(new APIError('BAD_REQUEST', { message: 'Organization already exists' })),
+    ).toBeUndefined();
   });
 
   it('returns undefined for an APIError without a body and for anything else', () => {

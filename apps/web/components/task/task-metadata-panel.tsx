@@ -15,7 +15,7 @@ import type {
   UpdateTaskRequest,
   WorkspaceMemberDto,
 } from '@kurultay/shared-types';
-import { ApiError, api } from '@/lib/api';
+import { api, resolveApiMessage } from '@/lib/api';
 import { TaskActivitySection } from './task-activity-section';
 import { TaskAssigneesSection } from './task-assignees-section';
 import { TaskCommentsSection } from './task-comments-section';
@@ -78,19 +78,18 @@ export function TaskMetadataPanel({
   });
 
   function toastMetaError(caught: unknown): void {
-    if (caught instanceof ApiError && caught.statusCode === 403) {
-      toast.error(t('forbidden'));
-    } else {
-      toast.error(t('saveError'));
-    }
+    toast.error(
+      resolveApiMessage(caught, t, { fallback: 'saveError', byStatus: { 403: 'forbidden' } }),
+    );
   }
 
   function toastLabelError(caught: unknown): void {
-    if (caught instanceof ApiError && caught.statusCode === 403) {
-      toast.error(t('labelForbidden'));
-    } else {
-      toast.error(t('labelSaveError'));
-    }
+    toast.error(
+      resolveApiMessage(caught, t, {
+        fallback: 'labelSaveError',
+        byStatus: { 403: 'labelForbidden' },
+      }),
+    );
   }
 
   async function patchTask(body: UpdateTaskRequest): Promise<void> {

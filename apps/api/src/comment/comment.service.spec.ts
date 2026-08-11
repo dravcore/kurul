@@ -99,6 +99,28 @@ describe('CommentService', () => {
     );
   });
 
+  it('drops the probe row and reports hasMore/nextCursor when more rows exist than the limit', async () => {
+    const { service, prisma } = buildService();
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    const rows = [COMMENT_ID, AUTHOR_ID, OTHER_ID].map((id, i) => ({
+      id,
+      taskId: TASK_ID,
+      userId: AUTHOR_ID,
+      body: `comment ${i}`,
+      createdAt,
+      user: { id: AUTHOR_ID, name: 'Ada', avatarUrl: null },
+    }));
+    // take: limit + 1 over-fetches by one row as the "is there another page?" probe.
+    prisma.comment.findMany.mockResolvedValue(rows);
+
+    const page = await service.list(WORKSPACE_ID, TASK_ID, { limit: 2 });
+
+    expect(page.items).toHaveLength(2);
+    expect(page.items.map((item) => item.id)).toEqual([COMMENT_ID, AUTHOR_ID]);
+    expect(page.hasMore).toBe(true);
+    expect(page.nextCursor).toBe(AUTHOR_ID);
+  });
+
   it('batches mention notifications for a comment instead of one call per mention', async () => {
     const { service, prisma, notificationService } = buildService();
     const createdAt = new Date('2026-01-01T00:00:00.000Z');

@@ -20,6 +20,26 @@ import type { UpdateWorkspaceDto } from './dto/update-workspace.dto';
  */
 const MAX_MEMBERS = 1000;
 
+/**
+ * The Better Auth organization codes that mean "this slug is already in use".
+ *
+ * The plugin does not use one code for both routes: `/organization/create` reports
+ * `ORGANIZATION_ALREADY_EXISTS`, while `/organization/update` reports
+ * `ORGANIZATION_SLUG_ALREADY_TAKEN` (a uniqueness check the route only grew in
+ * better-auth 1.6). Both are the same uniqueness violation to us, and
+ * `docs/api-conventions.md` answers that with a `409`, so both are matched here.
+ */
+const SLUG_CONFLICT_CODES = new Set([
+  'ORGANIZATION_ALREADY_EXISTS',
+  'ORGANIZATION_SLUG_ALREADY_TAKEN',
+]);
+
+/** True when the failure is Better Auth reporting a slug uniqueness violation. */
+function isSlugConflict(error: unknown): boolean {
+  const code = betterAuthErrorCode(error);
+  return code !== undefined && SLUG_CONFLICT_CODES.has(code);
+}
+
 @Injectable()
 export class WorkspaceService {
   constructor(private readonly prisma: PrismaService) {}
@@ -84,7 +104,7 @@ export class WorkspaceService {
       // The Prisma pre-check above catches the ordinary case; this covers the race where
       // the slug is taken between that read and the write. Better Auth reports it as a
       // `400`, but `docs/api-conventions.md` makes a uniqueness violation a `409`.
-      if (betterAuthErrorCode(error) === 'ORGANIZATION_ALREADY_EXISTS') {
+      if (isSlugConflict(error)) {
         throw new ConflictException('Workspace slug already taken');
       }
       rethrowBetterAuthError(error, 'Failed to create workspace');
@@ -138,7 +158,7 @@ export class WorkspaceService {
         createdAt: new Date(updated.createdAt),
       });
     } catch (error) {
-      if (betterAuthErrorCode(error) === 'ORGANIZATION_ALREADY_EXISTS') {
+      if (isSlugConflict(error)) {
         throw new ConflictException('Workspace slug already taken');
       }
       rethrowBetterAuthError(error, 'Failed to update workspace', {

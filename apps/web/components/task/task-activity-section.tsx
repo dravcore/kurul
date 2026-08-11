@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { ActivityDto } from '@kurultay/shared-types';
 import { formatActivitySummary } from '@/lib/activity-summary';
 import { formatRelativeTime } from '@/lib/relative-time';
@@ -17,6 +17,7 @@ export function TaskActivitySection({
   loading,
 }: TaskActivitySectionProps): React.ReactElement {
   const t = useTranslations('app.board.task.activity');
+  const locale = useLocale();
 
   return (
     <div className="flex flex-col gap-2">
@@ -31,7 +32,7 @@ export function TaskActivitySection({
                 dateTime={activity.createdAt}
                 title={new Date(activity.createdAt).toISOString()}
               >
-                {formatRelativeTime(activity.createdAt)}
+                {formatRelativeTime(activity.createdAt, locale)}
               </time>
             </div>
             <p className="mt-1 text-body text-foreground-secondary">

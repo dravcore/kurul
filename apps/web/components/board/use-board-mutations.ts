@@ -10,7 +10,7 @@ import type {
   MoveTaskRequest,
   TaskDto,
 } from '@kurultay/shared-types';
-import { ApiError, api } from '@/lib/api';
+import { api, apiStatus } from '@/lib/api';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import type { TaskMovePayload } from '@/components/task/use-board-task-dnd';
 
@@ -69,7 +69,7 @@ export function useBoardMutations({
         setTasks((current) => current.map((task) => (task.id === updated.id ? updated : task)));
       } catch (caught) {
         setTasks(previousTasks);
-        if (caught instanceof ApiError && caught.statusCode === 403) {
+        if (apiStatus(caught) === 403) {
           toast.error(t('errors.forbiddenTasks'));
         } else {
           toast.error(tTask('moveError'), {
@@ -124,7 +124,7 @@ export function useBoardMutations({
         next.splice(targetIndex, 0, updated);
         setColumns(next);
       } catch (caught) {
-        if (caught instanceof ApiError && caught.statusCode === 403) {
+        if (apiStatus(caught) === 403) {
           toast.error(t('errors.forbiddenColumns'));
         } else {
           toast.error(t('column.moveError'), {
@@ -160,7 +160,7 @@ export function useBoardMutations({
         }
         setColumns(created);
       } catch (caught) {
-        if (caught instanceof ApiError && caught.statusCode === 403) {
+        if (apiStatus(caught) === 403) {
           toast.error(t('errors.forbiddenColumns'));
         } else if (created.length > 0) {
           setColumns(created);

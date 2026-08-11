@@ -11,7 +11,7 @@ import type {
   UpdateTaskRequest,
   WorkspaceMemberDto,
 } from '@kurultay/shared-types';
-import { ApiError, api } from '@/lib/api';
+import { api, apiStatus, resolveApiMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -98,11 +98,17 @@ export function TaskPanel({
         title: previousTitle,
         description: previousDescription,
       });
-      if (caught instanceof ApiError && caught.statusCode === 403) {
-        toast.error(t('forbidden'));
-      } else if (caught instanceof ApiError && caught.statusCode === 404) {
-        toast.error(t('missing'));
-        close();
+      const status = apiStatus(caught);
+      // A retry only makes sense for a failure the server did not explain; re-sending a
+      // rejected write on a 403, or against a task that is gone, just repeats the toast.
+      if (status === 403 || status === 404) {
+        toast.error(
+          resolveApiMessage(caught, t, {
+            fallback: 'saveError',
+            byStatus: { 403: 'forbidden', 404: 'missing' },
+          }),
+        );
+        if (status === 404) close();
       } else {
         toast.error(t('saveError'), {
           action: { label: t('retryAction'), onClick: () => void save() },

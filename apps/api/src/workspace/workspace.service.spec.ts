@@ -71,11 +71,32 @@ describe('WorkspaceService Better Auth error mapping', () => {
   it('still answers 409 when Better Auth loses the slug race', async () => {
     const { service } = buildService();
     api.createOrganization.mockRejectedValue(
-      new APIError('BAD_REQUEST', { message: 'Organization already exists' }),
+      new APIError('BAD_REQUEST', {
+        message: 'Organization already exists',
+        code: 'ORGANIZATION_ALREADY_EXISTS',
+      }),
     );
 
     const thrown = await service
       .create('usr_1', { name: 'WS', slug: 'ws' }, request)
+      .catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(ConflictException);
+    expect((thrown as ConflictException).message).toBe('Workspace slug already taken');
+  });
+
+  // `/organization/update` reports the clash under its own code, not the one `create` uses.
+  it('answers 409 when updateOrganization loses the slug race', async () => {
+    const { service } = buildService();
+    api.updateOrganization.mockRejectedValue(
+      new APIError('BAD_REQUEST', {
+        message: 'Organization slug already taken',
+        code: 'ORGANIZATION_SLUG_ALREADY_TAKEN',
+      }),
+    );
+
+    const thrown = await service
+      .update(WORKSPACE_ID, { slug: 'taken' }, request)
       .catch((error: unknown) => error);
 
     expect(thrown).toBeInstanceOf(ConflictException);

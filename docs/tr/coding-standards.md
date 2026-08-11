@@ -222,7 +222,8 @@ components/
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `components/ui/`                      | Yalnızca shadcn/ui çıktısı. Proje component'lerini buraya koymayın ve primitive'leri shadcn workflow'unun ürettiğinin ötesinde elle değiştirmeyin. |
 | Domain klasörleri                     | Kendi component'lerine sahiptir; bir board component'i ne kadar küçük olursa olsun `board/`'a aittir                                               |
-| Domain'ler arası paylaşılan component | Yalnızca 3+ domain tarafından kullanılıyorsa; aksi halde lokal tutun                                                                               |
+| `components/common/`                  | Domain'den bağımsız, domain'ler arası paylaşılan bileşikler — DTO yok, API çağrısı yok. `ConfirmDialog` / `FormDialog` `ui/`'da değil buradadır    |
+| Domain'ler arası paylaşılan component | Önce lokal tutmayı tercih edin. 3+ domain kullanıyorsa ya da 2 domain aksi halde önemsiz olmayan bir iskeleti tekrarlayacaksa `common/`'a taşıyın  |
 | Sayfa dosyaları                       | `page.tsx` component'leri bir araya getirir; herhangi bir boyutta layout logic'i veya markup tutmaz                                                |
 
 ### Stil

@@ -25,7 +25,3 @@ export const doneColumnNameFilter = {
   equals: DONE_COLUMN_NAME,
   mode: 'insensitive',
 } as const;
-
-export function isDoneColumnName(name: string): boolean {
-  return name.trim().toLowerCase() === DONE_COLUMN_NAME_NORMALIZED;
-}

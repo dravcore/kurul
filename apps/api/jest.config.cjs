@@ -14,8 +14,11 @@ module.exports = {
       },
     ],
   },
+  // better-auth >=1.6 is ESM-only, and so is the dependency chain it pulls in
+  // (better-call -> rou3, nanostores). Jest runs CommonJS, so every one of these has to be
+  // handed to ts-jest instead of being skipped as a plain `node_modules` require.
   transformIgnorePatterns: [
-    'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch)/)',
+    'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch|rou3|nanostores)/)',
   ],
   collectCoverageFrom: ['**/*.(t|j)s', '!**/generated/**'],
   coveragePathIgnorePatterns: ['/generated/'],
