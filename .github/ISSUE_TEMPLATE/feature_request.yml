@@ -2,6 +2,19 @@ name: Feature request
 description: Propose a new feature or improvement
 labels: ['enhancement']
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Ideas are wanted. Implementations, for now, are not.**
+
+        Describe the problem, who it affects, and how you would expect it to behave — that is
+        the most useful thing you can send and it is what shapes the roadmap. Please keep
+        **code out of the thread**, though: a snippet is your copyrighted work, and while the
+        Contributor License Agreement is still in draft the maintainer cannot safely read one
+        and then write the feature.
+
+        See [CONTRIBUTING.md](../blob/develop/CONTRIBUTING.md#code-contributions-are-paused).
+
   - type: checkboxes
     id: existing-issue
     attributes:

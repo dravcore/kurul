@@ -7,6 +7,29 @@ same terms — see [LICENSE](LICENSE) — and you sign a
 [Contributor License Agreement](docs/cla.md) that additionally lets the maintainer license
 your contribution commercially. That is explained in full below.
 
+## Code contributions are paused
+
+> **We are not merging outside code, documentation, or translation pull requests right now.**
+> Ideas, bug reports and discussion are wanted as much as ever — see
+> [Ways to contribute](#ways-to-contribute).
+>
+> One exception: a typo or a dead link is still welcome as a one-line PR. A corrected spelling
+> is not an original work, so there is nothing to license and nothing to unpick later.
+
+The Contributor License Agreement below is a draft awaiting legal review. Until it is in
+force, a merged patch would sit in the codebase with its copyright unresolved: the maintainer
+could not license it commercially, and undoing that later means finding the author or deleting
+and rewriting their work. Neither is fair to you.
+
+So the honest thing is to say no up front rather than accept a patch we cannot use. This is
+temporary — the pause lifts when the CLA does. [SQLite](https://www.sqlite.org/copyright.html)
+runs this way permanently for the same reason; we do not intend to.
+
+**Please do not paste code into issues or comments.** Describe the change, point at the file
+and line, explain the approach — all of that is welcome and useful. But a diff or a snippet is
+your copyrighted work, and if it is sitting in the thread the maintainer cannot safely read it
+and then write the fix. Keeping code out of the discussion keeps that path clear.
+
 ## Code of conduct
 
 Participation is governed by [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Read it before
@@ -51,13 +74,20 @@ flag it on the PR so a maintainer can handle it rather than discover it later. S
 
 ## Ways to contribute
 
-| Type         | How                                                                            |
-| ------------ | ------------------------------------------------------------------------------ |
-| Bug report   | [Open a bug report issue](.github/ISSUE_TEMPLATE/bug_report.yml)               |
-| Feature idea | [Open a feature request issue](.github/ISSUE_TEMPLATE/feature_request.yml)     |
-| Code         | Claim an approved issue, then open a PR (see below)                            |
-| Docs         | PRs against `docs/` follow the same process as code                            |
-| Translation  | Turkish docs live under `docs/tr/`; README's Turkish sibling is `README.tr.md` |
+| Type             | Status | How                                                                        |
+| ---------------- | ------ | -------------------------------------------------------------------------- |
+| Bug report       | Open   | [Open a bug report issue](.github/ISSUE_TEMPLATE/bug_report.yml)           |
+| Feature idea     | Open   | [Open a feature request issue](.github/ISSUE_TEMPLATE/feature_request.yml) |
+| Design feedback  | Open   | Comment on an issue, or open a discussion                                  |
+| Typo / dead link | Open   | A one-line PR is fine                                                      |
+| Code             | Paused | See [Code contributions are paused](#code-contributions-are-paused)        |
+| Docs             | Paused | Same reason — a written page is a copyrighted work                         |
+| Translation      | Paused | Same reason — a translation is a derivative work                           |
+
+A feature idea, a bug report, or "this flow feels wrong and here is why" carries no copyright:
+they are facts and ideas, and they are genuinely the most useful thing anyone can send right
+now. What carries copyright is the written expression — a patch, a page of prose, a
+translation — and that is what the pause is about.
 
 ## Issue-first rule
 
