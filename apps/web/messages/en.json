@@ -43,8 +43,11 @@
       "continue": "Go to your workspace",
       "signInCta": "Sign in",
       "failedTitle": "This link didn't work",
+      "pendingTitle": "Confirm your email",
+      "pendingBody": "A confirmed address is what lets you accept workspace invitations. Everything else in Kurultay works without it.",
       "noAccount": "Need an account?",
-      "registerLink": "Create one"
+      "registerLink": "Create one",
+      "back": "Back to your workspace"
     },
     "verification": {
       "emailLabel": "Email",
@@ -68,6 +71,7 @@
       "workspaces": "Workspaces",
       "createWorkspace": "New workspace",
       "switchWorkspace": "Switch workspace",
+      "verifyEmail": "Confirm your email",
       "signOut": "Sign out",
       "loading": "Loading…",
       "loadError": "Could not load workspaces.",

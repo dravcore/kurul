@@ -17,6 +17,7 @@ import type {
   WorkspaceMemberDto,
 } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
+import { fetchAllWorkspaceMembers } from '@/lib/member-query';
 import { fetchAllBoardTasks, type BoardTaskFilters } from '@/lib/task-query';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 
@@ -86,7 +87,7 @@ export function useBoardData(
       const [nextBoard, nextColumns, nextMembers, nextLabels] = await Promise.all([
         api.get<BoardDto>(`/workspaces/${activeId}/boards/${boardId}`, { signal }),
         api.get<ColumnDto[]>(`/workspaces/${activeId}/boards/${boardId}/columns`, { signal }),
-        api.get<WorkspaceMemberDto[]>(`/workspaces/${activeId}/members`, { signal }),
+        fetchAllWorkspaceMembers(activeId, { signal }),
         api.get<LabelDto[]>(`/workspaces/${activeId}/boards/${boardId}/labels`, { signal }),
       ]);
       if (signal?.aborted) return;

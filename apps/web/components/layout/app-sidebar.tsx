@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { EmailVerificationLink } from '@/components/auth/email-verification-link';
 import { SancakRail, useSancakRail } from './sancak-rail';
 import { NotificationBell } from '@/components/notification/notification-bell';
 import { ThemeToggle } from './theme-toggle';
@@ -95,6 +96,8 @@ export function AppSidebar(): React.ReactElement {
 
       <div className="border-t border-border p-2">
         {collapsed ? <div className="mb-2 flex justify-center">{<ThemeToggle />}</div> : null}
+        {/* Renders itself away for a confirmed address — see EmailVerificationLink. */}
+        <EmailVerificationLink collapsed={collapsed} />
         <Button
           type="button"
           variant="ghost"

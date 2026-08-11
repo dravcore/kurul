@@ -1,6 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Query, Req } from '@nestjs/common';
 import { MemberRole } from '@kurultay/shared-types';
-import type { InvitationDto, WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import type {
+  CursorPage,
+  InvitationDto,
+  WorkspaceDto,
+  WorkspaceMemberDto,
+} from '@kurultay/shared-types';
 import type { Request } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';
@@ -13,6 +18,7 @@ import type { AuthenticatedUser } from '../common/types/request-context';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import { WorkspaceMemberQueryDto } from './dto/workspace-member-query.dto';
 import { WorkspaceInvitationService } from './workspace-invitation.service';
 import { WorkspaceService } from './workspace.service';
 
@@ -63,10 +69,27 @@ export class WorkspaceController {
     await this.workspaceService.remove(workspaceId, request);
   }
 
+  /**
+   * Declared before `:workspaceId/members` is irrelevant here — `/members/me` is a longer
+   * path, not a parameter that could swallow it — but the two stay adjacent on purpose: a
+   * caller that only needs its own role should never reach for the list.
+   */
+  @Get(':workspaceId/members/me')
+  @WorkspaceScoped()
+  getOwnMembership(
+    @UuidParam('workspaceId') workspaceId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<WorkspaceMemberDto> {
+    return this.workspaceService.getMembership(workspaceId, user.id);
+  }
+
   @Get(':workspaceId/members')
   @WorkspaceScoped()
-  listMembers(@UuidParam('workspaceId') workspaceId: string): Promise<WorkspaceMemberDto[]> {
-    return this.workspaceService.listMembers(workspaceId);
+  listMembers(
+    @UuidParam('workspaceId') workspaceId: string,
+    @Query() query: WorkspaceMemberQueryDto,
+  ): Promise<CursorPage<WorkspaceMemberDto>> {
+    return this.workspaceService.listMembers(workspaceId, query);
   }
 
   @Post(':workspaceId/invitations')

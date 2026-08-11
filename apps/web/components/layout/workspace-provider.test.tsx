@@ -1,0 +1,111 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+import { MemberRole, type WorkspaceDto, type WorkspaceMemberDto } from '@kurultay/shared-types';
+import messages from '@/messages/en.json';
+import { api } from '@/lib/api';
+import { WorkspaceProvider, useWorkspaceContext } from './workspace-provider';
+
+const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00';
+
+vi.mock('@/lib/api', () => ({
+  api: { get: vi.fn() },
+}));
+
+vi.mock('@/lib/socket', () => ({
+  disconnectSocket: vi.fn(),
+}));
+
+// Both hooks hand back the same object on every render, as the real ones do: the provider
+// treats the session and the router as effect dependencies, so a fresh literal per render
+// would refetch forever and the test would be measuring its own mock.
+vi.mock('next/navigation', () => {
+  const router = { replace: vi.fn(), refresh: vi.fn() };
+  return {
+    useRouter: () => router,
+    usePathname: () => '/boards',
+  };
+});
+
+vi.mock('@/lib/auth', () => {
+  const session = {
+    data: { session: { activeOrganizationId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00' } },
+    isPending: false,
+  };
+  return {
+    authClient: {
+      useSession: () => session,
+      organization: { setActive: vi.fn() },
+      signOut: vi.fn(),
+    },
+  };
+});
+
+const apiGet = vi.mocked(api.get);
+
+const workspace: WorkspaceDto = {
+  id: WORKSPACE_ID,
+  name: 'Kurultay',
+  slug: 'kurultay',
+  createdAt: '2026-01-01T00:00:00.000Z',
+};
+
+const membership: WorkspaceMemberDto = {
+  id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d01',
+  workspaceId: WORKSPACE_ID,
+  userId: 'user-1',
+  role: MemberRole.ADMIN,
+  name: 'Doğan',
+  avatarUrl: null,
+};
+
+function renderProvider() {
+  return renderHook(() => useWorkspaceContext(), {
+    wrapper: ({ children }) => (
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <WorkspaceProvider>{children}</WorkspaceProvider>
+      </NextIntlClientProvider>
+    ),
+  });
+}
+
+beforeEach(() => {
+  apiGet.mockReset();
+});
+
+describe('WorkspaceProvider bootstrap', () => {
+  /**
+   * The shell wants one fact — this user's role — and used to buy it with `/me` plus the
+   * entire roster, which is what made the roster's row cap load-bearing.
+   */
+  it('reads the role from its own membership without listing members', async () => {
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/workspaces') return Promise.resolve([workspace]) as never;
+      if (path === `/workspaces/${WORKSPACE_ID}/members/me`) {
+        return Promise.resolve(membership) as never;
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { result } = renderProvider();
+
+    await waitFor(() => expect(result.current.bootstrapped).toBe(true));
+    expect(result.current.activeRole).toBe(MemberRole.ADMIN);
+
+    const paths = apiGet.mock.calls.map((call) => call[0]);
+    expect(paths).toEqual(['/workspaces', `/workspaces/${WORKSPACE_ID}/members/me`]);
+  });
+
+  it('leaves the role unset when the membership read fails', async () => {
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/workspaces') return Promise.resolve([workspace]) as never;
+      return Promise.reject(new Error('network')) as never;
+    });
+
+    const { result } = renderProvider();
+
+    await waitFor(() => expect(result.current.bootstrapped).toBe(true));
+    expect(result.current.activeRole).toBeNull();
+    expect(result.current.loadError).not.toBeNull();
+  });
+});

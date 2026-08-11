@@ -11,6 +11,7 @@ import type {
   WorkspaceMemberDto,
 } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
+import { fetchAllWorkspaceMembers } from '@/lib/member-query';
 
 export type UseTaskMetadataOptions = {
   workspaceId: string;
@@ -83,9 +84,7 @@ export function useTaskMetadata({
         const [nextMembers, nextLabels, nextComments, nextActivities] = await Promise.all([
           sharedReady
             ? Promise.resolve(membersProp)
-            : api.get<WorkspaceMemberDto[]>(`/workspaces/${workspaceId}/members`, {
-                signal: controller.signal,
-              }),
+            : fetchAllWorkspaceMembers(workspaceId, { signal: controller.signal }),
           sharedReady
             ? Promise.resolve(labelsProp)
             : api.get<LabelDto[]>(`/workspaces/${workspaceId}/boards/${boardId}/labels`, {

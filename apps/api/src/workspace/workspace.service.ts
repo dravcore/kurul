@@ -5,20 +5,40 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { MemberRole } from '@kurultay/shared-types';
-import type { WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import type { CursorPage, WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
 import { auth } from '../auth/auth';
 import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth-error';
+import { toCursorPage } from '../common/pagination/cursor-page';
+import { MAX_PAGE_LIMIT } from '../common/pagination/page-limit';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import type { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import type { WorkspaceMemberQueryDto } from './dto/workspace-member-query.dto';
 
-/**
- * Hard cap on `listMembers` — the endpoint returns a plain array (no cursor contract), so
- * this bounds worst-case row count for very large workspaces instead of full pagination.
- */
-const MAX_MEMBERS = 1000;
+/** The membership row shape both member reads map from. */
+type MemberRow = {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  role: string;
+  user: { name: string; avatarUrl: string | null };
+};
+
+/** Name and avatar live on the user, so every member read joins the same two columns. */
+const memberInclude = { user: { select: { name: true, avatarUrl: true } } } as const;
+
+function toMemberDto(row: MemberRow): WorkspaceMemberDto {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    userId: row.userId,
+    role: row.role as MemberRole,
+    name: row.user.name,
+    avatarUrl: row.user.avatarUrl,
+  };
+}
 
 /**
  * The Better Auth organization codes that mean "this slug is already in use".
@@ -180,21 +200,50 @@ export class WorkspaceService {
     }
   }
 
-  async listMembers(workspaceId: string): Promise<WorkspaceMemberDto[]> {
-    const members = await this.prisma.workspaceMember.findMany({
-      where: { workspaceId },
-      include: { user: { select: { name: true, avatarUrl: true } } },
-      orderBy: { createdAt: 'asc' },
-      take: MAX_MEMBERS,
+  /**
+   * One cursor page of the workspace roster.
+   *
+   * This used to be a plain array behind `take: 1000`, which meant the 1001st member simply
+   * did not exist as far as any client could tell. Paging by `id` (UUIDv7, so ascending id
+   * is ascending join time — the order the array had) makes the remainder reachable instead
+   * of invisible: the response says `hasMore`, and the caller decides what to do about it.
+   */
+  async listMembers(
+    workspaceId: string,
+    query: WorkspaceMemberQueryDto,
+  ): Promise<CursorPage<WorkspaceMemberDto>> {
+    const limit = query.limit ?? MAX_PAGE_LIMIT;
+
+    const rows = await this.prisma.workspaceMember.findMany({
+      where: {
+        workspaceId,
+        ...(query.cursor ? { id: { gt: query.cursor } } : {}),
+      },
+      include: memberInclude,
+      orderBy: { id: 'asc' },
+      take: limit + 1,
     });
 
-    return members.map((m) => ({
-      id: m.id,
-      workspaceId: m.workspaceId,
-      userId: m.userId,
-      role: m.role as MemberRole,
-      name: m.user.name,
-      avatarUrl: m.user.avatarUrl,
-    }));
+    return toCursorPage(rows, limit, toMemberDto);
+  }
+
+  /**
+   * The caller's own membership.
+   *
+   * The shell only ever wanted the signed-in user's role, and paying for the whole roster to
+   * run `.find()` over it is exactly what made the truncation above load-bearing. This is the
+   * single indexed row that question actually needs.
+   */
+  async getMembership(workspaceId: string, userId: string): Promise<WorkspaceMemberDto> {
+    const member = await this.prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+      include: memberInclude,
+    });
+
+    if (!member) {
+      throw new NotFoundException('Workspace member not found');
+    }
+
+    return toMemberDto(member);
   }
 }

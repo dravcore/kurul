@@ -3,9 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import type { MemberRole, UserDto, WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import type { MemberRole, WorkspaceDto } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
+import { fetchOwnMembership } from '@/lib/member-query';
 import { disconnectSocket } from '@/lib/socket';
 
 interface WorkspaceContextValue {
@@ -92,16 +93,16 @@ export function WorkspaceProvider({
         }
 
         if (activeOrgId) {
-          const [me, members] = await Promise.all([
-            api.get<UserDto>('/me', { signal: controller.signal }),
-            api.get<WorkspaceMemberDto[]>(`/workspaces/${activeOrgId}/members`, {
-              signal: controller.signal,
-            }),
-          ]);
+          // The shell needs one thing from the workspace — this user's role — so it asks for
+          // exactly that. Reading the whole roster and matching it against `/me` cost two
+          // requests to answer a question one row already knows.
+          const membership = await fetchOwnMembership(activeOrgId, {
+            signal: controller.signal,
+          });
           if (controller.signal.aborted) {
             return;
           }
-          setActiveRole(members.find((member) => member.userId === me.id)?.role ?? null);
+          setActiveRole(membership.role);
         } else {
           setActiveRole(null);
         }
@@ -135,11 +136,8 @@ export function WorkspaceProvider({
       setActiveId(workspaceId);
       await authClient.organization.setActive({ organizationId: workspaceId });
       try {
-        const [me, members] = await Promise.all([
-          api.get<UserDto>('/me'),
-          api.get<WorkspaceMemberDto[]>(`/workspaces/${workspaceId}/members`),
-        ]);
-        setActiveRole(members.find((member) => member.userId === me.id)?.role ?? null);
+        const membership = await fetchOwnMembership(workspaceId);
+        setActiveRole(membership.role);
       } catch {
         setActiveRole(null);
       }

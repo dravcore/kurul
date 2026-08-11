@@ -53,7 +53,8 @@ GET    /workspaces/:workspaceId
 PATCH  /workspaces/:workspaceId
 DELETE /workspaces/:workspaceId
 
-GET    /workspaces/:workspaceId/members
+GET    /workspaces/:workspaceId/members        # roster'ın cursor sayfası
+GET    /workspaces/:workspaceId/members/me     # çağıranın kendi üyeliği
 POST   /workspaces/:workspaceId/invitations
 
 GET    /workspaces/:workspaceId/boards
@@ -261,9 +262,15 @@ isimleriyle):
 
 ## Pagination
 
-**Cursor pagination varsayılandır.** Sayfa numarası pagination'ı yalnızca toplam sayının
-doğal olarak küçük ve kararlı olduğu, küçük ve sınırlı koleksiyonlar için kabul edilebilir
-(bir workspace'in üyeleri, bir board'un column'ları).
+**Cursor pagination varsayılandır.** Sayfa numarası pagination'ı yalnızca gerçekten sınırlı
+koleksiyonlar (bir board'un column'ları) için kabul edilebilir — yani toplam sayının
+beklentiyle değil, yapısı gereği küçük olduğu yerlerde.
+
+"Üye sayısı zaten azdır" tam olarak böyle bir beklentiydi ve roster'ın bir faz boyunca
+`take: 1000` arkasında düz bir dizi döndürmesinin nedeni buydu: bu sınırı aşan bir workspace
+kuyruğunu sessizce kaybediyordu, yanıtta bunu söyleyen hiçbir alan olmadan. Boyutuna
+kullanıcının karar verdiği bir koleksiyon cursor alır: sayfalanmamış bir liste, sunucunun
+onu her zaman bütün döndürebileceği vaadidir.
 
 Neden varsayılan olarak cursor:
 
@@ -316,7 +323,7 @@ GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=0198e2c1-4f3a-7b21-9c4d-5e6
 ### Sayfa bazlı (yalnızca küçük koleksiyonlar)
 
 ```
-GET /workspaces/w_1/members?page=1&perPage=25
+GET /workspaces/w_1/some-bounded-collection?page=1&perPage=25
 ```
 
 ```jsonc
@@ -329,10 +336,14 @@ GET /workspaces/w_1/members?page=1&perPage=25
 }
 ```
 
-Liste yanıtları `@kurultay/shared-types` içindeki `CursorPage<T>` ile tiplenir. Küçük
-sayfa tabanlı koleksiyonlar (üyeler) şimdilik satır içi
-`{ items, page, perPage, total, totalPages }` şeklini kullanabilir — ikinci bir varsayılan
-paylaşılan sayfalama tipi eklemeyin.
+Bugün hiçbir endpoint bu şekli kullanmıyor — sayfalanan her liste
+`@kurultay/shared-types` içindeki `CursorPage<T>`. Gerçekten sayfa numarasına ihtiyaç duyan
+bir koleksiyon, ayrı bir tip yazmaya değene kadar yukarıdaki satır içi şekli kullanabilir;
+ikinci bir varsayılan paylaşılan sayfalama tipi eklemeyin.
+
+Tek sayfaya sığan bir liste de bir sayfadır. `GET .../members`, `limit` varsayılanını `100`
+tavanına ayarlar; dolayısıyla sıradan bir workspace tek istekte `hasMore: false` yanıtı alır
+— client cursor'ı yalnızca gidilecek bir yer kaldığında yürütür.
 
 ## Filtreleme, sıralama, alan seçimi
 

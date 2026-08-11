@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { Priority, type TaskDto } from '@kurultay/shared-types';
+import {
+  MemberRole,
+  Priority,
+  type TaskDto,
+  type WorkspaceMemberDto,
+} from '@kurultay/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import type { BoardTaskFilters, BoardTaskPage, FetchBoardTasksOptions } from '@/lib/task-query';
@@ -46,11 +51,24 @@ function task(id: string): TaskDto {
   };
 }
 
+function member(id: string): WorkspaceMemberDto {
+  return {
+    id,
+    workspaceId: WORKSPACE_ID,
+    userId: `user-${id}`,
+    role: MemberRole.MEMBER,
+    name: `Member ${id}`,
+    avatarUrl: null,
+  };
+}
+
 function metaResponse(path: string): unknown {
   if (path.endsWith('/columns')) {
     return [{ id: 'column-1', boardId: BOARD_ID, name: 'To Do', position: 1 }];
   }
-  if (path.endsWith('/members') || path.endsWith('/labels')) return [];
+  // The roster is a cursor page; the drain lives in `lib/member-query`.
+  if (path.includes('/members')) return { items: [], nextCursor: null, hasMore: false };
+  if (path.endsWith('/labels')) return [];
   return { id: BOARD_ID, name: 'Board' };
 }
 
@@ -141,6 +159,29 @@ describe('useBoardData task streaming', () => {
 
     await waitFor(() => expect(result.current.tasks).toHaveLength(2));
     expect(result.current.tasks[0]?.position).toBe(42);
+  });
+
+  /**
+   * The assignee filter and the assignee picker both filter this list locally, so a roster
+   * that stopped at page one would quietly hide the people on page two.
+   */
+  it('loads the whole roster, not just the first member page', async () => {
+    drain.mockResolvedValue([]);
+    apiGet.mockImplementation((path: string) => {
+      if (path.includes('/members')) {
+        return Promise.resolve(
+          path.includes('cursor=cursor-1')
+            ? { items: [member('b')], nextCursor: null, hasMore: false }
+            : { items: [member('a')], nextCursor: 'cursor-1', hasMore: true },
+        ) as never;
+      }
+      return Promise.resolve(metaResponse(path)) as never;
+    });
+
+    const { result } = renderBoardData();
+
+    await waitFor(() => expect(result.current.members).toHaveLength(2));
+    expect(result.current.members.map((entry) => entry.id)).toEqual(['a', 'b']);
   });
 
   it('reports the load error when the drain fails', async () => {
