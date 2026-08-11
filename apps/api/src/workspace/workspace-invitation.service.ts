@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,10 +10,28 @@ import type { InvitationDto, InvitationStatus, WorkspaceMemberDto } from '@kurul
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
 import { auth } from '../auth/auth';
-import { rethrowBetterAuthError } from '../auth/better-auth-error';
-import { envString } from '../common/env';
+import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth-error';
+import { buildInviteAcceptUrl } from '../auth/web-urls';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateInvitationDto } from './dto/create-invitation.dto';
+
+/**
+ * Better Auth's code for "this session's address is not verified", raised by
+ * accept/reject/get-invitation because `requireEmailVerificationOnInvitation` is on.
+ */
+const EMAIL_NOT_VERIFIED_CODE =
+  'EMAIL_VERIFICATION_REQUIRED_BEFORE_ACCEPTING_OR_REJECTING_INVITATION';
+
+/**
+ * Message the web client keys on to offer "resend verification email".
+ *
+ * Unlike the other invitation failures this one is deliberately specific: it describes the
+ * caller's own account to the caller, so it reveals nothing about anyone else, and a generic
+ * "Failed to accept invitation" would look like a broken invitation instead of a step the
+ * user still has to take.
+ */
+export const EMAIL_NOT_VERIFIED_MESSAGE =
+  'Confirm your email address before accepting this invitation';
 
 @Injectable()
 export class WorkspaceInvitationService {
@@ -106,7 +125,6 @@ export class WorkspaceInvitationService {
         throw new ConflictException('Invitation was changed concurrently, please try again');
       }
 
-      const webUrl = envString('WEB_URL', 'http://localhost:3000');
       return {
         id: invitation.id,
         workspaceId,
@@ -114,7 +132,9 @@ export class WorkspaceInvitationService {
         role: dto.role,
         status: invitation.status as InvitationStatus,
         expiresAt: new Date(invitation.expiresAt).toISOString(),
-        acceptUrl: `${webUrl}/invite/${invitation.id}`,
+        // Same builder the invitation email uses, so the link an admin copies from the UI and
+        // the link in the invitee's inbox can never point at different routes.
+        acceptUrl: buildInviteAcceptUrl(invitation.id),
       };
     } catch (error) {
       // Deliberately generic: the plugin distinguishes "already a member" from "already
@@ -192,6 +212,10 @@ export class WorkspaceInvitationService {
         avatarUrl: user.avatarUrl,
       };
     } catch (error) {
+      if (betterAuthErrorCode(error) === EMAIL_NOT_VERIFIED_CODE) {
+        throw new ForbiddenException(EMAIL_NOT_VERIFIED_MESSAGE);
+      }
+
       rethrowBetterAuthError(error, 'Failed to accept invitation', {
         404: 'Invitation not found',
       });

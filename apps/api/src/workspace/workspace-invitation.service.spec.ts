@@ -9,7 +9,10 @@ import { APIError } from 'better-auth/api';
 import type { Request } from 'express';
 import { auth } from '../auth/auth';
 import { PrismaService } from '../prisma/prisma.service';
-import { WorkspaceInvitationService } from './workspace-invitation.service';
+import {
+  EMAIL_NOT_VERIFIED_MESSAGE,
+  WorkspaceInvitationService,
+} from './workspace-invitation.service';
 
 // `auth.ts` opens a Postgres pool and demands DATABASE_URL / BETTER_AUTH_SECRET at import
 // time, so the whole module is replaced — these tests are about what the service does with
@@ -297,6 +300,30 @@ describe('WorkspaceInvitationService invitation error mapping', () => {
     expect(thrown).toBeInstanceOf(BadRequestException);
     expect((thrown as BadRequestException).message).toBe('Failed to accept invitation');
   });
+  it('tells an unverified invitee what to do instead of hiding it behind a generic 403', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findUnique.mockResolvedValue({
+      id: 'inv_1',
+      workspaceId: WORKSPACE_ID,
+      status: 'pending',
+    });
+    api.acceptInvitation.mockRejectedValue(
+      new APIError('FORBIDDEN', {
+        message: 'Email verification required before accepting or rejecting invitation',
+        code: 'EMAIL_VERIFICATION_REQUIRED_BEFORE_ACCEPTING_OR_REJECTING_INVITATION',
+      }),
+    );
+
+    const thrown = await service
+      .acceptInvitation(WORKSPACE_ID, 'inv_1', request)
+      .catch((error: unknown) => error);
+
+    // The message is the web client's cue to offer "resend the confirmation email"; it says
+    // nothing about anyone but the caller, so being specific here leaks nothing.
+    expect(thrown).toBeInstanceOf(ForbiddenException);
+    expect((thrown as ForbiddenException).message).toBe(EMAIL_NOT_VERIFIED_MESSAGE);
+  });
+
   it('keeps the 404 the service raised before reaching Better Auth', async () => {
     const { service, prisma } = buildService();
     prisma.workspaceInvitation.findUnique.mockResolvedValue(null);

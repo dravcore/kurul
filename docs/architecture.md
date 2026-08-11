@@ -85,18 +85,19 @@ Every module has the same skeleton: `*.module.ts`, `*.controller.ts`, `*.service
 **Current vs planned:** after Phase 9, feature modules including `realtime` are implemented.
 Treat the table below as the module map.
 
-| Module         | Responsibility                                                     |
-| -------------- | ------------------------------------------------------------------ |
-| `auth`         | Better Auth integration, session handling, request user resolution |
-| `workspace`    | Workspace CRUD, membership, invitations, roles                     |
-| `board`        | Board and column management, column ordering                       |
-| `task`         | Task CRUD, moving between columns, fractional-index reordering     |
-| `label`        | Board-scoped labels and task-label assignment                      |
-| `comment`      | Task comments                                                      |
-| `activity`     | Append-only activity log (`payload` is Json)                       |
-| `dashboard`    | Aggregation queries feeding the charts                             |
-| `notification` | Notification fan-out, Redis-backed queue                           |
-| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                     |
+| Module         | Responsibility                                                          |
+| -------------- | ----------------------------------------------------------------------- |
+| `auth`         | Better Auth integration, session handling, request user resolution      |
+| `workspace`    | Workspace CRUD, membership, invitations, roles                          |
+| `board`        | Board and column management, column ordering                            |
+| `task`         | Task CRUD, moving between columns, fractional-index reordering          |
+| `label`        | Board-scoped labels and task-label assignment                           |
+| `comment`      | Task comments                                                           |
+| `activity`     | Append-only activity log (`payload` is Json)                            |
+| `dashboard`    | Aggregation queries feeding the charts                                  |
+| `notification` | Notification fan-out, Redis-backed queue                                |
+| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                          |
+| `mail`         | SMTP delivery (`nodemailer`); logs instead of sending when unconfigured |
 
 Cross-cutting infrastructure:
 
@@ -257,19 +258,20 @@ Reaching stage 2 requires no architectural change — clean NestJS module bounda
 
 The reasoning behind each of these choices is recorded as an ADR:
 
-| ADR                                                                                            | Topic                                                   |
-| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modular monolith                             |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Better Auth with the organization plugin (→ Workspace)  |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                               |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Float positions for ordering                            |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                       |
-| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board and column Nest `@Roles` matrix                   |
-| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task Nest `@Roles` matrix                               |
-| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata Nest `@Roles` matrix            |
+| ADR                                                                                            | Topic                                                            |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modular monolith                                      |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                   |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts          |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Better Auth with the organization plugin (→ Workspace)           |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                                        |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Float positions for ordering                                     |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                         |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                                |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board and column Nest `@Roles` matrix                            |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task Nest `@Roles` matrix                                        |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata Nest `@Roles` matrix                     |
+| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail delivery, email verification on invitation accept only |
 
 Related: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (historical Phase 1 scaffold) · [docs/README.md](README.md) (docs map)

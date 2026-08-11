@@ -53,6 +53,16 @@ services:
       # No baked-in default: compose fails loudly instead of booting with a known secret.
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env — see docs/development.md#environment-variables}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:4000}
+      # SMTP is optional — unlike BETTER_AUTH_SECRET above, compose does not fail loudly when
+      # it's unset. The mail module falls back to logging instead of sending, so the API still
+      # boots, but no invitation can be accepted until these are set in .env (see
+      # docs/decisions/0013-invitation-email-verification.md).
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      MAIL_FROM: ${MAIL_FROM:-}
     ports:
       - '4000:4000'
     depends_on:

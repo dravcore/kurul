@@ -23,12 +23,43 @@
     },
     "invite": {
       "title": "Accept invitation",
-      "subtitle": "Join the workspace you were invited to.",
+      "subtitle": "You've been invited to join {workspace}.",
       "submit": "Accept invite",
+      "submitPending": "Accepting…",
       "signInFirst": "Sign in with the invited email to accept.",
       "signInCta": "Sign in",
       "loading": "Loading invitation…",
-      "error": "Could not accept this invitation."
+      "error": "Could not accept this invitation.",
+      "forbidden": "This invitation was sent to a different address.",
+      "loadError": "This invitation is no longer available. Ask for a new one.",
+      "backToApp": "Back to your workspaces",
+      "verifyTitle": "Confirm your email first",
+      "verifyBody": "Invitations can only be accepted from a confirmed address. Send a link to {email} and open it — you'll come straight back here."
+    },
+    "verifyEmail": {
+      "loading": "Checking your link…",
+      "successTitle": "Email confirmed",
+      "successBody": "Your address is confirmed. You can accept workspace invitations from it now.",
+      "continue": "Go to your workspace",
+      "signInCta": "Sign in",
+      "failedTitle": "This link didn't work",
+      "noAccount": "Need an account?",
+      "registerLink": "Create one"
+    },
+    "verification": {
+      "emailLabel": "Email",
+      "resendAction": "Send a new link",
+      "sending": "Sending…",
+      "sentTo": "A new link is on its way to {email}. It's good for a short while.",
+      "sentIfRegistered": "If that address has an unconfirmed account, a new link is on its way.",
+      "alreadyConfirmed": "This address is already confirmed.",
+      "sendError": "Could not send the link. Try again in a moment.",
+      "linkErrors": {
+        "TOKEN_EXPIRED": "This link has expired. Confirmation links are short-lived, so send yourself a new one.",
+        "INVALID_TOKEN": "This link isn't valid. It may have been used already, or copied without its last characters.",
+        "USER_NOT_FOUND": "There's no account for the address in this link.",
+        "unknown": "This link couldn't be checked."
+      }
     }
   },
   "app": {

@@ -30,6 +30,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0010](0010-task-permissions.md)                | Task Permissions                                                     | Accepted                                         | 2026-08-09 |
 | [0011](0011-label-task-metadata-permissions.md) | Label and Task-Metadata Permissions                                  | Accepted (comment-delete row superseded by 0012) | 2026-08-09 |
 | [0012](0012-comment-delete-authorship.md)       | Comment Delete Authorship                                            | Accepted                                         | 2026-08-09 |
+| [0013](0013-invitation-email-verification.md)   | Invitation-Acceptance Email Verification                             | Accepted                                         | 2026-08-10 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).

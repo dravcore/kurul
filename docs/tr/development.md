@@ -10,6 +10,7 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 - [Ön koşullar](#ön-koşullar)
 - [Klonlama ve kurulum](#klonlama-ve-kurulum)
 - [Ortam değişkenleri](#ortam-değişkenleri)
+- [SMTP ve Mailpit](#smtp-ve-mailpit)
 - [Çalışma modları](#çalışma-modları)
 - [pnpm script'leri](#pnpm-scriptleri)
 - [Veritabanı iş akışı](#veritabanı-iş-akışı)
@@ -64,15 +65,21 @@ cp .env.example .env
 
 Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit edilmemelidir.
 
-| Değişken              | Örnek                                                    | Amaç                                                                                                              |
-| --------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma bağlantı string'i                                                                                          |
-| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io Redis adapter'ı, caching, BullMQ due-soon worker (`due-soon` kuyruğu)                                   |
-| `BETTER_AUTH_SECRET`  | _(üret)_                                                 | Session imzalama secret'ı — zorunlu, varsayılan yok                                                               |
-| `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir)                                                 |
-| `API_PORT`            | `4000`                                                   | NestJS dinleme portu                                                                                              |
-| `WEB_URL`             | `http://localhost:3000`                                  | API için CORS origin'i                                                                                            |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                  | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir) |
+| Değişken              | Örnek                                                             | Amaç                                                                                                                       |
+| --------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay`          | Prisma bağlantı string'i                                                                                                   |
+| `REDIS_URL`           | `redis://localhost:6379`                                          | Socket.io Redis adapter'ı, caching, BullMQ due-soon worker (`due-soon` kuyruğu)                                            |
+| `BETTER_AUTH_SECRET`  | _(üret)_                                                          | Session imzalama secret'ı — zorunlu, varsayılan yok                                                                        |
+| `BETTER_AUTH_URL`     | `http://localhost:4000`                                           | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir)                                                          |
+| `API_PORT`            | `4000`                                                            | NestJS dinleme portu                                                                                                       |
+| `WEB_URL`             | `http://localhost:3000`                                           | API için CORS origin'i                                                                                                     |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                           | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir)          |
+| `SMTP_HOST`           | `localhost` (geliştirme, Mailpit üzerinden)                       | SMTP sunucu host'u. Tamamen boş bırakılırsa mail modülü göndermek yerine loglar — bkz. [SMTP ve Mailpit](#smtp-ve-mailpit) |
+| `SMTP_PORT`           | `1025` (geliştirme, Mailpit üzerinden) / `587` (tipik production) | SMTP sunucu portu                                                                                                          |
+| `SMTP_USER`           | _(Mailpit için boş)_                                              | SMTP auth kullanıcı adı, sunucunuz gerektiriyorsa                                                                          |
+| `SMTP_PASSWORD`       | _(Mailpit için boş)_                                              | SMTP auth şifresi, sunucunuz gerektiriyorsa                                                                                |
+| `SMTP_SECURE`         | `false`                                                           | Örtük TLS için (port 465) `true`, STARTTLS/plaintext için (587/25, ve Mailpit) `false`                                     |
+| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                                  | Giden mail'lerdeki `From:` başlığı                                                                                         |
 
 Bir secret üretmek için:
 
@@ -84,6 +91,43 @@ openssl rand -base64 32
 `apps/api/src/common/env.ts` yardımcıları üzerinden bağla (veya `process.env` okuyan çağrı
 noktası — bugün ayrı bir Zod/tipli env şeması yok), güvenli bir placeholder ile
 `.env.example`'a ekle ve yukarıdaki tabloda belgele.
+
+## SMTP ve Mailpit
+
+Kurultay bugün tek bir akış için e-posta gönderiyor: `accept-invitation`'ın bir davet
+edilenin workspace'e katılmasına izin vermeden önce ihtiyaç duyduğu doğrulama linki (bkz.
+[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
+`SMTP_HOST`'u boş bırakmak geçerli bir seçenek — API yine ayağa kalkar ve mail modülü mesajı
+göndermek yerine loglar — ama bu doğru olduğu sürece **hiçbir davet kabul edilemez**. Gerçek
+mail göndermeden akışı lokal olarak yerinde denemek için, `docker-compose.dev.yml`'in
+`postgres` ve `redis`'in yanında zaten başlattığı `mailpit` servisini kullanın:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d   # postgres + redis + mailpit
+```
+
+Sonra `.env`'inizde şunları set edin (zaten `.env.example`'ın önerdiği varsayılanlar, ama
+Mailpit host/port'un ona açıkça yönlendirilmesini gerektirir):
+
+```bash
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_SECURE=false
+# SMTP_USER / SMTP_PASSWORD boş kalır — Mailpit auth gerektirmez
+MAIL_FROM=Kurultay <noreply@example.com>
+```
+
+| URL                   | Ne                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| http://localhost:8025 | Mailpit web UI'ı — API'nin gönderdiği her mesaj gerçek bir inbox yerine buraya düşer  |
+| localhost:1025        | Mailpit'in SMTP dinleyicisi — yukarıdaki `SMTP_HOST`/`SMTP_PORT`'un işaret ettiği yer |
+
+Davet akışını uçtan uca test etmek için: uygulamadan bir davet gönderin, http://localhost:8025
+adresini açın, en yeni mesaja tıklayın ve içindeki doğrulama linkini tarayıcınızda açın (veya
+kopyalayın — Mailpit hem plain-text hem HTML kısımları render eder, link her ikisinde de aynı
+şekilde çalışır). Davet edilenin hesabı artık doğrulanmıştır ve `accept-invitation` başarılı
+olur. `docker compose -f docker-compose.dev.yml down -v`, Postgres/Redis volume'leriyle
+birlikte Mailpit'in sakladığı mesajları da temizler.
 
 ## Çalışma modları
 

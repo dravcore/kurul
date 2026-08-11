@@ -30,6 +30,7 @@ The technology chosen for each layer of Kurultay, with a short rationale and the
 | Drag & drop            | @dnd-kit                               | pragmatic-drag-and-drop               |
 | Charts                 | Recharts                               | Chart.js, Apache ECharts              |
 | Auth                   | Better Auth (organization plugin)      | Auth.js / NextAuth (maintenance mode) |
+| Email                  | `nodemailer` over SMTP                 | Provider API (Resend, SendGrid, …)    |
 | Deployment             | Docker Compose                         | Kubernetes (once scale demands it)    |
 
 Architecture (monorepo + modular monolith) is covered separately in [architecture.md](architecture.md).
@@ -67,6 +68,10 @@ The safest default for a React dashboard: broad ecosystem adoption, a comprehens
 ### Auth — Better Auth
 
 Multi-tenant workspaces are the heart of this product, so auth is a load-bearing choice. Better Auth is the strongest self-hosted option for new projects in 2026 — more capable than NextAuth, free, actively maintained — and Auth.js/NextAuth is in maintenance mode with Better Auth positioned as its successor. The decisive factor is the **organization plugin**: multi-tenant organizations, invitations, member roles, and permissions out of the box, which would take weeks to build. In product language those map 1:1 to **Workspace** / **WorkspaceMember** / invitations — see [`decisions/0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace). Self-hosting keeps data sovereignty in-house with no dependency on a managed service like Clerk. Note that Better Auth ships backend logic only — login and register UI is ours to write.
+
+### Email — nodemailer over SMTP
+
+Kurultay sends one class of transactional email so far: the verification link an invitee needs before `better-auth`'s hardened invitation-acceptance check will let them join a workspace (see [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)). `nodemailer` talks plain SMTP, configured only through `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` / `MAIL_FROM` — no provider SDK, so self-hosters point it at whatever mail server they already run instead of creating a new vendor account. `docker-compose.dev.yml` runs [Mailpit](https://mailpit.axllent.org/) as a local SMTP catch-all so development never sends real mail; see [development.md#smtp-and-mailpit](development.md#smtp-and-mailpit).
 
 ### Frontend — Next.js 16
 
@@ -113,19 +118,20 @@ Projects worth studying for architecture and data modelling:
 
 Full arguments and consequences live in [`decisions/`](decisions/) rather than being repeated here:
 
-| ADR                                                                                            | Topic                                                   |
-| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modular monolith                             |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Better Auth with the organization plugin (→ Workspace)  |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                               |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Float positions for ordering                            |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                       |
-| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board and column role matrix (OWNER/ADMIN structure)    |
-| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task role matrix (MEMBER+ content work)                 |
-| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata role matrix                     |
-| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Comment delete: authorship or OWNER/ADMIN               |
+| ADR                                                                                            | Topic                                                            |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modular monolith                                      |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                   |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts          |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Better Auth with the organization plugin (→ Workspace)           |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                                        |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Float positions for ordering                                     |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                         |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                                |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board and column role matrix (OWNER/ADMIN structure)             |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task role matrix (MEMBER+ content work)                          |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata role matrix                              |
+| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Comment delete: authorship or OWNER/ADMIN                        |
+| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail delivery, email verification on invitation accept only |
 
 Related: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)

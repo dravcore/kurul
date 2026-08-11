@@ -24,6 +24,7 @@ Kurultay, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğun
 | [0010](0010-task-permissions.md)                | Task İzinleri                                                        | Kabul edildi                                          | 2026-08-09 |
 | [0011](0011-label-task-metadata-permissions.md) | Label ve Task-Metadata İzinleri                                      | Kabul edildi (yorum-silme satırının yerini 0012 aldı) | 2026-08-09 |
 | [0012](0012-comment-delete-authorship.md)       | Yorum Silme Yazarlığı                                                | Kabul edildi                                          | 2026-08-09 |
+| [0013](0013-invitation-email-verification.md)   | Davet Kabulünde E-posta Doğrulaması                                  | Kabul edildi                                          | 2026-08-10 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 

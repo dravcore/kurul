@@ -27,6 +27,32 @@ export function apiStatus(caught: unknown): number | null {
   return caught instanceof ApiError ? caught.statusCode : null;
 }
 
+/** The failure Better Auth's client returns as a value instead of throwing. */
+export interface AuthClientErrorBody {
+  /** Better Auth's machine-readable reason, e.g. `EMAIL_ALREADY_VERIFIED`. */
+  code?: string;
+  message?: string;
+  status: number;
+  statusText: string;
+}
+
+/**
+ * Lifts a Better Auth client failure into the `ApiError` the rest of the app catches.
+ *
+ * Better Auth answers `{ data, error }` rather than throwing, so a screen that calls both it
+ * and `api.*` would otherwise need two error paths side by side — and `apiStatus`,
+ * `resolveApiMessage` and `useApiResource` would work on only one of them. The code goes into
+ * `error` because that is the field callers are told to branch on
+ * (`docs/api-conventions.md#errors`), never the message.
+ */
+export function authClientError(body: AuthClientErrorBody): ApiError {
+  return new ApiError({
+    statusCode: body.status,
+    error: body.code ?? body.statusText,
+    message: body.message ?? body.statusText,
+  });
+}
+
 /**
  * The slice of a next-intl translator this module needs — narrowed to a plain function so
  * the mapping stays testable without standing up an intl provider.

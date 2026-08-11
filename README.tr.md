@@ -55,6 +55,11 @@ pnpm dev
 - Web: http://localhost:3000
 - API health: http://localhost:4000/health
 
+Uygulama SMTP yapılandırılmadan da ayağa kalkar, ama davetler yapılandırılana kadar kabul
+edilemez — yukarıdaki dev compose dosyası [Mailpit](https://mailpit.axllent.org/)'i zaten
+başlatır, böylece bu akışı gerçek bir mail sağlayıcısı olmadan lokal olarak test edebilirsiniz;
+bkz. [docs/tr/development.md#smtp-ve-mailpit](docs/tr/development.md#smtp-ve-mailpit).
+
 Tam stack Docker: `docker compose up --build`. Günlük detaylar:
 [docs/tr/development.md](docs/tr/development.md).
 
@@ -65,6 +70,7 @@ Tam stack Docker: `docker compose up --build`. Günlük detaylar:
 | Backend           | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                     |
 | Frontend          | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts       |
 | Auth              | Better Auth (organization plugin → Workspace)                                  |
+| E-posta           | SMTP üzerinden `nodemailer` (davet doğrulaması)                                |
 | Paylaşılan tipler | `packages/shared-types` + `packages/auth-access` (DTO'lar / BA org AC rolleri) |
 | Deployment        | Docker Compose                                                                 |
 | Mimari            | Monorepo, modüler monolit — mikroservis yok                                    |

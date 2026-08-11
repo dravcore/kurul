@@ -3,8 +3,11 @@ name: CI
 on:
   push:
     branches: [develop, main]
+  # Every PR, not just those targeting develop/main. A stacked PR (one wave based on the
+  # previous one) has a feature branch as its base, so a `[develop, main]` filter skipped it
+  # entirely — and GitHub still reported the PR as mergeable, which reads as "CI passed".
   pull_request:
-    branches: [develop, main]
+    branches: ['**']
 
 concurrency:
   group: ci-${{ github.ref }}

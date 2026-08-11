@@ -31,6 +31,7 @@ alternatif.
 | Drag & drop            | @dnd-kit                               | pragmatic-drag-and-drop                 |
 | Grafik                 | Recharts                               | Chart.js, Apache ECharts                |
 | Auth                   | Better Auth (organization plugin)      | Auth.js / NextAuth (bakım modunda)      |
+| E-posta                | SMTP üzerinden `nodemailer`            | Sağlayıcı API'si (Resend, SendGrid, …)  |
 | Deployment             | Docker Compose                         | Kubernetes (ölçek gerektirdiğinde)      |
 
 Mimari (monorepo + modüler monolit) ayrı olarak [architecture.md](architecture.md)'de ele
@@ -133,6 +134,20 @@ Self-hosting, Clerk gibi yönetilen bir servise bağımlılık olmadan veri
 egemenliğini içeride tutuyor. Better Auth'un yalnızca backend logic sağladığını, login ve
 register UI'ının bizim yazmamız gerektiğini unutma.
 
+### E-posta — SMTP üzerinden nodemailer
+
+Kurultay bugüne kadar tek bir sınıf e-posta gönderiyor: `better-auth`'un sağlamlaştırılmış
+davet-kabul kontrolünün bir davet edilenin workspace'e katılmasına izin vermeden önce
+ihtiyaç duyduğu doğrulama linki (bkz.
+[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
+`nodemailer` düz SMTP konuşur, yalnızca `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` /
+`SMTP_PASSWORD` / `SMTP_SECURE` / `MAIL_FROM` üzerinden yapılandırılır — sağlayıcı SDK'sı yok,
+dolayısıyla self-hoster'lar yeni bir vendor hesabı oluşturmak yerine zaten çalıştırdıkları
+herhangi bir mail sunucusuna yönlendirirler. `docker-compose.dev.yml`, lokal geliştirmenin
+asla gerçek mail göndermemesi için lokal bir SMTP catch-all olarak
+[Mailpit](https://mailpit.axllent.org/) çalıştırır; bkz.
+[development.md#smtp-ve-mailpit](development.md#smtp-ve-mailpit).
+
 ### Frontend — Next.js 16
 
 `apps/web` için pinlenen major **Next.js 16** (App Router). Tailwind, shadcn/ui, klasik
@@ -188,19 +203,20 @@ Mimari ve veri modelleme için incelemeye değer projeler:
 Tam argümanlar ve sonuçlar burada tekrarlanmak yerine [`decisions/`](decisions/) altında
 yaşıyor:
 
-| ADR                                                                                            | Konu                                                    |
-| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modüler monolit                              |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8          |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Organization plugin'i ile Better Auth (→ Workspace)     |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                               |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Sıralama için Float position'lar                        |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                       |
-| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board ve column rol matrisi (OWNER/ADMIN yapısı)        |
-| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task rol matrisi (MEMBER+ içerik işi)                   |
-| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label ve task-metadata rol matrisi                      |
-| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Yorum silme: yazarlık veya OWNER/ADMIN                  |
+| ADR                                                                                            | Konu                                                              |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modüler monolit                                        |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                    |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts           |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Organization plugin'i ile Better Auth (→ Workspace)               |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                                         |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Sıralama için Float position'lar                                  |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                          |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                                 |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board ve column rol matrisi (OWNER/ADMIN yapısı)                  |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task rol matrisi (MEMBER+ içerik işi)                             |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label ve task-metadata rol matrisi                                |
+| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Yorum silme: yazarlık veya OWNER/ADMIN                            |
+| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde |
 
 İlgili: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)

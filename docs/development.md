@@ -10,6 +10,7 @@ How to set up a Kurultay development environment and work in it day to day.
 - [Prerequisites](#prerequisites)
 - [Clone and install](#clone-and-install)
 - [Environment variables](#environment-variables)
+- [SMTP and Mailpit](#smtp-and-mailpit)
 - [Run modes](#run-modes)
 - [pnpm scripts](#pnpm-scripts)
 - [Database workflow](#database-workflow)
@@ -64,15 +65,21 @@ cp .env.example .env
 
 Then fill in the blanks. `.env` is git-ignored and must never be committed.
 
-| Variable              | Example                                                  | Purpose                                                                                               |
-| --------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string                                                                              |
-| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io Redis adapter, caching, BullMQ due-soon worker (`due-soon` queue)                           |
-| `BETTER_AUTH_SECRET`  | _(generate)_                                             | Session signing secret — required, no default                                                         |
-| `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | Public URL of the API (Better Auth is mounted at `/auth/*`)                                           |
-| `API_PORT`            | `4000`                                                   | NestJS listen port                                                                                    |
-| `WEB_URL`             | `http://localhost:3000`                                  | CORS origin for the API                                                                               |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                  | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg) |
+| Variable              | Example                                                  | Purpose                                                                                                                  |
+| --------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string                                                                                                 |
+| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io Redis adapter, caching, BullMQ due-soon worker (`due-soon` queue)                                              |
+| `BETTER_AUTH_SECRET`  | _(generate)_                                             | Session signing secret — required, no default                                                                            |
+| `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                              |
+| `API_PORT`            | `4000`                                                   | NestJS listen port                                                                                                       |
+| `WEB_URL`             | `http://localhost:3000`                                  | CORS origin for the API                                                                                                  |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                  | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                    |
+| `SMTP_HOST`           | `localhost` (dev, via Mailpit)                           | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit) |
+| `SMTP_PORT`           | `1025` (dev, via Mailpit) / `587` (typical production)   | SMTP server port                                                                                                         |
+| `SMTP_USER`           | _(blank for Mailpit)_                                    | SMTP auth username, if your server requires one                                                                          |
+| `SMTP_PASSWORD`       | _(blank for Mailpit)_                                    | SMTP auth password, if your server requires one                                                                          |
+| `SMTP_SECURE`         | `false`                                                  | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                 |
+| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                         | `From:` header on outgoing mail                                                                                          |
 
 Generate a secret with:
 
@@ -84,6 +91,43 @@ openssl rand -base64 32
 PR: wire it through the env helpers in `apps/api/src/common/env.ts` (or the call site that
 reads `process.env` — there is no separate Zod/typed env schema today), add it to
 `.env.example` with a safe placeholder, and document it in the table above.
+
+## SMTP and Mailpit
+
+Kurultay sends email for one flow today: the verification link an invitee needs before
+`accept-invitation` will let them join a workspace (see
+[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
+Leaving `SMTP_HOST` unset is a valid choice — the API still boots, and the mail module logs
+the message instead of sending it — but while that's true, **no invitation can be accepted**.
+To exercise the real flow locally without sending real mail, use the `mailpit` service that
+`docker-compose.dev.yml` already starts alongside `postgres` and `redis`:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d   # postgres + redis + mailpit
+```
+
+Then set these in your `.env` (already the defaults suggested by `.env.example`, but Mailpit
+needs the host/port explicitly pointed at it):
+
+```bash
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_SECURE=false
+# SMTP_USER / SMTP_PASSWORD stay blank — Mailpit does not require auth
+MAIL_FROM=Kurultay <noreply@example.com>
+```
+
+| URL                   | What                                                                        |
+| --------------------- | --------------------------------------------------------------------------- |
+| http://localhost:8025 | Mailpit web UI — every message the API sends lands here, never a real inbox |
+| localhost:1025        | Mailpit's SMTP listener — what `SMTP_HOST`/`SMTP_PORT` above point at       |
+
+To test the invitation flow end to end: send an invitation from the app, open
+http://localhost:8025, click into the newest message, and open the verification link it
+contains in your browser (or copy it — Mailpit renders the plain-text and HTML parts, and
+the link works the same either way). The invitee's account is now verified and
+`accept-invitation` succeeds. `docker compose -f docker-compose.dev.yml down -v` clears
+Mailpit's stored messages along with the Postgres/Redis volumes.
 
 ## Run modes
 
