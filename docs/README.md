@@ -24,6 +24,7 @@ Map of Kurultay docs, language policy, and what belongs in the archive.
 | [git-strategy.md](git-strategy.md)         | Git Flow, Conventional Commits, releases     |
 | [testing.md](testing.md)                   | Test layers and expectations                 |
 | [api-conventions.md](api-conventions.md)   | REST naming, errors, pagination              |
+| [cla.md](cla.md)                           | Contributor License Agreement (**draft**)    |
 | [roadmap.md](roadmap.md)                   | Phases and MVP / beyond-MVP status           |
 | [decisions/](decisions/)                   | Architecture decision records (ADRs)         |
 

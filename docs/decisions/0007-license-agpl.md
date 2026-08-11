@@ -5,6 +5,10 @@
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0007-license-agpl.md)
 
+> **Follow-up:** the commercial model left open below is settled in
+> [0014](0014-dual-licensing-cla.md) — dual licensing rather than open core, plus a CLA. 0014
+> complements this record; it does not supersede it.
+
 ## Context
 
 Kurultay is an open-source project management tool that could plausibly be

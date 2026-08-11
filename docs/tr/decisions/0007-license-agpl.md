@@ -5,6 +5,8 @@
 
 > 🌐 [English (canonical)](../../decisions/0007-license-agpl.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
+> **Devamı:** aşağıda açık bırakılan ticari model [0014](0014-dual-licensing-cla.md)'te karara bağlandı — open-core yerine çift lisanslama, artı bir CLA. 0014 bu kaydı tamamlıyor, yerini almıyor.
+
 ## Bağlam
 
 Kurultay, üçüncü bir tarafça alınıp katkıda bulunma zorunluluğu olmadan kapalı kaynak bir SaaS olarak yeniden satılması makul biçimde mümkün olan, açık kaynak bir proje yönetim aracı. Lisans, bu sonucu engellerken maintainer'lar için sürdürülebilir bir iş modeline gerçekçi bir yol bırakmalı.
