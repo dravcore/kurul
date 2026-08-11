@@ -133,5 +133,6 @@ Full arguments and consequences live in [`decisions/`](decisions/) rather than b
 | [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata role matrix                              |
 | [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Comment delete: authorship or OWNER/ADMIN                        |
 | [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail delivery, email verification on invitation accept only |
+| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Dual licensing + contributor license agreement                   |
 
 Related: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)

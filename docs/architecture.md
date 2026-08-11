@@ -271,7 +271,9 @@ The reasoning behind each of these choices is recorded as an ADR:
 | [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board and column Nest `@Roles` matrix                            |
 | [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task Nest `@Roles` matrix                                        |
 | [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata Nest `@Roles` matrix                     |
+| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Comment delete: authorship or OWNER/ADMIN                        |
 | [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail delivery, email verification on invitation accept only |
+| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Dual licensing + contributor license agreement                   |
 
 Related: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (historical Phase 1 scaffold) · [docs/README.md](README.md) (docs map)

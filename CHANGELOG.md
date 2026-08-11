@@ -9,6 +9,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Contributor License Agreement scaffolding for the dual-licensing model
+  ([ADR 0014](docs/decisions/0014-dual-licensing-cla.md)): Harmony-derived CLA draft
+  ([docs/cla.md](docs/cla.md), EN/TR) — **not in force, pending legal review** — plus a
+  merge-blocking `CLA` workflow, a CONTRIBUTING section, and a PR-template checkbox.
 - `GET /workspaces/:workspaceId/members/me` returns the caller's own membership, so the app
   shell resolves the active role from one indexed row instead of `/me` plus the full roster.
 - Phase 9 realtime board sync

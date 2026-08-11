@@ -218,5 +218,6 @@ yaşıyor:
 | [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label ve task-metadata rol matrisi                                |
 | [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Yorum silme: yazarlık veya OWNER/ADMIN                            |
 | [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde |
+| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Çift lisanslama + katkıda bulunan lisans sözleşmesi               |
 
 İlgili: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)
