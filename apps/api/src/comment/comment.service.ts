@@ -78,6 +78,10 @@ export class CommentService {
     const task = await this.findTask(workspaceId, taskId);
     const mentionIds = parseMentions(dto.body).filter((id) => id !== userId);
 
+    // Hoisted out of the transaction so the mention signal can be published after it commits —
+    // a signal sent from inside would race the COMMIT the recipient's refetch has to see.
+    let mentionRecipients: string[] = [];
+
     const comment = await this.prisma.$transaction(async (tx) => {
       const created = await tx.comment.create({
         data: {
@@ -123,10 +127,16 @@ export class CommentService {
             actorId: userId,
           },
         });
+        mentionRecipients = memberIds;
       }
 
       return this.toDto(created);
     });
+
+    // One signal per mentioned user, however many rows the batch inserted.
+    if (mentionRecipients.length > 0) {
+      this.notificationService.emitUnreadChanged(workspaceId, mentionRecipients);
+    }
 
     this.realtime.emitToBoard(task.boardId, SocketEvents.COMMENT_ADDED, {
       workspaceId,

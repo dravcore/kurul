@@ -1,14 +1,15 @@
-import { IsOptional, IsUUID } from 'class-validator';
+import { IsOptional } from 'class-validator';
+import { IsUuidV7 } from '../../common/uuid';
 
 export class MoveTaskDto {
-  @IsUUID('7')
+  @IsUuidV7()
   columnId!: string;
 
   @IsOptional()
-  @IsUUID('7')
+  @IsUuidV7()
   beforeTaskId?: string | null;
 
   @IsOptional()
-  @IsUUID('7')
+  @IsUuidV7()
   afterTaskId?: string | null;
 }

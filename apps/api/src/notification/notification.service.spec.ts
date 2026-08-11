@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
-import { NotificationType } from '@kurultay/shared-types';
+import { NotificationType, SocketEvents } from '@kurultay/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { NotificationService } from './notification.service';
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
@@ -30,6 +31,7 @@ describe('NotificationService', () => {
     const prisma = {
       notification: {
         create: jest.fn(),
+        createMany: jest.fn(),
         findMany: jest.fn(),
         findFirst: jest.fn(),
         count: jest.fn(),
@@ -43,7 +45,15 @@ describe('NotificationService', () => {
     prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
       callback(prisma),
     );
-    return { service: new NotificationService(prisma as unknown as PrismaService), prisma };
+    const realtime = { emitToUser: jest.fn() };
+    return {
+      service: new NotificationService(
+        prisma as unknown as PrismaService,
+        realtime as unknown as RealtimeService,
+      ),
+      prisma,
+      realtime,
+    };
   }
 
   it('does not create a notification when actor equals recipient', async () => {
@@ -83,6 +93,83 @@ describe('NotificationService', () => {
         }),
       }),
     );
+  });
+
+  describe('emitUnreadChanged', () => {
+    it('signals each recipient in their own room, with the count-changed payload only', () => {
+      const { service, realtime } = buildService();
+
+      service.emitUnreadChanged(WORKSPACE_ID, [RECIPIENT_ID]);
+
+      expect(realtime.emitToUser).toHaveBeenCalledTimes(1);
+      expect(realtime.emitToUser).toHaveBeenCalledWith(
+        WORKSPACE_ID,
+        RECIPIENT_ID,
+        SocketEvents.NOTIFICATION_UNREAD_CHANGED,
+        // No title, no notification id: the badge needs a number, and the client fetches it.
+        { workspaceId: WORKSPACE_ID, userId: RECIPIENT_ID },
+      );
+    });
+
+    it('sends one signal per recipient however many rows the batch inserted', () => {
+      const { service, realtime } = buildService();
+
+      // A mention batch or a due-soon scan can name the same user several times over.
+      service.emitUnreadChanged(WORKSPACE_ID, [
+        RECIPIENT_ID,
+        ACTOR_ID,
+        RECIPIENT_ID,
+        RECIPIENT_ID,
+        ACTOR_ID,
+      ]);
+
+      expect(realtime.emitToUser).toHaveBeenCalledTimes(2);
+      expect(realtime.emitToUser).toHaveBeenCalledWith(
+        WORKSPACE_ID,
+        RECIPIENT_ID,
+        SocketEvents.NOTIFICATION_UNREAD_CHANGED,
+        { workspaceId: WORKSPACE_ID, userId: RECIPIENT_ID },
+      );
+      expect(realtime.emitToUser).toHaveBeenCalledWith(
+        WORKSPACE_ID,
+        ACTOR_ID,
+        SocketEvents.NOTIFICATION_UNREAD_CHANGED,
+        { workspaceId: WORKSPACE_ID, userId: ACTOR_ID },
+      );
+    });
+
+    it('publishes nothing for an empty recipient list', () => {
+      const { service, realtime } = buildService();
+
+      service.emitUnreadChanged(WORKSPACE_ID, []);
+
+      expect(realtime.emitToUser).not.toHaveBeenCalled();
+    });
+  });
+
+  it('does not publish from the write paths that run inside the caller transaction', async () => {
+    const { service, prisma, realtime } = buildService();
+    prisma.notification.create.mockResolvedValue({ id: 'n1' });
+    prisma.notification.createMany.mockResolvedValue({ count: 1 });
+
+    await service.createAssignment(prisma as unknown as PrismaService, {
+      workspaceId: WORKSPACE_ID,
+      userId: RECIPIENT_ID,
+      actorId: ACTOR_ID,
+      taskId: TASK_ID,
+      payload: {},
+    });
+    await service.createMentionBatch(prisma as unknown as PrismaService, {
+      workspaceId: WORKSPACE_ID,
+      actorId: ACTOR_ID,
+      taskId: TASK_ID,
+      userIds: [RECIPIENT_ID],
+      payload: {},
+    });
+
+    // A signal published before the caller's COMMIT invites a refetch that cannot see the row
+    // yet — the caller emits once its transaction has landed.
+    expect(realtime.emitToUser).not.toHaveBeenCalled();
   });
 
   it('skips due_soon when an unread or recent notification exists', async () => {
@@ -189,6 +276,36 @@ describe('NotificationService', () => {
 
       expect(prisma.notification.update).not.toHaveBeenCalled();
     });
+
+    it('signals the recipient so their other tabs drop the badge too', async () => {
+      const { service, prisma, realtime } = buildService();
+      prisma.notification.findFirst.mockResolvedValue(notificationRow());
+      prisma.notification.update.mockResolvedValue(notificationRow({ readAt: new Date() }));
+
+      await service.markRead(WORKSPACE_ID, RECIPIENT_ID, NOTIFICATION_ID);
+
+      expect(realtime.emitToUser).toHaveBeenCalledWith(
+        WORKSPACE_ID,
+        RECIPIENT_ID,
+        SocketEvents.NOTIFICATION_UNREAD_CHANGED,
+        { workspaceId: WORKSPACE_ID, userId: RECIPIENT_ID },
+      );
+    });
+
+    it('publishes nothing when the row was already read or was not found', async () => {
+      const { service, prisma, realtime } = buildService();
+      const readAt = new Date('2026-01-15T09:00:00.000Z');
+      prisma.notification.findFirst.mockResolvedValue(notificationRow({ readAt }));
+
+      await service.markRead(WORKSPACE_ID, RECIPIENT_ID, NOTIFICATION_ID);
+      expect(realtime.emitToUser).not.toHaveBeenCalled();
+
+      prisma.notification.findFirst.mockResolvedValue(null);
+      await expect(
+        service.markRead(WORKSPACE_ID, RECIPIENT_ID, NOTIFICATION_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(realtime.emitToUser).not.toHaveBeenCalled();
+    });
   });
 
   describe('markAllRead', () => {
@@ -219,6 +336,27 @@ describe('NotificationService', () => {
       await expect(service.markAllRead(WORKSPACE_ID, RECIPIENT_ID)).resolves.toEqual({
         updated: 0,
       });
+    });
+
+    it('signals once when rows were cleared and stays quiet when none were', async () => {
+      const { service, prisma, realtime } = buildService();
+      prisma.notification.updateMany.mockResolvedValue({ count: 4 });
+
+      await service.markAllRead(WORKSPACE_ID, RECIPIENT_ID);
+
+      // Four rows, one signal — the recipient refetches a single count.
+      expect(realtime.emitToUser).toHaveBeenCalledTimes(1);
+      expect(realtime.emitToUser).toHaveBeenCalledWith(
+        WORKSPACE_ID,
+        RECIPIENT_ID,
+        SocketEvents.NOTIFICATION_UNREAD_CHANGED,
+        { workspaceId: WORKSPACE_ID, userId: RECIPIENT_ID },
+      );
+
+      realtime.emitToUser.mockClear();
+      prisma.notification.updateMany.mockResolvedValue({ count: 0 });
+      await service.markAllRead(WORKSPACE_ID, RECIPIENT_ID);
+      expect(realtime.emitToUser).not.toHaveBeenCalled();
     });
   });
 

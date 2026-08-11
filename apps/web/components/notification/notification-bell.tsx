@@ -25,13 +25,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
+import { useNotificationSocket } from './use-notification-socket';
 import { toast } from 'sonner';
 
-// No socket event carries the unread notification count (see packages/shared-types/src/socket.ts
-// and apps/api/src/realtime/realtime.gateway.ts — the only realtime channel is the per-board
-// room used for task/column/comment events). Polling stays, but only while the tab is visible,
-// and at a much longer interval since it is the sole source of truth for the badge.
-const POLL_MS = 120_000;
+/**
+ * Fallback refresh interval, used **only while the notification room is not joined**.
+ *
+ * The badge is push-driven: the server signals the recipient's room whenever their unread
+ * count moves, and every (re)join answers with a full refresh, so a connected bell never
+ * polls. What the socket cannot cover is its own absence — a proxy that drops WebSockets, or
+ * the ~4 minutes of backoff plus a 60s cooldown that `lib/socket.ts` spends before it tries
+ * again. Removing the timer outright would leave the badge frozen for the whole of that
+ * window with nothing on screen saying so, which is worse than one request every two minutes
+ * in a state that should be rare.
+ */
+const FALLBACK_POLL_MS = 120_000;
 
 /** Stable identity so the closed dropdown does not reset its rows on every render. */
 const EMPTY_ITEMS: NotificationDto[] = [];
@@ -62,6 +70,7 @@ export function NotificationBell(): React.ReactElement {
     data: items,
     loading: loadingList,
     error: listError,
+    reload: reloadItems,
     setData: setItems,
   } = useApiResource<NotificationDto[]>(fetchItems, EMPTY_ITEMS, t('loadError'));
 
@@ -83,8 +92,23 @@ export function NotificationBell(): React.ReactElement {
     [workspaceId],
   );
 
+  // Rows only matter while the dropdown is open; the badge is refreshed either way.
+  const refreshOpenViews = useCallback((): void => {
+    void refreshUnread();
+    if (open) reloadItems();
+  }, [open, refreshUnread, reloadItems]);
+
+  const { connected } = useNotificationSocket(workspaceId, bootstrapped, {
+    onUnreadChanged: refreshOpenViews,
+    // A (re)join replays nothing, so the first thing after it is a full refresh — that is what
+    // closes the gap a disconnection opened.
+    onResync: refreshOpenViews,
+  });
+
   useEffect(() => {
-    if (!bootstrapped || !workspaceId) return;
+    // The socket is the primary channel; this effect is the fallback and stays unmounted
+    // while the room is joined, so a live bell issues no periodic requests at all.
+    if (!bootstrapped || !workspaceId || connected) return;
     const controller = new AbortController();
     void refreshUnread(controller.signal);
 
@@ -93,7 +117,7 @@ export function NotificationBell(): React.ReactElement {
       if (timer !== null) return;
       timer = window.setInterval(() => {
         void refreshUnread();
-      }, POLL_MS);
+      }, FALLBACK_POLL_MS);
     };
     const stopPolling = (): void => {
       if (timer !== null) {
@@ -101,12 +125,14 @@ export function NotificationBell(): React.ReactElement {
         timer = null;
       }
     };
+    // Still worth keeping, now that it guards the fallback only: a hidden tab whose socket is
+    // down has nobody looking at its badge, so it should not keep asking for it either.
     const onVisibilityChange = (): void => {
       if (document.visibilityState === 'hidden') {
         stopPolling();
       } else {
-        // Refresh once immediately so a badge that went stale in a background tab is
-        // never shown for up to POLL_MS after the tab is looked at again.
+        // Refresh once immediately so a badge that went stale in a background tab is never
+        // shown for up to FALLBACK_POLL_MS after the tab is looked at again.
         void refreshUnread();
         startPolling();
       }
@@ -122,7 +148,7 @@ export function NotificationBell(): React.ReactElement {
       stopPolling();
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [bootstrapped, workspaceId, refreshUnread]);
+  }, [bootstrapped, workspaceId, refreshUnread, connected]);
 
   async function markAllRead(): Promise<void> {
     if (!workspaceId) return;

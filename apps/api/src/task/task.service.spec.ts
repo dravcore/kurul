@@ -58,6 +58,7 @@ describe('TaskService', () => {
     const notificationService = {
       createAssignment: jest.fn().mockResolvedValue(null),
       createMention: jest.fn().mockResolvedValue(null),
+      emitUnreadChanged: jest.fn(),
     };
     const prisma = {
       board: {

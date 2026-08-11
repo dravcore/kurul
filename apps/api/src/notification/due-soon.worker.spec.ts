@@ -1,7 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { NotificationType } from '@kurultay/shared-types';
+import { NotificationType, SocketEvents } from '@kurultay/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { DueSoonWorker } from './due-soon.worker';
 import { NotificationService } from './notification.service';
 
@@ -38,7 +39,11 @@ describe('DueSoonWorker', () => {
         createMany: jest.fn().mockResolvedValue({ count: 2 }),
       },
     };
-    const notifications = new NotificationService(prisma as unknown as PrismaService);
+    const realtime = { emitToUser: jest.fn() };
+    const notifications = new NotificationService(
+      prisma as unknown as PrismaService,
+      realtime as unknown as RealtimeService,
+    );
     const worker = new DueSoonWorker(prisma as unknown as PrismaService, notifications);
 
     const created = await worker.runScan();
@@ -83,7 +88,11 @@ describe('DueSoonWorker', () => {
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
-    const notifications = new NotificationService(prisma as unknown as PrismaService);
+    const realtime = { emitToUser: jest.fn() };
+    const notifications = new NotificationService(
+      prisma as unknown as PrismaService,
+      realtime as unknown as RealtimeService,
+    );
     const worker = new DueSoonWorker(prisma as unknown as PrismaService, notifications);
 
     const created = await worker.runScan();
@@ -99,6 +108,102 @@ describe('DueSoonWorker', () => {
         ],
       }),
     );
+  });
+
+  it('signals each assignee once for the whole scan, not once per inserted row', async () => {
+    const due = new Date(Date.now() + 60 * 60 * 1000);
+    const prisma = {
+      task: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 't1',
+            title: 'Ship',
+            dueDate: due,
+            board: { workspaceId: 'w1' },
+            assignees: [{ userId: 'u1' }, { userId: 'u2' }],
+          },
+          {
+            id: 't2',
+            title: 'Review',
+            dueDate: due,
+            board: { workspaceId: 'w1' },
+            assignees: [{ userId: 'u1' }],
+          },
+          {
+            id: 't3',
+            title: 'Other tenant',
+            dueDate: due,
+            board: { workspaceId: 'w2' },
+            assignees: [{ userId: 'u1' }],
+          },
+        ]),
+      },
+      notification: {
+        findMany: jest.fn().mockResolvedValue([]),
+        createMany: jest.fn().mockResolvedValue({ count: 4 }),
+      },
+    };
+    const realtime = { emitToUser: jest.fn() };
+    const notifications = new NotificationService(
+      prisma as unknown as PrismaService,
+      realtime as unknown as RealtimeService,
+    );
+    const worker = new DueSoonWorker(prisma as unknown as PrismaService, notifications);
+
+    await worker.runScan();
+
+    // Four rows, three signals: u1/w1 is collapsed, and u1/w2 stays separate because the badge
+    // it feeds is a different tenant's.
+    expect(realtime.emitToUser).toHaveBeenCalledTimes(3);
+    expect(realtime.emitToUser).toHaveBeenCalledWith(
+      'w1',
+      'u1',
+      SocketEvents.NOTIFICATION_UNREAD_CHANGED,
+      { workspaceId: 'w1', userId: 'u1' },
+    );
+    expect(realtime.emitToUser).toHaveBeenCalledWith(
+      'w1',
+      'u2',
+      SocketEvents.NOTIFICATION_UNREAD_CHANGED,
+      { workspaceId: 'w1', userId: 'u2' },
+    );
+    expect(realtime.emitToUser).toHaveBeenCalledWith(
+      'w2',
+      'u1',
+      SocketEvents.NOTIFICATION_UNREAD_CHANGED,
+      { workspaceId: 'w2', userId: 'u1' },
+    );
+  });
+
+  it('publishes nothing when the scan inserted nothing', async () => {
+    const due = new Date(Date.now() + 60 * 60 * 1000);
+    const prisma = {
+      task: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 't1',
+            title: 'Ship',
+            dueDate: due,
+            board: { workspaceId: 'w1' },
+            assignees: [{ userId: 'u1' }],
+          },
+        ]),
+      },
+      notification: {
+        // Already notified — every pair is skipped, so `createMany` is never reached.
+        findMany: jest.fn().mockResolvedValue([{ userId: 'u1', taskId: 't1' }]),
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    const realtime = { emitToUser: jest.fn() };
+    const notifications = new NotificationService(
+      prisma as unknown as PrismaService,
+      realtime as unknown as RealtimeService,
+    );
+    const worker = new DueSoonWorker(prisma as unknown as PrismaService, notifications);
+
+    await expect(worker.runScan()).resolves.toBe(0);
+    expect(realtime.emitToUser).not.toHaveBeenCalled();
   });
 
   // `skipDuplicates` compiles to `INSERT ... ON CONFLICT DO NOTHING`, which is a no-op unless

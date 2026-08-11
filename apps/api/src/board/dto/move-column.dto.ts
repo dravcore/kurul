@@ -1,11 +1,12 @@
-import { IsOptional, IsUUID } from 'class-validator';
+import { IsOptional } from 'class-validator';
+import { IsUuidV7 } from '../../common/uuid';
 
 export class MoveColumnDto {
   @IsOptional()
-  @IsUUID('7')
+  @IsUuidV7()
   beforeColumnId?: string | null;
 
   @IsOptional()
-  @IsUUID('7')
+  @IsUuidV7()
   afterColumnId?: string | null;
 }
