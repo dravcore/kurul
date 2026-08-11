@@ -25,7 +25,8 @@ Kurultay, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğun
 | [0011](0011-label-task-metadata-permissions.md) | Label ve Task-Metadata İzinleri                                      | Kabul edildi (yorum-silme satırının yerini 0012 aldı) | 2026-08-09 |
 | [0012](0012-comment-delete-authorship.md)       | Yorum Silme Yazarlığı                                                | Kabul edildi                                          | 2026-08-09 |
 | [0013](0013-invitation-email-verification.md)   | Davet Kabulünde E-posta Doğrulaması                                  | Kabul edildi                                          | 2026-08-10 |
-| [0014](0014-dual-licensing-cla.md)              | Çift Lisanslama ve Katkıda Bulunan Lisans Sözleşmesi                 | Kabul edildi                                          | 2026-08-11 |
+| [0014](0014-dual-licensing-cla.md)              | Çift Lisanslama ve Katkıda Bulunan Lisans Sözleşmesi                 | Kabul edildi (yolu 0015 ile askıda)                   | 2026-08-11 |
+| [0015](0015-no-external-contributions.md)       | Dış Katkı Kabul Edilmiyor; Hukuk Masrafı Ertelendi                   | Kabul edildi                                          | 2026-08-12 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 

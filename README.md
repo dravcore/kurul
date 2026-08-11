@@ -96,6 +96,9 @@ Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 
 ## Contributing
 
+Bug reports, feature ideas, and design feedback are welcome and genuinely useful. **Outside
+code, documentation, and translation pull requests are not accepted** — the codebase stays
+single-authored, indefinitely ([ADR 0015](docs/decisions/0015-no-external-contributions.md)).
 Kurultay is issue-first: propose before you implement. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the process, and
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work together.

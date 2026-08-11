@@ -1,21 +1,56 @@
-name: CLA
+name: CLA (disabled)
 
-# Blocks merge until every commit author on a pull request has signed the Contributor License
-# Agreement (docs/cla.md). Rationale for the CLA itself and for this tooling choice:
-# docs/decisions/0014-dual-licensing-cla.md.
+# ============================================================================
+#  DISABLED ON PURPOSE — DO NOT RE-ENABLE WITHOUT A LAWYER'S REVIEW.
+# ============================================================================
 #
-# NOTE: docs/cla.md is still a DRAFT pending legal review. Keep this workflow disabled (or
-# accept that its check is advisory) until that banner is removed.
+# WHY THIS IS OFF
+#   Kurultay does not accept external code, documentation, or translation pull requests
+#   (ADR 0015 — docs/decisions/0015-no-external-contributions.md). With no outside patch
+#   ever being merged, there is nobody to ask for a signature.
 #
-# One-time setup before this can work:
+#   Worse, docs/cla.md is still a DRAFT pending legal review, so a live check would ask a
+#   contributor to sign an unreviewed agreement in order to unblock a pull request that
+#   would not be merged either way. That is confusing at best and disrespectful of the
+#   contributor's effort at worst. And a signature collected against a draft may not be
+#   valid — collecting no signatures is better than collecting invalid ones, because an
+#   invalid one only surfaces at the most expensive moment (the first commercial sale).
+#
+# WHAT WOULD TURN IT BACK ON
+#   All three, together — no partial re-enable:
+#     1. A lawyer has reviewed docs/cla.md and every `[FILL: …]` / `[ASK A LAWYER: …]`
+#        marker is resolved, and the not-in-force banner has been removed.
+#     2. ADR 0015 has been superseded (or amended) by a decision to reopen the project to
+#        external contributions.
+#     3. The one-time setup below has actually been done.
+#
+# HOW IT IS DISABLED (two independent guards — restore both to re-enable)
+#     a. The `on:` triggers are reduced to `workflow_dispatch`; the real triggers are kept
+#        below as comments so restoring them is mechanical rather than a rewrite.
+#     b. The `cla` job carries `if: ${{ false }}`, so even a deliberate manual dispatch is
+#        a no-op until that guard is removed.
+#   Nothing else was deleted: the action pin, the signing sentence, the allowlist, and the
+#   comment bodies are all intact and ready.
+#
+# ONE-TIME SETUP — DO NOT DO THIS NOW. It only applies when the workflow is re-enabled;
+# doing it while the workflow is dormant would block every pull request on a check that
+# can never report.
 #   1. Create the orphan branch that holds the signature ledger:
 #        git switch --orphan cla-signatures && git commit --allow-empty -m "chore: cla ledger"
 #        git push -u origin cla-signatures
 #      Signatures live on their own branch so the bot never pushes to `develop` or `main`,
 #      which Git Flow forbids and branch protection would reject anyway.
 #   2. Add "CLA" to the required status checks in branch protection for `develop`.
+#
+# Rationale for the CLA itself and for this tooling choice:
+# docs/decisions/0014-dual-licensing-cla.md (target model, suspended by 0015).
 
 on:
+  # Manual only, and even then the job below refuses to run. This is the disabled state.
+  workflow_dispatch:
+  #
+  # ---- RESTORE THE BLOCK BELOW TO RE-ENABLE (see "WHAT WOULD TURN IT BACK ON") ----
+  #
   # `pull_request_target`, not `pull_request`: the job needs a write-scoped token to commit the
   # signature file and comment on the PR, which `pull_request` does not get from a fork. This is
   # safe here only because nothing from the PR head is checked out or executed — the action reads
@@ -24,12 +59,13 @@ on:
   # Every PR, not just those targeting develop/main. A stacked PR (one wave based on the previous
   # one) has a feature branch as its base, so a `[develop, main]` filter skipped it entirely — and
   # GitHub still reported the PR as mergeable, which reads as "CLA passed". Same reasoning as ci.yml.
-  pull_request_target:
-    branches: ['**']
-    types: [opened, synchronize, closed]
-  # How a contributor signs: by posting the signing sentence as a PR comment.
-  issue_comment:
-    types: [created]
+  #
+  #   pull_request_target:
+  #     branches: ['**']
+  #     types: [opened, synchronize, closed]
+  #   # How a contributor signs: by posting the signing sentence as a PR comment.
+  #   issue_comment:
+  #     types: [created]
 
 permissions:
   actions: write # re-runs the blocked CLA check once a signature arrives
@@ -47,8 +83,12 @@ jobs:
   cla:
     name: CLA
     runs-on: ubuntu-latest
-    # Ignore comments on plain issues; only PR comments can carry a signature.
-    if: github.event_name == 'pull_request_target' || github.event.issue.pull_request
+    # SECOND GUARD — the workflow is disabled (see the header). This constant short-circuits
+    # the job even if the triggers above are restored by accident. Removing it is a deliberate,
+    # reviewable one-line change; restore the original condition below when re-enabling:
+    #   # Ignore comments on plain issues; only PR comments can carry a signature.
+    #   if: github.event_name == 'pull_request_target' || github.event.issue.pull_request
+    if: ${{ false }}
     steps:
       - name: Check CLA signatures
         # `contains` rather than an exact `==` on the comment body: GitHub expression string
@@ -67,7 +107,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-document: 'https://github.com/dravcore/kurultay/blob/main/docs/cla.md'
+          path-to-document: 'https://github.com/dravcore/kurultay/blob/develop/docs/cla.md'
           # Version is part of the path AND of the signing sentence below, so a signature can
           # never be silently carried over to an amended CLA text.
           path-to-signatures: 'signatures/v0.1/cla.json'
@@ -77,7 +117,7 @@ jobs:
           custom-pr-sign-comment: 'I have read the Kurultay CLA v0.1 and I hereby sign it'
           custom-notsigned-prcomment: |
             Thanks for the pull request! Before it can be merged, every commit author on it
-            needs to sign the [Kurultay Contributor License Agreement](https://github.com/dravcore/kurultay/blob/main/docs/cla.md).
+            needs to sign the [Kurultay Contributor License Agreement](https://github.com/dravcore/kurultay/blob/develop/docs/cla.md).
 
             Kurultay is AGPL-3.0 and intends to stay that way. The CLA exists because the
             project is funded by **dual licensing** — the maintainer also sells a commercial
@@ -85,7 +125,7 @@ jobs:
             distribute their work under a license other than AGPL-3.0. You keep the copyright
             in your code and every right to reuse it, and the CLA guarantees your contribution
             stays published under AGPL-3.0 as well. The reasoning, including the downsides, is
-            in [ADR 0014](https://github.com/dravcore/kurultay/blob/main/docs/decisions/0014-dual-licensing-cla.md).
+            in [ADR 0014](https://github.com/dravcore/kurultay/blob/develop/docs/decisions/0014-dual-licensing-cla.md).
 
             If you agree, post a new comment on this pull request containing exactly:
           custom-allsigned-prcomment: |

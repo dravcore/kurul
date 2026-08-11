@@ -313,6 +313,7 @@ Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 | [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Yorum silme: yazarlık veya OWNER/ADMIN                            |
 | [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde |
 | [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Çift lisanslama + katkıda bulunan lisans sözleşmesi               |
+| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)             | Dış katkı yok; CLA yürürlükte değil, hukuk masrafı ertelendi      |
 
 İlgili: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (tarihsel Faz 1 iskeleti) · [docs/README.md](../README.md) (docs haritası)

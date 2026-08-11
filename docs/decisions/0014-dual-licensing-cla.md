@@ -5,6 +5,10 @@
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0014-dual-licensing-cla.md)
 
+> **Follow-up:** the target model below stands, but the route to it is suspended by
+> [0015](0015-no-external-contributions.md) — external contributions are not accepted, the CLA
+> is held as an unenacted draft with its check disabled, and legal review is deferred.
+
 ## Context
 
 [ADR 0007](0007-license-agpl.md) chose AGPL-3.0 and left the commercial model open, naming

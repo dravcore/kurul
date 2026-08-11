@@ -274,6 +274,7 @@ The reasoning behind each of these choices is recorded as an ADR:
 | [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Comment delete: authorship or OWNER/ADMIN                        |
 | [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail delivery, email verification on invitation accept only |
 | [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Dual licensing + contributor license agreement                   |
+| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)             | No external contributions; CLA unenacted, legal spend deferred   |
 
 Related: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (historical Phase 1 scaffold) · [docs/README.md](README.md) (docs map)

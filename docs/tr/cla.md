@@ -8,9 +8,13 @@
 >
 > **Bu belge, incelenmemiş bir taslaktır.** Bir hukukçu tarafından incelenmemiş veya onaylanmamıştır, şu anda **yürürlükte değildir** ve içeriğinin hiçbir kısmı hukuki tavsiye değildir. Buna güvenmeyin. `[FILL: …]` ve `[HUKUKÇUYA SOR: …]` ile işaretlenmiş yer tutucular henüz çözülmemiştir ve bu metin herhangi biri için bağlayıcı hâle gelmeden önce karara bağlanmalıdır. Bu uyarı, incelenmiş ve merge edilmiş bir pull request ile kaldırılana kadar **hiçbir katkıda bulunandan bir şey imzalaması istenmemektedir.**
 >
+> **Bu belge şu anda kullanılmıyor.** Kurultay dış katkı kabul etmiyor ve CLA kontrolü devre dışı; dolayısıyla bunu kimse imzalamıyor ve hiçbir imza toplanmıyor. Hukuki inceleme bir gün gerçekleşirse diye hazır tutuluyor — bkz. [ADR 0015](decisions/0015-no-external-contributions.md).
+>
 > # ⚠️ DRAFT — PENDING LEGAL REVIEW, NOT IN FORCE
 >
 > **This document is an unreviewed draft.** It has **not** been reviewed or approved by a lawyer, it is **not** currently in effect, and nothing in it is legal advice. Do not rely on it. The placeholders marked `[FILL: …]` and `[HUKUKÇUYA SOR: …]` are unresolved and must be settled before this text becomes binding on anyone. Until this banner is removed in a merged, reviewed pull request, **no contributor is being asked to sign anything.**
+>
+> **This document is currently unused.** Kurultay does not accept external contributions and the CLA check is disabled, so nobody signs this and no signature is collected. It is kept ready in case legal review ever happens — see [ADR 0015](decisions/0015-no-external-contributions.md).
 
 ---
 
