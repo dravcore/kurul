@@ -219,5 +219,6 @@ yaşıyor:
 | [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Yorum silme: yazarlık veya OWNER/ADMIN                            |
 | [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde |
 | [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Çift lisanslama + katkıda bulunan lisans sözleşmesi               |
+| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)             | Dış katkı yok; CLA yürürlükte değil, hukuk masrafı ertelendi      |
 
 İlgili: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)

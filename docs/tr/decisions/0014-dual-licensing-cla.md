@@ -5,6 +5,8 @@
 
 > 🌐 [English (canonical)](../../decisions/0014-dual-licensing-cla.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
+> **Devamı:** aşağıdaki hedef model geçerliliğini koruyor, ama oraya giden yol [0015](0015-no-external-contributions.md) ile askıya alındı — dış katkı kabul edilmiyor, CLA yürürlüğe konmamış bir taslak olarak tutuluyor ve kontrolü devre dışı, hukuki inceleme ise ertelendi.
+
 ## Bağlam
 
 [ADR 0007](0007-license-agpl.md) AGPL-3.0'ı seçti ve ticari modeli açık bıraktı; muhtemel yol olarak open-core'u andı ve bunun "muhtemelen" bir CLA gerektireceğini not etti. Bu modelin artık netleşmesi gerekiyor, çünkü seçim, gelecekteki her katkının ne olabileceğini kısıtlıyor.

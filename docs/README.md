@@ -14,19 +14,19 @@ Map of Kurultay docs, language policy, and what belongs in the archive.
 
 ## Active docs
 
-| Doc                                        | Covers                                       |
-| ------------------------------------------ | -------------------------------------------- |
-| [architecture.md](architecture.md)         | Module map, data model, runtime evolution    |
-| [tech-stack.md](tech-stack.md)             | Stack choices and rationale                  |
-| [development.md](development.md)           | Env setup, Compose, pnpm scripts, day-to-day |
-| [coding-standards.md](coding-standards.md) | TS / NestJS / Next.js conventions            |
-| [design.md](design.md)                     | UI/UX language                               |
-| [git-strategy.md](git-strategy.md)         | Git Flow, Conventional Commits, releases     |
-| [testing.md](testing.md)                   | Test layers and expectations                 |
-| [api-conventions.md](api-conventions.md)   | REST naming, errors, pagination              |
-| [cla.md](cla.md)                           | Contributor License Agreement (**draft**)    |
-| [roadmap.md](roadmap.md)                   | Phases and MVP / beyond-MVP status           |
-| [decisions/](decisions/)                   | Architecture decision records (ADRs)         |
+| Doc                                        | Covers                                                                                                      |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| [architecture.md](architecture.md)         | Module map, data model, runtime evolution                                                                   |
+| [tech-stack.md](tech-stack.md)             | Stack choices and rationale                                                                                 |
+| [development.md](development.md)           | Env setup, Compose, pnpm scripts, day-to-day                                                                |
+| [coding-standards.md](coding-standards.md) | TS / NestJS / Next.js conventions                                                                           |
+| [design.md](design.md)                     | UI/UX language                                                                                              |
+| [git-strategy.md](git-strategy.md)         | Git Flow, Conventional Commits, releases                                                                    |
+| [testing.md](testing.md)                   | Test layers and expectations                                                                                |
+| [api-conventions.md](api-conventions.md)   | REST naming, errors, pagination                                                                             |
+| [cla.md](cla.md)                           | Contributor License Agreement (**draft**, unused — [ADR 0015](decisions/0015-no-external-contributions.md)) |
+| [roadmap.md](roadmap.md)                   | Phases and MVP / beyond-MVP status                                                                          |
+| [decisions/](decisions/)                   | Architecture decision records (ADRs)                                                                        |
 
 Root community files (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, …)
 sit outside `docs/` because GitHub treats them specially.

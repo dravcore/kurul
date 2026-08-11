@@ -7,6 +7,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Kurultay no longer accepts external code, documentation, or translation contributions
+  ([ADR 0015](docs/decisions/0015-no-external-contributions.md)): the codebase stays
+  single-authored, the CLA draft is kept but not enacted, and legal review is deferred to the
+  first commercial sale. The `CLA` workflow is disabled (manual trigger only, plus an
+  `if: false` job guard) rather than deleted, so no contributor is asked to sign a draft
+  agreement for a pull request that would not be merged. CONTRIBUTING, the PR template, and
+  `docs/cla.md` (EN/TR) now state the pause is indefinite.
+
 ### Added
 
 - Contributor License Agreement scaffolding for the dual-licensing model

@@ -18,12 +18,10 @@ Fixes #
 - [ ] Title follows Conventional Commits (`feat:`, `fix:`, `docs:`, ...)
 - [ ] Relevant docs updated (`docs/`, README, etc.)
 - [ ] Lint / typecheck / tests pass (once CI tooling exists)
-- [ ] I have read the
-      [Contributor License Agreement](https://github.com/dravcore/kurultay/blob/main/docs/cla.md)
-      and will sign it by commenting on this PR when the CLA bot asks. It lets the maintainer
-      license this contribution commercially as well as under AGPL-3.0 — see
-      [ADR 0014](https://github.com/dravcore/kurultay/blob/main/docs/decisions/0014-dual-licensing-cla.md).
-      _(Maintainers are allowlisted and can leave this unchecked. The CLA is still a draft
-      pending legal review.)_
-- [ ] If I am contributing as part of my job, my employer has approved it
-      ([details](https://github.com/dravcore/kurultay/blob/main/docs/cla.md#corporate-and-entity-contributions))
+- [ ] I understand that Kurultay does not merge outside code, documentation, or translation
+      pull requests — only typo / dead-link one-liners
+      ([CONTRIBUTING.md](https://github.com/dravcore/kurultay/blob/main/CONTRIBUTING.md#code-contributions-are-paused),
+      [ADR 0015](https://github.com/dravcore/kurultay/blob/main/docs/decisions/0015-no-external-contributions.md)).
+      There is nothing to sign: the
+      [CLA](https://github.com/dravcore/kurultay/blob/main/docs/cla.md) is an unenacted draft
+      and its check is disabled. _(Maintainers can leave this unchecked.)_

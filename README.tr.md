@@ -98,6 +98,10 @@ Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
 
 ## Katkıda bulunma
 
+Hata bildirimleri, özellik fikirleri ve tasarım geri bildirimi hoş karşılanıyor ve gerçekten
+faydalı. **Dışarıdan gelen kod, doküman ve çeviri pull request'leri kabul edilmiyor** — kod
+tabanı belirsiz süreyle tek yazarlı kalıyor
+([ADR 0015](docs/tr/decisions/0015-no-external-contributions.md)).
 Kurultay issue-first çalışıyor: uygulamaya geçmeden önce öner. Süreç için
 [CONTRIBUTING.md](CONTRIBUTING.md)'ye, birlikte nasıl çalıştığımız için ise
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)'ye bakın.
