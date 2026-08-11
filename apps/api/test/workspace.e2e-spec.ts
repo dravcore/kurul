@@ -80,6 +80,57 @@ describe('Workspace isolation and roles (e2e)', () => {
     await owner.agent.delete(`/workspaces/${workspace.id}`).expect(204);
   });
 
+  /**
+   * The member list is a cursor page, not a plain array with a hidden ceiling: a page that
+   * does not hold the whole roster has to say so and hand back a cursor that reaches the rest.
+   */
+  it('pages the member list by id and reaches every member', async () => {
+    const owner = await signUp(app, { name: 'Roster Owner' });
+    const workspace = await createWorkspace(owner.agent, 'Roster', `roster-${Date.now()}`);
+
+    for (const name of ['Second', 'Third']) {
+      const extra = await signUp(app, { name });
+      const extraMe = await extra.agent.get('/me').expect(200);
+      await addMember(prisma, workspace.id, extraMe.body.id as string, MemberRole.MEMBER);
+    }
+
+    const first = await owner.agent.get(`/workspaces/${workspace.id}/members?limit=2`).expect(200);
+    expect(first.body.items).toHaveLength(2);
+    expect(first.body.hasMore).toBe(true);
+    expect(first.body.nextCursor).toBe(first.body.items[1].id);
+
+    const second = await owner.agent
+      .get(`/workspaces/${workspace.id}/members?limit=2&cursor=${first.body.nextCursor as string}`)
+      .expect(200);
+    expect(second.body.items).toHaveLength(1);
+    expect(second.body.hasMore).toBe(false);
+    expect(second.body.nextCursor).toBeNull();
+
+    const ids = [...first.body.items, ...second.body.items].map(
+      (member: { id: string }) => member.id,
+    );
+    expect(new Set(ids).size).toBe(3);
+  });
+
+  it("answers the caller's own membership without the roster", async () => {
+    const owner = await signUp(app, { name: 'Self' });
+    const outsider = await signUp(app, { name: 'Outsider' });
+    const workspace = await createWorkspace(owner.agent, 'Self WS', `self-${Date.now()}`);
+    const me = await owner.agent.get('/me').expect(200);
+
+    await owner.agent
+      .get(`/workspaces/${workspace.id}/members/me`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.userId).toBe(me.body.id);
+        expect(body.role).toBe(MemberRole.OWNER);
+        expect(body.workspaceId).toBe(workspace.id);
+      });
+
+    // Cross-tenant stays 404, same as the list route.
+    await outsider.agent.get(`/workspaces/${workspace.id}/members/me`).expect(404);
+  });
+
   it('grants the invited role on accept and blocks revoked invitations', async () => {
     const owner = await signUp(app, { name: 'Inviter' });
     const invitee = await signUp(app, {
@@ -105,13 +156,15 @@ describe('Workspace isolation and roles (e2e)', () => {
       });
 
     const members = await owner.agent.get(`/workspaces/${workspace.id}/members`).expect(200);
-    expect(members.body).toEqual(
+    expect(members.body.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           role: MemberRole.GUEST,
         }),
       ]),
     );
+    expect(members.body.hasMore).toBe(false);
+    expect(members.body.nextCursor).toBeNull();
 
     // Second invite + revoke
     const other = await signUp(app, {
@@ -159,7 +212,7 @@ describe('Workspace isolation and roles (e2e)', () => {
       .expect(403);
 
     const members = await owner.agent.get(`/workspaces/${workspace.id}/members`).expect(200);
-    expect(members.body).toHaveLength(1);
+    expect(members.body.items).toHaveLength(1);
 
     // …and the same request succeeds once the address is confirmed, so the 403 above is the
     // verification gate and not some unrelated failure.

@@ -194,6 +194,66 @@ describe('VerifyEmailView', () => {
     );
   });
 
+  it('asks for nothing but the resend when someone came to request a link', () => {
+    // No `?error=`, so nothing failed — the flag is the only thing saying this is not the
+    // landing of a link that worked.
+    mocks.searchParams = new URLSearchParams('resend=1');
+    signedIn(false);
+    renderView();
+
+    expect(screen.getByRole('heading', { name: 'Confirm your email' })).toBeTruthy();
+    expect(screen.getByText(/lets you accept workspace invitations/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Send a new link' })).toBeTruthy();
+    // Nothing broke, so nothing gets blamed.
+    expect(screen.queryByRole('heading', { name: "This link didn't work" })).toBeNull();
+  });
+
+  it('sends the requested link to the signed-in address', async () => {
+    mocks.searchParams = new URLSearchParams('resend=1');
+    signedIn(false);
+    renderView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send a new link' }));
+
+    expect(mocks.sendVerificationEmail).toHaveBeenCalledWith({
+      email: 'ayse@example.com',
+      callbackURL: '/verify-email',
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe(
+        "A new link is on its way to ayse@example.com. It's good for a short while.",
+      ),
+    );
+  });
+
+  it('gives a signed-in visitor the way back to the app they walked in from', () => {
+    mocks.searchParams = new URLSearchParams('resend=1');
+    signedIn(false);
+    renderView();
+
+    expect(screen.getByRole('link', { name: 'Back to your workspace' }).getAttribute('href')).toBe(
+      '/dashboard',
+    );
+  });
+
+  it('offers no way back to a visitor who has no session to go back to', () => {
+    mocks.searchParams = new URLSearchParams('resend=1');
+    renderView();
+
+    expect(screen.queryByRole('link', { name: 'Back to your workspace' })).toBeNull();
+    // Signed out, nobody knows who to send the link to.
+    expect(screen.getByLabelText('Email')).toBeTruthy();
+  });
+
+  it('tells a confirmed account it is already done instead of resending', () => {
+    mocks.searchParams = new URLSearchParams('resend=1');
+    signedIn(true);
+    renderView();
+
+    expect(screen.getByRole('heading', { name: 'Email confirmed' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Send a new link' })).toBeNull();
+  });
+
   it('reports success when the session is already confirmed, whatever the link said', () => {
     // Two links in the mailbox, or a second tab: the older one fails, but the account is done.
     mocks.searchParams = new URLSearchParams('error=INVALID_TOKEN');

@@ -9,6 +9,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `GET /workspaces/:workspaceId/members/me` returns the caller's own membership, so the app
+  shell resolves the active role from one indexed row instead of `/me` plus the full roster.
 - Phase 9 realtime board sync
   ([spec](docs/specs/2026-08-09-phase-9-realtime-design.md)): Socket.io gateway with Redis
   adapter, session-cookie auth, `board:{id}` rooms, thin ID event contract (`actorId`),
@@ -100,6 +102,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Breaking:** `GET /workspaces/:workspaceId/boards/:boardId/tasks` now returns
   `CursorPage<TaskDto>` (`{ items, nextCursor, hasMore }`) instead of a bare `TaskDto[]`.
   Clients must drain pages (or raise `limit`, max 100) to load a full board.
+- **Breaking:** `GET /workspaces/:workspaceId/members` now returns
+  `CursorPage<WorkspaceMemberDto>` (`{ items, nextCursor, hasMore }`) instead of a bare
+  `WorkspaceMemberDto[]` capped at 1000 rows, and accepts `?limit=` (default and max 100)
+  and `?cursor=`. Clients drain pages — `fetchAllWorkspaceMembers` in
+  `apps/web/lib/member-query.ts` — instead of trusting a single response to hold the whole
+  roster.
 - Nest `/workspaces` is the sole public API for organization/workspace mutations; Better
   Auth `/auth/organization/*` mutation paths are HTTP-firewalled (reads + `set-active`
   remain).

@@ -67,7 +67,7 @@ describe('Auth (e2e)', () => {
     const me = await user.agent.get('/me').expect(200);
     const members = await user.agent.get(`/workspaces/${workspace.id}/members`).expect(200);
 
-    expect(members.body).toEqual(
+    expect(members.body.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           userId: me.body.id,

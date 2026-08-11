@@ -311,4 +311,9 @@ model Notification {
   // (userId, readAt) index was dropped — every notification query is workspace-scoped.
   @@index([workspaceId, userId, readAt, id])
   @@index([userId, type, taskId])
+  // `taskId` carries `onDelete: Cascade`, but no existing index leads with it — it only
+  // ever trails `userId` (here and in the partial unique index above), which a cascade
+  // delete's `WHERE "taskId" = $1` scan can't use. Without this, deleting a task forces a
+  // sequential scan of the whole (fast-growing) notification table to find its rows.
+  @@index([taskId])
 }

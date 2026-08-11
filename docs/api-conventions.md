@@ -51,7 +51,8 @@ GET    /workspaces/:workspaceId
 PATCH  /workspaces/:workspaceId
 DELETE /workspaces/:workspaceId
 
-GET    /workspaces/:workspaceId/members
+GET    /workspaces/:workspaceId/members        # cursor page of the roster
+GET    /workspaces/:workspaceId/members/me     # the caller's own membership
 POST   /workspaces/:workspaceId/invitations
 DELETE /workspaces/:workspaceId/invitations/:invitationId
 
@@ -259,9 +260,14 @@ the framework's built-in exceptions and hand-written ones look identical):
 
 ## Pagination
 
-**Cursor pagination is the default.** Page-number pagination is acceptable only for small,
-bounded collections (a workspace's members, a board's columns) where the total count is
-naturally small and stable.
+**Cursor pagination is the default.** Page-number pagination is acceptable only for
+genuinely bounded collections (a board's columns) where the total count is small by
+construction rather than by expectation.
+
+"Members are always few" was that expectation, and it is how the roster spent a phase
+returning a plain array behind `take: 1000` — a workspace past that simply lost its tail,
+with nothing in the response saying so. A collection whose size is the user's decision gets
+a cursor: an unpaginated list is a promise that the server can always return all of it.
 
 Why cursor by default:
 
@@ -312,7 +318,7 @@ GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=0198e2c1-4f3a-7b21-9c4d-5e6
 ### Page-based (small collections only)
 
 ```
-GET /workspaces/w_1/members?page=1&perPage=25
+GET /workspaces/w_1/some-bounded-collection?page=1&perPage=25
 ```
 
 ```jsonc
@@ -325,9 +331,14 @@ GET /workspaces/w_1/members?page=1&perPage=25
 }
 ```
 
-Both cursor lists use `@kurultay/shared-types` `CursorPage<T>`. Small page-based
-collections (members) may return an inline `{ items, page, perPage, total, totalPages }`
-shape until a dedicated type is needed — do not invent a second shared pagination default.
+No endpoint uses this shape today — every paginated list is a `CursorPage<T>` from
+`@kurultay/shared-types`. A collection that genuinely needs page numbers may return the
+inline shape above until a dedicated type is worth it; do not invent a second shared
+pagination default.
+
+A list that fits in one page is still a page. `GET .../members` defaults `limit` to the
+`100` ceiling, so an ordinary workspace is one request that answers `hasMore: false` — the
+client walks the cursor only when there is something left to walk to.
 
 ## Filtering, sorting, field selection
 
