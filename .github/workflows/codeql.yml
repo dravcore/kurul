@@ -1,0 +1,45 @@
+name: CodeQL
+
+# Free for public repositories. `pnpm audit` covers dependencies; this covers the code we
+# write ourselves — the half no advisory database knows about.
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: ['**']
+  schedule:
+    # Weekly, so a newly published query finds old code without waiting for someone to touch
+    # it. Monday early UTC keeps it clear of the usual PR traffic.
+    - cron: '17 3 * * 1'
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      # Required to upload results to the Security tab.
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # No build step: `javascript-typescript` uses an extractor that reads source directly,
+      # so CI stays fast and this job does not need Postgres, Redis, or a Prisma client.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript
