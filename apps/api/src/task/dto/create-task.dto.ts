@@ -5,13 +5,13 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
-  IsUUID,
   Max,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
 import { OptionalNullable } from '../../common/validation/optional';
+import { IsUuidV7 } from '../../common/uuid';
 import { MAX_ESTIMATED_MINUTES } from './task-limits';
 
 export class CreateTaskDto {
@@ -20,7 +20,7 @@ export class CreateTaskDto {
   @MaxLength(500)
   title!: string;
 
-  @IsUUID('7')
+  @IsUuidV7()
   columnId!: string;
 
   @OptionalNullable()
@@ -46,6 +46,6 @@ export class CreateTaskDto {
 
   /** Insert after this task in the target column; omit to append. */
   @IsOptional()
-  @IsUUID('7')
+  @IsUuidV7()
   afterTaskId?: string | null;
 }

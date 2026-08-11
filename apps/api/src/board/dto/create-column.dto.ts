@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsUuidV7 } from '../../common/uuid';
 
 export class CreateColumnDto {
   @IsString()
@@ -7,7 +8,7 @@ export class CreateColumnDto {
   name!: string;
 
   @IsOptional()
-  @IsUUID('7')
+  @IsUuidV7()
   afterColumnId?: string | null;
 
   @IsOptional()

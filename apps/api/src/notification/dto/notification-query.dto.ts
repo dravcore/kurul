@@ -1,7 +1,8 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 import { NotificationType } from '@kurultay/shared-types';
 import { DEFAULT_PAGE_LIMIT, PageLimit } from '../../common/pagination/page-limit';
+import { IsUuidV7 } from '../../common/uuid';
 
 function toBoolean(value: unknown): boolean | undefined {
   if (value === undefined || value === null || value === '') return undefined;
@@ -20,7 +21,7 @@ export class NotificationQueryDto {
   limit: number = DEFAULT_PAGE_LIMIT;
 
   @IsOptional()
-  @IsUUID('7')
+  @IsUuidV7()
   cursor?: string;
 
   @IsOptional()

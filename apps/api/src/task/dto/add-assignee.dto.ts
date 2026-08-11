@@ -1,7 +1,8 @@
-import { IsNotEmpty, IsUUID } from 'class-validator';
+import { IsNotEmpty } from 'class-validator';
+import { IsUuidV7 } from '../../common/uuid';
 
 export class AddAssigneeDto {
-  @IsUUID('7')
+  @IsUuidV7()
   @IsNotEmpty()
   userId!: string;
 }

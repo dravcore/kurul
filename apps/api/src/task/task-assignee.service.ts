@@ -33,6 +33,10 @@ export class TaskAssigneeService {
       throw new UnprocessableEntityException('User is not a member of this workspace');
     }
 
+    // Set inside the transaction, published after it commits: `createAssignment` returns null
+    // when the assignee is the actor, and only a stored row is worth signalling.
+    let notifiedUserId: string | null = null;
+
     await conflictOnUniqueViolation(async () => {
       await this.prisma.$transaction(async (tx) => {
         await tx.taskAssignee.create({
@@ -50,7 +54,7 @@ export class TaskAssigneeService {
           },
         });
 
-        await this.notificationService.createAssignment(tx, {
+        const notification = await this.notificationService.createAssignment(tx, {
           workspaceId,
           userId: dto.userId,
           actorId,
@@ -62,8 +66,13 @@ export class TaskAssigneeService {
             actorId,
           },
         });
+        notifiedUserId = notification ? dto.userId : null;
       });
     }, 'User is already assigned to this task');
+
+    if (notifiedUserId) {
+      this.notificationService.emitUnreadChanged(workspaceId, [notifiedUserId]);
+    }
 
     return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
   }

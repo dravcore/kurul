@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { NotificationType, type CursorPage, type NotificationDto } from '@kurultay/shared-types';
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useNotificationSocket } from './use-notification-socket';
 import { toast } from 'sonner';
 
 const PAGE_LIMIT = 50;
@@ -59,11 +60,35 @@ export function NotificationsList(): React.ReactElement {
   const {
     data: page,
     loading,
+    reload,
     setData: setPage,
   } = useApiResource<CursorPage<NotificationDto>>(fetchPage, EMPTY_PAGE, t('loadError'), {
     onError: () => toast.error(t('loadError')),
   });
   const { items, nextCursor } = page;
+
+  // The same signal the bell listens to. Reloading the first page is the whole response: the
+  // event carries no notification, and this screen shows rows the API has to render anyway.
+  const reloadFromSignal = useCallback((): void => {
+    // A reload mid-`loadMore` would be overwritten by the append that is already in flight.
+    if (!loadingMore) reload();
+  }, [loadingMore, reload]);
+
+  // The first join lands right after the initial load, which already has fresh rows; only a
+  // later one (a reconnect) is telling us something we missed.
+  const joinedOnce = useRef(false);
+  const onResync = useCallback((): void => {
+    if (!joinedOnce.current) {
+      joinedOnce.current = true;
+      return;
+    }
+    reloadFromSignal();
+  }, [reloadFromSignal]);
+
+  useNotificationSocket(workspaceId, true, {
+    onUnreadChanged: reloadFromSignal,
+    onResync,
+  });
 
   const setItems = useCallback(
     (update: (current: NotificationDto[]) => NotificationDto[]): void => {

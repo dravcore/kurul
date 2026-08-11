@@ -39,7 +39,10 @@ describe('CommentService', () => {
       callback(prisma),
     );
     const activityService = { record: jest.fn().mockResolvedValue({ id: 'activity-1' }) };
-    const notificationService = { createMentionBatch: jest.fn().mockResolvedValue(0) };
+    const notificationService = {
+      createMentionBatch: jest.fn().mockResolvedValue(0),
+      emitUnreadChanged: jest.fn(),
+    };
     const realtime = { emitToBoard: jest.fn() };
 
     return {
@@ -150,6 +153,37 @@ describe('CommentService', () => {
     );
   });
 
+  it('signals the mentioned users once, after the transaction has committed', async () => {
+    const { service, prisma, notificationService } = buildService();
+    const body = `hey @[Bob](${MENTIONED_ID}) and @[Bob](${MENTIONED_ID})`;
+    prisma.comment.create.mockResolvedValue({
+      id: COMMENT_ID,
+      taskId: TASK_ID,
+      userId: AUTHOR_ID,
+      body,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      user: { id: AUTHOR_ID, name: 'Ada', avatarUrl: null },
+    });
+    prisma.workspaceMember.findMany.mockResolvedValue([{ userId: MENTIONED_ID }]);
+
+    const order: string[] = [];
+    prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) => {
+      const result = await callback(prisma);
+      order.push('commit');
+      return result;
+    });
+    notificationService.emitUnreadChanged.mockImplementation(() => order.push('emit'));
+
+    await service.create(WORKSPACE_ID, TASK_ID, AUTHOR_ID, { body });
+
+    // Publishing from inside the transaction would invite a refetch that cannot see the rows.
+    expect(order).toEqual(['commit', 'emit']);
+    expect(notificationService.emitUnreadChanged).toHaveBeenCalledTimes(1);
+    expect(notificationService.emitUnreadChanged).toHaveBeenCalledWith(WORKSPACE_ID, [
+      MENTIONED_ID,
+    ]);
+  });
+
   it('skips the notification batch call when a comment has no mentions', async () => {
     const { service, prisma, notificationService } = buildService();
     prisma.comment.create.mockResolvedValue({
@@ -165,6 +199,7 @@ describe('CommentService', () => {
 
     expect(prisma.workspaceMember.findMany).not.toHaveBeenCalled();
     expect(notificationService.createMentionBatch).not.toHaveBeenCalled();
+    expect(notificationService.emitUnreadChanged).not.toHaveBeenCalled();
   });
 
   it('allows the author to delete their comment', async () => {

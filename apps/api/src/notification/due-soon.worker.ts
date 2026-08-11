@@ -90,6 +90,11 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
 
     let cursor: { dueDate: Date; id: string } | null = null;
     let totalCreated = 0;
+    // Recipients are collected across every page and signalled once at the end. A scan can
+    // insert thousands of rows over many batches; a per-row — or even per-batch — emit would
+    // hand the same user a burst of identical "your count changed" signals, and each one costs
+    // that browser an unread-count request.
+    const recipientsByWorkspace = new Map<string, Set<string>>();
 
     for (;;) {
       const tasks: ScanTaskRow[] = await this.prisma.task.findMany({
@@ -118,7 +123,13 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
 
       if (tasks.length === 0) break;
 
-      totalCreated += await this.notifyBatch(tasks, since);
+      const { created, recipients } = await this.notifyBatch(tasks, since);
+      totalCreated += created;
+      for (const recipient of recipients) {
+        const users = recipientsByWorkspace.get(recipient.workspaceId) ?? new Set<string>();
+        users.add(recipient.userId);
+        recipientsByWorkspace.set(recipient.workspaceId, users);
+      }
 
       if (tasks.length < SCAN_BATCH_SIZE) break;
       const last = tasks[tasks.length - 1]!;
@@ -126,10 +137,19 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
       cursor = { dueDate: last.dueDate, id: last.id };
     }
 
+    // After the inserts, never inside the loop — and one signal per (workspace, user) pair,
+    // not one per notification.
+    for (const [workspaceId, users] of recipientsByWorkspace) {
+      this.notifications.emitUnreadChanged(workspaceId, [...users]);
+    }
+
     return totalCreated;
   }
 
-  private async notifyBatch(tasks: ScanTaskRow[], since: Date): Promise<number> {
+  private async notifyBatch(
+    tasks: ScanTaskRow[],
+    since: Date,
+  ): Promise<{ created: number; recipients: Array<{ workspaceId: string; userId: string }> }> {
     const taskIds = tasks.map((task) => task.id);
     const userIds = [...new Set(tasks.flatMap((task) => task.assignees.map((row) => row.userId)))];
 
@@ -175,13 +195,20 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    if (rows.length === 0) return 0;
+    if (rows.length === 0) return { created: 0, recipients: [] };
 
     const result = await this.prisma.notification.createMany({
       data: rows,
       skipDuplicates: true,
     });
-    return result.count;
+    // `skipDuplicates` can drop rows a concurrent scanner already inserted, so a recipient here
+    // may end up with nothing new. The cost of that is one extra unread-count request in a
+    // browser whose badge is already correct — cheaper than reading back the inserted rows.
+    if (result.count === 0) return { created: 0, recipients: [] };
+    return {
+      created: result.count,
+      recipients: rows.map((row) => ({ workspaceId: row.workspaceId, userId: row.userId })),
+    };
   }
 
   private async process(_job: Job): Promise<void> {

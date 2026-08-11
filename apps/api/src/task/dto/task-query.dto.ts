@@ -5,7 +5,6 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   Validate,
   ValidatorConstraint,
@@ -14,7 +13,7 @@ import {
 } from 'class-validator';
 import { Priority } from '@kurultay/shared-types';
 import { DEFAULT_PAGE_LIMIT, PageLimit } from '../../common/pagination/page-limit';
-import { isUuidV7 } from '../../common/uuid';
+import { isUuidV7, IsUuidV7 } from '../../common/uuid';
 
 /** Split CSV or repeated query values into a flat string list. */
 function toStringList(value: unknown): string[] | undefined {
@@ -51,7 +50,7 @@ export class TaskQueryDto {
   limit: number = DEFAULT_PAGE_LIMIT;
 
   @IsOptional()
-  @IsUUID('7')
+  @IsUuidV7()
   cursor?: string;
 
   @IsOptional()
@@ -75,7 +74,7 @@ export class TaskQueryDto {
 
   @IsOptional()
   @Transform(({ value }) => toStringList(value))
-  @IsUUID('7', { each: true })
+  @IsUuidV7({ each: true })
   labelId?: string[];
 
   /** Only the string `null` — tasks with no due date. Ranges use bracket keys. */

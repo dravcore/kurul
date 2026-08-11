@@ -1,7 +1,8 @@
-import { IsOptional, IsUUID } from 'class-validator';
+import { IsOptional } from 'class-validator';
+import { IsUuidV7 } from '../../common/uuid';
 
 export class DashboardQueryDto {
   @IsOptional()
-  @IsUUID('7')
+  @IsUuidV7()
   boardId?: string;
 }

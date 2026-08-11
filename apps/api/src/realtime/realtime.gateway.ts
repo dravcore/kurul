@@ -16,13 +16,15 @@ import {
   SocketClientEvents,
   type BoardJoinPayload,
   type BoardLeavePayload,
+  type NotificationsJoinPayload,
+  type NotificationsLeavePayload,
 } from '@kurultay/shared-types';
 import type { Server, Socket } from 'socket.io';
 import { auth } from '../auth/auth';
 import { envString, isTestEnv } from '../common/env';
 import { parseRedisUrl } from '../common/redis-url';
 import { PrismaService } from '../prisma/prisma.service';
-import { boardRoom, RealtimeService } from './realtime.service';
+import { boardRoom, RealtimeService, userRoom } from './realtime.service';
 
 type AuthedSocket = Socket & {
   data: {
@@ -115,6 +117,58 @@ export class RealtimeGateway
     const boardId = typeof body?.boardId === 'string' ? body.boardId : '';
     if (boardId) {
       await client.leave(boardRoom(boardId));
+    }
+    return { ok: true };
+  }
+
+  /**
+   * Join the caller's own notification room.
+   *
+   * The room name is built from `client.data.userId` — the id Better Auth resolved from the
+   * handshake — and never from the message body, which is why the payload has no user field
+   * to trust. A body-supplied recipient would be an eavesdropping primitive: any authenticated
+   * socket could name someone else and receive their notification signals.
+   *
+   * Workspace membership is still checked, exactly as the board join does. The room is already
+   * private to one user, so this is not what stops a leak; it stops a socket from holding an
+   * open subscription to a tenant the user has been removed from.
+   */
+  @SubscribeMessage(SocketClientEvents.NOTIFICATIONS_JOIN)
+  async onNotificationsJoin(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: NotificationsJoinPayload,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const userId = client.data.userId;
+    if (!userId) {
+      return { ok: false, error: 'unauthenticated' };
+    }
+    const workspaceId = typeof body?.workspaceId === 'string' ? body.workspaceId : '';
+    if (!workspaceId) {
+      return { ok: false, error: 'workspaceId required' };
+    }
+
+    const membership = await this.prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId },
+      select: { id: true },
+    });
+    if (!membership) {
+      // Opaque deny — do not distinguish missing vs not-a-member.
+      return { ok: false, error: 'workspace not found' };
+    }
+
+    await client.join(userRoom(workspaceId, userId));
+    return { ok: true };
+  }
+
+  @SubscribeMessage(SocketClientEvents.NOTIFICATIONS_LEAVE)
+  async onNotificationsLeave(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: NotificationsLeavePayload,
+  ): Promise<{ ok: boolean }> {
+    const userId = client.data.userId;
+    const workspaceId = typeof body?.workspaceId === 'string' ? body.workspaceId : '';
+    if (userId && workspaceId) {
+      await client.leave(userRoom(workspaceId, userId));
     }
     return { ok: true };
   }

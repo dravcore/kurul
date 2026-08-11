@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { NotificationType } from '@kurultay/shared-types';
+import { NotificationType, SocketEvents } from '@kurultay/shared-types';
 import type {
   CursorPage,
   NotificationDto,
@@ -8,6 +8,7 @@ import type {
 import type { Prisma } from '../generated/prisma';
 import { toCursorPage } from '../common/pagination/cursor-page';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 export type NotificationDb = PrismaService | Prisma.TransactionClient;
 
@@ -46,7 +47,38 @@ type NotificationRow = {
 
 @Injectable()
 export class NotificationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeService,
+  ) {}
+
+  /**
+   * Tell each recipient that their unread count in this workspace changed.
+   *
+   * **Call this after the write has committed.** `create`, `createAssignment` and
+   * `createMentionBatch` all run inside the caller's transaction, so they deliberately do not
+   * publish: a signal sent before `COMMIT` invites the client to read a count that does not
+   * include the new row yet, and with polling gone that lost increment would sit on the badge
+   * until the next notification arrives. The read paths below own their transaction, so they
+   * publish here themselves.
+   *
+   * One signal per recipient, never one per row — a mention batch or a due-soon scan that
+   * inserts hundreds of rows still sends each user exactly one event, which is what keeps a
+   * bulk insert from turning into an emit storm. That is only affordable because the payload
+   * says "your count changed" rather than carrying the notifications themselves.
+   */
+  emitUnreadChanged(workspaceId: string, userIds: readonly string[]): void {
+    for (const userId of new Set(userIds)) {
+      this.realtime.emitToUser(
+        workspaceId,
+        userId,
+        SocketEvents.NOTIFICATION_UNREAD_CHANGED,
+        // The room is already scoped to this pair; the payload repeats it so a client holding
+        // several workspaces open can tell which badge to refresh.
+        { workspaceId, userId },
+      );
+    }
+  }
 
   private toDto(row: NotificationRow): NotificationDto {
     return {
@@ -62,7 +94,12 @@ export class NotificationService {
     };
   }
 
-  /** Insert a notification unless the actor is the recipient. */
+  /**
+   * Insert a notification unless the actor is the recipient.
+   *
+   * Publishes nothing: `db` is usually the caller's transaction client. The caller signals the
+   * recipient with `emitUnreadChanged` once that transaction has committed.
+   */
   async create(db: NotificationDb, input: CreateNotificationInput) {
     if (input.userId === input.actorId) return null;
     return db.notification.create({
@@ -94,6 +131,9 @@ export class NotificationService {
   /**
    * Bulk-inserts mention notifications for a comment in a single `createMany` instead of
    * one `create` per mentioned user — mirrors the due-soon worker's batch insert.
+   *
+   * Publishes nothing, for the same reason as `create`; the caller emits one signal per
+   * recipient after its transaction commits.
    */
   async createMentionBatch(
     db: NotificationDb,
@@ -173,7 +213,7 @@ export class NotificationService {
     userId: string,
     notificationId: string,
   ): Promise<NotificationDto> {
-    const row = await this.prisma.$transaction(async (tx) => {
+    const { row, changed } = await this.prisma.$transaction(async (tx) => {
       // Read inside the transaction: read and write split apart leave a window in which the row
       // can be deleted (user removal cascades) between the idempotency check and the update.
       const existing = await tx.notification.findFirst({
@@ -181,17 +221,23 @@ export class NotificationService {
       });
       if (!existing) throw new NotFoundException('Notification not found');
 
-      if (existing.readAt) return existing;
+      if (existing.readAt) return { row: existing, changed: false };
 
       // The write predicate repeats both scopes. workspaceId is the tenant boundary, but userId
       // is the tighter one that actually matters here: a notification is private to its
       // recipient, so a workspace-only predicate would let any member of the same workspace
       // mark someone else's row read. `markAllRead` already filters on the same pair.
-      return tx.notification.update({
+      const updated = await tx.notification.update({
         where: { id: notificationId, workspaceId, userId },
         data: { readAt: new Date() },
       });
+      return { row: updated, changed: true };
     });
+
+    // Only when the count actually moved. The signal goes to the recipient's room, which every
+    // tab of theirs holds open — including the one that did not issue this request, and the bell
+    // sitting next to the list page that did.
+    if (changed) this.emitUnreadChanged(workspaceId, [userId]);
     return this.toDto(row);
   }
 
@@ -200,6 +246,7 @@ export class NotificationService {
       where: { workspaceId, userId, readAt: null },
       data: { readAt: new Date() },
     });
+    if (result.count > 0) this.emitUnreadChanged(workspaceId, [userId]);
     return { updated: result.count };
   }
 }

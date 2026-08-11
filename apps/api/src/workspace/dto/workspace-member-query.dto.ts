@@ -1,5 +1,6 @@
-import { IsOptional, IsUUID } from 'class-validator';
+import { IsOptional } from 'class-validator';
 import { MAX_PAGE_LIMIT, PageLimit } from '../../common/pagination/page-limit';
+import { IsUuidV7 } from '../../common/uuid';
 
 /** Cursor page query for a workspace's members. */
 export class WorkspaceMemberQueryDto {
@@ -11,6 +12,6 @@ export class WorkspaceMemberQueryDto {
   limit: number = MAX_PAGE_LIMIT;
 
   @IsOptional()
-  @IsUUID('7')
+  @IsUuidV7()
   cursor?: string;
 }
