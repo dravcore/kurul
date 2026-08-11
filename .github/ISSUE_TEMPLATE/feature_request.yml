@@ -13,7 +13,7 @@ body:
         Contributor License Agreement is still in draft the maintainer cannot safely read one
         and then write the feature.
 
-        See [CONTRIBUTING.md](../blob/develop/CONTRIBUTING.md#code-contributions-are-paused).
+        See [CONTRIBUTING.md](https://github.com/dravcore/kurultay/blob/develop/CONTRIBUTING.md#code-contributions-are-paused).
 
   - type: checkboxes
     id: existing-issue
@@ -56,4 +56,4 @@ body:
     attributes:
       value: |
         Note: this is issue-first — please wait for maintainer feedback before starting
-        implementation. See [CONTRIBUTING.md](../../CONTRIBUTING.md).
+        implementation. See [CONTRIBUTING.md](https://github.com/dravcore/kurultay/blob/develop/CONTRIBUTING.md).

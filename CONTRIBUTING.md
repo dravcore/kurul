@@ -8,9 +8,9 @@ bug reports, feature ideas, design feedback — is wanted as much as ever.
 
 ## Code contributions are paused
 
-> **We do not merge outside code, documentation, or translation pull requests.** This has no
-> end date. Ideas, bug reports and discussion are wanted as much as ever — see
-> [Ways to contribute](#ways-to-contribute).
+> **Pull requests from outside contributors are not merged — whether they change code, docs,
+> or translations.** This has no end date. Ideas, bug reports and discussion are wanted as much
+> as ever — see [Ways to contribute](#ways-to-contribute).
 >
 > One exception: a typo or a dead link is still welcome as a one-line PR. A corrected spelling
 > is not an original work, so there is nothing to license and nothing to unpick later.

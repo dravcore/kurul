@@ -107,7 +107,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-document: 'https://github.com/dravcore/kurultay/blob/main/docs/cla.md'
+          path-to-document: 'https://github.com/dravcore/kurultay/blob/develop/docs/cla.md'
           # Version is part of the path AND of the signing sentence below, so a signature can
           # never be silently carried over to an amended CLA text.
           path-to-signatures: 'signatures/v0.1/cla.json'
@@ -117,7 +117,7 @@ jobs:
           custom-pr-sign-comment: 'I have read the Kurultay CLA v0.1 and I hereby sign it'
           custom-notsigned-prcomment: |
             Thanks for the pull request! Before it can be merged, every commit author on it
-            needs to sign the [Kurultay Contributor License Agreement](https://github.com/dravcore/kurultay/blob/main/docs/cla.md).
+            needs to sign the [Kurultay Contributor License Agreement](https://github.com/dravcore/kurultay/blob/develop/docs/cla.md).
 
             Kurultay is AGPL-3.0 and intends to stay that way. The CLA exists because the
             project is funded by **dual licensing** — the maintainer also sells a commercial
@@ -125,7 +125,7 @@ jobs:
             distribute their work under a license other than AGPL-3.0. You keep the copyright
             in your code and every right to reuse it, and the CLA guarantees your contribution
             stays published under AGPL-3.0 as well. The reasoning, including the downsides, is
-            in [ADR 0014](https://github.com/dravcore/kurultay/blob/main/docs/decisions/0014-dual-licensing-cla.md).
+            in [ADR 0014](https://github.com/dravcore/kurultay/blob/develop/docs/decisions/0014-dual-licensing-cla.md).
 
             If you agree, post a new comment on this pull request containing exactly:
           custom-allsigned-prcomment: |
