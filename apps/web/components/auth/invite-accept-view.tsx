@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import type { WorkspaceMemberDto } from '@kurultay/shared-types';
 import { VerificationResend } from '@/components/auth/verification-resend';
 import { Button } from '@/components/ui/button';
@@ -94,6 +95,10 @@ export function InviteAcceptView({
 
       await authClient.organization.setActive({ organizationId: workspaceId });
 
+      // The dashboard this lands on says nothing about having joined — an invitee who already
+      // had workspaces sees only the switcher label change. The Toaster is mounted in the root
+      // layout, so this survives the navigation and arrives on the destination.
+      toast.success(t('accepted'));
       router.replace('/dashboard');
       router.refresh();
     } catch (caught) {
