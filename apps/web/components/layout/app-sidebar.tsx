@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { LayoutDashboard, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { LayoutDashboard, LogOut, PanelLeftClose, PanelLeft, Settings } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,16 @@ export function AppSidebar(): React.ReactElement {
   }, []);
 
   const dashboardActive = pathname.startsWith('/dashboard');
+  const settingsActive = pathname.startsWith('/settings');
+
+  const navLinkClass = (active: boolean): string =>
+    cn(
+      'relative flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-2 text-body transition-colors',
+      active
+        ? 'bg-signature-subtle font-strong text-foreground'
+        : 'text-foreground-secondary hover:bg-muted',
+      collapsed && 'justify-center px-0',
+    );
 
   return (
     <aside
@@ -80,17 +90,21 @@ export function AppSidebar(): React.ReactElement {
           href="/dashboard"
           data-rail-active={dashboardActive || undefined}
           aria-current={dashboardActive ? 'page' : undefined}
-          className={cn(
-            'relative flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-2 text-body transition-colors',
-            dashboardActive
-              ? 'bg-signature-subtle font-strong text-foreground'
-              : 'text-foreground-secondary hover:bg-muted',
-            collapsed && 'justify-center px-0',
-          )}
+          className={navLinkClass(dashboardActive)}
           title={t('dashboard.title')}
         >
           <LayoutDashboard className="size-5 shrink-0" />
           {!collapsed ? <span>{t('dashboard.title')}</span> : null}
+        </Link>
+        <Link
+          href="/settings"
+          data-rail-active={settingsActive || undefined}
+          aria-current={settingsActive ? 'page' : undefined}
+          className={navLinkClass(settingsActive)}
+          title={t('shell.settings')}
+        >
+          <Settings className="size-5 shrink-0" />
+          {!collapsed ? <span>{t('shell.settings')}</span> : null}
         </Link>
       </nav>
 

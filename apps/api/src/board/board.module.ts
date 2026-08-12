@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LocaleModule } from '../locale/locale.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { BoardController } from './board.controller';
 import { BoardService } from './board.service';
@@ -6,7 +7,7 @@ import { ColumnController } from './column.controller';
 import { ColumnService } from './column.service';
 
 @Module({
-  imports: [RealtimeModule],
+  imports: [RealtimeModule, LocaleModule],
   controllers: [BoardController, ColumnController],
   providers: [BoardService, ColumnService],
   exports: [BoardService, ColumnService],

@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { ColumnCategory } from '@kurultay/shared-types';
+import { ColumnCategory, type Locale } from '@kurultay/shared-types';
+import type { LocaleService } from '../locale/locale.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RealtimeService } from '../realtime/realtime.service';
 import { ColumnService } from './column.service';
@@ -10,18 +11,21 @@ const ACTOR_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60';
 const COLUMN_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51';
 
 describe('ColumnService', () => {
-  function buildService() {
+  function buildService(locale: Locale = 'en') {
     const prisma = {
       board: { findFirst: jest.fn().mockResolvedValue({ id: BOARD_ID }) },
       column: {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
+        createMany: jest.fn().mockResolvedValue({ count: 3 }),
+        count: jest.fn().mockResolvedValue(0),
         update: jest.fn(),
         delete: jest.fn(),
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       task: { count: jest.fn().mockResolvedValue(0) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
     };
     // The default transaction hands the same mock back as `tx`, so assertions on
@@ -31,15 +35,147 @@ describe('ColumnService', () => {
       callback(prisma),
     );
     const realtime = { emitToBoard: jest.fn() };
+    const localeService = { resolve: jest.fn().mockResolvedValue(locale) };
     return {
       service: new ColumnService(
         prisma as unknown as PrismaService,
         realtime as unknown as RealtimeService,
+        localeService as unknown as LocaleService,
       ),
       prisma,
       realtime,
+      localeService,
     };
   }
+
+  /** The rows `createDefaults` re-reads after its bulk insert. */
+  function seededRows() {
+    return [
+      {
+        id: 'seed-1',
+        boardId: BOARD_ID,
+        name: 'To Do',
+        position: 1000,
+        color: null,
+        category: ColumnCategory.UNSTARTED,
+        _count: { tasks: 0 },
+      },
+      {
+        id: 'seed-2',
+        boardId: BOARD_ID,
+        name: 'In Progress',
+        position: 2000,
+        color: null,
+        category: ColumnCategory.STARTED,
+        _count: { tasks: 0 },
+      },
+      {
+        id: 'seed-3',
+        boardId: BOARD_ID,
+        name: 'Done',
+        position: 3000,
+        color: null,
+        category: ColumnCategory.COMPLETED,
+        _count: { tasks: 0 },
+      },
+    ];
+  }
+
+  describe('createDefaults', () => {
+    it('seeds the whole starting set in one transaction and returns it ordered', async () => {
+      const { service, prisma } = buildService();
+      prisma.column.findMany.mockResolvedValue(seededRows());
+
+      await expect(service.createDefaults(WORKSPACE_ID, BOARD_ID, ACTOR_ID)).resolves.toMatchObject(
+        [
+          { name: 'To Do', position: 1000, category: ColumnCategory.UNSTARTED, taskCount: 0 },
+          { name: 'In Progress', position: 2000, category: ColumnCategory.STARTED },
+          { name: 'Done', position: 3000, category: ColumnCategory.COMPLETED },
+        ],
+      );
+
+      // One bulk insert, not one request per column: a partial seed is the failure mode the
+      // web's old three-POST loop could leave behind.
+      expect(prisma.column.createMany).toHaveBeenCalledTimes(1);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.column.create).not.toHaveBeenCalled();
+    });
+
+    it('writes every seed column with the board id and its category', async () => {
+      const { service, prisma } = buildService();
+      prisma.column.findMany.mockResolvedValue(seededRows());
+
+      await service.createDefaults(WORKSPACE_ID, BOARD_ID, ACTOR_ID);
+
+      // Spelled out rather than compared against the catalog: reusing `defaultColumnsFor`
+      // here would keep passing if the Done column stopped being COMPLETED.
+      expect(prisma.column.createMany).toHaveBeenCalledWith({
+        data: [
+          { name: 'To Do', position: 1000, category: ColumnCategory.UNSTARTED, boardId: BOARD_ID },
+          {
+            name: 'In Progress',
+            position: 2000,
+            category: ColumnCategory.STARTED,
+            boardId: BOARD_ID,
+          },
+          { name: 'Done', position: 3000, category: ColumnCategory.COMPLETED, boardId: BOARD_ID },
+        ],
+      });
+    });
+
+    it('names the columns in the caller’s language', async () => {
+      const { service, prisma, localeService } = buildService();
+      prisma.column.findMany.mockResolvedValue(seededRows());
+
+      await service.createDefaults(WORKSPACE_ID, BOARD_ID, ACTOR_ID, 'en-GB');
+
+      expect(localeService.resolve).toHaveBeenCalledWith(ACTOR_ID, 'en-GB');
+    });
+
+    it('refuses a board that already has columns instead of appending a second set', async () => {
+      const { service, prisma, realtime } = buildService();
+      prisma.column.count.mockResolvedValue(3);
+
+      const rejected = service.createDefaults(WORKSPACE_ID, BOARD_ID, ACTOR_ID);
+      await expect(rejected).rejects.toBeInstanceOf(ConflictException);
+      await expect(rejected).rejects.toThrow('Board already has columns');
+      expect(prisma.column.createMany).not.toHaveBeenCalled();
+      expect(realtime.emitToBoard).not.toHaveBeenCalled();
+    });
+
+    it('locks the board row before counting, so two callers cannot both seed', async () => {
+      const { service, prisma } = buildService();
+      prisma.column.findMany.mockResolvedValue(seededRows());
+
+      await service.createDefaults(WORKSPACE_ID, BOARD_ID, ACTOR_ID);
+
+      // Under READ COMMITTED both callers would otherwise see an empty board and both
+      // insert, leaving six columns and two Done columns with nothing to catch it.
+      expect(prisma.$executeRaw).toHaveBeenCalled();
+      const [fragments] = prisma.$executeRaw.mock.calls[0] as [TemplateStringsArray];
+      expect(fragments.join('?')).toContain('FOR UPDATE');
+    });
+
+    it('returns 404 for a board outside the workspace, writing nothing', async () => {
+      const { service, prisma } = buildService();
+      prisma.board.findFirst.mockResolvedValue(null);
+
+      await expect(service.createDefaults(WORKSPACE_ID, BOARD_ID, ACTOR_ID)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.column.createMany).not.toHaveBeenCalled();
+    });
+
+    it('announces every seeded column on the board channel', async () => {
+      const { service, prisma, realtime } = buildService();
+      prisma.column.findMany.mockResolvedValue(seededRows());
+
+      await service.createDefaults(WORKSPACE_ID, BOARD_ID, ACTOR_ID);
+
+      // Another viewer sitting on the same empty board has to see the columns appear.
+      expect(realtime.emitToBoard).toHaveBeenCalledTimes(3);
+    });
+  });
 
   it('appends a created column after the final existing position', async () => {
     const { service, prisma, realtime } = buildService();

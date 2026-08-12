@@ -110,6 +110,7 @@ Aşağıdaki tabloyu modül haritası olarak okuyun.
 | `notification` | Bildirim dağıtımı, Redis destekli kuyruk                                  |
 | `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                            |
 | `mail`         | SMTP gönderimi (`nodemailer`); yapılandırılmamışsa gönderim yerine loglar |
+| `locale`       | Saklanan arayüz dili: `User.locale` okur/yazar, istek için çözümler       |
 
 Cross-cutting altyapı:
 
@@ -122,6 +123,13 @@ Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdı
 `realtime`, domain event'lerinin tüketicisidir, domain logic'in yaşadığı bir yer değil —
 böylece iş kurallarını beraberinde sürüklemeden kendi process rolüne çıkarılabilir.
 
+`locale`, `common/` altında bir yardımcı değil bir modüldür: hem `auth` hem `board` ona ihtiyaç
+duyar ve sınır kuralı, birbirlerine değil modüle bağımlı olmalarını söyler. API'nin sahip olduğu
+tek locale farkındalığı budur ve
+[ADR 0018](decisions/0018-localization-strategy.md)'in izin verdiği iki duruma sınırlıdır:
+kullanıcı adına veritabanına yazılan içerik (yeni bir board'un tohum kolonları) ve giden e-posta.
+Arayüz çevirisi tamamen web'de kalır.
+
 ---
 
 ## 4. apps/web — yapı
@@ -133,6 +141,7 @@ apps/web/
 │   ├── (app)/             # kimlikli kabuk: sidebar + workspace switcher
 │   │   ├── dashboard/
 │   │   ├── notifications/
+│   │   ├── settings/
 │   │   ├── workspaces/new/
 │   │   └── board/[boardId]/
 │   └── layout.tsx
@@ -144,8 +153,9 @@ apps/web/
 │   ├── board/             # BoardList, BoardView, BoardColumn, dialog'lar
 │   ├── task/              # TaskCard, TaskPanel, metadata editörleri, DnD yardımcıları
 │   ├── dashboard/         # grafik component'leri (Faz 7+)
-│   └── notification/      # NotificationBell, NotificationsList
-├── i18n/                  # next-intl request config (locale çözümleme)
+│   ├── notification/      # NotificationBell, NotificationsList
+│   └── settings/          # LanguageSettings
+├── i18n/                  # next-intl request config + locale çözümleme zinciri
 ├── messages/              # en.json — UI metni, locale başına tek düz dosya
 └── lib/
     ├── api.ts             # typed REST client
@@ -163,10 +173,14 @@ event'lerine karşı uzlaştırılır.
 
 **i18n:** `next-intl` Faz 1'den beri kurulu (`i18n/request.ts`, root layout'ta
 `NextIntlClientProvider`, UI metni `messages/en.json`'da), yani her kullanıcıya görünen metin
-zaten hardcode edilmek yerine `useTranslations()` üzerinden geçiyor. Locale şu an `en` olarak
-sabitlenmiş — henüz locale routing, switcher veya ikinci bir `messages/*.json` dosyası yok.
-Bir locale eklemek component ağacını yeniden yazmak değil, bir messages dosyası artı
-locale-çözümleme mantığı eklemektir. Ek UI dil paketleri için bkz.
+zaten hardcode edilmek yerine `useTranslations()` üzerinden geçiyor. Locale her render'da
+`User.locale → locale çerezi → Accept-Language → 'en'` zinciriyle çözülüyor
+([ADR 0018](decisions/0018-localization-strategy.md)) — bilinçli olarak **`[locale]` yol parçası
+ve i18n middleware'i yok**, çünkü burada indekslenen bir şey yok ve bir dil öneki
+`middleware.ts`'teki tüm literal yol karşılaştırmalarını tek seferde geçersiz kılardı.
+Ayarlar → Dil ekranı tercihi yazıyor; tek katalog hâlâ `en`, yani bir dil eklemek component
+ağacını yeniden yazmak değil, bir `SUPPORTED_LOCALES` girdisi artı bir `messages/<tag>.json`
+eklemektir. Ek UI dil paketleri için bkz.
 [roadmap.md — MVP ötesi](roadmap.md#mvp-ötesi).
 
 ---
@@ -198,7 +212,7 @@ client hâlâ Nest ve Better Auth adapter için `apps/api/src/generated/prisma`'
 
 | Model             | Anahtar alanlar                                                                                                                                     | Notlar                                                                                                                                                                                                                                                                                        |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `User`            | `id`, `email`, `name`, `avatarUrl`, `createdAt`                                                                                                     | Kimlik, Better Auth'a ait                                                                                                                                                                                                                                                                     |
+| `User`            | `id`, `email`, `name`, `avatarUrl`, `locale`, `createdAt`                                                                                           | Kimlik, Better Auth'a ait; `locale` nullable'dır ve boşken "tarayıcıyı izle" demektir                                                                                                                                                                                                         |
 | `Workspace`       | `id`, `name`, `slug`, `createdAt`                                                                                                                   | Tenant kökü — her şey buna bağlanır                                                                                                                                                                                                                                                           |
 | `WorkspaceMember` | `id`, `workspaceId`, `userId`, `role`                                                                                                               | Join tablosu; `role` yetkileri belirler                                                                                                                                                                                                                                                       |
 | `Board`           | `id`, `workspaceId`, `name`, `description`, `createdAt`                                                                                             | Board'lar bir workspace'e ait                                                                                                                                                                                                                                                                 |

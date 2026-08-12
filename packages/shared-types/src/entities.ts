@@ -5,12 +5,21 @@ import type {
   MemberRole,
   Priority,
 } from './enums.js';
+import type { Locale } from './locales.js';
 
 export interface UserDto {
   id: string;
   email: string;
   name: string;
   avatarUrl: string | null;
+  /**
+   * Chosen interface language as an IETF tag, or `null` for "never chose".
+   *
+   * `null` is a distinct state from `'en'`, not a missing value: an unset user follows their
+   * browser's `Accept-Language`, so the web's resolution chain has to be able to tell the two
+   * apart (docs/decisions/0018-localization-strategy.md).
+   */
+  locale: Locale | null;
   createdAt: string;
 }
 

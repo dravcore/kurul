@@ -4,9 +4,7 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
-  DEFAULT_COLUMNS,
   type ColumnDto,
-  type CreateColumnRequest,
   type MoveColumnRequest,
   type MoveTaskRequest,
   type TaskDto,
@@ -141,46 +139,40 @@ export function useBoardMutations({
   /**
    * Recreates the starting columns on a board that was left with none.
    *
-   * Still one request per column, and deliberately serial: `afterColumnId` is what pins the
-   * order, and firing the three in parallel would race the server's position calculation.
-   * A partial seed is therefore possible — the catch below keeps whatever landed rather than
-   * discarding it, and the whole loop collapses to a single call the day the API grows a
-   * bulk-create endpoint.
+   * One request. This used to be a serial loop of three POSTs — serial because `afterColumnId`
+   * was what pinned the order — which meant the third could fail and leave the board holding
+   * two columns, indistinguishable from a set the user had trimmed on purpose. The endpoint
+   * seeds them in a single transaction and answers with the whole list, so there is no partial
+   * state to reconcile and no order for the client to maintain.
+   *
+   * The names come back from the server rather than being sent: they are written in the
+   * creator's language (ADR 0018), and the categories that make the dashboard recognise the
+   * Done column travel with them.
    */
   const seedDefaults = useCallback(
     async function seed(): Promise<void> {
       if (!activeId) return;
       setDefaultsPending(true);
-      const created: ColumnDto[] = [];
       try {
-        let afterColumnId: string | undefined;
-        // `category` travels with the name: seeding a Done column that the dashboard does not
-        // recognise as completed is precisely the failure this list exists to prevent.
-        for (const { name, category } of DEFAULT_COLUMNS) {
-          const body: CreateColumnRequest = {
-            name,
-            category,
-            ...(afterColumnId ? { afterColumnId } : {}),
-          };
-          const column = await api.post<ColumnDto, CreateColumnRequest>(
-            `/workspaces/${activeId}/boards/${boardId}/columns`,
-            body,
-          );
-          created.push(column);
-          afterColumnId = column.id;
-        }
+        const created = await api.post<ColumnDto[]>(
+          `/workspaces/${activeId}/boards/${boardId}/columns/defaults`,
+          undefined,
+        );
         setColumns(created);
       } catch (caught) {
-        if (apiStatus(caught) === 403) {
+        const status = apiStatus(caught);
+        if (status === 403) {
           toast.error(t('errors.forbiddenColumns'));
-        } else if (created.length > 0) {
-          setColumns(created);
+        } else if (status === 409) {
+          // Someone else seeded this board while the empty state was on screen. Nothing
+          // failed — this view is simply stale, so refresh it instead of offering a retry
+          // that would conflict again.
           try {
             await reload();
           } catch {
-            // ignore reload failure — a plain error toast still shows
+            // ignore reload failure — the toast below still explains the situation
           }
-          toast.error(t('column.defaultsError'));
+          toast.error(t('column.defaultsConflict'));
         } else {
           toast.error(t('column.defaultsError'), {
             action: {

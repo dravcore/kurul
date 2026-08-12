@@ -1,13 +1,15 @@
 import { NotFoundException } from '@nestjs/common';
-import { ColumnCategory } from '@kurultay/shared-types';
+import { ColumnCategory, type Locale } from '@kurultay/shared-types';
+import { LocaleService } from '../locale/locale.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BoardService } from './board.service';
 
 const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
+const ACTOR_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51';
 
 describe('BoardService', () => {
-  function buildService() {
+  function buildService(locale: Locale = 'en') {
     const prisma = {
       board: {
         findFirst: jest.fn().mockResolvedValue(null),
@@ -23,7 +25,15 @@ describe('BoardService', () => {
     prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) =>
       callback(prisma),
     );
-    return { service: new BoardService(prisma as unknown as PrismaService), prisma };
+    const localeService = { resolve: jest.fn().mockResolvedValue(locale) };
+    return {
+      service: new BoardService(
+        prisma as unknown as PrismaService,
+        localeService as unknown as LocaleService,
+      ),
+      prisma,
+      localeService,
+    };
   }
 
   function boardRow() {
@@ -48,7 +58,9 @@ describe('BoardService', () => {
     const create = jest.fn().mockResolvedValue(created);
     prisma.$transaction.mockImplementation((callback) => callback({ board: { create } }));
 
-    await expect(service.create(WORKSPACE_ID, { name: 'Roadmap' })).resolves.toMatchObject({
+    await expect(
+      service.create(WORKSPACE_ID, ACTOR_ID, { name: 'Roadmap' }),
+    ).resolves.toMatchObject({
       id: BOARD_ID,
       createdAt: '2026-01-01T00:00:00.000Z',
     });
@@ -56,8 +68,8 @@ describe('BoardService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           // Each seed column carries its category explicitly. Spelled out rather than
-          // asserted against DEFAULT_COLUMNS: a test that reuses the constant it is checking
-          // would pass just as happily if the Done column stopped being COMPLETED.
+          // asserted against `defaultColumnsFor`: a test that reuses the catalog it is
+          // checking would pass just as happily if the Done column stopped being COMPLETED.
           columns: {
             create: [
               { name: 'To Do', position: 1000, category: ColumnCategory.UNSTARTED },
@@ -68,6 +80,25 @@ describe('BoardService', () => {
         }),
       }),
     );
+  });
+
+  it('seeds the columns in the language the creator reads', async () => {
+    const { service, prisma, localeService } = buildService();
+    const create = jest.fn().mockResolvedValue({
+      id: BOARD_ID,
+      workspaceId: WORKSPACE_ID,
+      name: 'Roadmap',
+      description: null,
+      createdAt: new Date('2026-01-01'),
+    });
+    prisma.$transaction.mockImplementation((callback) => callback({ board: { create } }));
+
+    await service.create(WORKSPACE_ID, ACTOR_ID, { name: 'Roadmap' }, 'en-GB,en;q=0.9');
+
+    // The creator's preference wins over the header, and the header is only consulted for a
+    // user who has not set one — the ordering lives in `LocaleService.resolve`, so all this
+    // asserts is that the board path actually asks it rather than hardcoding English.
+    expect(localeService.resolve).toHaveBeenCalledWith(ACTOR_ID, 'en-GB,en;q=0.9');
   });
 
   it('returns 404 when a board is outside the workspace', async () => {

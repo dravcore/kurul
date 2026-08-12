@@ -15,6 +15,21 @@
  * `POST /workspaces/:workspaceId/invitations` exist on the server but have no UI yet.
  */
 import type { ColumnCategory, LabelColorSlot, Priority } from './enums.js';
+import type { Locale } from './locales.js';
+
+/**
+ * `PATCH /me`
+ *
+ * The signed-in user's own profile. Only the interface language is editable today; name,
+ * email and avatar still go through Better Auth's own endpoints.
+ */
+export interface UpdateMeRequest {
+  /**
+   * Omit to leave unchanged. An explicit `null` clears the preference back to "follow the
+   * browser's `Accept-Language`", which is a real choice and not the same as picking English.
+   */
+  locale?: Locale | null;
+}
 
 /** `POST /workspaces/:workspaceId/boards/:boardId/tasks` */
 export interface CreateTaskRequest {

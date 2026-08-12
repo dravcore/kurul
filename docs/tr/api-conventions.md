@@ -65,6 +65,7 @@ DELETE /workspaces/:workspaceId/boards/:boardId
 
 GET    /workspaces/:workspaceId/boards/:boardId/columns
 POST   /workspaces/:workspaceId/boards/:boardId/columns
+POST   /workspaces/:workspaceId/boards/:boardId/columns/defaults  # boş board'u tohumla
 PATCH  /workspaces/:workspaceId/columns/:columnId
 DELETE /workspaces/:workspaceId/columns/:columnId
 PATCH  /workspaces/:workspaceId/columns/:columnId/position
@@ -122,10 +123,16 @@ adreslenir.
 Workspace olmayan route'lar (tam liste):
 
 ```
-GET  /health                 # liveness, kimliksiz
-POST /auth/*                 # Better Auth handler'ları
-GET  /me                     # mevcut kullanıcı profili
+GET   /health                # liveness, kimliksiz
+POST  /auth/*                # Better Auth handler'ları
+GET   /me                    # mevcut kullanıcı profili
+PATCH /me                    # kendi profili; bugün yalnızca arayüz dili
 ```
+
+`PATCH /me` workspace'e scope'lu değildir ve rol kontrolü yoktur: özne çağıranın kendisidir,
+dolayısıyla yetkilendirmenin tamamı session guard'ıdır. `User.locale`'in yazıldığı tek yer de
+burasıdır — bkz.
+[decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md).
 
 ### CRUD olmayan aksiyonlar
 

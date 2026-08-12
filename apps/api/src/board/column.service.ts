@@ -6,9 +6,11 @@ import {
 } from '@nestjs/common';
 import { SocketEvents, type ColumnCategory, type ColumnDto } from '@kurultay/shared-types';
 import { assertBoard } from '../common/board-access';
+import { defaultColumnsFor } from '../common/board-defaults';
 import { resolveCreateNeighbors, resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { batchUpdateColumnPositions } from '../common/position/rebalance-sql';
+import { LocaleService } from '../locale/locale.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import type { CreateColumnDto } from './dto/create-column.dto';
@@ -35,6 +37,7 @@ export class ColumnService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeService,
+    private readonly localeService: LocaleService,
   ) {}
 
   private toDto(row: ColumnRow): ColumnDto {
@@ -137,6 +140,74 @@ export class ColumnService {
 
     this.emitChanged(workspaceId, actorId, created.boardId, created.id);
     return created;
+  }
+
+  /**
+   * Seeds a board that has no columns with the starting set, in one transaction.
+   *
+   * Replaces a loop of three `POST .../columns` calls the web used to make. That loop had to
+   * be serial — each request passed the previous column's id as `afterColumnId` to pin the
+   * order — so a failure on the third request left the board holding two columns and no way
+   * to tell a half-seeded board from one a user had trimmed on purpose. Here the board either
+   * gains the whole set or none of it.
+   *
+   * Shares `defaultColumnsFor` with `BoardService.create`, which seeds the identical list when
+   * the board is first created; the positions come from that list rather than from the
+   * fractional-index math, because nothing exists to insert between.
+   */
+  async createDefaults(
+    workspaceId: string,
+    boardId: string,
+    actorId: string,
+    acceptLanguage?: string,
+  ): Promise<ColumnDto[]> {
+    await assertBoard(this.prisma, workspaceId, boardId);
+    const locale = await this.localeService.resolve(actorId, acceptLanguage);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      // Locks the board row for the rest of the transaction. Two clients hitting this at once
+      // would otherwise both read an empty board under READ COMMITTED and both insert, leaving
+      // six columns and two "Done"s — and there is no unique constraint on the way to catch
+      // it. Locking the board rather than the columns works because the rows being guarded do
+      // not exist yet.
+      await tx.$executeRaw`SELECT id FROM "Board" WHERE id = ${boardId} FOR UPDATE`;
+
+      const existing = await tx.column.count({ where: { boardId } });
+      if (existing > 0) {
+        // Conflict, not a silent merge: this endpoint means "start this board off", and the
+        // caller's empty-state view is stale. 409 tells the web to reload rather than append
+        // a second set of stages.
+        throw new ConflictException('Board already has columns');
+      }
+
+      await tx.column.createMany({
+        data: defaultColumnsFor(locale).map((column) => ({ ...column, boardId })),
+      });
+
+      // Re-read rather than trusting `createMany`'s count: `_count` is required on `ColumnRow`
+      // precisely so a caller cannot report `taskCount: 0` it never actually looked up.
+      return tx.column.findMany({
+        where: { boardId },
+        select: {
+          id: true,
+          boardId: true,
+          name: true,
+          position: true,
+          color: true,
+          category: true,
+          _count: { select: { tasks: true } },
+        },
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      });
+    });
+
+    // One event per column, matching what a client would have seen from the loop this
+    // replaces. Every listener answers by refetching the whole column list, so the extra
+    // events cost a repeated read and nothing else.
+    for (const column of created) {
+      this.emitChanged(workspaceId, actorId, boardId, column.id);
+    }
+    return created.map((column) => this.toDto(column));
   }
 
   async update(

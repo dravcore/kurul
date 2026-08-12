@@ -1,14 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { BoardDto } from '@kurultay/shared-types';
-import { DEFAULT_COLUMNS } from '../common/board-defaults';
+import { defaultColumnsFor } from '../common/board-defaults';
 import { assertBoard } from '../common/board-access';
+import { LocaleService } from '../locale/locale.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateBoardDto } from './dto/create-board.dto';
 import type { UpdateBoardDto } from './dto/update-board.dto';
 
 @Injectable()
 export class BoardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly localeService: LocaleService,
+  ) {}
 
   private toDto(row: {
     id: string;
@@ -34,14 +38,28 @@ export class BoardService {
     return boards.map((board) => this.toDto(board));
   }
 
-  async create(workspaceId: string, dto: CreateBoardDto): Promise<BoardDto> {
+  /**
+   * Creates a board with its starting columns, named in the creator's language.
+   *
+   * The seed names are user data, not interface text (ADR 0018 §3): they are written once, in
+   * whatever language the person creating the board reads, and belong to the board from then
+   * on — a later viewer sees them as typed, not re-translated. `category` is what carries the
+   * meaning across languages, so translating the labels cannot disturb the metrics (ADR 0019).
+   */
+  async create(
+    workspaceId: string,
+    actorId: string,
+    dto: CreateBoardDto,
+    acceptLanguage?: string,
+  ): Promise<BoardDto> {
+    const locale = await this.localeService.resolve(actorId, acceptLanguage);
     const board = await this.prisma.$transaction((tx) =>
       tx.board.create({
         data: {
           workspaceId,
           name: dto.name,
           description: dto.description,
-          columns: { create: DEFAULT_COLUMNS.map((column) => ({ ...column })) },
+          columns: { create: defaultColumnsFor(locale) },
         },
       }),
     );
