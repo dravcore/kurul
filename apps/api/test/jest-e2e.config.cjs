@@ -14,6 +14,14 @@ module.exports = {
         tsconfig: {
           allowJs: true,
           esModuleInterop: true,
+          // ts-jest compiles each file on its own into the CommonJS module Jest executes.
+          // `apps/api/tsconfig.json` now inherits NodeNext from the base config, which under
+          // a CJS package resolves ESM-only dependencies through `require(esm)` — a thing
+          // ts-jest's single-file output cannot express. Pinning the transform back to
+          // classic CommonJS keeps the runtime honest; the type-level win of NodeNext is in
+          // `pnpm typecheck` and `nest build`, which are unaffected by this override.
+          module: 'CommonJS',
+          moduleResolution: 'Node',
         },
       },
     ],

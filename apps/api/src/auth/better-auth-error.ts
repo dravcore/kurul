@@ -21,14 +21,8 @@ export type BetterAuthStatusMessages = Readonly<Partial<Record<number, string>>>
  * The `name` comparison mirrors Better Auth's own `isAPIError`: it keeps the narrowing
  * working even if a duplicated `better-call` copy ever breaks the `instanceof` identity.
  *
- * The `& Error` is not decoration. `APIError` really does extend `Error` at runtime, but
- * its declaration extends the one from `better-call/error` — a subpath that only exists in
- * that package's `exports` map. This project compiles with `moduleResolution: "Node"`,
- * which does not read `exports`, so the base class resolves to nothing and the type we see
- * is an `APIError` that is not an `Error`. Re-stating the runtime truth here keeps the
- * narrowing usable (notably for `throw`) without weakening it.
  */
-export function isBetterAuthApiError(error: unknown): error is APIError & Error {
+export function isBetterAuthApiError(error: unknown): error is APIError {
   return (
     error instanceof APIError ||
     (error instanceof Error && error.name === 'APIError' && 'statusCode' in error)
