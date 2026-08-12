@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TaskAssigneeService } from './task-assignee.service';
 import { TaskEventsService } from './task-events.service';
 import { TaskLabelService } from './task-label.service';
+import { buildListWhere } from './task-query-where';
 import { TaskReadService } from './task-read.service';
 import { TaskService } from './task.service';
 
@@ -800,56 +801,18 @@ describe('TaskService', () => {
       );
     });
 
-    it('builds AND filters for q, priority, assignee, label, and due range', async () => {
+    // The filter matrix itself is covered in task-query-where.spec.ts, against the function
+    // rather than through a Prisma mock. What is left to prove here is that `list` hands the
+    // query to it and passes the result on unaltered.
+    it('queries with the predicate the filter builder produced', async () => {
       const { service, prisma } = buildService();
       prisma.task.findMany.mockResolvedValue([]);
+      const query = { limit: 50, q: 'login', priority: ['HIGH' as const] };
 
-      await service.list(WORKSPACE_ID, BOARD_ID, {
-        limit: 50,
-        q: 'login',
-        priority: ['HIGH', 'URGENT'],
-        assigneeId: ['null', USER_ID],
-        labelId: ['0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'],
-        dueDate: 'null',
-        'dueDate[gte]': '2026-01-01T00:00:00.000Z',
-        'dueDate[lte]': '2026-12-31T00:00:00.000Z',
-        cursor: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60',
-      });
+      await service.list(WORKSPACE_ID, BOARD_ID, query);
 
       expect(prisma.task.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            boardId: BOARD_ID,
-            AND: expect.arrayContaining([
-              { id: { gt: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60' } },
-              {
-                OR: [
-                  { title: { contains: 'login', mode: 'insensitive' } },
-                  { description: { contains: 'login', mode: 'insensitive' } },
-                ],
-              },
-              { priority: { in: ['HIGH', 'URGENT'] } },
-              {
-                OR: [
-                  { assignees: { none: {} } },
-                  { assignees: { some: { userId: { in: [USER_ID] } } } },
-                ],
-              },
-              {
-                labels: {
-                  some: { labelId: { in: ['0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'] } },
-                },
-              },
-              { dueDate: null },
-              {
-                dueDate: {
-                  gte: new Date('2026-01-01T00:00:00.000Z'),
-                  lte: new Date('2026-12-31T00:00:00.000Z'),
-                },
-              },
-            ]),
-          },
-        }),
+        expect.objectContaining({ where: buildListWhere(BOARD_ID, query) }),
       );
     });
   });

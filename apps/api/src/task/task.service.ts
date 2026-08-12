@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { ActivityType, SocketEvents } from '@kurultay/shared-types';
 import type { CursorPage, TaskDto } from '@kurultay/shared-types';
-import type { Prisma } from '../generated/prisma';
 import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
 import { toCursorPage } from '../common/pagination/cursor-page';
@@ -25,6 +24,7 @@ import { createTaskAttributes, planTaskUpdate } from './task-fields';
 import { TaskAssigneeService } from './task-assignee.service';
 import { taskInclude, type TaskWithRelations } from './task.include';
 import { TaskLabelService } from './task-label.service';
+import { buildListWhere } from './task-query-where';
 import { TaskReadService } from './task-read.service';
 import { emptyTaskRelations, toTaskDto } from './task.mapper';
 
@@ -46,7 +46,7 @@ export class TaskService {
   ): Promise<CursorPage<TaskDto>> {
     await assertBoard(this.prisma, workspaceId, boardId);
 
-    const where = this.buildListWhere(boardId, query);
+    const where = buildListWhere(boardId, query);
     const limit = query.limit ?? 50;
 
     const rows = await this.prisma.task.findMany({
@@ -58,64 +58,6 @@ export class TaskService {
     });
 
     return toCursorPage(rows, limit, (task) => toTaskDto(task));
-  }
-
-  private buildListWhere(boardId: string, query: TaskQueryDto): Prisma.TaskWhereInput {
-    const and: Prisma.TaskWhereInput[] = [];
-
-    if (query.cursor) {
-      and.push({ id: { gt: query.cursor } });
-    }
-
-    if (query.q) {
-      and.push({
-        OR: [
-          { title: { contains: query.q, mode: 'insensitive' } },
-          { description: { contains: query.q, mode: 'insensitive' } },
-        ],
-      });
-    }
-
-    if (query.priority && query.priority.length > 0) {
-      and.push({ priority: { in: query.priority } });
-    }
-
-    if (query.assigneeId && query.assigneeId.length > 0) {
-      const wantsUnassigned = query.assigneeId.includes('null');
-      const userIds = query.assigneeId.filter((id) => id !== 'null');
-      const assigneeOr: Prisma.TaskWhereInput[] = [];
-      if (wantsUnassigned) {
-        assigneeOr.push({ assignees: { none: {} } });
-      }
-      if (userIds.length > 0) {
-        assigneeOr.push({ assignees: { some: { userId: { in: userIds } } } });
-      }
-      and.push(assigneeOr.length === 1 ? assigneeOr[0]! : { OR: assigneeOr });
-    }
-
-    if (query.labelId && query.labelId.length > 0) {
-      and.push({ labels: { some: { labelId: { in: query.labelId } } } });
-    }
-
-    if (query.dueDate === 'null') {
-      and.push({ dueDate: null });
-    }
-
-    const dueGte = query['dueDate[gte]'];
-    const dueLte = query['dueDate[lte]'];
-    if (dueGte || dueLte) {
-      and.push({
-        dueDate: {
-          ...(dueGte ? { gte: new Date(dueGte) } : {}),
-          ...(dueLte ? { lte: new Date(dueLte) } : {}),
-        },
-      });
-    }
-
-    return {
-      boardId,
-      ...(and.length > 0 ? { AND: and } : {}),
-    };
   }
 
   async create(
