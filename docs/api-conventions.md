@@ -348,16 +348,16 @@ client walks the cursor only when there is something left to walk to.
 
 ## Filtering, sorting, field selection
 
-| Concern              | Convention                                    | Example                              |
-| -------------------- | --------------------------------------------- | ------------------------------------ |
-| Equality filter      | `?field=value`                                | `?priority=HIGH`                     |
-| Multiple values (OR) | Repeated or comma-separated                   | `?priority=HIGH,URGENT`              |
-| Relation filter      | `?relationId=value`                           | `?assigneeId=usr_1&labelId=lbl_2`    |
-| Range                | `?field[gte]=`, `?field[lte]=`                | `?dueDate[lte]=2026-09-01T00:00:00Z` |
-| Null check           | `?field=null`                                 | `?dueDate=null`                      |
-| Free-text search     | `?q=`                                         | `?q=indexing`                        |
-| Sorting              | `?sort=field` / `?sort=-field` for descending | `?sort=-createdAt`                   |
-| Multi-sort           | Comma-separated, priority left to right       | `?sort=priority,-dueDate`            |
+| Concern              | Convention                                    | Example                                                                                                                |
+| -------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Equality filter      | `?field=value`                                | `?priority=HIGH`                                                                                                       |
+| Multiple values (OR) | Repeated or comma-separated                   | `?priority=HIGH,URGENT`                                                                                                |
+| Relation filter      | `?relationId=value`                           | `?assigneeId=usr_1&labelId=lbl_2`                                                                                      |
+| Range                | `?field[gte]=`, `?field[lte]=`                | `?dueDate[lte]=2026-09-01T00:00:00Z`                                                                                   |
+| Null check           | `?field=null`                                 | `?dueDate=null`                                                                                                        |
+| Free-text search     | `?q=`                                         | `?q=indexing`                                                                                                          |
+| Sorting              | `?sort=field` / `?sort=-field` for descending | Reserved convention — **no list endpoint accepts `sort` yet**; unknown query keys are `400` via `forbidNonWhitelisted` |
+| Multi-sort           | Comma-separated, priority left to right       | Same — not wired on any DTO today                                                                                      |
 
 - Combined filters are **AND**; repeated values within one filter are **OR**.
 - Only whitelisted fields are filterable and sortable, declared in the query DTO. An unknown

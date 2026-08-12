@@ -68,28 +68,32 @@ export class TaskService {
   ): Promise<TaskDto> {
     await assertBoard(this.prisma, workspaceId, boardId);
     const column = await this.findColumnOnBoard(workspaceId, boardId, dto.columnId);
-
-    // Only the ordering math reads these rows, and it reads two columns of them. Selecting the
-    // whole task instead drags every title, description and timestamp in the column across the
-    // wire on a create that will use none of it.
-    const siblings = await this.prisma.task.findMany({
-      where: { columnId: column.id },
-      orderBy: [{ position: 'asc' }, { id: 'asc' }],
-      select: { id: true, position: true },
-    });
-
-    // `afterTaskId` is the client's word for "insert after this task", which in position
-    // order makes that task the new row's `prev` — the DTO name is translated here, once.
-    const { insertionIndex, prev, next } = resolveCreateNeighbors(
-      siblings,
-      dto.afterTaskId,
-      'Task not found',
-    );
-    const prevPos = prev?.position ?? null;
-    const nextPos = next?.position ?? null;
     const attributes = createTaskAttributes(dto);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Lock before reading siblings so concurrent creates/moves into the same gap cannot
+      // both compute the same midpoint from a shared snapshot.
+      await tx.$executeRaw`SELECT id FROM "Column" WHERE id = ${column.id} FOR UPDATE`;
+
+      // Only the ordering math reads these rows, and it reads two columns of them. Selecting
+      // the whole task instead drags every title, description and timestamp in the column
+      // across the wire on a create that will use none of it.
+      const siblings = await tx.task.findMany({
+        where: { columnId: column.id },
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        select: { id: true, position: true },
+      });
+
+      // `afterTaskId` is the client's word for "insert after this task", which in position
+      // order makes that task the new row's `prev` — the DTO name is translated here, once.
+      const { insertionIndex, prev, next } = resolveCreateNeighbors(
+        siblings,
+        dto.afterTaskId,
+        'Task not found',
+      );
+      const prevPos = prev?.position ?? null;
+      const nextPos = next?.position ?? null;
+
       let position: number;
 
       if (needsRebalance(prevPos, nextPos)) {
@@ -277,6 +281,11 @@ export class TaskService {
           ? targetColumn
           : await tx.column.findFirst({ where: { id: fromColumnId } });
       const fromColumnName = fromColumn?.name ?? '';
+
+      // Lock the target column before reading siblings so two concurrent moves into the same
+      // gap cannot both compute the same midpoint from a shared snapshot. Matches the board
+      // row lock used when seeding default columns.
+      await tx.$executeRaw`SELECT id FROM "Column" WHERE id = ${targetColumn.id} FOR UPDATE`;
 
       // Two columns, as on create: the moved task itself is read in full above, and these rows
       // only ever contribute an id and a position to the rebalance.

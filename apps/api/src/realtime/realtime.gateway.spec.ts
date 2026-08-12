@@ -10,7 +10,7 @@ const OTHER_USER_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d54';
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
 
 async function buildGateway(
-  board: { id: string } | null,
+  board: { id: string; workspaceId: string } | null,
   membership: { id: string } | null = { id: 'member-1' },
 ) {
   const prisma = {
@@ -34,7 +34,11 @@ async function buildGateway(
 
 function client() {
   return {
-    data: { userId: USER_ID },
+    data: { userId: USER_ID } as {
+      userId?: string;
+      boardWorkspaces?: Record<string, string>;
+      notificationWorkspaces?: string[];
+    },
     join: jest.fn(),
     leave: jest.fn(),
   };
@@ -56,7 +60,7 @@ describe('RealtimeGateway board rooms', () => {
   });
 
   it('joins a member to the board room', async () => {
-    const { gateway, prisma } = await buildGateway({ id: BOARD_ID });
+    const { gateway, prisma } = await buildGateway({ id: BOARD_ID, workspaceId: WORKSPACE_ID });
     const socket = client();
 
     await expect(gateway.onBoardJoin(socket as never, { boardId: BOARD_ID })).resolves.toEqual({
@@ -69,9 +73,10 @@ describe('RealtimeGateway board rooms', () => {
         id: BOARD_ID,
         workspace: { members: { some: { userId: USER_ID } } },
       },
-      select: { id: true },
+      select: { id: true, workspaceId: true },
     });
     expect(socket.join).toHaveBeenCalledWith(boardRoom(BOARD_ID));
+    expect(socket.data.boardWorkspaces).toEqual({ [BOARD_ID]: WORKSPACE_ID });
   });
 
   it('rejects join with an opaque error when the user is not a workspace member', async () => {
@@ -88,7 +93,7 @@ describe('RealtimeGateway board rooms', () => {
   });
 
   it('rejects join on an unauthenticated socket without querying', async () => {
-    const { gateway, prisma } = await buildGateway({ id: BOARD_ID });
+    const { gateway, prisma } = await buildGateway({ id: BOARD_ID, workspaceId: WORKSPACE_ID });
     const socket = anonymousClient();
 
     await expect(gateway.onBoardJoin(socket as never, { boardId: BOARD_ID })).resolves.toEqual({
@@ -100,7 +105,7 @@ describe('RealtimeGateway board rooms', () => {
   });
 
   it('rejects join when boardId is missing or not a string', async () => {
-    const { gateway, prisma } = await buildGateway({ id: BOARD_ID });
+    const { gateway, prisma } = await buildGateway({ id: BOARD_ID, workspaceId: WORKSPACE_ID });
     const socket = client();
 
     await expect(gateway.onBoardJoin(socket as never, { boardId: '' })).resolves.toEqual({
@@ -116,7 +121,7 @@ describe('RealtimeGateway board rooms', () => {
   });
 
   it('leaves the board room without re-checking membership', async () => {
-    const { gateway, prisma } = await buildGateway({ id: BOARD_ID });
+    const { gateway, prisma } = await buildGateway({ id: BOARD_ID, workspaceId: WORKSPACE_ID });
     const socket = client();
 
     await expect(gateway.onBoardLeave(socket as never, { boardId: BOARD_ID })).resolves.toEqual({
@@ -127,7 +132,7 @@ describe('RealtimeGateway board rooms', () => {
   });
 
   it('acks a leave with no boardId instead of leaving an unnamed room', async () => {
-    const { gateway } = await buildGateway({ id: BOARD_ID });
+    const { gateway } = await buildGateway({ id: BOARD_ID, workspaceId: WORKSPACE_ID });
     const socket = client();
 
     await expect(gateway.onBoardLeave(socket as never, { boardId: '' })).resolves.toEqual({

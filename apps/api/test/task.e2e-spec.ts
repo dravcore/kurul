@@ -133,6 +133,48 @@ describe('Tasks (e2e)', () => {
     }
   });
 
+  it('gives concurrent moves into the same gap distinct positions', async () => {
+    const owner = await signUp(app, { name: 'RaceOwner' });
+    const workspace = await createWorkspace(owner.agent, 'Race', `race-${Date.now()}`);
+    const { boardId, columns } = await boardWithColumns(owner.agent, workspace.id);
+    const todo = columns.find((column) => column.name === 'To Do')!;
+
+    const first = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .send({ title: 'First', columnId: todo.id })
+      .expect(201);
+    const third = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .send({ title: 'Third', columnId: todo.id })
+      .expect(201);
+    const a = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .send({ title: 'A', columnId: todo.id })
+      .expect(201);
+    const b = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .send({ title: 'B', columnId: todo.id })
+      .expect(201);
+
+    const [raceA, raceB] = await Promise.all([
+      owner.agent.patch(`/workspaces/${workspace.id}/tasks/${a.body.id}/position`).send({
+        columnId: todo.id,
+        afterTaskId: first.body.id,
+      }),
+      owner.agent.patch(`/workspaces/${workspace.id}/tasks/${b.body.id}/position`).send({
+        columnId: todo.id,
+        afterTaskId: first.body.id,
+      }),
+    ]);
+    expect(raceA.status).toBe(200);
+    expect(raceB.status).toBe(200);
+    expect(raceA.body.position).not.toBe(raceB.body.position);
+    expect(raceA.body.position).toBeGreaterThan(first.body.position as number);
+    expect(raceA.body.position).toBeLessThan(third.body.position as number);
+    expect(raceB.body.position).toBeGreaterThan(first.body.position as number);
+    expect(raceB.body.position).toBeLessThan(third.body.position as number);
+  });
+
   it('returns 404 for cross-tenant access and 422 for cross-board column', async () => {
     const ownerA = await signUp(app, { name: 'A' });
     const ownerB = await signUp(app, { name: 'B' });

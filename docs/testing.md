@@ -171,7 +171,7 @@ Two ratchets keep already-covered code from sliding back. Both fail CI.
 Both sit a few points under the measurement taken when they were introduced — enough margin
 that a routine refactor does not trip them, tight enough that deleting a test does.
 
-`apps/web` has **no global floor**, deliberately. Overall web coverage is around 41% because
+`apps/web` has **no global floor**, deliberately. Overall web coverage is around 46% because
 most page-level components are untested, and a global floor at that number would catch no
 real regression while making the figure look like a target. `app/**` is floored because
 route entrypoints are thin and uniform: a new page arriving with no test at all is exactly
@@ -194,12 +194,14 @@ Every pull request runs, on `develop` and `main` as well:
 | Lint              | `pnpm lint`                                                                               |
 | Format check      | `pnpm format:check`                                                                       |
 | Typecheck         | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                       |
+| Audit             | `pnpm audit --audit-level high`                                                           |
 | Unit tests (api)  | `pnpm --filter @kurultay/api test:cov`                                                    |
 | Unit tests (web)  | `pnpm --filter @kurultay/web exec vitest run --coverage`                                  |
+| Unit tests (pkgs) | `pnpm --filter "./packages/*" test`                                                       |
 | Integration tests | `pnpm --filter @kurultay/api test:e2e` against Postgres and Redis service containers      |
 | Build             | `pnpm build`                                                                              |
 
-All steps must pass before merge. See [git-strategy.md](git-strategy.md#pull-request-process).
+All steps must pass before merge. CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on pushes to `develop` and `main`. See [git-strategy.md](git-strategy.md#pull-request-process).
 
 The workflow file is [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 

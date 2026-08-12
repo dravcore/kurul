@@ -102,6 +102,43 @@ export function TaskPanel({
     return () => document.removeEventListener('focusin', onFocusIn);
   }, []);
 
+  // Below `md` the panel is a fullscreen sheet (`fixed inset-0`). Without a focus trap, Tab
+  // walks onto the board underneath. Desktop keeps the panel in the layout flow, so the
+  // ordinary document tab order is correct there.
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia('(max-width: 767px)');
+
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key !== 'Tab' || !media.matches) return;
+      const root = panelRef.current;
+      if (!root) return;
+
+      const focusable = root.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (active instanceof Node && !root.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   useEffect(() => {
     // Recorded before focus moves into the panel — nothing else in the tree knows which card
     // opened it. Anything already inside is the panel's own doing (a task loading in

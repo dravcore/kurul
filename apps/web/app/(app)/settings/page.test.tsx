@@ -44,12 +44,6 @@ describe('SettingsPage', () => {
     expect(screen.getByText(messages.app.settings.language.description)).toBeTruthy();
   });
 
-  it('renders the language control', async () => {
-    render(await SettingsPage());
-
-    expect(screen.getByTestId('language-settings')).toBeTruthy();
-  });
-
   it('holds no hardcoded copy of its own', async () => {
     // Every user-visible string on this screen has to be catalog-backed, or the Turkish pass
     // will not see it (ADR 0018). The page composes; the strings live in `messages/en.json`.

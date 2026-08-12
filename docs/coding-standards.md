@@ -130,7 +130,8 @@ Rules:
   a narrow facade rather than the whole service.
 - Cross-module reads that would create a cycle are a design smell. Resolve them by moving
   the shared concern into `common/`, or by emitting an event, not by adding a back-import.
-- `PrismaModule` and `common/` are the only globally available dependencies.
+- `PrismaModule`, `common/`, and `AuthModule` are globally available (`@Global()`);
+  feature modules still import what they need for clarity where the boundary matters.
 
 This is what keeps the modular monolith extractable later — see
 [architecture.md](architecture.md) and
@@ -138,13 +139,14 @@ This is what keeps the modular monolith extractable later — see
 
 ### Multi-tenant isolation
 
-Every query is scoped by `workspaceId`, enforced at guard/interceptor level rather than
-re-implemented in each service. A service method that takes a `boardId` without a
-`workspaceId` in scope is a bug, not a shortcut.
+Every query is scoped by `workspaceId`. `WorkspaceGuard` establishes membership; each
+service method still filters Prisma with that `workspaceId` (or `board: { workspaceId }`).
+A service method that takes a `boardId` without a `workspaceId` in scope is a bug, not a
+shortcut.
 
-> This rule is currently enforced by review, not by a lint rule or a Prisma extension.
-> That gap is known and accepted for now; treat any query without workspace scoping as
-> blocking in review.
+> Request-scoped Prisma Client Extensions remain deferred. Isolation is enforced by
+> review and by the workspace-isolation integration tests — not by a lint rule or an
+> automatic query rewriter. Treat any query without workspace scoping as blocking in review.
 
 ## DTOs and validation
 
