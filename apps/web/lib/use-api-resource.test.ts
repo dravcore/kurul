@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { useApiResource } from './use-api-resource';
+import { useApiResource, useResourceField } from './use-api-resource';
 
 describe('useApiResource', () => {
   it('loads data and clears the loading flag', async () => {
@@ -55,5 +55,82 @@ describe('useApiResource', () => {
     unmount();
 
     expect(received?.aborted).toBe(true);
+  });
+
+  it('keeps the last loaded value on failure when asked to', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(['kept'])
+      .mockRejectedValueOnce(new Error('network'));
+    const { result } = renderHook(() =>
+      useApiResource<string[]>(fetcher, [], 'boom', { keepStaleOnError: true }),
+    );
+
+    await waitFor(() => expect(result.current.data).toEqual(['kept']));
+
+    act(() => result.current.reload());
+
+    await waitFor(() => expect(result.current.error).toBe('boom'));
+    expect(result.current.data).toEqual(['kept']);
+  });
+
+  it('reports the error through onError without clearing the value', async () => {
+    const onError = vi.fn();
+    const fetcher = vi.fn().mockResolvedValueOnce([1]).mockRejectedValueOnce(new Error('network'));
+    const { result } = renderHook(() =>
+      useApiResource<number[]>(fetcher, [], 'boom', { keepStaleOnError: true, onError }),
+    );
+
+    await waitFor(() => expect(result.current.data).toEqual([1]));
+    act(() => result.current.reload());
+
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    expect(result.current.data).toEqual([1]);
+  });
+});
+
+describe('useResourceField', () => {
+  interface Meta {
+    comments: string[];
+    activities: string[];
+  }
+
+  const initial: Meta = { comments: [], activities: [] };
+  /** Stable by contract — an inline closure would refetch on every commit. */
+  const loadMeta = (): Promise<Meta> => Promise.resolve({ comments: ['c1'], activities: ['a1'] });
+
+  function renderField() {
+    return renderHook(() => {
+      const resource = useApiResource<Meta>(loadMeta, initial, 'boom');
+      return { resource, setComments: useResourceField(resource.setData, 'comments') };
+    });
+  }
+
+  it('edits one field and leaves the rest of the resource alone', async () => {
+    const { result } = renderField();
+    await waitFor(() => expect(result.current.resource.data.comments).toEqual(['c1']));
+
+    act(() => result.current.setComments((current) => [...current, 'c2']));
+
+    expect(result.current.resource.data).toEqual({ comments: ['c1', 'c2'], activities: ['a1'] });
+  });
+
+  it('accepts a bare value as well as an updater', async () => {
+    const { result } = renderField();
+    await waitFor(() => expect(result.current.resource.data.comments).toEqual(['c1']));
+
+    act(() => result.current.setComments([]));
+
+    expect(result.current.resource.data).toEqual({ comments: [], activities: ['a1'] });
+  });
+
+  it('is stable across renders so it can be an effect dependency', async () => {
+    const { result, rerender } = renderField();
+    await waitFor(() => expect(result.current.resource.data.comments).toEqual(['c1']));
+
+    const first = result.current.setComments;
+    rerender();
+
+    expect(result.current.setComments).toBe(first);
   });
 });

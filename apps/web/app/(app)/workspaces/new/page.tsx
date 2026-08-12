@@ -34,7 +34,7 @@ export default function NewWorkspacePage(): React.ReactElement {
 
     try {
       const body: CreateWorkspaceRequest = { name, slug };
-      const workspace = await api.post<WorkspaceDto>('/workspaces', body);
+      const workspace = await api.post<WorkspaceDto, CreateWorkspaceRequest>('/workspaces', body);
       await authClient.organization.setActive({
         organizationId: workspace.id,
       });

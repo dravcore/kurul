@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type {
@@ -12,6 +12,7 @@ import type {
 } from '@kurultay/shared-types';
 import { api } from '@/lib/api';
 import { fetchAllWorkspaceMembers } from '@/lib/member-query';
+import { useApiResource, useResourceField } from '@/lib/use-api-resource';
 
 export type UseTaskMetadataOptions = {
   workspaceId: string;
@@ -39,6 +40,16 @@ export type UseTaskMetadataResult = {
   loadingMeta: boolean;
 };
 
+/** The four lists the panel loads together, held as one resource because they are one fetch. */
+type TaskMeta = {
+  members: WorkspaceMemberDto[];
+  boardLabels: LabelDto[];
+  comments: CommentDto[];
+  /** `null` once the thread is fully drained. */
+  commentsCursor: string | null;
+  activities: ActivityDto[];
+};
+
 const COMMENTS_PAGE_LIMIT = 100;
 /** Activity is capped at the newest page on purpose; the panel has no "older activity" view. */
 const ACTIVITIES_PAGE_LIMIT = 50;
@@ -47,6 +58,11 @@ const ACTIVITIES_PAGE_LIMIT = 50;
  * Everything the task panel shows besides the task row itself. One aborted-on-unmount fetch
  * covers all four lists, so opening a card is a single round of requests rather than one per
  * section.
+ *
+ * The abort/race handling is `useApiResource`'s, not this hook's — the four lists are one `T`
+ * precisely so they stay one abort, one loading flag and one failure. `metaRefreshKey` and the
+ * shared board caches sit in the fetcher's identity because that is what the hook watches to
+ * decide a reload is due.
  */
 export function useTaskMetadata({
   workspaceId,
@@ -59,112 +75,113 @@ export function useTaskMetadata({
   const t = useTranslations('app.board.task');
   const tActivity = useTranslations('app.board.task.activity');
 
-  const [members, setMembers] = useState<WorkspaceMemberDto[]>(membersProp ?? []);
-  const [boardLabels, setBoardLabels] = useState<LabelDto[]>(labelsProp ?? []);
-  const [comments, setComments] = useState<CommentDto[]>([]);
-  const [commentsCursor, setCommentsCursor] = useState<string | null>(null);
   const [loadingMoreComments, setLoadingMoreComments] = useState(false);
-  const [activities, setActivities] = useState<ActivityDto[]>([]);
-  const [loadingMeta, setLoadingMeta] = useState(true);
 
-  useEffect(() => {
-    if (membersProp) setMembers(membersProp);
-  }, [membersProp]);
+  const loadMeta = useCallback(
+    async (signal: AbortSignal): Promise<TaskMeta> => {
+      const sharedReady = membersProp !== undefined && labelsProp !== undefined;
+      const [members, boardLabels, comments, activities] = await Promise.all([
+        sharedReady
+          ? Promise.resolve(membersProp)
+          : fetchAllWorkspaceMembers(workspaceId, { signal }),
+        sharedReady
+          ? Promise.resolve(labelsProp)
+          : api.get<LabelDto[]>(`/workspaces/${workspaceId}/boards/${boardId}/labels`, { signal }),
+        api.get<CursorPage<CommentDto>>(
+          `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=${COMMENTS_PAGE_LIMIT}`,
+          { signal },
+        ),
+        api.get<CursorPage<ActivityDto>>(
+          `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=${ACTIVITIES_PAGE_LIMIT}`,
+          { signal },
+        ),
+      ]);
+      return {
+        members,
+        boardLabels,
+        comments: comments.items,
+        commentsCursor: comments.nextCursor,
+        activities: activities.items,
+      };
+    },
+    // `metaRefreshKey` is not read by the loader — it is a dependency because the hook
+    // reloads when the fetcher's identity changes, which is how a bump becomes a refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [workspaceId, boardId, taskId, metaRefreshKey, membersProp, labelsProp],
+  );
 
-  useEffect(() => {
-    if (labelsProp) setBoardLabels(labelsProp);
-  }, [labelsProp]);
+  const {
+    data: meta,
+    loading: loadingMeta,
+    setData: setMeta,
+  } = useApiResource<TaskMeta>(
+    loadMeta,
+    // The board's caches are the floor a failure falls back to, not an empty roster: the
+    // assignee picker still has real people in it when the comment thread is the thing that
+    // did not load. Only the first render's value is kept, which is the one BoardView mounts
+    // the panel with.
+    {
+      members: membersProp ?? [],
+      boardLabels: labelsProp ?? [],
+      comments: [],
+      commentsCursor: null,
+      activities: [],
+    },
+    // Held for the shape's sake; the panel reports this failure as a toast, below.
+    t('metaLoadError'),
+    { onError: () => toast.error(t('metaLoadError')) },
+  );
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoadingMeta(true);
-    void (async () => {
-      try {
-        const sharedReady = membersProp !== undefined && labelsProp !== undefined;
-        const [nextMembers, nextLabels, nextComments, nextActivities] = await Promise.all([
-          sharedReady
-            ? Promise.resolve(membersProp)
-            : fetchAllWorkspaceMembers(workspaceId, { signal: controller.signal }),
-          sharedReady
-            ? Promise.resolve(labelsProp)
-            : api.get<LabelDto[]>(`/workspaces/${workspaceId}/boards/${boardId}/labels`, {
-                signal: controller.signal,
-              }),
-          api.get<CursorPage<CommentDto>>(
-            `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=${COMMENTS_PAGE_LIMIT}`,
-            { signal: controller.signal },
-          ),
-          api.get<CursorPage<ActivityDto>>(
-            `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=${ACTIVITIES_PAGE_LIMIT}`,
-            { signal: controller.signal },
-          ),
-        ]);
-        if (!controller.signal.aborted) {
-          if (!sharedReady) {
-            setMembers(nextMembers);
-            setBoardLabels(nextLabels);
-          }
-          setComments(nextComments.items);
-          setCommentsCursor(nextComments.nextCursor);
-          setActivities(nextActivities.items);
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          setCommentsCursor(null);
-          toast.error(t('metaLoadError'));
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoadingMeta(false);
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, [workspaceId, boardId, taskId, metaRefreshKey, membersProp, labelsProp, t]);
+  const setBoardLabels = useResourceField(setMeta, 'boardLabels');
+  const setComments = useResourceField(setMeta, 'comments');
 
   /** Comments come back oldest first, so the next page appends to the end of the thread. */
   const loadMoreComments = useCallback(async (): Promise<void> => {
-    if (!commentsCursor || loadingMoreComments) return;
+    const cursor = meta.commentsCursor;
+    if (!cursor || loadingMoreComments) return;
     setLoadingMoreComments(true);
     try {
       const page = await api.get<CursorPage<CommentDto>>(
-        `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=${COMMENTS_PAGE_LIMIT}&cursor=${encodeURIComponent(commentsCursor)}`,
+        `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=${COMMENTS_PAGE_LIMIT}&cursor=${encodeURIComponent(cursor)}`,
       );
-      setComments((current) => {
+      setMeta((current) => {
         // A comment posted from this panel also sits past the cursor, so the next page can
         // repeat what is already on screen — the id is what decides, not the server slice.
-        const seen = new Set(current.map((comment) => comment.id));
-        return [...current, ...page.items.filter((comment) => !seen.has(comment.id))];
+        const seen = new Set(current.comments.map((comment) => comment.id));
+        return {
+          ...current,
+          comments: [...current.comments, ...page.items.filter((item) => !seen.has(item.id))],
+          commentsCursor: page.nextCursor,
+        };
       });
-      setCommentsCursor(page.nextCursor);
     } catch {
       toast.error(t('commentsLoadMoreError'));
     } finally {
       setLoadingMoreComments(false);
     }
-  }, [workspaceId, taskId, commentsCursor, loadingMoreComments, t]);
+  }, [workspaceId, taskId, meta.commentsCursor, loadingMoreComments, setMeta, t]);
 
   const refreshActivities = useCallback(async (): Promise<void> => {
     try {
       const page = await api.get<CursorPage<ActivityDto>>(
         `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=${ACTIVITIES_PAGE_LIMIT}`,
       );
-      setActivities(page.items);
+      setMeta((current) => ({ ...current, activities: page.items }));
     } catch {
       toast.error(tActivity('loadError'));
     }
-  }, [workspaceId, taskId, tActivity]);
+  }, [workspaceId, taskId, setMeta, tActivity]);
 
   return {
-    members,
-    boardLabels,
+    members: meta.members,
+    boardLabels: meta.boardLabels,
     setBoardLabels,
-    comments,
+    comments: meta.comments,
     setComments,
-    hasMoreComments: commentsCursor !== null,
+    hasMoreComments: meta.commentsCursor !== null,
     loadingMoreComments,
     loadMoreComments,
-    activities,
+    activities: meta.activities,
     refreshActivities,
     loadingMeta,
   };

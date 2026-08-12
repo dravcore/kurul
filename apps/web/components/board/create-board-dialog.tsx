@@ -31,7 +31,10 @@ export function CreateBoardDialog({
       name: name.trim(),
       description: description.trim() || null,
     };
-    const board = await api.post<BoardDto>(`/workspaces/${workspaceId}/boards`, body);
+    const board = await api.post<BoardDto, CreateBoardRequest>(
+      `/workspaces/${workspaceId}/boards`,
+      body,
+    );
     onCreated(board);
     setName('');
     setDescription('');

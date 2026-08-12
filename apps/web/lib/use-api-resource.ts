@@ -27,6 +27,15 @@ export interface UseApiResourceOptions {
    * does not have to be referentially stable.
    */
   onError?: (caught: unknown) => void;
+  /**
+   * Keep the last value that loaded when a later load fails, instead of clearing it.
+   *
+   * Off by default, for the reason in the reset branch below. Turn it on for a value that is
+   * re-fetched on a timer and rendered without an error surface of its own: an unread badge
+   * that blanks to zero because one poll failed is a worse lie than one showing the count
+   * from two minutes ago, and there is nowhere on a bell icon to say which it is.
+   */
+  keepStaleOnError?: boolean;
 }
 
 /**
@@ -51,6 +60,7 @@ export function useApiResource<T>(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
+  const keepStaleOnError = options?.keepStaleOnError ?? false;
 
   // Captured once: callers pass a fresh `[]` every render, which would otherwise make the
   // reset-on-failure path a new dependency on every commit.
@@ -76,8 +86,9 @@ export function useApiResource<T>(
         if (!controller.signal.aborted) setData(next);
       } catch (caught) {
         if (!controller.signal.aborted) {
-          // Stale rows next to an error message read as current data — drop them.
-          setData(initialDataRef.current);
+          // Stale rows next to an error message read as current data — drop them, unless the
+          // caller said the last value is worth more than a blank (`keepStaleOnError`).
+          if (!keepStaleOnError) setData(initialDataRef.current);
           setError(errorMessage);
           onErrorRef.current?.(caught);
         }
@@ -87,9 +98,38 @@ export function useApiResource<T>(
     })();
 
     return () => controller.abort();
-  }, [fetcher, errorMessage, reloadCount]);
+  }, [fetcher, errorMessage, reloadCount, keepStaleOnError]);
 
   const reload = useCallback(() => setReloadCount((count) => count + 1), []);
 
   return { data, loading, error, reload, setData };
+}
+
+/**
+ * A `useState`-shaped setter for one field of a resource loaded as a single object.
+ *
+ * A screen that loads four lists in one round of requests holds them as one `T` — that is
+ * what makes them one abort, one loading flag and one error. The parts still need to be
+ * edited on their own afterwards (a posted comment, a created label), and the alternative is
+ * mirroring each field back into its own `useState`, which reintroduces exactly the
+ * two-sources-of-truth problem the single fetch removed.
+ *
+ * Stable as long as `setData` and `key` are, so it is safe in an effect dependency list.
+ */
+export function useResourceField<T, K extends keyof T>(
+  setData: Dispatch<SetStateAction<T>>,
+  key: K,
+): Dispatch<SetStateAction<T[K]>> {
+  return useCallback(
+    (action: SetStateAction<T[K]>) => {
+      setData((current) => ({
+        ...current,
+        [key]:
+          typeof action === 'function'
+            ? (action as (previous: T[K]) => T[K])(current[key])
+            : action,
+      }));
+    },
+    [setData, key],
+  );
 }

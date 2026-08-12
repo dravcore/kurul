@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -19,6 +20,7 @@ import type {
 import { api } from '@/lib/api';
 import { fetchAllWorkspaceMembers } from '@/lib/member-query';
 import { fetchAllBoardTasks, type BoardTaskFilters } from '@/lib/task-query';
+import { useApiResource } from '@/lib/use-api-resource';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 
 export type UseBoardDataResult = {
@@ -45,7 +47,6 @@ export type UseBoardDataResult = {
   setLabels: Dispatch<SetStateAction<LabelDto[]>>;
   setLoading: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string | null>>;
-  setPanelError: Dispatch<SetStateAction<string | null>>;
   setMetaRefreshKey: Dispatch<SetStateAction<number>>;
 };
 
@@ -66,7 +67,6 @@ export function useBoardData(
   const [loading, setLoading] = useState(true);
   const [tasksSyncing, setTasksSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [panelError, setPanelError] = useState<string | null>(null);
   const [metaRefreshKey, setMetaRefreshKey] = useState(0);
 
   const columnsRef = useRef<ColumnDto[]>([]);
@@ -146,6 +146,17 @@ export function useBoardData(
     [reloadBoardMeta, reloadTasks],
   );
 
+  /**
+   * The board load stays on a hand-rolled controller rather than `useApiResource`.
+   *
+   * The hook models one value arriving once: a single `T`, set when the promise resolves.
+   * This load is five values arriving at three different times — the frame (board, columns,
+   * members, labels) and the first task page together decide when the skeleton comes down,
+   * while the remaining pages keep streaming into the same `tasks` array behind an already
+   * painted board. There is no `T` whose single assignment expresses that, and folding the
+   * pages into one resolved value would put the skeleton back up until the last page landed,
+   * which is the regression this streaming shape exists to avoid.
+   */
   useEffect(() => {
     if (!activeId) return;
     const controller = new AbortController();
@@ -187,33 +198,34 @@ export function useBoardData(
     return () => controller.abort();
   }, [activeId, boardId, filters, drainTasks, reloadBoardMeta, reloadTasks, t]);
 
+  /**
+   * A deep-linked task the board never loaded — filtered out, or on a page still draining.
+   * `null` once it is on the board, which is also what keeps the panel from re-requesting a
+   * row it can already read out of `tasks`.
+   */
+  const fetchSelectedTask = useMemo(() => {
+    if (!activeId || !selectedTaskId || loading) return null;
+    if (tasksRef.current.some((task) => task.id === selectedTaskId)) return null;
+    return (signal: AbortSignal): Promise<TaskDto> =>
+      api.get<TaskDto>(`/workspaces/${activeId}/tasks/${selectedTaskId}`, { signal });
+  }, [activeId, selectedTaskId, loading, tasksRef]);
+
+  const { data: fetchedTask, error: fetchedTaskError } = useApiResource<TaskDto | null>(
+    fetchSelectedTask,
+    null,
+    tTask('missing'),
+  );
+
   useEffect(() => {
-    if (!activeId || !selectedTaskId || loading) {
-      setPanelError(null);
-      return;
-    }
-    if (tasksRef.current.some((task) => task.id === selectedTaskId)) {
-      setPanelError(null);
-      return;
-    }
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const task = await api.get<TaskDto>(`/workspaces/${activeId}/tasks/${selectedTaskId}`);
-        if (!controller.signal.aborted) {
-          setTasks((current) =>
-            current.some((item) => item.id === task.id) ? current : [...current, task],
-          );
-          setPanelError(null);
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          setPanelError(tTask('missing'));
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, [activeId, selectedTaskId, loading, tTask]);
+    if (!fetchedTask) return;
+    setTasks((current) =>
+      current.some((item) => item.id === fetchedTask.id) ? current : [...current, fetchedTask],
+    );
+  }, [fetchedTask]);
+
+  // No request in flight means no failure to report — a task that is already on the board
+  // must not inherit the error left over from the last one that was not.
+  const panelError = fetchSelectedTask ? fetchedTaskError : null;
 
   return {
     board,
@@ -238,7 +250,6 @@ export function useBoardData(
     setLabels,
     setLoading,
     setError,
-    setPanelError,
     setMetaRefreshKey,
   };
 }

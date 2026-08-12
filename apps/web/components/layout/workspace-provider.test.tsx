@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { MemberRole, type WorkspaceDto, type WorkspaceMemberDto } from '@kurultay/shared-types';
 import messages from '@/messages/en.json';
@@ -107,5 +107,63 @@ describe('WorkspaceProvider bootstrap', () => {
     await waitFor(() => expect(result.current.bootstrapped).toBe(true));
     expect(result.current.activeRole).toBeNull();
     expect(result.current.loadError).not.toBeNull();
+  });
+
+  /**
+   * The roster decides the active workspace and the active workspace decides whose membership
+   * to read, so the two land together — a sign-out mid-sequence must not leave the shell with
+   * a workspace list and somebody else's role.
+   */
+  it('aborts the whole sequence on unmount', async () => {
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/workspaces') return Promise.resolve([workspace]) as never;
+      return new Promise(() => {}) as never;
+    });
+
+    const { unmount } = renderProvider();
+
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+    const signal = (apiGet.mock.calls[0]?.[1] as { signal: AbortSignal }).signal;
+    expect(signal.aborted).toBe(false);
+
+    unmount();
+
+    expect(signal.aborted).toBe(true);
+  });
+
+  it('retries the bootstrap from the start', async () => {
+    apiGet
+      .mockImplementationOnce(() => Promise.reject(new Error('network')) as never)
+      .mockImplementation((path: string) => {
+        if (path === '/workspaces') return Promise.resolve([workspace]) as never;
+        return Promise.resolve(membership) as never;
+      });
+
+    const { result } = renderProvider();
+    await waitFor(() => expect(result.current.loadError).not.toBeNull());
+
+    act(() => result.current.retryBootstrap());
+
+    await waitFor(() => expect(result.current.activeRole).toBe(MemberRole.ADMIN));
+    expect(result.current.loadError).toBeNull();
+    expect(result.current.workspaces).toHaveLength(1);
+  });
+
+  it('keeps the workspace list when switching, and re-reads only the role', async () => {
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/workspaces') return Promise.resolve([workspace]) as never;
+      return Promise.resolve({ ...membership, role: MemberRole.MEMBER }) as never;
+    });
+
+    const { result } = renderProvider();
+    await waitFor(() => expect(result.current.bootstrapped).toBe(true));
+
+    await act(async () => {
+      await result.current.onSwitch(WORKSPACE_ID);
+    });
+
+    expect(result.current.activeId).toBe(WORKSPACE_ID);
+    expect(result.current.activeRole).toBe(MemberRole.MEMBER);
+    expect(result.current.workspaces).toHaveLength(1);
   });
 });

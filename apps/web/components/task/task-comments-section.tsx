@@ -6,6 +6,7 @@ import type { CommentDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import { getActiveMentionQuery, insertMentionMarkup } from '@/lib/mentions';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { CommentBody } from './comment-body';
 
@@ -186,7 +187,7 @@ export function TaskCommentsSection({
       {canMutate ? (
         <div className="relative flex flex-col gap-2">
           <Label htmlFor={commentId}>{t('addComment')}</Label>
-          <textarea
+          <Textarea
             ref={commentRef}
             id={commentId}
             // The implicit `textbox` role does not support `aria-expanded`; the mention
@@ -215,7 +216,6 @@ export function TaskCommentsSection({
               syncMentionQuery(commentBody, event.currentTarget.selectionStart);
             }}
             onKeyDown={onCommentKeyDown}
-            className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-body outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
           />
           <p id={`${commentId}-hint`} className="text-micro text-muted-foreground">
             {t('mentions.hint')}

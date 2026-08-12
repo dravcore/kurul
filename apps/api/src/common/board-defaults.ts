@@ -1,18 +1,13 @@
 /**
- * The column vocabulary a fresh board starts with.
+ * Server-side view of the default board columns.
  *
- * Dashboard completion metrics key off the Done column, so the name lives here rather than
- * inline at each call site — a rename only has to happen once.
+ * The list itself lives in `@kurultay/shared-types` because the web app seeds the same
+ * columns when a board is left with none; only the Prisma-shaped derivations below are
+ * server concerns and stay here.
  */
+import { DEFAULT_COLUMNS, DONE_COLUMN_NAME } from '@kurultay/shared-types';
 
-export const DONE_COLUMN_NAME = 'Done';
-
-/** Seed columns for a new board; positions are Float (fractional indexing). */
-export const DEFAULT_COLUMNS: ReadonlyArray<{ name: string; position: number }> = [
-  { name: 'To Do', position: 1000 },
-  { name: 'In Progress', position: 2000 },
-  { name: DONE_COLUMN_NAME, position: 3000 },
-];
+export { DEFAULT_COLUMNS, DONE_COLUMN_NAME };
 
 /**
  * Users rename and re-case their columns freely, so "done" is matched loosely everywhere:
