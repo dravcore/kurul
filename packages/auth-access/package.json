@@ -24,6 +24,6 @@
   },
   "devDependencies": {
     "better-auth": "1.6.26",
-    "typescript": "^5.8.2"
+    "typescript": "^7.0.2"
   }
 }
