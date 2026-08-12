@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_COLUMNS, DONE_COLUMN_NAME } from '../src/board-defaults.js';
+import { DEFAULT_COLUMNS } from '../src/board-defaults.js';
+import { ColumnCategory } from '../src/enums.js';
 
 /**
  * These are the invariants the two seeders rely on and neither one checks. The API creates
  * `DEFAULT_COLUMNS` in a single nested write; the web app replays the same list one request
- * at a time as a recovery action; the dashboard finds the completed column by name. Nothing
- * in the type system says the three agree, which is the reason the list was centralised.
+ * at a time as a recovery action; the dashboard finds the completed column by category.
+ * Nothing in the type system says the three agree, which is the reason the list was
+ * centralised.
  */
 describe('DEFAULT_COLUMNS', () => {
   it('seeds a board with at least one column', () => {
@@ -43,26 +45,36 @@ describe('DEFAULT_COLUMNS', () => {
   it('names every column exactly once', () => {
     const names = DEFAULT_COLUMNS.map((column) => column.name);
 
-    // Columns are addressed by name across the stack, `DONE_COLUMN_NAME` included, so a
-    // duplicate makes those lookups pick one of two rows at random.
+    // A duplicate name gives the board two columns a person cannot tell apart, and makes any
+    // name-keyed lookup in a client pick one of the two at random.
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it('includes the column the dashboard counts completions in', () => {
-    const names = DEFAULT_COLUMNS.map((column) => column.name);
+  it('seeds exactly one column the dashboard counts completions in', () => {
+    const completed = DEFAULT_COLUMNS.filter(
+      (column) => column.category === ColumnCategory.COMPLETED,
+    );
 
-    // Renaming the Done column without renaming the constant leaves a board whose completion
-    // metrics silently read zero — no type error, no failing query, just wrong numbers.
-    expect(names).toContain(DONE_COLUMN_NAME);
+    // Under ADR 0019 completion is read from `category`, never from the name — which is what
+    // lets the seed names be translated. A fresh board with no COMPLETED column reports zero
+    // throughput forever; with two, every seeded board starts in the multi-completed shape
+    // that only a deliberate user split should produce.
+    expect(completed).toHaveLength(1);
   });
-});
 
-describe('DONE_COLUMN_NAME', () => {
-  it('matches itself under the normalisation the dashboard query applies', () => {
-    // `apps/api/src/common/board-defaults.ts` compares `lower(trim(column))` in SQL against
-    // `DONE_COLUMN_NAME.toLowerCase()` — which trims nothing. Padding here would make that
-    // comparison never match anything.
-    expect(DONE_COLUMN_NAME).toBe(DONE_COLUMN_NAME.trim());
-    expect(DONE_COLUMN_NAME.length).toBeGreaterThan(0);
+  it('gives the categories the workflow order the positions already imply', () => {
+    // Reading the board left to right should not walk backwards through the workflow. This is
+    // the one place the two orderings are stated together, so it is the only place they can be
+    // checked against each other.
+    const rank: Record<ColumnCategory, number> = {
+      [ColumnCategory.BACKLOG]: 0,
+      [ColumnCategory.UNSTARTED]: 1,
+      [ColumnCategory.STARTED]: 2,
+      [ColumnCategory.COMPLETED]: 3,
+      [ColumnCategory.CANCELED]: 4,
+    };
+    const ranks = DEFAULT_COLUMNS.map((column) => rank[column.category]);
+
+    expect(ranks).toStrictEqual([...ranks].sort((a, b) => a - b));
   });
 });

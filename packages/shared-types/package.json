@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc -b tsconfig.json --force && tsc -p tsconfig.cjs.json && node ./scripts/write-cjs-package-json.mjs",
     "lint": "eslint src test --max-warnings 0",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
