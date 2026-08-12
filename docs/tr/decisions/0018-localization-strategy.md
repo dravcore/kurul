@@ -63,10 +63,17 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
   Kurultay'da indekslenen hiçbir şey yok, dolayısıyla bu getiri geçerli değil; ona ihtiyaç
   duyacak tanıtım sitesinin de başka yerde yaşaması planlanıyor.
 - Yol parçasının maliyeti ise anında ve eksiksiz ödenir: tüm `app/` ağacı `app/[locale]/`
-  altına taşınır, Better Auth'un oturum akışının yanına bir middleware iner ve her `<Link>` ile
-  `router.push` next-intl'in locale-farkında sarmalayıcılarına geçmek zorunda kalır. Bu geçişi
-  kaçıran her çağrı yeri kullanıcının dilini sessizce sıfırlar — doğal olarak yakalayan bir
-  testi olmayan, sessiz bir hata biçimi.
+  altına taşınır ve her `<Link>` ile `router.push` next-intl'in locale-farkında
+  sarmalayıcılarına geçmek zorunda kalır — bu geçişi kaçıran her çağrı yeri kullanıcının dilini
+  sessizce sıfırlar, doğal olarak yakalayan bir testi olmayan sessiz bir hata biçimi.
+- Middleware maliyeti ilk bakışta göründüğünden ağır. `apps/web/middleware.ts` zaten var ve her
+  route'u oturuma karşı geçitliyor; üstelik tüm yönlendirme mantığı **literal yol eşlemesi**:
+  `/login`, `/register` ve `/verify-email` tutan bir `PUBLIC_PATHS` kümesi, bir
+  `pathname.startsWith('/invite/')` kontrolü ve kök yönlendirmesi için `pathname === '/'`. Dil
+  öneki bu karşılaştırmaların hepsini birden geçersiz kılar. Dolayısıyla yönlendirmeli i18n'e
+  geçmek, next-intl'in middleware'ini auth geçidiyle bileştirmek **ve** aynı değişiklikte auth
+  geçidinin eşlemesini yeniden yazmak demek — hatanın kullanıcıları oturumdan atacağı ya da daha
+  kötüsü kimliksiz bir isteği içeri alacağı tek dosyada.
 - next-intl, yönlendirmesiz kurulumu birinci sınıf bir yapılandırma olarak belgeliyor;
   dolayısıyla bu seçim kütüphaneye ters düşmüyor ve desteklenen yolun dışına çıkmıyor.
 - Workspace düzeyi yerine kullanıcı düzeyi, çünkü bir workspace meşru şekilde farklı diller
@@ -100,10 +107,10 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
 
 ## Değerlendirilen alternatifler
 
-| Alternatif                                                      | Neden olmadı                                                                                                                                                                    |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[locale]` yol parçası (next-intl'in yönlendirmeli varsayılanı) | SEO getirisi indekslenebilir sayfası olmayan bir uygulamada geçersiz; buna karşılık tüm route ağacına, bir middleware'e ve bugünden başlayan kalıcı link disiplinine mal oluyor |
-| Workspace düzeyinde locale                                      | Bir workspace meşru şekilde farklı diller okuyan üyelere sahiptir; ortak bir ayar birini yanlış dile mahkûm eder                                                                |
-| Backend i18n (`nestjs-i18n`, `Accept-Language` ile düzyazı)     | Web'in zaten sahip olduğu kataloğu ikizler ve ayrışmalarına izin verir; API zaten `resolveApiMessage` ile eşlenen kodlar döndürüyor                                             |
-| react-i18next veya Lingui'ye geçmek                             | next-intl 53 dosyada zaten entegre ve App Router'ın doğal seçeneği; takas hiçbir şey kazandırmaz, çalışan kodu yeniden yazar                                                    |
-| İstek anında makine çevirisi                                    | Ürün sözlüğü öngörülemez hale gelir, istek başına gecikme ve maliyet doğar, metni kullanıcı görmeden gözden geçirmenin yolu kalmaz                                              |
+| Alternatif                                                      | Neden olmadı                                                                                                                                                                                                                           |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[locale]` yol parçası (next-intl'in yönlendirmeli varsayılanı) | SEO getirisi indekslenebilir sayfası olmayan bir uygulamada geçersiz; buna karşılık tüm route ağacına, mevcut auth middleware'inin literal yol eşlemesinin yeniden yazılmasına ve bugünden başlayan kalıcı link disiplinine mal oluyor |
+| Workspace düzeyinde locale                                      | Bir workspace meşru şekilde farklı diller okuyan üyelere sahiptir; ortak bir ayar birini yanlış dile mahkûm eder                                                                                                                       |
+| Backend i18n (`nestjs-i18n`, `Accept-Language` ile düzyazı)     | Web'in zaten sahip olduğu kataloğu ikizler ve ayrışmalarına izin verir; API zaten `resolveApiMessage` ile eşlenen kodlar döndürüyor                                                                                                    |
+| react-i18next veya Lingui'ye geçmek                             | next-intl 53 dosyada zaten entegre ve App Router'ın doğal seçeneği; takas hiçbir şey kazandırmaz, çalışan kodu yeniden yazar                                                                                                           |
+| İstek anında makine çevirisi                                    | Ürün sözlüğü öngörülemez hale gelir, istek başına gecikme ve maliyet doğar, metni kullanıcı görmeden gözden geçirmenin yolu kalmaz                                                                                                     |

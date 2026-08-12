@@ -64,10 +64,17 @@ There is no `[locale]` path segment and no i18n middleware. Alongside that:
   `hreflang`. Nothing in Kurultay is indexed, so that payoff does not apply, and the marketing
   site that would need it is planned to live elsewhere.
 - The costs of the path segment are paid immediately and in full: the entire `app/` tree moves
-  under `app/[locale]/`, a middleware lands next to Better Auth's session flow, and every
-  `<Link>` and `router.push` has to switch to next-intl's locale-aware wrappers. Any call site
-  that misses the switch silently resets the user's language — a quiet failure mode with no
-  test that naturally catches it.
+  under `app/[locale]/`, and every `<Link>` and `router.push` has to switch to next-intl's
+  locale-aware wrappers — any call site that misses the switch silently resets the user's
+  language, a quiet failure mode no test naturally catches.
+- The middleware cost is worse than it first looks. `apps/web/middleware.ts` already exists and
+  gates every route on a session, and all of its routing logic is **literal path matching**: a
+  `PUBLIC_PATHS` set holding `/login`, `/register` and `/verify-email`, a
+  `pathname.startsWith('/invite/')` check, and `pathname === '/'` for the root redirect. A
+  locale prefix invalidates every one of those comparisons at once. Adopting routed i18n
+  therefore means composing next-intl's middleware with the auth gate _and_ rewriting the auth
+  gate's matching in the same change — on the one file where a mistake logs users out or, worse,
+  lets an unauthenticated request through.
 - next-intl documents the no-routing setup as a first-class configuration, so this choice does
   not fight the library or fall off the supported path.
 - User-level rather than workspace-level, because one workspace legitimately contains members
@@ -101,10 +108,10 @@ There is no `[locale]` path segment and no i18n middleware. Alongside that:
 
 ## Alternatives considered
 
-| Alternative                                           | Why not                                                                                                                                                    |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[locale]` path segment (next-intl's routed default)  | Its SEO payoff does not apply to an app with no indexable pages; it costs the whole route tree, a middleware, and permanent link discipline starting today |
-| Workspace-level locale                                | One workspace legitimately has members who read different languages; a shared setting forces someone into the wrong language                               |
-| Backend i18n (`nestjs-i18n`, `Accept-Language` prose) | Duplicates the catalog the web already owns and lets the two drift; the API already returns codes, which the web maps through `resolveApiMessage`          |
-| Switch to react-i18next or Lingui                     | next-intl is already integrated across 53 files and is the App-Router-native choice; a swap buys nothing and re-does working code                          |
-| Machine translation at request time                   | Unpredictable product vocabulary, per-request latency and cost, and no way to review the wording before users see it                                       |
+| Alternative                                           | Why not                                                                                                                                                                                                         |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[locale]` path segment (next-intl's routed default)  | Its SEO payoff does not apply to an app with no indexable pages; it costs the whole route tree, a rewrite of the existing auth middleware's literal path matching, and permanent link discipline starting today |
+| Workspace-level locale                                | One workspace legitimately has members who read different languages; a shared setting forces someone into the wrong language                                                                                    |
+| Backend i18n (`nestjs-i18n`, `Accept-Language` prose) | Duplicates the catalog the web already owns and lets the two drift; the API already returns codes, which the web maps through `resolveApiMessage`                                                               |
+| Switch to react-i18next or Lingui                     | next-intl is already integrated across 53 files and is the App-Router-native choice; a swap buys nothing and re-does working code                                                                               |
+| Machine translation at request time                   | Unpredictable product vocabulary, per-request latency and cost, and no way to review the wording before users see it                                                                                            |
