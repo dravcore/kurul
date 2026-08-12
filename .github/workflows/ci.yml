@@ -97,6 +97,13 @@ jobs:
           name: api-coverage
           path: apps/api/coverage
           if-no-files-found: ignore
+      - name: Upload web coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-coverage
+          path: apps/web/coverage
+          if-no-files-found: ignore
       - name: Migrate test database
         run: pnpm db:migrate
       - name: Integration tests

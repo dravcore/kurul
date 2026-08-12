@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Priority, type TaskDto, type UpdateTaskRequest } from '@kurultay/shared-types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { PriorityIcon } from './priority-icon';
 
 const PRIORITIES = [Priority.LOW, Priority.MEDIUM, Priority.HIGH, Priority.URGENT] as const;
@@ -60,9 +61,9 @@ export function TaskDetailFields({
         <Label htmlFor={priorityId}>{t('priority')}</Label>
         <div className="flex items-center gap-2">
           <PriorityIcon priority={task.priority} title={t(`priorityValues.${task.priority}`)} />
-          <select
+          <Select
             id={priorityId}
-            className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-body outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+            size="sm"
             value={task.priority}
             disabled={disabled}
             onChange={(event) => onPatch({ priority: event.target.value as Priority })}
@@ -72,7 +73,7 @@ export function TaskDetailFields({
                 {t(`priorityValues.${value}`)}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
 

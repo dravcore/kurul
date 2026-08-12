@@ -6,6 +6,7 @@ import { LabelColorSlot, type LabelDto } from '@kurultay/shared-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { LabelChip, labelSlotClass } from './label-chip';
 
@@ -110,8 +111,9 @@ export function TaskLabelsSection({
               onChange={(event) => setNewLabelName(event.target.value)}
             />
           </div>
-          <select
-            className="h-8 rounded-md border border-input bg-transparent px-2 text-body"
+          <Select
+            size="sm"
+            className="w-auto"
             value={newLabelColor}
             disabled={pending}
             aria-label={t('labelColor')}
@@ -122,7 +124,7 @@ export function TaskLabelsSection({
                 {slot}
               </option>
             ))}
-          </select>
+          </Select>
           <Button type="button" size="sm" disabled={pending} onClick={() => void createLabel()}>
             {t('createLabel')}
           </Button>

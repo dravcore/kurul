@@ -96,7 +96,10 @@ export function TaskMetadataPanel({
     setPending(true);
     const previous = task;
     try {
-      const updated = await api.patch<TaskDto>(`/workspaces/${workspaceId}/tasks/${task.id}`, body);
+      const updated = await api.patch<TaskDto, UpdateTaskRequest>(
+        `/workspaces/${workspaceId}/tasks/${task.id}`,
+        body,
+      );
       onUpdated(updated);
     } catch (caught) {
       const restore: Partial<TaskDto> & Pick<TaskDto, 'id'> = { id: previous.id };
@@ -121,9 +124,10 @@ export function TaskMetadataPanel({
         ? await api.delete<TaskDto>(
             `/workspaces/${workspaceId}/tasks/${task.id}/assignees/${userId}`,
           )
-        : await api.post<TaskDto>(`/workspaces/${workspaceId}/tasks/${task.id}/assignees`, {
-            userId,
-          } satisfies AddAssigneeRequest);
+        : await api.post<TaskDto, AddAssigneeRequest>(
+            `/workspaces/${workspaceId}/tasks/${task.id}/assignees`,
+            { userId },
+          );
       onUpdated(updated);
       await refreshActivities();
     } catch (caught) {
@@ -139,9 +143,10 @@ export function TaskMetadataPanel({
     try {
       const updated = assigned
         ? await api.delete<TaskDto>(`/workspaces/${workspaceId}/tasks/${task.id}/labels/${labelId}`)
-        : await api.post<TaskDto>(`/workspaces/${workspaceId}/tasks/${task.id}/labels`, {
-            labelId,
-          } satisfies AddTaskLabelRequest);
+        : await api.post<TaskDto, AddTaskLabelRequest>(
+            `/workspaces/${workspaceId}/tasks/${task.id}/labels`,
+            { labelId },
+          );
       onUpdated(updated);
     } catch (caught) {
       toastMetaError(caught);
@@ -155,7 +160,7 @@ export function TaskMetadataPanel({
     setPending(true);
     try {
       const body: CreateLabelRequest = { name, color };
-      const created = await api.post<LabelDto>(
+      const created = await api.post<LabelDto, CreateLabelRequest>(
         `/workspaces/${workspaceId}/boards/${boardId}/labels`,
         body,
       );
@@ -195,7 +200,7 @@ export function TaskMetadataPanel({
     setPending(true);
     try {
       const payload: CreateCommentRequest = { body };
-      const created = await api.post<CommentDto>(
+      const created = await api.post<CommentDto, CreateCommentRequest>(
         `/workspaces/${workspaceId}/tasks/${task.id}/comments`,
         payload,
       );

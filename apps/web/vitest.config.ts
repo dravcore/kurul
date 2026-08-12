@@ -28,6 +28,26 @@ export default defineConfig({
       // the units that *are* tested, and per-directory glob thresholds would be brittle
       // while `apps/web` is still being split/refactored (see tech-debt Wave 5/6). Revisit
       // once route-level tests exist or coverage is measured per meaningfully-tested folder.
+      //
+      // Route-level tests now exist, so `app/**` is exactly the "meaningfully-tested
+      // folder" that comment was waiting for — and it is the one place a glob floor is not
+      // brittle: routes are thin (await params, translate a title, compose components) and
+      // a new page arriving with no test at all is the regression worth catching. The
+      // global gate stays absent for the reason above; only this folder is floored.
+      //
+      // Floors sit a few points under the measured baseline (2026-08-12, `pnpm --filter
+      // @kurultay/web test:cov`: stmts 90.93 / branch 100 / funcs 90 / lines 90.93), the
+      // same margin `apps/api/jest.config.cjs` uses, so routine refactors do not trip it.
+      // `app/layout.tsx` counts here too: `next/font/google` is stubbed in its test rather
+      // than the file being excluded, because an excluded file is an invisible one.
+      thresholds: {
+        'app/**': {
+          statements: 85,
+          branches: 90,
+          functions: 85,
+          lines: 85,
+        },
+      },
     },
   },
 });

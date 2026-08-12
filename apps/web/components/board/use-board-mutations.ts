@@ -3,18 +3,17 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type {
-  ColumnDto,
-  CreateColumnRequest,
-  MoveColumnRequest,
-  MoveTaskRequest,
-  TaskDto,
+import {
+  DEFAULT_COLUMNS,
+  type ColumnDto,
+  type CreateColumnRequest,
+  type MoveColumnRequest,
+  type MoveTaskRequest,
+  type TaskDto,
 } from '@kurultay/shared-types';
 import { api, apiStatus } from '@/lib/api';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import type { TaskMovePayload } from '@/components/task/use-board-task-dnd';
-
-const DEFAULT_COLUMNS = ['To Do', 'In Progress', 'Done'] as const;
 
 export type UseBoardMutationsOptions = {
   boardId: string;
@@ -62,7 +61,7 @@ export function useBoardMutations({
           beforeTaskId: payload.beforeTaskId,
           afterTaskId: payload.afterTaskId,
         };
-        const updated = await api.patch<TaskDto>(
+        const updated = await api.patch<TaskDto, MoveTaskRequest>(
           `/workspaces/${activeId}/tasks/${payload.taskId}/position`,
           body,
         );
@@ -116,7 +115,7 @@ export function useBoardMutations({
           beforeColumnId: before?.id ?? null,
           afterColumnId: after?.id ?? null,
         };
-        const updated = await api.patch<ColumnDto>(
+        const updated = await api.patch<ColumnDto, MoveColumnRequest>(
           `/workspaces/${activeId}/columns/${column.id}/position`,
           body,
         );
@@ -139,6 +138,15 @@ export function useBoardMutations({
     [activeId, columnsRef, setColumns, t],
   );
 
+  /**
+   * Recreates the starting columns on a board that was left with none.
+   *
+   * Still one request per column, and deliberately serial: `afterColumnId` is what pins the
+   * order, and firing the three in parallel would race the server's position calculation.
+   * A partial seed is therefore possible — the catch below keeps whatever landed rather than
+   * discarding it, and the whole loop collapses to a single call the day the API grows a
+   * bulk-create endpoint.
+   */
   const seedDefaults = useCallback(
     async function seed(): Promise<void> {
       if (!activeId) return;
@@ -146,12 +154,12 @@ export function useBoardMutations({
       const created: ColumnDto[] = [];
       try {
         let afterColumnId: string | undefined;
-        for (const name of DEFAULT_COLUMNS) {
+        for (const { name } of DEFAULT_COLUMNS) {
           const body: CreateColumnRequest = {
             name,
             ...(afterColumnId ? { afterColumnId } : {}),
           };
-          const column = await api.post<ColumnDto>(
+          const column = await api.post<ColumnDto, CreateColumnRequest>(
             `/workspaces/${activeId}/boards/${boardId}/columns`,
             body,
           );

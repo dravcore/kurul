@@ -12,6 +12,7 @@ import { useApiResource } from '@/lib/use-api-resource';
 import { cn } from '@/lib/utils';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNotificationSocket } from './use-notification-socket';
 import { toast } from 'sonner';
@@ -163,8 +164,8 @@ export function NotificationsList(): React.ReactElement {
           </label>
           <label className="flex flex-col gap-1 text-small">
             <span className="text-muted-foreground">{t('typeFilter')}</span>
-            <select
-              className="h-9 min-w-[10rem] rounded-md border border-input bg-transparent px-3 text-body outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            <Select
+              className="min-w-[10rem]"
               value={typeFilter}
               onChange={(event) => setTypeFilter(event.target.value as TypeFilter)}
               aria-label={t('typeFilter')}
@@ -173,7 +174,7 @@ export function NotificationsList(): React.ReactElement {
               <option value={NotificationType.Assignment}>{t('typeAssignment')}</option>
               <option value={NotificationType.Mention}>{t('typeMention')}</option>
               <option value={NotificationType.DueSoon}>{t('typeDueSoon')}</option>
-            </select>
+            </Select>
           </label>
         </div>
         <Button

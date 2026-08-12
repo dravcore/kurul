@@ -191,6 +191,27 @@ describe('NotificationBell realtime badge', () => {
     await expectBadge('7');
   });
 
+  /**
+   * The badge has nowhere to say "this failed", so a blank one reads as "nothing unread".
+   * A count from two minutes ago is the less wrong of the two.
+   */
+  it('keeps the last known count when a refresh fails', async () => {
+    unreadCount(4);
+    renderBell();
+    fireConnect();
+    await expectBadge('4');
+
+    const callsBefore = get.mock.calls.length;
+    get.mockRejectedValue(new Error('network'));
+    fire(SocketEvents.NOTIFICATION_UNREAD_CHANGED, {
+      workspaceId: WORKSPACE_ID,
+      userId: USER_ID,
+    });
+
+    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(callsBefore));
+    await expectBadge('4');
+  });
+
   it('falls back to polling while the socket is down', async () => {
     vi.useFakeTimers();
     unreadCount(1);

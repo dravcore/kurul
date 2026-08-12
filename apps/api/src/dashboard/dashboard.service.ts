@@ -65,7 +65,7 @@ export class DashboardService {
       totalTasks,
       overdueCount,
       priorityGroups,
-      assigneeRows,
+      assigneeBuckets,
       unassignedCount,
       columns,
       columnCounts,
@@ -85,12 +85,7 @@ export class DashboardService {
         where: taskWhere,
         _count: { _all: true },
       }),
-      this.prisma.taskAssignee.groupBy({
-        by: ['userId'],
-        where: { task: taskWhere },
-        _count: { _all: true },
-        orderBy: { _count: { userId: 'desc' } },
-      }),
+      this.rankedAssigneeBuckets(workspaceId, query.boardId),
       this.prisma.task.count({
         where: { ...taskWhere, assignees: { none: {} } },
       }),
@@ -119,7 +114,12 @@ export class DashboardService {
       count: priorityGroups.find((row) => row.priority === priority)?._count._all ?? 0,
     }));
 
-    const byAssignee = await this.buildAssigneeBuckets(assigneeRows, unassignedCount);
+    // Unassigned leads, then the database's ranking, then its "Other" tail — the one bucket
+    // the query cannot produce is the one that has no assignee row to aggregate.
+    const byAssignee: DashboardCountByAssignee[] =
+      unassignedCount > 0
+        ? [{ userId: null, name: 'Unassigned', count: unassignedCount }, ...assigneeBuckets]
+        : assigneeBuckets;
 
     let byColumn: DashboardCountByColumn[] | null = null;
     if (columns && columnCounts) {
@@ -204,45 +204,71 @@ export class DashboardService {
     );
   }
 
-  private async buildAssigneeBuckets(
-    rows: Array<{ userId: string; _count: { _all: number } }>,
-    unassignedCount: number,
+  /**
+   * The top {@link ASSIGNEE_TOP_N} assignees followed by a single `Other` row, ranked and
+   * folded by the database.
+   *
+   * Done in Node this was a `groupBy` over every assignment plus a `user.findMany` for the
+   * names, which pulls one row per distinct assignee across the wire so that all but eight of
+   * them can be discarded and summed. A window function ranks the rows where they already
+   * live, so the result set is bounded at N + 1 no matter how large the workspace grows.
+   *
+   * **`count` is assignments, not tasks.** A task with three assignees is counted once for
+   * each of them, so `Σ byAssignee` deliberately exceeds `totalTasks` on any board that uses
+   * multiple assignees. This chart answers "how much is on each person's plate", and the
+   * alternative — attributing a shared task to exactly one of its assignees — would have to
+   * pick a winner arbitrarily and would under-report everyone else. `Unassigned` is the
+   * exception and is a task count, because a task with no assignee has no assignment row.
+   *
+   * The `Other` row is kept last rather than sorted in by size: it is a remainder, and a
+   * reader who sees it above a named person reads it as a person.
+   */
+  private rankedAssigneeBuckets(
+    workspaceId: string,
+    boardId: string | undefined,
   ): Promise<DashboardCountByAssignee[]> {
-    const assigned: DashboardCountByAssignee[] = [];
+    const boardFilter = boardId ? Prisma.sql`AND t."boardId" = ${boardId}` : Prisma.empty;
 
-    if (rows.length > 0) {
-      const users = await this.prisma.user.findMany({
-        where: { id: { in: rows.map((row) => row.userId) } },
-        select: { id: true, name: true },
-      });
-      const nameById = new Map(users.map((user) => [user.id, user.name] as const));
-      for (const row of rows) {
-        assigned.push({
-          userId: row.userId,
-          name: nameById.get(row.userId) ?? row.userId,
-          count: row._count._all,
-        });
-      }
-    }
-
-    assigned.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-
-    const buckets: DashboardCountByAssignee[] = [];
-    if (unassignedCount > 0) {
-      buckets.push({ userId: null, name: 'Unassigned', count: unassignedCount });
-    }
-
-    if (assigned.length <= ASSIGNEE_TOP_N) {
-      buckets.push(...assigned);
-      return buckets;
-    }
-
-    buckets.push(...assigned.slice(0, ASSIGNEE_TOP_N));
-    const otherCount = assigned.slice(ASSIGNEE_TOP_N).reduce((sum, row) => sum + row.count, 0);
-    if (otherCount > 0) {
-      buckets.push({ userId: null, name: 'Other', count: otherCount });
-    }
-    return buckets;
+    return this.prisma.$queryRaw<DashboardCountByAssignee[]>`
+      WITH counts AS (
+        SELECT ta."userId" AS "userId", COUNT(*)::int AS "count"
+        FROM "TaskAssignee" ta
+        INNER JOIN "Task" t ON t."id" = ta."taskId"
+        INNER JOIN "Board" b ON b."id" = t."boardId"
+        WHERE b."workspaceId" = ${workspaceId}
+          ${boardFilter}
+        GROUP BY ta."userId"
+      ),
+      ranked AS (
+        SELECT c."userId",
+               -- LEFT JOIN plus COALESCE: a deleted-then-orphaned assignment still shows its
+               -- weight rather than vanishing from the totals.
+               COALESCE(u."name", c."userId") AS "name",
+               c."count",
+               ROW_NUMBER() OVER (
+                 ORDER BY c."count" DESC, COALESCE(u."name", c."userId") ASC
+               ) AS "rn"
+        FROM counts c
+        LEFT JOIN "User" u ON u."id" = c."userId"
+      ),
+      buckets AS (
+        SELECT "userId", "name", "count", "rn"
+        FROM ranked
+        WHERE "rn" <= ${ASSIGNEE_TOP_N}::int
+        UNION ALL
+        -- HAVING with no GROUP BY yields exactly one row, or none when the tail is empty.
+        SELECT NULL::text AS "userId",
+               'Other' AS "name",
+               SUM("count")::int AS "count",
+               ${ASSIGNEE_TOP_N + 1}::bigint AS "rn"
+        FROM ranked
+        WHERE "rn" > ${ASSIGNEE_TOP_N}::int
+        HAVING SUM("count") > 0
+      )
+      SELECT "userId", "name", "count"
+      FROM buckets
+      ORDER BY "rn"
+    `;
   }
 }
 

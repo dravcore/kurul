@@ -34,7 +34,7 @@ export function CreateColumnDialog({
       name: name.trim(),
       ...(afterColumnId ? { afterColumnId } : {}),
     };
-    const column = await api.post<ColumnDto>(
+    const column = await api.post<ColumnDto, CreateColumnRequest>(
       `/workspaces/${workspaceId}/boards/${boardId}/columns`,
       body,
     );

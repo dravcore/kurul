@@ -36,5 +36,10 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
+# AI assistant config — local to each machine, never shared
+.claude/
+.cursor/
+.cursorrules
+
 # Docker volumes / local overrides
 docker-compose.override.yml
