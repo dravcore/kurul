@@ -77,7 +77,12 @@
       "retry": "Try again",
       "taskLoad": "This task couldn't load.",
       "commentsLoad": "The comments couldn't load.",
-      "activityLoad": "The history couldn't load."
+      "activityLoad": "The history couldn't load.",
+      "pageTitle": "This page didn't load.",
+      "pageBody": "Trying again usually clears it.",
+      "backHome": "Back to your boards",
+      "notFoundTitle": "This page doesn't exist.",
+      "notFoundBody": "The link may be out of date, or what it pointed at was deleted."
     },
     "shell": {
       "title": "Kurultay",
