@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TaskAssigneeService } from './task-assignee.service';
 import { TaskEventsService } from './task-events.service';
 import { TaskLabelService } from './task-label.service';
+import { buildListWhere } from './task-query-where';
 import { TaskReadService } from './task-read.service';
 import { TaskService } from './task.service';
 
@@ -29,6 +30,8 @@ function taskRow(
     columnId: string;
     title: string;
     position: number;
+    dueDate: Date | null;
+    estimatedMinutes: number | null;
   }> = {},
 ) {
   const now = new Date('2026-01-01');
@@ -40,8 +43,8 @@ function taskRow(
     description: null,
     priority: 'MEDIUM' as const,
     position: overrides.position ?? 1000,
-    dueDate: null,
-    estimatedMinutes: null,
+    dueDate: overrides.dueDate ?? null,
+    estimatedMinutes: overrides.estimatedMinutes ?? null,
     createdById: USER_ID,
     createdAt: now,
     updatedAt: now,
@@ -143,6 +146,12 @@ describe('TaskService', () => {
         data: expect.objectContaining({ position: 4000, createdById: USER_ID }),
       }),
     );
+    // The siblings are read for their ordering, so that is all the query may ask for.
+    expect(prisma.task.findMany).toHaveBeenCalledWith({
+      where: { columnId: COLUMN_ID },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
+    });
   });
 
   it('places the first task in an empty column at the base gap', async () => {
@@ -248,15 +257,26 @@ describe('TaskService', () => {
 
     let updateCall: { where: { id: string }; data: { position: number; columnId: string } } | null =
       null;
-    const executeRaw = jest.fn().mockResolvedValue(2);
+    const writeOrder: string[] = [];
+    // Both mocks resolve on a later tick, so a `Promise.all` would interleave start/settle and
+    // the log would not read as two completed statements in order.
+    const executeRaw = jest.fn().mockImplementation(async () => {
+      writeOrder.push('siblings:start');
+      await Promise.resolve();
+      writeOrder.push('siblings:done');
+      return 2;
+    });
     prisma.$transaction.mockImplementation(async (callback) =>
       callback({
         task: {
           findFirst: jest.fn().mockResolvedValue(moving),
           findMany: jest.fn().mockResolvedValue(tight),
-          update: jest.fn().mockImplementation(({ where, data }) => {
+          update: jest.fn().mockImplementation(async ({ where, data }) => {
             updateCall = { where, data };
-            return Promise.resolve({ ...moving, ...data, id: where.id });
+            writeOrder.push('moved:start');
+            await Promise.resolve();
+            writeOrder.push('moved:done');
+            return { ...moving, ...data, id: where.id };
           }),
         },
         column: {
@@ -283,6 +303,9 @@ describe('TaskService', () => {
     expect(columnId).toBe(COLUMN_ID);
     expect(result.position).toBe(2000);
     expect(result.columnId).toBe(COLUMN_ID);
+    // An interactive transaction is one connection: the rebalance writes run one after the
+    // other, so a failure names a statement and leaves a state that can be reasoned about.
+    expect(writeOrder).toEqual(['moved:start', 'moved:done', 'siblings:start', 'siblings:done']);
   });
 
   /** Wire up the $transaction mock the way move() consumes it. */
@@ -293,14 +316,18 @@ describe('TaskService', () => {
       siblings?: Array<ReturnType<typeof taskRow>>;
       column?: { id: string; boardId: string } | null;
     } = {},
-  ): { updates: Array<{ id: string; position?: number; columnId?: string }> } {
+  ): {
+    updates: Array<{ id: string; position?: number; columnId?: string }>;
+    siblingQuery: jest.Mock;
+  } {
     const updates: Array<{ id: string; position?: number; columnId?: string }> = [];
     const movedTask = options.task === undefined ? taskRow({ id: 't1' }) : options.task;
+    const siblingQuery = jest.fn().mockResolvedValue(options.siblings ?? []);
     prisma.$transaction.mockImplementation(async (callback) =>
       callback({
         task: {
           findFirst: jest.fn().mockResolvedValue(movedTask),
-          findMany: jest.fn().mockResolvedValue(options.siblings ?? []),
+          findMany: siblingQuery,
           update: jest.fn().mockImplementation(({ where, data }) => {
             updates.push({ id: where.id as string, ...data });
             return Promise.resolve({ ...(movedTask ?? taskRow({ id: 't1' })), ...data });
@@ -319,7 +346,7 @@ describe('TaskService', () => {
         },
       }),
     );
-    return { updates };
+    return { updates, siblingQuery };
   }
 
   it('returns 404 on create when afterTaskId does not exist in the target column', async () => {
@@ -374,7 +401,7 @@ describe('TaskService', () => {
   it('appends to the end of the target column when no neighbors are given', async () => {
     const { service, prisma } = buildService();
     const moving = taskRow({ id: 'moving', position: 500, columnId: 'other' });
-    const { updates } = mockMoveTx(prisma, {
+    const { updates, siblingQuery } = mockMoveTx(prisma, {
       task: moving,
       siblings: [taskRow({ id: 'a', position: 1000 })],
     });
@@ -383,6 +410,13 @@ describe('TaskService', () => {
 
     expect(updates).toEqual([{ id: 'moving', columnId: COLUMN_ID, position: 2000 }]);
     expect(result.position).toBe(2000);
+    // The siblings are read for their ordering, so that is all the query may ask for — the
+    // moved task's own row is the one read in full.
+    expect(siblingQuery).toHaveBeenCalledWith({
+      where: { columnId: COLUMN_ID },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
+    });
   });
 
   it('moves into an empty column at the base gap', async () => {
@@ -470,7 +504,9 @@ describe('TaskService', () => {
 
   it('clears dueDate and estimatedMinutes when the payload sets them to null', async () => {
     const { service, prisma } = buildService();
-    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.task.findFirst.mockResolvedValue(
+      taskRow({ id: 't1', dueDate: new Date('2026-03-01'), estimatedMinutes: 90 }),
+    );
     prisma.task.update.mockResolvedValue(taskRow({ id: 't1' }));
 
     await service.update(WORKSPACE_ID, 't1', ACTOR_ID, { dueDate: null, estimatedMinutes: null });
@@ -481,6 +517,61 @@ describe('TaskService', () => {
         data: { dueDate: null, estimatedMinutes: null },
       }),
     );
+  });
+
+  it('writes nothing when the payload repeats what is already stored', async () => {
+    const { service, prisma, activityService, realtimeMock } = buildService();
+    const stored = taskRow({ id: 't1', title: 'Task', dueDate: new Date('2026-03-01') });
+    prisma.task.findFirst.mockResolvedValue(stored);
+
+    const result = await service.update(WORKSPACE_ID, 't1', ACTOR_ID, {
+      title: 'Task',
+      dueDate: '2026-03-01T00:00:00.000Z',
+      priority: 'MEDIUM',
+    });
+
+    // `updatedAt` is what "last activity" reads, so a no-op PATCH must not move it.
+    expect(prisma.task.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(activityService.record).not.toHaveBeenCalled();
+    expect(realtimeMock.emitToBoard).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      id: 't1',
+      title: 'Task',
+      updatedAt: stored.updatedAt.toISOString(),
+    });
+  });
+
+  it('writes nothing for an empty payload', async () => {
+    const { service, prisma, realtimeMock } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+
+    await service.update(WORKSPACE_ID, 't1', ACTOR_ID, {});
+
+    expect(prisma.task.update).not.toHaveBeenCalled();
+    expect(realtimeMock.emitToBoard).not.toHaveBeenCalled();
+  });
+
+  it('records the activity and announces the change on a real edit', async () => {
+    const { service, prisma, activityService, realtimeMock } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1', title: 'Task' }));
+    prisma.task.update.mockResolvedValue(taskRow({ id: 't1', title: 'Renamed' }));
+
+    await service.update(WORKSPACE_ID, 't1', ACTOR_ID, { title: 'Renamed' });
+
+    expect(activityService.record).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        type: ActivityType.TaskUpdated,
+        payload: { title: 'Renamed', changes: { title: 'Renamed' } },
+      }),
+    );
+    expect(realtimeMock.emitToBoard).toHaveBeenCalledWith(BOARD_ID, SocketEvents.TASK_UPDATED, {
+      workspaceId: WORKSPACE_ID,
+      boardId: BOARD_ID,
+      actorId: ACTOR_ID,
+      taskId: 't1',
+    });
   });
 
   it('returns 404 and writes nothing when updating a task in another workspace', async () => {
@@ -710,56 +801,18 @@ describe('TaskService', () => {
       );
     });
 
-    it('builds AND filters for q, priority, assignee, label, and due range', async () => {
+    // The filter matrix itself is covered in task-query-where.spec.ts, against the function
+    // rather than through a Prisma mock. What is left to prove here is that `list` hands the
+    // query to it and passes the result on unaltered.
+    it('queries with the predicate the filter builder produced', async () => {
       const { service, prisma } = buildService();
       prisma.task.findMany.mockResolvedValue([]);
+      const query = { limit: 50, q: 'login', priority: ['HIGH' as const] };
 
-      await service.list(WORKSPACE_ID, BOARD_ID, {
-        limit: 50,
-        q: 'login',
-        priority: ['HIGH', 'URGENT'],
-        assigneeId: ['null', USER_ID],
-        labelId: ['0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'],
-        dueDate: 'null',
-        'dueDate[gte]': '2026-01-01T00:00:00.000Z',
-        'dueDate[lte]': '2026-12-31T00:00:00.000Z',
-        cursor: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60',
-      });
+      await service.list(WORKSPACE_ID, BOARD_ID, query);
 
       expect(prisma.task.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            boardId: BOARD_ID,
-            AND: expect.arrayContaining([
-              { id: { gt: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60' } },
-              {
-                OR: [
-                  { title: { contains: 'login', mode: 'insensitive' } },
-                  { description: { contains: 'login', mode: 'insensitive' } },
-                ],
-              },
-              { priority: { in: ['HIGH', 'URGENT'] } },
-              {
-                OR: [
-                  { assignees: { none: {} } },
-                  { assignees: { some: { userId: { in: [USER_ID] } } } },
-                ],
-              },
-              {
-                labels: {
-                  some: { labelId: { in: ['0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'] } },
-                },
-              },
-              { dueDate: null },
-              {
-                dueDate: {
-                  gte: new Date('2026-01-01T00:00:00.000Z'),
-                  lte: new Date('2026-12-31T00:00:00.000Z'),
-                },
-              },
-            ]),
-          },
-        }),
+        expect.objectContaining({ where: buildListWhere(BOARD_ID, query) }),
       );
     });
   });

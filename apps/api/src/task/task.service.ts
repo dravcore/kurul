@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { ActivityType, SocketEvents } from '@kurultay/shared-types';
 import type { CursorPage, TaskDto } from '@kurultay/shared-types';
-import type { Prisma } from '../generated/prisma';
 import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
 import { toCursorPage } from '../common/pagination/cursor-page';
@@ -25,6 +24,7 @@ import { createTaskAttributes, planTaskUpdate } from './task-fields';
 import { TaskAssigneeService } from './task-assignee.service';
 import { taskInclude, type TaskWithRelations } from './task.include';
 import { TaskLabelService } from './task-label.service';
+import { buildListWhere } from './task-query-where';
 import { TaskReadService } from './task-read.service';
 import { emptyTaskRelations, toTaskDto } from './task.mapper';
 
@@ -46,7 +46,7 @@ export class TaskService {
   ): Promise<CursorPage<TaskDto>> {
     await assertBoard(this.prisma, workspaceId, boardId);
 
-    const where = this.buildListWhere(boardId, query);
+    const where = buildListWhere(boardId, query);
     const limit = query.limit ?? 50;
 
     const rows = await this.prisma.task.findMany({
@@ -60,64 +60,6 @@ export class TaskService {
     return toCursorPage(rows, limit, (task) => toTaskDto(task));
   }
 
-  private buildListWhere(boardId: string, query: TaskQueryDto): Prisma.TaskWhereInput {
-    const and: Prisma.TaskWhereInput[] = [];
-
-    if (query.cursor) {
-      and.push({ id: { gt: query.cursor } });
-    }
-
-    if (query.q) {
-      and.push({
-        OR: [
-          { title: { contains: query.q, mode: 'insensitive' } },
-          { description: { contains: query.q, mode: 'insensitive' } },
-        ],
-      });
-    }
-
-    if (query.priority && query.priority.length > 0) {
-      and.push({ priority: { in: query.priority } });
-    }
-
-    if (query.assigneeId && query.assigneeId.length > 0) {
-      const wantsUnassigned = query.assigneeId.includes('null');
-      const userIds = query.assigneeId.filter((id) => id !== 'null');
-      const assigneeOr: Prisma.TaskWhereInput[] = [];
-      if (wantsUnassigned) {
-        assigneeOr.push({ assignees: { none: {} } });
-      }
-      if (userIds.length > 0) {
-        assigneeOr.push({ assignees: { some: { userId: { in: userIds } } } });
-      }
-      and.push(assigneeOr.length === 1 ? assigneeOr[0]! : { OR: assigneeOr });
-    }
-
-    if (query.labelId && query.labelId.length > 0) {
-      and.push({ labels: { some: { labelId: { in: query.labelId } } } });
-    }
-
-    if (query.dueDate === 'null') {
-      and.push({ dueDate: null });
-    }
-
-    const dueGte = query['dueDate[gte]'];
-    const dueLte = query['dueDate[lte]'];
-    if (dueGte || dueLte) {
-      and.push({
-        dueDate: {
-          ...(dueGte ? { gte: new Date(dueGte) } : {}),
-          ...(dueLte ? { lte: new Date(dueLte) } : {}),
-        },
-      });
-    }
-
-    return {
-      boardId,
-      ...(and.length > 0 ? { AND: and } : {}),
-    };
-  }
-
   async create(
     workspaceId: string,
     boardId: string,
@@ -127,9 +69,13 @@ export class TaskService {
     await assertBoard(this.prisma, workspaceId, boardId);
     const column = await this.findColumnOnBoard(workspaceId, boardId, dto.columnId);
 
+    // Only the ordering math reads these rows, and it reads two columns of them. Selecting the
+    // whole task instead drags every title, description and timestamp in the column across the
+    // wire on a create that will use none of it.
     const siblings = await this.prisma.task.findMany({
       where: { columnId: column.id },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
     });
 
     // `afterTaskId` is the client's word for "insert after this task", which in position
@@ -206,7 +152,16 @@ export class TaskService {
   ): Promise<TaskDto> {
     const existing = await this.taskRead.findTask(workspaceId, taskId);
     const { data, changes } = planTaskUpdate(existing, dto);
-    const changed = Object.keys(changes).length > 0;
+
+    // A PATCH that re-sends what is already stored is not an edit. Writing it anyway moved
+    // `updatedAt` forward, which is the field "last activity" sorting and staleness checks
+    // read — so closing a detail panel without typing anything used to look like work. The
+    // activity entry and the socket event were already suppressed for this case; the write
+    // was the one thing still leaking. The row was read under the workspace predicate, so
+    // returning it needs no further check.
+    if (Object.keys(changes).length === 0) {
+      return toTaskDto(existing);
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       // Re-read inside the transaction: the row could have been deleted, or moved out of
@@ -225,30 +180,26 @@ export class TaskService {
         include: taskInclude,
       });
 
-      if (changed) {
-        await this.activityService.record(tx, {
-          workspaceId,
-          taskId,
-          userId,
-          type: ActivityType.TaskUpdated,
-          payload: {
-            title: updated.title,
-            changes,
-          },
-        });
-      }
+      await this.activityService.record(tx, {
+        workspaceId,
+        taskId,
+        userId,
+        type: ActivityType.TaskUpdated,
+        payload: {
+          title: updated.title,
+          changes,
+        },
+      });
 
       return toTaskDto(updated);
     });
 
-    if (changed) {
-      this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_UPDATED, {
-        workspaceId,
-        boardId: result.boardId,
-        actorId: userId,
-        taskId: result.id,
-      });
-    }
+    this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_UPDATED, {
+      workspaceId,
+      boardId: result.boardId,
+      actorId: userId,
+      taskId: result.id,
+    });
     return result;
   }
 
@@ -327,9 +278,12 @@ export class TaskService {
           : await tx.column.findFirst({ where: { id: fromColumnId } });
       const fromColumnName = fromColumn?.name ?? '';
 
+      // Two columns, as on create: the moved task itself is read in full above, and these rows
+      // only ever contribute an id and a position to the rebalance.
       const siblings = await tx.task.findMany({
         where: { columnId: targetColumn.id },
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        select: { id: true, position: true },
       });
       const remaining = siblings.filter((item) => item.id !== taskId);
       // On a move the DTO fields line up with position order: `beforeTaskId` is the task that
@@ -345,26 +299,31 @@ export class TaskService {
       let result: TaskDto;
 
       if (needsRebalance(prev?.position ?? null, next?.position ?? null)) {
+        // The moved row joins its new siblings as the same two columns they are: `reordered`
+        // exists to hand `rebalancePositions` a length and to pair each id with its new slot.
         const reordered = [...remaining];
-        reordered.splice(insertionIndex, 0, { ...task, columnId: targetColumn.id });
+        reordered.splice(insertionIndex, 0, { id: task.id, position: task.position });
         const positions = rebalancePositions(reordered.length);
         const otherUpdates = reordered
           .map((item, index) => ({ item, index }))
           .filter(({ item }) => item.id !== taskId)
           .map(({ item, index }) => ({ id: item.id, position: positions[index]! }));
 
-        await Promise.all([
-          // Scoped predicate on the write too — the transaction-local read above proves the
-          // task was in the workspace, the predicate is what the database enforces.
-          tx.task.update({
-            where: { id: taskId, board: { workspaceId } },
-            data: {
-              position: positions[insertionIndex]!,
-              columnId: targetColumn.id,
-            },
-          }),
-          batchUpdateTaskPositions(tx, targetColumn.id, otherUpdates),
-        ]);
+        // Sequential, not `Promise.all`: an interactive transaction is one connection, so the
+        // two writes queue behind each other regardless. Racing them bought no parallelism and
+        // cost the ability to say which statement failed and what the transaction had already
+        // applied when it did.
+        //
+        // Scoped predicate on the write too — the transaction-local read above proves the task
+        // was in the workspace, the predicate is what the database enforces.
+        await tx.task.update({
+          where: { id: taskId, board: { workspaceId } },
+          data: {
+            position: positions[insertionIndex]!,
+            columnId: targetColumn.id,
+          },
+        });
+        await batchUpdateTaskPositions(tx, targetColumn.id, otherUpdates);
         result = toTaskDto({
           ...task,
           columnId: targetColumn.id,
