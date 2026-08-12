@@ -19,7 +19,7 @@ durumlar ve metin.
 - [10. Çapraz referanslar](#10-çapraz-referanslar)
 
 > **Durum.** Aşağıdaki her hex, tip boyutu ve piksel ölçüsü bir **öneridir**; gerçek ekranlarda
-> [Faz 3](roadmap.md#faz-3--boardlar-ve-columnlar)'te doğrulanacak ve Faz 7'ye kadar rafine
+> [Faz 3](../archive/roadmap-mvp-phases.md)'te doğrulanacak ve Faz 7'ye kadar rafine
 > edilecektir. _Kurallar_ — ölçülülük, tokenizasyon, klavye paritesi, kontrast tabanları, i18n —
 > ilk component'ten itibaren bağlayıcıdır.
 
@@ -364,7 +364,7 @@ başlamaktan çok daha pahalıya mal olur.
 
 ## 8. Grafikler ve dashboard
 
-[Faz 7](roadmap.md#faz-7--dashboard) için, Recharts ile render edilir. Form, herhangi bir renk
+[Faz 7](../archive/roadmap-mvp-phases.md) için, Recharts ile render edilir. Form, herhangi bir renk
 kararından önce, reader'ın job'ına göre seçilir. Asla dual bir y-axis, asla iki slice'ı geçen bir
 pie, asla generate edilmiş bir dokuzuncu ton — tail'i "Other" ("Diğer") içine katla ya da small
 multiple'lara facet'le.
@@ -446,6 +446,6 @@ verify edilmiş olarak.
 | [coding-standards.md](coding-standards.md#nextjs-appsweb)              | `components/ui/` yalnızca shadcn output'udur — token'lar theme'de edit edilir, asla bir primitive'de değil; component'lerde arbitrary hex yok; conditional class'lar `cn()` üzerinden |
 | [architecture.md](architecture.md#4-appsweb--yapı)                     | Bu dokümanın ortaya koyduğu `(auth)` / `(app)` route group'ları ve `board/`, `task/`, `dashboard/`, `layout/` component domain'leri                                                   |
 | [api-conventions.md](api-conventions.md#hatalar)                       | Error metninin türediği problem-JSON şekli, ve `statusCode` üzerinden branch'leme kuralı                                                                                              |
-| [roadmap.md](roadmap.md#faz-3--boardlar-ve-columnlar)                  | Faz 3 token'ları, shell'i ve board chrome'unu getirir; Faz 4 drag etkileşimini ve detay panelini; Faz 5 priority ve label render'ını; Faz 7 grafikleri                                |
+| [roadmap.md](../archive/roadmap-mvp-phases.md)                         | Faz 3 token'ları, shell'i ve board chrome'unu getirir; Faz 4 drag etkileşimini ve detay panelini; Faz 5 priority ve label render'ını; Faz 7 grafikleri                                |
 | [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts — yukarıdaki her kuralın karşısında yazıldığı toolkit                                                                         |
 | [tech-stack.md](tech-stack.md)                                         | Neden o toolkit                                                                                                                                                                       |

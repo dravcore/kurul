@@ -80,21 +80,18 @@ Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
 
 ## Dokümantasyon
 
-| Doküman                                                    | Kapsam                                                             |
-| ---------------------------------------------------------- | ------------------------------------------------------------------ |
-| [docs/README.md](docs/README.md)                           | Docs haritası, EN/TR politikası, arşiv politikası (EN kanonik)     |
-| [docs/tr/architecture.md](docs/tr/architecture.md)         | Modül haritası, veri modeli özeti                                  |
-| [docs/tr/tech-stack.md](docs/tr/tech-stack.md)             | Stack seçimleri ve gerekçeleri                                     |
-| [docs/tr/project-skeleton.md](docs/tr/project-skeleton.md) | Tarihsel Faz 1 iskeleti (monorepo’nun ilk kuruluş rehberi)         |
-| [docs/tr/development.md](docs/tr/development.md)           | Ortam kurulumu, günlük iş akışı, komutlar                          |
-| [docs/tr/coding-standards.md](docs/tr/coding-standards.md) | TS/NestJS/Next.js konvansiyonları                                  |
-| [docs/tr/design.md](docs/tr/design.md)                     | UI/UX dili: ilkeler, token'lar, yerleşim, hareket, durumlar, metin |
-| [docs/tr/git-strategy.md](docs/tr/git-strategy.md)         | Git Flow, Conventional Commits, release'ler                        |
-| [docs/tr/testing.md](docs/tr/testing.md)                   | Test katmanları, araçlar, beklentiler                              |
-| [docs/tr/api-conventions.md](docs/tr/api-conventions.md)   | REST adlandırma, hata formatı, pagination                          |
-| [docs/tr/roadmap.md](docs/tr/roadmap.md)                   | Fazlar ve ilerleme                                                 |
-| [docs/tr/decisions/](docs/tr/decisions/)                   | Hafif mimari karar kayıtları (ADR)                                 |
-| [docs/archive/](docs/archive/)                             | Tarihsel planlar ve meta-spec’ler (günlük okuma değil)             |
+Beş dakikalık harita (EN kanonik): **[docs/README.md](docs/README.md)**. Türkçe kopyalar
+`docs/tr/` altında.
+
+| Doküman                                                  | Kapsam                               |
+| -------------------------------------------------------- | ------------------------------------ |
+| [docs/tr/architecture.md](docs/tr/architecture.md)       | Modül haritası, veri modeli          |
+| [docs/tr/design.md](docs/tr/design.md)                   | UI/UX dili                           |
+| [docs/tr/development.md](docs/tr/development.md)         | Yerel kurulum ve günlük komutlar     |
+| [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST, hatalar, pagination            |
+| [docs/tr/roadmap.md](docs/tr/roadmap.md)                 | MVP bitti; Beyond MVP listesi        |
+| [docs/tr/decisions/](docs/tr/decisions/)                 | ADR’ler                              |
+| [docs/archive/](docs/archive/)                           | Tarihsel spec / plan / faz checklist |
 
 ## Katkıda bulunma
 

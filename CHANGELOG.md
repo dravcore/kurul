@@ -7,7 +7,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- Documentation map sharpened for post-MVP: `docs/README.md` is a five-minute reading guide;
+  `docs/roadmap.md` is status + Beyond MVP only; Phase 0–9 checklists moved to
+  `docs/archive/roadmap-mvp-phases.md`; shipped phase design specs moved to
+  `docs/archive/specs/` (CHANGELOG links updated).
 
 ## [0.1.0] - 2026-08-12
 
@@ -57,7 +62,7 @@ commit; this is the point it becomes a version.
 - `GET /workspaces/:workspaceId/members/me` returns the caller's own membership, so the app
   shell resolves the active role from one indexed row instead of `/me` plus the full roster.
 - Phase 9 realtime board sync
-  ([spec](docs/specs/2026-08-09-phase-9-realtime-design.md)): Socket.io gateway with Redis
+  ([spec](docs/archive/specs/2026-08-09-phase-9-realtime-design.md)): Socket.io gateway with Redis
   adapter, session-cookie auth, `board:{id}` rooms, thin ID event contract (`actorId`),
   emit-after-commit from task/column/comment mutations, web `useBoardSocket` with reconnect
   resync and mid-drag cancel. Presence remains out of MVP; notification unread push shipped separately, above.
@@ -67,34 +72,34 @@ commit; this is the point it becomes a version.
   [deferred notes](docs/archive/specs/2026-08-09-phase-8-deferred.md) (archived; open items
   moved to [roadmap.md](docs/roadmap.md#beyond-mvp)).
 - Phase 8 activity log and notifications
-  ([spec](docs/specs/2026-08-09-phase-8-activity-notifications-design.md)): activity writes
+  ([spec](docs/archive/specs/2026-08-09-phase-8-activity-notifications-design.md)): activity writes
   on task create/update/move/delete/assign/comment; workspace and task feeds; `Notification`
   model (assignment, mention, due-soon via BullMQ); shell bell + task History; comment
   `@[Name](userId)` mentions. Email deferred
   ([notes](docs/archive/specs/2026-08-09-phase-8-deferred.md), archived).
 - Phase 7 dashboard
-  ([spec](docs/specs/2026-08-09-phase-7-dashboard-design.md)):
+  ([spec](docs/archive/specs/2026-08-09-phase-7-dashboard-design.md)):
   `GET .../dashboard/summary?boardId?` with total/overdue tiles, priority and assignee
   charts, optional per-board column chart (Recharts), empty/loading states; completion
   over time now on `throughput` (Activity-backed).
 - Phase 6 filtering and search
-  ([spec](docs/specs/2026-08-09-phase-6-filtering-design.md)): whitelisted `TaskQueryDto`
+  ([spec](docs/archive/specs/2026-08-09-phase-6-filtering-design.md)): whitelisted `TaskQueryDto`
   on `GET .../boards/:boardId/tasks` (`q`, priority, assignee, label, due-date null/range,
   sort), cursor pagination (`CursorPage<TaskDto>`), filter indexes, and a URL-synced board
   filter bar with chips, `/` search focus, and empty state.
 - Phase 5 task metadata
-  ([spec](docs/specs/2026-08-09-phase-5-task-metadata-design.md)): board label CRUD with
+  ([spec](docs/archive/specs/2026-08-09-phase-5-task-metadata-design.md)): board label CRUD with
   `LabelColorSlot` colors, task assignees/labels, priority/`dueDate`/`estimatedMinutes`
   on `PATCH` tasks, comments, [ADR 0011](docs/decisions/0011-label-task-metadata-permissions.md),
   enriched `TaskDto`/`CommentDto`/`WorkspaceMemberDto`, and panel/card UI for metadata.
 - Phase 4 tasks and drag-and-drop
-  ([spec](docs/specs/2026-08-09-phase-4-tasks-design.md)): workspace-scoped task CRUD,
+  ([spec](docs/archive/specs/2026-08-09-phase-4-tasks-design.md)): workspace-scoped task CRUD,
   fractional `Task.position` moves with on-demand rebalance,
   [ADR 0010](docs/decisions/0010-task-permissions.md) (MEMBER+ mutate), `@dnd-kit`
   multi-column board with optimistic move + toast rollback, and a title/description
   detail panel at `/board/[boardId]/task/[taskId]`.
 - Visual debt closure and Phase 4 groundwork
-  ([spec](docs/specs/2026-08-09-visual-debt-design.md)): design.md type-scale tokens,
+  ([spec](docs/archive/specs/2026-08-09-visual-debt-design.md)): design.md type-scale tokens,
   reduced-motion policy that keeps color/opacity, shared `DamgaMark`, token-themed sonner
   toasts with retry actions, elevation tokens, shared 48px topbar, workspace switcher
   dropdown (usable from the collapsed rail), sliding sancak rail, shell loading skeleton,
@@ -153,7 +158,7 @@ commit; this is the point it becomes a version.
   updated for shipped realtime.
 - Docs: `docs/decisions/0011-label-task-metadata-permissions.md` superseded on the comment-delete
   rule by [ADR 0012](docs/decisions/0012-comment-delete-authorship.md) (author OR OWNER/ADMIN,
-  not any MEMBER); `docs/specs/2026-08-09-phase-8-deferred.md` archived to
+  not any MEMBER); `docs/archive/specs/2026-08-09-phase-8-deferred.md` archived to
   `docs/archive/specs/` with its remaining open follow-ups folded into
   [roadmap Beyond MVP](docs/roadmap.md#beyond-mvp); api-conventions, tech-stack, testing, and
   architecture docs refreshed to match the shipped activity/dashboard/notification routes, ADRs

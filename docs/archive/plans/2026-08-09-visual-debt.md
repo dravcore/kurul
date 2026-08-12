@@ -1,7 +1,7 @@
 # Visual Debt and Phase 4 Groundwork — Implementation Plan
 
 > **Status: shipped** — all four layers merged to `develop` (PRs #11, #15, #13, #14).
-> Spec: `docs/specs/2026-08-09-visual-debt-design.md`. Task checkboxes below are retained
+> Spec: `docs/archive/specs/2026-08-09-visual-debt-design.md`. Task checkboxes below are retained
 > as a historical record and marked complete.
 
 > **For agentic workers:** Historical plan — do not re-execute. Steps used checkbox
@@ -9,7 +9,7 @@
 
 **Goal:** Bring every shipped `apps/web` screen into conformance with `docs/design.md` and land the primitives Phase 4 needs (type scale, toast, elevation tokens, sliding sancak rail, reduced-motion policy).
 
-**Architecture:** Four stacked layers, each its own branch and PR: primitives → shell chrome → auth screens → board polish. Later layers consume earlier ones, so the order is a dependency chain. Spec: `docs/specs/2026-08-09-visual-debt-design.md`.
+**Architecture:** Four stacked layers, each its own branch and PR: primitives → shell chrome → auth screens → board polish. Later layers consume earlier ones, so the order is a dependency chain. Spec: `docs/archive/specs/2026-08-09-visual-debt-design.md`.
 
 **Tech Stack:** Next.js 16 App Router, Tailwind v4 (`@theme` tokens in `apps/web/app/globals.css`), shadcn/ui, sonner, next-intl, lucide-react.
 
@@ -343,7 +343,7 @@ Expected: no matches in files this layer touched (auth files still match until L
 ```bash
 git push -u origin feat/design-primitives
 gh pr create --base develop --title "feat: design primitives (type scale, toast, elevation, reduced motion)" --body "$(cat <<'EOF'
-Layer 1 of docs/specs/2026-08-09-visual-debt-design.md: type-scale tokens, reduced-motion policy that keeps color/opacity, shared DamgaMark, token-themed sonner toasts, elevation tokens.
+Layer 1 of docs/archive/specs/2026-08-09-visual-debt-design.md: type-scale tokens, reduced-motion policy that keeps color/opacity, shared DamgaMark, token-themed sonner toasts, elevation tokens.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
@@ -770,7 +770,7 @@ git commit -m "feat(web): shell loading skeleton matching final layout"
 ```bash
 git push -u origin feat/shell-chrome
 gh pr create --base feat/design-primitives --title "feat: shell chrome (topbar, workspace switcher, sancak rail)" --body "$(cat <<'EOF'
-Layer 2 of docs/specs/2026-08-09-visual-debt-design.md: shared topbar, workspace switcher dropdown (works from the collapsed rail), sliding sancak rail, shell loading skeleton. Retarget to develop once Layer 1 merges.
+Layer 2 of docs/archive/specs/2026-08-09-visual-debt-design.md: shared topbar, workspace switcher dropdown (works from the collapsed rail), sliding sancak rail, shell loading skeleton. Retarget to develop once Layer 1 merges.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
@@ -995,7 +995,7 @@ git commit -m "feat(web): auth and workspace forms on the identity system"
 ```bash
 git push -u origin feat/auth-visual
 gh pr create --base feat/shell-chrome --title "feat: auth screens on the identity system" --body "$(cat <<'EOF'
-Layer 3 of docs/specs/2026-08-09-visual-debt-design.md: Fraunces display headline + damga mark via a shared (auth) layout, ui/input + ui/label + ui/button, all non-token colors removed. Retarget to develop once Layer 2 merges.
+Layer 3 of docs/archive/specs/2026-08-09-visual-debt-design.md: Fraunces display headline + damga mark via a shared (auth) layout, ui/input + ui/label + ui/button, all non-token colors removed. Retarget to develop once Layer 2 merges.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
@@ -1206,7 +1206,7 @@ Expected: no matches.
 ```bash
 git push -u origin feat/board-polish
 gh pr create --base feat/auth-visual --title "feat: board polish (stagger, card states, toast errors)" --body "$(cat <<'EOF'
-Layer 4 of docs/specs/2026-08-09-visual-debt-design.md: first-paint column stagger, board card hover/focus, action errors as toasts with retry. Retarget to develop once Layer 3 merges.
+Layer 4 of docs/archive/specs/2026-08-09-visual-debt-design.md: first-paint column stagger, board card hover/focus, action errors as toasts with retry. Retarget to develop once Layer 3 merges.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF

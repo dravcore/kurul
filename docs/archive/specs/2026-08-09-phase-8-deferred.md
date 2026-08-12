@@ -1,7 +1,7 @@
 # Phase 8 — Deferred follow-ups
 
 **Date:** 2026-08-09 · **Status:** archived · **Parent:**
-[phase-8 design](../../specs/2026-08-09-phase-8-activity-notifications-design.md)
+[phase-8 design](./2026-08-09-phase-8-activity-notifications-design.md)
 
 > **Archived.** The MVP shipped and every still-open row below has been folded into
 > [roadmap.md — Beyond MVP](../../roadmap.md#beyond-mvp) (due-soon delivery alternatives,

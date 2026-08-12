@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Spec:** [docs/specs/2026-08-09-phase-7-dashboard-design.md](../specs/2026-08-09-phase-7-dashboard-design.md)
+**Spec:** [docs/archive/specs/2026-08-09-phase-7-dashboard-design.md](../specs/2026-08-09-phase-7-dashboard-design.md)
 
 **Goal:** Workspace aggregate view — total/overdue tiles, priority and assignee charts, optional per-board column chart — above the existing board list on `/dashboard`.
 
