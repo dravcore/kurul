@@ -1,10 +1,22 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { NotificationType, SocketEvents } from '@kurultay/shared-types';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { DueSoonWorker } from './due-soon.worker';
 import { NotificationService } from './notification.service';
+
+// The registration test needs to see what the worker asks BullMQ for without a Redis to ask
+// it against. No other test in this file constructs a queue, so the stub is file-wide.
+jest.mock('bullmq', () => ({
+  Queue: jest.fn().mockImplementation(() => ({
+    add: jest.fn(),
+    upsertJobScheduler: jest.fn().mockResolvedValue({ id: 'due-soon-scan' }),
+    close: jest.fn(),
+  })),
+  Worker: jest.fn().mockImplementation(() => ({ on: jest.fn(), close: jest.fn() })),
+}));
 
 /** Every migration's SQL, whitespace-normalised so statements can be matched as one line. */
 function allMigrationSql(): string {
@@ -250,6 +262,50 @@ describe('DueSoonWorker', () => {
     // The re-notify predicate is what the partial unique index backs up; widening it would
     // turn a skipped pair into a swallowed insert conflict.
     expect((fragments as string[]).join('?')).toContain('n."readAt" IS NULL OR n."createdAt" >= ');
+  });
+
+  describe('registration', () => {
+    const originalRedisUrl = process.env.REDIS_URL;
+
+    afterEach(async () => {
+      if (originalRedisUrl === undefined) delete process.env.REDIS_URL;
+      else process.env.REDIS_URL = originalRedisUrl;
+      jest.clearAllMocks();
+    });
+
+    function buildWorker(): DueSoonWorker {
+      const prisma = { task: { findMany: jest.fn() } } as unknown as PrismaService;
+      const notifications = {} as NotificationService;
+      return new DueSoonWorker(prisma, notifications);
+    }
+
+    it('registers the scan as a job scheduler, not as a deprecated repeatable job', async () => {
+      process.env.REDIS_URL = 'redis://localhost:6379';
+      const worker = buildWorker();
+
+      await worker.onModuleInit();
+
+      const queue = (Queue as unknown as jest.Mock).mock.results[0]!.value as {
+        add: jest.Mock;
+        upsertJobScheduler: jest.Mock;
+      };
+      expect(queue.add).not.toHaveBeenCalled();
+      expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
+        'due-soon-scan',
+        { every: 15 * 60 * 1000 },
+        { name: 'scan-due-soon', opts: { removeOnComplete: 100, removeOnFail: 50 } },
+      );
+
+      await worker.onModuleDestroy();
+    });
+
+    it('starts nothing when REDIS_URL is unset', async () => {
+      delete process.env.REDIS_URL;
+
+      await buildWorker().onModuleInit();
+
+      expect(Queue).not.toHaveBeenCalled();
+    });
   });
 
   // `skipDuplicates` compiles to `INSERT ... ON CONFLICT DO NOTHING`, which is a no-op unless

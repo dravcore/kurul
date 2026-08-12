@@ -57,14 +57,16 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
       );
     });
 
-    await this.queue.add(
-      JOB_NAME,
-      {},
+    // `add` with `repeat` is the deprecated repeatable-job API: it leaves a repeat *key* behind
+    // whose identity includes the interval, so changing REPEAT_EVERY_MS orphans the old key and
+    // the queue quietly runs two schedules. A job scheduler is addressed by its id alone, so an
+    // upsert replaces the previous definition instead of racing it.
+    await this.queue.upsertJobScheduler(
+      JOB_ID,
+      { every: REPEAT_EVERY_MS },
       {
-        jobId: JOB_ID,
-        repeat: { every: REPEAT_EVERY_MS },
-        removeOnComplete: 100,
-        removeOnFail: 50,
+        name: JOB_NAME,
+        opts: { removeOnComplete: 100, removeOnFail: 50 },
       },
     );
 
