@@ -33,6 +33,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0013](0013-invitation-email-verification.md)   | Invitation-Acceptance Email Verification                             | Accepted                                         | 2026-08-10 |
 | [0014](0014-dual-licensing-cla.md)              | Dual Licensing and a Contributor License Agreement                   | Accepted (route suspended by 0015)               | 2026-08-11 |
 | [0015](0015-no-external-contributions.md)       | No External Contributions; Legal Spend Deferred                      | Accepted                                         | 2026-08-12 |
+| [0016](0016-foreign-key-violation-status.md)    | Foreign-Key Violations Map to 409, Not 422                           | Accepted                                         | 2026-08-12 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).
