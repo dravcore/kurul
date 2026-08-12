@@ -105,6 +105,22 @@ There is no `[locale]` path segment and no i18n middleware. Alongside that:
   as a missing key.
 - The API gains a small amount of locale awareness — reading `Accept-Language` — which it did
   not have before. It is confined to database seeding and email.
+- **The seed column names live in the API, not in `@kurultay/shared-types`.** Settled during
+  implementation, because §3 leaves it open. They are data the API writes on the user's behalf,
+  and once the web stopped seeding — `POST …/columns/defaults` replaced its three-request loop —
+  the API became their only writer. A shared copy would ship every language's seed vocabulary
+  into a browser bundle that never renders it. What stays shared is `SUPPORTED_LOCALES`, which
+  genuinely crosses the boundary: the web renders the picker from it, the API validates
+  `PATCH /me` against it. The structural half of the seed list (position, `ColumnCategory`) is
+  held apart from the names so a translation cannot move a column or change what it means.
+- Adding a language is a change to `SUPPORTED_LOCALES` plus the two things that then fail to
+  compile: the API's `Record<Locale, …>` of seed names, and the missing `messages/<tag>.json`.
+  No data migration, and no `User.locale` backfill — the column stays nullable, and null keeps
+  meaning "follow the browser".
+- `GET /me` reads `User.locale` from the database rather than from the session. Better Auth
+  caches the session user in a cookie for five minutes, and `/me` is what the web's chain
+  consults, so a session-carried locale would leave the interface in the old language for up to
+  five minutes after the user changed it.
 
 ## Alternatives considered
 

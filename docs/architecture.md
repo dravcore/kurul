@@ -86,19 +86,20 @@ Every module has the same skeleton: `*.module.ts`, `*.controller.ts`, `*.service
 **Current vs planned:** after Phase 9, feature modules including `realtime` are implemented.
 Treat the table below as the module map.
 
-| Module         | Responsibility                                                          |
-| -------------- | ----------------------------------------------------------------------- |
-| `auth`         | Better Auth integration, session handling, request user resolution      |
-| `workspace`    | Workspace CRUD, membership, invitations, roles                          |
-| `board`        | Board and column management, column ordering                            |
-| `task`         | Task CRUD, moving between columns, fractional-index reordering          |
-| `label`        | Board-scoped labels and task-label assignment                           |
-| `comment`      | Task comments                                                           |
-| `activity`     | Append-only activity log (`payload` is Json)                            |
-| `dashboard`    | Aggregation queries feeding the charts                                  |
-| `notification` | Notification fan-out, Redis-backed queue                                |
-| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                          |
-| `mail`         | SMTP delivery (`nodemailer`); logs instead of sending when unconfigured |
+| Module         | Responsibility                                                                   |
+| -------------- | -------------------------------------------------------------------------------- |
+| `auth`         | Better Auth integration, session handling, request user resolution               |
+| `workspace`    | Workspace CRUD, membership, invitations, roles                                   |
+| `board`        | Board and column management, column ordering                                     |
+| `task`         | Task CRUD, moving between columns, fractional-index reordering                   |
+| `label`        | Board-scoped labels and task-label assignment                                    |
+| `comment`      | Task comments                                                                    |
+| `activity`     | Append-only activity log (`payload` is Json)                                     |
+| `dashboard`    | Aggregation queries feeding the charts                                           |
+| `notification` | Notification fan-out, Redis-backed queue                                         |
+| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                   |
+| `mail`         | SMTP delivery (`nodemailer`); logs instead of sending when unconfigured          |
+| `locale`       | Stored interface language: reads/writes `User.locale`, resolves it for a request |
 
 Cross-cutting infrastructure:
 
@@ -108,6 +109,8 @@ Cross-cutting infrastructure:
 | `prisma` | Shared `pg` pool + Nest `PrismaService`; Better Auth uses the same pool                                                                                   |
 
 Dependency direction: feature modules depend on `common` and `prisma`, never the reverse. `realtime` is a consumer of domain events, not a place where domain logic lives — so it can be lifted into its own process role without dragging business rules with it.
+
+`locale` is a module rather than a `common/` helper because `auth` and `board` both need it and the boundary rule says they depend on the module, not on each other. It is the only locale awareness the API has, and it is confined to the two cases [ADR 0018](decisions/0018-localization-strategy.md) allows: content written into the database on the user's behalf (a new board's seed columns) and outbound email. Interface translation stays entirely on the web.
 
 ---
 
@@ -120,6 +123,7 @@ apps/web/
 │   ├── (app)/             # authenticated shell: sidebar + workspace switcher
 │   │   ├── dashboard/
 │   │   ├── notifications/
+│   │   ├── settings/
 │   │   ├── workspaces/new/
 │   │   └── board/[boardId]/
 │   └── layout.tsx
@@ -131,8 +135,9 @@ apps/web/
 │   ├── board/             # BoardList, BoardView, BoardColumn, dialogs
 │   ├── task/              # TaskCard, TaskPanel, metadata editors, DnD helpers
 │   ├── dashboard/         # chart components (Phase 7+)
-│   └── notification/      # NotificationBell, NotificationsList
-├── i18n/                  # next-intl request config (locale resolution)
+│   ├── notification/      # NotificationBell, NotificationsList
+│   └── settings/          # LanguageSettings
+├── i18n/                  # next-intl request config + the locale resolution chain
 ├── messages/              # en.json — UI copy, one flat file per locale
 └── lib/
     ├── api.ts             # typed REST client
@@ -145,9 +150,13 @@ Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` r
 
 **i18n:** `next-intl` is wired from Phase 1 (`i18n/request.ts`, `NextIntlClientProvider` in the
 root layout, UI copy in `messages/en.json`) so every user-facing string already goes through
-`useTranslations()` rather than being hardcoded. The locale is currently hardcoded to `en` —
-no locale routing, switcher, or second `messages/*.json` file yet. Adding a locale is a
-messages file plus locale-resolution logic, not a rewrite of the component tree. See
+`useTranslations()` rather than being hardcoded. The locale is resolved per render through
+`User.locale → locale cookie → Accept-Language → 'en'`
+([ADR 0018](decisions/0018-localization-strategy.md)) — deliberately **no `[locale]` path
+segment and no i18n middleware**, because nothing here is indexed and a language prefix would
+invalidate every literal path comparison in `middleware.ts` at once. Settings → Language writes
+the preference; `en` is still the only catalog, so adding a language is a `SUPPORTED_LOCALES`
+entry plus a `messages/<tag>.json`, not a rewrite of the component tree. See
 [roadmap.md — Beyond MVP](roadmap.md#beyond-mvp) for additional UI language packs.
 
 ---
@@ -173,7 +182,7 @@ Enums and DTOs are **hand-maintained** to match the Prisma schema today; a mecha
 
 | Model             | Key fields                                                                                                                                          | Notes                                                                                                                                                                                                                                                                                  |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `User`            | `id`, `email`, `name`, `avatarUrl`, `createdAt`                                                                                                     | Identity, owned by Better Auth                                                                                                                                                                                                                                                         |
+| `User`            | `id`, `email`, `name`, `avatarUrl`, `locale`, `createdAt`                                                                                           | Identity, owned by Better Auth; `locale` is nullable and means "follow the browser" when unset                                                                                                                                                                                         |
 | `Workspace`       | `id`, `name`, `slug`, `createdAt`                                                                                                                   | Tenant root — everything hangs off this                                                                                                                                                                                                                                                |
 | `WorkspaceMember` | `id`, `workspaceId`, `userId`, `role`                                                                                                               | Join table; `role` drives permissions                                                                                                                                                                                                                                                  |
 | `Board`           | `id`, `workspaceId`, `name`, `description`, `createdAt`                                                                                             | Boards belong to a workspace                                                                                                                                                                                                                                                           |

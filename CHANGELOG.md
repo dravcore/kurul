@@ -29,6 +29,29 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Interface language is a stored user preference
+  ([ADR 0018](docs/decisions/0018-localization-strategy.md)). `User.locale` holds a nullable
+  IETF tag, a **Settings → Language** screen writes it and mirrors it into a `locale` cookie,
+  and `apps/web/i18n/request.ts` resolves each render through
+  `User.locale → locale cookie → Accept-Language → 'en'`. There is no `[locale]` path segment
+  and no i18n middleware. `null` is a real state, distinct from `'en'`: it means "follow my
+  browser", and the picker exposes it as **Match my browser**.
+
+  English is still the only language on offer — this is the mechanism, not the translation.
+  Adding a second one is a change to `SUPPORTED_LOCALES` plus the two places that then fail to
+  compile (the API's seed-column names and the missing `messages/<tag>.json`); no migration and
+  no backfill.
+- `PATCH /me` writes the caller's own profile. Session-guarded and not role-gated, since the
+  subject is the caller; `locale` is the only editable field today.
+- `POST /workspaces/:workspaceId/boards/:boardId/columns/defaults` seeds an empty board's
+  starting columns in one transaction and returns them. Replaces the three sequential POSTs the
+  web made, which could fail halfway and leave a board holding two of the three stages with no
+  way to tell that from a set the user had trimmed. Same roles as creating a single column;
+  `409` when the board already has columns, so a double-click cannot produce two Done columns.
+- New boards are seeded with columns named in the creator's language — resolved from
+  `User.locale`, falling back to `Accept-Language`. `ColumnCategory` still travels with each
+  seed column, so a translated Done column keeps counting as completed
+  ([ADR 0019](docs/decisions/0019-column-category.md)).
 - Column settings replace the rename-column dialog and set a column's name and category
   together. Without a way to say that "Shipped" means completed, the metrics fix above only
   applies to columns still called Done.

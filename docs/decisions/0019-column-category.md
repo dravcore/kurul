@@ -88,6 +88,10 @@ model Column {
   `DONE_COLUMN_NAME_NORMALIZED` and `doneColumnNameFilter` in
   `apps/api/src/common/board-defaults.ts`. Both halves are affected: the shared package gains
   the per-column category, the API half is deleted outright.
+  _Since superseded:_ implementing ADR 0018 moved the seed list back to
+  `apps/api/src/common/board-defaults.ts` as `defaultColumnsFor(locale)`, once the web stopped
+  seeding columns itself. The category still travels with each seed column; only its home
+  changed.
 - **The web needs a way to set a column's category** — otherwise a user's own "Shipped" column
   can never count as done, and the original defect is only half fixed. This is a follow-up, but
   it is required before this ADR delivers its value, not optional polish.

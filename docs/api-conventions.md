@@ -64,6 +64,7 @@ DELETE /workspaces/:workspaceId/boards/:boardId
 
 GET    /workspaces/:workspaceId/boards/:boardId/columns
 POST   /workspaces/:workspaceId/boards/:boardId/columns
+POST   /workspaces/:workspaceId/boards/:boardId/columns/defaults  # seed an empty board
 PATCH  /workspaces/:workspaceId/columns/:columnId
 DELETE /workspaces/:workspaceId/columns/:columnId
 PATCH  /workspaces/:workspaceId/columns/:columnId/position
@@ -121,10 +122,15 @@ workspace, because nothing further is needed to find it.
 Non-workspace routes (the complete list):
 
 ```
-GET  /health                 # liveness, unauthenticated
-POST /auth/*                 # Better Auth handlers
-GET  /me                     # current user profile
+GET   /health                # liveness, unauthenticated
+POST  /auth/*                # Better Auth handlers
+GET   /me                    # current user profile
+PATCH /me                    # own profile; interface language today
 ```
+
+`PATCH /me` is not workspace-scoped and not role-gated: the subject is the caller, so the
+session guard is the whole authorization story. It is also the only place `User.locale` is
+written — see [decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md).
 
 ### Actions that are not CRUD
 

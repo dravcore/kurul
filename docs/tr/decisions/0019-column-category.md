@@ -91,6 +91,10 @@ model Column {
   `apps/api/src/common/board-defaults.ts` içinde yalnızca Prisma şeklindeki
   `DONE_COLUMN_NAME_NORMALIZED` ve `doneColumnNameFilter` kaldı. İki yarı da etkilenir:
   paylaşılan paket kolon başına kategoriyi kazanır, API tarafındaki yarı tamamen silinir.
+  _Sonradan aşıldı:_ ADR 0018'in uygulanması, web kolonları kendisi tohumlamayı bıraktıktan
+  sonra tohum listesini `apps/api/src/common/board-defaults.ts` içine `defaultColumnsFor(locale)`
+  olarak geri taşıdı. Kategori hâlâ her tohum kolonuyla birlikte gider; yalnızca listenin evi
+  değişti.
 - **Web'in bir kolonun kategorisini ayarlayacak bir yola ihtiyacı var** — aksi hâlde
   kullanıcının kendi "Shipped" kolonu asla tamamlanmış sayılamaz ve özgün kusur yalnızca yarı
   yarıya düzelmiş olur. Bu bir takip işidir, ama bu ADR'nin değerini üretmesi için gereklidir;

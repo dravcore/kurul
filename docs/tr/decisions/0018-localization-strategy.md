@@ -104,6 +104,22 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
   anahtar olarak da ortaya çıkmaz.
 - API daha önce hiç sahip olmadığı küçük bir locale farkındalığı — `Accept-Language` okuma —
   kazanır. Bu, veritabanı tohumlaması ve e-posta ile sınırlıdır.
+- **Tohum kolon adları `@kurultay/shared-types`'ta değil API'de yaşar.** §3 bunu açık bıraktığı
+  için uygulama sırasında karara bağlandı. Bu adlar API'nin kullanıcı adına yazdığı veridir ve
+  web tohumlamayı bıraktığı anda — `POST …/columns/defaults` onun üç istekli döngüsünün yerini
+  aldı — API tek yazıcı hâline geldi. Paylaşılan bir kopya, tarayıcının hiç render etmediği bir
+  liste için her dilin tohum sözcüklerini bundle'a taşırdı. Paylaşılan kalan şey
+  `SUPPORTED_LOCALES`'tir; o gerçekten sınırı geçer: web seçiciyi ondan üretir, API `PATCH /me`'yi
+  ona karşı doğrular. Tohum listesinin yapısal yarısı (position, `ColumnCategory`) adlardan ayrı
+  tutulur, böylece bir çeviri bir kolonu yerinden oynatamaz veya anlamını değiştiremez.
+- Bir dil eklemek `SUPPORTED_LOCALES`'e yapılan bir değişiklik, artı ardından derlenmeyi
+  reddeden iki yerdir: API'nin tohum adları `Record<Locale, …>`'ı ve eksik
+  `messages/<tag>.json`. Veri migration'ı yok, `User.locale` backfill'i yok — sütun nullable
+  kalır ve null "tarayıcıyı izle" demeye devam eder.
+- `GET /me`, `User.locale`'i session'dan değil veritabanından okur. Better Auth session
+  kullanıcısını beş dakika boyunca bir çerezde önbelleğe alır ve web'in zinciri `/me`'ye
+  başvurur; session'da taşınan bir locale, kullanıcı dili değiştirdikten sonra arayüzü beş
+  dakikaya kadar eski dilde bırakırdı.
 
 ## Değerlendirilen alternatifler
 
