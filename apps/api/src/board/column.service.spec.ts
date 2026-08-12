@@ -61,7 +61,43 @@ describe('ColumnService', () => {
     expect(prisma.column.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ position: 4000 }) }),
     );
+    // The siblings are read for their ordering, so that is all the query may ask for.
+    expect(prisma.column.findMany).toHaveBeenCalledWith({
+      where: { boardId: BOARD_ID },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
+    });
     expect(realtime.emitToBoard).toHaveBeenCalled();
+  });
+
+  it('reads exactly the DTO fields when listing a board', async () => {
+    const { service, prisma } = buildService();
+    prisma.column.findMany.mockResolvedValue([
+      {
+        id: COLUMN_ID,
+        boardId: BOARD_ID,
+        name: 'Todo',
+        position: 1000,
+        color: null,
+        _count: { tasks: 3 },
+      },
+    ]);
+
+    await expect(service.list(WORKSPACE_ID, BOARD_ID)).resolves.toEqual([
+      { id: COLUMN_ID, boardId: BOARD_ID, name: 'Todo', position: 1000, color: null, taskCount: 3 },
+    ]);
+    expect(prisma.column.findMany).toHaveBeenCalledWith({
+      where: { boardId: BOARD_ID },
+      select: {
+        id: true,
+        boardId: true,
+        name: true,
+        position: true,
+        color: true,
+        _count: { select: { tasks: true } },
+      },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+    });
   });
 
   it('returns 404 when the requested column is outside the workspace', async () => {
@@ -238,19 +274,31 @@ describe('ColumnService', () => {
       position: 1000 + 1e-9,
       color: null,
     };
+    const siblingQuery = jest.fn().mockResolvedValue([beforeNeighbor, afterNeighbor, column]);
+    const writeOrder: string[] = [];
     prisma.$transaction.mockImplementation(async (callback) =>
       callback({
         column: {
           findFirst: jest.fn().mockResolvedValue(column),
-          findMany: jest.fn().mockResolvedValue([beforeNeighbor, afterNeighbor, column]),
-          update: jest.fn().mockResolvedValue({ ...column, position: 2000 }),
+          findMany: siblingQuery,
+          update: jest.fn().mockImplementation(async () => {
+            writeOrder.push('moved:start');
+            await Promise.resolve();
+            writeOrder.push('moved:done');
+            return { ...column, position: 2000 };
+          }),
           findFirstOrThrow: jest.fn().mockResolvedValue({
             ...column,
             position: 2000,
             _count: { tasks: 7 },
           }),
         },
-        $executeRaw: jest.fn().mockResolvedValue(2),
+        $executeRaw: jest.fn().mockImplementation(async () => {
+          writeOrder.push('siblings:start');
+          await Promise.resolve();
+          writeOrder.push('siblings:done');
+          return 2;
+        }),
       }),
     );
 
@@ -260,6 +308,16 @@ describe('ColumnService', () => {
         afterColumnId: afterNeighbor.id,
       }),
     ).resolves.toMatchObject({ id: COLUMN_ID, taskCount: 7 });
+    // The `_count` the response needs comes from the re-read after the write, not from the
+    // sibling scan, which only feeds the ordering math.
+    expect(siblingQuery).toHaveBeenCalledWith({
+      where: { boardId: BOARD_ID },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
+    });
+    // An interactive transaction is one connection: the rebalance writes run one after the
+    // other, so a failure names a statement and leaves a state that can be reasoned about.
+    expect(writeOrder).toEqual(['moved:start', 'moved:done', 'siblings:start', 'siblings:done']);
     expect(realtime.emitToBoard).toHaveBeenCalled();
   });
 });
