@@ -69,10 +69,25 @@ export function TaskPanel({
   const [description, setDescription] = useState(task?.description ?? '');
   const [pending, setPending] = useState(false);
 
-  useEffect(() => {
+  // Re-seed the editable fields when the panel switches task, or when the stored title or
+  // description changes under it (our own PATCH coming back, or a realtime edit). Done during
+  // render rather than from an effect so the panel never paints the previous task's title for
+  // one frame first — the flash was visible every time a card was opened from another card.
+  // The three compared values are exactly what the effect's dependency list was.
+  const [synced, setSynced] = useState({
+    id: task?.id,
+    title: task?.title,
+    description: task?.description,
+  });
+  if (
+    synced.id !== task?.id ||
+    synced.title !== task?.title ||
+    synced.description !== task?.description
+  ) {
+    setSynced({ id: task?.id, title: task?.title, description: task?.description });
     setTitle(task?.title ?? '');
     setDescription(task?.description ?? '');
-  }, [task?.id, task?.title, task?.description]);
+  }
 
   // Closing only takes focus back if the user still has it in here. Tracked from `focusin`
   // rather than read on the way out: by the time the unmount cleanup runs, React has already
