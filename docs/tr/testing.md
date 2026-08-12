@@ -151,18 +151,41 @@ veritabanına** (`kurultay_test`) karşı çalışır. Geliştirme veritabanına
 
 ## Coverage
 
-**Coverage bir sinyaldir, bir kapı değil.** Minimum bir yüzde yoktur ve CI coverage
-üzerinden başarısız olmaz.
+**Coverage önce bir sinyaldir.** Repo genelinde bir hedef yoktur ve bir sayıyı kendisi için
+yükseltme arzusu da yoktur.
 
 - Raporu, hiçbir testin çalıştırmadığı kodu bulmak için kullanın, sonra o kodun bir test
   _hak edip etmediğine_ karar verin.
 - Bir positioning algoritmasında düşük coverage bir problemdir. Bir DTO'da veya bir barrel
   dosyasında düşük coverage değildir.
-- Assertion'sız testlerle bir eşiği kandırmak, eşiğin hiç olmamasından daha kötüdür — bir
-  eşiğin olmamasının tam sebebi de budur.
+- Assertion'sız testlerle bir eşiği kandırmak, eşiğin hiç olmamasından daha kötüdür. Bu
+  yüzden taban değerler yalnızca zaten anlamlı biçimde test edilmiş koda uygulanır; bir
+  ortalamayı yukarı çekmek için asla global olarak konmaz.
 
-Bu duruş, API'nin bir taban değerin anlamlı olacağı kadar kararlı olduğu 1.0'da yeniden
-gözden geçirilir.
+### Taban değerlerin bulunduğu yerler
+
+Zaten kapsanmış kodun geri kaymasını iki mandal engeller. İkisi de CI'ı kırar.
+
+| Kapsam              | Taban değer                                           | Nerede tanımlı              |
+| ------------------- | ----------------------------------------------------- | --------------------------- |
+| `apps/api` global   | statements 55 / branches 45 / functions 57 / lines 56 | `apps/api/jest.config.cjs`  |
+| `apps/web` `app/**` | statements 85 / branches 90 / functions 85 / lines 85 | `apps/web/vitest.config.ts` |
+
+İkisi de konuldukları anda alınan ölçümün birkaç puan altındadır — rutin bir refactor'ın
+takılmayacağı kadar pay bırakan, ama bir testin silinmesini yakalayacak kadar dar.
+
+`apps/web`'in **global bir taban değeri yoktur**, bilinçli olarak. Sayfa seviyesindeki
+bileşenlerin çoğu test edilmediği için genel web coverage'ı %41 civarındadır ve o sayıda bir
+global taban hiçbir gerçek gerilemeyi yakalamaz, sadece rakamı bir hedef gibi gösterirdi.
+`app/**` taban değere sahiptir çünkü route girişleri ince ve tekdüzedir: hiç testi olmadan
+gelen yeni bir sayfa, tam olarak bir build'i kırmaya değer gerilemedir.
+`apps/web/vitest.config.ts` tam gerekçeyi satır içinde taşır.
+
+Global duruş, API'nin repo genelinde bir taban değerin anlamlı olacağı kadar kararlı olduğu
+1.0'da yeniden gözden geçirilir.
+
+Her iki suite de HTML/JSON raporlarını her koşuda — geçse de kalsa da — CI artifact'ı olarak
+yayımlar (`api-coverage`, `web-coverage`).
 
 ## CI
 

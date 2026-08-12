@@ -263,6 +263,53 @@ pub/sub fan-out, and the notification queue — all rebuildable. Losing it logs 
 and drops queued notifications that had not been delivered yet; it loses no board data.
 Redis upgrades within a major, and 7 → 8, are in-place and RDB/AOF compatible.
 
+### Index migrations take a write lock
+
+**Every index in `apps/api/prisma/migrations/` is created with a plain `CREATE INDEX`, which
+takes a `SHARE` lock on the table for the whole build.** Reads continue; **writes to that
+table block until the index finishes.** On a fresh or small database this is milliseconds and
+invisible. On a large one it is a write outage lasting as long as the build.
+
+The two that matter most are the trigram GIN indexes in
+`20260809190000_task_trgm_search_indexes` — `Task_title_idx` and `Task_description_idx`. GIN
+builds over text are among the slowest index builds there are, and `Task` is the
+fastest-growing table in the schema.
+
+This is a deliberate trade-off, not an oversight. `CREATE INDEX CONCURRENTLY` cannot run
+inside a transaction block, and `prisma migrate deploy` wraps each migration in one — so
+using it would mean hand-writing migrations Prisma cannot apply, in exchange for a lock that
+is imperceptible on every database this project has actually been deployed to. Prisma's own
+guidance for the case is the manual path below.
+
+**Before upgrading an instance with a large `Task` table (roughly: past a few hundred
+thousand rows), or any instance that cannot take a write pause:**
+
+1. Read the new migrations in the release before applying them:
+   `git diff <current-tag>..<target-tag> -- apps/api/prisma/migrations`.
+2. If one creates an index on a large table, apply that statement yourself first, with
+   `CONCURRENTLY`, while the old version is still serving traffic:
+
+   ```bash
+   docker compose exec -T postgres psql -U kurultay kurultay -c \
+     'CREATE INDEX CONCURRENTLY IF NOT EXISTS "Task_title_idx" ON "Task" USING GIN ("title" gin_trgm_ops);'
+   ```
+
+   `CONCURRENTLY` does not block writes, but it cannot run inside a transaction and takes
+   roughly twice as long. If it fails it leaves an **invalid** index behind, which must be
+   dropped (`DROP INDEX CONCURRENTLY "Task_title_idx";`) before retrying — check with
+   `SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;`.
+
+3. Then run `pnpm db:migrate` as usual. The migration's own `CREATE INDEX` is a no-op against
+   an index that already exists under the same name, so the deploy takes no lock.
+
+Do not do this routinely — for a normal-sized instance, step 3 alone is correct and the whole
+procedure is wasted effort. It is a release-note-driven escape hatch for the one case where
+the default would hurt.
+
+`CREATE EXTENSION IF NOT EXISTS pg_trgm` in that same migration needs superuser or
+`pg_database_owner` rights. A managed Postgres that restricts extensions must have `pg_trgm`
+enabled by its provider before the migration runs.
+
 ## Day-to-day loop
 
 ```bash

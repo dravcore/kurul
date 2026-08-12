@@ -148,17 +148,41 @@ migrated by the test setup. They never touch the development database.
 
 ## Coverage
 
-**Coverage is a signal, not a gate.** There is no minimum percentage and CI does not fail on
-coverage.
+**Coverage is a signal first.** There is no repo-wide target and no ambition to raise a
+number for its own sake.
 
 - Use the report to find code that no test exercises, then decide whether that code
   _deserves_ a test.
 - Low coverage on a positioning algorithm is a problem. Low coverage on a DTO or a barrel
   file is not.
-- Gaming a threshold with assertion-free tests is worse than having no threshold, which is
-  precisely why there isn't one.
+- Gaming a threshold with assertion-free tests is worse than having no threshold. That is
+  why floors are scoped to code that is already meaningfully tested, never applied globally
+  to pull an average up.
 
-This stance is revisited at 1.0, when the API is stable enough for a floor to be meaningful.
+### Where floors do exist
+
+Two ratchets keep already-covered code from sliding back. Both fail CI.
+
+| Scope               | Floor                                                 | Set in                      |
+| ------------------- | ----------------------------------------------------- | --------------------------- |
+| `apps/api` global   | statements 55 / branches 45 / functions 57 / lines 56 | `apps/api/jest.config.cjs`  |
+| `apps/web` `app/**` | statements 85 / branches 90 / functions 85 / lines 85 | `apps/web/vitest.config.ts` |
+
+Both sit a few points under the measurement taken when they were introduced — enough margin
+that a routine refactor does not trip them, tight enough that deleting a test does.
+
+`apps/web` has **no global floor**, deliberately. Overall web coverage is around 41% because
+most page-level components are untested, and a global floor at that number would catch no
+real regression while making the figure look like a target. `app/**` is floored because
+route entrypoints are thin and uniform: a new page arriving with no test at all is exactly
+the regression worth failing a build over. `apps/web/vitest.config.ts` carries the full
+reasoning inline.
+
+The global stance is revisited at 1.0, when the API is stable enough for a repo-wide floor to
+be meaningful.
+
+Both suites publish their HTML/JSON reports as CI artifacts (`api-coverage`, `web-coverage`)
+on every run, passing or failing.
 
 ## CI
 

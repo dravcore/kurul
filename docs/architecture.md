@@ -14,7 +14,8 @@ The shape of the Kurultay system: how the code is stored, how it runs, and how t
 - [6. Data model](#6-data-model)
 - [7. Multi-tenant isolation](#7-multi-tenant-isolation)
 - [8. Runtime evolution](#8-runtime-evolution)
-- [9. Decision records](#9-decision-records)
+- [9. Accepted runtime trade-offs](#9-accepted-runtime-trade-offs)
+- [10. Decision records](#10-decision-records)
 
 ---
 
@@ -254,27 +255,94 @@ Reaching stage 2 requires no architectural change — clean NestJS module bounda
 
 ---
 
-## 9. Decision records
+## 9. Accepted runtime trade-offs
+
+Two behaviours below are deliberate compromises, not oversights. Each was argued in a code
+comment at the point it was accepted and nowhere else, which meant the only way to learn
+about them was to already be reading the file. They are small enough not to warrant an ADR
+each, and consequential enough that an operator debugging a shutdown or a stale session
+should not have to rediscover them from source.
+
+### 9.1 Shutdown ordering is owned by one module, not by Nest
+
+`PrismaService` and Better Auth's own `PrismaClient` both borrow from a single process-wide
+`pg` pool (`api/src/prisma/database.ts`). Two clients, one pool, and **Nest gives no ordering
+guarantee between `onModuleDestroy` hooks** — so whichever module happens to be torn down
+first would end the pool out from under the other, and the survivor's `$disconnect()` would
+throw `Called end on pool more than once` / `cannot use a pool after calling end` on every
+SIGTERM.
+
+The resolution is that no module disconnects its own client. `database.ts` is the sole owner
+of the pool's lifecycle: clients register a disconnect callback via `registerPoolConsumer`,
+and `closeSharedDatabase` drains every registered client before ending the pool. It is
+idempotent and concurrency-safe — the first caller owns the shutdown, later or parallel
+callers await the same promise — so it genuinely does not matter which hook Nest runs first.
+
+| Trade-off                                   | Accepted because                                                                                                                                                                                      |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One shared pool                             | Two pools would double the connection count against Postgres `max_connections` for no benefit — both clients talk to the same database with the same credentials                                      |
+| Lifecycle held in module state              | The alternative is a Nest provider that both modules inject, which is more wiring to express the same "one owner" rule; Better Auth's client is constructed at module scope, outside Nest's DI anyway |
+| A failed disconnect does not block shutdown | `closeSharedDatabase` uses `Promise.allSettled` — one client that cannot disconnect must not strand the pool open and hang the process past its termination grace period                              |
+
+What this means in practice: **a "pool already ended" error at shutdown is a bug in this
+contract, not a transient.** It means some code disconnected a client directly instead of
+registering it. Any future client that borrows the shared pool must call
+`registerPoolConsumer`.
+
+### 9.2 Session revocation lags by up to five minutes; role revocation does not
+
+Better Auth is configured with `session.cookieCache` at `maxAge: 5 * 60`
+(`api/src/auth/auth.ts`). The signed session cookie is trusted without a database round trip
+until it expires, which removes one query from every authenticated request.
+
+The cost is precise: **revoking a session takes effect up to 300 seconds late.** Deleting the
+session row does not invalidate a cookie already in a browser's possession; that cookie
+remains accepted until its cache window lapses.
+
+What is _not_ affected is more important than what is:
+
+| Change                                 | Takes effect                                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Session revoked / signed out elsewhere | Up to 5 minutes late — the cookie is trusted until its cache expires                            |
+| Role changed (e.g. ADMIN → GUEST)      | **Immediately** — `WorkspaceGuard` reads `WorkspaceMember` from the database on every request   |
+| Removed from a workspace               | **Immediately** — same guard, same read; the membership row is gone and the request 404s        |
+| Email verified                         | Immediately — `autoSignInAfterVerification` rewrites the cookie, which is why that option is on |
+
+So the window is a _session-identity_ window, not an _authorization_ window. A demoted or
+ejected member cannot act on their old role for five minutes; only a signed-out browser can
+keep reading for up to five minutes with a cookie it already held. That asymmetry is what
+makes the trade acceptable at this scale, and it exists because the guard was deliberately
+not allowed to trust anything cached.
+
+If a deployment ever needs immediate session revocation — a security incident, a
+compliance requirement — the lever is `session.cookieCache.enabled: false`, paid for with one
+database read per authenticated request.
+
+---
+
+## 10. Decision records
 
 The reasoning behind each of these choices is recorded as an ADR:
 
-| ADR                                                                                            | Topic                                                            |
-| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modular monolith                                      |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                   |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts          |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Better Auth with the organization plugin (→ Workspace)           |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                                        |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Float positions for ordering                                     |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                         |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                                |
-| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board and column Nest `@Roles` matrix                            |
-| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task Nest `@Roles` matrix                                        |
-| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata Nest `@Roles` matrix                     |
-| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Comment delete: authorship or OWNER/ADMIN                        |
-| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail delivery, email verification on invitation accept only |
-| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Dual licensing + contributor license agreement                   |
-| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)             | No external contributions; CLA unenacted, legal spend deferred   |
+| ADR                                                                                                        | Topic                                                            |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)                         | Monorepo + modular monolith                                      |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                                 | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                   |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                               | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts          |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                                           | Better Auth with the organization plugin (→ Workspace)           |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                                         | Socket.io + Redis adapter                                        |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                                     | Float positions for ordering                                     |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                                   | AGPL-3.0                                                         |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                             | Git Flow + SemVer                                                |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)                           | Board and column Nest `@Roles` matrix                            |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                                           | Task Nest `@Roles` matrix                                        |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md)             | Label and task-metadata Nest `@Roles` matrix                     |
+| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)                         | Comment delete: authorship or OWNER/ADMIN                        |
+| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)                 | SMTP mail delivery, email verification on invitation accept only |
+| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                                       | Dual licensing + contributor license agreement                   |
+| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)                         | No external contributions; CLA unenacted, legal spend deferred   |
+| [`0016-foreign-key-violation-status.md`](decisions/0016-foreign-key-violation-status.md)                   | Prisma `P2003` maps to `409`, not `422`                          |
+| [`0017-partial-indexes-outside-prisma-schema.md`](decisions/0017-partial-indexes-outside-prisma-schema.md) | Partial indexes live in migrations, guarded by tests             |
 
 Related: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (historical Phase 1 scaffold) · [docs/README.md](README.md) (docs map)

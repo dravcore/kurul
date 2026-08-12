@@ -216,6 +216,54 @@ describe('AllExceptionsFilter', () => {
       });
     });
 
+    // ADR 0016: a foreign-key violation is a 409, not the 422 an audit pass proposed. Both
+    // shapes P2003 takes in this schema are conflicts with database *state* rather than
+    // faults in the request body — see the ADR for the full argument. The two tests below
+    // pin one shape each so the mapping cannot drift back on a reviewer's say-so.
+    it('maps a blocked delete (P2003 on a Restrict relation) to 409', () => {
+      const { host, response } = createHost('/workspaces/w_1/members/u_1');
+      const error = Object.assign(
+        new Error('Foreign key constraint violated on the constraint: `Task_createdById_fkey`'),
+        {
+          code: 'P2003',
+          clientVersion: '7.0.0',
+          name: 'PrismaClientKnownRequestError',
+          meta: { field_name: 'Task_createdById_fkey (index)' },
+        },
+      );
+
+      filter.catch(error, host);
+
+      expect(response.status).toHaveBeenCalledWith(409);
+      expect(body(response)).toMatchObject({
+        statusCode: 409,
+        error: 'Conflict',
+        message: 'Related resource conflict',
+      });
+    });
+
+    it('does not leak the database constraint name into a P2003 response', () => {
+      // `Task_createdById_fkey` is schema naming; clients branch on `statusCode` and
+      // `error`, and 409 carries no `details` array to put a field name in anyway.
+      const { host, response } = createHost();
+      const error = Object.assign(
+        new Error('Foreign key constraint violated on the constraint: `Task_columnId_fkey`'),
+        {
+          code: 'P2003',
+          clientVersion: '7.0.0',
+          name: 'PrismaClientKnownRequestError',
+          meta: { field_name: 'Task_columnId_fkey (index)' },
+        },
+      );
+
+      filter.catch(error, host);
+
+      const problem = body(response);
+      expect(problem.message).toBe('Related resource conflict');
+      expect(problem.details).toBeUndefined();
+      expect(JSON.stringify(problem)).not.toContain('fkey');
+    });
+
     it('logs a thrown plain object before responding 500', () => {
       const { host, response } = createHost();
 
