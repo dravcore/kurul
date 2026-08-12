@@ -29,6 +29,8 @@ Kurultay, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğun
 | [0015](0015-no-external-contributions.md)             | Dış Katkı Kabul Edilmiyor; Hukuk Masrafı Ertelendi                   | Kabul edildi                                          | 2026-08-12 |
 | [0016](0016-foreign-key-violation-status.md)          | Yabancı Anahtar İhlalleri 422'ye Değil 409'a Eşlenir                 | Kabul edildi                                          | 2026-08-12 |
 | [0017](0017-partial-indexes-outside-prisma-schema.md) | Kısmi İndeksler Migration'larda Yaşar, Testlerle Korunur             | Kabul edildi                                          | 2026-08-12 |
+| [0018](0018-localization-strategy.md)                 | Yerelleştirme Stratejisi: URL Yönlendirmesi Olmadan next-intl        | Kabul edildi                                          | 2026-08-12 |
+| [0019](0019-column-category.md)                       | Kolon Tamamlanmışlığı Bir Kategoridir, Ad Değil                      | Kabul edildi                                          | 2026-08-12 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 

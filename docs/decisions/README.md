@@ -35,6 +35,8 @@ debate. These are intentionally short and factual, not design documents.
 | [0015](0015-no-external-contributions.md)             | No External Contributions; Legal Spend Deferred                      | Accepted                                         | 2026-08-12 |
 | [0016](0016-foreign-key-violation-status.md)          | Foreign-Key Violations Map to 409, Not 422                           | Accepted                                         | 2026-08-12 |
 | [0017](0017-partial-indexes-outside-prisma-schema.md) | Partial Indexes Live in Migrations, Guarded by Tests                 | Accepted                                         | 2026-08-12 |
+| [0018](0018-localization-strategy.md)                 | Localization Strategy: next-intl Without URL Routing                 | Accepted                                         | 2026-08-12 |
+| [0019](0019-column-category.md)                       | Column Completion Is a Category, Not a Name                          | Accepted                                         | 2026-08-12 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).
