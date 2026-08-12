@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +42,27 @@ export interface ConfirmDialogProps {
 export function ConfirmDialog({
   open,
   onOpenChange,
+  ...body
+}: ConfirmDialogProps): React.ReactElement {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {/*
+          The pending/error pair lives one level down, inside the content Radix unmounts when
+          the dialog closes, so reopening after a failure mounts a fresh pair rather than
+          clearing the old one from an effect. Same guarantee, one fewer render, and no
+          window in which the reopened dialog is painted still showing the stale reason.
+        */}
+        <ConfirmDialogBody onOpenChange={onOpenChange} {...body} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type ConfirmDialogBodyProps = Omit<ConfirmDialogProps, 'open'>;
+
+function ConfirmDialogBody({
+  onOpenChange,
   title,
   description,
   cancelLabel,
@@ -50,14 +71,9 @@ export function ConfirmDialog({
   confirmDisabled = false,
   onConfirm,
   resolveError,
-}: ConfirmDialogProps): React.ReactElement {
+}: ConfirmDialogBodyProps): React.ReactElement {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // A dialog reopened after a failure must not still be showing the previous reason.
-  useEffect(() => {
-    if (open) setError(null);
-  }, [open]);
 
   async function confirm(): Promise<void> {
     setPending(true);
@@ -73,27 +89,25 @@ export function ConfirmDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          {description ? <DialogDescription>{description}</DialogDescription> : null}
-        </DialogHeader>
-        {error ? <p className="text-body text-destructive">{error}</p> : null}
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            {cancelLabel}
-          </Button>
-          <Button
-            type="button"
-            variant={destructive ? 'destructive' : 'default'}
-            disabled={pending || confirmDisabled}
-            onClick={() => void confirm()}
-          >
-            {confirmLabel}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <DialogHeader>
+        <DialogTitle>{title}</DialogTitle>
+        {description ? <DialogDescription>{description}</DialogDescription> : null}
+      </DialogHeader>
+      {error ? <p className="text-body text-destructive">{error}</p> : null}
+      <DialogFooter>
+        <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+          {cancelLabel}
+        </Button>
+        <Button
+          type="button"
+          variant={destructive ? 'destructive' : 'default'}
+          disabled={pending || confirmDisabled}
+          onClick={() => void confirm()}
+        >
+          {confirmLabel}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }

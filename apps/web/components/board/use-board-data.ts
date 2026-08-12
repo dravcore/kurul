@@ -161,12 +161,36 @@ export function useBoardData(
    * pages into one resolved value would put the skeleton back up until the last page landed,
    * which is the regression this streaming shape exists to avoid.
    */
+  /**
+   * Put the load status back the moment the request changes, during render rather than at the
+   * top of the effect below.
+   *
+   * The effect used to open with `setLoading(true)` / `setError(null)`, which cost a second
+   * render every time the board or the filters changed and left one frame in between showing
+   * the *previous* request's error over a board that was already being replaced.
+   *
+   * The skeleton comes back only for a board that is not on screen: a new board, or a retry
+   * after the last attempt at this one failed — which is what `error !== null` says, and is
+   * the same condition as the `loadedBoardIdRef` miss the effect used to test. A filter change
+   * on a board that did paint keeps it painted while the tasks re-drain behind it.
+   */
+  const [syncedRequest, setSyncedRequest] = useState({ activeId, boardId, filters });
+  if (
+    activeId &&
+    (syncedRequest.activeId !== activeId ||
+      syncedRequest.boardId !== boardId ||
+      syncedRequest.filters !== filters)
+  ) {
+    const isNewBoard = syncedRequest.activeId !== activeId || syncedRequest.boardId !== boardId;
+    setSyncedRequest({ activeId, boardId, filters });
+    if (isNewBoard || error !== null) setLoading(true);
+    setError(null);
+  }
+
   useEffect(() => {
     if (!activeId) return;
     const controller = new AbortController();
     const isInitial = loadedBoardIdRef.current !== boardId;
-    if (isInitial) setLoading(true);
-    setError(null);
     void (async () => {
       const reveal = (): void => {
         if (!controller.signal.aborted) setLoading(false);
@@ -207,12 +231,19 @@ export function useBoardData(
    * `null` once it is on the board, which is also what keeps the panel from re-requesting a
    * row it can already read out of `tasks`.
    */
+  // Read from `tasks` rather than `tasksRef`: a ref is invisible to rendering, so the memo
+  // below could not see the row arriving and went on handing back a fetcher for a task that
+  // was already on the board. Reduced to a boolean first so the memo's identity — which is
+  // what decides whether `useApiResource` refetches — does not change with every task page
+  // that drains in.
+  const hasSelectedTask =
+    selectedTaskId !== null && tasks.some((task) => task.id === selectedTaskId);
+
   const fetchSelectedTask = useMemo(() => {
-    if (!activeId || !selectedTaskId || loading) return null;
-    if (tasksRef.current.some((task) => task.id === selectedTaskId)) return null;
+    if (!activeId || !selectedTaskId || loading || hasSelectedTask) return null;
     return (signal: AbortSignal): Promise<TaskDto> =>
       api.get<TaskDto>(`/workspaces/${activeId}/tasks/${selectedTaskId}`, { signal });
-  }, [activeId, selectedTaskId, loading, tasksRef]);
+  }, [activeId, selectedTaskId, loading, hasSelectedTask]);
 
   /**
    * Whether the last failure was the server saying the row is not there.
@@ -224,34 +255,37 @@ export function useBoardData(
    */
   const [selectedTaskGone, setSelectedTaskGone] = useState(false);
 
-  const {
-    data: fetchedTask,
-    error: fetchedTaskError,
-    reload: retryPanelTask,
-  } = useApiResource<TaskDto | null>(fetchSelectedTask, null, tErrors('taskLoad'), {
-    onError: (caught) => setSelectedTaskGone(apiStatus(caught) === 404),
-  });
-
-  useEffect(() => {
-    if (!fetchedTask) return;
-    setTasks((current) =>
-      current.some((item) => item.id === fetchedTask.id) ? current : [...current, fetchedTask],
-    );
-  }, [fetchedTask]);
+  // The fetched row is not read back off the resource — `onSuccess` folds it straight into
+  // `tasks`, which is the one list the board and the panel both render from.
+  const { error: fetchedTaskError, reload: retryPanelTask } = useApiResource<TaskDto | null>(
+    fetchSelectedTask,
+    null,
+    tErrors('taskLoad'),
+    {
+      onError: (caught) => setSelectedTaskGone(apiStatus(caught) === 404),
+      // Folded in as the row arrives rather than from an effect watching the resolved value.
+      // The effect version needed a second render to do the merge, and `panelLoading` is keyed
+      // on the row being *in* `tasks` — so the frame in between was one where the fetch had
+      // succeeded and the panel still said the task was on its way.
+      onSuccess: (task) => {
+        if (!task) return;
+        setTasks((current) =>
+          current.some((item) => item.id === task.id) ? current : [...current, task],
+        );
+      },
+    },
+  );
 
   // No request in flight means no failure to report — a task that is already on the board
   // must not inherit the error left over from the last one that was not.
   const panelError = fetchSelectedTask && !selectedTaskGone ? fetchedTaskError : null;
 
   /**
-   * Still on its way. Deliberately keyed on the row reaching `tasks` rather than on the
-   * hook's own `loading`: the fetch resolving and the row being merged are two commits, and
-   * the panel would otherwise spend the one in between saying the task no longer exists.
+   * Still on its way. Keyed on the row reaching `tasks` rather than on the hook's own
+   * `loading`, so that "arrived" means the same thing here as it does to the panel rendering
+   * from `tasks` — one source, not two flags that can disagree for a frame.
    */
-  const panelLoading =
-    fetchSelectedTask !== null &&
-    fetchedTaskError === null &&
-    !tasks.some((task) => task.id === selectedTaskId);
+  const panelLoading = fetchSelectedTask !== null && fetchedTaskError === null && !hasSelectedTask;
 
   return {
     board,
