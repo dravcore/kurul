@@ -124,6 +124,23 @@ commit; this is the point it becomes a version.
 
 ### Changed
 
+- The interface speaks one vocabulary. A task is a task, never a card; an invitation is an
+  invitation, never an invite; the copy and the message keys both say "confirm" for email
+  confirmation rather than the keys saying "verify" while the copy said "confirm"; role names
+  are lowercase in prose. Two pairs of identical strings living under different keys were
+  collapsed — harmless while English is the only language, guaranteed to drift once it is not.
+- Success messages are the exception rather than the default. `docs/design.md` §7 now states
+  the rule — a message exists only where the screen cannot already answer "did that work?" —
+  and only three flows meet it: column settings, where `category` has no on-screen
+  representation; accepting an invitation, which lands on a dashboard that never mentions it;
+  and deleting a board label, which strips it from every task while the screen shows one chip.
+  Creating, deleting, moving, renaming and commenting confirm themselves.
+- Every error ends with a way out, and §7 records how that is decided: if the identical request
+  could succeed on a second attempt the surface carries a control, otherwise the sentence
+  carries the next move. An explained failure never gets a retry button, because one that
+  re-fails on every press teaches the user the product is broken — and a control still on
+  screen and still live already is the retry.
+
 - Kurultay no longer accepts external code, documentation, or translation contributions
   ([ADR 0015](docs/decisions/0015-no-external-contributions.md)): the codebase stays
   single-authored, the CLA draft is kept but not enacted, and legal review is deferred to the
@@ -181,6 +198,11 @@ commit; this is the point it becomes a version.
   files; unused `--ease-in-out` / `--ease-drawer` CSS tokens.
 
 ### Fixed
+
+- Failure messages name the thing that actually failed. **Add column** and **Add task** failed
+  with "Could not *create* this column/task", breaking the verb halfway through the flow;
+  posting or deleting a comment fell through to "Could not save this task."; deleting a board
+  label reported itself as an update.
 
 - Failed loads no longer report as empty successes. A failed notification load said "You're
   caught up" while unread items existed, a cold deep link to a task flashed "This task no
