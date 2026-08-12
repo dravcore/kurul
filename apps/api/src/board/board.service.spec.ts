@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import { ColumnCategory } from '@kurultay/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import { BoardService } from './board.service';
 
@@ -54,11 +55,14 @@ describe('BoardService', () => {
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          // Each seed column carries its category explicitly. Spelled out rather than
+          // asserted against DEFAULT_COLUMNS: a test that reuses the constant it is checking
+          // would pass just as happily if the Done column stopped being COMPLETED.
           columns: {
             create: [
-              { name: 'To Do', position: 1000 },
-              { name: 'In Progress', position: 2000 },
-              { name: 'Done', position: 3000 },
+              { name: 'To Do', position: 1000, category: ColumnCategory.UNSTARTED },
+              { name: 'In Progress', position: 2000, category: ColumnCategory.STARTED },
+              { name: 'Done', position: 3000, category: ColumnCategory.COMPLETED },
             ],
           },
         }),

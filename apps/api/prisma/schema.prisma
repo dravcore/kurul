@@ -21,6 +21,18 @@ enum MemberRole {
   GUEST
 }
 
+/// The semantic state a column represents, mirroring the vocabulary Jira, Linear and Azure
+/// DevOps all converged on independently. Only COMPLETED is read today; the rest is
+/// vocabulary the metrics layer grows into. CANCELED exists from day one because a canceled
+/// task is not a completed one and a boolean could never say so.
+enum ColumnCategory {
+  BACKLOG
+  UNSTARTED
+  STARTED
+  COMPLETED
+  CANCELED
+}
+
 model User {
   id            String   @id @default(uuid(7))
   email         String   @unique
@@ -148,17 +160,25 @@ model Board {
 }
 
 model Column {
-  id       String  @id @default(uuid(7))
+  id       String         @id @default(uuid(7))
   boardId  String
   name     String
   position Float
   color    String?
+  /// What the column *means* to the metrics layer, independent of what it is called.
+  /// Renaming "Done" to "Shipped" — or seeding a board in Turkish — must not change which
+  /// columns count as finished work, so completion is read from here and never from `name`.
+  /// See docs/decisions/0019-column-category.md.
+  category ColumnCategory @default(UNSTARTED)
 
   board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
   tasks Task[]
 
   @@unique([boardId, id])
   @@index([boardId])
+  /// Completion metrics resolve "which columns of this board are done" on every dashboard
+  /// read; boardId alone would still have to filter the category in the heap.
+  @@index([boardId, category])
 }
 
 model Task {

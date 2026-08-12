@@ -3,7 +3,7 @@
 import { memo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { ArrowLeft, ArrowRight, MoreHorizontal, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, MoreHorizontal, Plus, Settings2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { ColumnDto, TaskDto } from '@kurultay/shared-types';
 import { cn } from '@/lib/utils';
@@ -33,7 +33,7 @@ interface BoardColumnProps {
   canMutateTasks: boolean;
   canMoveLeft: boolean;
   canMoveRight: boolean;
-  onRename: () => void;
+  onOpenSettings: () => void;
   onDelete: () => void;
   onMoveLeft: () => void;
   onMoveRight: () => void;
@@ -51,7 +51,7 @@ export const BoardColumn = memo(function BoardColumn({
   canMutateTasks,
   canMoveLeft,
   canMoveRight,
-  onRename,
+  onOpenSettings,
   onDelete,
   onMoveLeft,
   onMoveRight,
@@ -90,7 +90,10 @@ export const BoardColumn = memo(function BoardColumn({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onRename}>{t('renameAction')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenSettings}>
+                <Settings2 />
+                {t('settingsTitle')}
+              </DropdownMenuItem>
               <DropdownMenuItem disabled={!canMoveLeft} onClick={onMoveLeft}>
                 <ArrowLeft />
                 {t('moveLeft')}
