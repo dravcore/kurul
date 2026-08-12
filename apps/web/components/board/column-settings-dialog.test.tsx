@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
+import { toast } from 'sonner';
 import { ColumnCategory, type ColumnDto } from '@kurultay/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
@@ -14,7 +15,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
   return { ...actual, api: { patch: vi.fn() } };
 });
 
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
 const apiPatch = vi.mocked(api.patch);
+const toastSuccess = vi.mocked(toast.success);
 
 const column: ColumnDto = {
   id: COLUMN_ID,
@@ -99,6 +103,19 @@ describe('ColumnSettingsDialog', () => {
       category: 'COMPLETED',
     });
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ category: 'COMPLETED' }));
+  });
+
+  it('confirms the save, because a category change leaves no mark on the board', async () => {
+    // The board renders a column's name, never its category. Without this the dialog closes
+    // over a board that looks exactly as it did, and the user has no way to tell the save
+    // landed — the one write here that the screen cannot report on its own.
+    renderDialog();
+
+    fireEvent.change(categorySelect(), { target: { value: 'COMPLETED' } });
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    expect(toastSuccess).toHaveBeenCalledWith(messages.app.board.column.settingsSaved);
   });
 
   it('renames without changing the category', async () => {

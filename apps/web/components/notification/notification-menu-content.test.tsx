@@ -63,9 +63,9 @@ describe('NotificationMenuContent', () => {
    * "you're caught up", which is the one thing it must never say wrongly.
    */
   it('reports a failed load instead of claiming there is nothing', () => {
-    renderMenu({ error: 'Could not load notifications.' });
+    renderMenu({ error: messages.app.notifications.loadError });
 
-    expect(screen.getByText('Could not load notifications.')).toBeDefined();
+    expect(screen.getByText(messages.app.notifications.loadError)).toBeDefined();
     expect(screen.queryByText(messages.app.notifications.empty)).toBeNull();
   });
 

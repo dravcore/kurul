@@ -76,7 +76,7 @@ describe('RegisterPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
-    expect(await screen.findByText('Could not create your account.')).toBeTruthy();
+    expect(await screen.findByText(messages.auth.register.error)).toBeTruthy();
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 });

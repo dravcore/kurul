@@ -35,6 +35,7 @@ const CompletionChart = dynamic(
 
 export function DashboardSummary(): React.ReactElement {
   const t = useTranslations('app.dashboard');
+  const tErrors = useTranslations('app.errors');
   const { activeId } = useWorkspaceContext();
   const router = useRouter();
   const pathname = usePathname();
@@ -63,6 +64,7 @@ export function DashboardSummary(): React.ReactElement {
     data: summary,
     loading,
     error,
+    reload,
   } = useApiResource<DashboardSummaryDto | null>(fetchSummary, null, t('loadError'));
 
   function onBoardChange(nextBoardId: string): void {
@@ -85,12 +87,18 @@ export function DashboardSummary(): React.ReactElement {
     );
   }
 
-  if (error) {
-    return <p className="text-body text-destructive">{error}</p>;
-  }
-
-  if (!summary) {
-    return <p className="text-body text-muted-foreground">{t('loadError')}</p>;
+  // A summary that did not arrive is the retryable case: nothing about it is explained, so the
+  // recovery is a control rather than a sentence (docs/design.md §7). `!summary` lands here too
+  // — a successful response with no body is still a view with nothing in it to read.
+  if (error || !summary) {
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <p className="text-body text-destructive">{error ?? t('loadError')}</p>
+        <Button type="button" onClick={reload}>
+          {tErrors('retry')}
+        </Button>
+      </div>
+    );
   }
 
   if (summary.totalTasks === 0) {

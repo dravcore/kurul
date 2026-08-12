@@ -32,7 +32,7 @@ export function VerificationResend({
   email,
   callbackPath,
 }: Readonly<VerificationResendProps>): React.ReactElement {
-  const t = useTranslations('auth.verification');
+  const t = useTranslations('auth.emailConfirmation');
   const [typedEmail, setTypedEmail] = useState('');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import type { WorkspaceMemberDto } from '@kurultay/shared-types';
 import { VerificationResend } from '@/components/auth/verification-resend';
 import { Button } from '@/components/ui/button';
@@ -33,7 +34,7 @@ export function InviteAcceptView({
   invitationId,
 }: Readonly<{ invitationId: string }>): React.ReactElement {
   const t = useTranslations('auth.invite');
-  const tv = useTranslations('auth.verification');
+  const tv = useTranslations('auth.emailConfirmation');
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, isPending: sessionPending } = authClient.useSession();
@@ -94,6 +95,10 @@ export function InviteAcceptView({
 
       await authClient.organization.setActive({ organizationId: workspaceId });
 
+      // The dashboard this lands on says nothing about having joined — an invitee who already
+      // had workspaces sees only the switcher label change. The Toaster is mounted in the root
+      // layout, so this survives the navigation and arrives on the destination.
+      toast.success(t('accepted'));
       router.replace('/dashboard');
       router.refresh();
     } catch (caught) {
@@ -140,10 +145,10 @@ export function InviteAcceptView({
             tabIndex={-1}
             className="font-display text-display tracking-tight"
           >
-            {t('verifyTitle')}
+            {t('confirmTitle')}
           </h1>
           <p className="text-body text-muted-foreground">
-            {t('verifyBody', { email: session.user.email })}
+            {t('confirmBody', { email: session.user.email })}
           </p>
           {linkError ? (
             <p className="text-body text-destructive">{tv(`linkErrors.${linkError}`)}</p>

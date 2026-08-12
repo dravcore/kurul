@@ -22,14 +22,30 @@ export function BoardLoadingState(): React.ReactElement {
   );
 }
 
-export function BoardErrorState({ message }: { message: string | null }): React.ReactElement {
+export function BoardErrorState({
+  message,
+  onRetry,
+}: {
+  message: string | null;
+  onRetry?: () => void;
+}): React.ReactElement {
   const t = useTranslations('app.board');
+  const tErrors = useTranslations('app.errors');
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
       <h1 className="text-title text-destructive">{message ?? t('loadError')}</h1>
-      <Button asChild variant="outline">
-        <Link href="/dashboard">{t('backToBoards')}</Link>
-      </Button>
+      {/* §6 spells this one out: "The board couldn't load. → Try again". Nothing here is
+          explained, so the way out has to be a control, not a link away from the problem. */}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {onRetry ? (
+          <Button type="button" onClick={onRetry}>
+            {tErrors('retry')}
+          </Button>
+        ) : null}
+        <Button asChild variant="outline">
+          <Link href="/dashboard">{t('backToBoards')}</Link>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -69,7 +85,7 @@ export function BoardColumnsEmptyState({
           </Button>
         </div>
       ) : (
-        <p className="text-body text-destructive">{t('errors.forbiddenColumns')}</p>
+        <p className="text-body text-destructive">{t('column.forbidden')}</p>
       )}
     </div>
   );

@@ -22,24 +22,25 @@
       "submit": "Create account",
       "hasAccount": "Already have an account?",
       "loginLink": "Sign in",
-      "error": "Could not create your account."
+      "error": "Could not create your account. Check your details and try again."
     },
     "invite": {
       "title": "Accept invitation",
       "subtitle": "You've been invited to join {workspace}.",
-      "submit": "Accept invite",
+      "submit": "Accept invitation",
       "submitPending": "Accepting…",
+      "accepted": "Invitation accepted",
       "signInFirst": "Sign in with the invited email to accept.",
       "signInCta": "Sign in",
       "loading": "Loading invitation…",
       "error": "Could not accept this invitation.",
-      "forbidden": "This invitation was sent to a different address.",
+      "forbidden": "This invitation was sent to a different address. Sign in as the invited address to accept it.",
       "loadError": "This invitation is no longer available. Ask for a new one.",
       "backToApp": "Back to your workspaces",
-      "verifyTitle": "Confirm your email first",
-      "verifyBody": "Invitations can only be accepted from a confirmed address. Send a link to {email} and open it — you'll come straight back here."
+      "confirmTitle": "Confirm your email first",
+      "confirmBody": "Invitations can only be accepted from a confirmed address. Send a link to {email} and open it — you'll come straight back here."
     },
-    "verifyEmail": {
+    "confirmEmail": {
       "loading": "Checking your link…",
       "successTitle": "Email confirmed",
       "successBody": "Your address is confirmed. You can accept workspace invitations from it now.",
@@ -52,7 +53,7 @@
       "registerLink": "Create one",
       "back": "Back to your workspace"
     },
-    "verification": {
+    "emailConfirmation": {
       "emailLabel": "Email",
       "resendAction": "Send a new link",
       "sending": "Sending…",
@@ -62,9 +63,9 @@
       "sendError": "Could not send the link. Try again in a moment.",
       "linkErrors": {
         "TOKEN_EXPIRED": "This link has expired. Confirmation links are short-lived, so send yourself a new one.",
-        "INVALID_TOKEN": "This link isn't valid. It may have been used already, or copied without its last characters.",
+        "INVALID_TOKEN": "This link isn't valid. It may have been used already, or copied without its last characters — send yourself a new one.",
         "USER_NOT_FOUND": "There's no account for the address in this link.",
-        "unknown": "This link couldn't be checked."
+        "unknown": "This link couldn't be checked. Send yourself a new one."
       }
     }
   },
@@ -88,11 +89,11 @@
       "title": "Kurultay",
       "createWorkspace": "New workspace",
       "switchWorkspace": "Switch workspace",
-      "verifyEmail": "Confirm your email",
+      "confirmEmail": "Confirm your email",
       "signOut": "Sign out",
       "loading": "Loading…",
-      "loadError": "Could not load workspaces.",
-      "retry": "Retry",
+      "loadError": "Your workspaces couldn't load.",
+      "retry": "Try again",
       "themeLight": "Switch to light theme",
       "themeDark": "Switch to dark theme",
       "collapseSidebar": "Collapse sidebar",
@@ -111,7 +112,7 @@
           "en": "English"
         },
         "saved": "Language updated",
-        "loadError": "Could not load your language setting.",
+        "loadError": "Your language setting couldn't load.",
         "saveError": "Could not save your language.",
         "saveErrorSignedOut": "Your session ended. Sign in to save this."
       }
@@ -146,16 +147,16 @@
       "tableDate": "Date",
       "unassigned": "Unassigned",
       "other": "Other",
-      "loadError": "Could not load dashboard charts.",
+      "loadError": "The charts couldn't load.",
       "emptyTitle": "Nothing to chart yet",
       "emptyBody": "Charts fill in as tasks are created and moved.",
       "openBoard": "Open a board"
     },
     "board": {
       "listSubtitle": "Open a board to divide the work.",
-      "listError": "Could not load boards.",
+      "listError": "Your boards couldn't load.",
       "loadError": "The board couldn't load.",
-      "loadingMore": "Loading the rest of the cards…",
+      "loadingMore": "Loading the rest of the tasks…",
       "backToBoards": "Back to boards",
       "emptyTitle": "No boards yet",
       "emptyBody": "A board is where the work gets divided. Start with one.",
@@ -175,21 +176,20 @@
       "boardMenu": "Board actions",
       "realtime": {
         "reconnecting": "Reconnecting…",
-        "dragCancelled": "Someone else moved this card"
+        "dragCancelled": "Someone else moved this task"
       },
       "errors": {
-        "forbiddenDelete": "You need Admin access to delete boards. Ask a workspace owner.",
-        "forbiddenColumns": "You need Admin access to change columns. Ask a workspace owner.",
-        "forbiddenTasks": "You need to be a workspace member to change tasks."
+        "forbiddenDelete": "You need admin access to delete boards. Ask a workspace owner."
       },
       "column": {
         "name": "Name",
         "menu": "Column actions",
         "createTitle": "Add column",
         "createAction": "Add column",
-        "createError": "Could not create this column.",
+        "createError": "Could not add this column.",
         "settingsTitle": "Column settings",
         "settingsAction": "Save changes",
+        "settingsSaved": "Column saved",
         "settingsError": "Could not save this column.",
         "category": "Category",
         "categoryHint": "Reports use the category, not the name, so a column called Shipped still counts as completed.",
@@ -217,7 +217,7 @@
         "retryAction": "Try again",
         "emptyDrop": "Drop a task here",
         "cancel": "Cancel",
-        "forbidden": "You need Admin access to change columns. Ask a workspace owner."
+        "forbidden": "You need admin access to change columns. Ask a workspace owner."
       },
       "filter": {
         "searchLabel": "Search tasks",
@@ -270,8 +270,10 @@
         },
         "createLabel": "Create label",
         "deleteLabel": "Delete",
-        "labelForbidden": "You need Admin access to manage board labels.",
+        "labelDeleted": "Label deleted from this board",
+        "labelForbidden": "You need admin access to manage board labels. Ask a workspace owner.",
         "labelSaveError": "Could not update labels.",
+        "labelDeleteError": "Could not delete this label.",
         "comments": "Comments",
         "noComments": "No comments yet",
         "loadMoreComments": "Load more comments",
@@ -279,7 +281,9 @@
         "commentsLoadMoreError": "Could not load more comments.",
         "addComment": "Add a comment",
         "postComment": "Post comment",
+        "commentError": "Could not post this comment.",
         "deleteComment": "Delete",
+        "commentDeleteError": "Could not delete this comment.",
         "mentions": {
           "pickerLabel": "Mention a member",
           "empty": "No members match",
@@ -299,7 +303,7 @@
         "activity": {
           "title": "History",
           "empty": "No activity yet",
-          "loadError": "Could not load activity.",
+          "loadError": "The history couldn't load.",
           "types": {
             "taskCreated": "Created “{title}”",
             "taskUpdated": "Updated “{title}”",
@@ -312,14 +316,14 @@
             "unknown": "{type}"
           }
         },
-        "metaLoadError": "Could not load task details.",
+        "metaLoadError": "This task's details couldn't load.",
         "openTask": "Open task",
         "panelLabel": "Task details",
         "close": "Close task panel",
         "backToBoard": "Back to board",
         "createTitle": "Add task",
         "createAction": "Add task",
-        "createError": "Could not create this task.",
+        "createError": "Could not add this task.",
         "deleteTitle": "Delete this task?",
         "deleteBody": "Delete “{title}”? This cannot be undone.",
         "deleteAction": "Delete task",
@@ -329,7 +333,7 @@
         "moveError": "Could not move this task.",
         "retryAction": "Try again",
         "cancel": "Cancel",
-        "forbidden": "You need to be a workspace member to change tasks."
+        "forbidden": "You need to be a workspace member to change tasks. Ask a workspace owner for access."
       }
     },
     "notifications": {
@@ -340,7 +344,7 @@
       "empty": "You're caught up",
       "loading": "Loading…",
       "loadMore": "Load more",
-      "loadError": "Could not load notifications.",
+      "loadError": "Notifications couldn't load.",
       "markAllRead": "Mark all read",
       "markReadError": "Could not update notification.",
       "openTaskError": "Could not open this task.",

@@ -272,7 +272,7 @@ word "Oops".
 | ------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `400` / `422` with `details[]` | Inline under each field; focus moves to the first | From `details[].constraint`, mapped to a catalog string: "Title can't be empty"           |
 | `401`                          | Redirect to sign-in, keeping the return URL       | Your session ended. Sign in to pick up where you left off.                                |
-| `403`                          | Inline on the blocked control                     | You need Admin access to change columns. Ask a workspace owner.                           |
+| `403`                          | Inline on the blocked control                     | You need admin access to change columns. Ask a workspace owner.                           |
 | `404` in panel                 | Replaces the panel body                           | This task no longer exists. Someone may have deleted it. → **Back to board**              |
 | `409`                          | Dialog over the stale editor                      | Someone changed this task while you were editing. → **Reload** · **Copy my changes**      |
 | `429` · `5xx`                  | Toast · error block where the content should be   | Too many requests. Try again in a few seconds. · The board couldn't load. → **Try again** |
@@ -294,13 +294,40 @@ From the user's side of the screen, active voice, sentence case.
 | Position updated           | Moved to In Progress       | What they did, not what the row did |
 
 - **One verb through a flow:** button **Create board** → dialog **Create board** → toast **Board
-  created**. Buttons name their action, never Yes/No/OK; destructive ones name the object.
+  created**. Buttons name their action, never Yes/No/OK; destructive ones name the object. The
+  verb holds all the way to the failure: an **Add column** button does not fail with "Could not
+  _create_ this column."
+- **The third beat only exists where the screen cannot show the result.** A card lands under the
+  cursor, a renamed column shows its new name, a deleted board leaves the grid — those confirm
+  themselves, and a toast on top is noise. Confirm when the effect is off-screen (an inbox, a
+  stored preference), when the thing that changed has no on-screen representation (a column's
+  `category`), or when the change reaches further than the view admits (deleting a board label
+  strips it from every task). Silence is the default; a message is the exception that has to
+  earn itself.
 - **One job per element.** A label labels, helper text explains, a placeholder shows an example
   — a placeholder is never a label.
 - **Never expose internals** (`workspaceId`, `position`, "fractional index", "optimistic
   update"). Ids appear only behind a copy-id affordance, in mono.
 - **Dates and durations:** relative near now ("in 2 days"), absolute beyond a week, exact value
   always in `title`. `estimatedMinutes` renders "2h 30m", never "150".
+
+**Every error ends with a way out.** Naming the object that failed is only half the message; the
+other half is the next move. Which half carries it is decided by one question — **could the
+identical request succeed on a second attempt?**
+
+|                   | **No** — the server explained itself                                                                        | **Yes** — the server did not                                                          |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Recovery lives in | **The sentence**                                                                                            | **The surface**                                                                       |
+| The user gets     | The reason, then the one move that changes it: ask an admin, reload, use the other address, send a new link | The object that failed, then a control: `action` on a toast, **Try again** on a block |
+| Typical causes    | `400` · `401` · `403` · `404` · `409`, a rejected credential, an expired link                               | network · timeout · `429` · `5xx`                                                     |
+| Example           | You need admin access to change columns. Ask a workspace owner.                                             | The board couldn't load. → **Try again**                                              |
+
+Two things keep the right-hand column honest. A control that re-fails on every press teaches the
+user the product is broken, so an **explained** failure never gets one — re-sending a write the
+server rejected on a `403`, or against a task that is gone, only repeats the toast. And when the
+control that failed is **still on screen and still live** — a dialog's submit button, "Load more",
+a select — that already _is_ the retry; a second one beside it is clutter, which is why the
+create/rename/delete dialogs carry no action of their own.
 
 Every user-visible string goes through **next-intl** from the first component, even though MVP
 ships English-only. This is the _layer_, not the translations: the roadmap's Beyond-MVP "i18n in

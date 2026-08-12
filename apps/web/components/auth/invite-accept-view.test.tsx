@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { NextIntlClientProvider } from 'next-intl';
 import messages from '@/messages/en.json';
 
+const ACCEPT_LABEL = messages.auth.invite.submit;
+
 const INVITATION_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51';
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60';
 
@@ -37,6 +39,8 @@ const mocks = vi.hoisted(() => ({
   post: vi.fn<(path: string) => Promise<unknown>>(),
 }));
 
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
 vi.mock('next/navigation', () => ({
   useSearchParams: () => mocks.searchParams,
   useRouter: () => ({ replace: mocks.replace, refresh: mocks.refresh }),
@@ -57,6 +61,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   return { ...actual, api: { ...actual.api, post: mocks.post } };
 });
 
+import { toast } from 'sonner';
 import { ApiError } from '@/lib/api';
 import { InviteAcceptView } from './invite-accept-view';
 
@@ -120,7 +125,7 @@ describe('InviteAcceptView', () => {
 
     expect(await screen.findByText("You've been invited to join Steppe Collective.")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Accept invite' }));
+    fireEvent.click(screen.getByRole('button', { name: ACCEPT_LABEL }));
 
     await waitFor(() =>
       expect(mocks.post).toHaveBeenCalledWith(
@@ -206,7 +211,7 @@ describe('InviteAcceptView', () => {
     );
     renderView();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Accept invite' }));
+    fireEvent.click(await screen.findByRole('button', { name: ACCEPT_LABEL }));
 
     const heading = await screen.findByRole('heading', { name: 'Confirm your email first' });
     // The button that was pressed is gone; focus has to land somewhere deliberate.
@@ -221,14 +226,25 @@ describe('InviteAcceptView', () => {
     );
     renderView();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Accept invite' }));
+    fireEvent.click(await screen.findByRole('button', { name: ACCEPT_LABEL }));
 
     await waitFor(() =>
-      expect(screen.getByRole('status').textContent).toBe(
-        'This invitation was sent to a different address.',
-      ),
+      expect(screen.getByRole('status').textContent).toBe(messages.auth.invite.forbidden),
     );
     expect(screen.queryByRole('heading', { name: 'Confirm your email first' })).toBeNull();
+  });
+
+  it('confirms the acceptance, because the dashboard it lands on never mentions it', async () => {
+    // An invitee who already had workspaces sees only the switcher label change; nothing on
+    // the destination says they joined. The Toaster lives in the root layout, so the message
+    // outlives the navigation.
+    signedIn(true);
+    invitationLoads();
+    renderView();
+
+    fireEvent.click(await screen.findByRole('button', { name: ACCEPT_LABEL }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(messages.auth.invite.accepted));
   });
 
   it('reads the invitation once the address is confirmed', async () => {
@@ -238,7 +254,7 @@ describe('InviteAcceptView', () => {
     invitationLoads();
     renderView();
 
-    expect(await screen.findByRole('button', { name: 'Accept invite' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: ACCEPT_LABEL })).toBeTruthy();
     expect(mocks.getInvitation).toHaveBeenCalledWith({ query: { id: INVITATION_ID } });
   });
 });

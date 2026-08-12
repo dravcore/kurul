@@ -216,7 +216,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
   }
 
   if (error || !board) {
-    return <BoardErrorState message={error} />;
+    return <BoardErrorState message={error} onRetry={() => void reload()} />;
   }
 
   const panelOpen = selectedTaskId !== null;

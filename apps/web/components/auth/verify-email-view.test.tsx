@@ -113,7 +113,7 @@ describe('VerifyEmailView', () => {
     renderView();
 
     expect(screen.getByRole('heading', { name: "This link didn't work" })).toBeTruthy();
-    expect(screen.getByText("This link couldn't be checked.")).toBeTruthy();
+    expect(screen.getByText(messages.auth.emailConfirmation.linkErrors.unknown)).toBeTruthy();
   });
 
   it('points a link with no account at registration and asks for the address', () => {

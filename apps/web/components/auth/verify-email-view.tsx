@@ -30,8 +30,8 @@ export const VERIFY_EMAIL_RESEND_PATH = `${VERIFY_EMAIL_PATH}?${RESEND_PARAM}=1`
  * thing it shows.
  */
 export function VerifyEmailView(): React.ReactElement {
-  const t = useTranslations('auth.verifyEmail');
-  const tv = useTranslations('auth.verification');
+  const t = useTranslations('auth.confirmEmail');
+  const tv = useTranslations('auth.emailConfirmation');
   const searchParams = useSearchParams();
   const { data: session, isPending } = authClient.useSession();
 

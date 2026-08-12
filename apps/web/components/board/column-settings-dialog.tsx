@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import { ColumnCategory, type ColumnDto, type UpdateColumnRequest } from '@kurultay/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { FormDialog } from '@/components/common/form-dialog';
@@ -64,6 +65,10 @@ export function ColumnSettingsDialog({
       body,
     );
     onSaved(updated);
+    // The only write on the board whose result the board cannot show: a renamed column is
+    // visible in its own header, but `category` exists solely for the dashboard's benefit
+    // (see `categoryHint`), so changing it alone closes the dialog over an unchanged board.
+    toast.success(t('settingsSaved'));
   }
 
   return (

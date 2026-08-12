@@ -93,6 +93,16 @@ export function TaskMetadataPanel({
     );
   }
 
+  /**
+   * Names the object the caller actually touched, rather than the task it hangs off.
+   *
+   * Comment writes used to fall through to `saveError` — "Could not save this task." — which
+   * describes a write the user did not make and leaves the comment they did make unexplained.
+   */
+  function toastObjectError(caught: unknown, fallback: string): void {
+    toast.error(resolveApiMessage(caught, t, { fallback, byStatus: { 403: 'forbidden' } }));
+  }
+
   async function patchTask(body: UpdateTaskRequest): Promise<void> {
     setPending(true);
     const previous = task;
@@ -189,8 +199,17 @@ export function TaskMetadataPanel({
         ...task,
         labels: task.labels.filter((label) => label.id !== labelId),
       });
+      // What the screen shows is one palette row and this task's chip going away. What actually
+      // happened is that the label left every task on the board, so the confirmation has to say
+      // so — the visible change under-reports the blast radius.
+      toast.success(t('labelDeleted'));
     } catch (caught) {
-      toastLabelError(caught);
+      toast.error(
+        resolveApiMessage(caught, t, {
+          fallback: 'labelDeleteError',
+          byStatus: { 403: 'labelForbidden' },
+        }),
+      );
     } finally {
       setPending(false);
     }
@@ -209,7 +228,7 @@ export function TaskMetadataPanel({
       await refreshActivities();
       return true;
     } catch (caught) {
-      toastMetaError(caught);
+      toastObjectError(caught, 'commentError');
       return false;
     } finally {
       setPending(false);
@@ -223,7 +242,7 @@ export function TaskMetadataPanel({
       await api.delete(`/workspaces/${workspaceId}/comments/${commentId}`);
       setComments((current) => current.filter((comment) => comment.id !== commentId));
     } catch (caught) {
-      toastMetaError(caught);
+      toastObjectError(caught, 'commentDeleteError');
     } finally {
       setPending(false);
     }

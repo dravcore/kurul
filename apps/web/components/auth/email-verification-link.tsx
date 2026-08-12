@@ -35,7 +35,7 @@ export function EmailVerificationLink({
     return null;
   }
 
-  const label = t('verifyEmail');
+  const label = t('confirmEmail');
 
   return (
     <Button

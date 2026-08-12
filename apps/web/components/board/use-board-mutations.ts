@@ -67,7 +67,7 @@ export function useBoardMutations({
       } catch (caught) {
         setTasks(previousTasks);
         if (apiStatus(caught) === 403) {
-          toast.error(t('errors.forbiddenTasks'));
+          toast.error(t('task.forbidden'));
         } else {
           toast.error(tTask('moveError'), {
             action: {
@@ -122,7 +122,7 @@ export function useBoardMutations({
         setColumns(next);
       } catch (caught) {
         if (apiStatus(caught) === 403) {
-          toast.error(t('errors.forbiddenColumns'));
+          toast.error(t('column.forbidden'));
         } else {
           toast.error(t('column.moveError'), {
             action: {
@@ -162,7 +162,7 @@ export function useBoardMutations({
       } catch (caught) {
         const status = apiStatus(caught);
         if (status === 403) {
-          toast.error(t('errors.forbiddenColumns'));
+          toast.error(t('column.forbidden'));
         } else if (status === 409) {
           // Someone else seeded this board while the empty state was on screen. Nothing
           // failed — this view is simply stale, so refresh it instead of offering a retry
