@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ActivityType, Priority } from '@kurultay/shared-types';
+import { ActivityType, ColumnCategory, Priority } from '@kurultay/shared-types';
 import type {
   DashboardCountByAssignee,
   DashboardCountByColumn,
@@ -8,7 +8,6 @@ import type {
 } from '@kurultay/shared-types';
 import { Prisma } from '../generated/prisma';
 import { assertBoard } from '../common/board-access';
-import { DONE_COLUMN_NAME_NORMALIZED, doneColumnNameFilter } from '../common/board-defaults';
 import { PrismaService } from '../prisma/prisma.service';
 import type { DashboardQueryDto } from './dto/dashboard-query.dto';
 import {
@@ -51,15 +50,17 @@ export class DashboardService {
     const throughputSeries = emptyThroughputSeries(now);
     const since = new Date(`${throughputSeries[0]!.date}T00:00:00.000Z`);
 
-    const doneColumns = await this.prisma.column.findMany({
+    // A set, never a single row: a board may legitimately split completion across several
+    // columns ("Shipped" and "Won't Do"), and nothing in the schema or the UI stops it.
+    const completedColumns = await this.prisma.column.findMany({
       where: {
         board: { workspaceId },
         ...(query.boardId ? { boardId: query.boardId } : {}),
-        name: doneColumnNameFilter,
+        category: ColumnCategory.COMPLETED,
       },
       select: { id: true },
     });
-    const doneColumnIds = doneColumns.map((column) => column.id);
+    const completedColumnIds = completedColumns.map((column) => column.id);
 
     const [
       totalTasks,
@@ -77,7 +78,9 @@ export class DashboardService {
         where: {
           ...taskWhere,
           dueDate: { not: null, lt: now },
-          ...(doneColumnIds.length > 0 ? { columnId: { notIn: doneColumnIds } } : {}),
+          // Overdue means "late and still open", so every completed column is excluded, not
+          // just the first one found.
+          ...(completedColumnIds.length > 0 ? { columnId: { notIn: completedColumnIds } } : {}),
         },
       }),
       this.prisma.task.groupBy({
@@ -106,7 +109,7 @@ export class DashboardService {
           })
         : Promise.resolve(null),
       this.countActivitiesByDay(workspaceId, ActivityType.TaskCreated, since, query.boardId),
-      this.countCompletedMovesByDay(workspaceId, since, doneColumnIds, query.boardId),
+      this.countCompletedMovesByDay(workspaceId, since, completedColumnIds, query.boardId),
     ]);
 
     const byPriority: DashboardCountByPriority[] = ALL_PRIORITIES.map((priority) => ({
@@ -182,14 +185,36 @@ export class DashboardService {
   }
 
   /**
-   * A task counts as completed when it was moved into a Done column. The recorded column
-   * id is checked first, with the recorded column *name* as a fallback so moves into a
-   * column that has since been deleted or renamed still show up in history.
+   * A task counts as completed when it was moved into a column that means "completed".
+   *
+   * Two branches, each answering a different question, ORed because either one is enough:
+   *
+   * 1. **The column is `COMPLETED` now** (`completedColumnIds`). This is the branch that
+   *    repairs a board: the moment someone marks their "Shipped" column as completed in
+   *    column settings, the last {@link THROUGHPUT_DAYS} days of moves into it start
+   *    counting. Without it the category UI would only fix the future.
+   * 2. **The column was `COMPLETED` at the time** (`toColumnCategory` in the payload). This
+   *    is the branch that survives deletion — once the column row is gone its id resolves to
+   *    nothing, and the activity log is the only remaining record of what that move meant.
+   *
+   * What used to sit in slot 2 was a match on the recorded column *name* against `'done'`.
+   * It is deleted rather than translated: a name predicate cannot be made to work for a
+   * column called "Bitti" or "Shipped", which is the whole of
+   * docs/decisions/0019-column-category.md. Activity rows written before this shipped carry
+   * no `toColumnCategory`, so for them only branch 1 applies, and a move into a column that
+   * was both renamed *and* deleted inside the window is lost. That gap closes on its own
+   * {@link THROUGHPUT_DAYS} days after deploy, which is why no explicit cutover marker is
+   * stored: the query never reads an activity older than the window.
+   *
+   * The OR is deliberately generous in one direction — re-categorising a column *away* from
+   * `COMPLETED` does not retroactively un-count moves recorded while it was completed. That
+   * is the safer of the two errors, and strictly narrower than the old behaviour, where any
+   * column ever named "Done" counted forever.
    */
   private countCompletedMovesByDay(
     workspaceId: string,
     since: Date,
-    doneColumnIds: string[],
+    completedColumnIds: string[],
     boardId?: string,
   ): Promise<DayCountRow[]> {
     return this.countActivitiesByDay(
@@ -198,8 +223,8 @@ export class DashboardService {
       since,
       boardId,
       Prisma.sql`AND (
-        lower(trim(both from COALESCE(a."payload"->>'toColumnName', ''))) = ${DONE_COLUMN_NAME_NORMALIZED}
-        OR a."payload"->>'toColumnId' = ANY(${doneColumnIds})
+        a."payload"->>'toColumnId' = ANY(${completedColumnIds})
+        OR a."payload"->>'toColumnCategory' = ${ColumnCategory.COMPLETED}
       )`,
     );
   }

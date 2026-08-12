@@ -292,7 +292,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
               dnd={dnd}
               accessibility={dndAccessibility}
               onCreateColumn={dialogs.openCreateColumn}
-              onRenameColumn={dialogs.openRenameColumn}
+              onOpenColumnSettings={dialogs.openColumnSettings}
               onDeleteColumn={dialogs.openDeleteColumn}
               onMoveColumn={(column, direction) => void moveColumn(column, direction)}
               onAddTask={dialogs.openCreateTask}
@@ -326,7 +326,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
           boardId={boardId}
           lastColumnId={columns.at(-1)?.id}
           onColumnCreated={(column) => setColumns((current) => [...current, column])}
-          onColumnRenamed={(column) =>
+          onColumnSaved={(column) =>
             setColumns((current) => current.map((item) => (item.id === column.id ? column : item)))
           }
           onColumnDeleted={(columnId) => {

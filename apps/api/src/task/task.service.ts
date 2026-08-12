@@ -353,6 +353,11 @@ export class TaskService {
           fromColumnName,
           toColumnId: targetColumn.id,
           toColumnName: targetColumn.name,
+          // Snapshotted next to the name, and for the same reason: the activity log records
+          // what the move meant when it happened. Throughput falls back to this when the
+          // target column no longer exists to be looked up — see
+          // `DashboardService.countCompletedMovesByDay`.
+          toColumnCategory: targetColumn.category,
         },
       });
 

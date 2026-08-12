@@ -1,4 +1,5 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ColumnCategory } from '@kurultay/shared-types';
 import { IsUuidV7 } from '../../common/uuid';
 
 export class CreateColumnDto {
@@ -15,4 +16,9 @@ export class CreateColumnDto {
   @IsString()
   @MaxLength(32)
   color?: string;
+
+  /** Omitted falls through to the schema default (`UNSTARTED`), not to a name-derived guess. */
+  @IsOptional()
+  @IsEnum(ColumnCategory)
+  category?: ColumnCategory;
 }

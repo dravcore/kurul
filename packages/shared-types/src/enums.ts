@@ -19,6 +19,29 @@ export const MemberRole = {
 
 export type MemberRole = (typeof MemberRole)[keyof typeof MemberRole];
 
+/**
+ * Manually mirrors the `ColumnCategory` enum in apps/api/prisma/schema.prisma.
+ *
+ * What a column *means*, held apart from what it is called. Completion metrics read this and
+ * never `Column.name`, so renaming "Done" to "Shipped" — or seeding a board's columns in the
+ * creator's language — cannot silently zero a dashboard.
+ *
+ * Only `COMPLETED` has a consumer today. The rest is deliberate vocabulary: `CANCELED` ships
+ * unused because a canceled task is neither finished work nor open work, and discovering that
+ * after choosing a boolean costs a second migration and a second backfill.
+ *
+ * See docs/decisions/0019-column-category.md.
+ */
+export const ColumnCategory = {
+  BACKLOG: 'BACKLOG',
+  UNSTARTED: 'UNSTARTED',
+  STARTED: 'STARTED',
+  COMPLETED: 'COMPLETED',
+  CANCELED: 'CANCELED',
+} as const;
+
+export type ColumnCategory = (typeof ColumnCategory)[keyof typeof ColumnCategory];
+
 /** Better Auth / Nest invitation lifecycle statuses. */
 export const InvitationStatus = {
   pending: 'pending',
