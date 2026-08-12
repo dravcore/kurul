@@ -52,10 +52,25 @@ pnpm db:generate       # apps/api/prisma/schema.prisma'dan Prisma client'ı üre
 Repository bir pnpm workspace'idir (`apps/*`, `packages/*`). `pnpm install`'ı her zaman
 repository kökünden çalıştırın — asla `apps/api` veya `apps/web` içinden değil.
 
-Üretilen Prisma client'ı (`apps/api/src/generated/`) git tarafından ignore edilir ve onu
-oluşturan bir `postinstall` hook'u yoktur — `pnpm db:generate` her yeni klonda gerekli, açık
-bir adımdır. `@prisma/client`'tan türeyen tipleri import eden kod, bunu en az bir kez
-çalıştırana kadar typecheck veya build olmaz.
+Üretilen Prisma client'ı (`apps/api/src/generated/`) git-ignore'ludur ve onu oluşturan bir
+`postinstall` hook'u yoktur — `pnpm db:generate` her temiz klonda gerekli ve açık bir adımdır.
+`@prisma/client` türevli tipleri import eden kod, bunu en az bir kez çalıştırana kadar
+typecheck'ten geçmez ve build olmaz.
+
+`packages/shared-types` ve `packages/auth-access` build edilmiş `dist/` dizinlerinden tüketilir
+ve o dizinler de aynı sebeple git-ignore'ludur; dolayısıyla temiz bir klonda test suite'leri
+koşmadan önce bunların build edilmesi gerekir:
+
+```bash
+pnpm --filter @kurultay/shared-types build
+pnpm --filter @kurultay/auth-access build
+```
+
+Bu adımı atlamak yardımcı bir hata üretmez. `pnpm test`, paylaşılan bir tipi import eden her
+dosyada `Failed to resolve entry for package "@kurultay/shared-types"` ile düşer ve bu, eksik
+bir build'den çok bozuk bir checkout gibi okunur. `pnpm build` ve `pnpm typecheck` bunu yan
+etki olarak zaten yapar; `pnpm test` yapmaz, `pnpm lint` de yapmaz. CI bunları hem lint hem
+test job'ından önce açıkça build eder.
 
 ## Ortam değişkenleri
 
