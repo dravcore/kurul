@@ -52,7 +52,7 @@ describe('Workspace isolation and roles (e2e)', () => {
     // OWNER — allow delete is tested separately; allow invite + deny nothing critical here.
     await owner.agent
       .post(`/workspaces/${workspace.id}/invitations`)
-      .send({ email: 'invitee-owner@test.kurultay.dev', role: MemberRole.MEMBER })
+      .send({ email: 'invitee-owner@test.example.com', role: MemberRole.MEMBER })
       .expect(201);
 
     // ADMIN — allow update, deny delete
@@ -66,14 +66,14 @@ describe('Workspace isolation and roles (e2e)', () => {
     await member.agent.get(`/workspaces/${workspace.id}/members`).expect(200);
     await member.agent
       .post(`/workspaces/${workspace.id}/invitations`)
-      .send({ email: 'invitee-member@test.kurultay.dev', role: MemberRole.GUEST })
+      .send({ email: 'invitee-member@test.example.com', role: MemberRole.GUEST })
       .expect(403);
 
     // GUEST — allow get workspace, deny invite
     await guest.agent.get(`/workspaces/${workspace.id}`).expect(200);
     await guest.agent
       .post(`/workspaces/${workspace.id}/invitations`)
-      .send({ email: 'invitee-guest@test.kurultay.dev', role: MemberRole.GUEST })
+      .send({ email: 'invitee-guest@test.example.com', role: MemberRole.GUEST })
       .expect(403);
 
     // OWNER can still delete
@@ -134,7 +134,7 @@ describe('Workspace isolation and roles (e2e)', () => {
   it('grants the invited role on accept and blocks revoked invitations', async () => {
     const owner = await signUp(app, { name: 'Inviter' });
     const invitee = await signUp(app, {
-      email: `invitee-${Date.now()}@test.kurultay.dev`,
+      email: `invitee-${Date.now()}@test.example.com`,
       name: 'Invitee',
     });
     await confirmEmail(app, prisma, invitee);
@@ -168,7 +168,7 @@ describe('Workspace isolation and roles (e2e)', () => {
 
     // Second invite + revoke
     const other = await signUp(app, {
-      email: `revoked-${Date.now()}@test.kurultay.dev`,
+      email: `revoked-${Date.now()}@test.example.com`,
       name: 'Revoked',
     });
     const second = await owner.agent
@@ -195,7 +195,7 @@ describe('Workspace isolation and roles (e2e)', () => {
   it('refuses to accept an invitation from an unconfirmed email address', async () => {
     const owner = await signUp(app, { name: 'Inviter' });
     const squatter = await signUp(app, {
-      email: `unconfirmed-${Date.now()}@test.kurultay.dev`,
+      email: `unconfirmed-${Date.now()}@test.example.com`,
       name: 'Unconfirmed',
     });
     const workspace = await createWorkspace(owner.agent, 'Guarded WS', `guarded-${Date.now()}`);
@@ -226,7 +226,7 @@ describe('Workspace isolation and roles (e2e)', () => {
   it('resends the same invitation when the role is unchanged', async () => {
     const owner = await signUp(app, { name: 'Inviter' });
     const workspace = await createWorkspace(owner.agent, 'Resend WS', `resend-${Date.now()}`);
-    const email = `resend-${Date.now()}@test.kurultay.dev`;
+    const email = `resend-${Date.now()}@test.example.com`;
 
     const first = await owner.agent
       .post(`/workspaces/${workspace.id}/invitations`)
@@ -250,7 +250,7 @@ describe('Workspace isolation and roles (e2e)', () => {
   it('revokes and reissues when the same email is re-invited at a different role', async () => {
     const owner = await signUp(app, { name: 'Inviter' });
     const workspace = await createWorkspace(owner.agent, 'Reinvite WS', `reinvite-${Date.now()}`);
-    const email = `reinvite-${Date.now()}@test.kurultay.dev`;
+    const email = `reinvite-${Date.now()}@test.example.com`;
 
     const asGuest = await owner.agent
       .post(`/workspaces/${workspace.id}/invitations`)
@@ -286,7 +286,7 @@ describe('Workspace isolation and roles (e2e)', () => {
 
     await owner.agent
       .post(`/workspaces/${workspace.id}/invitations`)
-      .send({ email: `owner-invite-${Date.now()}@test.kurultay.dev`, role: MemberRole.OWNER })
+      .send({ email: `owner-invite-${Date.now()}@test.example.com`, role: MemberRole.OWNER })
       .expect(400);
   });
 
@@ -313,7 +313,7 @@ describe('Workspace isolation and roles (e2e)', () => {
     await owner.agent
       .post('/auth/organization/invite-member')
       .send({
-        email: `ba-invite-${Date.now()}@test.kurultay.dev`,
+        email: `ba-invite-${Date.now()}@test.example.com`,
         role: MemberRole.MEMBER,
         organizationId: workspace.id,
       })

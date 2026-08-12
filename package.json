@@ -24,11 +24,12 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx,mjs,cjs,js,json,md,yml,yaml,css}": [
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0",
       "prettier --write"
     ],
-    "*.{ts,tsx}": [
-      "eslint --fix --max-warnings 0"
+    "*.{mjs,cjs,js,json,md,yml,yaml,css}": [
+      "prettier --write"
     ]
   },
   "devDependencies": {
