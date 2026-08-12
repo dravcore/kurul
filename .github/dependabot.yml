@@ -4,12 +4,29 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    # Majors now arrive as one PR per package, so the cap has to leave room for a
+    # week that lands several of them alongside the two grouped PRs.
+    open-pull-requests-limit: 15
     groups:
+      # Only minor/patch is grouped. A grouped PR is all-or-nothing: one member that
+      # needs a real migration holds back every other member until someone does the
+      # work. Minor/patch bumps rarely need migration, so batching them is a net win
+      # — one PR, one CI run, one review.
+      #
+      # Majors are deliberately left out of every group. Dependabot opens an
+      # individual PR for any update that matches no group, which is exactly what a
+      # breaking change needs: reviewed, migrated and merged on its own timeline
+      # without blocking anything else.
       production:
         dependency-type: production
+        update-types:
+          - minor
+          - patch
       development:
         dependency-type: development
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
