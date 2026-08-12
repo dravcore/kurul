@@ -27,6 +27,8 @@ Kurultay, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğun
 | [0013](0013-invitation-email-verification.md)   | Davet Kabulünde E-posta Doğrulaması                                  | Kabul edildi                                          | 2026-08-10 |
 | [0014](0014-dual-licensing-cla.md)              | Çift Lisanslama ve Katkıda Bulunan Lisans Sözleşmesi                 | Kabul edildi (yolu 0015 ile askıda)                   | 2026-08-11 |
 | [0015](0015-no-external-contributions.md)       | Dış Katkı Kabul Edilmiyor; Hukuk Masrafı Ertelendi                   | Kabul edildi                                          | 2026-08-12 |
+| [0018](0018-localization-strategy.md)           | Yerelleştirme Stratejisi: URL Yönlendirmesi Olmadan next-intl        | Kabul edildi                                          | 2026-08-12 |
+| [0019](0019-column-category.md)                 | Kolon Tamamlanmışlığı Bir Kategoridir, Ad Değil                      | Kabul edildi                                          | 2026-08-12 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 
