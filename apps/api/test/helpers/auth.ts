@@ -12,7 +12,7 @@ export interface TestUser {
 }
 
 function uniqueEmail(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.kurultay.dev`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.example.com`;
 }
 
 export async function signUp(

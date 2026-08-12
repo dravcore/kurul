@@ -12,8 +12,22 @@ import {
 export interface ApiResource<T> {
   data: T;
   loading: boolean;
-  /** The caller's message, set on any failure; `null` while the last load succeeded. */
+  /**
+   * The caller's message, set on any failure; `null` while the last load succeeded, and
+   * `null` throughout when the caller passed no message. Read {@link ApiResource.failed} to
+   * ask whether the load failed — this field answers what to *say* about it, not whether.
+   */
   error: string | null;
+  /**
+   * Whether the last load failed, independent of whether there is a message for it.
+   *
+   * A caller that renders its own copy — because one message cannot describe what several
+   * emptied lists now mean — needs the fact without the sentence. Before this existed such a
+   * caller had to invent a message solely to compare it against `null`, which put a string in
+   * the catalogue that nothing ever displayed and that the next translator would have paid to
+   * translate.
+   */
+  failed: boolean;
   /** Refetch without remounting — for a retry button or an external change. */
   reload: () => void;
   /** Local edits (optimistic insert, remove) without a round trip. */
@@ -53,12 +67,13 @@ export interface UseApiResourceOptions {
 export function useApiResource<T>(
   fetcher: ((signal: AbortSignal) => Promise<T>) | null,
   initialData: T,
-  errorMessage: string,
+  errorMessage: string | null,
   options?: UseApiResourceOptions,
 ): ApiResource<T> {
   const [data, setData] = useState<T>(initialData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const keepStaleOnError = options?.keepStaleOnError ?? false;
 
@@ -79,6 +94,7 @@ export function useApiResource<T>(
     const controller = new AbortController();
     setLoading(true);
     setError(null);
+    setFailed(false);
 
     void (async () => {
       try {
@@ -90,6 +106,7 @@ export function useApiResource<T>(
           // caller said the last value is worth more than a blank (`keepStaleOnError`).
           if (!keepStaleOnError) setData(initialDataRef.current);
           setError(errorMessage);
+          setFailed(true);
           onErrorRef.current?.(caught);
         }
       } finally {
@@ -102,7 +119,7 @@ export function useApiResource<T>(
 
   const reload = useCallback(() => setReloadCount((count) => count + 1), []);
 
-  return { data, loading, error, reload, setData };
+  return { data, loading, error, failed, reload, setData };
 }
 
 /**

@@ -21,13 +21,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary'],
       exclude: ['node_modules/**', '.next/**', '**/*.test.{ts,tsx}', '**/*.config.*'],
-      // No `thresholds` gate here on purpose: overall coverage sits around 13% because
-      // `app/**` route entrypoints and most page-level components have no unit tests yet
-      // (they're better covered by e2e/integration tests, which don't exist in this repo
-      // yet either). A global floor at today's ~13% wouldn't catch any real regression in
-      // the units that *are* tested, and per-directory glob thresholds would be brittle
-      // while `apps/web` is still being split/refactored (see tech-debt Wave 5/6). Revisit
-      // once route-level tests exist or coverage is measured per meaningfully-tested folder.
+      // No *global* `thresholds` gate here, still on purpose — but not for the reason this
+      // comment used to give. Overall coverage is no longer ~13%; it is around 46%, and the
+      // `app/**` floor below is the glob threshold the old note said it was waiting for.
+      // What keeps a global floor off is that the number is still an average over two very
+      // different populations: units with real tests sit well above it, and page-level
+      // components with none sit near zero. A floor at the average would ratchet on the
+      // second group's absence rather than on any regression in the first.
       //
       // Route-level tests now exist, so `app/**` is exactly the "meaningfully-tested
       // folder" that comment was waiting for — and it is the one place a glob floor is not

@@ -34,8 +34,10 @@ docker compose version
 pnpm -v
 ```
 
-İsim kontrolleri: npm paket adı `kurultay` müsait. Kalanlar: `github.com/dravcore/kurultay`
-ve bir domain (`kurultay.dev` / `kurultay.io`).
+İsim kontrollerinin sonucu: npm paket adı `kurultay` müsait ve hâlâ alınmadı — henüz hiçbir
+paket yayınlanmadı. `github.com/dravcore/kurultay` alındı, proje orada yaşıyor. `kurultay.dev`
+ise **müsait değildi**; kayıtlı bir domain yok ve projeye şu an yalnız depo üzerinden
+erişiliyor. Domain kararı hâlâ açık.
 
 > **İsmin kökeni.** _Kurultay_, Türk-Moğol geleneğinde boyların toplandığı, tartıştığı,
 > karar aldığı ve işi bölüştüğü büyük meclistir — aracın yaptığı şeyin adil bir tarifi.
