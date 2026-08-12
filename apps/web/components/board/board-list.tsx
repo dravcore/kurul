@@ -24,6 +24,7 @@ import { DamgaMark } from '@/components/brand/damga-mark';
 
 export function BoardList(): React.ReactElement {
   const t = useTranslations('app.board');
+  const tShell = useTranslations('app.shell');
   const { activeId, activeRole } = useWorkspaceContext();
   const [createOpen, setCreateOpen] = useState(false);
   const [renameBoard, setRenameBoard] = useState<BoardDto | null>(null);
@@ -44,13 +45,15 @@ export function BoardList(): React.ReactElement {
     setData: setBoards,
   } = useApiResource<BoardDto[]>(fetchBoards, [], t('listError'));
 
-  if (!activeId) {
-    return <p className="text-body text-muted-foreground">{t('listError')}</p>;
-  }
-
-  if (loading) {
+  // No active workspace is a state, not a failure. The shell resolves the roster and, when it
+  // is empty, redirects to `/workspaces/new`; until then there is no workspace to scope a
+  // request to, so nothing has been asked and nothing has gone wrong. Saying "Could not load
+  // boards." here blamed a request that was never made — and left that as the last word on
+  // screen for the whole redirect. Same shape as the load below, because it is the same wait.
+  if (!activeId || loading) {
     return (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-busy>
+        <span className="sr-only">{tShell('loading')}</span>
         {Array.from({ length: 3 }).map((_, index) => (
           <Skeleton key={index} className="h-[88px] w-full rounded-[var(--radius-lg)]" />
         ))}

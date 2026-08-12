@@ -47,11 +47,17 @@ function Board({
   open,
   card = true,
   selected = task,
+  loading = false,
+  loadError = null,
+  onRetryLoad,
 }: {
   open: boolean;
   card?: boolean;
   /** `null` while the board is still fetching the task the URL points at. */
   selected?: TaskDto | null;
+  loading?: boolean;
+  loadError?: string | null;
+  onRetryLoad?: () => void;
 }): React.ReactElement {
   return (
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -71,6 +77,9 @@ function Board({
             task={selected}
             canMutate
             canManageLabels
+            loading={loading}
+            loadError={loadError}
+            onRetryLoad={onRetryLoad}
             onUpdated={vi.fn()}
             onRequestDelete={vi.fn()}
           />
@@ -173,6 +182,60 @@ describe('TaskPanel focus', () => {
     rerender(<Board open={false} />);
 
     expect(document.activeElement).toBe(landmark());
+  });
+});
+
+/**
+ * "Not loaded yet", "not there" and "could not be read" are three different answers, and the
+ * panel used to give the middle one to all three: `loadError || !task` put a cold deep link —
+ * where the board has not fetched the row yet — straight onto "This task no longer exists".
+ */
+describe('TaskPanel load states', () => {
+  const panel = (): HTMLElement => screen.getByRole('complementary');
+
+  it('waits instead of declaring the task gone while it is still loading', () => {
+    render(<Board open card={false} selected={null} loading />);
+
+    expect(screen.queryByText(messages.app.board.task.missing)).toBeNull();
+    expect(panel().getAttribute('aria-busy')).toBe('true');
+  });
+
+  it('says the task is gone once the load settled without it', () => {
+    render(<Board open card={false} selected={null} />);
+
+    expect(screen.getByText(messages.app.board.task.missing)).toBeDefined();
+    expect(panel().hasAttribute('aria-busy')).toBe(false);
+    // Nothing to retry: the server answered, and the answer was that it is not there.
+    expect(screen.queryByRole('button', { name: messages.app.errors.retry })).toBeNull();
+  });
+
+  it('separates a failed load from a task that is gone, and offers a retry', () => {
+    const onRetryLoad = vi.fn();
+    render(
+      <Board
+        open
+        card={false}
+        selected={null}
+        loadError="This task couldn't load."
+        onRetryLoad={onRetryLoad}
+      />,
+    );
+
+    expect(screen.getByText("This task couldn't load.")).toBeDefined();
+    expect(screen.queryByText(messages.app.board.task.missing)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: messages.app.errors.retry }));
+
+    expect(onRetryLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a way back to the board out of every failed state', () => {
+    const { rerender } = render(<Board open card={false} selected={null} />);
+    expect(screen.getByRole('button', { name: messages.app.board.task.backToBoard })).toBeDefined();
+
+    rerender(<Board open card={false} selected={null} loadError="This task couldn't load." />);
+
+    expect(screen.getByRole('button', { name: messages.app.board.task.backToBoard })).toBeDefined();
   });
 });
 

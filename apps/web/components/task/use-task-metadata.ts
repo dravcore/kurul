@@ -38,6 +38,12 @@ export type UseTaskMetadataResult = {
   activities: ActivityDto[];
   refreshActivities: () => Promise<void>;
   loadingMeta: boolean;
+  /**
+   * The load failed, so `comments` and `activities` are the empty fallback rather than an
+   * answer. The sections that render them say so instead of showing their empty message —
+   * `[]` on its own cannot tell "nothing here" from "nothing read".
+   */
+  metaFailed: boolean;
 };
 
 /** The four lists the panel loads together, held as one resource because they are one fetch. */
@@ -113,6 +119,7 @@ export function useTaskMetadata({
   const {
     data: meta,
     loading: loadingMeta,
+    error: metaError,
     setData: setMeta,
   } = useApiResource<TaskMeta>(
     loadMeta,
@@ -127,9 +134,10 @@ export function useTaskMetadata({
       commentsCursor: null,
       activities: [],
     },
-    // Held for the shape's sake; the panel reports this failure as a toast, below.
+    // Reported in place by the comment and activity sections rather than as a toast: those
+    // two lists are what the failure emptied, and a toast that fades leaves them reading as
+    // "no comments" and "no activity" — the wrong answer, and the one that stays on screen.
     t('metaLoadError'),
-    { onError: () => toast.error(t('metaLoadError')) },
   );
 
   const setBoardLabels = useResourceField(setMeta, 'boardLabels');
@@ -184,5 +192,6 @@ export function useTaskMetadata({
     activities: meta.activities,
     refreshActivities,
     loadingMeta,
+    metaFailed: metaError !== null,
   };
 }
