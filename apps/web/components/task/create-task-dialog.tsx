@@ -31,7 +31,7 @@ export function CreateTaskDialog({
 
   async function onSubmit(): Promise<void> {
     const body: CreateTaskRequest = { title: title.trim(), columnId };
-    const task = await api.post<TaskDto>(
+    const task = await api.post<TaskDto, CreateTaskRequest>(
       `/workspaces/${workspaceId}/boards/${boardId}/tasks`,
       body,
     );

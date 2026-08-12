@@ -130,26 +130,48 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-/** Typed Nest API client used by the web app. */
+/**
+ * Typed Nest API client used by the web app.
+ *
+ * Writes take the request type as a second explicit type argument
+ * (`api.post<ColumnDto, CreateColumnRequest>(path, body)`). It defaults to `never` rather
+ * than being inferred from `body`, which is the whole point: an inferred body type accepts
+ * whatever it is handed, so the `@kurultay/shared-types` request shapes were documentation
+ * that the compiler never read. With `never` as the default, a call that passes a body
+ * without naming its type does not compile at all, and one that names it is checked against
+ * the DTO the endpoint actually validates.
+ *
+ * `NoInfer` is what keeps the default reachable — without it, omitting both type arguments
+ * would let `body` re-open the hole it closes. A body-less write (`POST .../read-all`) still
+ * works unchanged, because `body` stays optional.
+ */
 export const api = {
-  get<T>(path: string, init?: RequestInit): Promise<T> {
-    return request<T>(path, { ...init, method: 'GET' });
+  get<TResponse>(path: string, init?: RequestInit): Promise<TResponse> {
+    return request<TResponse>(path, { ...init, method: 'GET' });
   },
-  post<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
-    return request<T>(path, {
+  post<TResponse, TBody = never>(
+    path: string,
+    body?: NoInfer<TBody>,
+    init?: RequestInit,
+  ): Promise<TResponse> {
+    return request<TResponse>(path, {
       ...init,
       method: 'POST',
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   },
-  patch<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
-    return request<T>(path, {
+  patch<TResponse, TBody = never>(
+    path: string,
+    body?: NoInfer<TBody>,
+    init?: RequestInit,
+  ): Promise<TResponse> {
+    return request<TResponse>(path, {
       ...init,
       method: 'PATCH',
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   },
-  delete<T = void>(path: string, init?: RequestInit): Promise<T> {
-    return request<T>(path, { ...init, method: 'DELETE' });
+  delete<TResponse = void>(path: string, init?: RequestInit): Promise<TResponse> {
+    return request<TResponse>(path, { ...init, method: 'DELETE' });
   },
 };

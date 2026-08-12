@@ -33,7 +33,7 @@ export function RenameColumnDialog({
   async function onSubmit(): Promise<void> {
     if (!column) return;
     const body: UpdateColumnRequest = { name: name.trim() };
-    const updated = await api.patch<ColumnDto>(
+    const updated = await api.patch<ColumnDto, UpdateColumnRequest>(
       `/workspaces/${workspaceId}/columns/${column.id}`,
       body,
     );

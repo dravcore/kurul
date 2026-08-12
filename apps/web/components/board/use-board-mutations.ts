@@ -62,7 +62,7 @@ export function useBoardMutations({
           beforeTaskId: payload.beforeTaskId,
           afterTaskId: payload.afterTaskId,
         };
-        const updated = await api.patch<TaskDto>(
+        const updated = await api.patch<TaskDto, MoveTaskRequest>(
           `/workspaces/${activeId}/tasks/${payload.taskId}/position`,
           body,
         );
@@ -116,7 +116,7 @@ export function useBoardMutations({
           beforeColumnId: before?.id ?? null,
           afterColumnId: after?.id ?? null,
         };
-        const updated = await api.patch<ColumnDto>(
+        const updated = await api.patch<ColumnDto, MoveColumnRequest>(
           `/workspaces/${activeId}/columns/${column.id}/position`,
           body,
         );
@@ -151,7 +151,7 @@ export function useBoardMutations({
             name,
             ...(afterColumnId ? { afterColumnId } : {}),
           };
-          const column = await api.post<ColumnDto>(
+          const column = await api.post<ColumnDto, CreateColumnRequest>(
             `/workspaces/${activeId}/boards/${boardId}/columns`,
             body,
           );

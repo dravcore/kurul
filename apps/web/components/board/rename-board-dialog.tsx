@@ -40,7 +40,7 @@ export function RenameBoardDialog({
       name: name.trim(),
       description: description.trim() || null,
     };
-    const updated = await api.patch<BoardDto>(
+    const updated = await api.patch<BoardDto, UpdateBoardRequest>(
       `/workspaces/${workspaceId}/boards/${board.id}`,
       body,
     );
