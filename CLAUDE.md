@@ -25,6 +25,9 @@ Open-source Kanban-focused project management tool. `dravcore/kurultay` — AGPL
 - **Git Flow:** `main` (releases) ← `develop` (integration) ← `feature/*`, `fix/*`, `docs/*`, `chore/*`, plus `release/*`, `hotfix/*`
 - **Conventional Commits** (`feat:`, `fix:`, `docs:` ...) · SemVer + `CHANGELOG.md`
 - No direct commits to `main` or `develop` — all work goes through feature branch + PR
+- **No AI attribution anywhere:** no `Co-Authored-By: Claude/Cursor/…` trailer in commits, no
+  `🤖 Generated with …` footer in PR bodies, issues, comments, CHANGELOG, or docs. Write the
+  message body and stop.
 
 ## Documentation
 
