@@ -159,11 +159,13 @@ describe('Tasks (e2e)', () => {
     const [raceA, raceB] = await Promise.all([
       owner.agent.patch(`/workspaces/${workspace.id}/tasks/${a.body.id}/position`).send({
         columnId: todo.id,
-        afterTaskId: first.body.id,
+        beforeTaskId: first.body.id,
+        afterTaskId: third.body.id,
       }),
       owner.agent.patch(`/workspaces/${workspace.id}/tasks/${b.body.id}/position`).send({
         columnId: todo.id,
-        afterTaskId: first.body.id,
+        beforeTaskId: first.body.id,
+        afterTaskId: third.body.id,
       }),
     ]);
     expect(raceA.status).toBe(200);
