@@ -150,6 +150,21 @@ export interface DashboardCountByPriority {
   count: number;
 }
 
+/**
+ * One bar of the workload-by-assignee chart.
+ *
+ * **`count` is assignments, not tasks.** A task with three assignees contributes one to each
+ * of them, so `Σ byAssignee` deliberately exceeds `totalTasks` on any board that uses
+ * multiple assignees. That is the intended reading, not a discrepancy to reconcile: the
+ * chart answers "how much is on each person's plate", and attributing a shared task to
+ * exactly one of its assignees would have to pick a winner arbitrarily and under-report
+ * everyone else. `Unassigned` is the exception and is a task count, because a task with
+ * nobody on it has no assignment row to aggregate.
+ *
+ * The reasoning lives in full on `DashboardService.rankedAssigneeBuckets`; it is repeated
+ * here because a consumer reading only this package would otherwise see two totals that do
+ * not add up and treat one of them as a bug.
+ */
 export interface DashboardCountByAssignee {
   /** `null` for Unassigned or Other aggregate buckets. */
   userId: string | null;
