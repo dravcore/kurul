@@ -17,10 +17,9 @@ The visual and interaction language of the Kurultay web app: principles, tokens,
 - [9. Accessibility](#9-accessibility)
 - [10. Cross-references](#10-cross-references)
 
-> **Status.** Every hex, type size, and pixel dimension below is a **proposal**, to be
-> validated on real screens in [Phase 3](roadmap.md#phase-3--boards-and-columns) and refined
-> through Phase 7. The _rules_ — restraint, tokenization, keyboard parity, contrast floors,
-> i18n — bind from the first component.
+> **Status.** Colour, type, and spacing tokens below are **validated in product**
+> (`apps/web/app/globals.css`). Interaction patterns that are still aspirational are called
+> out inline; do not treat every sentence as shipped behaviour.
 
 ## 1. Design principles
 
@@ -163,7 +162,7 @@ App shell per the `(app)` route group in [architecture.md §4](architecture.md#4
 | Region             | Spec                                                                                                                  |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------- |
 | Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand                     |
-| Topbar             | 48px sticky — board name, filter entry, overflow, presence avatars                                                    |
+| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet)                               |
 | Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                |
 | Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯`                 |
 | Card               | 10px 12px padding, 8px gap, min 56px (title only), typical 72–92px; title clamps at 3 lines so nothing exceeds ~140px |
@@ -172,17 +171,18 @@ App shell per the `(app)` route group in [architecture.md §4](architecture.md#4
 | Settings and forms | 720px max width — prose is read, not scanned                                                                          |
 | Touch target       | 40px minimum on coarse pointers, achieved with padding, not size                                                      |
 
-**Task detail: a right-side panel, not a modal.** 480px default, drag-resizable 420–640px,
-**non-modal** — the board stays visible and clickable behind it. Below 1024px it becomes a
-full-screen sheet. Confirmations, board creation, and destructive actions stay **dialogs**;
-those genuinely need to block.
+**Task detail: a right-side panel, not a modal.** ~480px wide (`min` 420px / `max` 640px via
+CSS), **non-modal** — the board stays visible and clickable behind it on desktop. Below the
+Tailwind `md` breakpoint (768px) it becomes a fullscreen sheet (`fixed inset-0`). Drag-resize
+of the panel width is not implemented; the CSS bounds are fixed. Confirmations, board
+creation, and destructive actions stay **dialogs**; those genuinely need to block.
 
-| Why a panel |                                                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Context     | The point of a board is the surrounding cards; a modal deletes them                                                                              |
-| Flow        | Triage is open → edit → next. A panel keeps the next card one click away instead of a dismiss plus a click.                                      |
-| Realtime    | A card moving under a modal is invisible; behind a panel it is visible                                                                           |
-| Routing     | Deep-linkable at `board/[boardId]/task/[taskId]` via an intercepting route — a shared URL opens the full page, an in-board click opens the panel |
+| Why a panel |                                                                                                                                                                            |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Context     | The point of a board is the surrounding cards; a modal deletes them                                                                                                        |
+| Flow        | Triage is open → edit → next. A panel keeps the next card one click away instead of a dismiss plus a click.                                                                |
+| Realtime    | A card moving under a modal is invisible; behind a panel it is visible                                                                                                     |
+| Routing     | Deep-linkable at `board/[boardId]/task/[taskId]` — both soft navigation and a hard load render `BoardView` with the task selected (no Next.js intercepting/`@modal` route) |
 
 ## 5. Interaction patterns
 
@@ -200,7 +200,7 @@ those genuinely need to block.
 | Remote create / update | `--signature-subtle` background fading out over 1200ms. No movement, no size change. Color-only, so it survives `prefers-reduced-motion` unchanged. |
 | Remote move            | Card animates to its new position over 220ms; during a local drag the update is queued and applied on drop                                          |
 | Remote delete          | Fade to 0 over 160ms, then close the gap over 160ms — two beats, so the eye can follow                                                              |
-| Presence · disconnect  | Avatars in the topbar, a small avatar on a card someone else has open · a quiet inline "Reconnecting…" bar, never a blocking overlay                |
+| Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Reconnecting…" bar, never a blocking overlay                                    |
 
 **Keyboard baseline.** Focus is always visible: 2px `--ring` at 2px offset, and `outline: none`
 without a replacement is a review blocker. Tab order follows visual order; the board is a
@@ -334,15 +334,15 @@ ships English-only. This is the _layer_, not the translations: the roadmap's Bey
 the application UI" row is about shipping further language packs, and the plumbing lands with
 the Phase 1 skeleton because retrofitting it costs far more than starting with it.
 
-| i18n rule                     |                                                                                                                                                 |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| No hardcoded strings          | A string literal in JSX is a lint error. `getTranslations` in server components, `useTranslations` in client ones.                              |
-| Keys                          | By domain, mirroring the component tree: `board.column.addAction`, `task.priority.urgent`, `errors.http.409`                                    |
-| Catalogs                      | `messages/en.json` is canonical and the only pack in MVP; Turkish is the first translation, after Phase 5                                       |
-| Plurals, interpolation        | ICU format (`{count, plural, …}`). Never concatenate sentence fragments — word order differs per language.                                      |
-| Dates, numbers, relative time | `Intl.*` via next-intl formatters with the active locale; no hand-formatted dates                                                               |
-| Casing                        | **No `text-transform: uppercase` on translated strings** — Turkish `i → İ` breaks under CSS casing. Write the intended casing into the catalog. |
-| Layout                        | Assume ±35% string length; nothing is a fixed pixel width because the English fits                                                              |
+| i18n rule                     |                                                                                                                                                                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No hardcoded strings          | User-facing copy goes through `useTranslations` / `getTranslations` and `messages/*.json`. There is no ESLint rule forbidding JSX string literals yet — `messages/catalog.test.ts` catches missing/orphan keys for bound `t('…')` calls. |
+| Keys                          | By domain, mirroring the component tree: `board.column.addAction`, `task.priority.urgent`, `errors.http.409`                                                                                                                             |
+| Catalogs                      | `messages/en.json` is canonical and the only pack in MVP; Turkish is the first translation, after Phase 5                                                                                                                                |
+| Plurals, interpolation        | ICU format (`{count, plural, …}`). Never concatenate sentence fragments — word order differs per language.                                                                                                                               |
+| Dates, numbers, relative time | `Intl.*` via next-intl formatters with the active locale; no hand-formatted dates                                                                                                                                                        |
+| Casing                        | **No `text-transform: uppercase` on translated strings** — Turkish `i → İ` breaks under CSS casing. Write the intended casing into the catalog.                                                                                          |
+| Layout                        | Assume ±35% string length; nothing is a fixed pixel width because the English fits                                                                                                                                                       |
 
 ## 8. Charts and dashboard
 

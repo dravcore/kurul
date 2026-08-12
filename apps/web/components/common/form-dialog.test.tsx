@@ -127,9 +127,12 @@ describe('FormDialog', () => {
   it('submits on Enter in a field, without reloading the page', async () => {
     // The whole reason the fields sit inside a real <form>.
     const { onSubmit } = renderDialog();
+    const form = screen.getByLabelText('Name').closest('form') as HTMLFormElement;
+    const event = new Event('submit', { bubbles: true, cancelable: true });
 
-    fireEvent.submit(screen.getByLabelText('Name').closest('form') as HTMLFormElement);
+    form.dispatchEvent(event);
 
+    expect(event.defaultPrevented).toBe(true);
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
   });
 });

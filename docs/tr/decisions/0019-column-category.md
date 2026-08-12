@@ -95,10 +95,8 @@ model Column {
   sonra tohum listesini `apps/api/src/common/board-defaults.ts` içine `defaultColumnsFor(locale)`
   olarak geri taşıdı. Kategori hâlâ her tohum kolonuyla birlikte gider; yalnızca listenin evi
   değişti.
-- **Web'in bir kolonun kategorisini ayarlayacak bir yola ihtiyacı var** — aksi hâlde
-  kullanıcının kendi "Shipped" kolonu asla tamamlanmış sayılamaz ve özgün kusur yalnızca yarı
-  yarıya düzelmiş olur. Bu bir takip işidir, ama bu ADR'nin değerini üretmesi için gereklidir;
-  isteğe bağlı bir cila değildir.
+- **Web kolon ayarlarında kategori düzenlenebilir** — aksi hâlde kullanıcının kendi "Shipped"
+  kolonu asla tamamlanmış sayılamaz. `column-settings-dialog.tsx` içinde yayında.
 - Bir board'un birden fazla `COMPLETED` kolonu olması meşrudur (örneğin "Shipped" ve "Won't Do"
   ileride ayrılırsa). Metrikler tamamlanmışlığı tek bir satır değil bir kolon kümesi olarak ele
   almalıdır. Eski ad eşlemesi `mode: 'insensitive'` üzerinden aynı özelliğe sahipti, yani bu

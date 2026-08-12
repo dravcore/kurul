@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { CommentDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import { getActiveMentionQuery, insertMentionMarkup } from '@/lib/mentions';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,7 @@ export function TaskCommentsSection({
 }: TaskCommentsSectionProps): React.ReactElement {
   const t = useTranslations('app.board.task');
   const tErrors = useTranslations('app.errors');
+  const locale = useLocale();
   const commentId = useId();
   const mentionListId = useId();
   const commentRef = useRef<HTMLTextAreaElement | null>(null);
@@ -157,7 +158,7 @@ export function TaskCommentsSection({
               <div className="min-w-0">
                 <p className="text-small font-medium text-foreground">{comment.author.name}</p>
                 <p className="text-micro text-muted-foreground">
-                  {new Date(comment.createdAt).toLocaleString()}
+                  {new Date(comment.createdAt).toLocaleString(locale)}
                 </p>
               </div>
               {canMutate ? (

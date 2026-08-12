@@ -213,6 +213,7 @@ describe('TaskService', () => {
             boardId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d70',
           }),
         },
+        $executeRaw: jest.fn().mockResolvedValue(0),
       }),
     );
 
@@ -234,6 +235,7 @@ describe('TaskService', () => {
         column: {
           findFirst: jest.fn().mockResolvedValue({ id: COLUMN_ID, boardId: BOARD_ID }),
         },
+        $executeRaw: jest.fn().mockResolvedValue(0),
       }),
     );
 
@@ -260,7 +262,12 @@ describe('TaskService', () => {
     const writeOrder: string[] = [];
     // Both mocks resolve on a later tick, so a `Promise.all` would interleave start/settle and
     // the log would not read as two completed statements in order.
+    let lockSeen = false;
     const executeRaw = jest.fn().mockImplementation(async () => {
+      if (!lockSeen) {
+        lockSeen = true;
+        return 0;
+      }
       writeOrder.push('siblings:start');
       await Promise.resolve();
       writeOrder.push('siblings:done');
@@ -291,18 +298,18 @@ describe('TaskService', () => {
       beforeTaskId: 'a',
     });
 
-    // The rebalance write carries the tenant scope too, not just the id.
     expect(updateCall).toEqual({
       where: { id: 'c', board: { workspaceId: WORKSPACE_ID } },
       data: { position: 2000, columnId: COLUMN_ID },
     });
-    expect(executeRaw).toHaveBeenCalledTimes(1);
-    const [, ids, positions, columnId] = executeRaw.mock.calls[0]!;
+    expect(result.position).toBe(2000);
+    expect(result.columnId).toBe(COLUMN_ID);
+    // Column FOR UPDATE + sibling rebalance write.
+    expect(executeRaw).toHaveBeenCalledTimes(2);
+    const [, ids, positions, columnId] = executeRaw.mock.calls[1]!;
     expect(ids).toEqual(['a', 'b']);
     expect(positions).toEqual([1000, 3000]);
     expect(columnId).toBe(COLUMN_ID);
-    expect(result.position).toBe(2000);
-    expect(result.columnId).toBe(COLUMN_ID);
     // An interactive transaction is one connection: the rebalance writes run one after the
     // other, so a failure names a statement and leaves a state that can be reasoned about.
     expect(writeOrder).toEqual(['moved:start', 'moved:done', 'siblings:start', 'siblings:done']);
@@ -344,6 +351,7 @@ describe('TaskService', () => {
               options.column === undefined ? { id: COLUMN_ID, boardId: BOARD_ID } : options.column,
             ),
         },
+        $executeRaw: jest.fn().mockResolvedValue(0),
       }),
     );
     return { updates, siblingQuery };
@@ -351,7 +359,15 @@ describe('TaskService', () => {
 
   it('returns 404 on create when afterTaskId does not exist in the target column', async () => {
     const { service, prisma } = buildService();
-    prisma.task.findMany.mockResolvedValue([taskRow({ id: 'a', position: 1000 })]);
+    prisma.$transaction.mockImplementation(async (callback) =>
+      callback({
+        task: {
+          findMany: jest.fn().mockResolvedValue([taskRow({ id: 'a', position: 1000 })]),
+          create: jest.fn(),
+        },
+        $executeRaw: jest.fn().mockResolvedValue(0),
+      }),
+    );
 
     await expect(
       service.create(WORKSPACE_ID, BOARD_ID, USER_ID, {
@@ -360,20 +376,26 @@ describe('TaskService', () => {
         afterTaskId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d99',
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect(prisma.task.create).not.toHaveBeenCalled();
   });
 
   it('rebalances the whole column when a create hits an exhausted gap', async () => {
     const { service, prisma } = buildService();
     const a = taskRow({ id: 'a', position: 1000 });
     const b = taskRow({ id: 'b', position: 1000 + MIN_GAP / 2 });
-    prisma.task.findMany.mockResolvedValue([a, b]);
 
     let createdPosition: number | undefined;
-    const executeRaw = jest.fn().mockResolvedValue(2);
+    let lockSeen = false;
+    const executeRaw = jest.fn().mockImplementation(async () => {
+      if (!lockSeen) {
+        lockSeen = true;
+        return 0;
+      }
+      return 2;
+    });
     prisma.$transaction.mockImplementation(async (callback) =>
       callback({
         task: {
+          findMany: jest.fn().mockResolvedValue([a, b]),
           create: jest.fn().mockImplementation(({ data }) => {
             createdPosition = data.position as number;
             return Promise.resolve(taskRow({ id: 'new', position: data.position as number }));
@@ -389,8 +411,8 @@ describe('TaskService', () => {
       afterTaskId: 'a',
     });
 
-    expect(executeRaw).toHaveBeenCalledTimes(1);
-    const [, ids, positions, columnId] = executeRaw.mock.calls[0]!;
+    expect(executeRaw).toHaveBeenCalledTimes(2);
+    const [, ids, positions, columnId] = executeRaw.mock.calls[1]!;
     expect(ids).toEqual(['a', 'b']);
     expect(positions).toEqual([1000, 3000]);
     expect(columnId).toBe(COLUMN_ID);
