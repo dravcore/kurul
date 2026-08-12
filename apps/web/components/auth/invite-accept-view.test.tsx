@@ -229,9 +229,7 @@ describe('InviteAcceptView', () => {
     fireEvent.click(await screen.findByRole('button', { name: ACCEPT_LABEL }));
 
     await waitFor(() =>
-      expect(screen.getByRole('status').textContent).toBe(
-        'This invitation was sent to a different address.',
-      ),
+      expect(screen.getByRole('status').textContent).toBe(messages.auth.invite.forbidden),
     );
     expect(screen.queryByRole('heading', { name: 'Confirm your email first' })).toBeNull();
   });

@@ -25,6 +25,7 @@ import { DamgaMark } from '@/components/brand/damga-mark';
 export function BoardList(): React.ReactElement {
   const t = useTranslations('app.board');
   const tShell = useTranslations('app.shell');
+  const tErrors = useTranslations('app.errors');
   const { activeId, activeRole } = useWorkspaceContext();
   const [createOpen, setCreateOpen] = useState(false);
   const [renameBoard, setRenameBoard] = useState<BoardDto | null>(null);
@@ -42,6 +43,7 @@ export function BoardList(): React.ReactElement {
     data: boards,
     loading,
     error,
+    reload,
     setData: setBoards,
   } = useApiResource<BoardDto[]>(fetchBoards, [], t('listError'));
 
@@ -62,7 +64,16 @@ export function BoardList(): React.ReactElement {
   }
 
   if (error) {
-    return <p className="text-body text-destructive">{error}</p>;
+    // Nothing here explains itself — a list that did not arrive is the retryable case, so the
+    // recovery is a control rather than a sentence (docs/design.md §7).
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <p className="text-body text-destructive">{error}</p>
+        <Button type="button" onClick={reload}>
+          {tErrors('retry')}
+        </Button>
+      </div>
+    );
   }
 
   return (

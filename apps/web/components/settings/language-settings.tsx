@@ -11,6 +11,7 @@ import {
   type UpdateMeRequest,
   type UserDto,
 } from '@kurultay/shared-types';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,6 +31,7 @@ const FOLLOW_BROWSER = '';
 
 export function LanguageSettings(): React.ReactElement {
   const t = useTranslations('app.settings.language');
+  const tErrors = useTranslations('app.errors');
   const router = useRouter();
   const [saving, setSaving] = useState(false);
 
@@ -38,6 +40,7 @@ export function LanguageSettings(): React.ReactElement {
     data: user,
     loading,
     error,
+    reload,
   } = useApiResource<UserDto | null>(fetchMe, null, t('loadError'));
 
   const onChange = useCallback(
@@ -76,7 +79,15 @@ export function LanguageSettings(): React.ReactElement {
   }
 
   if (error !== null || !user) {
-    return <p className="text-body text-destructive">{error ?? t('loadError')}</p>;
+    // Unexplained, so the recovery is a control rather than a sentence (docs/design.md §7).
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <p className="text-body text-destructive">{error ?? t('loadError')}</p>
+        <Button type="button" onClick={reload}>
+          {tErrors('retry')}
+        </Button>
+      </div>
+    );
   }
 
   return (

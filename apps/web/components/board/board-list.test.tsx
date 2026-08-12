@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { MemberRole, type BoardDto } from '@kurultay/shared-types';
 import messages from '@/messages/en.json';
@@ -69,6 +69,20 @@ describe('BoardList', () => {
     renderList();
 
     expect(await screen.findByText(messages.app.board.listError)).toBeDefined();
+  });
+
+  it('offers a way out of a failed load, not just the news of it', async () => {
+    // A load nobody explained is the retryable half of §7: the recovery has to be a control,
+    // because there is nothing else on this screen for the user to press.
+    fetchBoards.mockRejectedValueOnce(new Error('network'));
+    renderList();
+
+    await screen.findByText(messages.app.board.listError);
+    fetchBoards.mockResolvedValue([board('0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d70')]);
+    fireEvent.click(screen.getByRole('button', { name: messages.app.errors.retry }));
+
+    expect(await screen.findByText('Board 0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d70')).toBeDefined();
+    expect(screen.queryByText(messages.app.board.listError)).toBeNull();
   });
 
   /**

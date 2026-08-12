@@ -22,7 +22,7 @@
       "submit": "Create account",
       "hasAccount": "Already have an account?",
       "loginLink": "Sign in",
-      "error": "Could not create your account."
+      "error": "Could not create your account. Check your details and try again."
     },
     "invite": {
       "title": "Accept invitation",
@@ -34,7 +34,7 @@
       "signInCta": "Sign in",
       "loading": "Loading invitation…",
       "error": "Could not accept this invitation.",
-      "forbidden": "This invitation was sent to a different address.",
+      "forbidden": "This invitation was sent to a different address. Sign in as the invited address to accept it.",
       "loadError": "This invitation is no longer available. Ask for a new one.",
       "backToApp": "Back to your workspaces",
       "confirmTitle": "Confirm your email first",
@@ -63,9 +63,9 @@
       "sendError": "Could not send the link. Try again in a moment.",
       "linkErrors": {
         "TOKEN_EXPIRED": "This link has expired. Confirmation links are short-lived, so send yourself a new one.",
-        "INVALID_TOKEN": "This link isn't valid. It may have been used already, or copied without its last characters.",
+        "INVALID_TOKEN": "This link isn't valid. It may have been used already, or copied without its last characters — send yourself a new one.",
         "USER_NOT_FOUND": "There's no account for the address in this link.",
-        "unknown": "This link couldn't be checked."
+        "unknown": "This link couldn't be checked. Send yourself a new one."
       }
     }
   },
@@ -271,7 +271,7 @@
         "createLabel": "Create label",
         "deleteLabel": "Delete",
         "labelDeleted": "Label deleted from this board",
-        "labelForbidden": "You need admin access to manage board labels.",
+        "labelForbidden": "You need admin access to manage board labels. Ask a workspace owner.",
         "labelSaveError": "Could not update labels.",
         "labelDeleteError": "Could not delete this label.",
         "comments": "Comments",
@@ -333,7 +333,7 @@
         "moveError": "Could not move this task.",
         "retryAction": "Try again",
         "cancel": "Cancel",
-        "forbidden": "You need to be a workspace member to change tasks."
+        "forbidden": "You need to be a workspace member to change tasks. Ask a workspace owner for access."
       }
     },
     "notifications": {

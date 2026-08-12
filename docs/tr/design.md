@@ -310,7 +310,15 @@ Ekranın kullanıcı tarafından, active voice, sentence case.
 - **Bir flow boyunca tek bir verb:** button **Create board** (**Board oluştur**) → dialog
   **Create board** (**Board oluştur**) → toast **Board created** (**Board oluşturuldu**).
   Button'lar aksiyonlarını adlandırır, asla Yes/No/OK değil; destructive olanlar object'i
-  adlandırır.
+  adlandırır. Verb, failure'a kadar korunur: bir **Add column** (**Column ekle**) button'ı
+  "Could not _create_ this column." ("Bu column _oluşturulamadı_.") diye başarısız olmaz.
+- **Üçüncü vuruş yalnızca ekranın sonucu gösteremediği yerde vardır.** Bir card cursor'ın altına
+  iner, yeniden adlandırılmış bir column yeni adını gösterir, silinen bir board grid'den çıkar —
+  bunlar kendilerini doğrular, üstüne bir toast gürültüdür. Etki ekran dışındaysa (bir inbox,
+  saklanan bir tercih), değişen şeyin ekranda bir karşılığı yoksa (bir column'ın `category`'si),
+  ya da değişiklik view'ın kabul ettiğinden daha uzağa uzanıyorsa (bir board label'ını silmek onu
+  her task'tan çıkarır) doğrula. Sessizlik default'tur; mesaj, kendini hak etmesi gereken
+  istisnadır.
 - **Element başına bir görev.** Bir label label'lar, helper text açıklar, bir placeholder bir
   örnek gösterir — bir placeholder asla bir label değildir.
 - **Internal'ları asla ifşa etme** (`workspaceId`, `position`, "fractional index", "optimistic
@@ -318,6 +326,25 @@ Ekranın kullanıcı tarafından, active voice, sentence case.
 - **Date'ler ve süreler:** şimdiye yakın relative ("in 2 days" / "2 gün içinde"), bir haftadan
   öte absolute, exact değer her zaman `title`'da. `estimatedMinutes`, asla "150" değil "2h 30m"
   ("2s 30dk") render eder.
+
+**Her error bir çıkış yoluyla biter.** Başarısız olan object'i adlandırmak mesajın yalnızca
+yarısıdır; diğer yarısı bir sonraki hamledir. Bunu hangi yarının taşıdığına tek bir soru karar
+verir — **aynı request ikinci bir denemede başarılı olabilir mi?**
+
+|                       | **Hayır** — server kendini açıkladı                                                                                                                | **Evet** — server açıklamadı                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Recovery nerede yaşar | **Cümlede**                                                                                                                                        | **Surface'te**                                                                         |
+| Kullanıcı ne alır     | Sebep, ardından onu değiştiren tek hamle: bir admin'e sor, reload et, diğer adresi kullan, yeni bir link gönder                                    | Başarısız olan object, ardından bir control: toast'ta `action`, block'ta **Try again** |
+| Tipik sebepler        | `400` · `401` · `403` · `404` · `409`, reddedilen bir credential, süresi dolmuş bir link                                                           | network · timeout · `429` · `5xx`                                                      |
+| Örnek                 | You need admin access to change columns. Ask a workspace owner. (Column'ları değiştirmek için admin erişimi gerekir. Bir workspace owner'ına sor.) | The board couldn't load. → **Try again** (Board yüklenemedi. → **Yeniden dene**)       |
+
+Sağdaki sütunu iki şey dürüst tutar. Her basışta yeniden başarısız olan bir control, kullanıcıya
+ürünün bozuk olduğunu öğretir; bu yüzden **açıklanmış** bir failure asla control almaz — server'ın
+`403` ile reddettiği bir write'ı, ya da artık var olmayan bir task'a yapılan bir write'ı yeniden
+göndermek yalnızca toast'ı tekrarlar. Ve başarısız olan control **hâlâ ekrandaysa ve hâlâ
+canlıysa** — bir dialog'un submit button'ı, "Load more", bir select — retry zaten odur; yanına bir
+ikincisini koymak karmaşadır. Create/rename/delete dialog'larının kendi action'ını taşımamasının
+sebebi budur.
 
 Kullanıcıya görünen her string, MVP English-only ship etse bile, ilk component'ten itibaren
 **next-intl** üzerinden geçer. Bu _layer_'dır, çeviriler değil: roadmap'in Beyond-MVP "i18n in
