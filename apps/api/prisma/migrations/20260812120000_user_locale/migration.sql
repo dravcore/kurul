@@ -1,0 +1,13 @@
+-- Interface language becomes a stored user preference
+-- (docs/decisions/0018-localization-strategy.md).
+--
+-- Nullable, with no backfill and no default. Null means "never chose", which is a different
+-- state from an explicit 'en': an unset user follows their browser's Accept-Language, so
+-- backfilling 'en' would pin every existing account to English and make the header link of
+-- the resolution chain unreachable for them.
+--
+-- No CHECK constraint against the supported list either. The set of shipped locales changes
+-- with the message catalogs, not with the schema, and a constraint here would turn adding a
+-- language into a migration. `PATCH /me` validates the value against SUPPORTED_LOCALES at the
+-- edge, and the resolution chain falls back to 'en' for anything it cannot load.
+ALTER TABLE "User" ADD COLUMN "locale" TEXT;

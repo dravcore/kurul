@@ -39,6 +39,14 @@ model User {
   name          String
   emailVerified Boolean  @default(false)
   avatarUrl     String?
+  /// Interface language as an IETF tag (`en`), or null for "never chose".
+  ///
+  /// Null is not the same as `'en'`: a user who has not picked still follows their browser's
+  /// `Accept-Language`, and writing the default in at sign-up would freeze whichever language
+  /// they happened to sign up in. Stored rather than kept only in a cookie because outbound
+  /// email has to know the recipient's language with no request in flight
+  /// (docs/decisions/0018-localization-strategy.md).
+  locale        String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
