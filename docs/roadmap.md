@@ -5,7 +5,7 @@ beyond.
 
 > 🌐 English (canonical) | [Türkçe](tr/roadmap.md)
 
-**Last updated:** 2026-08-09
+**Last updated:** 2026-08-12
 
 ## Contents
 
@@ -21,6 +21,7 @@ beyond.
 - [Phase 7 — Dashboard](#phase-7--dashboard)
 - [Phase 8 — Activity log and notifications](#phase-8--activity-log-and-notifications)
 - [Phase 9 — Realtime](#phase-9--realtime)
+- [Post-MVP hardening](#post-mvp-hardening)
 - [Beyond MVP](#beyond-mvp)
 
 ## How this roadmap works
@@ -269,7 +270,9 @@ tenant-safely until this exists.
 - [x] Empty and loading states
 
 > Completion-over-time shipped after Activity: `throughput` on
-> `GET .../dashboard/summary` (14 UTC days, created vs moves into a Done-named column).
+> `GET .../dashboard/summary` (14 UTC days, created vs moves into a column whose
+> `ColumnCategory` is `COMPLETED` — it keyed off the column _name_ until
+> [ADR 0019](decisions/0019-column-category.md)).
 > Column (“status”) chart requires optional `?boardId=`. See the Phase 7 spec.
 
 ---
@@ -317,25 +320,57 @@ schema is one pass of work; building it early is a tax on all eight phases befor
 
 ---
 
+## Post-MVP hardening
+
+**Goal:** pay down what nine phases of delivery left behind, before adding anything new.
+**Status:** done
+
+Not a phase — the phases are the product, this is the debt they accrued. A six-axis audit
+after Phase 9 found 48 items; the ones that survived verification were closed across nine
+PRs. Recorded here because the roadmap otherwise jumps from "MVP complete" to "beyond MVP"
+with no account of the two weeks in between.
+
+- [x] Correctness: tenant-scoped write predicates across eight services, check-then-act folded
+      into transactions, Prisma error mapping, socket `board:join` tenant leak
+- [x] Guardrails: type-aware ESLint with `jsx-a11y`, coverage measured _and_ floored
+      (API global, `apps/web` scoped to `app/**`), CodeQL, blocking `pnpm audit`
+- [x] Scale: dashboard aggregation moved into SQL, `due-soon` deduplicated by pairs rather
+      than a cross product, ordering reads narrowed, `better-auth` 1.3.34 → 1.6.26
+- [x] Duplication: `toCursorPage`, `useApiResource`, `ConfirmDialog` / `FormDialog`,
+      `resolveApiMessage`, `Textarea` / `Select` primitives
+- [x] [ADR 0016](decisions/0016-foreign-key-violation-status.md) — foreign-key violations map
+      to `409`, not `422`
+- [x] [ADR 0017](decisions/0017-partial-indexes-outside-prisma-schema.md) — partial indexes
+      live in migrations, guarded by tests
+- [x] [ADR 0018](decisions/0018-localization-strategy.md) — localization strategy
+- [x] [ADR 0019](decisions/0019-column-category.md) — column completion is a category, not a name
+
+Test count over the period: 249 API + 80 web → **421 API + 302 web + 28 shared-types**, plus
+89 e2e. Two defects surfaced that no item had named: an e2e harness that re-bound the HTTP
+server on every request, and a focus ring that had already been lost to copy-pasted class
+strings.
+
+---
+
 ## Beyond MVP
 
 Not scheduled. Listed so the architecture stays compatible with them, not as commitments.
 
-| Item                                                   | Note                                                                                                                                                                |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[-]` E2E test suite (Playwright)                      | Once the UI stops changing shape — [testing.md](testing.md)                                                                                                         |
-| `[-]` Gantt / timeline view                            | `dueDate` + `estimatedMinutes` are kept separate for this                                                                                                           |
-| `[-]` Task attachments                                 | Needs an object-storage decision (ADR)                                                                                                                              |
-| `[-]` Board templates                                  |                                                                                                                                                                     |
-| `[-]` Public API tokens + `/v1` prefix                 | Post-1.0 — [api-conventions.md](api-conventions.md#versioning)                                                                                                      |
-| `[-]` Webhooks                                         |                                                                                                                                                                     |
-| `[-]` Email notifications                              | Transport already ships for transactional mail ([ADR 0013](decisions/0013-invitation-email-verification.md)); this row is routing `Notification` rows to it         |
-| `[-]` Import from Trello / Jira                        |                                                                                                                                                                     |
-| `[-]` Further UI language packs                        | The next-intl layer itself ships in Phase 1 and MVP is English-only; this row is about additional locales (Turkish first) — see [design.md](design.md#7-ui-writing) |
-| `[-]` Self-host deployment guide beyond Docker Compose |                                                                                                                                                                     |
-| `[-]` Due-soon delivery alternatives                   | In-process Nest interval scanner (simpler ops, single-replica fallback) or OS cron → internal HTTP (for self-hosters who prefer cron over BullMQ/Redis)             |
-| `[-]` Mentions without the member picker               | Plain `@DisplayName` regex, or an API-only `mentionedUserIds[]` — only if the structured `@[Name](userId)` picker UX turns out to be blocked                        |
-| `[-]` Realtime push of notifications / activity        | Phase 9 shipped board sync (task/column/comment events) only; the notification bell and activity feed still poll rather than subscribing to a socket event          |
+| Item                                                   | Note                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[-]` E2E test suite (Playwright)                      | Once the UI stops changing shape — [testing.md](testing.md)                                                                                                                                                                                                                                                                      |
+| `[-]` Gantt / timeline view                            | `dueDate` + `estimatedMinutes` are kept separate for this                                                                                                                                                                                                                                                                        |
+| `[-]` Task attachments                                 | Needs an object-storage decision (ADR)                                                                                                                                                                                                                                                                                           |
+| `[-]` Board templates                                  |                                                                                                                                                                                                                                                                                                                                  |
+| `[-]` Public API tokens + `/v1` prefix                 | Post-1.0 — [api-conventions.md](api-conventions.md#versioning)                                                                                                                                                                                                                                                                   |
+| `[-]` Webhooks                                         |                                                                                                                                                                                                                                                                                                                                  |
+| `[-]` Email notifications                              | Transport already ships for transactional mail ([ADR 0013](decisions/0013-invitation-email-verification.md)); this row is routing `Notification` rows to it                                                                                                                                                                      |
+| `[-]` Import from Trello / Jira                        |                                                                                                                                                                                                                                                                                                                                  |
+| `[-]` Further UI language packs                        | The resolution mechanism shipped post-MVP ([ADR 0018](decisions/0018-localization-strategy.md)): `User.locale` → cookie → `Accept-Language`, a language setting, and locale-seeded board columns. What remains is a second locale — `SUPPORTED_LOCALES`, `messages/tr.json`, the API seed names, and translatable mail templates |
+| `[-]` Self-host deployment guide beyond Docker Compose |                                                                                                                                                                                                                                                                                                                                  |
+| `[-]` Due-soon delivery alternatives                   | In-process Nest interval scanner (simpler ops, single-replica fallback) or OS cron → internal HTTP (for self-hosters who prefer cron over BullMQ/Redis)                                                                                                                                                                          |
+| `[-]` Mentions without the member picker               | Plain `@DisplayName` regex, or an API-only `mentionedUserIds[]` — only if the structured `@[Name](userId)` picker UX turns out to be blocked                                                                                                                                                                                     |
+| `[-]` Realtime push of the activity feed               | The notification bell now subscribes to `notification:unread-changed` and only polls as a fallback. The task activity feed is neither pushed nor polled — it loads when the panel opens, so a feed left open goes stale                                                                                                          |
 
 **1.0.0** is cut when Phases 1–9 are complete and the REST API is stable enough to promise
 backwards compatibility.
