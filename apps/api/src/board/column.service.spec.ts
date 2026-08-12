@@ -275,19 +275,30 @@ describe('ColumnService', () => {
       color: null,
     };
     const siblingQuery = jest.fn().mockResolvedValue([beforeNeighbor, afterNeighbor, column]);
+    const writeOrder: string[] = [];
     prisma.$transaction.mockImplementation(async (callback) =>
       callback({
         column: {
           findFirst: jest.fn().mockResolvedValue(column),
           findMany: siblingQuery,
-          update: jest.fn().mockResolvedValue({ ...column, position: 2000 }),
+          update: jest.fn().mockImplementation(async () => {
+            writeOrder.push('moved:start');
+            await Promise.resolve();
+            writeOrder.push('moved:done');
+            return { ...column, position: 2000 };
+          }),
           findFirstOrThrow: jest.fn().mockResolvedValue({
             ...column,
             position: 2000,
             _count: { tasks: 7 },
           }),
         },
-        $executeRaw: jest.fn().mockResolvedValue(2),
+        $executeRaw: jest.fn().mockImplementation(async () => {
+          writeOrder.push('siblings:start');
+          await Promise.resolve();
+          writeOrder.push('siblings:done');
+          return 2;
+        }),
       }),
     );
 
@@ -304,6 +315,9 @@ describe('ColumnService', () => {
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
       select: { id: true, position: true },
     });
+    // An interactive transaction is one connection: the rebalance writes run one after the
+    // other, so a failure names a statement and leaves a state that can be reasoned about.
+    expect(writeOrder).toEqual(['moved:start', 'moved:done', 'siblings:start', 'siblings:done']);
     expect(realtime.emitToBoard).toHaveBeenCalled();
   });
 });

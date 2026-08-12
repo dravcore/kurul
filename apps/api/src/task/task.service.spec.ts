@@ -254,15 +254,26 @@ describe('TaskService', () => {
 
     let updateCall: { where: { id: string }; data: { position: number; columnId: string } } | null =
       null;
-    const executeRaw = jest.fn().mockResolvedValue(2);
+    const writeOrder: string[] = [];
+    // Both mocks resolve on a later tick, so a `Promise.all` would interleave start/settle and
+    // the log would not read as two completed statements in order.
+    const executeRaw = jest.fn().mockImplementation(async () => {
+      writeOrder.push('siblings:start');
+      await Promise.resolve();
+      writeOrder.push('siblings:done');
+      return 2;
+    });
     prisma.$transaction.mockImplementation(async (callback) =>
       callback({
         task: {
           findFirst: jest.fn().mockResolvedValue(moving),
           findMany: jest.fn().mockResolvedValue(tight),
-          update: jest.fn().mockImplementation(({ where, data }) => {
+          update: jest.fn().mockImplementation(async ({ where, data }) => {
             updateCall = { where, data };
-            return Promise.resolve({ ...moving, ...data, id: where.id });
+            writeOrder.push('moved:start');
+            await Promise.resolve();
+            writeOrder.push('moved:done');
+            return { ...moving, ...data, id: where.id };
           }),
         },
         column: {
@@ -289,6 +300,9 @@ describe('TaskService', () => {
     expect(columnId).toBe(COLUMN_ID);
     expect(result.position).toBe(2000);
     expect(result.columnId).toBe(COLUMN_ID);
+    // An interactive transaction is one connection: the rebalance writes run one after the
+    // other, so a failure names a statement and leaves a state that can be reasoned about.
+    expect(writeOrder).toEqual(['moved:start', 'moved:done', 'siblings:start', 'siblings:done']);
   });
 
   /** Wire up the $transaction mock the way move() consumes it. */

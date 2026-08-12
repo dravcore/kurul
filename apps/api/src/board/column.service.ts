@@ -236,15 +236,18 @@ export class ColumnService {
           .filter(({ item }) => item.id !== columnId)
           .map(({ item, index }) => ({ id: item.id, position: positions[index]! }));
 
-        await Promise.all([
-          // Scoped predicate on the write too — the transaction-local read above proves the
-          // column was in the workspace, the predicate is what the database enforces.
-          tx.column.update({
-            where: { id: columnId, board: { workspaceId } },
-            data: { position: positions[insertionIndex]! },
-          }),
-          batchUpdateColumnPositions(tx, column.boardId, otherUpdates),
-        ]);
+        // Sequential, not `Promise.all`: an interactive transaction is one connection, so the
+        // two writes queue behind each other regardless. Racing them bought no parallelism and
+        // cost the ability to say which statement failed and what the transaction had already
+        // applied when it did.
+        //
+        // Scoped predicate on the write too — the transaction-local read above proves the
+        // column was in the workspace, the predicate is what the database enforces.
+        await tx.column.update({
+          where: { id: columnId, board: { workspaceId } },
+          data: { position: positions[insertionIndex]! },
+        });
+        await batchUpdateColumnPositions(tx, column.boardId, otherUpdates);
         const refreshed = await tx.column.findFirstOrThrow({
           where: { id: columnId, board: { workspaceId } },
           include: { _count: { select: { tasks: true } } },
