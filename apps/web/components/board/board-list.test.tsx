@@ -73,7 +73,7 @@ describe('BoardList', () => {
 
   /**
    * No active workspace is a moment, not a failure: the shell resolves the roster and, when
-   * it is empty, redirects to `/workspaces/new`. Answering "Could not load boards." blames a
+   * it is empty, redirects to `/workspaces/new`. Answering "Your boards couldn't load." blames a
    * request that was never made — and it is the one thing on screen while the redirect runs.
    */
   it('waits rather than blaming a load when there is no active workspace yet', () => {

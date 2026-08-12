@@ -33,7 +33,7 @@ export function InviteAcceptView({
   invitationId,
 }: Readonly<{ invitationId: string }>): React.ReactElement {
   const t = useTranslations('auth.invite');
-  const tv = useTranslations('auth.verification');
+  const tv = useTranslations('auth.emailConfirmation');
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, isPending: sessionPending } = authClient.useSession();
@@ -140,10 +140,10 @@ export function InviteAcceptView({
             tabIndex={-1}
             className="font-display text-display tracking-tight"
           >
-            {t('verifyTitle')}
+            {t('confirmTitle')}
           </h1>
           <p className="text-body text-muted-foreground">
-            {t('verifyBody', { email: session.user.email })}
+            {t('confirmBody', { email: session.user.email })}
           </p>
           {linkError ? (
             <p className="text-body text-destructive">{tv(`linkErrors.${linkError}`)}</p>

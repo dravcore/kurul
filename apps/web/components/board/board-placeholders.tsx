@@ -69,7 +69,7 @@ export function BoardColumnsEmptyState({
           </Button>
         </div>
       ) : (
-        <p className="text-body text-destructive">{t('errors.forbiddenColumns')}</p>
+        <p className="text-body text-destructive">{t('column.forbidden')}</p>
       )}
     </div>
   );

@@ -9,7 +9,7 @@ import { VerifyEmailView } from '@/components/auth/verify-email-view';
  * boundary or the whole route opts out of static rendering.
  */
 export default async function VerifyEmailPage(): Promise<React.ReactElement> {
-  const t = await getTranslations('auth.verifyEmail');
+  const t = await getTranslations('auth.confirmEmail');
 
   return (
     <Suspense fallback={<p className="text-body text-muted-foreground">{t('loading')}</p>}>

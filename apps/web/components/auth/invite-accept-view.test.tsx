@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { NextIntlClientProvider } from 'next-intl';
 import messages from '@/messages/en.json';
 
+const ACCEPT_LABEL = messages.auth.invite.submit;
+
 const INVITATION_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51';
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60';
 
@@ -120,7 +122,7 @@ describe('InviteAcceptView', () => {
 
     expect(await screen.findByText("You've been invited to join Steppe Collective.")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Accept invite' }));
+    fireEvent.click(screen.getByRole('button', { name: ACCEPT_LABEL }));
 
     await waitFor(() =>
       expect(mocks.post).toHaveBeenCalledWith(
@@ -206,7 +208,7 @@ describe('InviteAcceptView', () => {
     );
     renderView();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Accept invite' }));
+    fireEvent.click(await screen.findByRole('button', { name: ACCEPT_LABEL }));
 
     const heading = await screen.findByRole('heading', { name: 'Confirm your email first' });
     // The button that was pressed is gone; focus has to land somewhere deliberate.
@@ -221,7 +223,7 @@ describe('InviteAcceptView', () => {
     );
     renderView();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Accept invite' }));
+    fireEvent.click(await screen.findByRole('button', { name: ACCEPT_LABEL }));
 
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toBe(
@@ -238,7 +240,7 @@ describe('InviteAcceptView', () => {
     invitationLoads();
     renderView();
 
-    expect(await screen.findByRole('button', { name: 'Accept invite' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: ACCEPT_LABEL })).toBeTruthy();
     expect(mocks.getInvitation).toHaveBeenCalledWith({ query: { id: INVITATION_ID } });
   });
 });

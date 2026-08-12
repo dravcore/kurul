@@ -272,7 +272,7 @@ word "Oops".
 | ------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `400` / `422` with `details[]` | Inline under each field; focus moves to the first | From `details[].constraint`, mapped to a catalog string: "Title can't be empty"           |
 | `401`                          | Redirect to sign-in, keeping the return URL       | Your session ended. Sign in to pick up where you left off.                                |
-| `403`                          | Inline on the blocked control                     | You need Admin access to change columns. Ask a workspace owner.                           |
+| `403`                          | Inline on the blocked control                     | You need admin access to change columns. Ask a workspace owner.                           |
 | `404` in panel                 | Replaces the panel body                           | This task no longer exists. Someone may have deleted it. → **Back to board**              |
 | `409`                          | Dialog over the stale editor                      | Someone changed this task while you were editing. → **Reload** · **Copy my changes**      |
 | `429` · `5xx`                  | Toast · error block where the content should be   | Too many requests. Try again in a few seconds. · The board couldn't load. → **Try again** |
