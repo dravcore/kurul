@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { createTranslator } from 'next-intl';
+import { createTranslator, type NamespaceKeys, type NestedKeyOf } from 'next-intl';
 import messages from '@/messages/en.json';
+
+type Namespace = NamespaceKeys<typeof messages, NestedKeyOf<typeof messages>>;
 
 const INVITATION_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51';
 
@@ -10,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('next-intl/server', () => ({
-  getTranslations: (namespace: string) =>
+  getTranslations: (namespace: Namespace) =>
     Promise.resolve(createTranslator({ locale: 'en', messages, namespace })),
 }));
 
