@@ -21,7 +21,7 @@ jobs:
       DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_ci
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -75,7 +75,7 @@ jobs:
       BETTER_AUTH_URL: http://localhost:4000
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -118,7 +118,7 @@ jobs:
       DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_ci
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
