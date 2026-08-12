@@ -79,7 +79,25 @@
       "themeLight": "Switch to light theme",
       "themeDark": "Switch to dark theme",
       "collapseSidebar": "Collapse sidebar",
-      "expandSidebar": "Expand sidebar"
+      "expandSidebar": "Expand sidebar",
+      "settings": "Settings"
+    },
+    "settings": {
+      "title": "Settings",
+      "language": {
+        "title": "Language",
+        "description": "Choose the language Kurultay speaks to you in. It applies everywhere you sign in, and to the email we send you.",
+        "label": "Interface language",
+        "followBrowser": "Match my browser",
+        "help": "New boards start with columns named in this language. Columns you already have keep their names.",
+        "options": {
+          "en": "English"
+        },
+        "saved": "Language updated",
+        "loadError": "Could not load your language setting.",
+        "saveError": "Could not save your language.",
+        "saveErrorSignedOut": "Your session ended. Sign in to save this."
+      }
     },
     "workspace": {
       "createTitle": "Create a workspace",
