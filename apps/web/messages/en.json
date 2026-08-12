@@ -198,6 +198,7 @@
         "emptyBody": "Columns are the stages work moves through. Start with To Do, In Progress, and Done, or name your own.",
         "useDefaults": "Use default columns",
         "defaultsError": "Could not create the default columns.",
+        "defaultsConflict": "This board already has columns. Reloading the board.",
         "retryAction": "Try again",
         "emptyDrop": "Drop a task here",
         "cancel": "Cancel",

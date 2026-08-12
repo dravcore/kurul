@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Patch, Post } from '@nestjs/common';
 import type { ColumnDto } from '@kurultay/shared-types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';
@@ -35,6 +35,24 @@ export class ColumnController {
     @Body() dto: CreateColumnDto,
   ): Promise<ColumnDto> {
     return this.columnService.create(workspaceId, boardId, user.id, dto);
+  }
+
+  /**
+   * Seeds an empty board with the starting columns in one transaction.
+   *
+   * Same guard as `POST boards/:boardId/columns` — this creates columns, so it is gated on
+   * exactly the roles that may create one. `Accept-Language` is the fallback for a user who
+   * has set no preference; the names are written into the database, not rendered.
+   */
+  @Post('boards/:boardId/columns/defaults')
+  @WorkspaceRoles(...ADMIN_ROLES)
+  createDefaults(
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('boardId') boardId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Headers('accept-language') acceptLanguage?: string,
+  ): Promise<ColumnDto[]> {
+    return this.columnService.createDefaults(workspaceId, boardId, user.id, acceptLanguage);
   }
 
   @Patch('columns/:columnId')

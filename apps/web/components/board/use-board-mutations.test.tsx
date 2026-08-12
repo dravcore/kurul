@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { DEFAULT_COLUMNS, type ColumnDto, type TaskDto } from '@kurultay/shared-types';
+import { ApiError } from '@/lib/api';
+import type { ColumnDto, TaskDto } from '@kurultay/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { useBoardMutations } from './use-board-mutations';
@@ -50,17 +51,15 @@ function renderMutations() {
   return { ...view, setColumns, reload };
 }
 
-/** Each create answers with a column whose id is the name, so ordering is readable. */
-function stubCreates(): void {
-  apiPost.mockImplementation(
-    (_path: string, body?: unknown) =>
-      Promise.resolve({
-        id: (body as { name: string }).name,
-        boardId: BOARD_ID,
-        name: (body as { name: string }).name,
-        position: 0,
-      }) as never,
-  );
+/** What the bulk endpoint answers with: the whole seeded set, already ordered. */
+const SEEDED_COLUMNS = [
+  { id: 'c1', boardId: BOARD_ID, name: 'To Do', position: 1000, category: 'UNSTARTED' },
+  { id: 'c2', boardId: BOARD_ID, name: 'In Progress', position: 2000, category: 'STARTED' },
+  { id: 'c3', boardId: BOARD_ID, name: 'Done', position: 3000, category: 'COMPLETED' },
+];
+
+function apiError(statusCode: number): ApiError {
+  return new ApiError({ statusCode, error: 'Error', message: 'failed' });
 }
 
 beforeEach(() => {
@@ -72,68 +71,69 @@ afterEach(() => {
 });
 
 describe('useBoardMutations seedDefaults', () => {
-  it('seeds exactly the shared default columns, in order', async () => {
-    stubCreates();
-    const { result } = renderMutations();
+  it('seeds the whole set in one request to the defaults endpoint', async () => {
+    apiPost.mockResolvedValue(SEEDED_COLUMNS as never);
+    const { result, setColumns } = renderMutations();
 
     await result.current.seedDefaults();
 
-    const names = apiPost.mock.calls.map((call) => (call[1] as { name: string }).name);
-    expect(names).toEqual(DEFAULT_COLUMNS.map((column) => column.name));
-    for (const call of apiPost.mock.calls) {
-      expect(call[0]).toBe(`/workspaces/${WORKSPACE_ID}/boards/${BOARD_ID}/columns`);
-    }
-  });
-
-  it('sends each column its category, not just its name', async () => {
-    stubCreates();
-    const { result } = renderMutations();
-
-    await result.current.seedDefaults();
-
-    const categories = apiPost.mock.calls.map(
-      (call) => (call[1] as { category?: string }).category,
+    // One call, not one per column: the serial loop this replaces could fail halfway and
+    // leave a board holding two of the three stages.
+    expect(apiPost).toHaveBeenCalledTimes(1);
+    expect(apiPost.mock.calls[0]?.[0]).toBe(
+      `/workspaces/${WORKSPACE_ID}/boards/${BOARD_ID}/columns/defaults`,
     );
-    // Spelled out rather than mapped from DEFAULT_COLUMNS: a Done column seeded without
-    // COMPLETED reports zero throughput forever, and asserting against the same constant the
-    // code reads would not notice.
-    expect(categories).toEqual(['UNSTARTED', 'STARTED', 'COMPLETED']);
+    expect(setColumns).toHaveBeenCalledWith(SEEDED_COLUMNS);
   });
 
-  /**
-   * The order is carried by `afterColumnId`, not by request order — the server owns the
-   * Float each column lands on, so an omitted anchor would append wherever it liked.
-   */
-  it('anchors each column after the one before it', async () => {
-    stubCreates();
+  it('sends no body, because the server owns the names and the order', async () => {
+    apiPost.mockResolvedValue(SEEDED_COLUMNS as never);
     const { result } = renderMutations();
 
     await result.current.seedDefaults();
 
-    const anchors = apiPost.mock.calls.map(
-      (call) => (call[1] as { afterColumnId?: string }).afterColumnId,
-    );
-    const names = DEFAULT_COLUMNS.map((column) => column.name);
-    expect(anchors).toEqual([undefined, ...names.slice(0, -1)]);
+    // The names are written in the creator's language (ADR 0018) and the positions come from
+    // the server's own catalog, so a client-supplied list would only be able to disagree.
+    expect(apiPost.mock.calls[0]?.[1]).toBeUndefined();
   });
 
-  it('keeps the columns that were created when a later one fails', async () => {
-    const [first] = DEFAULT_COLUMNS;
-    apiPost
-      .mockResolvedValueOnce({
-        id: 'c1',
-        boardId: BOARD_ID,
-        name: first?.name ?? '',
-        position: 1000,
-      } as never)
-      .mockRejectedValueOnce(new Error('network'));
+  it('reloads instead of retrying when the board was seeded meanwhile', async () => {
+    apiPost.mockRejectedValue(apiError(409));
+    const { result, reload } = renderMutations();
 
+    await result.current.seedDefaults();
+
+    // 409 means this empty-state view is stale, not that anything failed — retrying would
+    // just conflict again.
+    await waitFor(() => expect(reload).toHaveBeenCalled());
+  });
+
+  it('reports a forbidden seed without offering a retry', async () => {
+    apiPost.mockRejectedValue(apiError(403));
     const { result, setColumns, reload } = renderMutations();
 
     await result.current.seedDefaults();
 
-    expect(setColumns).toHaveBeenCalledWith([expect.objectContaining({ id: 'c1' })]);
-    // A partial seed is refetched rather than guessed at — see the hook's docstring.
-    await waitFor(() => expect(reload).toHaveBeenCalled());
+    expect(setColumns).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('leaves the board untouched when the request fails outright', async () => {
+    apiPost.mockRejectedValue(new Error('network'));
+    const { result, setColumns } = renderMutations();
+
+    await result.current.seedDefaults();
+
+    // Nothing partial can land now, so there is no half-seeded state to write into the view.
+    expect(setColumns).not.toHaveBeenCalled();
+  });
+
+  it('clears the pending flag whether the seed succeeds or fails', async () => {
+    apiPost.mockRejectedValue(new Error('network'));
+    const { result } = renderMutations();
+
+    await result.current.seedDefaults();
+
+    await waitFor(() => expect(result.current.defaultsPending).toBe(false));
   });
 });
