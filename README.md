@@ -78,21 +78,18 @@ Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 
 ## Documentation
 
-| Doc                                                  | Covers                                                           |
-| ---------------------------------------------------- | ---------------------------------------------------------------- |
-| [docs/README.md](docs/README.md)                     | Docs map, EN/TR policy, archive policy                           |
-| [docs/architecture.md](docs/architecture.md)         | Module map, data model overview                                  |
-| [docs/tech-stack.md](docs/tech-stack.md)             | Stack choices and rationale                                      |
-| [docs/project-skeleton.md](docs/project-skeleton.md) | Historical Phase 1 scaffold (how the monorepo was first built)   |
-| [docs/development.md](docs/development.md)           | Environment setup, daily workflow, commands                      |
-| [docs/coding-standards.md](docs/coding-standards.md) | TS/NestJS/Next.js conventions                                    |
-| [docs/design.md](docs/design.md)                     | UI/UX language: principles, tokens, layout, motion, states, copy |
-| [docs/git-strategy.md](docs/git-strategy.md)         | Git Flow, Conventional Commits, releases                         |
-| [docs/testing.md](docs/testing.md)                   | Test layers, tools, expectations                                 |
-| [docs/api-conventions.md](docs/api-conventions.md)   | REST naming, error format, pagination                            |
-| [docs/roadmap.md](docs/roadmap.md)                   | Phases and progress                                              |
-| [docs/decisions/](docs/decisions/)                   | Lightweight architecture decision records                        |
-| [docs/archive/](docs/archive/)                       | Historical plans and meta-specs (not day-to-day reading)         |
+Start with the five-minute map: **[docs/README.md](docs/README.md)** (what to read for
+product, coding, API, releases, roadmap).
+
+| Doc                                                | Covers                                    |
+| -------------------------------------------------- | ----------------------------------------- |
+| [docs/architecture.md](docs/architecture.md)       | Module map, data model                    |
+| [docs/design.md](docs/design.md)                   | UI/UX language                            |
+| [docs/development.md](docs/development.md)         | Local setup and daily commands            |
+| [docs/api-conventions.md](docs/api-conventions.md) | REST, errors, pagination                  |
+| [docs/roadmap.md](docs/roadmap.md)                 | MVP done; beyond-MVP backlog              |
+| [docs/decisions/](docs/decisions/)                 | ADRs                                      |
+| [docs/archive/](docs/archive/)                     | Historical specs, plans, phase checklists |
 
 ## Contributing
 

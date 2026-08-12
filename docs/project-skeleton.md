@@ -1,7 +1,8 @@
 # Project Skeleton
 
 > **Historical Phase 1 scaffold.** Prefer [architecture.md](architecture.md) and the live
-> repo for current layout. Kept for how the monorepo was first built.
+> repo for current layout. This file records how the monorepo was first built — not a
+> checklist for new work. Day-to-day map: [README.md](README.md).
 
 A step-by-step reference for building the Kurultay monorepo skeleton: workspace, apps, schema, containers, and the checks that say it is done.
 
@@ -163,7 +164,7 @@ Comment         id, taskId, userId, body, createdAt
 Activity        id, workspaceId, taskId?, userId, type, payload(Json), createdAt
 ```
 
-`Notification` is deferred to [roadmap Phase 8](roadmap.md#phase-8--activity-log-and-notifications) — not created in the first migration. Invitations are owned by Better Auth (organization plugin), not a Prisma model here; see [ADR 0004](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
+`Notification` is deferred to [roadmap Phase 8](archive/roadmap-mvp-phases.md#phase-8--activity-log-and-notifications) — not created in the first migration. Invitations are owned by Better Auth (organization plugin), not a Prisma model here; see [ADR 0004](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
 
 **Critical details**
 

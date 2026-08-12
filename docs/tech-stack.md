@@ -4,6 +4,10 @@ The technology chosen for each layer of Kurultay, with a short rationale and the
 
 > 🌐 English (canonical) | [Türkçe](tr/tech-stack.md)
 
+**Pins.** Majors and product choices below are the lasting decisions. Exact versions drift;
+treat root and app `package.json` / `pnpm-lock.yaml` as source of truth for what is installed
+today. Architecture shape: [architecture.md](architecture.md).
+
 ## Contents
 
 - [1. Summary](#1-summary)

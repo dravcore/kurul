@@ -5,6 +5,10 @@ alternatif.
 
 > 🌐 [English (canonical)](../tech-stack.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
+**Pin’ler.** Aşağıdaki major’lar ve ürün seçimleri kalıcı kararlardır. Tam sürümler kayar;
+bugün neyin kurulu olduğu için kök ve app `package.json` / `pnpm-lock.yaml` kaynağıdır.
+Mimari şekil: [architecture.md](architecture.md).
+
 ## İçindekiler
 
 - [1. Özet](#1-özet)

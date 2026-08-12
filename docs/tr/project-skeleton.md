@@ -1,7 +1,8 @@
 # Proje İskeleti
 
 > **Tarihsel Faz 1 iskeleti.** Güncel yerleşim için [architecture.md](architecture.md) ve
-> canlı repo’yu tercih edin. Monorepo’nun ilk nasıl kurulduğunu belgelemek için tutulur.
+> canlı repo’yu tercih edin. Bu dosya monorepo’nun ilk kuruluşunu belgeler — yeni iş
+> checklist’i değildir. Günlük harita: [../README.md](../README.md).
 
 Kurultay monorepo iskeletini kurmak için adım adım bir referans: workspace, uygulamalar,
 şema, container'lar ve işin bittiğini söyleyen kontroller.
@@ -170,7 +171,7 @@ Comment         id, taskId, userId, body, createdAt
 Activity        id, workspaceId, taskId?, userId, type, payload(Json), createdAt
 ```
 
-`Notification` [roadmap Faz 8](roadmap.md#faz-8--aktivite-logu-ve-bildirimler)'e ertelenmiştir — ilk migration'da oluşturulmaz. Davetler Better Auth'a (organization plugin) aittir, burada Prisma modeli değildir; bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
+`Notification` [roadmap Faz 8](../archive/roadmap-mvp-phases.md)'e ertelenmiştir — ilk migration'da oluşturulmaz. Davetler Better Auth'a (organization plugin) aittir, burada Prisma modeli değildir; bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
 
 **Kritik detaylar**
 
