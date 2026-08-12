@@ -15,6 +15,7 @@ import { api, apiStatus, resolveApiMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { TaskMetadataPanel } from './task-metadata-panel';
 
@@ -172,14 +173,14 @@ export function TaskPanel({
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={descriptionId}>{t('description')}</Label>
-              <textarea
+              <Textarea
                 id={descriptionId}
                 value={description}
                 disabled={!canMutate || pending}
                 onChange={(event) => setDescription(event.target.value)}
                 onBlur={() => void save()}
                 rows={8}
-                className="min-h-32 w-full rounded-md border border-input bg-transparent px-3 py-2 text-body outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+                className="min-h-32"
               />
             </div>
             <TaskMetadataPanel

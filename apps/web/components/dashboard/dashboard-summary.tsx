@@ -12,6 +12,7 @@ import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { DamgaMark } from '@/components/brand/damga-mark';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatTile } from './stat-tile';
 
@@ -116,8 +117,8 @@ export function DashboardSummary(): React.ReactElement {
         </div>
         <label className="flex flex-col gap-1 text-small">
           <span className="text-muted-foreground">{t('boardFilter')}</span>
-          <select
-            className="h-9 min-w-[12rem] rounded-md border border-input bg-transparent px-3 text-body outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          <Select
+            className="min-w-[12rem]"
             value={selectedBoardId}
             onChange={(event) => onBoardChange(event.target.value)}
             aria-label={t('boardFilter')}
@@ -128,7 +129,7 @@ export function DashboardSummary(): React.ReactElement {
                 {board.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
       </div>
 
