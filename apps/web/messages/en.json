@@ -73,6 +73,9 @@
       "title": "Kurultay",
       "description": "Open-source Kanban-focused project management"
     },
+    "errors": {
+      "retry": "Try again"
+    },
     "shell": {
       "title": "Kurultay",
       "createWorkspace": "New workspace",
