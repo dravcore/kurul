@@ -37,7 +37,7 @@ interface BoardCanvasProps {
     screenReaderInstructions: ScreenReaderInstructions;
   };
   onCreateColumn: () => void;
-  onRenameColumn: (column: ColumnDto) => void;
+  onOpenColumnSettings: (column: ColumnDto) => void;
   onDeleteColumn: (column: ColumnDto) => void;
   onMoveColumn: (column: ColumnDto, direction: -1 | 1) => void;
   onAddTask: (columnId: string) => void;
@@ -55,7 +55,7 @@ export function BoardCanvas({
   dnd,
   accessibility,
   onCreateColumn,
-  onRenameColumn,
+  onOpenColumnSettings,
   onDeleteColumn,
   onMoveColumn,
   onAddTask,
@@ -83,7 +83,7 @@ export function BoardCanvas({
             canMutateTasks={canMutateTasks}
             canMoveLeft={index > 0}
             canMoveRight={index < columns.length - 1}
-            onRename={() => onRenameColumn(column)}
+            onOpenSettings={() => onOpenColumnSettings(column)}
             onDelete={() => onDeleteColumn(column)}
             onMoveLeft={() => onMoveColumn(column, -1)}
             onMoveRight={() => onMoveColumn(column, 1)}

@@ -154,9 +154,12 @@ export function useBoardMutations({
       const created: ColumnDto[] = [];
       try {
         let afterColumnId: string | undefined;
-        for (const { name } of DEFAULT_COLUMNS) {
+        // `category` travels with the name: seeding a Done column that the dashboard does not
+        // recognise as completed is precisely the failure this list exists to prevent.
+        for (const { name, category } of DEFAULT_COLUMNS) {
           const body: CreateColumnRequest = {
             name,
+            category,
             ...(afterColumnId ? { afterColumnId } : {}),
           };
           const column = await api.post<ColumnDto, CreateColumnRequest>(

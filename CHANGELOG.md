@@ -7,6 +7,32 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Renaming a board's Done column no longer zeroes its completion and throughput metrics
+  ([ADR 0019](docs/decisions/0019-column-category.md)). Columns carry a `ColumnCategory`
+  (`BACKLOG` / `UNSTARTED` / `STARTED` / `COMPLETED` / `CANCELED`) that the dashboard reads
+  instead of matching the column's name against `'done'`, so "Shipped", "Released" or a
+  column seeded in another language counts as finished work. Completion is a *set* of
+  columns: a board may mark more than one column `COMPLETED`. Only `COMPLETED` is consumed
+  today; the other four are vocabulary for later.
+
+  > **Upgrade note — one-time, manual.** The migration backfills `COMPLETED` where
+  > `lower(btrim(name)) = 'done'`, which is the same rule the retired matcher used. **A board
+  > whose Done column had already been renamed reports zero completions until someone opens
+  > column settings and sets its category.** The backfill cannot recover intent from an
+  > arbitrary name — that is the whole reason the name stopped being the carrier — so there is
+  > nothing to guess from and no way to detect the affected boards. Those dashboards were
+  > already reporting zero before this release; the fix is available to them, it is just not
+  > automatic. Set the category once per affected column and the last 14 days of moves start
+  > counting immediately.
+
+### Added
+
+- Column settings replace the rename-column dialog and set a column's name and category
+  together. Without a way to say that "Shipped" means completed, the metrics fix above only
+  applies to columns still called Done.
+
 ### Changed
 
 - Kurultay no longer accepts external code, documentation, or translation contributions

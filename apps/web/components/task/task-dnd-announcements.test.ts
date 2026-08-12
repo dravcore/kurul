@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Active, Over } from '@dnd-kit/core';
-import { Priority, type ColumnDto, type TaskDto } from '@kurultay/shared-types';
+import { ColumnCategory, Priority, type ColumnDto, type TaskDto } from '@kurultay/shared-types';
 import { columnDroppableId } from '@/components/board/board-column';
 import { buildTaskDndAnnouncements } from './task-dnd-announcements';
 
@@ -27,7 +27,15 @@ function task(id: string, columnId: string): TaskDto {
 }
 
 function column(id: string, name: string): ColumnDto {
-  return { id, boardId: 'board-1', name, position: 1000, color: null, taskCount: 0 };
+  return {
+    id,
+    boardId: 'board-1',
+    name,
+    position: 1000,
+    color: null,
+    category: ColumnCategory.UNSTARTED,
+    taskCount: 0,
+  };
 }
 
 const tasks = [task('a', COLUMN_A), task('d', COLUMN_B)];

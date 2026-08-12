@@ -12,14 +12,14 @@ export type BoardDialogsController = {
   createColumnOpen: boolean;
   setCreateColumnOpen: Dispatch<SetStateAction<boolean>>;
   createTaskColumnId: string | null;
-  renameColumn: ColumnDto | null;
+  columnSettings: ColumnDto | null;
   deleteColumn: ColumnDto | null;
   deleteTask: TaskDto | null;
   openCreateColumn: () => void;
   openCreateTask: (columnId: string) => void;
   closeCreateTask: () => void;
-  openRenameColumn: (column: ColumnDto) => void;
-  closeRenameColumn: () => void;
+  openColumnSettings: (column: ColumnDto) => void;
+  closeColumnSettings: () => void;
   openDeleteColumn: (column: ColumnDto) => void;
   closeDeleteColumn: () => void;
   openDeleteTask: (task: TaskDto) => void;
@@ -29,15 +29,15 @@ export type BoardDialogsController = {
 export function useBoardDialogs(): BoardDialogsController {
   const [createColumnOpen, setCreateColumnOpen] = useState(false);
   const [createTaskColumnId, setCreateTaskColumnId] = useState<string | null>(null);
-  const [renameColumn, setRenameColumn] = useState<ColumnDto | null>(null);
+  const [columnSettings, setColumnSettings] = useState<ColumnDto | null>(null);
   const [deleteColumn, setDeleteColumn] = useState<ColumnDto | null>(null);
   const [deleteTask, setDeleteTask] = useState<TaskDto | null>(null);
 
   const openCreateColumn = useCallback(() => setCreateColumnOpen(true), []);
   const openCreateTask = useCallback((columnId: string) => setCreateTaskColumnId(columnId), []);
   const closeCreateTask = useCallback(() => setCreateTaskColumnId(null), []);
-  const openRenameColumn = useCallback((column: ColumnDto) => setRenameColumn(column), []);
-  const closeRenameColumn = useCallback(() => setRenameColumn(null), []);
+  const openColumnSettings = useCallback((column: ColumnDto) => setColumnSettings(column), []);
+  const closeColumnSettings = useCallback(() => setColumnSettings(null), []);
   const openDeleteColumn = useCallback((column: ColumnDto) => setDeleteColumn(column), []);
   const closeDeleteColumn = useCallback(() => setDeleteColumn(null), []);
   const openDeleteTask = useCallback((task: TaskDto) => setDeleteTask(task), []);
@@ -48,14 +48,14 @@ export function useBoardDialogs(): BoardDialogsController {
       createColumnOpen,
       setCreateColumnOpen,
       createTaskColumnId,
-      renameColumn,
+      columnSettings,
       deleteColumn,
       deleteTask,
       openCreateColumn,
       openCreateTask,
       closeCreateTask,
-      openRenameColumn,
-      closeRenameColumn,
+      openColumnSettings,
+      closeColumnSettings,
       openDeleteColumn,
       closeDeleteColumn,
       openDeleteTask,
@@ -64,14 +64,14 @@ export function useBoardDialogs(): BoardDialogsController {
     [
       createColumnOpen,
       createTaskColumnId,
-      renameColumn,
+      columnSettings,
       deleteColumn,
       deleteTask,
       openCreateColumn,
       openCreateTask,
       closeCreateTask,
-      openRenameColumn,
-      closeRenameColumn,
+      openColumnSettings,
+      closeColumnSettings,
       openDeleteColumn,
       closeDeleteColumn,
       openDeleteTask,

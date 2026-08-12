@@ -5,7 +5,7 @@ import { CreateTaskDialog } from '@/components/task/create-task-dialog';
 import { DeleteTaskDialog } from '@/components/task/delete-task-dialog';
 import { CreateColumnDialog } from './create-column-dialog';
 import { DeleteColumnDialog } from './delete-column-dialog';
-import { RenameColumnDialog } from './rename-column-dialog';
+import { ColumnSettingsDialog } from './column-settings-dialog';
 import type { BoardDialogsController } from './use-board-dialogs';
 
 interface BoardDialogsProps {
@@ -15,7 +15,7 @@ interface BoardDialogsProps {
   /** New columns append after the current last one. */
   lastColumnId?: string;
   onColumnCreated: (column: ColumnDto) => void;
-  onColumnRenamed: (column: ColumnDto) => void;
+  onColumnSaved: (column: ColumnDto) => void;
   onColumnDeleted: (columnId: string) => void;
   onTaskCreated: (task: TaskDto) => void;
   onTaskDeleted: (taskId: string) => void;
@@ -28,7 +28,7 @@ export function BoardDialogs({
   boardId,
   lastColumnId,
   onColumnCreated,
-  onColumnRenamed,
+  onColumnSaved,
   onColumnDeleted,
   onTaskCreated,
   onTaskDeleted,
@@ -43,14 +43,14 @@ export function BoardDialogs({
         afterColumnId={lastColumnId}
         onCreated={onColumnCreated}
       />
-      <RenameColumnDialog
-        open={dialogs.renameColumn !== null}
+      <ColumnSettingsDialog
+        open={dialogs.columnSettings !== null}
         onOpenChange={(open) => {
-          if (!open) dialogs.closeRenameColumn();
+          if (!open) dialogs.closeColumnSettings();
         }}
         workspaceId={workspaceId}
-        column={dialogs.renameColumn}
-        onRenamed={onColumnRenamed}
+        column={dialogs.columnSettings}
+        onSaved={onColumnSaved}
       />
       <DeleteColumnDialog
         open={dialogs.deleteColumn !== null}

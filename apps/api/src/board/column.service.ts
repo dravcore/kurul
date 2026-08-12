@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SocketEvents, type ColumnDto } from '@kurultay/shared-types';
+import { SocketEvents, type ColumnCategory, type ColumnDto } from '@kurultay/shared-types';
 import { assertBoard } from '../common/board-access';
 import { resolveCreateNeighbors, resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
@@ -26,6 +26,7 @@ type ColumnRow = {
   name: string;
   position: number;
   color: string | null;
+  category: ColumnCategory;
   _count: { tasks: number };
 };
 
@@ -43,6 +44,7 @@ export class ColumnService {
       name: row.name,
       position: row.position,
       color: row.color,
+      category: row.category,
       taskCount: row._count.tasks,
     };
   }
@@ -73,6 +75,7 @@ export class ColumnService {
         name: true,
         position: true,
         color: true,
+        category: true,
         _count: { select: { tasks: true } },
       },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
@@ -117,6 +120,7 @@ export class ColumnService {
             boardId,
             name: dto.name,
             color: dto.color,
+            category: dto.category,
             position: positions[insertionIndex]!,
           },
           include: { _count: { select: { tasks: true } } },
@@ -125,7 +129,7 @@ export class ColumnService {
       });
     } else {
       const row = await this.prisma.column.create({
-        data: { boardId, name: dto.name, color: dto.color, position },
+        data: { boardId, name: dto.name, color: dto.color, category: dto.category, position },
         include: { _count: { select: { tasks: true } } },
       });
       created = this.toDto(row);
@@ -157,6 +161,7 @@ export class ColumnService {
         data: {
           ...(dto.name !== undefined ? { name: dto.name } : {}),
           ...(dto.color !== undefined ? { color: dto.color } : {}),
+          ...(dto.category !== undefined ? { category: dto.category } : {}),
         },
         include: { _count: { select: { tasks: true } } },
       });

@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { Priority } from '@kurultay/shared-types';
+import { ColumnCategory, Priority } from '@kurultay/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   applyThroughputDayCounts,
@@ -113,7 +113,7 @@ describe('DashboardService', () => {
     ]);
   });
 
-  it('counts throughput created and completed moves into Done', async () => {
+  it('counts throughput created and completed moves into a COMPLETED column', async () => {
     const { service, prisma } = buildService();
     prisma.task.count.mockResolvedValue(0);
     prisma.task.groupBy.mockResolvedValue([]);
@@ -178,6 +178,98 @@ describe('DashboardService', () => {
     expect(sql).toContain('"rn" <= ');
     // No name lookup follows the aggregate: the join inside the query already resolved them.
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+  });
+
+  describe('completion is read from category, never from the column name', () => {
+    /**
+     * `countActivitiesByDay` composes its query out of nested `Prisma.sql` fragments, so a
+     * tagged-template call carries fragments where a flat query would carry values. Both are
+     * flattened here — the assertions are about the finished predicate, not about which
+     * fragment happens to hold each piece of it.
+     */
+    function flatten(strings: readonly string[], values: readonly unknown[]) {
+      let sql = '';
+      const params: unknown[] = [];
+      strings.forEach((chunk, index) => {
+        sql += chunk;
+        if (index >= values.length) return;
+        const value = values[index];
+        if (isSqlFragment(value)) {
+          const nested = flatten(value.strings, value.values);
+          sql += nested.sql;
+          params.push(...nested.params);
+        } else {
+          sql += '?';
+          params.push(value);
+        }
+      });
+      return { sql, params };
+    }
+
+    function isSqlFragment(
+      value: unknown,
+    ): value is { strings: readonly string[]; values: readonly unknown[] } {
+      return typeof value === 'object' && value !== null && 'strings' in value && 'values' in value;
+    }
+
+    /** The `$queryRaw` call that carries the completed-moves predicate. */
+    async function completedMovesCall(boardId?: string) {
+      const { service, prisma } = buildService();
+      prisma.task.count.mockResolvedValue(0);
+      prisma.task.groupBy.mockResolvedValue([]);
+      prisma.column.findMany.mockResolvedValue([{ id: 'done-id' }, { id: 'shipped-id' }]);
+      mockRawQueries(prisma);
+
+      await service.summary(WORKSPACE_ID, boardId ? { boardId } : {});
+
+      // Fixed order inside the Promise.all: assignees, created, completed.
+      const [strings, ...values] = prisma.$queryRaw.mock.calls[2]!;
+      return { prisma, ...flatten(strings as string[], values) };
+    }
+
+    it('selects the completed columns by category rather than by name', async () => {
+      const { prisma } = await completedMovesCall();
+
+      expect(prisma.column.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ category: ColumnCategory.COMPLETED }),
+        }),
+      );
+      const [{ where }] = prisma.column.findMany.mock.calls[0]! as [{ where: object }];
+      expect(where).not.toHaveProperty('name');
+    });
+
+    it('treats completion as a set of columns, not a single row', async () => {
+      const { params } = await completedMovesCall();
+
+      // Two COMPLETED columns on one board is legitimate — "Shipped" and "Won't Do" split
+      // apart later — so the predicate takes the whole set.
+      expect(params).toContainEqual(['done-id', 'shipped-id']);
+    });
+
+    it('no longer matches the recorded column name against "done"', async () => {
+      const { sql, params } = await completedMovesCall();
+
+      // A name predicate can never match "Bitti" or "Shipped"; that is the defect ADR 0019
+      // exists to close, so it must be gone rather than merely supplemented.
+      expect(sql).not.toContain('toColumnName');
+      expect(params).not.toContain('done');
+    });
+
+    it('falls back to the category snapshotted in the activity payload', async () => {
+      const { sql, params } = await completedMovesCall();
+
+      // The only surviving record of a move into a column that has since been deleted.
+      expect(sql).toContain("'toColumnCategory'");
+      expect(params).toContain(ColumnCategory.COMPLETED);
+    });
+
+    it('excludes overdue tasks sitting in any completed column', async () => {
+      const { prisma } = await completedMovesCall();
+
+      const overdueCall = prisma.task.count.mock.calls[1]! as [{ where: { columnId?: unknown } }];
+      expect(overdueCall[0].where.columnId).toEqual({ notIn: ['done-id', 'shipped-id'] });
+    });
   });
 
   it('returns 404 when boardId is outside the workspace', async () => {

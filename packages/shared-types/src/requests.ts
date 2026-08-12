@@ -14,7 +14,7 @@
  * added with the first caller — `PATCH /labels/:labelId`, `PATCH /workspaces/:workspaceId` and
  * `POST /workspaces/:workspaceId/invitations` exist on the server but have no UI yet.
  */
-import type { LabelColorSlot, Priority } from './enums.js';
+import type { ColumnCategory, LabelColorSlot, Priority } from './enums.js';
 
 /** `POST /workspaces/:workspaceId/boards/:boardId/tasks` */
 export interface CreateTaskRequest {
@@ -78,12 +78,15 @@ export interface CreateColumnRequest {
   /** Insert after this column; omit to append. */
   afterColumnId?: string | null;
   color?: string;
+  /** Omit to fall back to the server default (`ColumnCategory.UNSTARTED`). */
+  category?: ColumnCategory;
 }
 
 /** `PATCH /workspaces/:workspaceId/columns/:columnId` */
 export interface UpdateColumnRequest {
   name?: string;
   color?: string | null;
+  category?: ColumnCategory;
 }
 
 /** `PATCH /workspaces/:workspaceId/columns/:columnId/position` */
