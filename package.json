@@ -35,7 +35,7 @@
     "@eslint/js": "^10.0.1",
     "@next/eslint-plugin-next": "^16.0.0",
     "@vitest/coverage-v8": "^4.1.10",
-    "dotenv": "^16.6.1",
+    "dotenv": "^17.4.2",
     "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-jsx-a11y": "^6.10.2",
