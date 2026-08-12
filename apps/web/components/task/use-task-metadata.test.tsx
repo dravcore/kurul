@@ -150,6 +150,30 @@ describe('useTaskMetadata', () => {
     expect(result.current.hasMoreComments).toBe(false);
   });
 
+  /**
+   * The empty arrays above are the fallback, not an answer — the panel has to be able to tell
+   * them from a thread that really is empty, or it says "No comments yet" about comments it
+   * never managed to read.
+   */
+  it('says the load failed rather than leaving the empty lists to speak for it', async () => {
+    fetchMembers.mockResolvedValue([]);
+    apiGet.mockRejectedValue(new Error('network'));
+    const { result } = renderMeta({ members: [member('shared')], labels: [label('shared')] });
+
+    await waitFor(() => expect(result.current.loadingMeta).toBe(false));
+
+    expect(result.current.metaFailed).toBe(true);
+  });
+
+  it('leaves the failure flag down when the load succeeds', async () => {
+    stubMeta();
+    const { result } = renderMeta();
+
+    await waitFor(() => expect(result.current.loadingMeta).toBe(false));
+
+    expect(result.current.metaFailed).toBe(false);
+  });
+
   it('refetches when metaRefreshKey is bumped', async () => {
     stubMeta();
     const { result, rerender } = renderMeta();

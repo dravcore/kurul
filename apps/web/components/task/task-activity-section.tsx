@@ -9,14 +9,21 @@ interface TaskActivitySectionProps {
   activities: ActivityDto[];
   /** Suppresses the empty message until the first fetch has settled. */
   loading: boolean;
+  /**
+   * The load failed, so `activities` is the empty fallback rather than an answer. Replaces
+   * the empty message: "No activity yet" about a list nobody read is a different claim.
+   */
+  loadFailed?: boolean;
 }
 
 /** Read-only history for the task, newest last, as the API returns it. */
 export function TaskActivitySection({
   activities,
   loading,
+  loadFailed = false,
 }: TaskActivitySectionProps): React.ReactElement {
   const t = useTranslations('app.board.task.activity');
+  const tErrors = useTranslations('app.errors');
   const locale = useLocale();
 
   return (
@@ -40,7 +47,9 @@ export function TaskActivitySection({
             </p>
           </li>
         ))}
-        {activities.length === 0 && !loading ? (
+        {loadFailed ? (
+          <li className="text-small text-destructive">{tErrors('activityLoad')}</li>
+        ) : activities.length === 0 && !loading ? (
           <li className="text-small text-muted-foreground">{t('empty')}</li>
         ) : null}
       </ul>

@@ -75,7 +75,9 @@
     },
     "errors": {
       "retry": "Try again",
-      "taskLoad": "This task couldn't load."
+      "taskLoad": "This task couldn't load.",
+      "commentsLoad": "The comments couldn't load.",
+      "activityLoad": "The history couldn't load."
     },
     "shell": {
       "title": "Kurultay",

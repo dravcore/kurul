@@ -68,6 +68,7 @@ export function TaskMetadataPanel({
     activities,
     refreshActivities,
     loadingMeta,
+    metaFailed,
   } = useTaskMetadata({
     workspaceId,
     boardId,
@@ -262,6 +263,7 @@ export function TaskMetadataPanel({
         canMutate={canMutate}
         pending={pending}
         loading={loadingMeta}
+        loadFailed={metaFailed}
         hasMore={hasMoreComments}
         loadingMore={loadingMoreComments}
         onLoadMore={() => void loadMoreComments()}
@@ -269,7 +271,7 @@ export function TaskMetadataPanel({
         onDelete={(commentId) => void removeComment(commentId)}
       />
 
-      <TaskActivitySection activities={activities} loading={loadingMeta} />
+      <TaskActivitySection activities={activities} loading={loadingMeta} loadFailed={metaFailed} />
     </div>
   );
 }
