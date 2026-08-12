@@ -74,7 +74,8 @@
       "description": "Open-source Kanban-focused project management"
     },
     "errors": {
-      "retry": "Try again"
+      "retry": "Try again",
+      "taskLoad": "This task couldn't load."
     },
     "shell": {
       "title": "Kurultay",

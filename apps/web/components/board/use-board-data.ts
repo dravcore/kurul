@@ -17,7 +17,7 @@ import type {
   TaskDto,
   WorkspaceMemberDto,
 } from '@kurultay/shared-types';
-import { api } from '@/lib/api';
+import { api, apiStatus } from '@/lib/api';
 import { fetchAllWorkspaceMembers } from '@/lib/member-query';
 import { fetchAllBoardTasks, type BoardTaskFilters } from '@/lib/task-query';
 import { useApiResource } from '@/lib/use-api-resource';
@@ -33,7 +33,11 @@ export type UseBoardDataResult = {
   /** True while task pages are still draining behind an already-painted board. */
   tasksSyncing: boolean;
   error: string | null;
+  /** The deep-linked task has not arrived yet — neither on the board nor from its own fetch. */
+  panelLoading: boolean;
+  /** A retryable failure to read the deep-linked task. `null` when it is simply not there. */
   panelError: string | null;
+  retryPanelTask: () => void;
   metaRefreshKey: number;
   columnsRef: React.MutableRefObject<ColumnDto[]>;
   tasksRef: React.MutableRefObject<TaskDto[]>;
@@ -56,7 +60,7 @@ export function useBoardData(
   selectedTaskId: string | null = null,
 ): UseBoardDataResult {
   const t = useTranslations('app.board');
-  const tTask = useTranslations('app.board.task');
+  const tErrors = useTranslations('app.errors');
   const { activeId } = useWorkspaceContext();
 
   const [board, setBoard] = useState<BoardDto | null>(null);
@@ -210,11 +214,23 @@ export function useBoardData(
       api.get<TaskDto>(`/workspaces/${activeId}/tasks/${selectedTaskId}`, { signal });
   }, [activeId, selectedTaskId, loading, tasksRef]);
 
-  const { data: fetchedTask, error: fetchedTaskError } = useApiResource<TaskDto | null>(
-    fetchSelectedTask,
-    null,
-    tTask('missing'),
-  );
+  /**
+   * Whether the last failure was the server saying the row is not there.
+   *
+   * `useApiResource` reports one message per failure, but the panel has to tell a task that is
+   * gone (nothing to retry) from a load that broke (worth another go), and only the caught
+   * error knows which. Never read while `fetchedTaskError` is `null`, so it does not need
+   * clearing on success — the two are written in the same pass.
+   */
+  const [selectedTaskGone, setSelectedTaskGone] = useState(false);
+
+  const {
+    data: fetchedTask,
+    error: fetchedTaskError,
+    reload: retryPanelTask,
+  } = useApiResource<TaskDto | null>(fetchSelectedTask, null, tErrors('taskLoad'), {
+    onError: (caught) => setSelectedTaskGone(apiStatus(caught) === 404),
+  });
 
   useEffect(() => {
     if (!fetchedTask) return;
@@ -225,7 +241,17 @@ export function useBoardData(
 
   // No request in flight means no failure to report — a task that is already on the board
   // must not inherit the error left over from the last one that was not.
-  const panelError = fetchSelectedTask ? fetchedTaskError : null;
+  const panelError = fetchSelectedTask && !selectedTaskGone ? fetchedTaskError : null;
+
+  /**
+   * Still on its way. Deliberately keyed on the row reaching `tasks` rather than on the
+   * hook's own `loading`: the fetch resolving and the row being merged are two commits, and
+   * the panel would otherwise spend the one in between saying the task no longer exists.
+   */
+  const panelLoading =
+    fetchSelectedTask !== null &&
+    fetchedTaskError === null &&
+    !tasks.some((task) => task.id === selectedTaskId);
 
   return {
     board,
@@ -236,7 +262,9 @@ export function useBoardData(
     loading,
     tasksSyncing,
     error,
+    panelLoading,
     panelError,
+    retryPanelTask,
     metaRefreshKey,
     columnsRef,
     tasksRef,

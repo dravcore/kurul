@@ -15,6 +15,7 @@ import { api, apiStatus, resolveApiMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { TaskMetadataPanel } from './task-metadata-panel';
@@ -27,7 +28,14 @@ interface TaskPanelProps {
   canManageLabels: boolean;
   members?: WorkspaceMemberDto[];
   labels?: LabelDto[];
+  /**
+   * The deep-linked task is still being fetched. Distinct from `task === null`, which on its
+   * own cannot tell "not here yet" from "not there at all".
+   */
+  loading?: boolean;
+  /** The fetch failed for a reason that is worth another attempt — never a 404. */
   loadError?: string | null;
+  onRetryLoad?: () => void;
   metaRefreshKey?: number;
   onUpdated: (patch: Partial<TaskDto> & Pick<TaskDto, 'id'>) => void;
   onRequestDelete: () => void;
@@ -41,12 +49,15 @@ export function TaskPanel({
   canManageLabels,
   members,
   labels,
+  loading = false,
   loadError = null,
+  onRetryLoad,
   metaRefreshKey = 0,
   onUpdated,
   onRequestDelete,
 }: TaskPanelProps): React.ReactElement {
   const t = useTranslations('app.board.task');
+  const tErrors = useTranslations('app.errors');
   const router = useRouter();
   const panelRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -192,6 +203,7 @@ export function TaskPanel({
         'fixed inset-0 z-30 md:static md:inset-auto',
       )}
       aria-label={t('panelLabel')}
+      aria-busy={loading || undefined}
     >
       <div className="flex h-[var(--topbar-height)] shrink-0 items-center gap-2 border-b border-border px-3">
         <h2
@@ -213,9 +225,36 @@ export function TaskPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {loadError || !task ? (
+        {/*
+          Three answers, not two. A cold deep link (`/board/x/task/y`) opens the panel before
+          the board has the row, and folding that into `!task` flashed "This task no longer
+          exists" at a task that exists — the one sentence here that must never be a guess.
+          Only the third branch is retryable: a 404 is the server being clear, and asking it
+          again just repeats itself. `loadError` is `null` for that case by contract.
+        */}
+        {loading ? (
           <div className="flex flex-col gap-3">
-            <p className="text-body text-destructive">{loadError ?? t('missing')}</p>
+            <Skeleton className="h-9 w-full rounded-[var(--radius-md)]" />
+            <Skeleton className="h-32 w-full rounded-[var(--radius-md)]" />
+            <Skeleton className="h-24 w-full rounded-[var(--radius-md)]" />
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-body text-destructive">{loadError}</p>
+            <div className="flex flex-wrap gap-2">
+              {onRetryLoad ? (
+                <Button type="button" onClick={onRetryLoad}>
+                  {tErrors('retry')}
+                </Button>
+              ) : null}
+              <Button type="button" variant="outline" onClick={close}>
+                {t('backToBoard')}
+              </Button>
+            </div>
+          </div>
+        ) : !task ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-body text-destructive">{t('missing')}</p>
             <Button type="button" variant="outline" onClick={close}>
               {t('backToBoard')}
             </Button>

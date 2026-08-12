@@ -8,7 +8,7 @@ import {
   type WorkspaceMemberDto,
 } from '@kurultay/shared-types';
 import messages from '@/messages/en.json';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import type { BoardTaskFilters, BoardTaskPage, FetchBoardTasksOptions } from '@/lib/task-query';
 import { fetchAllBoardTasks } from '@/lib/task-query';
 import { useBoardData } from './use-board-data';
@@ -16,9 +16,12 @@ import { useBoardData } from './use-board-data';
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00';
 const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d01';
 
-vi.mock('@/lib/api', () => ({
-  api: { get: vi.fn() },
-}));
+// `ApiError` and `apiStatus` stay real: telling a task that is gone from one that could not be
+// read is exactly what the hook uses them for, so stubbing them would stub the behaviour away.
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>();
+  return { ...actual, api: { get: vi.fn() } };
+});
 
 vi.mock('@/lib/task-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/task-query')>();
@@ -233,17 +236,76 @@ describe('useBoardData deep-linked task', () => {
     expect(signal?.aborted).toBe(true);
   });
 
-  it('reports a task the API cannot produce', async () => {
+  /**
+   * The three answers the panel has to be able to tell apart. Collapsing them is what put
+   * "This task no longer exists" on screen while the lookup was still in flight.
+   */
+  it('holds the panel at loading until the task actually lands on the board', async () => {
+    let answer = (): void => {};
+    const lookup = new Promise<TaskDto>((resolve) => {
+      answer = () => resolve(task('task-9'));
+    });
     drain.mockResolvedValue([]);
     apiGet.mockImplementation((path: string) => {
-      if (path.endsWith('/tasks/task-9')) return Promise.reject(new Error('404')) as never;
+      if (path.endsWith('/tasks/task-9')) return lookup as never;
       return Promise.resolve(metaResponse(path)) as never;
     });
 
     const { result } = renderBoardData('task-9');
 
-    await waitFor(() => expect(result.current.panelError).not.toBeNull());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.panelLoading).toBe(true);
+    expect(result.current.panelError).toBeNull();
+
+    await act(async () => {
+      answer();
+      await lookup;
+    });
+
+    await waitFor(() => expect(result.current.panelLoading).toBe(false));
+    expect(result.current.tasks.map((item) => item.id)).toEqual(['task-9']);
+  });
+
+  it('treats a 404 as gone rather than as something to retry', async () => {
+    drain.mockResolvedValue([]);
+    apiGet.mockImplementation((path: string) => {
+      if (path.endsWith('/tasks/task-9')) {
+        return Promise.reject(
+          new ApiError({ statusCode: 404, error: 'Not Found', message: 'Task not found' }),
+        ) as never;
+      }
+      return Promise.resolve(metaResponse(path)) as never;
+    });
+
+    const { result } = renderBoardData('task-9');
+
+    await waitFor(() => expect(result.current.panelLoading).toBe(false));
+    // No message and no task: the panel renders `missing`, with no retry offered.
+    expect(result.current.panelError).toBeNull();
     expect(result.current.tasks).toEqual([]);
+  });
+
+  it('reports a failure the server did not explain, and retries it on request', async () => {
+    drain.mockResolvedValue([]);
+    apiGet.mockImplementation((path: string) => {
+      if (path.endsWith('/tasks/task-9')) return Promise.reject(new Error('network')) as never;
+      return Promise.resolve(metaResponse(path)) as never;
+    });
+
+    const { result } = renderBoardData('task-9');
+
+    await waitFor(() => expect(result.current.panelError).toBe("This task couldn't load."));
+    expect(result.current.panelLoading).toBe(false);
+    expect(result.current.tasks).toEqual([]);
+
+    apiGet.mockImplementation((path: string) => {
+      if (path.endsWith('/tasks/task-9')) return Promise.resolve(task('task-9')) as never;
+      return Promise.resolve(metaResponse(path)) as never;
+    });
+    act(() => result.current.retryPanelTask());
+
+    await waitFor(() => expect(result.current.tasks.map((item) => item.id)).toEqual(['task-9']));
+    expect(result.current.panelError).toBeNull();
   });
 
   it('asks for nothing when the board already has the task', async () => {

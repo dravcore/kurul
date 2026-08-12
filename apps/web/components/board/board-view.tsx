@@ -97,7 +97,9 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     loading,
     tasksSyncing,
     error,
+    panelLoading,
     panelError,
+    retryPanelTask,
     metaRefreshKey,
     columnsRef,
     tasksRef,
@@ -309,7 +311,9 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             canManageLabels={canMutateLabelsFlag}
             members={members}
             labels={labels}
+            loading={panelLoading}
             loadError={panelError}
+            onRetryLoad={retryPanelTask}
             metaRefreshKey={metaRefreshKey}
             onUpdated={applyTaskPatch}
             onRequestDelete={() => {
