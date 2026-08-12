@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import type { TaskDto } from '@kurultay/shared-types';
+import { formatEstimate } from '@/lib/duration';
 import { cn } from '@/lib/utils';
 import { LabelDots } from './label-chip';
 import { PriorityIcon } from './priority-icon';
@@ -71,7 +72,7 @@ export function TaskCard({
             </span>
           ) : null}
           {task.estimatedMinutes !== null ? (
-            <span>{t('estimateMinutes', { minutes: task.estimatedMinutes })}</span>
+            <span>{formatEstimate(task.estimatedMinutes, t)}</span>
           ) : null}
           {assigneeNames ? (
             <span className="truncate" title={assigneeNames}>

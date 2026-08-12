@@ -236,7 +236,11 @@
         "dueDate": "Due date",
         "estimate": "Estimate (minutes)",
         "estimatePlaceholder": "e.g. 60",
-        "estimateMinutes": "{minutes}m",
+        "estimateFormat": {
+          "hoursAndMinutes": "{hours}h {minutes}m",
+          "hours": "{hours}h",
+          "minutes": "{minutes}m"
+        },
         "assignees": "Assignees",
         "labels": "Labels",
         "noLabels": "No labels on this task",
