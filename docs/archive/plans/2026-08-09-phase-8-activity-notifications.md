@@ -1,5 +1,7 @@
 # Phase 8 — Activity and notifications — Implementation Plan
 
+> **Historical plan — shipped. Do not re-execute.** Checkboxes are a frozen record. Ignore any AI attribution footers in this file.
+
 > **For agentic workers:** Use executing-plans or subagent-driven-development. Spec:
 > [docs/archive/specs/2026-08-09-phase-8-activity-notifications-design.md](../specs/2026-08-09-phase-8-activity-notifications-design.md).
 > Deferred: [docs/archive/specs/2026-08-09-phase-8-deferred.md](../specs/2026-08-09-phase-8-deferred.md)

@@ -61,5 +61,5 @@ Contract: `@kurultay/shared-types` `SocketEvents` / payload map. Every payload i
 
 ## See also
 
-- [ADR 0005](../decisions/0005-realtime-socketio.md)
+- [ADR 0005](../../decisions/0005-realtime-socketio.md)
 - [roadmap Phase 9](../roadmap-mvp-phases.md#phase-9--realtime)

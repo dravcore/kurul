@@ -17,7 +17,7 @@ Fixes #
 - [ ] Targets `develop` (or `main` for release/hotfix only)
 - [ ] Title follows Conventional Commits (`feat:`, `fix:`, `docs:`, ...)
 - [ ] Relevant docs updated (`docs/`, README, etc.)
-- [ ] Lint / typecheck / tests pass (once CI tooling exists)
+- [ ] Lint / typecheck / tests pass (CI green)
 - [ ] I understand that Kurultay does not merge outside code, documentation, or translation
       pull requests — only typo / dead-link one-liners
       ([CONTRIBUTING.md](https://github.com/dravcore/kurultay/blob/develop/CONTRIBUTING.md#code-contributions-are-paused),

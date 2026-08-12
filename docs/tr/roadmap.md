@@ -8,15 +8,15 @@ Kurultay’ın durumu ve şimdilik bilinçli olarak kapsam dışı bırakılanla
 
 ## Durum
 
-**MVP tamam.** Faz 0–9 ve MVP sonrası sağlamlaştırma
+**MVP tamam.** Ürün Faz **1–9** (artı Faz **0** docs/standartlar) ve MVP sonrası sağlamlaştırma
 [`v0.1.0`](../../CHANGELOG.md#010---2026-08-12) ile yayınlandı. Aktif iş, aşağıdaki Beyond
 MVP maddeleri ve `develop` üzerindeki sıradan bug/refactor’lar.
 
-| İz                         | Durum                                                                     |
-| -------------------------- | ------------------------------------------------------------------------- |
-| Faz 0–9 (MVP)              | Bitti — ayrıntılı checklist: [EN arşiv](../archive/roadmap-mvp-phases.md) |
-| MVP sonrası sağlamlaştırma | Bitti — aynı arşiv                                                        |
-| Beyond MVP                 | Planlanmadı — yalnızca uyumluluk listesi                                  |
+| İz                         | Durum                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| Faz 0–9                    | Bitti — Faz 0 docs; 1–9 ürün MVP — [EN arşiv](../archive/roadmap-mvp-phases.md) |
+| MVP sonrası sağlamlaştırma | Bitti — aynı arşiv                                                              |
+| Beyond MVP                 | Planlanmadı — yalnızca uyumluluk listesi                                        |
 
 Görev seviyesi iş [GitHub Issues](https://github.com/dravcore/kurultay/issues)’ta.
 Release süreci: [git-strategy.md](git-strategy.md).

@@ -83,7 +83,11 @@ Kurultay sends one class of transactional email so far: the verification link an
 
 ### i18n — next-intl
 
-`next-intl` is wired from Phase 1 — every user-facing string goes through `useTranslations()` / `messages/en.json` rather than being hardcoded — so the app is translation-ready even though the locale is currently hardcoded to `en` and there is no locale switcher yet (MVP is English-only, see [roadmap.md — Beyond MVP](roadmap.md#beyond-mvp)). The alternative was retrofitting i18n after strings had already spread through the component tree, which is the more expensive order.
+`next-intl` is wired from Phase 1 — user-facing strings go through `useTranslations()` /
+`messages/<locale>.json` rather than being hardcoded. Locale resolution is
+`User.locale → locale cookie → Accept-Language → 'en'` ([ADR 0018](decisions/0018-localization-strategy.md));
+**Settings → Language** can set a preference or “Match my browser”. English is still the only
+catalog on offer — additional UI language packs remain [Beyond MVP](roadmap.md#beyond-mvp).
 
 ### Deployment — Docker Compose
 
@@ -120,24 +124,7 @@ Projects worth studying for architecture and data modelling:
 
 ## 5. Decision records
 
-Full arguments and consequences live in [`decisions/`](decisions/) rather than being repeated here:
+Stack and product ADRs are indexed in [decisions/README.md](decisions/README.md) (0001–0019).
+Start there rather than duplicating the table here.
 
-| ADR                                                                                            | Topic                                                            |
-| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modular monolith                                      |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                   |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts          |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Better Auth with the organization plugin (→ Workspace)           |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                                        |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Float positions for ordering                                     |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                         |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                                |
-| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board and column role matrix (OWNER/ADMIN structure)             |
-| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task role matrix (MEMBER+ content work)                          |
-| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata role matrix                              |
-| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Comment delete: authorship or OWNER/ADMIN                        |
-| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail delivery, email verification on invitation accept only |
-| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Dual licensing + contributor license agreement                   |
-| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)             | No external contributions; CLA unenacted, legal spend deferred   |
-
-Related: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)
+Related: [architecture.md](architecture.md) · [archive/project-skeleton.md](archive/project-skeleton.md) (historical Phase 1 scaffold)

@@ -49,7 +49,7 @@ pull request. This holds for maintainers too.
 `hotfix/*`, something went wrong.
 
 Branch protection on `main` and `develop` enforces this: no direct pushes, pull requests
-required. Required status checks are added once CI lands in Phase 1.
+required. Required status checks are enforced by [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 
 ### Dependabot and `main`
 

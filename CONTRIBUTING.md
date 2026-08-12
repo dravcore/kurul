@@ -140,9 +140,11 @@ Test expectations: [docs/testing.md](docs/testing.md).
   changes, and frontend from backend, where possible.
 - Link the issue the PR addresses.
 - Fill in the PR template checklist (conventional title, docs updated where relevant,
-  lint/typecheck/tests once CI exists).
-- Expect **one approving review** before merge; maintainers merge into `develop` with a merge
-  commit (`--no-ff`) — nothing is squashed, so keep the branch's own commit history readable.
+  lint/typecheck/tests — CI must be green).
+- Expect **one approving review** before merge. Prefer a merge commit into `develop`
+  (`--no-ff`) so multi-commit history stays readable; squash into `develop` is allowed for
+  Dependabot / single-commit noise. Squash into `main` is never allowed — see
+  [docs/git-strategy.md](docs/git-strategy.md#merge-strategy).
   While Kurultay has a single maintainer there is nobody to review _their_ PRs, so
   maintainer-authored PRs are self-reviewed and self-merged once CI is green. Your PRs are
   reviewed as normal, and the review requirement applies to everyone again as soon as a

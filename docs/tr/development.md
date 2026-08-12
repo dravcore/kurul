@@ -20,7 +20,7 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 
 ## Durum
 
-Monorepo ve MVP özellik seti (Faz 1–9) repository’de **mevcuttur**. Bu sayfadaki komutlar
+Monorepo ve MVP özellik seti (Faz 1–9; Faz 0 docs/standartlardı) repository’de **mevcuttur**. Bu sayfadaki komutlar
 gündelik kontrattır — gerçeklik bu dokümandan sapıyorsa ikisinden biri buglıdır ve aynı
 PR’da düzeltilir.
 
@@ -30,13 +30,13 @@ PR’da düzeltilir.
 
 ## Ön koşullar
 
-| Araç           | Sürüm           | Kontrol                  | Notlar                                                                                                                                                                                                           |
-| -------------- | --------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Node.js        | 22 veya üzeri   | `node -v`                | 22 taban çizgisi — Node 20 ömrünü tamamladı (2026-04-30) ve Prisma 7 zaten ≥ 20.19.0 istiyor. **24 LTS önerilir** (2028-04-30'a kadar Active LTS)                                                                |
-| pnpm           | 9 veya üzeri    | `pnpm -v`                | Corepack üzerinden: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack, Node ≥ 25 ile artık birlikte gelmiyor — orada önce `npm i -g corepack`, ya da pnpm'i bağımsız kurun: `npm i -g pnpm` |
-| Docker         | herhangi güncel | `docker -v`              | macOS'ta Docker Desktop veya Colima                                                                                                                                                                              |
-| Docker Compose | v2 (plugin)     | `docker compose version` | `docker-compose` v1 desteklenmiyor                                                                                                                                                                               |
-| Git            | 2.30+           | `git --version`          |                                                                                                                                                                                                                  |
+| Araç           | Sürüm              | Kontrol                  | Notlar                                                                                                                                                                                                           |
+| -------------- | ------------------ | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js        | **≥ 24** (engines) | `node -v`                | Kök `package.json` `"engines": { "node": ">=24" }`. Prisma 7 ≥ 20.19.0 ister; proje tabanı daha yüksek. Desteklenen çizgi **24 LTS**.                                                                            |
+| pnpm           | 9 veya üzeri       | `pnpm -v`                | Corepack üzerinden: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack, Node ≥ 25 ile artık birlikte gelmiyor — orada önce `npm i -g corepack`, ya da pnpm'i bağımsız kurun: `npm i -g pnpm` |
+| Docker         | herhangi güncel    | `docker -v`              | macOS'ta Docker Desktop veya Colima                                                                                                                                                                              |
+| Docker Compose | v2 (plugin)        | `docker compose version` | `docker-compose` v1 desteklenmiyor                                                                                                                                                                               |
+| Git            | 2.30+              | `git --version`          |                                                                                                                                                                                                                  |
 
 Yerel bir PostgreSQL veya Redis kurulumu gerekmiyor — ikisi de Docker içinde çalışır.
 

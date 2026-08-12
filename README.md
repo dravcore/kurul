@@ -6,7 +6,7 @@ Open-source, Kanban-focused project management tool.
 
 ## Status
 
-Kurultay’s **MVP feature set (Phases 1–9) is complete** — auth/workspaces, boards and
+Kurultay’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards) — auth/workspaces, boards and
 tasks, filtering, dashboard, activity/notifications, and realtime board sync. See
 [docs/roadmap.md](docs/roadmap.md). Beyond-MVP items (email notifications, presence,
 Playwright e2e, extra locales, …) remain listed under Beyond MVP.

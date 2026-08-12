@@ -214,4 +214,4 @@ The workflow file is [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 - [coding-standards.md](coding-standards.md) — code conventions tests assume
 - [api-conventions.md](api-conventions.md) — status codes and error shapes to assert on
 - [git-strategy.md](git-strategy.md) — PR requirements
-- [roadmap.md](roadmap.md) — when CI and e2e land
+- [roadmap.md](roadmap.md) — MVP status and Beyond MVP (Playwright e2e still deferred)

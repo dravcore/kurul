@@ -8,7 +8,7 @@ Assignees, board labels (slot colors), priority, dueDate, estimatedMinutes, comm
 
 ## Permissions
 
-[ADR 0011](../decisions/0011-label-task-metadata-permissions.md). Task field/assignee/comment mutate stays MEMBER+ ([ADR 0010](../decisions/0010-task-permissions.md)); label CRUD Admin+.
+[ADR 0011](../../decisions/0011-label-task-metadata-permissions.md). Task field/assignee/comment mutate stays MEMBER+ ([ADR 0010](../../decisions/0010-task-permissions.md)); label CRUD Admin+.
 
 ## Non-goals
 
