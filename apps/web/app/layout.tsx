@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Archivo, Fraunces, JetBrains_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
-import { getLocale, getMessages } from 'next-intl/server';
+import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
@@ -24,10 +24,16 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: 'Kurultay',
-  description: 'Open-source Kanban-focused project management',
-};
+// The tab title and share description are user-visible copy, so they come from the catalogue
+// like every other string (ADR 0018). That makes this `generateMetadata` rather than a static
+// `metadata` export: the locale is only known per request.
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('app.meta');
+  return {
+    title: t('title'),
+    description: t('description'),
+  };
+}
 
 export default async function RootLayout({
   children,

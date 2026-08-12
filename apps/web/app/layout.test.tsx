@@ -4,6 +4,7 @@ import { isValidElement, type ReactElement } from 'react';
 const mocks = vi.hoisted(() => ({
   getLocale: vi.fn<() => Promise<string>>(),
   getMessages: vi.fn<() => Promise<Record<string, unknown>>>(),
+  getTranslations: vi.fn<(ns: string) => Promise<(key: string) => string>>(),
 }));
 
 // `next/font/google` is a build-time transform, not a runtime module — the loaders are
@@ -17,6 +18,7 @@ vi.mock('next/font/google', () => ({
 vi.mock('next-intl/server', () => ({
   getLocale: mocks.getLocale,
   getMessages: mocks.getMessages,
+  getTranslations: mocks.getTranslations,
 }));
 
 vi.mock('@/components/layout/theme-provider', () => ({
@@ -29,7 +31,8 @@ vi.mock('@/components/ui/sonner', () => ({
 
 vi.mock('./globals.css', () => ({}));
 
-import RootLayout, { metadata } from './layout';
+import RootLayout, { generateMetadata } from './layout';
+import messages from '@/messages/en.json';
 
 /** Depth-first search for the first element whose props carry `messages`. */
 function findWithMessages(node: unknown): ReactElement | undefined {
@@ -58,6 +61,9 @@ function findWithMessages(node: unknown): ReactElement | undefined {
 beforeEach(() => {
   mocks.getLocale.mockReset().mockResolvedValue('tr');
   mocks.getMessages.mockReset().mockResolvedValue({ app: { dashboard: { title: 'Panel' } } });
+  mocks.getTranslations
+    .mockReset()
+    .mockResolvedValue((key: string) => `${key} in the negotiated locale`);
 });
 
 describe('RootLayout', () => {
@@ -80,7 +86,18 @@ describe('RootLayout', () => {
     });
   });
 
-  it('names the app in the document title', () => {
-    expect(metadata.title).toBe('Kurultay');
+  it('names the app in the document title', async () => {
+    // A static `metadata` export would pin the tab title and share description to English
+    // for every locale, so both are resolved per request through the catalogue instead.
+    const meta = await generateMetadata();
+
+    expect(mocks.getTranslations).toHaveBeenCalledWith('app.meta');
+    expect(meta.title).toBe('title in the negotiated locale');
+    expect(meta.description).toBe('description in the negotiated locale');
+  });
+
+  it('keeps the English metadata copy in the catalogue', () => {
+    expect(messages.app.meta.title).toBe('Kurultay');
+    expect(messages.app.meta.description).toBe('Open-source Kanban-focused project management');
   });
 });
