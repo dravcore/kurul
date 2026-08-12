@@ -143,6 +143,12 @@ describe('TaskService', () => {
         data: expect.objectContaining({ position: 4000, createdById: USER_ID }),
       }),
     );
+    // The siblings are read for their ordering, so that is all the query may ask for.
+    expect(prisma.task.findMany).toHaveBeenCalledWith({
+      where: { columnId: COLUMN_ID },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
+    });
   });
 
   it('places the first task in an empty column at the base gap', async () => {
@@ -293,14 +299,18 @@ describe('TaskService', () => {
       siblings?: Array<ReturnType<typeof taskRow>>;
       column?: { id: string; boardId: string } | null;
     } = {},
-  ): { updates: Array<{ id: string; position?: number; columnId?: string }> } {
+  ): {
+    updates: Array<{ id: string; position?: number; columnId?: string }>;
+    siblingQuery: jest.Mock;
+  } {
     const updates: Array<{ id: string; position?: number; columnId?: string }> = [];
     const movedTask = options.task === undefined ? taskRow({ id: 't1' }) : options.task;
+    const siblingQuery = jest.fn().mockResolvedValue(options.siblings ?? []);
     prisma.$transaction.mockImplementation(async (callback) =>
       callback({
         task: {
           findFirst: jest.fn().mockResolvedValue(movedTask),
-          findMany: jest.fn().mockResolvedValue(options.siblings ?? []),
+          findMany: siblingQuery,
           update: jest.fn().mockImplementation(({ where, data }) => {
             updates.push({ id: where.id as string, ...data });
             return Promise.resolve({ ...(movedTask ?? taskRow({ id: 't1' })), ...data });
@@ -319,7 +329,7 @@ describe('TaskService', () => {
         },
       }),
     );
-    return { updates };
+    return { updates, siblingQuery };
   }
 
   it('returns 404 on create when afterTaskId does not exist in the target column', async () => {
@@ -374,7 +384,7 @@ describe('TaskService', () => {
   it('appends to the end of the target column when no neighbors are given', async () => {
     const { service, prisma } = buildService();
     const moving = taskRow({ id: 'moving', position: 500, columnId: 'other' });
-    const { updates } = mockMoveTx(prisma, {
+    const { updates, siblingQuery } = mockMoveTx(prisma, {
       task: moving,
       siblings: [taskRow({ id: 'a', position: 1000 })],
     });
@@ -383,6 +393,13 @@ describe('TaskService', () => {
 
     expect(updates).toEqual([{ id: 'moving', columnId: COLUMN_ID, position: 2000 }]);
     expect(result.position).toBe(2000);
+    // The siblings are read for their ordering, so that is all the query may ask for — the
+    // moved task's own row is the one read in full.
+    expect(siblingQuery).toHaveBeenCalledWith({
+      where: { columnId: COLUMN_ID },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
+    });
   });
 
   it('moves into an empty column at the base gap', async () => {

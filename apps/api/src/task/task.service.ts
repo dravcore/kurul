@@ -127,9 +127,13 @@ export class TaskService {
     await assertBoard(this.prisma, workspaceId, boardId);
     const column = await this.findColumnOnBoard(workspaceId, boardId, dto.columnId);
 
+    // Only the ordering math reads these rows, and it reads two columns of them. Selecting the
+    // whole task instead drags every title, description and timestamp in the column across the
+    // wire on a create that will use none of it.
     const siblings = await this.prisma.task.findMany({
       where: { columnId: column.id },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
     });
 
     // `afterTaskId` is the client's word for "insert after this task", which in position
@@ -327,9 +331,12 @@ export class TaskService {
           : await tx.column.findFirst({ where: { id: fromColumnId } });
       const fromColumnName = fromColumn?.name ?? '';
 
+      // Two columns, as on create: the moved task itself is read in full above, and these rows
+      // only ever contribute an id and a position to the rebalance.
       const siblings = await tx.task.findMany({
         where: { columnId: targetColumn.id },
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        select: { id: true, position: true },
       });
       const remaining = siblings.filter((item) => item.id !== taskId);
       // On a move the DTO fields line up with position order: `beforeTaskId` is the task that
@@ -345,8 +352,10 @@ export class TaskService {
       let result: TaskDto;
 
       if (needsRebalance(prev?.position ?? null, next?.position ?? null)) {
+        // The moved row joins its new siblings as the same two columns they are: `reordered`
+        // exists to hand `rebalancePositions` a length and to pair each id with its new slot.
         const reordered = [...remaining];
-        reordered.splice(insertionIndex, 0, { ...task, columnId: targetColumn.id });
+        reordered.splice(insertionIndex, 0, { id: task.id, position: task.position });
         const positions = rebalancePositions(reordered.length);
         const otherUpdates = reordered
           .map((item, index) => ({ item, index }))

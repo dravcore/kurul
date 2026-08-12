@@ -63,9 +63,18 @@ export class ColumnService {
 
   async list(workspaceId: string, boardId: string): Promise<ColumnDto[]> {
     await assertBoard(this.prisma, workspaceId, boardId);
+    // Selected rather than included: `ColumnRow` is exactly what `toDto` reads, and spelling
+    // it out keeps `createdAt`/`updatedAt` off the wire on the board's hottest read.
     const columns = await this.prisma.column.findMany({
       where: { boardId },
-      include: { _count: { select: { tasks: true } } },
+      select: {
+        id: true,
+        boardId: true,
+        name: true,
+        position: true,
+        color: true,
+        _count: { select: { tasks: true } },
+      },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
     });
     return columns.map((column) => this.toDto(column));
@@ -78,9 +87,12 @@ export class ColumnService {
     dto: CreateColumnDto,
   ): Promise<ColumnDto> {
     await assertBoard(this.prisma, workspaceId, boardId);
+    // Ordering math only: id and position are the whole input to the neighbour lookup and the
+    // rebalance that may follow.
     const columns = await this.prisma.column.findMany({
       where: { boardId },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
     });
     // `afterColumnId` is the client's word for "insert after this column", which in position
     // order makes that column the new row's `prev` — the DTO name is translated here, once.
@@ -198,9 +210,12 @@ export class ColumnService {
         throw new BadRequestException('A column cannot be its own neighbor');
       }
 
+      // Same two columns as on create; the moved column itself was read in full above, and the
+      // response is re-read with `_count` after the write.
       const columns = await tx.column.findMany({
         where: { boardId: column.boardId },
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        select: { id: true, position: true },
       });
       const remaining = columns.filter((item) => item.id !== columnId);
       // On a move the DTO fields line up with position order: `beforeColumnId` is the column
@@ -214,7 +229,7 @@ export class ColumnService {
       );
       if (needsRebalance(prev?.position ?? null, next?.position ?? null)) {
         const reordered = [...remaining];
-        reordered.splice(insertionIndex, 0, column);
+        reordered.splice(insertionIndex, 0, { id: column.id, position: column.position });
         const positions = rebalancePositions(reordered.length);
         const otherUpdates = reordered
           .map((item, index) => ({ item, index }))
