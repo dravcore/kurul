@@ -7,28 +7,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed
+_Nothing yet._
 
-- Renaming a board's Done column no longer zeroes its completion and throughput metrics
-  ([ADR 0019](docs/decisions/0019-column-category.md)). Columns carry a `ColumnCategory`
-  (`BACKLOG` / `UNSTARTED` / `STARTED` / `COMPLETED` / `CANCELED`) that the dashboard reads
-  instead of matching the column's name against `'done'`, so "Shipped", "Released" or a
-  column seeded in another language counts as finished work. Completion is a *set* of
-  columns: a board may mark more than one column `COMPLETED`. Only `COMPLETED` is consumed
-  today; the other four are vocabulary for later.
+## [0.1.0] - 2026-08-12
 
-  > **Upgrade note — one-time, manual.** The migration backfills `COMPLETED` where
-  > `lower(btrim(name)) = 'done'`, which is the same rule the retired matcher used. **A board
-  > whose Done column had already been renamed reports zero completions until someone opens
-  > column settings and sets its category.** The backfill cannot recover intent from an
-  > arbitrary name — that is the whole reason the name stopped being the carrier — so there is
-  > nothing to guess from and no way to detect the affected boards. Those dashboards were
-  > already reporting zero before this release; the fix is available to them, it is just not
-  > automatic. Set the category once per affected column and the last 14 days of moves start
-  > counting immediately.
+First release: roadmap Phases 1–9 — the MVP — together with the post-MVP hardening pass that
+followed them. Everything below had been accumulating under `[Unreleased]` since the first
+commit; this is the point it becomes a version.
 
 ### Added
 
+- The notification bell subscribes to `notification:unread-changed` instead of relying on a
+  poll. The event is a signal, not the notification: the badge only needs a number, so the
+  client answers with one integer and refetches the list only when it is open. Polling stays
+  as a fallback for what a socket cannot cover — its own absence — at 120s and paused while
+  the tab is hidden.
+- CodeQL analysis and a blocking `pnpm audit --audit-level high` step run on every pull
+  request.
 - Interface language is a stored user preference
   ([ADR 0018](docs/decisions/0018-localization-strategy.md)). `User.locale` holds a nullable
   IETF tag, a **Settings → Language** screen writes it and mirrors it into a `locale` cookie,
@@ -55,19 +50,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Column settings replace the rename-column dialog and set a column's name and category
   together. Without a way to say that "Shipped" means completed, the metrics fix above only
   applies to columns still called Done.
-
-### Changed
-
-- Kurultay no longer accepts external code, documentation, or translation contributions
-  ([ADR 0015](docs/decisions/0015-no-external-contributions.md)): the codebase stays
-  single-authored, the CLA draft is kept but not enacted, and legal review is deferred to the
-  first commercial sale. The `CLA` workflow is disabled (manual trigger only, plus an
-  `if: false` job guard) rather than deleted, so no contributor is asked to sign a draft
-  agreement for a pull request that would not be merged. CONTRIBUTING, the PR template, and
-  `docs/cla.md` (EN/TR) now state the pause is indefinite.
-
-### Added
-
 - Contributor License Agreement scaffolding for the dual-licensing model
   ([ADR 0014](docs/decisions/0014-dual-licensing-cla.md)): Harmony-derived CLA draft
   ([docs/cla.md](docs/cla.md), EN/TR) — **not in force, pending legal review** — plus a
@@ -78,7 +60,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ([spec](docs/specs/2026-08-09-phase-9-realtime-design.md)): Socket.io gateway with Redis
   adapter, session-cookie auth, `board:{id}` rooms, thin ID event contract (`actorId`),
   emit-after-commit from task/column/comment mutations, web `useBoardSocket` with reconnect
-  resync and mid-drag cancel. Notification Socket push and presence remain out of MVP.
+  resync and mid-drag cancel. Presence remains out of MVP; notification unread push shipped separately, above.
 - Deferred follow-ups: `/notifications` page (unread + type filters, cursor Load more,
   View all from the bell) and dashboard created-vs-completed throughput (14 UTC days;
   `task.moved` payloads include column names). See
@@ -142,6 +124,30 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The interface speaks one vocabulary. A task is a task, never a card; an invitation is an
+  invitation, never an invite; the copy and the message keys both say "confirm" for email
+  confirmation rather than the keys saying "verify" while the copy said "confirm"; role names
+  are lowercase in prose. Two pairs of identical strings living under different keys were
+  collapsed — harmless while English is the only language, guaranteed to drift once it is not.
+- Success messages are the exception rather than the default. `docs/design.md` §7 now states
+  the rule — a message exists only where the screen cannot already answer "did that work?" —
+  and only three flows meet it: column settings, where `category` has no on-screen
+  representation; accepting an invitation, which lands on a dashboard that never mentions it;
+  and deleting a board label, which strips it from every task while the screen shows one chip.
+  Creating, deleting, moving, renaming and commenting confirm themselves.
+- Every error ends with a way out, and §7 records how that is decided: if the identical request
+  could succeed on a second attempt the surface carries a control, otherwise the sentence
+  carries the next move. An explained failure never gets a retry button, because one that
+  re-fails on every press teaches the user the product is broken — and a control still on
+  screen and still live already is the retry.
+
+- Kurultay no longer accepts external code, documentation, or translation contributions
+  ([ADR 0015](docs/decisions/0015-no-external-contributions.md)): the codebase stays
+  single-authored, the CLA draft is kept but not enacted, and legal review is deferred to the
+  first commercial sale. The `CLA` workflow is disabled (manual trigger only, plus an
+  `if: false` job guard) rather than deleted, so no contributor is asked to sign a draft
+  agreement for a pull request that would not be merged. CONTRIBUTING, the PR template, and
+  `docs/cla.md` (EN/TR) now state the pause is indefinite.
 - Docs: README and process docs reflect MVP complete (Phases 1–9); Turkish architecture
   module map aligned with English; api-conventions / testing / development status wording
   updated for shipped realtime.
@@ -193,9 +199,48 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Failure messages name the thing that actually failed. **Add column** and **Add task** failed
+  with "Could not *create* this column/task", breaking the verb halfway through the flow;
+  posting or deleting a comment fell through to "Could not save this task."; deleting a board
+  label reported itself as an update.
+
+- Failed loads no longer report as empty successes. A failed notification load said "You're
+  caught up" while unread items existed, a cold deep link to a task flashed "This task no
+  longer exists", a failed metadata load read as "No comments yet", and a board list with no
+  active workspace yet blamed a request that was never made. `useBoardData` also passed
+  "task is missing" as the error message for *every* failure, so a network error claimed the
+  task had been deleted; it now reads the status and only says that on a `404`.
+- `app/(app)/error.tsx`, `app/error.tsx` and `not-found.tsx` keep a render error or a dead
+  link inside the design system. A broken board now keeps the sidebar, switcher and bell
+  rather than dropping the user onto an unstyled page.
+- Label colours are named — blue, orange, aqua, yellow, magenta, green, violet, red, the
+  vocabulary `docs/design.md` §8 already used — instead of rendering the storage slot ids
+  `slot-1`…`slot-8` on screen.
+- A 150-minute estimate renders as "2h 30m" rather than "150m", with the phrasing owned by
+  the message catalogue so word order stays translatable.
+- Renaming a board's Done column no longer zeroes its completion and throughput metrics
+  ([ADR 0019](docs/decisions/0019-column-category.md)). Columns carry a `ColumnCategory`
+  (`BACKLOG` / `UNSTARTED` / `STARTED` / `COMPLETED` / `CANCELED`) that the dashboard reads
+  instead of matching the column's name against `'done'`, so "Shipped", "Released" or a
+  column seeded in another language counts as finished work. Completion is a *set* of
+  columns: a board may mark more than one column `COMPLETED`. Only `COMPLETED` is consumed
+  today; the other four are vocabulary for later.
+
+  > **Upgrade note — one-time, manual.** The migration backfills `COMPLETED` where
+  > `lower(btrim(name)) = 'done'`, which is the same rule the retired matcher used. **A board
+  > whose Done column had already been renamed reports zero completions until someone opens
+  > column settings and sets its category.** The backfill cannot recover intent from an
+  > arbitrary name — that is the whole reason the name stopped being the carrier — so there is
+  > nothing to guess from and no way to detect the affected boards. Those dashboards were
+  > already reporting zero before this release; the fix is available to them, it is just not
+  > automatic. Set the category once per affected column and the last 14 days of moves start
+  > counting immediately.
 - Tech-debt correctness pass (Wave 2): reject `null` on non-nullable update DTOs, preserve
   column `taskCount` after rebalance, map Prisma errors, fix dashboard "Other" assignee
   buckets, opaque `board:join` denies, scoped task updates, and board-view retry/patch/ref bugs.
 - Tech-debt performance and resource pass (Wave 3): enable Nest shutdown hooks and Better Auth
   session cookie cache, batch due-soon scans and rebalance SQL, paginate comments, and add
   `pg_trgm` search indexes.
+
+[unreleased]: https://github.com/dravcore/kurultay/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/dravcore/kurultay/releases/tag/v0.1.0
