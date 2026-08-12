@@ -94,14 +94,14 @@ jobs:
           pnpm --filter @kurultay/web exec vitest run --coverage
       - name: Upload API coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: api-coverage
           path: apps/api/coverage
           if-no-files-found: ignore
       - name: Upload web coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-coverage
           path: apps/web/coverage
