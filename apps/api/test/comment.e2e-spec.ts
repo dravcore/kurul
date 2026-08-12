@@ -93,7 +93,7 @@ describe('Comments (e2e)', () => {
     expect(secondPage.body.items[0]).toMatchObject({ body: 'Comment 2' });
   });
 
-  it('allows a member to delete another member’s comment (ADR 0011 flat delete)', async () => {
+  it('restricts comment deletion to the author or an elevated role (ADR 0012)', async () => {
     const owner = await signUp(app, { name: 'Owner' });
     const member = await signUp(app, { name: 'Member' });
     const workspace = await createWorkspace(owner.agent, 'FlatDel', `fd-${Date.now()}`);

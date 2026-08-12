@@ -264,6 +264,52 @@ herkesin oturumunu kapatır ve henüz teslim edilmemiş kuyruklanmış bildiriml
 hiçbir board verisini kaybetmez. Redis yükseltmeleri bir major içinde, ve 7 → 8, yerinde
 ve RDB/AOF uyumludur.
 
+### İndeks migration'ları yazma kilidi alır
+
+**`apps/api/prisma/migrations/` içindeki her indeks düz bir `CREATE INDEX` ile oluşturulur ve
+bu, inşa boyunca tablo üzerinde bir `SHARE` kilidi tutar.** Okumalar sürer; **o tabloya
+yazmalar indeks bitene kadar bloke olur.** Taze veya küçük bir veritabanında bu milisaniyeler
+sürer ve görünmezdir. Büyük bir veritabanında ise inşa süresi kadar uzun bir yazma kesintisidir.
+
+En kritik olan ikisi, `20260809190000_task_trgm_search_indexes` içindeki trigram GIN
+indeksleridir: `Task_title_idx` ve `Task_description_idx`. Metin üzerindeki GIN inşaları var
+olan en yavaş indeks inşaları arasındadır ve `Task`, şemadaki en hızlı büyüyen tablodur.
+
+Bu bilinçli bir takas, bir gözden kaçırma değil. `CREATE INDEX CONCURRENTLY` bir transaction
+bloğu içinde çalışamaz ve `prisma migrate deploy` her migration'ı bir transaction'a sarar —
+yani onu kullanmak, Prisma'nın uygulayamayacağı migration'ları elle yazmak anlamına gelirdi;
+karşılığında ise bu projenin fiilen deploy edildiği her veritabanında fark edilmeyen bir kilit
+kazanılırdı. Prisma'nın bu durum için kendi önerisi de aşağıdaki manuel yoldur.
+
+**Büyük bir `Task` tablosu olan (kabaca: birkaç yüz bin satırı geçmiş) bir kurulumu ya da
+yazma duraklaması kaldıramayacak herhangi bir kurulumu yükseltmeden önce:**
+
+1. Uygulamadan önce sürümdeki yeni migration'ları okuyun:
+   `git diff <mevcut-tag>..<hedef-tag> -- apps/api/prisma/migrations`.
+2. Biri büyük bir tabloda indeks oluşturuyorsa, eski sürüm hâlâ trafiğe hizmet ederken o
+   ifadeyi `CONCURRENTLY` ile kendiniz uygulayın:
+
+   ```bash
+   docker compose exec -T postgres psql -U kurultay kurultay -c \
+     'CREATE INDEX CONCURRENTLY IF NOT EXISTS "Task_title_idx" ON "Task" USING GIN ("title" gin_trgm_ops);'
+   ```
+
+   `CONCURRENTLY` yazmaları bloke etmez, ama bir transaction içinde çalışamaz ve kabaca iki
+   kat uzun sürer. Başarısız olursa geride **geçersiz** bir indeks bırakır; yeniden denemeden
+   önce bunun düşürülmesi gerekir (`DROP INDEX CONCURRENTLY "Task_title_idx";`) — kontrol
+   için: `SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;`.
+
+3. Sonra her zamanki gibi `pnpm db:migrate` çalıştırın. Migration'ın kendi `CREATE INDEX`'i,
+   aynı adla zaten var olan bir indekse karşı no-op'tur, dolayısıyla deploy hiç kilit almaz.
+
+Bunu rutin olarak yapmayın — normal boyuttaki bir kurulum için tek başına 3. adım doğrudur ve
+tüm prosedür boşa emektir. Bu, yalnızca varsayılanın canı yakacağı tek durum için, sürüm
+notlarıyla tetiklenen bir kaçış kapısıdır.
+
+Aynı migration'daki `CREATE EXTENSION IF NOT EXISTS pg_trgm` superuser veya
+`pg_database_owner` yetkisi ister. Eklentileri kısıtlayan yönetilen bir Postgres'te,
+migration çalışmadan önce `pg_trgm`'in sağlayıcı tarafından etkinleştirilmiş olması gerekir.
+
 ## Günlük döngü
 
 ```bash

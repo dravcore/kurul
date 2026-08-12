@@ -14,7 +14,8 @@ Kurultay sisteminin şekli: kod nasıl saklanıyor, nasıl çalışıyor ve veri
 - [6. Veri modeli](#6-veri-modeli)
 - [7. Multi-tenant izolasyonu](#7-multi-tenant-izolasyonu)
 - [8. Runtime evrimi](#8-runtime-evrimi)
-- [9. Karar kayıtları](#9-karar-kayıtları)
+- [9. Kabul edilmiş runtime takasları](#9-kabul-edilmiş-runtime-takasları)
+- [10. Karar kayıtları](#10-karar-kayıtları)
 
 ---
 
@@ -293,27 +294,94 @@ Aşamalı yol bilinçli bir tercihtir: mikroservis kapısı açık kalır, bedel
 
 ---
 
-## 9. Karar kayıtları
+## 9. Kabul edilmiş runtime takasları
+
+Aşağıdaki iki davranış, gözden kaçmış şeyler değil, bilinçli tavizlerdir. Her biri kabul
+edildiği noktada bir kod yorumunda savunuldu ve başka hiçbir yerde belgelenmedi; yani
+haklarında bilgi edinmenin tek yolu zaten o dosyayı okuyor olmaktı. Her birine ayrı bir ADR
+ayıracak kadar büyük değiller, ama bir shutdown'ı veya bayat bir oturumu debug eden bir
+operatörün onları kaynaktan yeniden keşfetmek zorunda kalmayacağı kadar önemliler.
+
+### 9.1 Kapanış sırası Nest'e değil, tek bir modüle aittir
+
+`PrismaService` ve Better Auth'un kendi `PrismaClient`'ı, süreç genelinde tek bir `pg`
+havuzundan ödünç alır (`api/src/prisma/database.ts`). İki istemci, tek havuz — ve **Nest,
+`onModuleDestroy` hook'ları arasında hiçbir sıra garantisi vermez.** Yani hangi modül önce
+yıkılırsa havuzu diğerinin altından çekip alırdı ve hayatta kalanın `$disconnect()` çağrısı
+her SIGTERM'de `Called end on pool more than once` / `cannot use a pool after calling end`
+fırlatırdı.
+
+Çözüm şu: hiçbir modül kendi istemcisini kapatmaz. Havuzun yaşam döngüsünün tek sahibi
+`database.ts`'tir: istemciler `registerPoolConsumer` ile bir disconnect callback'i kaydeder ve
+`closeSharedDatabase`, havuzu kapatmadan önce kayıtlı her istemciyi boşaltır. İdempotent ve
+eşzamanlılığa dayanıklıdır — ilk çağıran kapanışın sahibidir, sonraki veya paralel çağıranlar
+aynı promise'i bekler — dolayısıyla Nest'in hangi hook'u önce koşturduğu gerçekten fark etmez.
+
+| Takas                                        | Kabul edilme nedeni                                                                                                                                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tek paylaşılan havuz                         | İki havuz, hiçbir fayda sağlamadan Postgres `max_connections`'a karşı bağlantı sayısını ikiye katlardı — iki istemci de aynı veritabanına aynı kimlik bilgileriyle konuşuyor                                   |
+| Yaşam döngüsünün modül durumunda tutulması   | Alternatif, iki modülün de inject ettiği bir Nest provider'ı; aynı "tek sahip" kuralını ifade etmek için daha fazla bağlantı demek. Better Auth'un istemcisi zaten modül kapsamında, Nest DI dışında kuruluyor |
+| Başarısız bir disconnect kapanışı engellemez | `closeSharedDatabase`, `Promise.allSettled` kullanır — kapanamayan tek bir istemci havuzu açık bırakıp süreci sonlandırma süresinin ötesine takamamalı                                                         |
+
+Pratikte bunun anlamı: **kapanışta gelen bir "pool already ended" hatası geçici bir durum
+değil, bu sözleşmenin ihlalidir.** Bir yerde bir kod, istemciyi kaydetmek yerine doğrudan
+kapatmıştır. Paylaşılan havuzdan ödünç alan her yeni istemci `registerPoolConsumer`
+çağırmalıdır.
+
+### 9.2 Oturum iptali beş dakikaya kadar gecikir; rol iptali gecikmez
+
+Better Auth, `session.cookieCache` ile `maxAge: 5 * 60` olarak yapılandırılmıştır
+(`api/src/auth/auth.ts`). İmzalı oturum çerezi, süresi dolana kadar veritabanına gidilmeden
+kabul edilir; bu da kimlik doğrulamalı her istekten bir sorgu düşürür.
+
+Bedeli net: **bir oturumu iptal etmek 300 saniyeye kadar geç etkili olur.** Session satırını
+silmek, tarayıcının elinde zaten bulunan bir çerezi geçersiz kılmaz; o çerez, önbellek
+penceresi kapanana dek kabul edilmeye devam eder.
+
+Etkilenmeyenler, etkilenenlerden daha önemlidir:
+
+| Değişiklik                                      | Ne zaman etkili olur                                                                         |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Oturum iptal edildi / başka yerde çıkış yapıldı | 5 dakikaya kadar geç — çerez, önbelleği dolana kadar kabul edilir                            |
+| Rol değişti (ör. ADMIN → GUEST)                 | **Anında** — `WorkspaceGuard`, her istekte `WorkspaceMember`'ı veritabanından okur           |
+| Workspace'ten çıkarıldı                         | **Anında** — aynı guard, aynı okuma; üyelik satırı yok ve istek 404 döner                    |
+| E-posta doğrulandı                              | Anında — `autoSignInAfterVerification` çerezi yeniden yazar, o seçenek zaten bunun için açık |
+
+Yani bu pencere bir _yetkilendirme_ penceresi değil, bir _oturum kimliği_ penceresidir. Rolü
+düşürülmüş veya atılmış bir üye beş dakika boyunca eski rolüyle işlem yapamaz; yalnızca çıkış
+yapmış bir tarayıcı, elinde tuttuğu çerezle beş dakikaya kadar okumaya devam edebilir. Bu
+asimetri, takası bu ölçekte kabul edilebilir kılan şeydir ve guard'ın bilinçli olarak
+önbelleklenmiş hiçbir şeye güvenmesine izin verilmediği için vardır.
+
+Bir kurulum bir gün anlık oturum iptaline ihtiyaç duyarsa — bir güvenlik olayı, bir uyumluluk
+gereksinimi — kol `session.cookieCache.enabled: false`'dır; bedeli kimlik doğrulamalı her
+istek başına bir veritabanı okumasıdır.
+
+---
+
+## 10. Karar kayıtları
 
 Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 
-| ADR                                                                                            | Konu                                                              |
-| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modüler monolit                                        |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                    |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts           |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Organization plugin'i ile Better Auth (→ Workspace)               |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                                         |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Sıralama için Float position'lar                                  |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                          |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                                 |
-| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board ve column Nest `@Roles` matrisi                             |
-| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task Nest `@Roles` matrisi                                        |
-| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label ve task-metadata Nest `@Roles` matrisi                      |
-| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Yorum silme: yazarlık veya OWNER/ADMIN                            |
-| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde |
-| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Çift lisanslama + katkıda bulunan lisans sözleşmesi               |
-| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)             | Dış katkı yok; CLA yürürlükte değil, hukuk masrafı ertelendi      |
+| ADR                                                                                                        | Konu                                                              |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)                         | Monorepo + modüler monolit                                        |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                                 | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                    |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                               | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts           |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                                           | Organization plugin'i ile Better Auth (→ Workspace)               |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                                         | Socket.io + Redis adapter                                         |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                                     | Sıralama için Float position'lar                                  |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                                   | AGPL-3.0                                                          |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                             | Git Flow + SemVer                                                 |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)                           | Board ve column Nest `@Roles` matrisi                             |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                                           | Task Nest `@Roles` matrisi                                        |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md)             | Label ve task-metadata Nest `@Roles` matrisi                      |
+| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)                         | Yorum silme: yazarlık veya OWNER/ADMIN                            |
+| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)                 | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde |
+| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                                       | Çift lisanslama + katkıda bulunan lisans sözleşmesi               |
+| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)                         | Dış katkı yok; CLA yürürlükte değil, hukuk masrafı ertelendi      |
+| [`0016-foreign-key-violation-status.md`](decisions/0016-foreign-key-violation-status.md)                   | Prisma `P2003`, `422`'ye değil `409`'a eşlenir                    |
+| [`0017-partial-indexes-outside-prisma-schema.md`](decisions/0017-partial-indexes-outside-prisma-schema.md) | Kısmi indeksler migration'larda yaşar, testlerle korunur          |
 
 İlgili: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (tarihsel Faz 1 iskeleti) · [docs/README.md](../README.md) (docs haritası)
