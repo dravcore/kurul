@@ -111,20 +111,26 @@ export function TaskLabelsSection({
               onChange={(event) => setNewLabelName(event.target.value)}
             />
           </div>
-          <Select
-            size="sm"
-            className="w-auto"
-            value={newLabelColor}
-            disabled={pending}
-            aria-label={t('labelColor')}
-            onChange={(event) => setNewLabelColor(event.target.value as LabelColorSlot)}
-          >
-            {SLOTS.map((slot) => (
-              <option key={slot} value={slot}>
-                {slot}
-              </option>
-            ))}
-          </Select>
+          <div className="flex items-center gap-2">
+            <span
+              className={cn('size-3 shrink-0 rounded-full', labelSlotClass(newLabelColor))}
+              aria-hidden
+            />
+            <Select
+              size="sm"
+              className="w-auto"
+              value={newLabelColor}
+              disabled={pending}
+              aria-label={t('labelColor')}
+              onChange={(event) => setNewLabelColor(event.target.value as LabelColorSlot)}
+            >
+              {SLOTS.map((slot) => (
+                <option key={slot} value={slot}>
+                  {t(`colorValues.${slot}`)}
+                </option>
+              ))}
+            </Select>
+          </div>
           <Button type="button" size="sm" disabled={pending} onClick={() => void createLabel()}>
             {t('createLabel')}
           </Button>
