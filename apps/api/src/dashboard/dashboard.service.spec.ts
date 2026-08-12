@@ -45,18 +45,31 @@ describe('DashboardService', () => {
         count: jest.fn(),
         groupBy: jest.fn(),
       },
-      taskAssignee: {
-        groupBy: jest.fn().mockResolvedValue([]),
-      },
       column: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
-      user: {
         findMany: jest.fn().mockResolvedValue([]),
       },
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
     return { service: new DashboardService(prisma as unknown as PrismaService), prisma };
+  }
+
+  /**
+   * `summary` issues its raw queries in a fixed order inside one `Promise.all`: assignee
+   * buckets, then created-per-day, then completed-per-day. Naming them here keeps the tests
+   * from spelling out a chain of `mockResolvedValueOnce` whose meaning is positional.
+   */
+  function mockRawQueries(
+    prisma: ReturnType<typeof buildService>['prisma'],
+    results: {
+      assignees?: Array<{ userId: string | null; name: string; count: number }>;
+      created?: Array<{ day: Date; count: number }>;
+      completed?: Array<{ day: Date; count: number }>;
+    } = {},
+  ): void {
+    prisma.$queryRaw
+      .mockResolvedValueOnce(results.assignees ?? [])
+      .mockResolvedValueOnce(results.created ?? [])
+      .mockResolvedValueOnce(results.completed ?? []);
   }
 
   it('returns zero-filled priorities, throughput, and null byColumn without boardId', async () => {
@@ -78,7 +91,7 @@ describe('DashboardService', () => {
       { priority: Priority.URGENT, count: 0 },
     ]);
     expect(prisma.board.findFirst).not.toHaveBeenCalled();
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
   });
 
   it('fills byColumn including zero-count columns when boardId is set', async () => {
@@ -106,9 +119,10 @@ describe('DashboardService', () => {
     prisma.task.groupBy.mockResolvedValue([]);
     prisma.column.findMany.mockResolvedValue([{ id: 'done-id' }]);
     const today = emptyThroughputSeries()[THROUGHPUT_DAYS - 1]!.date;
-    prisma.$queryRaw
-      .mockResolvedValueOnce([{ day: new Date(`${today}T00:00:00.000Z`), count: 1 }])
-      .mockResolvedValueOnce([{ day: new Date(`${today}T00:00:00.000Z`), count: 1 }]);
+    mockRawQueries(prisma, {
+      created: [{ day: new Date(`${today}T00:00:00.000Z`), count: 1 }],
+      completed: [{ day: new Date(`${today}T00:00:00.000Z`), count: 1 }],
+    });
 
     const summary = await service.summary(WORKSPACE_ID, {});
     const todayRow = summary.throughput.find((day) => day.date === today)!;
@@ -116,24 +130,54 @@ describe('DashboardService', () => {
     expect(todayRow.completed).toBe(1);
   });
 
-  it('keeps top 8 assignees and folds the rest into Other', async () => {
+  it('puts Unassigned ahead of the ranked buckets the database returned', async () => {
     const { service, prisma } = buildService();
-    prisma.task.count.mockResolvedValue(0);
+    // totalTasks, overdueCount, then unassignedCount.
+    prisma.task.count.mockResolvedValueOnce(9).mockResolvedValueOnce(0).mockResolvedValueOnce(4);
     prisma.task.groupBy.mockResolvedValue([]);
-    const rows = Array.from({ length: 10 }, (_, index) => ({
-      userId: `0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d${String(60 + index).padStart(2, '0')}`,
-      _count: { _all: 10 - index },
-    }));
-    prisma.taskAssignee.groupBy.mockResolvedValue(rows);
-    prisma.user.findMany.mockResolvedValue(
-      rows.map((row, index) => ({ id: row.userId, name: `User ${index}` })),
-    );
+    mockRawQueries(prisma, {
+      assignees: [
+        { userId: 'u1', name: 'Ada', count: 5 },
+        { userId: null, name: 'Other', count: 3 },
+      ],
+    });
 
     const summary = await service.summary(WORKSPACE_ID, {});
 
-    expect(summary.byAssignee).toHaveLength(9);
-    expect(summary.byAssignee.slice(0, 8).every((row) => row.userId !== null)).toBe(true);
-    expect(summary.byAssignee[8]).toEqual({ userId: null, name: 'Other', count: 1 + 2 });
+    expect(summary.byAssignee).toEqual([
+      { userId: null, name: 'Unassigned', count: 4 },
+      { userId: 'u1', name: 'Ada', count: 5 },
+      { userId: null, name: 'Other', count: 3 },
+    ]);
+  });
+
+  it('omits the Unassigned bucket when every task has an assignee', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.count.mockResolvedValueOnce(5).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+    prisma.task.groupBy.mockResolvedValue([]);
+    mockRawQueries(prisma, { assignees: [{ userId: 'u1', name: 'Ada', count: 5 }] });
+
+    const summary = await service.summary(WORKSPACE_ID, {});
+
+    expect(summary.byAssignee).toEqual([{ userId: 'u1', name: 'Ada', count: 5 }]);
+  });
+
+  it('ranks and folds assignees in SQL rather than reading every assignment into Node', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.count.mockResolvedValue(0);
+    prisma.task.groupBy.mockResolvedValue([]);
+    mockRawQueries(prisma);
+
+    await service.summary(WORKSPACE_ID, {});
+
+    const sql = (prisma.$queryRaw.mock.calls[0]![0] as string[]).join('?');
+    // The top-N split and the "Other" total are the database's job — that is the whole point
+    // of the query, and doing either in Node means every assignment row crossed the wire.
+    expect(sql).toContain('ROW_NUMBER()');
+    expect(sql).toContain("'Other'");
+    expect(sql).toContain('"rn" <= ');
+    // No name lookup follows the aggregate: the join inside the query already resolved them.
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
   });
 
   it('returns 404 when boardId is outside the workspace', async () => {
