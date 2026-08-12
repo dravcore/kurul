@@ -81,8 +81,8 @@ function stubMeta(): void {
 /** Stable identity: the hook re-runs its load effect whenever `filters` changes. */
 const NO_FILTERS: BoardTaskFilters = {};
 
-function renderBoardData() {
-  return renderHook(() => useBoardData(BOARD_ID, NO_FILTERS), {
+function renderBoardData(selectedTaskId: string | null = null) {
+  return renderHook(() => useBoardData(BOARD_ID, NO_FILTERS, selectedTaskId), {
     wrapper: ({ children }) => (
       <NextIntlClientProvider locale="en" messages={messages}>
         {children}
@@ -191,5 +191,73 @@ describe('useBoardData task streaming', () => {
 
     await waitFor(() => expect(result.current.error).toBe("The board couldn't load."));
     expect(result.current.loading).toBe(false);
+  });
+});
+
+/** A task reached by URL that the board's own pages never brought back — filtered, or deleted. */
+describe('useBoardData deep-linked task', () => {
+  it('fetches the missing task and adds it to the board', async () => {
+    drain.mockResolvedValue([]);
+    apiGet.mockImplementation((path: string) => {
+      if (path.endsWith('/tasks/task-9')) return Promise.resolve(task('task-9')) as never;
+      return Promise.resolve(metaResponse(path)) as never;
+    });
+
+    const { result } = renderBoardData('task-9');
+
+    await waitFor(() => expect(result.current.tasks.map((item) => item.id)).toEqual(['task-9']));
+    expect(result.current.panelError).toBeNull();
+  });
+
+  /** The lookup must be abortable like every other read here — it used to be the one that was not. */
+  it('passes an abort signal with the lookup', async () => {
+    drain.mockResolvedValue([]);
+    apiGet.mockImplementation((path: string) => {
+      if (path.endsWith('/tasks/task-9')) return new Promise(() => {}) as never;
+      return Promise.resolve(metaResponse(path)) as never;
+    });
+
+    const { unmount } = renderBoardData('task-9');
+
+    await waitFor(() =>
+      expect(apiGet.mock.calls.some((call) => (call[0] as string).endsWith('/tasks/task-9'))).toBe(
+        true,
+      ),
+    );
+    const lookup = apiGet.mock.calls.find((call) => (call[0] as string).endsWith('/tasks/task-9'));
+    const signal = (lookup?.[1] as { signal?: AbortSignal }).signal;
+    expect(signal?.aborted).toBe(false);
+
+    unmount();
+
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('reports a task the API cannot produce', async () => {
+    drain.mockResolvedValue([]);
+    apiGet.mockImplementation((path: string) => {
+      if (path.endsWith('/tasks/task-9')) return Promise.reject(new Error('404')) as never;
+      return Promise.resolve(metaResponse(path)) as never;
+    });
+
+    const { result } = renderBoardData('task-9');
+
+    await waitFor(() => expect(result.current.panelError).not.toBeNull());
+    expect(result.current.tasks).toEqual([]);
+  });
+
+  it('asks for nothing when the board already has the task', async () => {
+    drain.mockImplementation(async (_ws, _board, _filters, options?: FetchBoardTasksOptions) => {
+      options?.onPage?.({ items: [task('task-9')], index: 0, hasMore: false });
+      return [task('task-9')];
+    });
+
+    const { result } = renderBoardData('task-9');
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(apiGet.mock.calls.some((call) => (call[0] as string).endsWith('/tasks/task-9'))).toBe(
+      false,
+    );
+    expect(result.current.panelError).toBeNull();
   });
 });

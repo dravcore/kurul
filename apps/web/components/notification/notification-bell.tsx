@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Bell } from 'lucide-react';
@@ -14,6 +14,7 @@ import { notificationTitle } from '@/lib/notification-copy';
 import { markAllNotificationsRead, openNotificationTarget } from '@/lib/notification-actions';
 import { formatRelativeTime } from '@/lib/relative-time';
 import { useApiResource } from '@/lib/use-api-resource';
+
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,7 +51,32 @@ export function NotificationBell(): React.ReactElement {
   const router = useRouter();
   const { activeId: workspaceId, bootstrapped } = useWorkspaceContext();
   const [open, setOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnread = useMemo(
+    () =>
+      bootstrapped && workspaceId
+        ? (signal: AbortSignal): Promise<number> =>
+            api
+              .get<NotificationUnreadCountDto>(
+                `/workspaces/${workspaceId}/notifications/unread-count`,
+                { signal },
+              )
+              .then((result) => result.count)
+        : null,
+    [bootstrapped, workspaceId],
+  );
+  const {
+    data: unreadCount,
+    reload: reloadUnread,
+    setData: setUnreadCount,
+  } = useApiResource<number>(
+    fetchUnread,
+    0,
+    // Never rendered: a bell icon has nowhere to put a sentence, which is also why the last
+    // known count is kept rather than blanked when a refresh fails.
+    t('loadError'),
+    { keepStaleOnError: true },
+  );
 
   // Only fetched while the dropdown is open — a closed bell needs the badge, not the rows.
   const fetchItems = useMemo(
@@ -74,29 +100,11 @@ export function NotificationBell(): React.ReactElement {
     setData: setItems,
   } = useApiResource<NotificationDto[]>(fetchItems, EMPTY_ITEMS, t('loadError'));
 
-  const refreshUnread = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
-      if (!workspaceId) return;
-      try {
-        const result = await api.get<NotificationUnreadCountDto>(
-          `/workspaces/${workspaceId}/notifications/unread-count`,
-          { signal },
-        );
-        if (!signal?.aborted) {
-          setUnreadCount(result.count);
-        }
-      } catch {
-        // Keep last known count; avoid toast spam on poll.
-      }
-    },
-    [workspaceId],
-  );
-
   // Rows only matter while the dropdown is open; the badge is refreshed either way.
   const refreshOpenViews = useCallback((): void => {
-    void refreshUnread();
+    reloadUnread();
     if (open) reloadItems();
-  }, [open, refreshUnread, reloadItems]);
+  }, [open, reloadUnread, reloadItems]);
 
   const { connected } = useNotificationSocket(workspaceId, bootstrapped, {
     onUnreadChanged: refreshOpenViews,
@@ -105,19 +113,26 @@ export function NotificationBell(): React.ReactElement {
     onResync: refreshOpenViews,
   });
 
+  // Distinguishes "never joined" — where the resource's own first load already covers the
+  // badge — from "was joined and dropped", which is the transition that opens a gap.
+  const roomWasJoinedRef = useRef(false);
+  useEffect(() => {
+    if (connected) roomWasJoinedRef.current = true;
+  }, [connected]);
+
   useEffect(() => {
     // The socket is the primary channel; this effect is the fallback and stays unmounted
     // while the room is joined, so a live bell issues no periodic requests at all.
     if (!bootstrapped || !workspaceId || connected) return;
-    const controller = new AbortController();
-    void refreshUnread(controller.signal);
+    if (roomWasJoinedRef.current) {
+      roomWasJoinedRef.current = false;
+      reloadUnread();
+    }
 
     let timer: number | null = null;
     const startPolling = (): void => {
       if (timer !== null) return;
-      timer = window.setInterval(() => {
-        void refreshUnread();
-      }, FALLBACK_POLL_MS);
+      timer = window.setInterval(reloadUnread, FALLBACK_POLL_MS);
     };
     const stopPolling = (): void => {
       if (timer !== null) {
@@ -133,7 +148,7 @@ export function NotificationBell(): React.ReactElement {
       } else {
         // Refresh once immediately so a badge that went stale in a background tab is never
         // shown for up to FALLBACK_POLL_MS after the tab is looked at again.
-        void refreshUnread();
+        reloadUnread();
         startPolling();
       }
     };
@@ -144,11 +159,10 @@ export function NotificationBell(): React.ReactElement {
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
-      controller.abort();
       stopPolling();
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [bootstrapped, workspaceId, refreshUnread, connected]);
+  }, [bootstrapped, workspaceId, reloadUnread, connected]);
 
   async function markAllRead(): Promise<void> {
     if (!workspaceId) return;
