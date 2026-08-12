@@ -23,17 +23,11 @@ export interface DefaultColumn {
   category: ColumnCategory;
 }
 
-/**
- * Dashboard completion metrics key off the Done column by name, so it is named once and
- * referenced — a rename only has to happen here.
- *
- * @deprecated Superseded by {@link ColumnCategory}; the metrics move off it next.
- */
-export const DONE_COLUMN_NAME = 'Done';
-
 /** Ordered: index is the order a client seeding them one at a time must preserve. */
 export const DEFAULT_COLUMNS: readonly DefaultColumn[] = [
   { name: 'To Do', position: 1000, category: ColumnCategory.UNSTARTED },
   { name: 'In Progress', position: 2000, category: ColumnCategory.STARTED },
-  { name: DONE_COLUMN_NAME, position: 3000, category: ColumnCategory.COMPLETED },
+  // No `DONE_COLUMN_NAME` constant any more: nothing matches on this string, so naming it
+  // once bought nothing but the impression that something still did.
+  { name: 'Done', position: 3000, category: ColumnCategory.COMPLETED },
 ];

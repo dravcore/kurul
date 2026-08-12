@@ -116,4 +116,187 @@ describe('Dashboard (e2e)', () => {
     const anonymous = request(app.getHttpServer());
     await anonymous.get(`/workspaces/${workspace.id}/dashboard/summary`).expect(401);
   });
+
+  describe('completion follows the column category, not the column name', () => {
+    const today = (): string => new Date().toISOString().slice(0, 10);
+
+    /** Owner, workspace and a board with its three seeded columns. */
+    async function setUpBoard() {
+      const owner = await signUp(app, { name: 'Owner' });
+      const workspace = await createWorkspace(owner.agent, 'Dash', `dash-${Date.now()}`);
+      const board = await owner.agent
+        .post(`/workspaces/${workspace.id}/boards`)
+        .send({ name: 'Main' })
+        .expect(201);
+      const columns = await owner.agent
+        .get(`/workspaces/${workspace.id}/boards/${board.body.id}/columns`)
+        .expect(200);
+      const byName = (name: string): { id: string; name: string; category: string } =>
+        columns.body.find((column: { name: string }) => column.name === name);
+      return { owner, workspace, boardId: board.body.id as string, byName };
+    }
+
+    async function createTask(
+      owner: Awaited<ReturnType<typeof setUpBoard>>['owner'],
+      workspaceId: string,
+      boardId: string,
+      columnId: string,
+    ): Promise<string> {
+      const task = await owner.agent
+        .post(`/workspaces/${workspaceId}/boards/${boardId}/tasks`)
+        .send({ title: 'Work', columnId })
+        .expect(201);
+      return task.body.id as string;
+    }
+
+    async function completedToday(
+      owner: Awaited<ReturnType<typeof setUpBoard>>['owner'],
+      workspaceId: string,
+    ): Promise<number> {
+      const summary = await owner.agent
+        .get(`/workspaces/${workspaceId}/dashboard/summary`)
+        .expect(200);
+      return summary.body.throughput.find((row: { date: string }) => row.date === today())
+        .completed as number;
+    }
+
+    it('seeds each default column with its category', async () => {
+      const { byName } = await setUpBoard();
+
+      expect(byName('To Do').category).toBe('UNSTARTED');
+      expect(byName('In Progress').category).toBe('STARTED');
+      expect(byName('Done').category).toBe('COMPLETED');
+    });
+
+    it('keeps counting completions after the Done column is renamed', async () => {
+      // The live defect ADR 0019 closes: this renamed board reported zero completions.
+      const { owner, workspace, boardId, byName } = await setUpBoard();
+      const taskId = await createTask(owner, workspace.id, boardId, byName('To Do').id);
+      const done = byName('Done');
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/columns/${done.id}`)
+        .send({ name: 'Shipped' })
+        .expect(200);
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/tasks/${taskId}/position`)
+        .send({ columnId: done.id })
+        .expect(200);
+
+      await expect(completedToday(owner, workspace.id)).resolves.toBe(1);
+    });
+
+    it('counts a completed column whose name is not English', async () => {
+      // ADR 0018 seeds column names in the creator's locale; "Bitti" must count as done.
+      const { owner, workspace, boardId, byName } = await setUpBoard();
+      const bitti = await owner.agent
+        .post(`/workspaces/${workspace.id}/boards/${boardId}/columns`)
+        .send({ name: 'Bitti', category: 'COMPLETED' })
+        .expect(201);
+      const taskId = await createTask(owner, workspace.id, boardId, byName('To Do').id);
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/tasks/${taskId}/position`)
+        .send({ columnId: bitti.body.id })
+        .expect(200);
+
+      await expect(completedToday(owner, workspace.id)).resolves.toBe(1);
+    });
+
+    it('does not count a column merely named Done', async () => {
+      // The inverse of the same rule, and the reason the name predicate had to be deleted
+      // rather than kept as a fallback.
+      const { owner, workspace, boardId, byName } = await setUpBoard();
+      const decoy = await owner.agent
+        .post(`/workspaces/${workspace.id}/boards/${boardId}/columns`)
+        .send({ name: 'Done' })
+        .expect(201);
+      expect(decoy.body.category).toBe('UNSTARTED');
+      const taskId = await createTask(owner, workspace.id, boardId, byName('To Do').id);
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/tasks/${taskId}/position`)
+        .send({ columnId: decoy.body.id })
+        .expect(200);
+
+      await expect(completedToday(owner, workspace.id)).resolves.toBe(0);
+    });
+
+    it('counts moves into every completed column, not just the first', async () => {
+      const { owner, workspace, boardId, byName } = await setUpBoard();
+      const wontDo = await owner.agent
+        .post(`/workspaces/${workspace.id}/boards/${boardId}/columns`)
+        .send({ name: "Won't Do", category: 'COMPLETED' })
+        .expect(201);
+      const first = await createTask(owner, workspace.id, boardId, byName('To Do').id);
+      const second = await createTask(owner, workspace.id, boardId, byName('To Do').id);
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/tasks/${first}/position`)
+        .send({ columnId: byName('Done').id })
+        .expect(200);
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/tasks/${second}/position`)
+        .send({ columnId: wontDo.body.id })
+        .expect(200);
+
+      await expect(completedToday(owner, workspace.id)).resolves.toBe(2);
+    });
+
+    it('retroactively counts moves once a column is marked completed', async () => {
+      // This is what makes the column-settings UI a repair and not just a fix going forward:
+      // the id branch of the predicate resolves against the column's category *now*.
+      const { owner, workspace, boardId, byName } = await setUpBoard();
+      const shipped = await owner.agent
+        .post(`/workspaces/${workspace.id}/boards/${boardId}/columns`)
+        .send({ name: 'Shipped' })
+        .expect(201);
+      const taskId = await createTask(owner, workspace.id, boardId, byName('To Do').id);
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/tasks/${taskId}/position`)
+        .send({ columnId: shipped.body.id })
+        .expect(200);
+
+      await expect(completedToday(owner, workspace.id)).resolves.toBe(0);
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/columns/${shipped.body.id}`)
+        .send({ category: 'COMPLETED' })
+        .expect(200);
+
+      await expect(completedToday(owner, workspace.id)).resolves.toBe(1);
+    });
+
+    it('still counts a move into a completed column that was later deleted', async () => {
+      // The case the deleted name fallback used to serve. The activity payload's
+      // `toColumnCategory` snapshot is what carries it now — and unlike the name, it carries
+      // it in every language.
+      const { owner, workspace, boardId, byName } = await setUpBoard();
+      const taskId = await createTask(owner, workspace.id, boardId, byName('To Do').id);
+      const done = byName('Done');
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/tasks/${taskId}/position`)
+        .send({ columnId: done.id })
+        .expect(200);
+      // The column must be empty before it can be deleted.
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/tasks/${taskId}/position`)
+        .send({ columnId: byName('To Do').id })
+        .expect(200);
+      await owner.agent.delete(`/workspaces/${workspace.id}/columns/${done.id}`).expect(204);
+
+      // The move into Done survives; the move back out of it was never a completion.
+      await expect(completedToday(owner, workspace.id)).resolves.toBe(1);
+    });
+
+    it('rejects a category the enum does not define', async () => {
+      const { owner, workspace, boardId } = await setUpBoard();
+
+      await owner.agent
+        .post(`/workspaces/${workspace.id}/boards/${boardId}/columns`)
+        .send({ name: 'Nope', category: 'FINISHED' })
+        .expect(400);
+    });
+  });
 });

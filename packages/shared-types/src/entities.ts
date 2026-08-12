@@ -180,6 +180,6 @@ export interface DashboardSummaryDto {
   byAssignee: DashboardCountByAssignee[];
   /** Present only when `boardId` query is set. */
   byColumn: DashboardCountByColumn[] | null;
-  /** Last 14 UTC days: `task.created` vs moves into a Done-named column. */
+  /** Last 14 UTC days: `task.created` vs moves into a `COMPLETED` column. */
   throughput: DashboardThroughputDay[];
 }
