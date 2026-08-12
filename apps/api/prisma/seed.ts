@@ -118,9 +118,8 @@ async function main(): Promise<void> {
     ],
   });
 
-   
   console.log(`Seeded demo user ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
-   
+
   console.log(`Seeded workspace slug=demo id=${workspace.id}`);
 
   await prisma.$disconnect();
