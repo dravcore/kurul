@@ -1,4 +1,10 @@
-import type { InvitationStatus, LabelColorSlot, MemberRole, Priority } from './enums.js';
+import type {
+  ColumnCategory,
+  InvitationStatus,
+  LabelColorSlot,
+  MemberRole,
+  Priority,
+} from './enums.js';
 
 export interface UserDto {
   id: string;
@@ -49,6 +55,12 @@ export interface ColumnDto {
   name: string;
   position: number;
   color: string | null;
+  /**
+   * Semantic state, independent of `name` and of position. Metrics key off this; a client
+   * that wants to know whether a column means "finished" reads `category`, never the label
+   * the user typed.
+   */
+  category: ColumnCategory;
   taskCount: number;
 }
 

@@ -85,6 +85,21 @@ describe('useBoardMutations seedDefaults', () => {
     }
   });
 
+  it('sends each column its category, not just its name', async () => {
+    stubCreates();
+    const { result } = renderMutations();
+
+    await result.current.seedDefaults();
+
+    const categories = apiPost.mock.calls.map(
+      (call) => (call[1] as { category?: string }).category,
+    );
+    // Spelled out rather than mapped from DEFAULT_COLUMNS: a Done column seeded without
+    // COMPLETED reports zero throughput forever, and asserting against the same constant the
+    // code reads would not notice.
+    expect(categories).toEqual(['UNSTARTED', 'STARTED', 'COMPLETED']);
+  });
+
   /**
    * The order is carried by `afterColumnId`, not by request order — the server owns the
    * Float each column lands on, so an omitted anchor would append wherever it liked.

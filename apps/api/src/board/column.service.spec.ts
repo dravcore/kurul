@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { ColumnCategory } from '@kurultay/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RealtimeService } from '../realtime/realtime.service';
 import { ColumnService } from './column.service';
@@ -49,6 +50,7 @@ describe('ColumnService', () => {
       name: 'Review',
       position: 4000,
       color: null,
+      category: ColumnCategory.UNSTARTED,
       _count: { tasks: 0 },
     });
 
@@ -70,6 +72,55 @@ describe('ColumnService', () => {
     expect(realtime.emitToBoard).toHaveBeenCalled();
   });
 
+  it('passes an explicit category straight through on create', async () => {
+    const { service, prisma } = buildService();
+    prisma.column.findMany.mockResolvedValue([{ id: 'last', position: 3000 }]);
+    prisma.column.create.mockResolvedValue({
+      id: 'new',
+      boardId: BOARD_ID,
+      name: 'Shipped',
+      position: 4000,
+      color: null,
+      category: ColumnCategory.COMPLETED,
+      _count: { tasks: 0 },
+    });
+
+    await expect(
+      service.create(WORKSPACE_ID, BOARD_ID, ACTOR_ID, {
+        name: 'Shipped',
+        category: ColumnCategory.COMPLETED,
+      }),
+    ).resolves.toMatchObject({ category: ColumnCategory.COMPLETED });
+    expect(prisma.column.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ category: ColumnCategory.COMPLETED }),
+      }),
+    );
+  });
+
+  it('leaves category to the schema default when create omits it', async () => {
+    const { service, prisma } = buildService();
+    prisma.column.findMany.mockResolvedValue([]);
+    prisma.column.create.mockResolvedValue({
+      id: 'new',
+      boardId: BOARD_ID,
+      name: 'Review',
+      position: 1000,
+      color: null,
+      category: ColumnCategory.UNSTARTED,
+      _count: { tasks: 0 },
+    });
+
+    await service.create(WORKSPACE_ID, BOARD_ID, ACTOR_ID, { name: 'Review' });
+
+    // `undefined` is what makes Prisma fall through to `@default(UNSTARTED)`; sending a
+    // guess derived from the name is exactly the behaviour ADR 0019 removes.
+    const { data } = prisma.column.create.mock.calls[0]![0] as {
+      data: { category?: unknown };
+    };
+    expect(data.category).toBeUndefined();
+  });
+
   it('reads exactly the DTO fields when listing a board', async () => {
     const { service, prisma } = buildService();
     prisma.column.findMany.mockResolvedValue([
@@ -79,12 +130,21 @@ describe('ColumnService', () => {
         name: 'Todo',
         position: 1000,
         color: null,
+        category: ColumnCategory.UNSTARTED,
         _count: { tasks: 3 },
       },
     ]);
 
     await expect(service.list(WORKSPACE_ID, BOARD_ID)).resolves.toEqual([
-      { id: COLUMN_ID, boardId: BOARD_ID, name: 'Todo', position: 1000, color: null, taskCount: 3 },
+      {
+        id: COLUMN_ID,
+        boardId: BOARD_ID,
+        name: 'Todo',
+        position: 1000,
+        color: null,
+        category: ColumnCategory.UNSTARTED,
+        taskCount: 3,
+      },
     ]);
     expect(prisma.column.findMany).toHaveBeenCalledWith({
       where: { boardId: BOARD_ID },
@@ -94,6 +154,7 @@ describe('ColumnService', () => {
         name: true,
         position: true,
         color: true,
+        category: true,
         _count: { select: { tasks: true } },
       },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
@@ -206,6 +267,7 @@ describe('ColumnService', () => {
         name: 'Renamed',
         position: 1000,
         color: null,
+        category: ColumnCategory.UNSTARTED,
         _count: { tasks: 0 },
       });
 
@@ -216,6 +278,32 @@ describe('ColumnService', () => {
           where: { id: COLUMN_ID, board: { workspaceId: WORKSPACE_ID } },
           data: { name: 'Renamed' },
         }),
+      );
+    });
+
+    it('writes a category change without touching the name', async () => {
+      const { service, prisma } = buildService();
+      prisma.column.findFirst.mockResolvedValue({ id: COLUMN_ID });
+      prisma.column.update.mockResolvedValue({
+        id: COLUMN_ID,
+        boardId: BOARD_ID,
+        name: 'Shipped',
+        position: 1000,
+        color: null,
+        category: ColumnCategory.COMPLETED,
+        _count: { tasks: 0 },
+      });
+
+      // The whole point of ADR 0019: a column called "Shipped" can mean completed without
+      // being renamed to something the metrics recognise.
+      await expect(
+        service.update(WORKSPACE_ID, COLUMN_ID, ACTOR_ID, {
+          category: ColumnCategory.COMPLETED,
+        }),
+      ).resolves.toMatchObject({ name: 'Shipped', category: ColumnCategory.COMPLETED });
+
+      expect(prisma.column.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { category: ColumnCategory.COMPLETED } }),
       );
     });
 
