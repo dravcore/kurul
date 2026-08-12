@@ -1,4 +1,7 @@
 {
+  "common": {
+    "close": "Close"
+  },
   "auth": {
     "login": {
       "title": "Sign in to Kurultay",
@@ -66,9 +69,12 @@
     }
   },
   "app": {
+    "meta": {
+      "title": "Kurultay",
+      "description": "Open-source Kanban-focused project management"
+    },
     "shell": {
       "title": "Kurultay",
-      "workspaces": "Workspaces",
       "createWorkspace": "New workspace",
       "switchWorkspace": "Switch workspace",
       "verifyEmail": "Confirm your email",
@@ -135,7 +141,6 @@
       "openBoard": "Open a board"
     },
     "board": {
-      "listTitle": "Boards",
       "listSubtitle": "Open a board to divide the work.",
       "listError": "Could not load boards.",
       "loadError": "The board couldn't load.",
@@ -159,7 +164,6 @@
       "boardMenu": "Board actions",
       "realtime": {
         "reconnecting": "Reconnecting…",
-        "boardUpdated": "Board updated",
         "dragCancelled": "Someone else moved this card"
       },
       "errors": {
