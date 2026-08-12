@@ -4,6 +4,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Without this Dependabot targets the repository default branch, which is `main`.
+    # Under Git Flow `main` is releases only — it takes merges from release/* and
+    # hotfix/* and nothing else — so a dependency bump must never open against it.
+    # `develop` is the integration branch and the correct base for routine updates.
+    target-branch: develop
     # Majors now arrive as one PR per package, so the cap has to leave room for a
     # week that lands several of them alongside the two grouped PRs.
     open-pull-requests-limit: 15
@@ -32,4 +37,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Same reason as above. This block is why PRs #74-#78 opened against `main`
+    # and were merged straight into it, bypassing `develop` entirely.
+    target-branch: develop
     open-pull-requests-limit: 5
