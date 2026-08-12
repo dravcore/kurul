@@ -133,6 +133,63 @@ describe('Tasks (e2e)', () => {
     }
   });
 
+  it('serialises concurrent moves into the same gap under a column lock', async () => {
+    const owner = await signUp(app, { name: 'RaceOwner' });
+    const workspace = await createWorkspace(owner.agent, 'Race', `race-${Date.now()}`);
+    const { boardId, columns } = await boardWithColumns(owner.agent, workspace.id);
+    const todo = columns.find((column) => column.name === 'To Do')!;
+
+    const first = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .send({ title: 'First', columnId: todo.id })
+      .expect(201);
+    const third = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .send({ title: 'Third', columnId: todo.id })
+      .expect(201);
+    const a = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .send({ title: 'A', columnId: todo.id })
+      .expect(201);
+    const b = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards/${boardId}/tasks`)
+      .send({ title: 'B', columnId: todo.id })
+      .expect(201);
+
+    // Both name the same adjacent pair. The column FOR UPDATE lock lets one apply; the
+    // other then sees a non-adjacent pair (the winner sits between first and third) and
+    // gets the opaque neighbor 404 — not two cards with the same midpoint.
+    const [raceA, raceB] = await Promise.all([
+      owner.agent.patch(`/workspaces/${workspace.id}/tasks/${a.body.id}/position`).send({
+        columnId: todo.id,
+        beforeTaskId: first.body.id,
+        afterTaskId: third.body.id,
+      }),
+      owner.agent.patch(`/workspaces/${workspace.id}/tasks/${b.body.id}/position`).send({
+        columnId: todo.id,
+        beforeTaskId: first.body.id,
+        afterTaskId: third.body.id,
+      }),
+    ]);
+
+    const statuses = [raceA.status, raceB.status].sort((left, right) => left - right);
+    expect(statuses).toEqual([200, 404]);
+
+    const winner = raceA.status === 200 ? raceA : raceB;
+    expect(winner.body.position).toBeGreaterThan(first.body.position as number);
+    expect(winner.body.position).toBeLessThan(third.body.position as number);
+
+    const listed = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${boardId}/tasks?limit=100`)
+      .expect(200);
+    const positions = (
+      listed.body as { items: Array<{ columnId: string; position: number }> }
+    ).items
+      .filter((task) => task.columnId === todo.id)
+      .map((task) => task.position);
+    expect(new Set(positions).size).toBe(positions.length);
+  });
+
   it('returns 404 for cross-tenant access and 422 for cross-board column', async () => {
     const ownerA = await signUp(app, { name: 'A' });
     const ownerB = await signUp(app, { name: 'B' });

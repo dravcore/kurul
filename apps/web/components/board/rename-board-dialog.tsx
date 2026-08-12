@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BoardDto, UpdateBoardRequest } from '@kurultay/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
@@ -24,15 +24,22 @@ export function RenameBoardDialog({
   onRenamed,
 }: RenameBoardDialogProps): React.ReactElement {
   const t = useTranslations('app.board');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState(board?.name ?? '');
+  const [description, setDescription] = useState(board?.description ?? '');
 
-  useEffect(() => {
-    if (board) {
-      setName(board.name);
-      setDescription(board.description ?? '');
-    }
-  }, [board]);
+  // Load the fields when a different board is handed over, during render rather than from an
+  // effect: the effect painted one frame of the *previous* board's name first, which is
+  // visible every time the dialog is opened on a second board.
+  //
+  // Still nothing to do when `board` is null. That is the dialog closing, and Radix keeps the
+  // content mounted while it animates out — blanking the fields mid-animation would be a new
+  // flicker, not a fix. Compared by identity, exactly as the effect's dependency was.
+  const [syncedBoard, setSyncedBoard] = useState(board);
+  if (board && board !== syncedBoard) {
+    setSyncedBoard(board);
+    setName(board.name);
+    setDescription(board.description ?? '');
+  }
 
   async function onSubmit(): Promise<void> {
     if (!board) return;

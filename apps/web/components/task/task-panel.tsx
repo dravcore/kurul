@@ -69,10 +69,25 @@ export function TaskPanel({
   const [description, setDescription] = useState(task?.description ?? '');
   const [pending, setPending] = useState(false);
 
-  useEffect(() => {
+  // Re-seed the editable fields when the panel switches task, or when the stored title or
+  // description changes under it (our own PATCH coming back, or a realtime edit). Done during
+  // render rather than from an effect so the panel never paints the previous task's title for
+  // one frame first — the flash was visible every time a card was opened from another card.
+  // The three compared values are exactly what the effect's dependency list was.
+  const [synced, setSynced] = useState({
+    id: task?.id,
+    title: task?.title,
+    description: task?.description,
+  });
+  if (
+    synced.id !== task?.id ||
+    synced.title !== task?.title ||
+    synced.description !== task?.description
+  ) {
+    setSynced({ id: task?.id, title: task?.title, description: task?.description });
     setTitle(task?.title ?? '');
     setDescription(task?.description ?? '');
-  }, [task?.id, task?.title, task?.description]);
+  }
 
   // Closing only takes focus back if the user still has it in here. Tracked from `focusin`
   // rather than read on the way out: by the time the unmount cleanup runs, React has already
@@ -85,6 +100,43 @@ export function TaskPanel({
     }
     document.addEventListener('focusin', onFocusIn);
     return () => document.removeEventListener('focusin', onFocusIn);
+  }, []);
+
+  // Below `md` the panel is a fullscreen sheet (`fixed inset-0`). Without a focus trap, Tab
+  // walks onto the board underneath. Desktop keeps the panel in the layout flow, so the
+  // ordinary document tab order is correct there.
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia('(max-width: 767px)');
+
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key !== 'Tab' || !media.matches) return;
+      const root = panelRef.current;
+      if (!root) return;
+
+      const focusable = root.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (active instanceof Node && !root.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   useEffect(() => {

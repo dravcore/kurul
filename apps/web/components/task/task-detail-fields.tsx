@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Priority, type TaskDto, type UpdateTaskRequest } from '@kurultay/shared-types';
 import { Input } from '@/components/ui/input';
@@ -33,9 +33,15 @@ export function TaskDetailFields({
     task.estimatedMinutes !== null ? String(task.estimatedMinutes) : '',
   );
 
-  useEffect(() => {
+  // Re-seed the draft when the panel switches task, or when the saved estimate changes under
+  // it (our own PATCH coming back, or a realtime edit). Done during render rather than from
+  // an effect so the field never paints the previous task's estimate for one frame first.
+  // The pair is exactly what the effect's dependency list was.
+  const [synced, setSynced] = useState({ id: task.id, estimate: task.estimatedMinutes });
+  if (synced.id !== task.id || synced.estimate !== task.estimatedMinutes) {
+    setSynced({ id: task.id, estimate: task.estimatedMinutes });
     setEstimateDraft(task.estimatedMinutes !== null ? String(task.estimatedMinutes) : '');
-  }, [task.id, task.estimatedMinutes]);
+  }
 
   const dueValue = task.dueDate ? task.dueDate.slice(0, 10) : '';
 

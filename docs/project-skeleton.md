@@ -33,7 +33,10 @@ docker compose version
 pnpm -v
 ```
 
-Name checks: the npm package name `kurultay` is available. Remaining: `github.com/dravcore/kurultay`, and a domain (`kurultay.dev` / `kurultay.io`).
+Name checks, as they resolved: the npm package name `kurultay` is available and still
+unclaimed — nothing is published yet. `github.com/dravcore/kurultay` was taken and is where
+this lives. `kurultay.dev` was **not** available; no domain is registered, and the project is
+reachable only through the repository. A domain decision is still open.
 
 > **Name origin.** A _kurultay_ is the great assembly of the Turkic-Mongol tradition, where the tribes gathered, debated, decided, and divided the work — a fair description of what the tool does. (`kurultay` is the Turkish spelling; `kurultai` the Mongolian/English transliteration.) The README should tell this story.
 

@@ -109,10 +109,18 @@ export function useBoardRealtime({
   const resyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resyncRunningRef = useRef(false);
   const resyncQueuedRef = useRef(false);
-  const lastDrainStartedAtRef = useRef(Date.now());
+  const lastDrainStartedAtRef = useRef(0);
   // Read through a ref so a debounced resync runs the current filters, not the ones that
   // were active when the timer was armed.
   const runResyncRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+  // Mount counts as a drain, so a join landing right behind the initial load does not queue
+  // a resync on top of data that is already arriving. Seeded here rather than as the
+  // `useRef` initial value because `Date.now()` is impure and must not be read during
+  // render — an aborted or replayed render would stamp a time the commit never happened at.
+  useEffect(() => {
+    lastDrainStartedAtRef.current = Date.now();
+  }, []);
 
   // The board data hook clears `loading` when a drain has painted the board, which is the
   // freshness a join would otherwise ask us to re-fetch.
