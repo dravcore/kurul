@@ -86,7 +86,9 @@ share types cleanly with the Next.js frontend.
     compare-and-swap guard on `Task.position` — must be built as **Client
     Extensions**. There is no middleware layer to fall back to.
   - **Env vars are not auto-loaded**; `dotenv` is called explicitly.
-  - Minimum Node 20.19.0 and TypeScript 5.4 follow from the above.
+  - Minimum Node 20.19.0 and TypeScript 5.4 follow from the above (Prisma’s documented
+    floor at acceptance). The **repository engines field** is stricter today:
+    `"node": ">=24"` in the root `package.json` — see [development.md](../development.md).
 - Redis becomes a hard runtime dependency for basic features, not an optional
   extra.
 - Prisma's schema-first flow is less flexible than raw SQL for complex queries

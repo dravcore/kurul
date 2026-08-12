@@ -49,7 +49,7 @@ request üzerinden ulaşır. Bu maintainer'lar için de geçerlidir.
 `hotfix/*`'ten bir merge değilse, bir şeyler ters gitmiştir.
 
 `main` ve `develop` üzerindeki branch protection bunu zorunlu kılar: doğrudan push yok,
-pull request zorunlu. Zorunlu status check'ler Faz 1'de CI geldiğinde eklenir.
+pull request zorunlu. Zorunlu status check'ler [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) ile uygulanır.
 
 ### Dependabot ve `main`
 

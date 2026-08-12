@@ -9,6 +9,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Docs consistency pass: Node ≥24, i18n status, squash policy, archive links,
+  project-skeleton archived, TR design status synced.
 - Documentation map sharpened for post-MVP: `docs/README.md` is a five-minute reading guide;
   `docs/roadmap.md` is status + Beyond MVP only; Phase 0–9 checklists moved to
   `docs/archive/roadmap-mvp-phases.md`; shipped phase design specs moved to

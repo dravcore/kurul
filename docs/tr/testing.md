@@ -216,4 +216,4 @@ Workflow dosyası: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
 - [coding-standards.md](coding-standards.md) — testlerin varsaydığı kod konvansiyonları
 - [api-conventions.md](api-conventions.md) — assert edilecek status kodları ve hata şekilleri
 - [git-strategy.md](git-strategy.md) — PR gereksinimleri
-- [roadmap.md](roadmap.md) — CI ve e2e'nin ne zaman geleceği
+- [roadmap.md](roadmap.md) — MVP durumu ve Beyond MVP (Playwright e2e hâlâ erteli)

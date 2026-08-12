@@ -10,7 +10,7 @@ boards. Charts sit above the existing board list on `/dashboard`.
 ## Permissions
 
 Read-only. Any workspace member (including GUEST) may call the summary endpoint
-([ADR 0010](../decisions/0010-task-permissions.md) — no new mutate roles).
+([ADR 0010](../../decisions/0010-task-permissions.md) — no new mutate roles).
 
 ## Non-goals
 
@@ -52,7 +52,7 @@ Reuse Phase 6 indexes; no N+1. Unknown query keys → `400`.
 ## Web
 
 - Filter row: board select (`All boards` / one board) synced to URL `?boardId=`
-- Stat tiles: total tasks + overdue ([design.md](../design.md) §8)
+- Stat tiles: total tasks + overdue ([design.md](../../design.md) §8)
 - Recharts: priority horizontal bar; assignee horizontal bar (top 8 + Other); column bar when board selected
 - Each chart: “View as table” toggle; loading skeletons; empty state when `totalTasks === 0` (Damga + copy per design.md §6)
 - Keep `BoardList` below; all strings via `en.json`

@@ -17,7 +17,7 @@ Assignees, labels, priority UI, due date/estimate UI, comments (Phase 5). Filter
 
 ## API
 
-Per [api-conventions.md](../api-conventions.md):
+Per [api-conventions.md](../../api-conventions.md):
 
 | Method           | Path                                              | Roles                         |
 | ---------------- | ------------------------------------------------- | ----------------------------- |
@@ -39,7 +39,7 @@ order: `position asc, id asc` (deterministic tie-break).
 
 ## Permissions
 
-[ADR 0010](../decisions/0010-task-permissions.md) — MEMBER+ mutate tasks; GUEST read-only.
+[ADR 0010](../../decisions/0010-task-permissions.md) — MEMBER+ mutate tasks; GUEST read-only.
 
 ## Sequencing
 

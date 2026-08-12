@@ -8,15 +8,15 @@ Where Kurultay is, and what is explicitly out of scope for now.
 
 ## Status
 
-**MVP is complete.** Phases 0–9 and the post-MVP hardening pass shipped in
+**MVP is complete.** Product Phases **1–9** (plus Phase **0** docs/standards) and the post-MVP hardening pass shipped in
 [`v0.1.0`](../CHANGELOG.md#010---2026-08-12). Active work is beyond-MVP items (below) and
 ordinary bugs/refactors on `develop`.
 
-| Track              | State                                                                  |
-| ------------------ | ---------------------------------------------------------------------- |
-| Phases 0–9 (MVP)   | Done — detailed checklists in [archive](archive/roadmap-mvp-phases.md) |
-| Post-MVP hardening | Done — same archive                                                    |
-| Beyond MVP         | Not scheduled — compatibility list only                                |
+| Track              | State                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| Phases 0–9         | Done — Phase 0 docs; 1–9 product MVP — [archive checklists](archive/roadmap-mvp-phases.md) |
+| Post-MVP hardening | Done — same archive                                                                        |
+| Beyond MVP         | Not scheduled — compatibility list only                                                    |
 
 Task-level work lives in [GitHub Issues](https://github.com/dravcore/kurultay/issues), not
 here. Process for cutting a release: [git-strategy.md](git-strategy.md).

@@ -6,7 +6,7 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 ## Durum
 
-Kurultay’ın **MVP özellik seti (Faz 1–9) tamamlandı** — auth/workspace’ler, board ve
+Kurultay’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı) — auth/workspace’ler, board ve
 task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Bkz.
 [docs/roadmap.md](docs/tr/roadmap.md). MVP ötesi maddeler (e-posta bildirimleri, presence,
 Playwright e2e, ek diller, …) hâlâ MVP ötesi altında listelenir.

@@ -10,8 +10,8 @@ pagination on `GET .../boards/:boardId/tasks`, and a URL-synced filter bar on th
 ## Permissions
 
 Read-only filters — any workspace member (including GUEST) can filter. No new mutate
-permissions ([ADR 0010](../decisions/0010-task-permissions.md),
-[ADR 0011](../decisions/0011-label-task-metadata-permissions.md)).
+permissions ([ADR 0010](../../decisions/0010-task-permissions.md),
+[ADR 0011](../../decisions/0011-label-task-metadata-permissions.md)).
 
 ## Non-goals
 
@@ -41,7 +41,7 @@ Combined filters are AND. Unknown keys → `400`. Indexes: `(boardId, priority)`
 
 Board client drains pages until `!hasMore`, then sorts by `position, id` for Kanban/DnD.
 Filter state lives in the URL. Topbar: search + filter controls + active chips. `/` focuses
-search. Empty state when filters match nothing ([design.md](../design.md) §6).
+search. Empty state when filters match nothing ([design.md](../../design.md) §6).
 
 ## Sequencing
 

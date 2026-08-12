@@ -46,12 +46,12 @@ sit outside `docs/` because GitHub treats them specially.
 
 ## Historical
 
-| Doc                                                            | Status                                                                                 |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [project-skeleton.md](project-skeleton.md)                     | Phase 1 scaffold how-to — prefer [architecture.md](architecture.md) for current layout |
-| [archive/roadmap-mvp-phases.md](archive/roadmap-mvp-phases.md) | Full Phase 0–9 + hardening checklists (pre-`v0.1.0` detail)                            |
-| [archive/specs/](archive/specs/)                               | Shipped phase / visual-debt design specs                                               |
-| [archive/plans/](archive/plans/)                               | Finished implementation plans                                                          |
+| Doc                                                            | Status                                                                                                               |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [project-skeleton.md](project-skeleton.md)                     | Stub → [archive/project-skeleton.md](archive/project-skeleton.md); live layout is [architecture.md](architecture.md) |
+| [archive/roadmap-mvp-phases.md](archive/roadmap-mvp-phases.md) | Full Phase 0–9 + hardening checklists (pre-`v0.1.0` detail)                                                          |
+| [archive/specs/](archive/specs/)                               | Shipped phase / visual-debt design specs                                                                             |
+| [archive/plans/](archive/plans/)                               | Finished implementation plans                                                                                        |
 
 New feature design after MVP opens as a **GitHub Issue** (and an ADR when a lasting decision
 is needed). Do not grow a parallel `docs/specs/` tree for routine work.

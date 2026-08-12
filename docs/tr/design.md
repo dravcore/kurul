@@ -18,10 +18,9 @@ durumlar ve metin.
 - [9. Erişilebilirlik](#9-erişilebilirlik)
 - [10. Çapraz referanslar](#10-çapraz-referanslar)
 
-> **Durum.** Aşağıdaki her hex, tip boyutu ve piksel ölçüsü bir **öneridir**; gerçek ekranlarda
-> [Faz 3](../archive/roadmap-mvp-phases.md)'te doğrulanacak ve Faz 7'ye kadar rafine
-> edilecektir. _Kurallar_ — ölçülülük, tokenizasyon, klavye paritesi, kontrast tabanları, i18n —
-> ilk component'ten itibaren bağlayıcıdır.
+> **Durum.** Aşağıdaki renk, tipografi ve spacing token'ları üründe **doğrulanmıştır**
+> (`apps/web/app/globals.css`). Hâlâ aspirasyonel olan etkileşim kalıpları satır içinde
+> belirtilir; her cümleyi shipped davranış sanmayın.
 
 ## 1. Tasarım ilkeleri
 

@@ -20,7 +20,7 @@ How to set up a Kurultay development environment and work in it day to day.
 
 ## Status
 
-The monorepo and MVP feature set (Phases 1–9) **exist** in the repository. Commands on this
+The monorepo and MVP feature set (Phases 1–9; Phase 0 was docs/standards) **exist** in the repository. Commands on this
 page are the day-to-day contract — if reality and this document diverge, one of the two is a
 bug and gets fixed in the same PR.
 
@@ -30,13 +30,13 @@ bug and gets fixed in the same PR.
 
 ## Prerequisites
 
-| Tool           | Version     | Check                    | Notes                                                                                                                                                                                                        |
-| -------------- | ----------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Node.js        | 22 or newer | `node -v`                | 22 is the floor — Node 20 is end-of-life (2026-04-30) and Prisma 7 needs ≥ 20.19.0 regardless. **24 LTS recommended** (Active LTS to 2028-04-30)                                                             |
-| pnpm           | 9 or newer  | `pnpm -v`                | Via Corepack: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack is no longer bundled with Node ≥ 25 — there, `npm i -g corepack` first, or install pnpm standalone with `npm i -g pnpm` |
-| Docker         | any current | `docker -v`              | Docker Desktop or Colima on macOS                                                                                                                                                                            |
-| Docker Compose | v2 (plugin) | `docker compose version` | `docker-compose` v1 is not supported                                                                                                                                                                         |
-| Git            | 2.30+       | `git --version`          |                                                                                                                                                                                                              |
+| Tool           | Version            | Check                    | Notes                                                                                                                                                                                                        |
+| -------------- | ------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Node.js        | **≥ 24** (engines) | `node -v`                | Root `package.json` `"engines": { "node": ">=24" }`. Prisma 7 needs ≥ 20.19.0; the project floor is higher. **24 LTS** is the supported line.                                                                |
+| pnpm           | 9 or newer         | `pnpm -v`                | Via Corepack: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack is no longer bundled with Node ≥ 25 — there, `npm i -g corepack` first, or install pnpm standalone with `npm i -g pnpm` |
+| Docker         | any current        | `docker -v`              | Docker Desktop or Colima on macOS                                                                                                                                                                            |
+| Docker Compose | v2 (plugin)        | `docker compose version` | `docker-compose` v1 is not supported                                                                                                                                                                         |
+| Git            | 2.30+              | `git --version`          |                                                                                                                                                                                                              |
 
 No local PostgreSQL or Redis installation is needed — both run in Docker.
 

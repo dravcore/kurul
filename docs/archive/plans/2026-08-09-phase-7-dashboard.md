@@ -1,5 +1,7 @@
 # Phase 7 — Dashboard — Implementation Plan
 
+> **Historical plan — shipped. Do not re-execute.** Checkboxes are a frozen record. Ignore any AI attribution footers in this file.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Spec:** [docs/archive/specs/2026-08-09-phase-7-dashboard-design.md](../specs/2026-08-09-phase-7-dashboard-design.md)

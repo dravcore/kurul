@@ -19,9 +19,7 @@
 - **Tokens only:** no raw hex, no Tailwind palette colors (`text-red-600` etc.), and no `text-[var(--color-…)]`-style arbitrary values in components. Use the utilities generated from `globals.css` (`text-destructive`, `bg-signature-subtle`, …).
 - **Every user-visible string** goes through next-intl (`apps/web/messages/en.json`); no string literals in JSX. English, sentence case.
 - `apps/web/components/ui/` is shadcn-generated output: only shadcn-style additions (the sonner wrapper) and the shadow-token class swap are allowed there. Brand/custom components live in `components/brand/` or `components/layout/`.
-- Git Flow + Conventional Commits. Branch layout: `feat/design-primitives` from `develop`; each later layer branches from the previous layer's branch (stacked). Each layer ends with a PR to `develop` (retarget stacked PRs after the parent merges). PR bodies end with: `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 - No new test infrastructure. Verification per task = lint + typecheck; per layer = build + the grep gate in Task 6/12/15/19 + a manual two-theme pass by the reviewer.
-- Commit messages end with `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
 
 ---
 
@@ -345,7 +343,6 @@ git push -u origin feat/design-primitives
 gh pr create --base develop --title "feat: design primitives (type scale, toast, elevation, reduced motion)" --body "$(cat <<'EOF'
 Layer 1 of docs/archive/specs/2026-08-09-visual-debt-design.md: type-scale tokens, reduced-motion policy that keeps color/opacity, shared DamgaMark, token-themed sonner toasts, elevation tokens.
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
@@ -772,7 +769,6 @@ git push -u origin feat/shell-chrome
 gh pr create --base feat/design-primitives --title "feat: shell chrome (topbar, workspace switcher, sancak rail)" --body "$(cat <<'EOF'
 Layer 2 of docs/archive/specs/2026-08-09-visual-debt-design.md: shared topbar, workspace switcher dropdown (works from the collapsed rail), sliding sancak rail, shell loading skeleton. Retarget to develop once Layer 1 merges.
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
@@ -997,7 +993,6 @@ git push -u origin feat/auth-visual
 gh pr create --base feat/shell-chrome --title "feat: auth screens on the identity system" --body "$(cat <<'EOF'
 Layer 3 of docs/archive/specs/2026-08-09-visual-debt-design.md: Fraunces display headline + damga mark via a shared (auth) layout, ui/input + ui/label + ui/button, all non-token colors removed. Retarget to develop once Layer 2 merges.
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
@@ -1208,7 +1203,6 @@ git push -u origin feat/board-polish
 gh pr create --base feat/auth-visual --title "feat: board polish (stagger, card states, toast errors)" --body "$(cat <<'EOF'
 Layer 4 of docs/archive/specs/2026-08-09-visual-debt-design.md: first-paint column stagger, board card hover/focus, action errors as toasts with retry. Retarget to develop once Layer 3 merges.
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```

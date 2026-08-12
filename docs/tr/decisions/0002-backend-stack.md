@@ -34,7 +34,9 @@ Backend'in; solo/küçük ekip tarafından geliştirilen, realtime'a eğilimli, 
   - Generator'ın **`output` yolu zorunlu** ve `node_modules` dışında bir yere işaret etmeli. Client Nest ve Better Auth adapter için `apps/api/src/generated/prisma`'ya üretilir. `@kurultay/shared-types` DTO/enum'ları bugün şemaya karşı elle tutulur; mekanik Prisma→shared-types codegen hâlâ aspirasyonel.
   - **Client middleware (`$use`) kaldırıldı.** Sorgu seviyesindeki cross-cutting guard'lar — [architecture.md §7](../architecture.md#7-multi-tenant-izolasyonu)'deki `workspaceId` scoping helper'ı, `Task.position` üzerinde bir compare-and-swap guard'ı — **Client Extension** olarak inşa edilmeli. Geri düşülecek bir middleware katmanı yok.
   - **Env değişkenleri otomatik yüklenmiyor**; `dotenv` açıkça çağrılıyor.
-  - Yukarıdakilerden asgari Node 20.19.0 ve TypeScript 5.4 gerekliliği doğuyor.
+  - Yukarıdakilerden asgari Node 20.19.0 ve TypeScript 5.4 gerekliliği doğuyor (kabul
+    anındaki Prisma tabanı). **Depo `engines` alanı bugün daha sıkı:** kök
+    `package.json` içinde `"node": ">=24"` — bkz. [development.md](../development.md).
 - Redis, temel özellikler için opsiyonel bir ek değil, katı bir runtime bağımlılığı haline geliyor.
 - Prisma'nın şema-öncelikli akışı, karmaşık sorgular sonunda ortaya çıktığında ham SQL'e göre daha az esnek.
 - Uçtan uca TypeScript'e bağlanmak, OSS emsallerin ücretsiz elde ettiği Django'nun her şey dahil admin panelinden vazgeçmek anlamına geliyor.
