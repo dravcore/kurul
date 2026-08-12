@@ -69,6 +69,18 @@ afterEach(() => {
 });
 
 describe('TaskCommentsSection', () => {
+  /**
+   * A failed metadata load drops the thread back to `[]`, and an empty `[]` under a failure
+   * reads as "nobody has commented" — which invites the author to conclude their comments
+   * were deleted. The thread is unknown here, not empty.
+   */
+  it('reports a failed load instead of showing an empty thread', () => {
+    renderSection({ loadFailed: true });
+
+    expect(screen.getByText(messages.app.errors.commentsLoad)).toBeDefined();
+    expect(screen.queryByText('No comments yet')).toBeNull();
+  });
+
   it('shows the empty message only once the first fetch has settled', () => {
     renderSection({ loading: true });
     expect(screen.queryByText('No comments yet')).toBeNull();

@@ -25,6 +25,7 @@ type TypeFilter = '' | (typeof NotificationType)[keyof typeof NotificationType];
 
 export function NotificationsList(): React.ReactElement {
   const t = useTranslations('app.notifications');
+  const tErrors = useTranslations('app.errors');
   const locale = useLocale();
   const router = useRouter();
   const { activeId: workspaceId } = useWorkspaceContext();
@@ -61,11 +62,10 @@ export function NotificationsList(): React.ReactElement {
   const {
     data: page,
     loading,
+    error,
     reload,
     setData: setPage,
-  } = useApiResource<CursorPage<NotificationDto>>(fetchPage, EMPTY_PAGE, t('loadError'), {
-    onError: () => toast.error(t('loadError')),
-  });
+  } = useApiResource<CursorPage<NotificationDto>>(fetchPage, EMPTY_PAGE, t('loadError'));
   const { items, nextCursor } = page;
 
   // The same signal the bell listens to. Reloading the first page is the whole response: the
@@ -193,6 +193,18 @@ export function NotificationsList(): React.ReactElement {
           <Skeleton className="h-16 w-full rounded-[var(--radius-md)]" />
           <Skeleton className="h-16 w-full rounded-[var(--radius-md)]" />
           <Skeleton className="h-16 w-full rounded-[var(--radius-md)]" />
+        </div>
+      ) : error ? (
+        // Same rule the bell's dropdown follows: a failed load clears the rows, so the empty
+        // branch below would answer "You're caught up" for a list nobody managed to read.
+        // Reported in place rather than as a toast, and with the retry the dropdown has no
+        // room for — this screen is where the user came to read them, so a message that
+        // vanishes on its own leaves the wrong answer as the last thing on the page.
+        <div className="flex flex-col items-center gap-3 py-16 text-center">
+          <p className="text-body text-destructive">{error}</p>
+          <Button type="button" variant="outline" onClick={reload}>
+            {tErrors('retry')}
+          </Button>
         </div>
       ) : items.length === 0 ? (
         <p className="py-16 text-center text-body text-muted-foreground">{t('empty')}</p>

@@ -17,6 +17,12 @@ interface TaskCommentsSectionProps {
   pending: boolean;
   /** Suppresses the empty message until the first fetch has settled. */
   loading: boolean;
+  /**
+   * The load failed, so `comments` is the empty fallback rather than an answer. Replaces the
+   * empty message: an author who reads "No comments yet" on their own thread concludes the
+   * comments were deleted.
+   */
+  loadFailed?: boolean;
   /** The thread is cursor-paginated: older pages are on screen, newer ones may not be. */
   hasMore?: boolean;
   loadingMore?: boolean;
@@ -38,6 +44,7 @@ export function TaskCommentsSection({
   canMutate,
   pending,
   loading,
+  loadFailed = false,
   hasMore = false,
   loadingMore = false,
   onLoadMore,
@@ -45,6 +52,7 @@ export function TaskCommentsSection({
   onDelete,
 }: TaskCommentsSectionProps): React.ReactElement {
   const t = useTranslations('app.board.task');
+  const tErrors = useTranslations('app.errors');
   const commentId = useId();
   const mentionListId = useId();
   const commentRef = useRef<HTMLTextAreaElement | null>(null);
@@ -167,7 +175,9 @@ export function TaskCommentsSection({
             <CommentBody body={comment.body} className="mt-1" />
           </li>
         ))}
-        {comments.length === 0 && !loading ? (
+        {loadFailed ? (
+          <li className="text-small text-destructive">{tErrors('commentsLoad')}</li>
+        ) : comments.length === 0 && !loading ? (
           <li className="text-small text-muted-foreground">{t('noComments')}</li>
         ) : null}
       </ul>
