@@ -1,0 +1,376 @@
+# Development
+
+How to set up a Kurultay development environment and work in it day to day.
+
+> 🌐 English (canonical) | [Türkçe](tr/development.md)
+
+## Contents
+
+- [Status](#status)
+- [Prerequisites](#prerequisites)
+- [Clone and install](#clone-and-install)
+- [Environment variables](#environment-variables)
+- [SMTP and Mailpit](#smtp-and-mailpit)
+- [Run modes](#run-modes)
+- [pnpm scripts](#pnpm-scripts)
+- [Database workflow](#database-workflow)
+- [Upgrading and backups](#upgrading-and-backups)
+- [Day-to-day loop](#day-to-day-loop)
+- [Troubleshooting](#troubleshooting)
+
+## Status
+
+The monorepo and MVP feature set (Phases 1–9) **exist** in the repository. Commands on this
+page are the day-to-day contract — if reality and this document diverge, one of the two is a
+bug and gets fixed in the same PR.
+
+- Layout, Prisma models, and early acceptance criteria: [project-skeleton.md](project-skeleton.md)
+- Phase progress (MVP complete): [roadmap.md](roadmap.md)
+- Why each tool was chosen: [tech-stack.md](tech-stack.md)
+
+## Prerequisites
+
+| Tool           | Version     | Check                    | Notes                                                                                                                                                                                                        |
+| -------------- | ----------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Node.js        | 22 or newer | `node -v`                | 22 is the floor — Node 20 is end-of-life (2026-04-30) and Prisma 7 needs ≥ 20.19.0 regardless. **24 LTS recommended** (Active LTS to 2028-04-30)                                                             |
+| pnpm           | 9 or newer  | `pnpm -v`                | Via Corepack: `corepack enable && corepack prepare pnpm@latest --activate`. Corepack is no longer bundled with Node ≥ 25 — there, `npm i -g corepack` first, or install pnpm standalone with `npm i -g pnpm` |
+| Docker         | any current | `docker -v`              | Docker Desktop or Colima on macOS                                                                                                                                                                            |
+| Docker Compose | v2 (plugin) | `docker compose version` | `docker-compose` v1 is not supported                                                                                                                                                                         |
+| Git            | 2.30+       | `git --version`          |                                                                                                                                                                                                              |
+
+No local PostgreSQL or Redis installation is needed — both run in Docker.
+
+## Clone and install
+
+```bash
+git clone https://github.com/dravcore/kurultay.git
+cd kurultay
+pnpm install          # installs every workspace package
+pnpm db:generate       # generate the Prisma client from apps/api/prisma/schema.prisma
+```
+
+The repository is a pnpm workspace (`apps/*`, `packages/*`). Always run `pnpm install` from
+the repository root — never inside `apps/api` or `apps/web`.
+
+The generated Prisma client (`apps/api/src/generated/`) is git-ignored and there is no
+`postinstall` hook that creates it — `pnpm db:generate` is a required, explicit step on every
+fresh clone. Code that imports `@prisma/client`-derived types will not typecheck or build
+until you've run it at least once.
+
+`packages/shared-types` and `packages/auth-access` are consumed from their built `dist/`,
+which is git-ignored for the same reason, so a fresh clone needs them built before the test
+suites will run:
+
+```bash
+pnpm --filter @kurultay/shared-types build
+pnpm --filter @kurultay/auth-access build
+```
+
+Skipping this does not produce a helpful error. `pnpm test` fails in `apps/web` with
+`Failed to resolve entry for package "@kurultay/shared-types"` across every file that imports
+a shared type, which reads like a broken checkout rather than a missing build. `pnpm build`
+and `pnpm typecheck` both do this for you as a side effect; `pnpm test` does not, and neither
+does `pnpm lint`. CI builds them explicitly before both the lint and test jobs.
+
+## Environment variables
+
+```bash
+cp .env.example .env
+```
+
+Then fill in the blanks. `.env` is git-ignored and must never be committed.
+
+| Variable              | Example                                                  | Purpose                                                                                                                  |
+| --------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string                                                                                                 |
+| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io Redis adapter, caching, BullMQ due-soon worker (`due-soon` queue)                                              |
+| `BETTER_AUTH_SECRET`  | _(generate)_                                             | Session signing secret — required, no default                                                                            |
+| `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                              |
+| `API_PORT`            | `4000`                                                   | NestJS listen port                                                                                                       |
+| `WEB_URL`             | `http://localhost:3000`                                  | CORS origin for the API                                                                                                  |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                  | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                    |
+| `SMTP_HOST`           | `localhost` (dev, via Mailpit)                           | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit) |
+| `SMTP_PORT`           | `1025` (dev, via Mailpit) / `587` (typical production)   | SMTP server port                                                                                                         |
+| `SMTP_USER`           | _(blank for Mailpit)_                                    | SMTP auth username, if your server requires one                                                                          |
+| `SMTP_PASSWORD`       | _(blank for Mailpit)_                                    | SMTP auth password, if your server requires one                                                                          |
+| `SMTP_SECURE`         | `false`                                                  | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                 |
+| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                         | `From:` header on outgoing mail                                                                                          |
+
+Generate a secret with:
+
+```bash
+openssl rand -base64 32
+```
+
+**Adding a new environment variable is a three-step change**, and all three go in the same
+PR: wire it through the env helpers in `apps/api/src/common/env.ts` (or the call site that
+reads `process.env` — there is no separate Zod/typed env schema today), add it to
+`.env.example` with a safe placeholder, and document it in the table above.
+
+## SMTP and Mailpit
+
+Kurultay sends email for one flow today: the verification link an invitee needs before
+`accept-invitation` will let them join a workspace (see
+[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
+Leaving `SMTP_HOST` unset is a valid choice — the API still boots, and the mail module logs
+the message instead of sending it — but while that's true, **no invitation can be accepted**.
+To exercise the real flow locally without sending real mail, use the `mailpit` service that
+`docker-compose.dev.yml` already starts alongside `postgres` and `redis`:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d   # postgres + redis + mailpit
+```
+
+Then set these in your `.env` (already the defaults suggested by `.env.example`, but Mailpit
+needs the host/port explicitly pointed at it):
+
+```bash
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_SECURE=false
+# SMTP_USER / SMTP_PASSWORD stay blank — Mailpit does not require auth
+MAIL_FROM=Kurultay <noreply@example.com>
+```
+
+| URL                   | What                                                                        |
+| --------------------- | --------------------------------------------------------------------------- |
+| http://localhost:8025 | Mailpit web UI — every message the API sends lands here, never a real inbox |
+| localhost:1025        | Mailpit's SMTP listener — what `SMTP_HOST`/`SMTP_PORT` above point at       |
+
+To test the invitation flow end to end: send an invitation from the app, open
+http://localhost:8025, click into the newest message, and open the verification link it
+contains in your browser (or copy it — Mailpit renders the plain-text and HTML parts, and
+the link works the same either way). The invitee's account is now verified and
+`accept-invitation` succeeds. `docker compose -f docker-compose.dev.yml down -v` clears
+Mailpit's stored messages along with the Postgres/Redis volumes.
+
+## Run modes
+
+### Recommended: dev loop (services in Docker, apps on host)
+
+Postgres and Redis run in containers; `api` and `web` run on the host with hot reload. This
+is the fast loop — no image rebuild between code changes.
+
+```bash
+pnpm db:generate                                 # generate the Prisma client (skip if already done)
+docker compose -f docker-compose.dev.yml up -d   # postgres + redis only
+pnpm db:migrate                                  # apply migrations
+pnpm dev                                         # api + web in parallel, hot reload
+```
+
+| URL                          | What                           |
+| ---------------------------- | ------------------------------ |
+| http://localhost:3000        | Web app (Next.js)              |
+| http://localhost:4000        | API (NestJS)                   |
+| http://localhost:4000/health | Health check — must return 200 |
+
+Stop the containers with `docker compose -f docker-compose.dev.yml down` (add `-v` to also
+drop the database volume and start from a clean slate).
+
+### Full stack in Docker
+
+Everything containerized, closest to production. Use it to verify the Dockerfiles and
+compose wiring, or when you just want to run Kurultay rather than develop it.
+
+```bash
+docker compose up --build
+```
+
+|                             | Dev loop             | Full Docker                                       |
+| --------------------------- | -------------------- | ------------------------------------------------- |
+| Hot reload                  | Yes                  | No — rebuild required                             |
+| Startup after a code change | seconds              | tens of seconds                                   |
+| Matches production          | Partially            | Yes                                               |
+| Use for                     | Everyday development | Verifying images, release checks, running the app |
+
+## pnpm scripts
+
+Run from the repository root.
+
+| Script           | Command               | What it does                                                                                                                                                                                                                                            |
+| ---------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dev`            | `pnpm dev`            | Runs `apps/api` and `apps/web` in parallel with hot reload                                                                                                                                                                                              |
+| `build`          | `pnpm build`          | Builds every workspace package                                                                                                                                                                                                                          |
+| `lint`           | `pnpm lint`           | ESLint across all packages                                                                                                                                                                                                                              |
+| `format`         | `pnpm format`         | Prettier write across the repo                                                                                                                                                                                                                          |
+| `format:check`   | `pnpm format:check`   | Prettier check (CI gate)                                                                                                                                                                                                                                |
+| `typecheck`      | `pnpm typecheck`      | Builds `@kurultay/shared-types` + `@kurultay/auth-access`, then `tsc --noEmit` in every workspace                                                                                                                                                       |
+| `test`           | `pnpm test`           | Runs the test suites of every workspace package                                                                                                                                                                                                         |
+| `db:generate`    | `pnpm db:generate`    | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made                                                    |
+| `db:migrate`     | `pnpm db:migrate`     | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate` |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it                 |
+| `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                       |
+| `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                            |
+
+To target a single workspace, use pnpm's filter flag:
+
+```bash
+pnpm --filter @kurultay/api dev
+pnpm --filter @kurultay/web build
+pnpm --filter @kurultay/api test
+```
+
+## Database workflow
+
+```bash
+# 1. Edit apps/api/prisma/schema.prisma
+# 2. Create and apply a migration, and regenerate the client
+pnpm db:migrate:dev
+# 3. Load demo data (empty boards are hard to develop against)
+pnpm db:seed
+# 4. Inspect the data
+pnpm db:studio
+```
+
+Use `pnpm db:migrate:dev`, not `pnpm db:migrate`, to create the migration — `db:migrate` only
+applies migrations that already exist (`prisma migrate deploy`) and will not generate one from
+your schema edit. `db:migrate:dev` also regenerates the Prisma client, so no separate
+`pnpm db:generate` step is needed here.
+
+When you're instead picking up migrations someone else already committed (e.g. after
+`git pull`), use `pnpm db:migrate` followed by `pnpm db:generate` — `db:migrate` applies them
+but, unlike `db:migrate:dev`, does not regenerate the client.
+
+Rules:
+
+- Migrations are **committed**. Never edit an already-committed migration file — write a
+  new one.
+- Schema changes go in their own PR, separate from the logic that uses them, whenever that
+  split is practical.
+- `Task.position` and `Column.position` are `Float` (fractional indexing) — see
+  [project-skeleton.md](project-skeleton.md) for the model-level rules that must not be
+  changed casually.
+
+Resetting a local database from scratch:
+
+```bash
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up -d
+pnpm db:migrate
+pnpm db:seed
+```
+
+## Upgrading and backups
+
+This applies to anyone running Kurultay with data they care about, not to throwaway local
+databases. Pre-1.0, breaking schema changes can ship in any `0.y.0` release
+([git-strategy.md](git-strategy.md#versioning-policy-semver)), so the rule is simple:
+
+**Dump the database before every upgrade.**
+
+```bash
+docker compose exec -T postgres pg_dump -U kurultay kurultay > kurultay-$(date +%F).sql
+```
+
+- Read the `CHANGELOG.md` entry for the target version first — every breaking change carries
+  a migration note there.
+- Then upgrade the images and run the migrations.
+
+**PostgreSQL major-version upgrades need a dump and restore.** The official `postgres` image
+refuses to start when the `PGDATA` volume was initialized by a different major version
+("database files are incompatible with server"); the volume does not migrate itself. To move
+from one major to the next: `pg_dump` on the old image, start the new major against an empty
+volume, `psql`/`pg_restore` the dump. Minor upgrades (18.4 → 18.5) are in-place and need no
+dump — the pre-upgrade backup above is still the sane habit.
+
+**Redis is not backed up.** It holds cache, sessions, rate-limit counters, the Socket.io
+pub/sub fan-out, and the notification queue — all rebuildable. Losing it logs everyone out
+and drops queued notifications that had not been delivered yet; it loses no board data.
+Redis upgrades within a major, and 7 → 8, are in-place and RDB/AOF compatible.
+
+### Index migrations take a write lock
+
+**Every index in `apps/api/prisma/migrations/` is created with a plain `CREATE INDEX`, which
+takes a `SHARE` lock on the table for the whole build.** Reads continue; **writes to that
+table block until the index finishes.** On a fresh or small database this is milliseconds and
+invisible. On a large one it is a write outage lasting as long as the build.
+
+The two that matter most are the trigram GIN indexes in
+`20260809190000_task_trgm_search_indexes` — `Task_title_idx` and `Task_description_idx`. GIN
+builds over text are among the slowest index builds there are, and `Task` is the
+fastest-growing table in the schema.
+
+This is a deliberate trade-off, not an oversight. `CREATE INDEX CONCURRENTLY` cannot run
+inside a transaction block, and `prisma migrate deploy` wraps each migration in one — so
+using it would mean hand-writing migrations Prisma cannot apply, in exchange for a lock that
+is imperceptible on every database this project has actually been deployed to. Prisma's own
+guidance for the case is the manual path below.
+
+**Before upgrading an instance with a large `Task` table (roughly: past a few hundred
+thousand rows), or any instance that cannot take a write pause:**
+
+1. Read the new migrations in the release before applying them:
+   `git diff <current-tag>..<target-tag> -- apps/api/prisma/migrations`.
+2. If one creates an index on a large table, apply that statement yourself first, with
+   `CONCURRENTLY`, while the old version is still serving traffic:
+
+   ```bash
+   docker compose exec -T postgres psql -U kurultay kurultay -c \
+     'CREATE INDEX CONCURRENTLY IF NOT EXISTS "Task_title_idx" ON "Task" USING GIN ("title" gin_trgm_ops);'
+   ```
+
+   `CONCURRENTLY` does not block writes, but it cannot run inside a transaction and takes
+   roughly twice as long. If it fails it leaves an **invalid** index behind, which must be
+   dropped (`DROP INDEX CONCURRENTLY "Task_title_idx";`) before retrying — check with
+   `SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;`.
+
+3. Then run `pnpm db:migrate` as usual. The migration's own `CREATE INDEX` is a no-op against
+   an index that already exists under the same name, so the deploy takes no lock.
+
+Do not do this routinely — for a normal-sized instance, step 3 alone is correct and the whole
+procedure is wasted effort. It is a release-note-driven escape hatch for the one case where
+the default would hurt.
+
+`CREATE EXTENSION IF NOT EXISTS pg_trgm` in that same migration needs superuser or
+`pg_database_owner` rights. A managed Postgres that restricts extensions must have `pg_trgm`
+enabled by its provider before the migration runs.
+
+## Day-to-day loop
+
+```bash
+# 1. Start from an up-to-date develop and branch
+git switch develop && git pull
+git switch -c feature/board-drag-and-drop
+
+# 2. Bring the services up (once per session)
+docker compose -f docker-compose.dev.yml up -d
+pnpm dev
+
+# 3. Write code + tests
+
+# 4. Verify locally before pushing
+pnpm lint
+pnpm build
+pnpm --filter @kurultay/api test
+
+# 5. Commit in Conventional Commits format, in English
+git commit -m "feat(web): add drag-and-drop to the kanban board"
+
+# 6. Push and open a PR against develop
+git push -u origin feature/board-drag-and-drop
+```
+
+CI runs the same lint, typecheck, and test steps on every PR — running them locally first
+just saves a round trip. Branch naming, commit format, and the PR/release process are
+specified in [git-strategy.md](git-strategy.md).
+
+## Troubleshooting
+
+| Symptom                                        | Cause                                                             | Fix                                                                           |
+| ---------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `ECONNREFUSED 127.0.0.1:5432`                  | Postgres container is not up                                      | `docker compose -f docker-compose.dev.yml up -d`                              |
+| `Environment variable not found: DATABASE_URL` | `.env` missing                                                    | `cp .env.example .env` and fill it in                                         |
+| Port 3000/4000/5432 already in use             | Another process or a stale container                              | `docker compose down`, or change the port in `.env`                           |
+| Prisma types out of date after pulling         | Client not regenerated — `pnpm db:migrate` does not regenerate it | `pnpm db:generate` (after applying any new migrations with `pnpm db:migrate`) |
+| Freshly generated client not picked up         | A running `pnpm dev` keeps the old client in `dist`               | Restart `pnpm dev` after `pnpm db:generate` — assets are copied at (re)start  |
+| `pnpm install` fails with a workspace error    | Ran inside a sub-package                                          | Run it from the repository root                                               |
+
+## See also
+
+- [project-skeleton.md](project-skeleton.md) — the layout and acceptance criteria this
+  document is the contract for
+- [roadmap.md](roadmap.md) — phase order
+- [git-strategy.md](git-strategy.md) — branches, commits, releases
+- [coding-standards.md](coding-standards.md) — how the code inside these apps is written
+- [testing.md](testing.md) — how to run and write tests
+- [../CONTRIBUTING.md](../CONTRIBUTING.md) — contribution process

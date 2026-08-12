@@ -1,0 +1,24 @@
+-- `Notification.taskId` carries `onDelete: Cascade` (schema.prisma), but every existing
+-- index that touches it puts another column first:
+--   Notification_userId_type_taskId_idx        (userId, type, taskId)
+--   Notification_due_soon_unread_uidx  partial  (userId, taskId) WHERE type='due_soon' ...
+-- Postgres can't use either for a bare `WHERE "taskId" = $1`, which is exactly the lookup
+-- `ON DELETE CASCADE` runs when a Task row is deleted. Without a taskId-leading index, that
+-- delete forces a sequential scan of the whole Notification table — one of the
+-- fastest-growing tables in the schema. A single-column index is enough: nothing in
+-- notification.service.ts or due-soon.worker.ts filters on taskId together with other
+-- equality columns in a way that would benefit from a wider composite, so a second column
+-- would only add write overhead without a matching query to serve.
+-- CreateIndex
+CREATE INDEX "Notification_taskId_idx" ON "Notification"("taskId");
+
+-- Not using CREATE INDEX CONCURRENTLY here: `prisma migrate deploy`/`dev` applies each
+-- migration.sql inside a single database transaction, and CONCURRENTLY cannot run inside a
+-- transaction block (Postgres raises "CREATE INDEX CONCURRENTLY cannot run inside a
+-- transaction block"). Splitting this into its own non-transactional migration is possible
+-- in principle, but the rest of this migration set doesn't do that even for larger indexes
+-- (see 20260809190000_task_trgm_search_indexes, which builds two GIN trigram indexes on
+-- Task the same plain way), so this follows existing project precedent instead of
+-- introducing a one-off deploy path. Plan this migration's rollout for a low-traffic window:
+-- plain CREATE INDEX holds a SHARE lock on Notification for the build's duration, blocking
+-- writes (not reads) to the table until it completes.

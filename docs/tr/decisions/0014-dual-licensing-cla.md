@@ -1,0 +1,65 @@
+# 0014. Çift Lisanslama ve Katkıda Bulunan Lisans Sözleşmesi
+
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-11
+
+> 🌐 [English (canonical)](../../decisions/0014-dual-licensing-cla.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+
+> **Devamı:** aşağıdaki hedef model geçerliliğini koruyor, ama oraya giden yol [0015](0015-no-external-contributions.md) ile askıya alındı — dış katkı kabul edilmiyor, CLA yürürlüğe konmamış bir taslak olarak tutuluyor ve kontrolü devre dışı, hukuki inceleme ise ertelendi.
+
+## Bağlam
+
+[ADR 0007](0007-license-agpl.md) AGPL-3.0'ı seçti ve ticari modeli açık bıraktı; muhtemel yol olarak open-core'u andı ve bunun "muhtemelen" bir CLA gerektireceğini not etti. Bu modelin artık netleşmesi gerekiyor, çünkü seçim, gelecekteki her katkının ne olabileceğini kısıtlıyor.
+
+Bunların hepsini mümkün kılan şey AGPL-3.0. Permissive bir lisans, kodu kimseye sormadan kapalı hâle getirmeye izin verir; dolayısıyla satacak bir şey kalmaz. AGPL'in network-use copyleft'i ise bir kurumun gerçekten parayla kurtulmayı tercih edebileceği somut bir yükümlülük yaratır. Lisans, ürünün sahip olduğu tek kaldıraçtır. Ama bu kaldıraç **telif hakkı sahibine** aittir ve varsayılan olarak her katkıda bulunan kendi yamasının telifini elinde tutar. Yalnızca AGPL-3.0 altında, gelen bir katkı dünyaya AGPL-3.0 ile lisanslanmış olarak gelir ve fazlası olmaz — maintainer tam olarak herkesin sahip olduğu hakları alır. Bu, açık kaynak projeyi yayımlamaya devam etmek için yeterli, birine AGPL'den muafiyet satmak için yeterli değildir; çünkü maintainer kontrol etmediği kod üzerinde şart veremez.
+
+Bunu düzeltme penceresi şimdi. Kurultay'ın tek katkıda bulunanı var — maintainer'ın kendisi — dolayısıyla bugün bir katkı sözleşmesi kurmanın maliyeti bir pull request. Dış katkılar sözleşmesiz geldikten sonra, dokundukları kod kalıcı olarak yalnızca AGPL kalır; bu yazarların hepsi bulunup yeniden lisanslamaya ikna edilmedikçe. Bu, ADR 0007'nin tarif ettiği anlamda, ters yöne bakan bir tek yönlü kapı.
+
+## Karar
+
+**Open-core değil, çift lisanslama**, ve **tüm dış katkılar için bir Katkıda Bulunan Lisans Sözleşmesi.**
+
+Tek kod tabanı, tamamen AGPL-3.0, hiçbir şey esirgenmiyor — topluluk her özelliği görüyor ve çalıştırıyor. AGPL'in yükümlülüklerini kabul edemeyen kurumlar, aynı koda maintainer'dan ayrı bir ticari lisans satın alıyor.
+
+İkinci yarıyı hukuken mümkün kılmak için her dış katkıda bulunan bir CLA imzalıyor ([docs/cla.md](../cla.md)); bu sözleşme maintainer'a münhasır olmayan, dünya çapında, süresiz, geri alınamaz, alt lisans verilebilir ve katkıyı **herhangi bir** lisans şartıyla dağıtma hakkını içeren bir lisans veriyor — katkıda bulunan telifini ve kendi kodunu yeniden kullanmaya dair her hakkını korurken. Sözleşme, tam olarak bu durum için yazılmış olan **Harmony** Bireysel CLA'sından (HA-CLA-I, "any license" outbound seçeneği) türetildi; outbound hak devri tek ve permissive bir çıkış lisansı varsayan ve çift lisanslamanın dayandığı yeniden lisanslama hakkını taşımayan Apache Bireysel CLA'sından değil.
+
+Maintainer'ın gerçek kişi ve Türkiye mukimi olmasından üç somut sonuç doğuyor:
+
+- **Haklar Doğan Can Yıldız'a gerçek kişi olarak veriliyor.** Ortada bir şirket yok. Sonradan bir şirket kurulursa, hakların oraya taşınması ayrı bir devir işlemidir; kendiliğinden olmaz.
+- **Sözleşme bir lisans verme işlemidir, devir değil.** Çift lisanslama mülkiyet değil, alt lisans verilebilir bir lisans gerektirir; ve lisans biçimi, özellikle mali hakların devrine bağlanan daha katı şekil şartlarından kaçınmayı hedefler. Bu kaçınmanın başarılı olup olmadığı hukukçuya bırakılan bir sorudur ve belgede işaretlenmiştir.
+- **Belge bir taslaktır.** Öne çıkan bir "yürürlükte değil" uyarısı ve çözülmemiş `[HUKUKÇUYA SOR: …]` işaretleriyle geliyor. Bunlar çözülene kadar kimseden imza istenmiyor.
+
+Uygulama, her commit yazarı sabit bir cümleyi PR yorumu olarak yazarak imzalayana kadar merge'ü bloklayan bir GitHub Actions kontrolüyle yapılıyor ([`.github/workflows/cla.yml`](../../../.github/workflows/cla.yml)).
+
+Bu ADR, ADR 0007'nin **yerini almaz, onu tamamlar**. 0007'nin lisans kararı değişmeden duruyor; 0014 yalnızca oradaki open-core kenar notunun yerine kararlaştırılmış bir model koyuyor.
+
+## Gerekçe
+
+- **Permissive bir lisans ürünü ortadan kaldırırdı.** MIT veya Apache-2.0 altında bir müşterinin ticari lisansa hiç ihtiyacı olmaz, çünkü ücretsiz lisans zaten ücretlinin izin vereceği her şeye izin verir. Çift lisanslama, ancak varsayılan şartlar birinin kurtulmak istediği şartlar olduğunda bir iş modelidir — AGPL'in sağladığı ve ADR 0007'nin zaten satın aldığı şey de budur.
+- **DCO bunun yerini tutmaz.** Developer Certificate of Origin bir menşe beyanıdır: katkıda bulunan, kodu projenin mevcut lisansı altında sunma hakkına sahip olduğunu tasdik eder. Bu lisansın ötesinde bir şey vermez. Maintainer'ı katkıyı farklı şartlarla dağıtmaya yetkilendiremez; dolayısıyla DCO altında ticari lisansın her dış katkıyı dışarıda bırakması gerekirdi — dış katkılar ortak koda dokunduğu anda bu uygulanamaz hâle gelir.
+- **Tek kişilik ekipte open-core yerine çift lisanslama.** Open-core, topluluk kodu ile proprietary kod arasında sürekli bakımı yapılan bir sınır gerektirir: iki build hedefi, iki test matrisi ve her özellikte "bu hangi tarafa düşüyor" kararı, sonsuza kadar uygulanmak üzere. ADR 0007 bu "dikkatli mimari ayrımı" bir maliyet olarak andı. Solo bir maintainer için bu, henüz onu haklı çıkaracak gelir yokken her değişiklikte ödenen tekrarlayan bir vergidir. Çift lisanslama bir kez, en başta, bir katkı sözleşmesi maliyeti getirir ve mimariye dokunmaz. Ayrıca açık kaynak iddiasını temiz tutar: hiçbir özellik esirgenmediği için "açık kaynak" ifadesinin yıldız işaretine ihtiyacı olmaz.
+- **El yazması veya Apache türevi bir sözleşme yerine Harmony.** Harmony, katkıları birden fazla lisansla dağıtmayı amaçlayan projeler için hukukçular tarafından yazıldı ve Madde 2.3'teki "any license" outbound seçeneği modelin ihtiyaç duyduğu maddenin ta kendisi. Madde 2.1(a) — katkıda bulunan mülkiyetini ve önceki tüm haklarını korur — sözleşmeyi imzalanabilir kılan şeydir ve biri itiraz ettiğinde işaret edilecek cümledir.
+- **Şeref sistemi yerine bir CLA kontrol botu.** İmzasız merge edilmiş bir katkı geri alınamaz; kodun revert edilmesi veya yeniden yazılması gerekir. Zorunlu bir status check, hata modunu "kod tabanı sessizce kirlendi" yerine "PR bekliyor" yapar.
+
+## Sonuçlar
+
+- **CLA katkı kaybettirecek.** Bazı geliştiriciler CLA'yı ilke olarak reddeder, bazıları bir yazım hatası düzeltmek için hukuki belge okumaz, bazıları da işvereninden peşine düşmeye üşeneceği bir onay almadan imzalayamaz. Bu, drive-by katkılar üzerinde gerçek ve kalıcı bir vergidir ve genç bir projenin en az sahip olduğu para birimiyle ödenir. Bilerek kabul ediliyor.
+- **Dürüstlük bilinçli, ve o da bir maliyet.** [CONTRIBUTING.md](../../../CONTRIBUTING.md) ve botun yorumu, CLA'nın maintainer'ın kodu ticari lisansla satabilmesi için var olduğunu açıkça söylüyor. Daha muğlak bir ifade kısa vadede daha az katkıda bulunan kaybettirir, biri durumu çözdüğünde daha çok güven kaybettirir.
+- **Bunların hiçbiri geliri garanti etmiyor.** Çift lisanslama yalnızca AGPL uyumunun gerçekten korkulduğu yerde dönüşür — düzenlemeye tabi kurumlar, ürünü sattıkları bir şeye gömen şirketler, lisans kara listesi tutan hukuk departmanı olan organizasyonlar. Küçük şirketler ve iç dağıtımlar ezici çoğunlukla umursamıyor; AGPL bir aracı kurum içinde self-host etmek zaten hiçbir yükümlülük doğurmuyor. CLA geliri _mümkün_ kılıyor, _muhtemel_ değil; model kusursuz uygulanıp yine de hiçbir şey kazandırmayabilir.
+- **İlk imzasız dış katkı geri alınamaz.** Kontrol devreye girmeden bir PR merge edilirse, o kod yalnızca AGPL'dir. Sonradan çıkarmak, revert etmek veya sıfırdan yeniden yazmak demektir; o kod yerinde dururken ticari lisansı yayımlamak ise lisans ihlali olurdu. Mekanizmanın ilk dış PR'dan sonra değil önce kurulmasının sebebi budur.
+- **Hukuki iş bitmedi.** Belge, açık soruları olan bir taslak — bir şirket kurulduğunda "Biz" kim olacak, PR yorumu geçerli bir imza mı, FSEK'in şekil şartı lisans vermeye de uzanıyor mu, hangi hukuk uygulanacak. Bunlar [docs/cla.md](../cla.md#hukukçuya-sorulacaklar) içinde listeli ve CLA kimseyi bağlamadan önce cevaplanmalı. O zamana kadar kontrol, uygulama değil iskele.
+- **Kurumsal katkıda bulunanın henüz bir yolu yok.** Kurumsal CLA yok. Katkı vermek isteyen bir şirketin böyle bir belgeyi beklemesi ya da çalışanının işveren onayıyla bireysel olarak imzalaması gerekiyor; bu ikincisi kurumsal bir sözleşmeden daha ince bir koruma.
+- **İmza defteri deponun geçmişinin parçası oluyor.** İmzalar, ayrı bir `cla-signatures` orphan dalındaki `signatures/v0.1/cla.json` dosyasında yaşıyor — özel bir uzak depo yerine bu seçildi, çünkü herkese açık bir kayıt hem bağladığı katkıda bulunanlar hem de projenin lisans durumunu değerlendiren herkes tarafından denetlenebilir, ve depo geneli yetkiye sahip bir personal access token secret'ına ihtiyaç duymaz. Kendi dalında olması, bot commit'lerini Git Flow'un doğrudan yazmayı yasakladığı `develop` ve `main` dışında tutuyor. Bedeli, defterin yalnızca pull request'te zaten herkese açık olanı tutabilmesi: bir GitHub kullanıcı adı ve id'si, asla bir e-posta adresi. Hukuki inceleme kayıtta daha fazla kimlik verisi isterse, bu karar özel depoya ve personal access token'a geçişi zorunlu kılar.
+- **CLA kontrol aracının bakımı yapılmıyor.** `contributor-assistant/github-action` Mart 2026'da arşivlendi. v2.6.1 commit SHA'sına sabitlendi, böylece terk edilmiş bir depo altımızdan değişemez ve action çalışmaya devam edecek kadar kendi kendine yeterli — ama düzeltme almayacak ve GitHub node20 action runtime'ını emekliye ayırdığında er ya da geç bozulacak. Bugünkü alternatifler daha kötü: barındırılan cla-assistant.io servisi imzaları bir OAuth uygulamasının arkasında başkasının altyapısına koyuyor, mevcut fork'ların ise benimsenmesi yok. Geçiş, sürpriz değil, bilinen bir gelecek işi.
+- **Her katkıda bulunan bir de patent lisansı veriyor.** CLA'nın Madde 2.2'si, çoğu katkıda bulunanın bir açık kaynak projeden beklediği telif devrinden daha geniş. CLA'lar için standart ve yine de bazılarının reddetmesi için bir sebep.
+
+## Değerlendirilen Alternatifler
+
+| Alternatif                                         | Neden değil                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open-core (AGPL çekirdek + proprietary eklentiler) | ADR 0007'nin öngördüğü yol. Kalıcı bir mimari sınır ve her özellikte "hangi tarafa düşüyor" kararı gerektiriyor — solo bir maintainer'ın, ortada gelir yokken her değişiklikte ödediği tekrarlayan bir maliyet. Ayrıca açık kaynak iddiasını zayıflatıyor: bazı özellikler esirgeniyor |
+| CLA yerine DCO                                     | Yalnızca menşei tasdik ediyor. Yeniden lisanslama hakkı vermiyor, dolayısıyla katkı gelen kod ticari lisanslı bir build'de asla yer alamazdı — ticari sürümün her dış katkıyı dışarıda bırakması gerekirdi                                                                             |
+| Permissive lisans (MIT / Apache-2.0)               | Satacak bir şey kalmıyor: ücretsiz lisans zaten kapalı kaynak kullanıma ve yeniden satışa izin verdiği için hiçbir müşterinin ticari lisansa ihtiyacı olmuyor. Ayrıca ADR 0007'nin kapattığı SaaS yeniden satış boşluğunu tekrar açıyor                                                |
+| BSL / source-available (Sentry, HashiCorp tarzı)   | CLA problemini açık kaynağı kaldırarak çözüyor: OSI onaylı bir lisans değil, dolayısıyla AGPL seçiminin mümkün kılmak için yapıldığı katkı modelini ve topluluk dağıtımını dışlıyor                                                                                                    |
+| Lisans verme yerine telif devri (Harmony CAA)      | Maintainer'a en güçlü konumu veriyor, ama mülkiyeti katkıda bulunanlardan alıyor — çok daha zor bir talep — ve mali hakların devrine uygulanan daha katı şekil şartlarını tetikliyor. Çift lisanslama için alt lisans verilebilir bir lisans yeterli                                   |
+| CLA yok, sonra karar veririz                       | Bugünün en ucuz, yarının en pahalı seçeneği: sözleşmesiz merge edilen katkılar kalıcı olarak yalnızca AGPL kalıyor ve bunu geri almak geçmişteki her yazarı bulup ikna etmeyi gerektiriyor                                                                                             |

@@ -1,0 +1,59 @@
+name: Feature request
+description: Propose a new feature or improvement
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Ideas are wanted. Implementations, for now, are not.**
+
+        Describe the problem, who it affects, and how you would expect it to behave — that is
+        the most useful thing you can send and it is what shapes the roadmap. Please keep
+        **code out of the thread**, though: a snippet is your copyrighted work, and while the
+        Contributor License Agreement is still in draft the maintainer cannot safely read one
+        and then write the feature.
+
+        See [CONTRIBUTING.md](https://github.com/dravcore/kurultay/blob/develop/CONTRIBUTING.md#code-contributions-are-paused).
+
+  - type: checkboxes
+    id: existing-issue
+    attributes:
+      label: Is there an existing issue for this?
+      description: Search open and closed issues before filing a new one.
+      options:
+        - label: I searched and found no existing issue for this feature
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem does this solve? Who is affected?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about, and why you didn't pick them.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, links, or anything else relevant.
+
+  - type: markdown
+    attributes:
+      value: |
+        Note: this is issue-first — please wait for maintainer feedback before starting
+        implementation. See [CONTRIBUTING.md](https://github.com/dravcore/kurultay/blob/develop/CONTRIBUTING.md).

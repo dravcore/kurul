@@ -1,0 +1,11 @@
+{
+  // Type-check only. `tsconfig.json` deliberately narrows `include` to `src/**` so the tests
+  // never reach `dist`, but that also left them outside `pnpm typecheck` — a test importing an
+  // export that no longer exists stayed green until vitest ran it. `apps/web` type-checks its
+  // tests via a `**/*.ts` include; this is the same coverage without widening what gets built.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

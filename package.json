@@ -1,0 +1,51 @@
+{
+  "name": "kurultay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Open-source Kanban-focused project management",
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @kurultay/api --filter @kurultay/web dev",
+    "build": "pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access --filter @kurultay/api --filter @kurultay/web build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r --filter @kurultay/api --filter @kurultay/web --filter @kurultay/shared-types --filter @kurultay/auth-access test",
+    "typecheck": "pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build && pnpm -r typecheck",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,mjs,cjs,js,json,md,yml,yaml,css}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "@next/eslint-plugin-next": "^16.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "dotenv": "^16.6.1",
+    "eslint": "^9.22.0",
+    "eslint-config-prettier": "^10.1.1",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.0",
+    "prettier": "^3.5.3",
+    "prisma": "^7.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.1"
+  }
+}
