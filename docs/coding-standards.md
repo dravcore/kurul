@@ -297,11 +297,11 @@ Use them sparingly.
 
 ## Formatting and linting
 
-| Tool           | Role                                                                                                                                                                           |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Prettier       | All formatting. Config is committed; no editor-local overrides.                                                                                                                |
-| ESLint         | Correctness rules via flat config (`@eslint/js`, `typescript-eslint`, `eslint-config-prettier`). Nest/Next/import plugins are not wired yet — keep import order by convention. |
-| `tsc --noEmit` | Typecheck, run in CI separately from lint                                                                                                                                      |
+| Tool           | Role                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prettier       | All formatting. Config is committed; no editor-local overrides.                                                                                                                                                                                                                                                                                                                                                        |
+| ESLint         | Flat config: `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, plus `apps/web` plugins (`eslint-plugin-react-hooks`, `@next/eslint-plugin-next`, `eslint-plugin-jsx-a11y` recommended). Nest and `eslint-plugin-import` are not wired — keep import order by convention. `jsx-a11y` still peers on eslint ^3–9; root `pnpm.peerDependencyRules.allowedVersions` allows eslint 10 until upstream catches up. |
+| `tsc --noEmit` | Typecheck, run in CI separately from lint                                                                                                                                                                                                                                                                                                                                                                              |
 
 ```bash
 pnpm lint          # ESLint check

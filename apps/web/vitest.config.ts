@@ -35,17 +35,41 @@ export default defineConfig({
       // a new page arriving with no test at all is the regression worth catching. The
       // global gate stays absent for the reason above; only this folder is floored.
       //
-      // Floors sit a few points under the measured baseline (2026-08-12, `pnpm --filter
-      // @kurultay/web test:cov`: stmts 90.93 / branch 100 / funcs 90 / lines 90.93), the
-      // same margin `apps/api/jest.config.cjs` uses, so routine refactors do not trip it.
+      // Floors sit a few points under the measured baseline, the same margin
+      // `apps/api/jest.config.cjs` uses, so routine refactors do not trip them.
+      //
+      // `app/**` (2026-08-12): stmts 90.93 / branch 100 / funcs 90 / lines 90.93.
       // `app/layout.tsx` counts here too: `next/font/google` is stubbed in its test rather
       // than the file being excluded, because an excluded file is an invisible one.
+      //
+      // Board / task / layout (2026-08-12, same `test:cov` run): board 70/59/59/75,
+      // task 65/65/63/67, layout 80/71/90/84. These are the interactive surfaces that
+      // already have meaningful unit coverage; a second glob floor catches deleting a
+      // board/task/layout test without waiting for a global average to become meaningful.
       thresholds: {
         'app/**': {
           statements: 85,
           branches: 90,
           functions: 85,
           lines: 85,
+        },
+        'components/board/**': {
+          statements: 65,
+          branches: 54,
+          functions: 54,
+          lines: 70,
+        },
+        'components/task/**': {
+          statements: 60,
+          branches: 60,
+          functions: 58,
+          lines: 62,
+        },
+        'components/layout/**': {
+          statements: 75,
+          branches: 65,
+          functions: 85,
+          lines: 78,
         },
       },
     },
