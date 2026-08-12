@@ -12,6 +12,17 @@ updates:
     # Majors now arrive as one PR per package, so the cap has to leave room for a
     # week that lands several of them alongside the two grouped PRs.
     open-pull-requests-limit: 15
+    ignore:
+      # TypeScript 7 is held, not skipped. Two dependencies declare ranges that exclude it:
+      # `typescript-eslint` peers on `typescript >=4.8.4 <6.1.0` and `ts-jest` on `>=4.3 <7`.
+      # Taking 7 today means dropping type-aware linting or the API test runner, which is not
+      # something a version bump gets to decide. Remove this entry once both publish stable
+      # releases that accept 7 — until then Dependabot would reopen a PR every week that
+      # cannot pass CI, and a recurring red PR teaches everyone to ignore red PRs.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
+
     groups:
       # Only minor/patch is grouped. A grouped PR is all-or-nothing: one member that
       # needs a real migration holds back every other member until someone does the
