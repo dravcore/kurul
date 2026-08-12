@@ -48,7 +48,10 @@ export function TaskPanel({
 }: TaskPanelProps): React.ReactElement {
   const t = useTranslations('app.board.task');
   const router = useRouter();
+  const panelRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const focusInsideRef = useRef(false);
   const titleId = useId();
   const descriptionId = useId();
   const [title, setTitle] = useState(task?.title ?? '');
@@ -60,12 +63,69 @@ export function TaskPanel({
     setDescription(task?.description ?? '');
   }, [task?.id, task?.title, task?.description]);
 
+  // Closing only takes focus back if the user still has it in here. Tracked from `focusin`
+  // rather than read on the way out: by the time the unmount cleanup runs, React has already
+  // detached the panel and the browser has already reset `document.activeElement`.
   useEffect(() => {
+    function onFocusIn(event: FocusEvent): void {
+      const target = event.target;
+      focusInsideRef.current =
+        target instanceof Node && (panelRef.current?.contains(target) ?? false);
+    }
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, []);
+
+  useEffect(() => {
+    // Recorded before focus moves into the panel — nothing else in the tree knows which card
+    // opened it. Anything already inside is the panel's own doing (a task loading in
+    // underneath it), never a place worth returning to, and `<body>` is the lost-focus state
+    // this is here to avoid rather than a target to restore.
+    const opener = document.activeElement;
+    if (
+      opener instanceof HTMLElement &&
+      opener !== document.body &&
+      !panelRef.current?.contains(opener)
+    ) {
+      openerRef.current = opener;
+    }
     headingRef.current?.focus();
+    focusInsideRef.current = panelRef.current?.contains(document.activeElement) ?? false;
   }, [task?.id]);
 
+  // This panel is a plain `<aside>` behind a route segment, not a Radix dialog, so nothing
+  // hands focus back when the route drops it: React removes the focused node and the browser
+  // resets focus to `<body>`, dumping a keyboard user at the top of the document. Radix
+  // `FocusScope` covers the dialogs in `form-dialog.tsx`; here it is done by hand, on unmount.
+  useEffect(() => {
+    return () => {
+      if (!focusInsideRef.current) return;
+
+      const opener = openerRef.current;
+      if (opener?.isConnected) {
+        opener.focus();
+        if (document.activeElement === opener) return;
+      }
+
+      // The opener is regularly gone by now — the task was deleted, filtered out of the
+      // board, or moved by another client. The board's landmark keeps focus on the page and
+      // the tab order roughly where the user was, instead of back at `<body>`. It is not
+      // focusable on its own, so it is lent a tabindex for exactly this one focus.
+      const main = document.querySelector('main');
+      if (!main) return;
+      if (!main.hasAttribute('tabindex')) {
+        main.setAttribute('tabindex', '-1');
+        main.addEventListener('blur', () => main.removeAttribute('tabindex'), { once: true });
+      }
+      main.focus();
+    };
+  }, []);
+
   const close = useCallback((): void => {
-    router.push(`/board/${boardId}`);
+    // `scroll: false` also opts out of the router's focus pass: Next calls `focus()` on the
+    // new route segment after any scroll-applying navigation, which would land on the board
+    // wrapper and undo the restoration above. The board is already on screen either way.
+    router.push(`/board/${boardId}`, { scroll: false });
   }, [boardId, router]);
 
   useEffect(() => {
@@ -125,6 +185,7 @@ export function TaskPanel({
 
   return (
     <aside
+      ref={panelRef}
       className={cn(
         'flex h-full w-full flex-col border-l border-border bg-card',
         'md:w-[min(480px,100%)] md:max-w-[640px] md:min-w-[420px]',
