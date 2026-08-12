@@ -29,6 +29,8 @@ function taskRow(
     columnId: string;
     title: string;
     position: number;
+    dueDate: Date | null;
+    estimatedMinutes: number | null;
   }> = {},
 ) {
   const now = new Date('2026-01-01');
@@ -40,8 +42,8 @@ function taskRow(
     description: null,
     priority: 'MEDIUM' as const,
     position: overrides.position ?? 1000,
-    dueDate: null,
-    estimatedMinutes: null,
+    dueDate: overrides.dueDate ?? null,
+    estimatedMinutes: overrides.estimatedMinutes ?? null,
     createdById: USER_ID,
     createdAt: now,
     updatedAt: now,
@@ -501,7 +503,9 @@ describe('TaskService', () => {
 
   it('clears dueDate and estimatedMinutes when the payload sets them to null', async () => {
     const { service, prisma } = buildService();
-    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.task.findFirst.mockResolvedValue(
+      taskRow({ id: 't1', dueDate: new Date('2026-03-01'), estimatedMinutes: 90 }),
+    );
     prisma.task.update.mockResolvedValue(taskRow({ id: 't1' }));
 
     await service.update(WORKSPACE_ID, 't1', ACTOR_ID, { dueDate: null, estimatedMinutes: null });
@@ -512,6 +516,61 @@ describe('TaskService', () => {
         data: { dueDate: null, estimatedMinutes: null },
       }),
     );
+  });
+
+  it('writes nothing when the payload repeats what is already stored', async () => {
+    const { service, prisma, activityService, realtimeMock } = buildService();
+    const stored = taskRow({ id: 't1', title: 'Task', dueDate: new Date('2026-03-01') });
+    prisma.task.findFirst.mockResolvedValue(stored);
+
+    const result = await service.update(WORKSPACE_ID, 't1', ACTOR_ID, {
+      title: 'Task',
+      dueDate: '2026-03-01T00:00:00.000Z',
+      priority: 'MEDIUM',
+    });
+
+    // `updatedAt` is what "last activity" reads, so a no-op PATCH must not move it.
+    expect(prisma.task.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(activityService.record).not.toHaveBeenCalled();
+    expect(realtimeMock.emitToBoard).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      id: 't1',
+      title: 'Task',
+      updatedAt: stored.updatedAt.toISOString(),
+    });
+  });
+
+  it('writes nothing for an empty payload', async () => {
+    const { service, prisma, realtimeMock } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+
+    await service.update(WORKSPACE_ID, 't1', ACTOR_ID, {});
+
+    expect(prisma.task.update).not.toHaveBeenCalled();
+    expect(realtimeMock.emitToBoard).not.toHaveBeenCalled();
+  });
+
+  it('records the activity and announces the change on a real edit', async () => {
+    const { service, prisma, activityService, realtimeMock } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1', title: 'Task' }));
+    prisma.task.update.mockResolvedValue(taskRow({ id: 't1', title: 'Renamed' }));
+
+    await service.update(WORKSPACE_ID, 't1', ACTOR_ID, { title: 'Renamed' });
+
+    expect(activityService.record).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        type: ActivityType.TaskUpdated,
+        payload: { title: 'Renamed', changes: { title: 'Renamed' } },
+      }),
+    );
+    expect(realtimeMock.emitToBoard).toHaveBeenCalledWith(BOARD_ID, SocketEvents.TASK_UPDATED, {
+      workspaceId: WORKSPACE_ID,
+      boardId: BOARD_ID,
+      actorId: ACTOR_ID,
+      taskId: 't1',
+    });
   });
 
   it('returns 404 and writes nothing when updating a task in another workspace', async () => {

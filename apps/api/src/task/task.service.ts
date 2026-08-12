@@ -210,7 +210,16 @@ export class TaskService {
   ): Promise<TaskDto> {
     const existing = await this.taskRead.findTask(workspaceId, taskId);
     const { data, changes } = planTaskUpdate(existing, dto);
-    const changed = Object.keys(changes).length > 0;
+
+    // A PATCH that re-sends what is already stored is not an edit. Writing it anyway moved
+    // `updatedAt` forward, which is the field "last activity" sorting and staleness checks
+    // read — so closing a detail panel without typing anything used to look like work. The
+    // activity entry and the socket event were already suppressed for this case; the write
+    // was the one thing still leaking. The row was read under the workspace predicate, so
+    // returning it needs no further check.
+    if (Object.keys(changes).length === 0) {
+      return toTaskDto(existing);
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       // Re-read inside the transaction: the row could have been deleted, or moved out of
@@ -229,30 +238,26 @@ export class TaskService {
         include: taskInclude,
       });
 
-      if (changed) {
-        await this.activityService.record(tx, {
-          workspaceId,
-          taskId,
-          userId,
-          type: ActivityType.TaskUpdated,
-          payload: {
-            title: updated.title,
-            changes,
-          },
-        });
-      }
+      await this.activityService.record(tx, {
+        workspaceId,
+        taskId,
+        userId,
+        type: ActivityType.TaskUpdated,
+        payload: {
+          title: updated.title,
+          changes,
+        },
+      });
 
       return toTaskDto(updated);
     });
 
-    if (changed) {
-      this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_UPDATED, {
-        workspaceId,
-        boardId: result.boardId,
-        actorId: userId,
-        taskId: result.id,
-      });
-    }
+    this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_UPDATED, {
+      workspaceId,
+      boardId: result.boardId,
+      actorId: userId,
+      taskId: result.id,
+    });
     return result;
   }
 
