@@ -40,10 +40,8 @@ share types cleanly with the Next.js frontend.
 - **Postgres + Redis** is close to undisputed: both commercial peers (ClickUp,
   Linear) and OSS peers (Plane, Taiga, Focalboard) use Postgres — JSON fields
   cover flexible metadata (custom fields), relational integrity covers
-  task/board relations. Redis covers the Socket.io pub/sub adapter and the BullMQ
-  due-soon notification queue. Sessions live in PostgreSQL (Better Auth); HTTP rate
-  limiting is not wired yet — those two were anticipated Redis jobs at decision time and
-  are not current runtime uses.
+  task/board relations. Redis is one tool covering four needs: notification
+  queue, session store, rate limiting, and the Socket.io pub/sub adapter.
 - **PostgreSQL 18, the current major.** Pinning the previous major would be
   supportable for years, but silently: a greenfield project has no reason to
   start one version behind. The deadline matters more than the version — the

@@ -119,7 +119,7 @@ export function useTaskMetadata({
   const {
     data: meta,
     loading: loadingMeta,
-    failed: metaFailed,
+    error: metaError,
     setData: setMeta,
   } = useApiResource<TaskMeta>(
     loadMeta,
@@ -134,11 +134,10 @@ export function useTaskMetadata({
       commentsCursor: null,
       activities: [],
     },
-    // No message: the comment and activity sections each report the failure in place, because
-    // one sentence cannot say what two emptied lists now mean — and a toast that fades leaves
-    // them reading as "no comments" and "no activity", the wrong answer and the one that stays
-    // on screen. `failed` below is the whole of what this caller needs.
-    null,
+    // Reported in place by the comment and activity sections rather than as a toast: those
+    // two lists are what the failure emptied, and a toast that fades leaves them reading as
+    // "no comments" and "no activity" — the wrong answer, and the one that stays on screen.
+    t('metaLoadError'),
   );
 
   const setBoardLabels = useResourceField(setMeta, 'boardLabels');
@@ -193,6 +192,6 @@ export function useTaskMetadata({
     activities: meta.activities,
     refreshActivities,
     loadingMeta,
-    metaFailed,
+    metaFailed: metaError !== null,
   };
 }

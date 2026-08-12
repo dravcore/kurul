@@ -46,15 +46,12 @@ export function useBoardSocket(
     const socket = getSocket();
 
     function onConnect(): void {
+      setConnected(true);
       socket.emit(
         SocketClientEvents.BOARD_JOIN,
         { boardId },
         (ack: { ok?: boolean } | undefined) => {
-          // `connected` flips only once the room is actually joined: a socket that connected
-          // but was denied the room delivers nothing, and the caller has to keep showing a
-          // reconnecting / offline state rather than trust a live-looking flag.
           if (ack?.ok) {
-            setConnected(true);
             handlersRef.current.onResync();
           }
         },

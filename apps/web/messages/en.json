@@ -316,6 +316,7 @@
             "unknown": "{type}"
           }
         },
+        "metaLoadError": "This task's details couldn't load.",
         "openTask": "Open task",
         "panelLabel": "Task details",
         "close": "Close task panel",

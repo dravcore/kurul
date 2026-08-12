@@ -40,7 +40,7 @@ const api = auth.api as unknown as {
 };
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
-const EMAIL = 'invitee@test.example.com';
+const EMAIL = 'invitee@test.kurultay.dev';
 
 interface PrismaStub {
   workspaceInvitation: { findMany: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock };
@@ -192,14 +192,14 @@ describe('WorkspaceInvitationService.createInvitation', () => {
 
     await service.createInvitation(
       WORKSPACE_ID,
-      { email: 'Mixed.Case@Test.Example.Com', role: MemberRole.MEMBER },
+      { email: 'Mixed.Case@Test.Kurultay.Dev', role: MemberRole.MEMBER },
       request,
     );
 
     expect(prisma.workspaceInvitation.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          email: 'mixed.case@test.example.com',
+          email: 'mixed.case@test.kurultay.dev',
           workspaceId: WORKSPACE_ID,
           status: 'pending',
         }),

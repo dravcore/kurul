@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
@@ -47,16 +47,10 @@ export function useBoardMutations({
   const tTask = useTranslations('app.board.task');
   const { activeId } = useWorkspaceContext();
   const [defaultsPending, setDefaultsPending] = useState(false);
-  // Overlapping drags each capture their own pre-move snapshot. A late failure from an
-  // earlier PATCH must not `setTasks` that snapshot back — it would wipe a newer optimistic
-  // (or already-accepted) order. Only the latest in-flight generation may roll back; older
-  // failures resync from the server instead.
-  const moveGenerationRef = useRef(0);
 
   const commitTaskMove = useCallback(
     async function commit(payload: TaskMovePayload): Promise<void> {
       if (!activeId) return;
-      const generation = ++moveGenerationRef.current;
       const previousTasks = tasksRef.current;
       setTasks(payload.nextTasks);
       try {
@@ -71,16 +65,7 @@ export function useBoardMutations({
         );
         setTasks((current) => current.map((task) => (task.id === updated.id ? updated : task)));
       } catch (caught) {
-        if (generation === moveGenerationRef.current) {
-          setTasks(previousTasks);
-        } else {
-          try {
-            await reload();
-          } catch {
-            // Toast below still explains the failed move; a stale board is preferable to a
-            // wrong rollback of a newer drag.
-          }
-        }
+        setTasks(previousTasks);
         if (apiStatus(caught) === 403) {
           toast.error(t('task.forbidden'));
         } else {
@@ -109,7 +94,7 @@ export function useBoardMutations({
         }
       }
     },
-    [activeId, reload, setTasks, t, tTask, tasksRef],
+    [activeId, setTasks, t, tTask, tasksRef],
   );
 
   const moveColumn = useCallback(

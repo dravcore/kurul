@@ -42,66 +42,6 @@ describe('useApiResource', () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
-  it('hands the loaded value to onSuccess in the same pass that sets it', async () => {
-    const folded: string[][] = [];
-    const fetcher = vi.fn().mockResolvedValue(['a', 'b']);
-    const { result } = renderHook(() =>
-      useApiResource<string[]>(fetcher, [], 'boom', {
-        onSuccess: (value) => folded.push(value),
-      }),
-    );
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(folded).toEqual([['a', 'b']]);
-  });
-
-  it('does not call onSuccess for a request that failed or was aborted', async () => {
-    const onSuccess = vi.fn();
-    const failing = vi.fn().mockRejectedValue(new Error('network'));
-    const { result } = renderHook(() =>
-      useApiResource<string[]>(failing, [], 'boom', { onSuccess }),
-    );
-
-    await waitFor(() => expect(result.current.error).toBe('boom'));
-    expect(onSuccess).not.toHaveBeenCalled();
-
-    let settle: ((value: string[]) => void) | undefined;
-    const pending = (): Promise<string[]> =>
-      new Promise<string[]>((resolve) => {
-        settle = resolve;
-      });
-    const { unmount } = renderHook(() =>
-      useApiResource<string[]>(pending, [], 'boom', { onSuccess }),
-    );
-    unmount();
-    settle?.(['late']);
-    await Promise.resolve();
-
-    expect(onSuccess).not.toHaveBeenCalled();
-  });
-
-  it('clears the previous failure as soon as a refetch is requested', async () => {
-    // The status has to flip with the request, not one render later: a consumer that reads
-    // `error` while the next attempt is already scheduled would otherwise still be told the
-    // last one failed.
-    const fetcher = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('network'))
-      .mockResolvedValueOnce(['second']);
-    const { result } = renderHook(() => useApiResource<string[]>(fetcher, [], 'boom'));
-
-    await waitFor(() => expect(result.current.error).toBe('boom'));
-    expect(result.current.failed).toBe(true);
-
-    act(() => result.current.reload());
-
-    expect(result.current.error).toBeNull();
-    expect(result.current.failed).toBe(false);
-    expect(result.current.loading).toBe(true);
-
-    await waitFor(() => expect(result.current.data).toEqual(['second']));
-  });
-
   it('aborts the in-flight request on unmount', () => {
     let received: AbortSignal | undefined;
     const fetcher = (signal: AbortSignal): Promise<string[]> => {

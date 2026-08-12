@@ -37,4 +37,10 @@ describe('NotificationsPage', () => {
       messages.app.notifications.pageTitle,
     );
   });
+
+  it('renders the notifications list', async () => {
+    render(await NotificationsPage());
+
+    expect(screen.getByTestId('notifications-list')).toBeTruthy();
+  });
 });

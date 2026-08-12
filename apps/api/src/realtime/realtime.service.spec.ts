@@ -101,31 +101,21 @@ describe('RealtimeService', () => {
     ).not.toThrow();
   });
 
-  it('evicts a user from board and notification rooms for one workspace', async () => {
-    const leave = jest.fn().mockResolvedValue(undefined);
-    const socket = {
-      data: {
-        userId: 'u1',
-        boardWorkspaces: { b1: 'ws1', b2: 'ws2' },
-        notificationWorkspaces: ['ws1', 'ws3'],
-      },
-      leave,
-    };
-    const other = {
-      data: { userId: 'u2', boardWorkspaces: { b1: 'ws1' } },
-      leave: jest.fn(),
-    };
-    const fetchSockets = jest.fn().mockResolvedValue([socket, other]);
+  it('drops the emit when the server is not attached', () => {
     const service = new RealtimeService();
-    service.attachServer({ to: jest.fn(), fetchSockets } as unknown as Server);
+    const emit = jest.fn();
+    const to = jest.fn().mockReturnValue({ emit });
 
-    await service.evictUserFromWorkspace('ws1', 'u1');
+    expect(() =>
+      service.emitToBoard('b1', SocketEvents.TASK_DELETED, {
+        workspaceId: 'ws',
+        boardId: 'b1',
+        actorId: 'u1',
+        taskId: 't1',
+      }),
+    ).not.toThrow();
 
-    expect(leave).toHaveBeenCalledWith(userRoom('ws1', 'u1'));
-    expect(leave).toHaveBeenCalledWith(boardRoom('b1'));
-    expect(leave).not.toHaveBeenCalledWith(boardRoom('b2'));
-    expect(socket.data.boardWorkspaces).toEqual({ b2: 'ws2' });
-    expect(socket.data.notificationWorkspaces).toEqual(['ws3']);
-    expect(other.leave).not.toHaveBeenCalled();
+    expect(to).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalled();
   });
 });

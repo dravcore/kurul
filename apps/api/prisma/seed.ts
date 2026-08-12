@@ -4,7 +4,7 @@ import { Pool } from 'pg';
 import { Priority, PrismaClient } from '../src/generated/prisma';
 import { auth } from '../src/auth/auth';
 
-const DEMO_EMAIL = 'demo@example.com';
+const DEMO_EMAIL = 'demo@kurultay.dev';
 const DEMO_PASSWORD = 'demo-password-change-me';
 const DEMO_NAME = 'Demo User';
 
@@ -118,8 +118,9 @@ async function main(): Promise<void> {
     ],
   });
 
+  // eslint-disable-next-line no-console -- seed feedback
   console.log(`Seeded demo user ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
-
+  // eslint-disable-next-line no-console -- seed feedback
   console.log(`Seeded workspace slug=demo id=${workspace.id}`);
 
   await prisma.$disconnect();

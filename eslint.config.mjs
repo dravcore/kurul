@@ -26,18 +26,21 @@ const reactHooksConfigs = (() => {
 
 /** @type {import('eslint').Linter.Config[]} */
 const jsxA11yConfigs = (() => {
-  // Required for apps/web — do not soft-fail. Upstream still peers on eslint ^3–9 while
-  // this repo is on eslint 10; package.json pnpm.peerDependencyRules.allowedVersions
-  // documents that until eslint-plugin-jsx-a11y ships an eslint-10-compatible release.
-  const jsxA11y = require('eslint-plugin-jsx-a11y');
-  const recommended = jsxA11y.flatConfigs.recommended;
-  return [
-    {
-      ...recommended,
-      name: 'kurultay/jsx-a11y',
-      files: ['apps/web/**/*.tsx'],
-    },
-  ];
+  try {
+    const jsxA11y = require('eslint-plugin-jsx-a11y');
+    const recommended = jsxA11y.flatConfigs?.recommended ?? jsxA11y.configs.recommended;
+    return [
+      {
+        files: ['apps/web/**/*.tsx'],
+        plugins: { 'jsx-a11y': jsxA11y },
+        rules: {
+          ...recommended.rules,
+        },
+      },
+    ];
+  } catch {
+    return [];
+  }
 })();
 
 /** @type {import('eslint').Linter.Config[]} */

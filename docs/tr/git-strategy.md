@@ -51,15 +51,6 @@ request üzerinden ulaşır. Bu maintainer'lar için de geçerlidir.
 `main` ve `develop` üzerindeki branch protection bunu zorunlu kılar: doğrudan push yok,
 pull request zorunlu. Zorunlu status check'ler Faz 1'de CI geldiğinde eklenir.
 
-### Dependabot ve `main`
-
-Dependabot `main`'e değil, `develop`'a açmalıdır. Her iki ekosistem
-[`.github/dependabot.yml`](../../.github/dependabot.yml) içinde bu yüzden
-`target-branch: develop` ayarlıdır. Bağımlılık bump'larını doğrudan `main`'e merge etmek
-([#82](https://github.com/dravcore/kurultay/pull/82)'de olduğu gibi) Git Flow'u atlar ve
-`develop`'ı CI config'te geride bırakır — tekrarlanmamalı. Bir Dependabot PR bir şekilde
-`main`'i hedefliyorsa, merge'den önce `develop`'a retarget edin.
-
 ## Branch adlandırma
 
 Format: `type/kebab-kısa-açıklama`
@@ -165,10 +156,9 @@ insanlar tarafından okunur.
 1. Güncel bir `develop`'tan dallanın.
 2. PR'ı **`develop`'a karşı** açın (`hotfix/*` ve `release/*` dışında, asla `main`'e karşı
    değil).
-3. PR başlığı Conventional Commits'i takip eder. Branch'teki commit'lerin history'de
-   kalması için merge commit (`--no-ff`) tercih edin; PR açmadan önce onları temiz tutun.
-   `develop`'a squash, gürültü (Dependabot, tek-commit chore) için serbesttir. `main`'e
-   squash asla serbest değildir — aşağıdaki Merge stratejisine bakın.
+3. PR başlığı Conventional Commits'i takip eder — merge'ler merge commit (`--no-ff`) ile
+   yapılır, yani branch'teki commit'ler history'de tek tek kalır; PR açmadan önce onları
+   temiz tutun.
 4. PR'ları küçük ve tek sorumluluklu tutun: bir konu, tercihen lockfile'lar ve üretilen
    çıktı hariç ~500 değişen satırın altında. Mümkün olduğunda şema değişikliklerini logic
    değişikliklerinden, backend'i frontend'den ayırın.
@@ -186,18 +176,16 @@ olduğu anda tekrar devreye girer** ve bu paragraf o zaman silinir.
 
 ### Merge stratejisi
 
-| Merge                                                 | Strateji                                                                         | Sebep                                                               |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Merge commit** tercih; Dependabot / tek-commit gürültü için **squash serbest** | Anlamlı çok-commit history korunur; bot gürültüsü squash ile ezilir |
-| `release/*` → `main`                                  | **Yalnızca merge commit** (`--no-ff`)                                            | Release'i history'de ayrı, geri alınabilir bir nokta olarak korur   |
-| `hotfix/*` → `main`                                   | **Yalnızca merge commit** (`--no-ff`)                                            | Aynı sebep                                                          |
-| `main` → `develop` (geri-merge)                       | **Merge commit** (`--no-ff`)                                                     | Release/hotfix commit'lerini yeniden yazmadan geri taşır            |
+| Merge                                                 | Strateji                     | Sebep                                                                           |
+| ----------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------- |
+| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Merge commit** (`--no-ff`) | Tek tek, incelenebilir commit'leri (ör. bir tech-debt dalgası) history'de korur |
+| `release/*` → `main`                                  | **Merge commit** (`--no-ff`) | Release'i history'de ayrı, geri alınabilir bir nokta olarak korur               |
+| `hotfix/*` → `main`                                   | **Merge commit** (`--no-ff`) | Aynı sebep                                                                      |
+| `main` → `develop` (geri-merge)                       | **Merge commit** (`--no-ff`) | Release/hotfix commit'lerini yeniden yazmadan geri taşır                        |
 
-`main`'e squash ve rebase yasaktır. `main` üzerindeki bir repository ruleset, izin verilen
-merge yöntemlerini merge commit ile sınırlar; böylece bir release/hotfix yanlışlıkla
-düzleştirilemez. `develop`'a squash Dependabot ve diğer tek-commit branch'ler için açık;
-insanların çok-commit işi hâlâ merge commit tercih eder. Fixup gürültüsünü PR açmadan
-**önce** branch üzerinde temizleyin (interactive rebase veya amend).
+`develop` veya `main`'e her merge bir merge commit'tir — hiçbir şey squash edilmez. Fixup
+gürültüsünü PR açmadan **önce** branch üzerinde temizleyin (interactive rebase veya amend);
+history okunabilir hale geldiğinde onu squash etmek yerine olduğu gibi merge edin.
 
 Merge sonrası branch'i silin. GitHub'ın "delete branch on merge" ayarı bunu hallediyor.
 
@@ -326,8 +314,8 @@ API versiyonlama duruşu (1.0 öncesi `/v1` öneki yok)
 | PR hedef branch'i                    | `develop` (`main`'e giden `release/*` ve `hotfix/*` hariç) |
 | Commit dili                          | İngilizce                                                  |
 | Commit formatı                       | Conventional Commits                                       |
-| Feature → `develop`                  | Merge commit tercih; Dependabot/gürültü için squash OK     |
-| Release/hotfix → `main`              | Yalnızca merge commit + `develop`'a geri-merge             |
+| Feature merge'i                      | Merge commit (`--no-ff`)                                   |
+| Release/hotfix merge'i               | `--no-ff` + `develop`'a geri-merge                         |
 | Tag formatı                          | `vX.Y.Z`                                                   |
 | Changelog                            | Release zamanında değil, PR'da güncellenir                 |
 
