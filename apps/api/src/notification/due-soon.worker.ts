@@ -146,27 +146,51 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
     return totalCreated;
   }
 
+  /**
+   * The (task, user) pairs in this batch that were already told about their due date.
+   *
+   * The obvious spelling — `taskId: { in: … }` AND `userId: { in: … }` — asks for the cross
+   * product: a 500-task batch with a handful of assignees each searches hundreds of thousands
+   * of combinations to find the few hundred that were actually paired, and then Node throws
+   * the rest away. Joining against the pairs themselves, unnested into a two-column relation,
+   * searches exactly the rows the batch is about. Same idiom as the position rebalance writes.
+   *
+   * The predicate is unchanged on purpose: a pair is skipped while its reminder is unread, or
+   * while it is younger than the re-notify window. Widening it here would let the partial
+   * unique index (`Notification_due_soon_unread_uidx`) do the rejecting instead, which turns a
+   * skipped row into a swallowed conflict.
+   */
+  private async findAlreadyNotified(
+    pairs: Array<{ taskId: string; userId: string }>,
+    since: Date,
+  ): Promise<Set<string>> {
+    const taskIds = pairs.map((pair) => pair.taskId);
+    const userIds = pairs.map((pair) => pair.userId);
+
+    const existing = await this.prisma.$queryRaw<Array<{ userId: string; taskId: string }>>`
+      SELECT n."userId", n."taskId"
+      FROM "Notification" n
+      INNER JOIN unnest(${taskIds}::text[], ${userIds}::text[]) AS pair("taskId", "userId")
+        ON n."taskId" = pair."taskId" AND n."userId" = pair."userId"
+      WHERE n."type" = ${NotificationType.DueSoon}
+        AND (n."readAt" IS NULL OR n."createdAt" >= ${since})
+    `;
+
+    return new Set(existing.map((row) => `${row.userId}:${row.taskId}`));
+  }
+
   private async notifyBatch(
     tasks: ScanTaskRow[],
     since: Date,
   ): Promise<{ created: number; recipients: Array<{ workspaceId: string; userId: string }> }> {
-    const taskIds = tasks.map((task) => task.id);
-    const userIds = [...new Set(tasks.flatMap((task) => task.assignees.map((row) => row.userId)))];
-
-    const existing = await this.prisma.notification.findMany({
-      where: {
-        type: NotificationType.DueSoon,
-        taskId: { in: taskIds },
-        userId: { in: userIds },
-        OR: [{ readAt: null }, { createdAt: { gte: since } }],
-      },
-      select: { userId: true, taskId: true },
-    });
-    const skip = new Set(
-      existing
-        .filter((row): row is { userId: string; taskId: string } => row.taskId !== null)
-        .map((row) => `${row.userId}:${row.taskId}`),
+    const pairs = tasks.flatMap((task) =>
+      task.dueDate === null
+        ? []
+        : task.assignees.map((assignee) => ({ taskId: task.id, userId: assignee.userId })),
     );
+    if (pairs.length === 0) return { created: 0, recipients: [] };
+
+    const skip = await this.findAlreadyNotified(pairs, since);
 
     const rows: Array<{
       workspaceId: string;
