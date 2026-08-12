@@ -4,15 +4,40 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    # Without this Dependabot targets the repository default branch, which is `main`.
+    # Under Git Flow `main` is releases only — it takes merges from release/* and
+    # hotfix/* and nothing else — so a dependency bump must never open against it.
+    # `develop` is the integration branch and the correct base for routine updates.
+    target-branch: develop
+    # Majors now arrive as one PR per package, so the cap has to leave room for a
+    # week that lands several of them alongside the two grouped PRs.
+    open-pull-requests-limit: 15
     groups:
+      # Only minor/patch is grouped. A grouped PR is all-or-nothing: one member that
+      # needs a real migration holds back every other member until someone does the
+      # work. Minor/patch bumps rarely need migration, so batching them is a net win
+      # — one PR, one CI run, one review.
+      #
+      # Majors are deliberately left out of every group. Dependabot opens an
+      # individual PR for any update that matches no group, which is exactly what a
+      # breaking change needs: reviewed, migrated and merged on its own timeline
+      # without blocking anything else.
       production:
         dependency-type: production
+        update-types:
+          - minor
+          - patch
       development:
         dependency-type: development
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    # Same reason as above. This block is why PRs #74-#78 opened against `main`
+    # and were merged straight into it, bypassing `develop` entirely.
+    target-branch: develop
     open-pull-requests-limit: 5
