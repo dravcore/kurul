@@ -243,6 +243,16 @@
         "removeLabel": "Remove label {name}",
         "newLabel": "New label",
         "labelColor": "Label color",
+        "colorValues": {
+          "slot-1": "Blue",
+          "slot-2": "Orange",
+          "slot-3": "Aqua",
+          "slot-4": "Yellow",
+          "slot-5": "Magenta",
+          "slot-6": "Green",
+          "slot-7": "Violet",
+          "slot-8": "Red"
+        },
         "createLabel": "Create label",
         "deleteLabel": "Delete",
         "labelForbidden": "You need Admin access to manage board labels.",
