@@ -86,6 +86,8 @@ jobs:
         run: pnpm db:generate
       - name: Build shared packages
         run: pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build
+      - name: Unit tests (shared packages)
+        run: pnpm --filter @kurultay/shared-types test
       - name: Unit tests with coverage
         run: |
           pnpm --filter @kurultay/api test:cov

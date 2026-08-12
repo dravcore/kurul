@@ -277,6 +277,9 @@ importers:
       typescript:
         specifier: ^5.8.2
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(terser@5.49.2)(tsx@4.23.11)(yaml@2.9.0)
 
 packages:
 
