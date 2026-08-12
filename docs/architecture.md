@@ -100,7 +100,6 @@ Treat the table below as the module map.
 | `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                   |
 | `mail`         | SMTP delivery (`nodemailer`); logs instead of sending when unconfigured          |
 | `locale`       | Stored interface language: reads/writes `User.locale`, resolves it for a request |
-| `health`       | Liveness probe (`GET /health`), unauthenticated                                  |
 
 Cross-cutting infrastructure:
 
@@ -187,7 +186,7 @@ Enums and DTOs are **hand-maintained** to match the Prisma schema today; a mecha
 | `Workspace`       | `id`, `name`, `slug`, `createdAt`                                                                                                                   | Tenant root — everything hangs off this                                                                                                                                                                                                                                                |
 | `WorkspaceMember` | `id`, `workspaceId`, `userId`, `role`                                                                                                               | Join table; `role` drives permissions                                                                                                                                                                                                                                                  |
 | `Board`           | `id`, `workspaceId`, `name`, `description`, `createdAt`                                                                                             | Boards belong to a workspace                                                                                                                                                                                                                                                           |
-| `Column`          | `id`, `boardId`, `name`, `position`, `color`, `category`                                                                                            | `position` orders columns within a board. `category` (`UNSTARTED` / `STARTED` / `COMPLETED`) is the semantic stage metrics and the dashboard key off — never the display name ([ADR 0019](decisions/0019-column-category.md))                                                          |
+| `Column`          | `id`, `boardId`, `name`, `position`, `color`                                                                                                        | `position` orders columns within a board                                                                                                                                                                                                                                               |
 | `Task`            | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt` | The core entity — see rules below                                                                                                                                                                                                                                                      |
 | `TaskAssignee`    | `id`, `taskId`, `userId`                                                                                                                            | Join table; multiple assignees per task                                                                                                                                                                                                                                                |
 | `Label`           | `id`, `boardId`, `name`, `color`                                                                                                                    | Board-scoped. `color` stores a design-token slot name (`slot-1`…`slot-8`), resolved per theme — not a raw hex; see [design.md](design.md)                                                                                                                                              |
@@ -239,18 +238,15 @@ deleting a user has to be a deliberate operation rather than a silent erasure.
 
 Every workspace is a tenant, and the isolation rule is absolute: **every query is scoped by `workspaceId`.**
 
-That rule is enforced by `WorkspaceGuard` (membership) plus **service-level `workspaceId`
-predicates** on every Prisma read/write. Request-scoped Prisma Client Extensions remain
-deferred — a new handler that queries by bare resource id without a tenant predicate is a
-bug, not something the guard can paper over:
+That rule is enforced at the guard level today (request-scoped Prisma Client Extensions remain deferred), not re-implemented in each service:
 
 1. A guard resolves the current user's membership in the requested workspace and rejects the request if there is none (404 for non-members — anti-enumeration).
 2. The resolved `workspaceId` / membership role is attached to the request context.
-3. Services take `workspaceId` from the controller and filter every query with it (or via the parent chain `board: { workspaceId }`).
+3. Services read the scope from that context; repository access paths always filter on it.
 4. Nested resources are validated through their parent chain (task → board → workspace) so a valid id from another tenant cannot be smuggled in.
 5. Workspace/org **mutations** go through Nest `/workspaces/*` only — Better Auth `/auth/organization/*` mutation HTTP is firewalled so Nest policy cannot be bypassed.
 
-Membership `role` (`OWNER`/`ADMIN`/`MEMBER`/`GUEST`) is checked in the same layer for permission decisions. Scaffold controllers use `/workspaces/:workspaceId/...` so `WorkspaceGuard` can read `params.workspaceId` when handlers arrive. Coding review treats any query without workspace scoping as blocking ([coding-standards.md](coding-standards.md#multi-tenant-isolation)).
+Placing this in one layer means a new module inherits isolation by default. A module that reaches around it is a bug, not a variation in style. Membership `role` (`OWNER`/`ADMIN`/`MEMBER`/`GUEST`) is checked in the same layer for permission decisions. Scaffold controllers use `/workspaces/:workspaceId/...` so `WorkspaceGuard` can read `params.workspaceId` when handlers arrive.
 
 ---
 
@@ -356,8 +352,6 @@ The reasoning behind each of these choices is recorded as an ADR:
 | [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)                         | No external contributions; CLA unenacted, legal spend deferred   |
 | [`0016-foreign-key-violation-status.md`](decisions/0016-foreign-key-violation-status.md)                   | Prisma `P2003` maps to `409`, not `422`                          |
 | [`0017-partial-indexes-outside-prisma-schema.md`](decisions/0017-partial-indexes-outside-prisma-schema.md) | Partial indexes live in migrations, guarded by tests             |
-| [`0018-localization-strategy.md`](decisions/0018-localization-strategy.md)                                 | Locale chain, no `[locale]` routing, API seeds/email only        |
-| [`0019-column-category.md`](decisions/0019-column-category.md)                                             | Column completion is a category, not a name                      |
 
 Related: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (historical Phase 1 scaffold) · [docs/README.md](README.md) (docs map)

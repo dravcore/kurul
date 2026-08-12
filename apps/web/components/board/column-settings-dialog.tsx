@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ColumnCategory, type ColumnDto, type UpdateColumnRequest } from '@kurultay/shared-types';
@@ -48,24 +48,14 @@ export function ColumnSettingsDialog({
   onSaved,
 }: ColumnSettingsDialogProps): React.ReactElement {
   const t = useTranslations('app.board.column');
-  const [name, setName] = useState(column?.name ?? '');
-  const [category, setCategory] = useState<ColumnCategory>(
-    column?.category ?? ColumnCategory.UNSTARTED,
-  );
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState<ColumnCategory>(ColumnCategory.UNSTARTED);
 
-  // Load the fields when a different column is handed over, during render rather than from an
-  // effect: the effect painted one frame of the *previous* column's name first, which is
-  // visible every time the dialog is opened on a second column.
-  //
-  // Still nothing to do when `column` is null. That is the dialog closing, and Radix keeps
-  // the content mounted while it animates out — blanking the fields mid-animation would be a
-  // new flicker, not a fix. Compared by identity, exactly as the effect's dependency was.
-  const [syncedColumn, setSyncedColumn] = useState(column);
-  if (column && column !== syncedColumn) {
-    setSyncedColumn(column);
+  useEffect(() => {
+    if (!column) return;
     setName(column.name);
     setCategory(column.category);
-  }
+  }, [column]);
 
   async function onSubmit(): Promise<void> {
     if (!column) return;

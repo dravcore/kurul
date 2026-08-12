@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -47,47 +47,22 @@ export interface FormDialogProps {
 export function FormDialog({
   open,
   onOpenChange,
-  initialFocusRef,
-  ...body
-}: FormDialogProps): React.ReactElement {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        onOpenAutoFocus={
-          initialFocusRef
-            ? (event) => {
-                event.preventDefault();
-                initialFocusRef.current?.focus();
-              }
-            : undefined
-        }
-      >
-        {/*
-          The pending/error pair lives one level down, inside the content Radix unmounts when
-          the dialog closes, so reopening after a failure mounts a fresh pair rather than
-          clearing the old one from an effect. Same guarantee, one fewer render, and no
-          window in which the reopened dialog is painted still showing the stale reason.
-        */}
-        <FormDialogBody onOpenChange={onOpenChange} {...body} />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-type FormDialogBodyProps = Omit<FormDialogProps, 'open' | 'initialFocusRef'>;
-
-function FormDialogBody({
-  onOpenChange,
   title,
   cancelLabel,
   submitLabel,
   submitDisabled = false,
+  initialFocusRef,
   onSubmit,
   resolveError,
   children,
-}: FormDialogBodyProps): React.ReactElement {
+}: FormDialogProps): React.ReactElement {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // A dialog reopened after a failure must not still be showing the previous reason.
+  useEffect(() => {
+    if (open) setError(null);
+  }, [open]);
 
   async function submit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
@@ -104,22 +79,33 @@ function FormDialogBody({
   }
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{title}</DialogTitle>
-      </DialogHeader>
-      <form className="flex flex-col gap-3" onSubmit={(event) => void submit(event)}>
-        {children}
-        {error ? <p className="text-body text-destructive">{error}</p> : null}
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            {cancelLabel}
-          </Button>
-          <Button type="submit" disabled={pending || submitDisabled}>
-            {submitLabel}
-          </Button>
-        </DialogFooter>
-      </form>
-    </>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        onOpenAutoFocus={
+          initialFocusRef
+            ? (event) => {
+                event.preventDefault();
+                initialFocusRef.current?.focus();
+              }
+            : undefined
+        }
+      >
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <form className="flex flex-col gap-3" onSubmit={(event) => void submit(event)}>
+          {children}
+          {error ? <p className="text-body text-destructive">{error}</p> : null}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              {cancelLabel}
+            </Button>
+            <Button type="submit" disabled={pending || submitDisabled}>
+              {submitLabel}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

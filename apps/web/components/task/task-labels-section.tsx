@@ -53,18 +53,14 @@ export function TaskLabelsSection({
     <div className="flex flex-col gap-2">
       <p className="text-small font-medium text-foreground">{t('labels')}</p>
       <div className="flex flex-wrap gap-1.5">
-        {taskLabels.map((label) =>
-          canMutate ? (
-            <LabelChip
-              key={label.id}
-              label={label}
-              removeLabel={t('removeLabel', { name: label.name })}
-              onRemove={() => onToggleLabel(label.id, true)}
-            />
-          ) : (
-            <LabelChip key={label.id} label={label} />
-          ),
-        )}
+        {taskLabels.map((label) => (
+          <LabelChip
+            key={label.id}
+            label={label}
+            removeLabel={canMutate ? t('removeLabel', { name: label.name }) : undefined}
+            onRemove={canMutate ? () => onToggleLabel(label.id, true) : undefined}
+          />
+        ))}
         {taskLabels.length === 0 ? (
           <span className="text-small text-muted-foreground">{t('noLabels')}</span>
         ) : null}

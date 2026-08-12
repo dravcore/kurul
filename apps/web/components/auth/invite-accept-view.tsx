@@ -47,15 +47,7 @@ export function InviteAcceptView({
   const [verificationRequired, setVerificationRequired] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
-  /**
-   * Whether the confirm-first screen we are about to render was reached by *this user's*
-   * accept attempt, rather than by the load path that renders it on arrival.
-   *
-   * A ref and not state: it is never read while rendering and changing it must never cause a
-   * render — the render that matters is the one `setVerificationRequired` already schedules,
-   * and this only tells the effect running after it whether to move focus.
-   */
-  const moveFocusToVerifyRef = useRef(false);
+  const [moveFocusToVerify, setMoveFocusToVerify] = useState(false);
   const verifyHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const fetchInvitation = useCallback(async (): Promise<Invitation> => {
@@ -85,12 +77,12 @@ export function InviteAcceptView({
   // screen; without this, focus would fall back to the document body and a keyboard user
   // would have to tab in from the top to reach the control that replaced it.
   useEffect(() => {
-    if (!verificationRequired || !moveFocusToVerifyRef.current) {
+    if (!moveFocusToVerify) {
       return;
     }
-    moveFocusToVerifyRef.current = false;
     verifyHeadingRef.current?.focus();
-  }, [verificationRequired]);
+    setMoveFocusToVerify(false);
+  }, [moveFocusToVerify]);
 
   async function onAccept(workspaceId: string): Promise<void> {
     setAccepting(true);
@@ -111,8 +103,8 @@ export function InviteAcceptView({
       router.refresh();
     } catch (caught) {
       if (isEmailVerificationRequired(caught, emailVerified)) {
-        moveFocusToVerifyRef.current = true;
         setVerificationRequired(true);
+        setMoveFocusToVerify(true);
         return;
       }
       setAcceptError(

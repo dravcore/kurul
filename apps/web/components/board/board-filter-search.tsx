@@ -2,7 +2,6 @@
 
 import { Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 
@@ -22,15 +21,9 @@ export function BoardFilterSearch({ value, onCommit }: BoardFilterSearchProps): 
   const searchRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(value ?? '');
 
-  // Re-seed the draft when the committed query changes underneath us (back/forward, a chip
-  // cleared elsewhere). Done during render rather than from an effect so the box never
-  // paints one frame of the previous query first — and without a `key` remount, which would
-  // take the caret and the `/`-shortcut focus with it.
-  const [syncedValue, setSyncedValue] = useState(value);
-  if (syncedValue !== value) {
-    setSyncedValue(value);
+  useEffect(() => {
     setDraft(value ?? '');
-  }
+  }, [value]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {

@@ -41,4 +41,11 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2, name: 'Boards' })).toBeTruthy();
   });
+
+  it('renders the summary and the board list side by side', async () => {
+    render(await DashboardPage());
+
+    expect(screen.getByTestId('dashboard-summary')).toBeTruthy();
+    expect(screen.getByTestId('board-list')).toBeTruthy();
+  });
 });

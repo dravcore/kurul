@@ -35,11 +35,11 @@ export function LabelDots({ labels, className }: LabelDotsProps): React.ReactEle
   );
 }
 
-type LabelChipProps = {
+interface LabelChipProps {
   label: LabelDto;
-} & (
-  { onRemove?: undefined; removeLabel?: undefined } | { onRemove: () => void; removeLabel: string }
-);
+  onRemove?: () => void;
+  removeLabel?: string;
+}
 
 export function LabelChip({ label, onRemove, removeLabel }: LabelChipProps): React.ReactElement {
   return (
@@ -50,7 +50,7 @@ export function LabelChip({ label, onRemove, removeLabel }: LabelChipProps): Rea
         <button
           type="button"
           className="text-muted-foreground hover:text-foreground"
-          aria-label={removeLabel}
+          aria-label={removeLabel ?? 'Remove'}
           onClick={onRemove}
         >
           ×

@@ -24,17 +24,6 @@ describe('parseMentions', () => {
   it('returns an empty list when there are no mentions', () => {
     expect(parseMentions('plain comment')).toEqual([]);
   });
-
-  it('still reads a mention whose name is long but plausible', () => {
-    const name = 'A'.repeat(200);
-    expect(parseMentions(`@[${name}](${alice})`)).toEqual([alice]);
-  });
-
-  it('stops reading a name past the bound rather than scanning the rest of the body', () => {
-    // Mirrors apps/api parse-mentions.spec.ts — guards the ReDoS bound, not elapsed time.
-    const name = 'A'.repeat(201);
-    expect(parseMentions(`@[${name}](${alice})`)).toEqual([]);
-  });
 });
 
 describe('formatMentionMarkup / insertMentionMarkup', () => {

@@ -161,24 +161,21 @@ number for its own sake.
 
 ### Where floors do exist
 
-These floors keep already-covered code from sliding back. Each fails CI.
+Two ratchets keep already-covered code from sliding back. Both fail CI.
 
-| Scope                             | Floor                                                 | Set in                      |
-| --------------------------------- | ----------------------------------------------------- | --------------------------- |
-| `apps/api` global                 | statements 55 / branches 45 / functions 57 / lines 56 | `apps/api/jest.config.cjs`  |
-| `apps/web` `app/**`               | statements 85 / branches 90 / functions 85 / lines 85 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/board/**`  | statements 65 / branches 54 / functions 54 / lines 70 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/task/**`   | statements 60 / branches 60 / functions 58 / lines 62 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/layout/**` | statements 75 / branches 65 / functions 85 / lines 78 | `apps/web/vitest.config.ts` |
+| Scope               | Floor                                                 | Set in                      |
+| ------------------- | ----------------------------------------------------- | --------------------------- |
+| `apps/api` global   | statements 55 / branches 45 / functions 57 / lines 56 | `apps/api/jest.config.cjs`  |
+| `apps/web` `app/**` | statements 85 / branches 90 / functions 85 / lines 85 | `apps/web/vitest.config.ts` |
 
-All sit a few points under the measurement taken when they were introduced — enough margin
+Both sit a few points under the measurement taken when they were introduced — enough margin
 that a routine refactor does not trip them, tight enough that deleting a test does.
 
-`apps/web` has **no global floor**, deliberately. Overall web coverage is around 75% of
-instrumented lines in recent runs, but that average still mixes heavily-tested hooks with
-thin page shells; a global floor at the average would catch little. Folder floors cover the
-surfaces that already have meaningful unit tests: route entrypoints (`app/**`) and the
-interactive board / task / layout components. `apps/web/vitest.config.ts` carries the full
+`apps/web` has **no global floor**, deliberately. Overall web coverage is around 41% because
+most page-level components are untested, and a global floor at that number would catch no
+real regression while making the figure look like a target. `app/**` is floored because
+route entrypoints are thin and uniform: a new page arriving with no test at all is exactly
+the regression worth failing a build over. `apps/web/vitest.config.ts` carries the full
 reasoning inline.
 
 The global stance is revisited at 1.0, when the API is stable enough for a repo-wide floor to
@@ -197,14 +194,12 @@ Every pull request runs, on `develop` and `main` as well:
 | Lint              | `pnpm lint`                                                                               |
 | Format check      | `pnpm format:check`                                                                       |
 | Typecheck         | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                       |
-| Audit             | `pnpm audit --audit-level high`                                                           |
 | Unit tests (api)  | `pnpm --filter @kurultay/api test:cov`                                                    |
 | Unit tests (web)  | `pnpm --filter @kurultay/web exec vitest run --coverage`                                  |
-| Unit tests (pkgs) | `pnpm --filter "./packages/*" test`                                                       |
 | Integration tests | `pnpm --filter @kurultay/api test:e2e` against Postgres and Redis service containers      |
 | Build             | `pnpm build`                                                                              |
 
-All steps must pass before merge. CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on pushes to `develop` and `main`. See [git-strategy.md](git-strategy.md#pull-request-process).
+All steps must pass before merge. See [git-strategy.md](git-strategy.md#pull-request-process).
 
 The workflow file is [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 

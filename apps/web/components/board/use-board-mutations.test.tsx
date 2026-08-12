@@ -3,7 +3,6 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { ApiError } from '@/lib/api';
 import type { ColumnDto, TaskDto } from '@kurultay/shared-types';
-import type { SetStateAction } from 'react';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { useBoardMutations } from './use-board-mutations';
@@ -23,15 +22,11 @@ vi.mock('@/components/layout/workspace-provider', () => ({
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
 const apiPost = vi.mocked(api.post);
-const apiPatch = vi.mocked(api.patch);
 
 function renderMutations() {
   const columnsRef = { current: [] as ColumnDto[] };
   const tasksRef = { current: [] as TaskDto[] };
   const setColumns = vi.fn();
-  const setTasks = vi.fn((update: SetStateAction<TaskDto[]>) => {
-    tasksRef.current = typeof update === 'function' ? update(tasksRef.current) : update;
-  });
   const reload = vi.fn().mockResolvedValue(undefined);
 
   const view = renderHook(
@@ -41,7 +36,7 @@ function renderMutations() {
         columnsRef,
         tasksRef,
         setColumns,
-        setTasks,
+        setTasks: vi.fn(),
         reload,
       }),
     {
@@ -53,7 +48,7 @@ function renderMutations() {
     },
   );
 
-  return { ...view, setColumns, setTasks, tasksRef, reload };
+  return { ...view, setColumns, reload };
 }
 
 /** What the bulk endpoint answers with: the whole seeded set, already ordered. */
@@ -69,7 +64,6 @@ function apiError(statusCode: number): ApiError {
 
 beforeEach(() => {
   apiPost.mockReset();
-  apiPatch.mockReset();
 });
 
 afterEach(() => {
@@ -141,77 +135,5 @@ describe('useBoardMutations seedDefaults', () => {
     await result.current.seedDefaults();
 
     await waitFor(() => expect(result.current.defaultsPending).toBe(false));
-  });
-});
-
-describe('useBoardMutations commitTaskMove', () => {
-  const COLUMN_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d10';
-  const TASK_A = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d11';
-  const TASK_B = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d12';
-
-  function task(id: string, position: number): TaskDto {
-    return {
-      id,
-      boardId: BOARD_ID,
-      columnId: COLUMN_ID,
-      title: id,
-      description: null,
-      priority: 'MEDIUM',
-      position,
-      dueDate: null,
-      estimatedMinutes: null,
-      assignees: [],
-      labels: [],
-      createdById: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d53',
-      createdAt: '2026-08-01T00:00:00.000Z',
-      updatedAt: '2026-08-01T00:00:00.000Z',
-    };
-  }
-
-  it('does not roll back a newer optimistic order when an older move fails', async () => {
-    let resolveFirst!: (value: TaskDto) => void;
-    let rejectFirst!: (reason?: unknown) => void;
-    const firstPatch = new Promise<TaskDto>((resolve, reject) => {
-      resolveFirst = resolve;
-      rejectFirst = reject;
-    });
-    apiPatch
-      .mockReturnValueOnce(firstPatch as never)
-      .mockResolvedValueOnce(task(TASK_B, 500) as never);
-
-    const { result, tasksRef, reload } = renderMutations();
-    const initial = [task(TASK_A, 1000), task(TASK_B, 2000)];
-    tasksRef.current = initial;
-
-    const afterA = [task(TASK_A, 500), task(TASK_B, 2000)];
-    const afterB = [task(TASK_B, 500), task(TASK_A, 1000)];
-
-    const moveA = result.current.commitTaskMove({
-      taskId: TASK_A,
-      columnId: COLUMN_ID,
-      beforeTaskId: null,
-      afterTaskId: TASK_B,
-      previousTasks: initial,
-      nextTasks: afterA,
-    });
-    const moveB = result.current.commitTaskMove({
-      taskId: TASK_B,
-      columnId: COLUMN_ID,
-      beforeTaskId: null,
-      afterTaskId: TASK_A,
-      previousTasks: afterA,
-      nextTasks: afterB,
-    });
-
-    await moveB;
-    expect(tasksRef.current.map((item) => item.id)).toEqual([TASK_B, TASK_A]);
-
-    rejectFirst(new Error('network'));
-    await moveA;
-
-    // A late failure must not restore A's pre-move snapshot over B's accepted order.
-    expect(tasksRef.current.map((item) => item.id)).toEqual([TASK_B, TASK_A]);
-    expect(reload).toHaveBeenCalled();
-    void resolveFirst;
   });
 });

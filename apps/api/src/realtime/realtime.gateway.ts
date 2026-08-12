@@ -24,10 +24,12 @@ import { auth } from '../auth/auth';
 import { envString, isTestEnv } from '../common/env';
 import { parseRedisUrl } from '../common/redis-url';
 import { PrismaService } from '../prisma/prisma.service';
-import { boardRoom, RealtimeService, userRoom, type SocketRoomState } from './realtime.service';
+import { boardRoom, RealtimeService, userRoom } from './realtime.service';
 
 type AuthedSocket = Socket & {
-  data: SocketRoomState;
+  data: {
+    userId?: string;
+  };
 };
 
 @WebSocketGateway({
@@ -96,7 +98,7 @@ export class RealtimeGateway
         id: boardId,
         workspace: { members: { some: { userId } } },
       },
-      select: { id: true, workspaceId: true },
+      select: { id: true },
     });
     if (!board) {
       // Opaque deny — do not distinguish missing vs cross-tenant board.
@@ -104,10 +106,6 @@ export class RealtimeGateway
     }
 
     await client.join(boardRoom(boardId));
-    client.data.boardWorkspaces = {
-      ...client.data.boardWorkspaces,
-      [boardId]: board.workspaceId,
-    };
     return { ok: true };
   }
 
@@ -119,9 +117,6 @@ export class RealtimeGateway
     const boardId = typeof body?.boardId === 'string' ? body.boardId : '';
     if (boardId) {
       await client.leave(boardRoom(boardId));
-      if (client.data.boardWorkspaces) {
-        delete client.data.boardWorkspaces[boardId];
-      }
     }
     return { ok: true };
   }
@@ -162,10 +157,6 @@ export class RealtimeGateway
     }
 
     await client.join(userRoom(workspaceId, userId));
-    const joined = client.data.notificationWorkspaces ?? [];
-    if (!joined.includes(workspaceId)) {
-      client.data.notificationWorkspaces = [...joined, workspaceId];
-    }
     return { ok: true };
   }
 
@@ -178,11 +169,6 @@ export class RealtimeGateway
     const workspaceId = typeof body?.workspaceId === 'string' ? body.workspaceId : '';
     if (userId && workspaceId) {
       await client.leave(userRoom(workspaceId, userId));
-      if (client.data.notificationWorkspaces) {
-        client.data.notificationWorkspaces = client.data.notificationWorkspaces.filter(
-          (id: string) => id !== workspaceId,
-        );
-      }
     }
     return { ok: true };
   }

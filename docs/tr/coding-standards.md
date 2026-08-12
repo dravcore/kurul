@@ -303,11 +303,11 @@ Bunları ölçülü kullanın.
 
 ## Formatting ve linting
 
-| Araç           | Rol                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Prettier       | Tüm formatting. Config commit edilir; editor-local override yok.                                                                                                                                                                                                                                                                                                                                                                      |
-| ESLint         | Flat config: `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, artı `apps/web` plugin'leri (`eslint-plugin-react-hooks`, `@next/eslint-plugin-next`, `eslint-plugin-jsx-a11y` recommended). Nest ve `eslint-plugin-import` bağlı değil — import sırası konvansiyonla tutulur. `jsx-a11y` hâlâ eslint ^3–9 peer'ı istiyor; kök `pnpm.peerDependencyRules.allowedVersions` upstream yakalayana kadar eslint 10'a izin verir. |
-| `tsc --noEmit` | Typecheck, CI'da lint'ten ayrı çalışır                                                                                                                                                                                                                                                                                                                                                                                                |
+| Araç           | Rol                                                                                                                                                                                     |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prettier       | Tüm formatting. Config commit edilir; editor-local override yok.                                                                                                                        |
+| ESLint         | Flat config ile doğruluk kuralları (`@eslint/js`, `typescript-eslint`, `eslint-config-prettier`). Nest/Next/import plugin'leri henüz bağlı değil — import sırası konvansiyonla tutulur. |
+| `tsc --noEmit` | Typecheck, CI'da lint'ten ayrı çalışır                                                                                                                                                  |
 
 ```bash
 pnpm lint          # ESLint kontrol

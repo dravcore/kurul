@@ -3,7 +3,6 @@ import type { AccessControl } from 'better-auth/plugins/access';
 import { ac as sharedAc, organizationRoles as sharedRoles } from '@kurultay/auth-access';
 import { buildInvitationEmail } from '../mail/mail-templates';
 import { sendMail } from '../mail/send-mail';
-import { evictUserFromWorkspaceSockets } from '../realtime/workspace-socket-eviction';
 import { buildInviteAcceptUrl } from './web-urls';
 
 /** The payload Better Auth hands to `sendInvitationEmail`, derived from the plugin's own type. */
@@ -53,20 +52,6 @@ export const organizationOptions = {
         acceptUrl: buildInviteAcceptUrl(data.id),
       }),
     );
-  },
-  // HTTP membership revocation is immediate; Socket.io rooms are not. When Better Auth
-  // removes a member (Nest `/workspaces/*` will call the same API when that path lands),
-  // drop their board and notification rooms so they stop receiving tenant events.
-  organizationHooks: {
-    afterRemoveMember: async ({
-      member,
-      organization,
-    }: {
-      member: { userId: string };
-      organization: { id: string };
-    }) => {
-      await evictUserFromWorkspaceSockets(organization.id, member.userId);
-    },
   },
   schema: {
     organization: {
