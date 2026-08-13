@@ -309,12 +309,15 @@ Biten her request ayrıca stdout'a tek satırlık bir JSON erişim logu yazar:
   "status": 200,
   "durationMs": 15.444,
   "userId": "0198e2c1-9a11-7c40-8f2b-1d3e5a7c9b02", // kimliksiz istekte yer almaz
+  "ip": "203.0.113.7", // Express'in çözdüğü client IP'si — bkz. aşağıda TRUST_PROXY
 }
 ```
 
 Bu alan listesi kapalıdır. Request body'leri, query string'ler, header'lar ve cookie'ler
 asla loglanmaz: query kullanıcının verdiği filtreleri ve arama terimlerini, header'lar ise
-session cookie'lerini ve davet token'larını taşır.
+session cookie'lerini ve davet token'larını taşır. `ip`, ham bir header değil Express'in kendi
+`req.ip`'sidir — yapılandırılmamışsa bu her zaman TCP peer'ıdır, yani yapılandırılmamış bir
+reverse proxy arkasında her istek için proxy'nin adresidir. Aşağıda `TRUST_PROXY`'ye bakın.
 
 ## Rate limiting
 
@@ -340,10 +343,24 @@ yapar. Better Auth'un sayaçları `REDIS_URL` tanımlıysa Redis'te tutulur — 
 paylaşılır, restart'ı atlatır — değilse process belleğinde, ki bu da desteklenen tek-instance
 konfigürasyonudur. Nest throttler'ının sayaçları her zaman instance başınadır.
 
-Reverse proxy arkasında bütçelerin client başına olması, ancak proxy'nin client IP'sini
-uygulamaya iletmesiyle mümkündür: Express'te `trust proxy`, Better Auth'ta
-`advanced.ipAddress.ipAddressHeaders` ayarlanmalı — ve yalnızca proxy'nizin gerçekten yazdığı
-header'lar için; taklit edilebilir bir header'a güvenmek her client'a sınırsız bütçe verir.
+İki limiter da aynı çözümlenmiş client IP'sini kullanır, tek bir ayarla sürülür:
+`TRUST_PROXY` (varsayılan boş/`false`). Kapalıyken uygulama, ham TCP bağlantısının ötesinde
+istek hakkında hiçbir şeye güvenmez — `req.ip` her zaman socket peer'ıdır ve bir client'ın
+gönderdiği herhangi bir `X-Forwarded-For` tamamen yok sayılır; doğrudan expose edilen bir
+kurulumu bir client'ın kendi rate-limit bucket'ına sızmasına karşı güvenli kılan da budur.
+Reverse proxy arkasında (Caddy/Traefik uygulamanın önünde TLS sonlandırıyor) bunu kapalı
+bırakmak, her isteğin proxy'den gelmiş gibi görünmesi demektir — gerçek her client için tek
+bir paylaşılan bütçe, ve erişim logundaki `ip` alanı da aynı şekilde işe yaramaz hale gelir.
+`TRUST_PROXY`'yi hop sayısına (tek proxy için `1`) ya da proxy'nin IP/CIDR'ine ayarlayın;
+Express gerçek client'ı `X-Forwarded-For`'dan her iki router için de aynı şekilde çözer.
+Better Auth bu ayara kendiliğinden hiç bakmaz — `X-Forwarded-For`'u kendi başına yeniden
+parse eder ve uygulamanın önünde hiç proxy olmasa bile tek-değerli, taklit edilmiş bir
+header'ı kabul ederdi — bu yüzden `auth/auth.ts`, Better Auth'un
+`advanced.ipAddress.ipAddressHeaders` ayarını, uygulamanın her istekte aynı
+Express-çözümlü adresle damgaladığı ve client'ın gönderdiği her şeyin üzerine yazdığı özel
+bir header'a yönlendirir. `TRUST_PROXY=true`, hiçbir doğrulama yapmadan iletilen zincirin
+tamamına güvenir ve yalnızca API proxy dışında erişilemezken kullanılmalıdır — doğrudan
+expose edilen bir kurulumda her saldırgana sınırsız bütçe verir.
 
 `RATE_LIMIT_ENABLED=false` her iki limiter'ı da kapatır. Tek bir adresten route başına
 yüzlerce istek süren entegrasyon testleri için vardır; bunu ayarlayan bir deployment'ın

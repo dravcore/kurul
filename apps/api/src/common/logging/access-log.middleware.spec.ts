@@ -30,6 +30,7 @@ interface RequestOverrides {
   originalUrl?: string;
   requestId?: string;
   user?: { id: string };
+  ip?: string;
 }
 
 function emit(
@@ -43,6 +44,7 @@ function emit(
     method: 'GET',
     originalUrl: '/workspaces/w_1/tasks',
     url: '/workspaces/w_1/tasks',
+    ip: '203.0.113.7',
     ...overrides,
   } as unknown as RequestWithId;
   const res = createRes(statusCode);
@@ -100,6 +102,22 @@ describe('createAccessLogMiddleware', () => {
     expect('userId' in emit().parsed).toBe(false);
   });
 
+  it("records Express's resolved client ip, not a raw header", () => {
+    const { parsed } = emit({ ip: '198.51.100.23' });
+
+    expect(parsed.ip).toBe('198.51.100.23');
+  });
+
+  it('falls back to a literal placeholder rather than omitting ip outright', () => {
+    // Not a real scenario over the HTTP listener this app binds — `req.ip` is only ever
+    // undefined here because a unit test built a bare object without it — but the field stays
+    // in the closed set unconditionally, unlike userId/requestId, so a caller can always find
+    // the key.
+    const { parsed } = emit({ ip: undefined });
+
+    expect(parsed.ip).toBe('unknown');
+  });
+
   it.each<[number, AccessLogLine['level']]>([
     [200, 'info'],
     [201, 'info'],
@@ -128,6 +146,7 @@ describe('createAccessLogMiddleware', () => {
 
     expect(Object.keys(parsed).sort()).toEqual([
       'durationMs',
+      'ip',
       'level',
       'method',
       'path',
