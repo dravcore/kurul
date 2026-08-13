@@ -58,19 +58,21 @@ repository kökünden çalıştırın — asla `apps/api` veya `apps/web` içind
 typecheck'ten geçmez ve build olmaz.
 
 `packages/shared-types` ve `packages/auth-access` build edilmiş `dist/` dizinlerinden tüketilir
-ve o dizinler de aynı sebeple git-ignore'ludur; dolayısıyla temiz bir klonda test suite'leri
-koşmadan önce bunların build edilmesi gerekir:
+ve o dizinler de aynı sebeple git-ignore'ludur; dolayısıyla temiz bir klonda, paylaşılan bir
+tipi import eden herhangi bir şey koşmadan önce bunların build edilmesi gerekir:
 
 ```bash
-pnpm --filter @kurultay/shared-types build
-pnpm --filter @kurultay/auth-access build
+pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access build
 ```
 
 Bu adımı atlamak yardımcı bir hata üretmez. `pnpm test`, paylaşılan bir tipi import eden her
-dosyada `Failed to resolve entry for package "@kurultay/shared-types"` ile düşer ve bu, eksik
-bir build'den çok bozuk bir checkout gibi okunur. `pnpm build` ve `pnpm typecheck` bunu yan
-etki olarak zaten yapar; `pnpm test` yapmaz, `pnpm lint` de yapmaz. CI bunları hem lint hem
-test job'ından önce açıkça build eder.
+dosyada `Failed to resolve entry for package "@kurultay/shared-types"` ile düşer; `pnpm dev`,
+`apps/api` içinde `TS2307: Cannot find module '@kurultay/shared-types'` ile düşer; `pnpm
+db:seed` ise veritabanına hiç ulaşamadan `Cannot find module
+'.../@kurultay/auth-access/dist/cjs/index.js'` ile ölür — hepsi eksik bir build'den çok bozuk
+bir checkout gibi okunur. `pnpm build` ve `pnpm typecheck` bunu yan etki olarak zaten yapar;
+`pnpm dev`, `pnpm db:seed`, `pnpm test` ve `pnpm lint` yapmaz. CI bunları hem lint hem test
+job'ından önce açıkça build eder.
 
 ## Ortam değişkenleri
 

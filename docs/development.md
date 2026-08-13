@@ -58,19 +58,22 @@ fresh clone. Code that imports `@prisma/client`-derived types will not typecheck
 until you've run it at least once.
 
 `packages/shared-types` and `packages/auth-access` are consumed from their built `dist/`,
-which is git-ignored for the same reason, so a fresh clone needs them built before the test
-suites will run:
+which is git-ignored for the same reason, so a fresh clone needs them built before anything
+that imports a shared type will run:
 
 ```bash
-pnpm --filter @kurultay/shared-types build
-pnpm --filter @kurultay/auth-access build
+pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access build
 ```
 
 Skipping this does not produce a helpful error. `pnpm test` fails in `apps/web` with
 `Failed to resolve entry for package "@kurultay/shared-types"` across every file that imports
-a shared type, which reads like a broken checkout rather than a missing build. `pnpm build`
-and `pnpm typecheck` both do this for you as a side effect; `pnpm test` does not, and neither
-does `pnpm lint`. CI builds them explicitly before both the lint and test jobs.
+a shared type, `pnpm dev` fails in `apps/api` with `TS2307: Cannot find module
+'@kurultay/shared-types'`, and `pnpm db:seed` dies with `Cannot find module
+'.../@kurultay/auth-access/dist/cjs/index.js'` before it ever reaches the database — all of
+which read like a broken checkout rather than a missing build. `pnpm build` and
+`pnpm typecheck` both do this for you as a side effect; `pnpm dev`, `pnpm db:seed`,
+`pnpm test`, and `pnpm lint` do not. CI builds them explicitly before both the lint and test
+jobs.
 
 ## Environment variables
 
