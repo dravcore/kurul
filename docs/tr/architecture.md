@@ -16,6 +16,7 @@ Kurultay sisteminin şekli: kod nasıl saklanıyor, nasıl çalışıyor ve veri
 - [8. Runtime evrimi](#8-runtime-evrimi)
 - [9. Kabul edilmiş runtime takasları](#9-kabul-edilmiş-runtime-takasları)
 - [10. Karar kayıtları](#10-karar-kayıtları)
+- [11. Güvenlik başlıkları](#11-güvenlik-başlıkları)
 
 ---
 
@@ -420,6 +421,32 @@ Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 | [`0018-localization-strategy.md`](decisions/0018-localization-strategy.md)                                 | Locale zinciri, `[locale]` yönlendirmesi yok, API yalnız seed/mail |
 | [`0019-column-category.md`](decisions/0019-column-category.md)                                             | Kolon tamamlanmışlığı bir kategoridir, ad değil                    |
 | [`0020-data-retention.md`](decisions/0020-data-retention.md)                                               | Tablo başına saklama pencereleri, gecelik bir süpürmeyle uygulanır |
+
+---
+
+## 11. Güvenlik başlıkları
+
+Her iki süreç de her yanıtta sabit bir sertleştirme (hardening) başlığı seti gönderir —
+`apps/api` bunu `helmet` ile (`apps/api/src/common/configure-app.ts`), `apps/web` ise Next'in
+`headers()` fonksiyonuyla yapar (`apps/web/next.config.ts`, gerçek kaynağı okuyabilsin diye
+`apps/web/lib/security-headers.ts` içine ayrılmış — bir vitest suite'i böylece kopyasını değil
+gerçek kaynağı test eder). Tek bir politika paylaşmak yerine ayrı ayrı yapılandırılmalarının
+nedeni, aynı türde süreçler olmamaları: API yalnızca JSON yanıtlar ve hiç render edilmez; web
+uygulaması ise script'i gerçekten çalıştıran ve sayfayı çizen tarayıcı yüzeyidir.
+
+| Başlık                      | `apps/api`                                                                                                                                                    | `apps/web`                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Content-Security-Policy`   | `default-src 'none'` — bir API hiçbir şey render etmez, dolayısıyla hiçbir şeyin yüklenmesine, çerçevelenmesine veya bir `<base>`/form hedefine izin verilmez | `default-src 'self'`; `script-src`/`style-src` `'unsafe-inline'` ekler (App Router hydration + `next-themes`'in inline script'i, ve Radix/`@dnd-kit`'in inline `style` özniteliği — nonce'un neden kullanılmadığı ve `'unsafe-inline'`'in gerekliliğinin nasıl doğrulandığı için `lib/security-headers.ts`'e bakın); `connect-src` API'nin `http(s)` origin'ini ve ondan türetilen `ws(s)` origin'ini adlandırır, çünkü `lib/socket.ts` ikisini de çevirir |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`                                                                                                                         | Aynı değer. İkisi de düz HTTP'de etkisizdir — tarayıcılar başlığı HTTPS dışında yok sayar — bu yüzden local/dev'de bedelsizdir ve yalnızca bir deployment süreç önünde TLS'i sonlandırdığında devreye girer                                                                                                                                                                                                                                                |
+| `X-Frame-Options`           | `DENY`                                                                                                                                                        | `DENY`, CSP'yi legacy başlığa tercih eden tarayıcılar için `frame-ancestors 'none'` ile desteklenir                                                                                                                                                                                                                                                                                                                                                        |
+| `X-Content-Type-Options`    | `nosniff`                                                                                                                                                     | `nosniff`                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `Referrer-Policy`           | `no-referrer` (helmet'in varsayılanı, değiştirilmeden bırakıldı — API hiçbir zaman bir navigasyon hedefi değildir)                                            | `strict-origin-when-cross-origin` — same-origin navigasyon tam path'i korur, cross-origin yalnızca origin'i alır, düz HTTP'ye düşüş hiçbir şey almaz                                                                                                                                                                                                                                                                                                       |
+| `Permissions-Policy`        | Ayarlı değil — bir JSON API'nin, bir tarayıcı özellik-izin politikasının yöneteceği bir sayfa bağlamı yoktur                                                  | `camera`, `microphone`, `geolocation`, `payment`, `usb` ve `interest-cohort`'u (FLoC/Topics-API opt-out) reddeder — hiçbirini hiçbir board, task veya dashboard görünümü talep etmez                                                                                                                                                                                                                                                                       |
+
+API'de `Cross-Origin-Resource-Policy`, helmet'in varsayılanı `same-origin` yerine
+`cross-origin`'dir, çünkü web uygulaması onu meşru olarak okuyan ayrı bir origin'dir
+(`WEB_URL`/`NEXT_PUBLIC_API_URL`); bu erişim CORP tarafından değil,
+`configure-app.ts`'teki CORS allowlist'i tarafından kapılanır.
 
 İlgili: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (tarihsel Faz 1 iskeleti) · [docs/README.md](../README.md) (docs haritası)

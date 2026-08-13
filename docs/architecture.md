@@ -16,6 +16,7 @@ The shape of the Kurultay system: how the code is stored, how it runs, and how t
 - [8. Runtime evolution](#8-runtime-evolution)
 - [9. Accepted runtime trade-offs](#9-accepted-runtime-trade-offs)
 - [10. Decision records](#10-decision-records)
+- [11. Security headers](#11-security-headers)
 
 ---
 
@@ -381,6 +382,31 @@ The reasoning behind each of these choices is recorded as an ADR:
 | [`0018-localization-strategy.md`](decisions/0018-localization-strategy.md)                                 | Locale chain, no `[locale]` routing, API seeds/email only        |
 | [`0019-column-category.md`](decisions/0019-column-category.md)                                             | Column completion is a category, not a name                      |
 | [`0020-data-retention.md`](decisions/0020-data-retention.md)                                               | Per-table retention windows, enforced by a nightly sweep         |
+
+---
+
+## 11. Security headers
+
+Both processes set a fixed set of hardening headers on every response — `apps/api` via
+`helmet` (`apps/api/src/common/configure-app.ts`), `apps/web` via Next's `headers()`
+(`apps/web/next.config.ts`, backed by `apps/web/lib/security-headers.ts` so a vitest suite can
+assert on the real source). They are configured separately rather than sharing one policy
+object, because they are not the same kind of process: the API answers only JSON and is never
+rendered, the web app is the browser surface that actually executes script and paints a page.
+
+| Header                      | `apps/api`                                                                                                         | `apps/web`                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Content-Security-Policy`   | `default-src 'none'` — an API renders nothing, so nothing is allowed to load, frame, or set a `<base>`/form target | `default-src 'self'`; `script-src`/`style-src` add `'unsafe-inline'` (App Router hydration + `next-themes` inline script, and Radix/`@dnd-kit` inline `style` attributes — see `lib/security-headers.ts` for why a nonce was not used and how `'unsafe-inline'` was verified necessary); `connect-src` names the API's `http(s)` origin and its derived `ws(s)` origin, because `lib/socket.ts` dials both |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`                                                                              | Same value. Both are inert on plain HTTP — browsers ignore the header outside HTTPS — so it costs nothing in local/dev and only takes effect once a deployment terminates TLS in front of the process                                                                                                                                                                                                      |
+| `X-Frame-Options`           | `DENY`                                                                                                             | `DENY`, backed by CSP `frame-ancestors 'none'` for browsers that honour CSP over the legacy header                                                                                                                                                                                                                                                                                                         |
+| `X-Content-Type-Options`    | `nosniff`                                                                                                          | `nosniff`                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `Referrer-Policy`           | `no-referrer` (helmet's default, left unchanged — the API is never a navigation target)                            | `strict-origin-when-cross-origin` — same-origin navigation keeps the full path, cross-origin gets only the origin, and a downgrade to plain HTTP gets nothing                                                                                                                                                                                                                                              |
+| `Permissions-Policy`        | Not set — a JSON API has no page context for a browser feature-permission policy to govern                         | Denies `camera`, `microphone`, `geolocation`, `payment`, `usb`, and `interest-cohort` (the FLoC/Topics-API opt-out) — none of which any board, task, or dashboard view ever requests                                                                                                                                                                                                                       |
+
+`Cross-Origin-Resource-Policy` on the API is `cross-origin` rather than helmet's default
+`same-origin`, because the web app is a separate origin (`WEB_URL`/`NEXT_PUBLIC_API_URL`) that
+legitimately reads it; that access stays gated by the CORS allowlist in `configure-app.ts`, not
+by CORP.
 
 Related: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (historical Phase 1 scaffold) · [docs/README.md](README.md) (docs map)
