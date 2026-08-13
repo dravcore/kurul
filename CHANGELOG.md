@@ -49,6 +49,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`Notification_activityId_idx`): `activityId` is `ON DELETE SET NULL`, which Postgres runs
   per deleted row, so without it each batch of deleted activities meant one sequential scan of
   the whole notification table per row.
+- The web app now sends the same class of baseline security headers the API already did
+  (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`), via
+  `apps/web/next.config.ts`'s `headers()`. Unlike the API's `default-src 'none'` — it renders
+  no HTML — the web CSP is shaped for a real App Router application: `script-src`/`style-src`
+  allow `'unsafe-inline'`, verified empirically to be required (Next's RSC hydration script and
+  `next-themes`'s FOUC-prevention script are both inline, and Radix/`@dnd-kit` position
+  elements via an inline `style` attribute CSP nonces cannot cover), and `connect-src` names
+  the configured API origin plus its derived `ws(s)` origin so both the REST client and the
+  Socket.io transport keep working. `Permissions-Policy` denies `camera`, `microphone`,
+  `geolocation`, `payment`, `usb`, and `interest-cohort` (FLoC/Topics-API opt-out) — none of
+  which the app ever requests. See `docs/architecture.md#11-security-headers` for the full
+  header table across both processes.
 - Membership revocation — the half of the access lifecycle that was missing. Until now a user
   who joined a workspace could only be removed by deleting the workspace or editing the
   database by hand, and no role could be lowered. Three routes close that:
