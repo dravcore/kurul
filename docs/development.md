@@ -10,6 +10,7 @@ How to set up a Kurultay development environment and work in it day to day.
 - [Prerequisites](#prerequisites)
 - [Clone and install](#clone-and-install)
 - [Environment variables](#environment-variables)
+- [Database and cache credentials](#database-and-cache-credentials)
 - [SMTP and Mailpit](#smtp-and-mailpit)
 - [Run modes](#run-modes)
 - [pnpm scripts](#pnpm-scripts)
@@ -101,10 +102,13 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `SMTP_SECURE`         | `false`                                                  | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                    |
 | `MAIL_FROM`           | `Kurultay <noreply@example.com>`                         | `From:` header on outgoing mail                                                                                             |
 
-`.env.example` also carries `BACKUP_INTERVAL` and `BACKUP_KEEP`. They are **compose-only** —
-`docker-compose.yml` interpolates them into the `backup` sidecar and no application code
-reads them, so they are absent from the table above and need no wiring in `apps/api`. See
-[Upgrading and backups](#upgrading-and-backups).
+`.env.example` also carries `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
+`REDIS_PASSWORD`, `BACKUP_INTERVAL`, and `BACKUP_KEEP`. All six are **compose-only** —
+`docker-compose.yml` interpolates them into the `postgres`/`redis`/`migrate`/`api`/`backup`
+services and no application code reads them directly, so they are absent from the table
+above and need no wiring in `apps/api`. See
+[Database and cache credentials](#database-and-cache-credentials) for the first four and
+[Upgrading and backups](#upgrading-and-backups) for the backup pair.
 
 Generate a secret with:
 
@@ -116,6 +120,52 @@ openssl rand -base64 32
 PR: wire it through the env helpers in `apps/api/src/common/env.ts` (or the call site that
 reads `process.env` — there is no separate Zod/typed env schema today), add it to
 `.env.example` with a safe placeholder, and document it in the table above.
+
+## Database and cache credentials
+
+Neither `docker-compose.yml` nor `docker-compose.dev.yml` bakes a well-known
+`kurultay`/`kurultay` password into the Postgres container any more — `POSTGRES_PASSWORD` is
+a required `.env` value, and compose refuses to start until it is set:
+
+```bash
+$ docker compose config
+error while interpolating services.migrate.environment.DATABASE_URL: required variable POSTGRES_PASSWORD is missing a value: set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials
+```
+
+This is the same fail-loud pattern as `BETTER_AUTH_SECRET` above: a placeholder default would
+mean every self-hosted instance that skips reading `.env.example` carefully starts up with a
+password every other Kurultay install also has, on a database exposed to whatever else shares
+its Docker network.
+
+| Variable            | Default           | Purpose                                                                                                                 |
+| ------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_USER`     | `kurultay`        | Postgres role compose creates on first boot and every service connects as                                               |
+| `POSTGRES_PASSWORD` | _none — required_ | Postgres role password. No default; `docker compose config`/`up` fails loudly if unset                                  |
+| `POSTGRES_DB`       | `kurultay`        | Database name compose creates on first boot                                                                             |
+| `REDIS_PASSWORD`    | _(blank)_         | Optional `requirepass` for the `redis` service. Unset keeps Redis passwordless, exactly as before this variable existed |
+
+These four feed the `DATABASE_URL`/`REDIS_URL` that `docker-compose.yml` assembles for its own
+`migrate`/`api` services (`postgres:5432`/`redis:6379`, the in-network addresses) — a
+**separate** knob from the host-side `DATABASE_URL`/`REDIS_URL` in your `.env` that `pnpm dev`
+uses to reach `localhost:5432`/`localhost:6379` in the [dev loop](#run-modes). Compose does
+not keep the two in sync: if you change `POSTGRES_PASSWORD` or `REDIS_PASSWORD`, update the
+host-side `DATABASE_URL`/`REDIS_URL` to match, or `api`/`web` running on the host will fail to
+authenticate against the containers `docker-compose.dev.yml` starts.
+
+`REDIS_PASSWORD` deliberately has no `:?`-required guard like `POSTGRES_PASSWORD` does — Redis
+here holds cache entries, sessions, rate-limit counters, and the notification queue, all
+rebuildable, never board data (see ["Redis is not backed
+up"](#upgrading-and-backups)) — so making it required would break every existing
+`docker-compose.yml` on upgrade for comparatively little gain. Leave it blank to keep the
+previous passwordless behavior; set it to add defense in depth against another container that
+lands on the same Docker network.
+
+**Changing `POSTGRES_PASSWORD` on an existing `postgres_data` volume does not rotate the
+running database's password.** The official Postgres image only applies
+`POSTGRES_PASSWORD` during `initdb`, i.e. the first time a volume is created — editing `.env`
+and restarting an already-initialized stack leaves the role's password exactly as it was. See
+the `[Unreleased]` entry in `CHANGELOG.md` for the `ALTER USER ... PASSWORD` command that
+rotates it on a running instance.
 
 ## SMTP and Mailpit
 

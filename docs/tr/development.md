@@ -10,6 +10,7 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 - [Ön koşullar](#ön-koşullar)
 - [Klonlama ve kurulum](#klonlama-ve-kurulum)
 - [Ortam değişkenleri](#ortam-değişkenleri)
+- [Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri)
 - [SMTP ve Mailpit](#smtp-ve-mailpit)
 - [Çalışma modları](#çalışma-modları)
 - [pnpm script'leri](#pnpm-scriptleri)
@@ -100,10 +101,13 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `SMTP_SECURE`         | `false`                                                           | Örtük TLS için (port 465) `true`, STARTTLS/plaintext için (587/25, ve Mailpit) `false`                                     |
 | `MAIL_FROM`           | `Kurultay <noreply@example.com>`                                  | Giden mail'lerdeki `From:` başlığı                                                                                         |
 
-`.env.example` ayrıca `BACKUP_INTERVAL` ve `BACKUP_KEEP` taşır. Bunlar **yalnızca compose'a
-aittir** — `docker-compose.yml` onları `backup` sidecar'ına enterpolasyon eder ve hiçbir
-uygulama kodu okumaz; bu yüzden yukarıdaki tabloda yer almazlar ve `apps/api` tarafında
-bağlanmaları gerekmez. Bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme).
+`.env.example` ayrıca `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `REDIS_PASSWORD`,
+`BACKUP_INTERVAL` ve `BACKUP_KEEP` taşır. Altısı da **yalnızca compose'a aittir** —
+`docker-compose.yml` bunları `postgres`/`redis`/`migrate`/`api`/`backup` servislerine
+enterpolasyon eder ve hiçbir uygulama kodu doğrudan okumaz; bu yüzden yukarıdaki tabloda yer
+almazlar ve `apps/api` tarafında bağlanmaları gerekmez. İlk dördü için bkz.
+[Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri), yedekleme
+çifti için bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme).
 
 Bir secret üretmek için:
 
@@ -115,6 +119,52 @@ openssl rand -base64 32
 `apps/api/src/common/env.ts` yardımcıları üzerinden bağla (veya `process.env` okuyan çağrı
 noktası — bugün ayrı bir Zod/tipli env şeması yok), güvenli bir placeholder ile
 `.env.example`'a ekle ve yukarıdaki tabloda belgele.
+
+## Veritabanı ve cache kimlik bilgileri
+
+Ne `docker-compose.yml` ne de `docker-compose.dev.yml` artık Postgres konteynerine bilinen bir
+`kurultay`/`kurultay` şifresi gömüyor — `POSTGRES_PASSWORD` zorunlu bir `.env` değeridir ve
+ayarlanmadan compose başlamayı reddeder:
+
+```bash
+$ docker compose config
+error while interpolating services.migrate.environment.DATABASE_URL: required variable POSTGRES_PASSWORD is missing a value: set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials
+```
+
+Bu, yukarıdaki `BETTER_AUTH_SECRET` ile aynı fail-loud kalıbıdır: bir placeholder varsayılan,
+`.env.example`'ı dikkatlice okumayan her self-hosted kurulumun, Docker ağını paylaşan başka
+her şeye açık bir veritabanında, diğer her Kurultay kurulumuyla aynı şifreyle ayağa kalkması
+anlamına gelirdi.
+
+| Değişken            | Varsayılan      | Amaç                                                                                                                   |
+| ------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_USER`     | `kurultay`      | Compose'un ilk açılışta oluşturduğu ve her servisin bağlandığı Postgres rolü                                           |
+| `POSTGRES_PASSWORD` | _yok — zorunlu_ | Postgres rol şifresi. Varsayılanı yok; ayarlanmazsa `docker compose config`/`up` sesli şekilde başarısız olur          |
+| `POSTGRES_DB`       | `kurultay`      | Compose'un ilk açılışta oluşturduğu veritabanı adı                                                                     |
+| `REDIS_PASSWORD`    | _(boş)_         | `redis` servisi için opsiyonel `requirepass`. Boş bırakılırsa Redis bu değişken var olmadan önceki gibi şifresiz kalır |
+
+Bu dört değişken, `docker-compose.yml`'in kendi `migrate`/`api` servisleri için kurduğu
+`DATABASE_URL`/`REDIS_URL`'i besler (`postgres:5432`/`redis:6379`, ağ içi adresler) — bu,
+[dev loop](#çalışma-modları)'da `pnpm dev`'in `localhost:5432`/`localhost:6379`'a ulaşmak için
+kullandığı `.env`'inizdeki host-side `DATABASE_URL`/`REDIS_URL`'den **ayrı** bir düğmedir.
+Compose ikisini birbiriyle senkron tutmaz: `POSTGRES_PASSWORD` veya `REDIS_PASSWORD`'ü
+değiştirirseniz, host-side `DATABASE_URL`/`REDIS_URL`'i de eşleştirin — yoksa host'ta çalışan
+`api`/`web`, `docker-compose.dev.yml`'in başlattığı konteynerlere karşı authenticate olamaz.
+
+`REDIS_PASSWORD`, `POSTGRES_PASSWORD`'ün sahip olduğu `:?`-zorunlu koruması olmadan
+tasarlanmıştır — buradaki Redis cache girdileri, session'lar, rate-limit sayaçları ve
+bildirim kuyruğunu tutar; hepsi yeniden inşa edilebilir, hiçbiri board verisi değildir (bkz.
+["Redis yedeklenmez"](#yükseltme-ve-yedekleme)) — bu yüzden zorunlu kılmak, karşılığında
+görece az bir kazanç için her mevcut `docker-compose.yml`'i yükseltmede bozardı. Boş
+bırakmak önceki şifresiz davranışı korur; ayarlamak, aynı Docker ağına düşen başka bir
+konteynere karşı savunma derinliği ekler.
+
+**`POSTGRES_PASSWORD`'ü mevcut bir `postgres_data` volume'unda değiştirmek, çalışan
+veritabanının şifresini döndürmez.** Resmi Postgres image'ı `POSTGRES_PASSWORD`'ü yalnızca
+`initdb` sırasında, yani bir volume ilk oluşturulduğunda uygular — `.env`'i düzenleyip zaten
+initialize edilmiş bir stack'i yeniden başlatmak, rolün şifresini tam olarak eskisi gibi
+bırakır. Çalışan bir instance'ta şifreyi döndüren `ALTER USER ... PASSWORD` komutu için
+`CHANGELOG.md`'deki `[Unreleased]` girdisine bakın.
 
 ## SMTP ve Mailpit
 

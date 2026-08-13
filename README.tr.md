@@ -77,7 +77,7 @@ MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadma
 ```bash
 git clone https://github.com/dravcore/kurultay.git
 cd kurultay
-cp .env.example .env   # BETTER_AUTH_SECRET ayarla (openssl rand -base64 32)
+cp .env.example .env   # BETTER_AUTH_SECRET ve POSTGRES_PASSWORD ayarla (openssl rand -base64 32)
 pnpm install
 pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access build   # paylaşılan paketler, git-ignored dist/ üzerinden tüketilir
 pnpm db:generate        # Prisma client'ı üret (git-ignored, otomatik oluşmaz)
@@ -89,6 +89,11 @@ pnpm dev
 
 - Web: http://localhost:3000
 - API health: http://localhost:4000/health
+
+`POSTGRES_PASSWORD`'ün varsayılanı yoktur — ayarlanmadan compose başlamayı reddeder — ve
+`.env.example`'da birkaç satır üstündeki `DATABASE_URL`'in şifre kısmı bununla elle
+eşleştirilmelidir; bkz.
+[docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri](docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri).
 
 Uygulama SMTP yapılandırılmadan da ayağa kalkar, ama davetler yapılandırılana kadar kabul
 edilemez — yukarıdaki dev compose dosyası [Mailpit](https://mailpit.axllent.org/)'i zaten
