@@ -2,6 +2,8 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { mountBetterAuth } from '../auth/mount-better-auth';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
+import { createAccessLogMiddleware } from './logging/access-log.middleware';
+import { requestIdMiddleware } from './logging/request-id';
 import { validationExceptionFactory } from './validation/validation-exception.factory';
 
 /** Shared Nest bootstrap (HTTP app + e2e) so pipes/filters/CORS/auth stay in sync. */
@@ -38,6 +40,14 @@ export function configureApp(app: INestApplication, options: { corsOrigin: strin
       // deployment terminates TLS.
     }),
   );
+
+  // Correlation and access logging sit above everything that answers a request, for the same
+  // reason helmet does: the Better Auth mount below bypasses the Nest router (ADR 0004), and
+  // so does anything Express rejects before routing. Registered here, one middleware pair
+  // covers Nest routes, auth traffic, CORS preflights and 404s alike. Order within the pair
+  // matters — the id has to exist before the access log reads it.
+  app.use(requestIdMiddleware);
+  app.use(createAccessLogMiddleware());
 
   app.enableCors({
     origin: options.corsOrigin,

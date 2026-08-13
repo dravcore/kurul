@@ -255,6 +255,7 @@ the framework's built-in exceptions and hand-written ones look identical):
   ],
   "path": "/workspaces/w_1/boards/b_1/tasks",
   "timestamp": "2026-08-08T09:12:31.114Z",
+  "requestId": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
 }
 ```
 
@@ -266,12 +267,44 @@ the framework's built-in exceptions and hand-written ones look identical):
 | `details`    | array  | no       | Per-field validation problems; present only for `400`/`422`         |
 | `path`       | string | yes      | Request path                                                        |
 | `timestamp`  | string | yes      | ISO 8601 UTC                                                        |
+| `requestId`  | string | yes      | Correlation id; same value as the `X-Request-Id` response header    |
 
 - One global exception filter produces this shape for **every** error, including unhandled
   ones. There is no second error format anywhere in the API.
 - `message` is never a raw exception string in production, and stack traces are logged, not
   returned.
 - Clients branch on `statusCode` and `error`, never on `message` text.
+
+### Request correlation
+
+Every request carries an id, and every response returns it in the `X-Request-Id` header. A
+client may supply its own — an id minted by a reverse proxy or load balancer flows straight
+through — as long as it is URL-safe and between 8 and 128 characters; anything else is
+discarded and replaced with a generated [UUIDv7](#data-types), so a header value can never
+reach a log line or a response body unsanitised.
+
+The same id appears in three places, which is the point: the `X-Request-Id` header the client
+received, the `requestId` field of the error envelope, and the server's log lines for that
+request. A user reporting a failure quotes one id, and it selects exactly one request.
+
+Each finished request also writes a single-line JSON access log to stdout:
+
+```jsonc
+{
+  "ts": "2026-08-13T19:03:32.070Z",
+  "level": "info", // info < 400, warn 4xx, error 5xx
+  "requestId": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
+  "method": "GET",
+  "path": "/workspaces/w_1/tasks", // route only — the query string is stripped
+  "status": 200,
+  "durationMs": 15.444,
+  "userId": "0198e2c1-9a11-7c40-8f2b-1d3e5a7c9b02", // omitted when unauthenticated
+}
+```
+
+That field list is closed. Request bodies, query strings, headers and cookies are never
+logged: the query carries user-supplied filters and search terms, and the headers carry
+session cookies and invitation tokens.
 
 ## Pagination
 

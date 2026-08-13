@@ -29,6 +29,8 @@ interface ExpressLikeResponse {
 // Imported below the mock on purpose: pulling in configureApp loads ../auth/mount-better-auth,
 // so the factory above has to be registered — and `mountBetterAuth` assigned — first.
 import { configureApp } from './configure-app';
+import type { AccessLogLine } from './logging/access-log.middleware';
+import { UUID_V7_REGEX } from './uuid';
 
 @Controller('probe')
 class ProbeController {
@@ -40,6 +42,10 @@ class ProbeController {
 
 describe('configureApp security headers', () => {
   let app: INestApplication<App>;
+  // The access log writes to stdout by default. Capturing it keeps the suite's output clean
+  // and doubles as the assertion surface for the access-log tests below.
+  let stdout: jest.SpyInstance;
+  let logLines: string[];
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -50,6 +56,25 @@ describe('configureApp security headers', () => {
     configureApp(app, { corsOrigin: 'http://localhost:3000' });
     await app.init();
   });
+
+  beforeEach(() => {
+    logLines = [];
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      logLines.push(String(chunk));
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+  });
+
+  /** The access-log line for the request just made, parsed. */
+  function accessLog(): AccessLogLine {
+    const lines = logLines.filter((line) => line.startsWith('{'));
+    expect(lines).toHaveLength(1);
+    return JSON.parse(lines[0] ?? '{}') as AccessLogLine;
+  }
 
   afterAll(async () => {
     await app.close();
@@ -118,5 +143,71 @@ describe('configureApp security headers', () => {
     expect(response.headers['access-control-allow-credentials']).toBe('true');
     // Cross-origin reads from the web app must not be blocked by CORP.
     expect(response.headers['cross-origin-resource-policy']).toBe('cross-origin');
+  });
+
+  describe('request correlation', () => {
+    it('mints a UUIDv7 request id and returns it in the response header', async () => {
+      const response = await request(app.getHttpServer()).get('/probe').expect(200);
+
+      expect(response.headers['x-request-id']).toMatch(UUID_V7_REGEX);
+    });
+
+    it('echoes a safe inbound X-Request-Id so an upstream trace survives', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/probe')
+        .set('X-Request-Id', 'edge-7f3a9c21b4d0')
+        .expect(200);
+
+      expect(response.headers['x-request-id']).toBe('edge-7f3a9c21b4d0');
+    });
+
+    it('covers the Better Auth mount, which bypasses the Nest router', async () => {
+      const response = await request(app.getHttpServer()).get('/auth/get-session').expect(200);
+
+      expect(response.headers['x-request-id']).toMatch(UUID_V7_REGEX);
+    });
+
+    it('correlates the access-log line with the header the client received', async () => {
+      const response = await request(app.getHttpServer()).get('/probe').expect(200);
+
+      expect(accessLog().requestId).toBe(response.headers['x-request-id']);
+    });
+  });
+
+  describe('access log', () => {
+    it('writes one structured JSON line per request', async () => {
+      await request(app.getHttpServer()).get('/probe').expect(200);
+
+      expect(accessLog()).toMatchObject({
+        level: 'info',
+        method: 'GET',
+        path: '/probe',
+        status: 200,
+      });
+    });
+
+    it('logs Better Auth traffic, which no Nest interceptor would see', async () => {
+      await request(app.getHttpServer()).get('/auth/get-session').expect(200);
+
+      expect(accessLog()).toMatchObject({
+        method: 'GET',
+        path: '/auth/get-session',
+        status: 200,
+      });
+    });
+
+    it('logs a 404 at warn level — a request the router never matched', async () => {
+      await request(app.getHttpServer()).get('/nope').expect(404);
+
+      expect(accessLog()).toMatchObject({ level: 'warn', path: '/nope', status: 404 });
+    });
+
+    it('keeps the query string out of the logged path', async () => {
+      await request(app.getHttpServer()).get('/probe?q=salary%20review').expect(200);
+
+      const line = logLines.filter((entry) => entry.startsWith('{')).join('');
+      expect(line).not.toContain('salary');
+      expect(accessLog().path).toBe('/probe');
+    });
   });
 });

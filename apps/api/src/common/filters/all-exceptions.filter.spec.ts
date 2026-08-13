@@ -9,7 +9,13 @@ interface CapturedResponse {
   json: jest.Mock;
 }
 
-function createHost(url = '/workspaces/w_1/tasks'): {
+const REQUEST_ID = '0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d';
+
+/** `null` means "the request carries no id at all" — i.e. `requestIdMiddleware` never ran. */
+function createHost(
+  url = '/workspaces/w_1/tasks',
+  requestId: string | null = REQUEST_ID,
+): {
   host: ArgumentsHost;
   response: CapturedResponse;
 } {
@@ -21,7 +27,7 @@ function createHost(url = '/workspaces/w_1/tasks'): {
   const host = {
     switchToHttp: () => ({
       getResponse: () => response,
-      getRequest: () => ({ url }),
+      getRequest: () => (requestId === null ? { url } : { url, requestId }),
     }),
   } as unknown as ArgumentsHost;
 
@@ -279,7 +285,75 @@ describe('AllExceptionsFilter', () => {
 
       filter.catch(error, host);
 
-      expect(logError).toHaveBeenCalledWith('database unreachable', error.stack);
+      expect(logError).toHaveBeenCalledWith(
+        `database unreachable (requestId=${REQUEST_ID})`,
+        error.stack,
+      );
+    });
+  });
+
+  // BE-03: a 500 is only actionable if the line in the process log and the response the user
+  // is looking at can be joined. Both carry the id `requestIdMiddleware` put on the request.
+  describe('correlation', () => {
+    it('returns the request id in the error envelope', () => {
+      const { host, response } = createHost();
+
+      filter.catch(new HttpException('Task does not exist', HttpStatus.NOT_FOUND), host);
+
+      expect(body(response)).toMatchObject({ statusCode: 404, requestId: REQUEST_ID });
+    });
+
+    it('appends the request id to the 5xx log line', () => {
+      const { host, response } = createHost();
+      const error = new HttpException('upstream exploded', HttpStatus.BAD_GATEWAY);
+
+      filter.catch(error, host);
+
+      expect(logError).toHaveBeenCalledWith(
+        `upstream exploded (requestId=${REQUEST_ID})`,
+        error.stack,
+      );
+      expect(body(response).requestId).toBe(REQUEST_ID);
+    });
+
+    it('correlates non-Error throws too', () => {
+      const { host, response } = createHost();
+
+      filter.catch('boom', host);
+
+      expect(logError).toHaveBeenCalledWith(
+        `Non-Error exception thrown: boom (requestId=${REQUEST_ID})`,
+      );
+      expect(body(response).requestId).toBe(REQUEST_ID);
+    });
+
+    it('does not log a 4xx, but still hands the client an id to quote', () => {
+      const { host, response } = createHost();
+
+      filter.catch(new HttpException('Nope', HttpStatus.FORBIDDEN), host);
+
+      expect(logError).not.toHaveBeenCalled();
+      expect(body(response).requestId).toBe(REQUEST_ID);
+    });
+
+    it('omits requestId rather than emitting null when no id is on the request', () => {
+      const { host, response } = createHost('/workspaces/w_1/tasks', null);
+
+      filter.catch(new Error('database unreachable'), host);
+
+      const problem = body(response);
+      expect('requestId' in problem).toBe(false);
+      expect(logError).toHaveBeenCalledWith('database unreachable', expect.any(String));
+    });
+
+    it('ignores a client-forged id that never passed the middleware', () => {
+      // getRequestId re-validates: nothing unsafe reaches a log line or a response body.
+      const { host, response } = createHost('/workspaces/w_1/tasks', 'forged\r\nX-Admin: 1');
+
+      filter.catch(new HttpException('Nope', HttpStatus.FORBIDDEN), host);
+
+      const problem = body(response);
+      expect('requestId' in problem).toBe(false);
     });
   });
 });

@@ -10,6 +10,7 @@ import type { Request, Response } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { Prisma } from '../../generated/prisma';
 import { isProductionEnv } from '../env';
+import { getRequestId } from '../logging/request-id';
 import type { ValidationDetail } from '../validation/validation-exception.factory';
 
 interface ProblemDetails {
@@ -19,6 +20,7 @@ interface ProblemDetails {
   details?: ValidationDetail[];
   path: string;
   timestamp: string;
+  requestId?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -103,10 +105,25 @@ function mapPrismaError(error: Prisma.PrismaClientKnownRequestError): {
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
+  /**
+   * Logs a failure with the correlation id appended, so the stack trace in the process log
+   * and the access-log line for the same request join on `requestId` — and so does the
+   * `requestId` the client was handed in the error envelope.
+   */
+  private logFailure(requestId: string | undefined, message: string, stack?: string): void {
+    const line = requestId === undefined ? message : `${message} (requestId=${requestId})`;
+    if (stack === undefined) {
+      this.logger.error(line);
+      return;
+    }
+    this.logger.error(line, stack);
+  }
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    const requestId = getRequestId(request);
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let error = reasonPhrase(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -136,7 +153,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
 
       if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
-        this.logger.error(exception.message, exception.stack);
+        this.logFailure(requestId, exception.message, exception.stack);
       }
     } else if (
       exception instanceof Prisma.PrismaClientKnownRequestError ||
@@ -149,13 +166,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
         error = reasonPhrase(statusCode);
         message = mapped.message;
       } else {
-        this.logger.error(prismaError.message, prismaError.stack);
+        this.logFailure(requestId, prismaError.message, prismaError.stack);
         if (!isProductionEnv()) {
           message = prismaError.message;
         }
       }
     } else if (exception instanceof Error) {
-      this.logger.error(exception.message, exception.stack);
+      this.logFailure(requestId, exception.message, exception.stack);
       if (!isProductionEnv()) {
         message = exception.message;
       }
@@ -163,7 +180,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // Nothing here has a stack, so the value itself is all there is to log — without
       // this branch a `throw 'boom'` becomes a completely silent 500.
       const described = describe(exception);
-      this.logger.error(`Non-Error exception thrown: ${described}`);
+      this.logFailure(requestId, `Non-Error exception thrown: ${described}`);
       if (!isProductionEnv()) {
         message = described;
       }
@@ -176,6 +193,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ...(details ? { details } : {}),
       path: request.url,
       timestamp: new Date().toISOString(),
+      // Present on every response the running app produces (`requestIdMiddleware` runs
+      // ahead of the router), which is what makes a reported failure traceable: the same id
+      // is in the `X-Request-Id` response header and in the server-side log line.
+      ...(requestId !== undefined ? { requestId } : {}),
     };
 
     response.status(statusCode).json(problem);

@@ -9,6 +9,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Structured HTTP access logging and request correlation. Every request is assigned an id —
+  a safe inbound `X-Request-Id` is reused so an id minted by a proxy survives, anything else
+  is replaced by a generated UUIDv7 — and it comes back in the `X-Request-Id` response
+  header. Each finished request writes one JSON line to stdout
+  (`{ts, level, requestId, method, path, status, durationMs, userId?}`); bodies, query
+  strings, headers and cookies are never logged. The same id is appended to 5xx log lines
+  and returned as `requestId` in the error envelope, so a reported failure names exactly one
+  request. Both middlewares run ahead of the Better Auth mount, which bypasses the Nest
+  router, so sign-in traffic and unmatched routes are logged too.
 - `GET /health/ready` — an unauthenticated readiness probe that checks Postgres (`SELECT 1`)
   and Redis (`PING`) in parallel, each bounded by a 2s timeout so a wedged dependency answers
   `down` instead of leaving the probe hanging. `200` when the instance can serve traffic,
