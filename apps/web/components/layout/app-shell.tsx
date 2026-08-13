@@ -52,7 +52,11 @@ function AppShellFrame({
   return (
     <div className="flex min-h-screen bg-background">
       <AppSidebar />
-      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+      {/* Skip-link target (see app/(app)/layout.tsx): tabIndex={-1} lets the fragment
+          navigation move keyboard focus here without adding a tab stop. */}
+      <main id="main-content" tabIndex={-1} className="flex min-w-0 flex-1 flex-col outline-none">
+        {children}
+      </main>
     </div>
   );
 }
