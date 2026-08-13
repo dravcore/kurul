@@ -1,0 +1,335 @@
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Queue, Worker, type Job } from 'bullmq';
+import { envBool, envInt, envString } from '../common/env';
+import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
+import { parseRedisUrl } from '../common/redis-url';
+import { PrismaService } from '../prisma/prisma.service';
+
+const QUEUE_NAME = 'cleanup';
+const JOB_NAME = 'purge-expired';
+const JOB_ID = 'retention-cleanup';
+/**
+ * Once a day. Retention is measured in days, so a tighter schedule would spend scans to
+ * delete rows that only became deletable minutes ago; a looser one lets a table sit up to
+ * that long past its stated window, which is the thing the policy promises not to do.
+ */
+const REPEAT_EVERY_MS = 24 * 60 * 60 * 1000;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Rows removed per `DELETE` statement.
+ *
+ * One unbounded `DELETE FROM "Notification" WHERE …` would be simpler and is the wrong shape
+ * here: the first run after this ships has to clear however much history the instance has
+ * accumulated, and that single statement holds row locks and an open transaction — plus the
+ * WAL and dead tuples it generates — for its entire duration. Autovacuum cannot reclaim any
+ * of it until the transaction commits, so peak bloat is proportional to the *total* deleted
+ * rather than to a batch.
+ *
+ * Batching trades that for repeated scans (see {@link CleanupWorker.deleteInBatches}). A
+ * thousand rows is large enough that steady state is one statement per table per night and
+ * small enough that each transaction is measured in milliseconds.
+ */
+export const CLEANUP_BATCH_SIZE = 1000;
+
+/**
+ * Ceiling on the batches one table gets per run — a stop, not a target.
+ *
+ * The loop's real exit condition is a short batch. This bound exists so that a bug in a
+ * predicate (one that matches rows the `DELETE` does not actually remove) becomes a job that
+ * ends after a bounded amount of work instead of one that spins against the database until
+ * someone notices. At the default batch size it also caps a first run at a million rows per
+ * table; whatever is left is deleted by the next night's run.
+ */
+export const MAX_BATCHES_PER_TABLE = 1000;
+
+export const DEFAULT_NOTIFICATION_RETENTION_DAYS = 90;
+export const DEFAULT_ACTIVITY_RETENTION_DAYS = 365;
+
+/** Rows deleted in one run, per table. */
+export interface CleanupCounts {
+  sessions: number;
+  verifications: number;
+  notifications: number;
+  activities: number;
+}
+
+export interface RetentionSettings {
+  enabled: boolean;
+  /** Days a *read* notification is kept after it was read. `0` disables the sweep. */
+  notificationDays: number;
+  /** Days an activity row is kept after it was written. `0` disables the sweep. */
+  activityDays: number;
+}
+
+/**
+ * Reads a retention window in days.
+ *
+ * `0` is a supported value meaning "keep forever" — a self-hoster under a legal obligation to
+ * retain an audit trail has to be able to say so without editing code. A negative value is
+ * refused rather than clamped: it would otherwise read as a cutoff in the *future* and delete
+ * live rows, which is the one mistake this job must never make quietly.
+ */
+function retentionDays(name: string, fallback: number): number {
+  const days = envInt(name, fallback);
+  if (days < 0) {
+    throw new Error(`Invalid ${name}: expected a non-negative number of days, received "${days}"`);
+  }
+  return days;
+}
+
+/**
+ * Read on every run, not once at boot, so the e2e suite can flip `CLEANUP_ENABLED` around a
+ * single call and so a restart is enough to change a window (there is no config reload path).
+ */
+export function retentionSettings(): RetentionSettings {
+  return {
+    enabled: envBool('CLEANUP_ENABLED', true),
+    notificationDays: retentionDays(
+      'NOTIFICATION_RETENTION_DAYS',
+      DEFAULT_NOTIFICATION_RETENTION_DAYS,
+    ),
+    activityDays: retentionDays('ACTIVITY_RETENTION_DAYS', DEFAULT_ACTIVITY_RETENTION_DAYS),
+  };
+}
+
+/** The instant before which a row of the given age is deletable. */
+export function cutoffFor(now: Date, days: number): Date {
+  return new Date(now.getTime() - days * MS_PER_DAY);
+}
+
+/**
+ * The line this job exists to leave behind.
+ *
+ * Counts only. The rows being deleted are IP addresses, user agents, e-mail addresses in
+ * `Verification.identifier` and notification payloads carrying task titles — precisely the
+ * data the policy exists to remove from the database, so copying any of it into a log
+ * aggregator on the way out would defeat the whole job. `docs/decisions/0020-data-retention.md`.
+ */
+export interface CleanupLogLine extends CleanupCounts {
+  ts: string;
+  level: 'info';
+  event: 'retention.cleanup';
+  durationMs: number;
+}
+
+/**
+ * Deletes rows the retention policy no longer allows the database to hold.
+ *
+ * Scheduled the same way as `notification/due-soon.worker.ts` — a BullMQ job scheduler on the
+ * shared `REDIS_URL`, closed from `onModuleDestroy` — so the two scheduled jobs in this
+ * codebase behave identically under deploy and shutdown, and so a multi-replica deployment
+ * gets one sweep per night rather than one per replica.
+ *
+ * Unlike every other query in the API this one is **not scoped by `workspaceId`**. It is a
+ * global operator sweep with no request, no session and no tenant behind it: an expired
+ * session belongs to a user, not to a workspace, and `Verification` has no tenant column at
+ * all. The multi-tenant rule in CLAUDE.md guards data a *caller* can reach; nothing here is
+ * reachable by a caller. See ADR 0020.
+ */
+@Injectable()
+export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(CleanupWorker.name);
+  private queue: Queue | null = null;
+  private worker: Worker | null = null;
+  /**
+   * Test seam. Production writes the JSON line to stdout; the unit spec swaps in a collector
+   * so it can assert on what a log aggregator would actually receive. Not a constructor
+   * parameter because Nest resolves constructor parameters by type, and a function type has
+   * no provider to resolve to.
+   */
+  private write: LogWriter = stdoutWriter;
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** @internal — for tests. */
+  setLogWriter(write: LogWriter): void {
+    this.write = write;
+  }
+
+  async onModuleInit(): Promise<void> {
+    if (!retentionSettings().enabled) {
+      // A deliberate off switch, so a warn rather than a log: an instance that has silently
+      // stopped enforcing its own retention policy is worth noticing in a startup log.
+      this.logger.warn('CLEANUP_ENABLED is false — retention cleanup worker not started');
+      return;
+    }
+
+    const redisUrl = envString('REDIS_URL', '');
+    if (!redisUrl) {
+      this.logger.warn('REDIS_URL unset — retention cleanup worker not started');
+      return;
+    }
+
+    let connection: { host: string; port: number; password?: string };
+    try {
+      connection = parseRedisUrl(redisUrl);
+    } catch {
+      this.logger.error('Invalid REDIS_URL — retention cleanup worker not started');
+      return;
+    }
+
+    this.queue = new Queue(QUEUE_NAME, { connection });
+    this.worker = new Worker(QUEUE_NAME, (job) => this.process(job), { connection });
+
+    this.worker.on('failed', (job, error) => {
+      this.logger.error(
+        `cleanup job ${job?.id ?? '?'} failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+
+    // Same reasoning as the due-soon scan: `add` with `repeat` keys the schedule on the
+    // interval, so changing REPEAT_EVERY_MS orphans the old key and leaves two schedules
+    // running. A job scheduler is addressed by its id alone, so an upsert replaces the
+    // previous definition instead of racing it.
+    await this.queue.upsertJobScheduler(
+      JOB_ID,
+      { every: REPEAT_EVERY_MS },
+      {
+        name: JOB_NAME,
+        opts: { removeOnComplete: 100, removeOnFail: 50 },
+      },
+    );
+
+    this.logger.log(`retention cleanup worker registered (every ${REPEAT_EVERY_MS / 3600000}h)`);
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.worker?.close();
+    await this.queue?.close();
+  }
+
+  /**
+   * Exposed for tests — sweep once.
+   *
+   * The `enabled` check is repeated here even though `onModuleInit` already refuses to
+   * register the scheduler when it is off. A job scheduler lives in Redis, not in this
+   * process: an instance restarted with `CLEANUP_ENABLED=false` leaves the definition another
+   * replica (or the same Redis, after a rollback) can still act on. Checking at the point of
+   * deletion is what actually makes the switch mean "delete nothing".
+   */
+  async runCleanup(now: Date = new Date()): Promise<CleanupCounts> {
+    const settings = retentionSettings();
+    const empty: CleanupCounts = {
+      sessions: 0,
+      verifications: 0,
+      notifications: 0,
+      activities: 0,
+    };
+    if (!settings.enabled) return empty;
+
+    const startedAt = process.hrtime.bigint();
+
+    // `expiresAt` is the row's own statement of when it stopped being useful, so there is no
+    // window to configure: a session past its expiry cannot authenticate anybody and a
+    // verification token past its expiry cannot be redeemed. Keeping either one longer stores
+    // an IP address, a user agent or an e-mail address for no purpose at all — which is the
+    // exact shape of the compliance problem, not merely a storage one.
+    const sessions = await this.deleteInBatches(
+      () => this.prisma.$executeRaw`
+        DELETE FROM "Session"
+        WHERE "id" IN (
+          SELECT "id" FROM "Session" WHERE "expiresAt" < ${now} LIMIT ${CLEANUP_BATCH_SIZE}
+        )
+      `,
+    );
+
+    const verifications = await this.deleteInBatches(
+      () => this.prisma.$executeRaw`
+        DELETE FROM "Verification"
+        WHERE "id" IN (
+          SELECT "id" FROM "Verification" WHERE "expiresAt" < ${now} LIMIT ${CLEANUP_BATCH_SIZE}
+        )
+      `,
+    );
+
+    // `readAt IS NOT NULL` is load-bearing: an unread notification is still doing its job no
+    // matter how old it is, and deleting it would silently drop something the user was told
+    // was waiting for them. The clock starts at `readAt`, not at `createdAt`, for the same
+    // reason — the retention window measures how long a *finished* notification is kept.
+    const notifications =
+      settings.notificationDays === 0
+        ? 0
+        : await this.deleteInBatches(() => {
+            const cutoff = cutoffFor(now, settings.notificationDays);
+            return this.prisma.$executeRaw`
+              DELETE FROM "Notification"
+              WHERE "id" IN (
+                SELECT "id" FROM "Notification"
+                WHERE "readAt" IS NOT NULL AND "readAt" < ${cutoff}
+                LIMIT ${CLEANUP_BATCH_SIZE}
+              )
+            `;
+          });
+
+    // Activity is append-only and has no "done" marker, so its window runs from `createdAt`.
+    // Deleting a row here nulls `Notification.activityId` (the FK is `onDelete: SetNull`),
+    // which is why migration 20260814090000 adds the index that referential action needs —
+    // without it Postgres re-scans the whole Notification table once per deleted activity.
+    const activities =
+      settings.activityDays === 0
+        ? 0
+        : await this.deleteInBatches(() => {
+            const cutoff = cutoffFor(now, settings.activityDays);
+            return this.prisma.$executeRaw`
+              DELETE FROM "Activity"
+              WHERE "id" IN (
+                SELECT "id" FROM "Activity" WHERE "createdAt" < ${cutoff} LIMIT ${CLEANUP_BATCH_SIZE}
+              )
+            `;
+          });
+
+    const counts: CleanupCounts = { sessions, verifications, notifications, activities };
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+
+    // Emitted even when every count is zero. One line a night is a rounding error in log
+    // volume, and its absence is the only evidence anyone gets that the sweep stopped
+    // running — a job that quietly does nothing is indistinguishable from a job that is
+    // quietly not scheduled.
+    const line: CleanupLogLine = {
+      ts: new Date().toISOString(),
+      level: 'info',
+      event: 'retention.cleanup',
+      durationMs: Math.round(durationMs * 1000) / 1000,
+      ...counts,
+    };
+    this.write(JSON.stringify(line));
+
+    return counts;
+  }
+
+  /**
+   * Runs one table's `DELETE` until it stops filling a batch.
+   *
+   * The exit condition is a batch that came back short, which is the only signal that says
+   * "no matching rows are left" without a second counting query. Each call is its own
+   * implicit transaction — that is the point of the loop: the lock and the WAL of one batch
+   * are released before the next begins, so a large first sweep never turns into one
+   * long-running transaction that blocks autovacuum on the table it is cleaning.
+   *
+   * The cost is that every batch re-evaluates the predicate from the start of the table. That
+   * is accepted rather than fixed with a keyset cursor: after the first run the loop is a
+   * single short batch per table, and the alternative (paging by `id` across statements) has
+   * to remember where it was across transactions that are deleting the very rows the cursor
+   * points at. Nothing here needs to be fast — it runs once a night, off any request path.
+   */
+  private async deleteInBatches(runBatch: () => Promise<number>): Promise<number> {
+    let total = 0;
+
+    for (let pass = 0; pass < MAX_BATCHES_PER_TABLE; pass += 1) {
+      const deleted = await runBatch();
+      total += deleted;
+      if (deleted < CLEANUP_BATCH_SIZE) return total;
+    }
+
+    this.logger.warn(
+      `retention cleanup stopped at the ${MAX_BATCHES_PER_TABLE}-batch ceiling; the remainder is deleted on the next run`,
+    );
+    return total;
+  }
+
+  private async process(_job: Job): Promise<void> {
+    await this.runCleanup();
+  }
+}

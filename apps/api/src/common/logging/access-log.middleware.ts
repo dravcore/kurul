@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { AuthedRequest } from '../types/request-context';
+import { stdoutWriter, type LogWriter } from './json-log';
 import { getRequestId } from './request-id';
 
 /**
@@ -22,12 +23,10 @@ export interface AccessLogLine {
   userId?: string;
 }
 
-/** Writes a single line to stdout; container runtimes collect it from there. */
-export type LogWriter = (line: string) => void;
-
-const defaultWriter: LogWriter = (line) => {
-  process.stdout.write(`${line}\n`);
-};
+// Re-exported so existing importers (and this file's own spec) keep their import path while
+// the type itself lives with the sink it describes — `json-log.ts` is now shared with the
+// retention cleanup worker, which emits its own JSON line through the same transport.
+export type { LogWriter } from './json-log';
 
 function levelFor(status: number): AccessLogLine['level'] {
   if (status >= 500) {
@@ -58,7 +57,7 @@ function pathOf(req: Request): string {
  * `durationMs` are the real ones, and `userId` picks up the user that `SessionAuthGuard`
  * attached during the request, which has not happened yet when the middleware itself runs.
  */
-export function createAccessLogMiddleware(write: LogWriter = defaultWriter) {
+export function createAccessLogMiddleware(write: LogWriter = stdoutWriter) {
   return function accessLog(req: Request, res: Response, next: NextFunction): void {
     const startedAt = process.hrtime.bigint();
 

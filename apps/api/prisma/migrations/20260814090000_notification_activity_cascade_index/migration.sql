@@ -1,0 +1,23 @@
+-- `Notification.activityId` carries `onDelete: SetNull` (schema.prisma), and until now no
+-- index led with it — the column appeared in no index at all. That was harmless while
+-- nothing ever deleted an `Activity` row on its own: the only path that removed activities
+-- was a workspace cascade, which deletes the notifications too.
+--
+-- The retention sweep (src/retention/cleanup.worker.ts, ADR 0020) introduces that path. For
+-- `ON DELETE SET NULL` Postgres runs the referential action per deleted row —
+-- `UPDATE ONLY "Notification" SET "activityId" = NULL WHERE $1 = "activityId"` — so without
+-- an index on the column, deleting a batch of 1000 activities means 1000 sequential scans of
+-- the whole Notification table. On the two fastest-growing tables in the schema that turns a
+-- nightly maintenance job into an outage.
+--
+-- Single-column is enough: the referential action's predicate is a bare equality on
+-- `activityId` and nothing in notification.service.ts filters on `activityId` together with
+-- another column, so a wider composite would only add write overhead with no query to serve.
+-- CreateIndex
+CREATE INDEX "Notification_activityId_idx" ON "Notification"("activityId");
+
+-- Deliberately not `CREATE INDEX CONCURRENTLY`, for the same reason as
+-- 20260811090000_notification_task_cascade_index: `prisma migrate deploy` applies each
+-- migration.sql inside a single transaction, and CONCURRENTLY cannot run inside a
+-- transaction block. Plain `CREATE INDEX` holds a SHARE lock on Notification for the
+-- build's duration, blocking writes (not reads) — apply this in a low-traffic window.

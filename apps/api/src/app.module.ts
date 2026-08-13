@@ -14,6 +14,7 @@ import { ActivityModule } from './activity/activity.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationModule } from './notification/notification.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { RetentionModule } from './retention/retention.module';
 import { SessionAuthGuard } from './common/guards/session-auth.guard';
 import { throttlerOptions } from './common/rate-limit/rate-limit';
 
@@ -33,6 +34,7 @@ import { throttlerOptions } from './common/rate-limit/rate-limit';
     DashboardModule,
     NotificationModule,
     RealtimeModule,
+    RetentionModule,
   ],
   providers: [
     // Order matters: global guards run in registration order, and the throttler has to come
