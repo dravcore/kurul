@@ -17,4 +17,19 @@ describe('Health (e2e)', () => {
   it('GET /health returns 200 without a session', async () => {
     await request(app.getHttpServer()).get('/health').expect(200).expect({ status: 'ok' });
   });
+
+  /**
+   * The suite runs against a live test database, so the database probe has to report `up`.
+   * Redis is asserted as "not down" rather than "up": CI provides one (`REDIS_URL` set), while
+   * a local run may have none, and a deployment without Redis reports `skipped` — a supported
+   * configuration, not a failure. See `HealthService.probeRedis`.
+   */
+  it('GET /health/ready probes dependencies without a session', async () => {
+    const response = await request(app.getHttpServer()).get('/health/ready');
+
+    expect(response.body.checks.database).toBe('up');
+    expect(response.body.checks.redis).not.toBe('down');
+    expect(response.body.status).toBe('ok');
+    expect(response.status).toBe(200);
+  });
 });
