@@ -55,8 +55,13 @@ export const organizationOptions = {
     );
   },
   // HTTP membership revocation is immediate; Socket.io rooms are not. When Better Auth
-  // removes a member (Nest `/workspaces/*` will call the same API when that path lands),
-  // drop their board and notification rooms so they stop receiving tenant events.
+  // removes a member — which is what `DELETE /workspaces/:workspaceId/members/:userId` does,
+  // through `auth.api.removeMember` — drop their board and notification rooms so they stop
+  // receiving tenant events.
+  //
+  // This covers removal only. `/organization/leave` deletes the membership without running
+  // this hook, so `WorkspaceMemberService.leave` calls `evictUserFromWorkspaceSockets`
+  // itself; the two paths must stay evenly covered.
   organizationHooks: {
     afterRemoveMember: async ({
       member,

@@ -3,7 +3,14 @@ import { MemberRole } from '@kurultay/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';
-import { addMember, confirmEmail, createWorkspace, setMemberRole, signUp } from './helpers/auth';
+import {
+  addMember,
+  confirmEmail,
+  createWorkspace,
+  setMemberRole,
+  signUp,
+  type TestUser,
+} from './helpers/auth';
 import { resetDatabase } from './helpers/db';
 
 describe('Workspace isolation and roles (e2e)', () => {
@@ -298,6 +305,247 @@ describe('Workspace isolation and roles (e2e)', () => {
     await setMemberRole(prisma, workspace.id, me.body.id as string, MemberRole.ADMIN);
 
     await owner.agent.delete(`/workspaces/${workspace.id}`).expect(403);
+  });
+
+  /**
+   * BE-01. Everything below is the revoke half of the access lifecycle: until these routes
+   * existed, a user who joined a workspace could only be removed by deleting the workspace or
+   * editing the database by hand.
+   */
+  describe('membership revocation', () => {
+    /** Signs up a user, joins them to `workspaceId` at `role`, and returns their id + agent. */
+    async function joinAs(
+      workspaceId: string,
+      role: MemberRole,
+      name: string,
+    ): Promise<TestUser & { id: string }> {
+      const user = await signUp(app, { name });
+      const me = await user.agent.get('/me').expect(200);
+      await addMember(prisma, workspaceId, me.body.id as string, role);
+      return { ...user, id: me.body.id as string };
+    }
+
+    it('removes a member and revokes their access on the very next request', async () => {
+      const owner = await signUp(app, { name: 'Revoker' });
+      const workspace = await createWorkspace(owner.agent, 'Revoke', `revoke-${Date.now()}`);
+      const target = await joinAs(workspace.id, MemberRole.MEMBER, 'Removed');
+
+      // The access being revoked is real before the removal, so the 404 afterwards can only
+      // be the removal.
+      await target.agent.get(`/workspaces/${workspace.id}`).expect(200);
+
+      await owner.agent.delete(`/workspaces/${workspace.id}/members/${target.id}`).expect(204);
+
+      await target.agent.get(`/workspaces/${workspace.id}`).expect(404);
+      await target.agent.get(`/workspaces/${workspace.id}/members`).expect(404);
+
+      const rows = await prisma.workspaceMember.findMany({ where: { workspaceId: workspace.id } });
+      expect(rows).toHaveLength(1);
+    });
+
+    it('keeps a removal request from another tenant opaque', async () => {
+      const owner = await signUp(app, { name: 'Tenant A' });
+      const outsider = await signUp(app, { name: 'Tenant B' });
+      const workspace = await createWorkspace(owner.agent, 'Opaque', `opaque-${Date.now()}`);
+      const target = await joinAs(workspace.id, MemberRole.MEMBER, 'Bystander');
+
+      await outsider.agent.delete(`/workspaces/${workspace.id}/members/${target.id}`).expect(404);
+
+      expect(await prisma.workspaceMember.count({ where: { workspaceId: workspace.id } })).toBe(2);
+    });
+
+    it('refuses an ADMIN removing an OWNER, and refuses removing the last OWNER', async () => {
+      const owner = await signUp(app, { name: 'Sole Owner' });
+      const workspace = await createWorkspace(owner.agent, 'Hierarchy', `hier-${Date.now()}`);
+      const ownerMe = await owner.agent.get('/me').expect(200);
+      const admin = await joinAs(workspace.id, MemberRole.ADMIN, 'Deputy');
+
+      await admin.agent
+        .delete(`/workspaces/${workspace.id}/members/${ownerMe.body.id as string}`)
+        .expect(403);
+
+      // …and the OWNER cannot take themselves out through this endpoint either.
+      await owner.agent
+        .delete(`/workspaces/${workspace.id}/members/${ownerMe.body.id as string}`)
+        .expect(400);
+
+      expect(
+        await prisma.workspaceMember.count({
+          where: { workspaceId: workspace.id, role: MemberRole.OWNER },
+        }),
+      ).toBe(1);
+    });
+
+    it('404s for a user who is not a member of the workspace', async () => {
+      const owner = await signUp(app, { name: 'Owner' });
+      const stranger = await signUp(app, { name: 'Stranger' });
+      const workspace = await createWorkspace(owner.agent, 'Absent', `absent-${Date.now()}`);
+      const strangerMe = await stranger.agent.get('/me').expect(200);
+
+      await owner.agent
+        .delete(`/workspaces/${workspace.id}/members/${strangerMe.body.id as string}`)
+        .expect(404);
+    });
+
+    it('rejects a role the enum does not name', async () => {
+      const owner = await signUp(app, { name: 'Owner' });
+      const workspace = await createWorkspace(owner.agent, 'Enum', `enum-${Date.now()}`);
+      const target = await joinAs(workspace.id, MemberRole.MEMBER, 'Target');
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/members/${target.id}/role`)
+        .send({ role: 'SUPERUSER' })
+        .expect(400);
+
+      // whitelist + forbidNonWhitelisted: an unknown key is a 400, not a silently ignored one.
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/members/${target.id}/role`)
+        .send({ role: MemberRole.GUEST, isOwner: true })
+        .expect(400);
+    });
+
+    it('grants the new role immediately on promotion and takes it away on demotion', async () => {
+      const owner = await signUp(app, { name: 'Owner' });
+      const workspace = await createWorkspace(owner.agent, 'Roles', `roles-${Date.now()}`);
+      const subject = await joinAs(workspace.id, MemberRole.MEMBER, 'Subject');
+
+      // MEMBER: may not invite.
+      await subject.agent
+        .post(`/workspaces/${workspace.id}/invitations`)
+        .send({ email: `pre-${Date.now()}@test.example.com`, role: MemberRole.GUEST })
+        .expect(403);
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/members/${subject.id}/role`)
+        .send({ role: MemberRole.ADMIN })
+        .expect(200)
+        .expect(({ body }) => {
+          expect(body.role).toBe(MemberRole.ADMIN);
+          expect(body.userId).toBe(subject.id);
+          expect(body.workspaceId).toBe(workspace.id);
+        });
+
+      // …and the very next request already carries the new role.
+      await subject.agent
+        .post(`/workspaces/${workspace.id}/invitations`)
+        .send({ email: `post-${Date.now()}@test.example.com`, role: MemberRole.GUEST })
+        .expect(201);
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/members/${subject.id}/role`)
+        .send({ role: MemberRole.GUEST })
+        .expect(200);
+
+      // GUEST: reads still work, writes do not.
+      await subject.agent.get(`/workspaces/${workspace.id}`).expect(200);
+      await subject.agent
+        .patch(`/workspaces/${workspace.id}`)
+        .send({ name: 'Guest Rename' })
+        .expect(403);
+    });
+
+    it('lets only an OWNER hand over ownership', async () => {
+      const owner = await signUp(app, { name: 'Owner' });
+      const workspace = await createWorkspace(owner.agent, 'Handover', `handover-${Date.now()}`);
+      const admin = await joinAs(workspace.id, MemberRole.ADMIN, 'Deputy');
+      const other = await joinAs(workspace.id, MemberRole.MEMBER, 'Candidate');
+
+      await admin.agent
+        .patch(`/workspaces/${workspace.id}/members/${other.id}/role`)
+        .send({ role: MemberRole.OWNER })
+        .expect(403);
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/members/${other.id}/role`)
+        .send({ role: MemberRole.OWNER })
+        .expect(200);
+
+      expect(
+        await prisma.workspaceMember.count({
+          where: { workspaceId: workspace.id, role: MemberRole.OWNER },
+        }),
+      ).toBe(2);
+    });
+
+    it('refuses to demote the last OWNER', async () => {
+      const owner = await signUp(app, { name: 'Sole Owner' });
+      const workspace = await createWorkspace(owner.agent, 'Demote', `demote-${Date.now()}`);
+      const ownerMe = await owner.agent.get('/me').expect(200);
+
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/members/${ownerMe.body.id as string}/role`)
+        .send({ role: MemberRole.ADMIN })
+        .expect(409);
+
+      const still = await prisma.workspaceMember.findFirstOrThrow({
+        where: { workspaceId: workspace.id, userId: ownerMe.body.id as string },
+      });
+      expect(still.role).toBe(MemberRole.OWNER);
+    });
+
+    it('lets a member leave on their own, at any role', async () => {
+      const owner = await signUp(app, { name: 'Owner' });
+      const workspace = await createWorkspace(owner.agent, 'Leave', `leave-${Date.now()}`);
+      const guest = await joinAs(workspace.id, MemberRole.GUEST, 'Guest');
+
+      await guest.agent.get(`/workspaces/${workspace.id}`).expect(200);
+
+      await guest.agent.post(`/workspaces/${workspace.id}/members/me/leave`).expect(204);
+
+      await guest.agent.get(`/workspaces/${workspace.id}`).expect(404);
+      await guest.agent.post(`/workspaces/${workspace.id}/members/me/leave`).expect(404);
+      expect(await prisma.workspaceMember.count({ where: { workspaceId: workspace.id } })).toBe(1);
+    });
+
+    it('refuses to let the last OWNER leave', async () => {
+      const owner = await signUp(app, { name: 'Sole Owner' });
+      const workspace = await createWorkspace(owner.agent, 'Stuck', `stuck-${Date.now()}`);
+
+      await owner.agent.post(`/workspaces/${workspace.id}/members/me/leave`).expect(409);
+
+      // …and the way out is to hand ownership over first.
+      const heir = await joinAs(workspace.id, MemberRole.MEMBER, 'Heir');
+      await owner.agent
+        .patch(`/workspaces/${workspace.id}/members/${heir.id}/role`)
+        .send({ role: MemberRole.OWNER })
+        .expect(200);
+
+      await owner.agent.post(`/workspaces/${workspace.id}/members/me/leave`).expect(204);
+      await owner.agent.get(`/workspaces/${workspace.id}`).expect(404);
+    });
+
+    /**
+     * The firewall is the reason these Nest routes exist at all; adding them must not open the
+     * Better Auth HTTP surface they replace.
+     */
+    it('keeps the Better Auth member-mutation paths blocked', async () => {
+      const owner = await signUp(app, { name: 'Owner' });
+      const workspace = await createWorkspace(owner.agent, 'Firewall', `fw-${Date.now()}`);
+      const target = await joinAs(workspace.id, MemberRole.MEMBER, 'Target');
+      const member = await prisma.workspaceMember.findFirstOrThrow({
+        where: { workspaceId: workspace.id, userId: target.id },
+      });
+
+      await owner.agent
+        .post('/auth/organization/remove-member')
+        .send({ memberIdOrEmail: member.id, organizationId: workspace.id })
+        .expect(403);
+
+      await owner.agent
+        .post('/auth/organization/update-member-role')
+        .send({ memberId: member.id, role: MemberRole.ADMIN, organizationId: workspace.id })
+        .expect(403);
+
+      await target.agent
+        .post('/auth/organization/leave')
+        .send({ organizationId: workspace.id })
+        .expect(403);
+
+      const untouched = await prisma.workspaceMember.findFirstOrThrow({
+        where: { id: member.id },
+      });
+      expect(untouched.role).toBe(MemberRole.MEMBER);
+    });
   });
 
   it('blocks Better Auth organization mutation HTTP so Nest remains the public API', async () => {
