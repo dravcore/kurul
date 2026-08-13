@@ -124,10 +124,20 @@ Workspace olmayan route'lar (tam liste):
 
 ```
 GET   /health                # liveness, kimliksiz
+GET   /health/ready          # readiness, kimliksiz
 POST  /auth/*                # Better Auth handler'ları
 GET   /me                    # mevcut kullanıcı profili
 PATCH /me                    # kendi profili; bugün yalnızca arayüz dili
 ```
+
+İki health route'u farklı sorulara cevap verir, birbirinin yerine kullanılamaz. `/health`
+liveness'tır — süreç ayakta mı — ve hiçbir bağımlılığa dokunmaz; böylece bir bağımlılıktaki
+anlık dalgalanma instance'ı yeniden başlatmaya yol açmaz. `/health/ready` Postgres ve Redis'i
+yoklar: instance trafik alabiliyorsa `{ status, checks }` gövdesiyle `200`, alamıyorsa aynı
+gövdeyle `503` döner; `checks` düşen bağımlılığı adıyla söyler (`up` / `down` / `skipped` —
+sonuncusu deployment'ın o bağımlılığı hiç yapılandırmadığı anlamına gelir). Hata gövdesi
+bilinçli olarak aşağıdaki hata zarfı değil, probe belgesinin kendisidir — çağıran taraf bir
+healthcheck'tir, bir istemci değil.
 
 `PATCH /me` workspace'e scope'lu değildir ve rol kontrolü yoktur: özne çağıranın kendisidir,
 dolayısıyla yetkilendirmenin tamamı session guard'ıdır. `User.locale`'in yazıldığı tek yer de

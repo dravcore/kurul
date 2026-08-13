@@ -123,10 +123,19 @@ Non-workspace routes (the complete list):
 
 ```
 GET   /health                # liveness, unauthenticated
+GET   /health/ready          # readiness, unauthenticated
 POST  /auth/*                # Better Auth handlers
 GET   /me                    # current user profile
 PATCH /me                    # own profile; interface language today
 ```
+
+The two health routes answer different questions and are not interchangeable. `/health` is
+liveness — the process is up — and touches nothing, so a dependency blip never gets an
+instance restarted. `/health/ready` probes Postgres and Redis and answers `200` with
+`{ status, checks }` when the instance can serve traffic, `503` with the same document when it
+cannot; `checks` names the dependency that is down (`up` / `down` / `skipped`, the last one
+meaning the deployment does not configure it). The failure body is intentionally the probe
+document rather than the error envelope below — the caller is a healthcheck, not a client.
 
 `PATCH /me` is not workspace-scoped and not role-gated: the subject is the caller, so the
 session guard is the whole authorization story. It is also the only place `User.locale` is
