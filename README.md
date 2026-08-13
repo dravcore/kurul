@@ -21,6 +21,36 @@ and divide tasks among themselves — tracked, prioritized, and visible to every
 Kurultay aims to be a self-hostable, AGPL-licensed alternative to commercial Kanban/PM tools
 (Trello, Linear, Jira) for teams who want to own their data and their workflow.
 
+## Why Kurultay
+
+Teams picking a self-hosted board rarely compare it to Trello — they compare it to the other
+self-hostable options. Where that field stands today:
+
+| Project                                                          | Where it stands                                                                                                                    |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [Planka](https://github.com/plankanban/planka)                   | Source-available, no longer OSI open source — "fair-code distributed under the Fair Use License and PLANKA Pro/Enterprise License" |
+| [WeKan](https://github.com/wekan/wekan)                          | Fully open source (MIT), no paid tier; Meteor-based stack (Meteor 3.5 / Node.js 24)                                                |
+| [Focalboard](https://github.com/mattermost-community/focalboard) | "This repository is currently not maintained" — work continues only as a Mattermost plugin                                         |
+| [Vikunja](https://vikunja.io/pricing/)                           | AGPLv3 core, but the admin panel, audit logs and time tracking are Pro-only even on an instance you host yourself                  |
+| [OpenProject](https://www.openproject.org/pricing/)              | GPLv3 Community Edition, Rails-based and enterprise-shaped; a set of features stays Enterprise-only                                |
+
+Kurultay's answer is deliberately narrow:
+
+- **One license, one tier.** AGPL-3.0 for the whole codebase, nothing held back. The commercial
+  model is dual licensing of that same code, not a paid feature build
+  ([ADR 0014](docs/decisions/0014-dual-licensing-cla.md)).
+- **Current stack, one compose file.** Next.js 16 / NestJS 11 / PostgreSQL 18, TypeScript end to
+  end, `docker compose up --build` for the whole thing.
+- **Realtime and multi-tenancy in the core.** Socket.io board sync and workspace-scoped queries
+  were designed in, not added on top.
+
+And what it is not, at `v0.1.0`: no task attachments, no checklists or subtasks, no time
+tracking, no public API tokens or webhooks, and an English-only UI. Attachments, API tokens,
+webhooks and further language packs are listed under [Beyond MVP](docs/roadmap.md#beyond-mvp),
+each with the open question holding it up; checklists, subtasks and time tracking are not on
+that list at all. If you need them today, one of the more mature projects above is the better
+choice.
+
 ## Features
 
 Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
