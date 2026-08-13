@@ -20,11 +20,58 @@ x-logging: &logging
     max-size: '10m'
     max-file: '3'
 
+# SEC-02's non-root half landed in PR #109 (`USER node` in both Dockerfiles' runner
+# stages); this is the capability half the finding also asked for. The Linux capability
+# set a container gets by default (CAP_NET_RAW, CAP_SYS_PTRACE, CAP_CHOWN, …) is attack
+# surface regardless of which user is running: an RCE or dependency-confusion bug inherits
+# whatever the kernel handed the container, not whatever the app process dropped on its
+# own. Dropping the full set and re-adding only what a service is verified to need shrinks
+# that surface to exactly what's load-bearing. `no-new-privileges` closes the matching
+# escalation path — a setuid/setcap binary reached through a supply-chain dependency
+# could otherwise claw back what was dropped here.
+#
+# A mapping merge (`<<: *hardened`), not a scalar anchor like `x-logging` above: postgres
+# and redis below need this baseline *plus* a couple of narrowly-scoped `cap_add` entries,
+# so the anchor has to be mergeable into a service block that also declares its own keys.
+# Every cap_add is commented at its call site with which entrypoint step demands it and how
+# that was confirmed — a service that "probably" needs a capability doesn't get one; only
+# a service that failed without it and passed with it does. Api/web/migrate/backup below
+# take the anchor with no additions: verified running with the full set dropped and nothing
+# else, because none of them chown, setuid, or bind privileged ports.
+x-hardened: &hardened
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
+
 services:
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
     logging: *logging
+    <<: *hardened
+    # The official postgres entrypoint always starts as root (regardless of any `--user`
+    # flag) so it can fix up a fresh or host-mounted data directory before dropping to the
+    # `postgres` role — see `docker-entrypoint.sh`'s `docker_create_db_directories()` and
+    # its final `exec gosu postgres "$BASH_SOURCE" "$@"`. Verified by running the image
+    # with `cap_drop: [ALL]` and nothing else against a fresh named volume: it fails at
+    # `chmod: /var/run/postgresql: Operation not permitted` / `chown: ...: Operation not
+    # permitted` before initdb ever runs. Re-added one capability at a time until both a
+    # first boot (empty volume, runs initdb) and a *second* boot (existing volume, skips
+    # initdb) succeeded end-to-end:
+    #   - CAP_CHOWN, CAP_FOWNER — `docker_create_db_directories` chowns/chmods PGDATA and
+    #     /var/run/postgresql to the postgres uid on every start, not just the first.
+    #   - CAP_SETUID, CAP_SETGID — the final `gosu postgres` re-exec needs both to drop
+    #     from root to the postgres uid/gid.
+    #   - CAP_DAC_OVERRIDE — *not* needed on the very first boot (root just created PGDATA,
+    #     so it already owns it), but every boot after the first calls
+    #     `find "$PGDATA" \! -user postgres -exec chown …`, and by then PGDATA is `chmod
+    #     0700` owned by `postgres`. Without DAC_OVERRIDE, root can't even `find` its way
+    #     into a 0700 directory it doesn't own the traversal rights to — confirmed: a
+    #     restart with the other four caps but not this one failed with `find:
+    #     /var/lib/postgresql/18/docker: Permission denied` and the container exited.
+    # `no-new-privileges` (from the anchor) does not conflict with `gosu`: gosu drops
+    # privilege via the setuid()/setgid() syscalls under an already-held capability, not by
+    # exec'ing a setuid-bit binary, so there is nothing for no-new-privileges to block.
+    cap_add: [CHOWN, FOWNER, SETUID, SETGID, DAC_OVERRIDE]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kurultay}
       # No baked-in default: compose fails loudly instead of initializing (or, on every later
@@ -47,6 +94,37 @@ services:
     image: redis:8-alpine
     restart: unless-stopped
     logging: *logging
+    <<: *hardened
+    # CAP_SETUID / CAP_SETGID, not DAC_OVERRIDE: the redis image's own entrypoint drops
+    # privilege via `setpriv --reuid redis --regid redis` (see `docker-entrypoint.sh`), but
+    # only when its *first* argument is literally `redis-server` — that's how it tells "I
+    # was asked to run the server" apart from "I was asked to run some other command in
+    # this image". An earlier version of this block ran `sh -c '...'` to make
+    # `REDIS_PASSWORD` optional, which handed the entrypoint `sh` as $1 instead, so the
+    # `redis-server` check never matched, the privilege drop never ran, and the process
+    # spent its whole life as root — confirmed with `docker top` (not `docker exec ... id`,
+    # which reports the *exec session's* user from the image's `USER`, not PID 1's actual
+    # runtime user, and would have shown root either way). That was a real regression
+    # introduced when `REDIS_PASSWORD` went from a hardcoded default to an optional
+    # variable (PR #166), not something inherent to running in a container — the `command:`
+    # below now passes `redis-server` as `$1` directly (exec form, empty string included
+    # even when the array element is blank — a plain shell string would have dropped it),
+    # so the entrypoint's own detection matches again and the drop to uid 999 happens as
+    # the image intends.
+    #
+    # With that fixed, `cap_drop: [ALL]` alone still isn't enough — `has_cap setuid && has_cap
+    # setgid` is exactly what gates whether the entrypoint's `setpriv` re-exec runs at all,
+    # so the two capabilities it needs to perform the drop have to survive the drop:
+    # `CAP_SETUID`/`CAP_SETGID` back on the allowlist lets `setpriv` switch to `redis`
+    # (confirmed via `docker top`: `999 ... redis-server`, not `root ...`), after which
+    # `setpriv`'s own `--bounding-set=-all` strips capabilities right back down inside the
+    # container — so the end state has *fewer* capabilities than the DAC_OVERRIDE approach
+    # this replaced, and none of them belong to root. `DAC_OVERRIDE` is no longer needed at
+    # all once the process actually owns `/data` as uid 999 instead of trying to write into
+    # it as root: verified with the same SET → restart cycle used to catch the original
+    # regression — `DB saved on disk` at shutdown, `Done loading RDB, keys loaded: 1` on the
+    # next boot, value intact after `GET`, capability set never touching DAC_OVERRIDE.
+    cap_add: [SETUID, SETGID]
     environment:
       # Optional, unlike POSTGRES_PASSWORD above: this Redis instance holds cache entries,
       # sessions, rate-limit counters and the notification queue — no board data (see
@@ -56,21 +134,25 @@ services:
       # before; set it in .env to add defense in depth against another container reachable on
       # the same Docker network.
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-    # The official image has no env var for `requirepass` — it only takes effect via a CLI
-    # flag or config file — so the entrypoint has to branch in a shell. `$$` (not `$`), so
-    # Compose leaves the reference untouched at config time and the container's own shell
-    # resolves it at runtime from the REDIS_PASSWORD set above.
-    command:
-      - sh
-      - -c
-      - >-
-        if [ -n "$$REDIS_PASSWORD" ]; then
-          exec redis-server --requirepass "$$REDIS_PASSWORD";
-        else
-          exec redis-server;
-        fi
+    # Exec form, and substituted by Compose itself (`${REDIS_PASSWORD:-}`, not the
+    # `$$REDIS_PASSWORD` escape used elsewhere in this file for values read inside a
+    # container's own shell) — there is no shell in this command line to resolve a runtime
+    # reference, and there does not need to be: `--requirepass ''` when the variable is
+    # unset is exactly `requirepass` unset, so a blank `.env` value reproduces the
+    # passwordless default this project has always shipped, without a conditional. Must
+    # stay array form: a single command *string* here would go through `sh -c` again (the
+    # same trap this replaces) and a string with a trailing blank argument silently loses
+    # it, whereas the array passes an explicit empty element through to `redis-server`.
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']
     volumes:
       - redis_data:/data
+    # Still branches on REDIS_PASSWORD, even though `redis-cli -a "" ping` was confirmed to
+    # work either way (it prints `AUTH failed: ... without any password configured` to
+    # stderr and then still answers PONG with exit 0 — the auth attempt fails but the
+    # command it's chained to doesn't). Kept conditional anyway: that stderr line would
+    # repeat on every 5s probe on every install that never sets a password, which is most
+    # of them, turning `docker compose logs` / `docker inspect`'s health log into a
+    # permanent false alarm about auth failing. Correctness alone doesn't win against that.
     healthcheck:
       test:
         [
@@ -92,6 +174,16 @@ services:
   backup:
     image: postgres:18-alpine
     logging: *logging
+    <<: *hardened
+    # Unlike postgres above, `entrypoint:` here replaces docker-entrypoint.sh outright —
+    # backup.sh runs directly, so the chown/gosu dance that needs postgres's extra
+    # capabilities never executes and this container runs as root (the image's default)
+    # for its whole life without ever touching ownership of anything. All it does is talk
+    # pg_dump over the network and write into its own backup_data volume, which docker
+    # creates owned by root — nothing here needs a capability beyond the default-safe
+    # baseline. Verified by running the image standalone against a live postgres with
+    # `cap_drop: [ALL]` and no `cap_add`: `backup.sh once` wrote a valid non-empty dump
+    # file and exited 0.
     environment:
       # postgres:5432 is the in-network address, same as the api/migrate services above —
       # unrelated to the host .env DATABASE_URL used by the dev loop.
@@ -124,6 +216,14 @@ services:
     # `up`, so its log file accumulates one migration run's output per deploy forever.
     # Uniformity also means nobody has to re-derive which services were exempt.
     logging: *logging
+    <<: *hardened
+    # The `migrate` build target (apps/api/Dockerfile) has no `USER` directive — it's the
+    # `build` stage reused as-is, one layer before `runner` adds `USER node` — so this runs
+    # as root regardless. That's fine here: `prisma migrate deploy` only opens a network
+    # connection to postgres and reads its own already-built `/app`, no chown/setuid/bind
+    # of anything. Verified by building the `migrate` target and running it standalone with
+    # `cap_drop: [ALL]` and no `cap_add` against a live postgres: all 13 migrations applied
+    # and the container exited 0.
     environment:
       # postgres:5432 (not localhost) — this is the in-network address, unrelated to
       # whatever DATABASE_URL a developer has in their host .env for the dev loop.
@@ -141,6 +241,11 @@ services:
     # deliberate exception: it is a one-shot job that must stay exited.
     restart: unless-stopped
     logging: *logging
+    <<: *hardened
+    # `runner` (apps/api/Dockerfile) already runs as `USER node` (PR #109, SEC-02's other
+    # half) and never chowns, binds a privileged port, or otherwise needs a capability the
+    # kernel doesn't hand every process by default. Verified: full stack up with `cap_drop:
+    # [ALL]` and no `cap_add`, `/health/ready` → 200.
     environment:
       # postgres:5432 / redis:6379 are the in-network addresses; they're intentionally not
       # sourced from the host .env, whose DATABASE_URL/REDIS_URL point at localhost for the
@@ -211,6 +316,11 @@ services:
         NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-}
     restart: unless-stopped
     logging: *logging
+    <<: *hardened
+    # Same reasoning as api above: `runner` (apps/web/Dockerfile) already runs as `USER
+    # node` and the Next.js standalone server needs nothing beyond the default-safe
+    # baseline. Verified: full stack up with `cap_drop: [ALL]` and no `cap_add`, web
+    # healthcheck reports healthy.
     ports:
       - '3000:3000'
     # busybox wget follows 3xx redirects, so a redirecting root page still counts as healthy;

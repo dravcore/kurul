@@ -14,6 +14,7 @@ How to set up a Kurultay development environment and work in it day to day.
 - [Database connection pool](#database-connection-pool)
 - [SMTP and Mailpit](#smtp-and-mailpit)
 - [Run modes](#run-modes)
+- [Container hardening](#container-hardening)
 - [pnpm scripts](#pnpm-scripts)
 - [Database workflow](#database-workflow)
 - [Data retention](#data-retention)
@@ -337,6 +338,57 @@ service: the dev loop's database is throwaway by design.
 | Startup after a code change | seconds              | tens of seconds                                   |
 | Matches production          | Partially            | Yes                                               |
 | Use for                     | Everyday development | Verifying images, release checks, running the app |
+
+## Container hardening
+
+Every service in both compose files runs with the full Linux capability set dropped
+(`cap_drop: [ALL]`) and `no-new-privileges:true` set, via the `x-hardened` YAML anchor at
+the top of each file. A default container capability set — `CAP_NET_RAW`, `CAP_SYS_PTRACE`,
+`CAP_CHOWN`, and a dozen others — is attack surface regardless of which OS user the process
+runs as: a code-execution bug inherits whatever the kernel handed the container, not
+whatever the application dropped on its own initiative. This is the second half of SEC-02
+(`audit/findings/security.md`); the first half — `USER node` in both Dockerfiles' runner
+stages, so `api`/`web` don't run as root in the first place — landed in PR #109.
+
+A capability is re-added only where a service was actually run with just the drop and
+observed to fail, never because it "seems like it might need it." The comments beside each
+`cap_add:` in the compose files carry the failure that justified it; the short version:
+
+| Service      | `cap_add`                                             | Why                                                                                                                                                                                                                                                                                                                       |
+| ------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api`, `web` | none                                                  | Already `USER node` — no `chown`, `setuid`, or privileged port bind at any point in the container's life                                                                                                                                                                                                                  |
+| `migrate`    | none                                                  | The `migrate` build target has no `USER` (it's the pre-`runner` `build` stage), so it runs as root, but it only opens a DB connection and reads its own already-built `/app`                                                                                                                                              |
+| `backup`     | none                                                  | `entrypoint:` replaces the postgres image's own entrypoint outright, so its chown/re-exec logic never runs — the sidecar stays root but never touches ownership of anything                                                                                                                                               |
+| `postgres`   | `CHOWN`, `FOWNER`, `SETUID`, `SETGID`, `DAC_OVERRIDE` | The official entrypoint always starts as root, `chown`s `PGDATA` to the `postgres` user on _every_ boot (not just the first), then `gosu postgres` re-execs itself — `DAC_OVERRIDE` specifically is needed from the second boot onward, once `PGDATA` is `chmod 0700` and root can no longer `find` its way in without it |
+| `redis`      | `SETUID`, `SETGID`                                    | The entrypoint drops privilege to uid 999 via `setpriv`, but only when its first argument is literally `redis-server` — see below                                                                                                                                                                                         |
+
+**redis's `command:` is exec form, not a shell wrapper, and that isn't cosmetic.** An
+earlier draft of this hardening pass used `command: ['sh', '-c', 'if [ -n "$REDIS_PASSWORD" ]; then …; fi']`
+to keep `REDIS_PASSWORD` optional. That handed the container's entrypoint `sh` as its first
+argument instead of `redis-server`, which is exactly what the entrypoint's own privilege-drop
+check keys on — so the drop silently never ran, and redis-server spent its entire life as
+root. Caught during review by checking `docker top` (not `docker exec ... id`, which reports
+the _exec session's_ user from the image's `USER` directive, not PID 1's actual runtime
+user — the wrong tool would have shown the same output either way and hidden the bug). This
+was a genuine regression from PR #166, which introduced the `sh -c` wrapper to make
+`REDIS_PASSWORD` optional without a hardcoded default.
+
+The fix is `command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']` — array form,
+substituted by Compose itself at config time (`${REDIS_PASSWORD:-}`, not the `$$` escape
+used elsewhere in this file for values a container's own shell resolves at runtime). With
+`redis-server` back as the literal first argument, the entrypoint's detection matches again,
+`setpriv --reuid redis --regid redis` runs, and the capabilities that operation needs
+(`SETUID`, `SETGID`) replace the `DAC_OVERRIDE` an earlier version of this document
+described — `DAC_OVERRIDE` was compensating for running as root; once the process is uid 999
+and owns `/data` outright (the image bakes it that way), no override is needed. Confirmed
+with `docker top` showing `999 ... redis-server` instead of `root ... redis-server`, and a
+`SET` → restart cycle that survives with the value intact in both the password and
+no-password cases.
+
+Out of scope for this hardening pass: a read-only root filesystem (`read_only: true`) and
+seccomp profiles. Both are stricter constraints that need a per-service audit of which
+paths must stay writable (temp dirs, node's own `/tmp` use, etc.) — tracked as a follow-up,
+not bundled in here.
 
 ## pnpm scripts
 

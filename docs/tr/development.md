@@ -14,6 +14,7 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 - [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)
 - [SMTP ve Mailpit](#smtp-ve-mailpit)
 - [Çalışma modları](#çalışma-modları)
+- [Container sertleştirme](#container-sertleştirme)
 - [pnpm script'leri](#pnpm-scriptleri)
 - [Veritabanı iş akışı](#veritabanı-iş-akışı)
 - [Veri saklama](#veri-saklama)
@@ -338,6 +339,60 @@ servis yok: geliştirme döngüsünün veritabanı tasarım gereği atılabilir.
 | Kod değişikliği sonrası başlama | saniyeler          | onlarca saniye                                                   |
 | Production'a benzerlik          | Kısmen             | Evet                                                             |
 | Kullanım amacı                  | Günlük geliştirme  | Image'ları doğrulama, release kontrolleri, uygulamayı çalıştırma |
+
+## Container sertleştirme
+
+Her iki compose dosyasındaki her servis, dosyaların başındaki `x-hardened` YAML anchor'ı
+üzerinden tüm Linux capability set'i düşürülmüş (`cap_drop: [ALL]`) ve
+`no-new-privileges:true` ayarlanmış olarak çalışır. Bir container'ın varsayılan capability
+seti — `CAP_NET_RAW`, `CAP_SYS_PTRACE`, `CAP_CHOWN` ve bir düzine daha fazlası — hangi işletim
+sistemi kullanıcısıyla çalıştığından bağımsız olarak saldırı yüzeyidir: bir kod-çalıştırma
+açığı, uygulamanın kendi inisiyatifiyle düşürdüğü değil, kernel'in container'a verdiği her
+şeyi devralır. Bu, SEC-02'nin ikinci yarısıdır (`audit/findings/security.md`); birinci
+yarı — her iki Dockerfile'ın runner stage'inde `USER node`, yani `api`/`web`'in baştan root
+olarak çalışmaması — PR #109'da tamamlandı.
+
+Bir capability yalnızca bir servis düşürülmüş haliyle gerçekten çalıştırılıp başarısız
+olduğu gözlemlendiğinde geri eklenir, "muhtemelen gerekir" diye değil. Compose
+dosyalarındaki her `cap_add:` yanındaki yorum, o kararı gerektiren gerçek hatayı taşır;
+kısa özeti:
+
+| Servis       | `cap_add`                                             | Neden                                                                                                                                                                                                                                                                                                                                                 |
+| ------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api`, `web` | yok                                                   | Zaten `USER node` — container'ın ömrü boyunca hiçbir noktada `chown`, `setuid` veya ayrıcalıklı port bind'i yok                                                                                                                                                                                                                                       |
+| `migrate`    | yok                                                   | `migrate` build hedefinin `USER`'ı yok (runner öncesi `build` stage'inin kendisi), yani root çalışır — ama yalnızca DB'ye bağlanır ve kendi zaten inşa edilmiş `/app`'ini okur                                                                                                                                                                        |
+| `backup`     | yok                                                   | `entrypoint:`, postgres imajının kendi entrypoint'ini tamamen değiştiriyor, dolayısıyla chown/re-exec mantığı hiç çalışmıyor — sidecar root kalır ama hiçbir sahiplik değiştirmiyor                                                                                                                                                                   |
+| `postgres`   | `CHOWN`, `FOWNER`, `SETUID`, `SETGID`, `DAC_OVERRIDE` | Resmî entrypoint her zaman root olarak başlar, _her_ açılışta (yalnızca ilkinde değil) `PGDATA`'yı `postgres` kullanıcısına `chown`'lar, sonra `gosu postgres` ile kendini yeniden exec eder — `DAC_OVERRIDE` özellikle ikinci açılıştan itibaren gerekir: `PGDATA` artık `chmod 0700` olduğunda root bu izin olmadan içine `find` ile bile giremiyor |
+| `redis`      | `SETUID`, `SETGID`                                    | Entrypoint, `setpriv` ile uid 999'a ayrıcalık düşürür — ama yalnızca ilk argümanı harfiyen `redis-server` olduğunda; aşağıya bakın                                                                                                                                                                                                                    |
+
+**redis'in `command:`'i exec form'dur, shell wrapper değil — ve bu kozmetik bir tercih değil.**
+Bu sertleştirme turunun ilk taslağı, `REDIS_PASSWORD`'u opsiyonel tutmak için
+`command: ['sh', '-c', 'if [ -n "$REDIS_PASSWORD" ]; then …; fi']` kullanıyordu. Bu,
+container'ın entrypoint'ine ilk argüman olarak `redis-server` yerine `sh`'ı veriyordu — tam
+olarak entrypoint'in kendi ayrıcalık-düşürme kontrolünün baktığı şey bu. Dolayısıyla düşürme
+sessizce hiç çalışmadı ve redis-server ömrü boyunca root olarak kaldı. Review sırasında
+`docker top` ile yakalandı (`docker exec ... id` ile değil — o, PID 1'in gerçek çalışma
+zamanı kullanıcısını değil, imajın `USER` yönergesinden gelen _exec session_'ın kullanıcısını
+raporlar; yanlış araç aynı çıktıyı verip hatayı gizlerdi). Bu, `REDIS_PASSWORD`'u sabit bir
+varsayılan olmadan opsiyonel yapmak için `sh -c` wrapper'ını ekleyen PR #166'dan kaynaklanan
+gerçek bir gerilemeydi.
+
+Düzeltme `command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']` — dizi (exec)
+formu, Compose'un kendisi tarafından config zamanında değiştiriliyor (`${REDIS_PASSWORD:-}`,
+bu dosyada başka yerlerde bir container'ın kendi shell'inin çalışma zamanında çözdüğü
+değerler için kullanılan `$$` kaçışı değil). `redis-server` yeniden ilk argüman olarak literal
+şekilde geldiğinde entrypoint'in tespiti yeniden eşleşiyor, `setpriv --reuid redis --regid
+redis` çalışıyor, ve bu işlemin ihtiyaç duyduğu capability'ler (`SETUID`, `SETGID`) bu
+belgenin önceki bir sürümünde anlatılan `DAC_OVERRIDE`'ın yerini alıyor — `DAC_OVERRIDE`,
+root olarak çalışmayı telafi ediyordu; süreç artık uid 999 olup `/data`'ya (imajın bu şekilde
+bakladığı) doğrudan sahipken hiçbir override gerekmiyor. `docker top`'un `root ...
+redis-server` yerine `999 ... redis-server` göstermesiyle, ve hem şifreli hem şifresiz
+durumda değerin sağlam kaldığı bir `SET` → restart döngüsüyle doğrulandı.
+
+Bu sertleştirme turunun kapsamı dışında: salt-okunur kök dosya sistemi (`read_only: true`)
+ve seccomp profilleri. İkisi de hangi yolların yazılabilir kalması gerektiğine dair
+servis-bazlı bir denetim isteyen daha katı kısıtlar (geçici dizinler, node'un kendi `/tmp`
+kullanımı vb.) — takip işi olarak izleniyor, buraya dahil edilmedi.
 
 ## pnpm script'leri
 
