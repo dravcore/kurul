@@ -11,6 +11,7 @@ import { STATUS_CODES } from 'node:http';
 import { Prisma } from '../../generated/prisma';
 import { isProductionEnv } from '../env';
 import { getRequestId } from '../logging/request-id';
+import { captureServerError, type ServerErrorContext } from '../observability/sentry';
 import type { ValidationDetail } from '../validation/validation-exception.factory';
 
 interface ProblemDetails {
@@ -109,14 +110,42 @@ export class AllExceptionsFilter implements ExceptionFilter {
    * Logs a failure with the correlation id appended, so the stack trace in the process log
    * and the access-log line for the same request join on `requestId` — and so does the
    * `requestId` the client was handed in the error envelope.
+   *
+   * The same four call sites are also the complete list of what reaches Sentry, and that is
+   * not an accident of implementation — it is the filter's signal/noise policy:
+   *
+   * - **4xx never goes to Sentry.** A `404` for a deleted task, a `403` from a permission
+   *   check, a `400` from `ValidationPipe`, a `429` from the throttler — these are the API
+   *   working as designed, driven by whatever the client sent. They are already counted in
+   *   the access log (`level: 'warn'`), and shipping them would bury the ~dozen real
+   *   failures a month under thousands of events on a free-tier quota, which is how an
+   *   alerting channel stops being read.
+   * - **5xx and anything unrecognised does.** A `500` means the server broke: an unmapped
+   *   Prisma error, a bug that threw, a `throw 'boom'` with no stack. Nobody sent that on
+   *   purpose, and it is exactly the class of failure OPS-05 says currently goes unnoticed
+   *   until a user complains.
+   *
+   * The split falls out of the control flow for free: `logFailure` was already called only
+   * on `statusCode >= 500` and on the three non-`HttpException` branches, so reporting rides
+   * along with logging and the two can never drift apart.
    */
-  private logFailure(requestId: string | undefined, message: string, stack?: string): void {
-    const line = requestId === undefined ? message : `${message} (requestId=${requestId})`;
+  private reportFailure(
+    error: unknown,
+    context: ServerErrorContext,
+    message: string,
+    stack?: string,
+  ): void {
+    const line =
+      context.requestId === undefined ? message : `${message} (requestId=${context.requestId})`;
     if (stack === undefined) {
       this.logger.error(line);
-      return;
+    } else {
+      this.logger.error(line, stack);
     }
-    this.logger.error(line, stack);
+
+    // No-op unless `SENTRY_DSN` is set (see `common/observability/sentry.ts`), so this call
+    // stays unconditional and the default install pays nothing for it.
+    captureServerError(error, context);
   }
 
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -124,6 +153,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
     const requestId = getRequestId(request);
+    // Built once and shared by every `reportFailure` branch below. `statusCode` is filled in
+    // per branch because only the `HttpException` path knows a code other than 500.
+    const failureContext: ServerErrorContext = {
+      ...(requestId !== undefined ? { requestId } : {}),
+      ...(typeof request.method === 'string' ? { method: request.method } : {}),
+      ...(typeof request.url === 'string' ? { path: request.url } : {}),
+    };
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let error = reasonPhrase(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -153,7 +189,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
 
       if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
-        this.logFailure(requestId, exception.message, exception.stack);
+        this.reportFailure(
+          exception,
+          { ...failureContext, statusCode },
+          exception.message,
+          exception.stack,
+        );
       }
     } else if (
       exception instanceof Prisma.PrismaClientKnownRequestError ||
@@ -166,13 +207,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
         error = reasonPhrase(statusCode);
         message = mapped.message;
       } else {
-        this.logFailure(requestId, prismaError.message, prismaError.stack);
+        this.reportFailure(
+          prismaError,
+          { ...failureContext, statusCode },
+          prismaError.message,
+          prismaError.stack,
+        );
         if (!isProductionEnv()) {
           message = prismaError.message;
         }
       }
     } else if (exception instanceof Error) {
-      this.logFailure(requestId, exception.message, exception.stack);
+      this.reportFailure(
+        exception,
+        { ...failureContext, statusCode },
+        exception.message,
+        exception.stack,
+      );
       if (!isProductionEnv()) {
         message = exception.message;
       }
@@ -180,7 +231,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // Nothing here has a stack, so the value itself is all there is to log — without
       // this branch a `throw 'boom'` becomes a completely silent 500.
       const described = describe(exception);
-      this.logFailure(requestId, `Non-Error exception thrown: ${described}`);
+      // Wrapped in a real `Error` before it is reported: Sentry groups by exception type and
+      // stack, and a bare string yields one undifferentiated "Error" issue with no frames.
+      // The wrapper is created here (not inside `captureServerError`) so the stack starts at
+      // the filter rather than inside the reporting helper.
+      this.reportFailure(
+        new Error(`Non-Error exception thrown: ${described}`),
+        { ...failureContext, statusCode },
+        `Non-Error exception thrown: ${described}`,
+      );
       if (!isProductionEnv()) {
         message = described;
       }

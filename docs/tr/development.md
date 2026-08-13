@@ -19,6 +19,7 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 - [Veri saklama](#veri-saklama)
 - [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme)
 - [Geri alma (rollback)](#geri-alma-rollback)
+- [Gözlemlenebilirlik](#gözlemlenebilirlik)
 - [Günlük döngü](#günlük-döngü)
 - [Sorun giderme](#sorun-giderme)
 
@@ -109,6 +110,17 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `DATABASE_POOL_MAX`                   | `20`                                                                | Paylaşılan `pg` havuzunun Postgres'e açtığı azami eşzamanlı bağlantı sayısı — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                       |
 | `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                             | Tüm `DATABASE_POOL_MAX` bağlantılar meşgulken bir isteğin havuzdan bağlantı için ne kadar bekleyeceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                             |
 | `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                             | Postgres'in tek bir SQL ifadesini öldürmeden önce ne kadar çalışmasına izin vereceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                              |
+| `SENTRY_DSN`                          | _(boş)_                                                             | API hata takibi. **Boş = kapalı, ve kapalı SDK'nın hiç yüklenmemesi demektir** — bkz. [Gözlemlenebilirlik](#gözlemlenebilirlik)                                                                                                                    |
+| `SENTRY_ENVIRONMENT`                  | _(boş)_ / `production`                                              | API event'lerindeki ortam etiketi; boşsa `NODE_ENV`'e düşer. Staging ve production aynı imajı çalıştırıyorsa açıkça ayarlayın                                                                                                                      |
+| `SENTRY_RELEASE`                      | _(boş)_ / `v0.2.0`                                                  | API event'lerindeki sürüm etiketi; en iyisi dağıtılan tag. Boşsa hiç gönderilmez                                                                                                                                                                   |
+| `NEXT_PUBLIC_SENTRY_DSN`              | _(boş)_                                                             | Web hata takibi, aynı opt-in kuralı — **build sırasında gömülür**, değiştirdikten sonra web imajını yeniden build edin                                                                                                                             |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(boş)_ / `production`                                              | `SENTRY_ENVIRONMENT`'ın web karşılığı, o da build zamanlı                                                                                                                                                                                          |
+| `NEXT_PUBLIC_SENTRY_RELEASE`          | _(boş)_ / `v0.2.0`                                                  | `SENTRY_RELEASE`'in web karşılığı, o da build zamanlı                                                                                                                                                                                              |
+
+`SENTRY_AUTH_TOKEN`, `SENTRY_ORG` ve `SENTRY_PROJECT` yalnızca `next build` tarafından, source
+map yüklenirken ve yalnızca ayarlanmışlarsa okunur; bunlar olmadan build sessizce başarılı
+olduğu için `.env.example`'da yer almazlar. Bkz.
+[Gözlemlenebilirlik](#gözlemlenebilirlik).
 
 `.env.example` ayrıca `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `REDIS_PASSWORD`,
 `BACKUP_INTERVAL` ve `BACKUP_KEEP` taşır. Altısı da **yalnızca compose'a aittir** —
@@ -731,6 +743,154 @@ yükselt, `main`'e PR aç, tag'le, `develop`'a back-merge et, sonra production'�
 yükselt — rollback'i bitiren şey de budur. Kötü release `v0.2.0` idiyse ve production
 `v0.1.0`'da park hâlindeyse, hotfix `v0.2.1` olarak yayınlanır; eski tag'de, onu yayınlamanın
 alacağı süreden daha uzun park hâlinde kalmayın.
+
+## Gözlemlenebilirlik
+
+Üç sinyal, üç hedef. Buradaki hiçbir şey bir metrik stack'i değildir — Prometheus yok, Grafana
+yok, log toplayıcı yok. Kurultay'ın ölçeğinde cevaplanmaya değer soru "bir şey bozuldu mu ve
+bunu fark eden oldu mu"dur; bunun için tam olarak bu kadarı yeter:
+
+| Sinyal                      | Nereye akar                                                           | Nerede yapılandırılır                              |
+| --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------- |
+| İstek ve süreç log'ları     | konteyner stdout → Docker `json-file`, sınırlandırılmış ve rotasyonlu | `docker-compose.yml` (`x-logging`)                 |
+| Yakalanmamış hatalar (5xx)  | Sentry, **yalnızca bir DSN yapılandırdıysanız**                       | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`            |
+| Instance'ın ayakta olmaması | `/health/ready`'yi yoklayan harici bir uptime monitörü                | monitörünüzün paneli — bu repository'de hiçbir şey |
+
+Üçü tek bir tanımlayıcı üzerinde buluşur. Her istek bir `X-Request-Id` alır (upstream bir
+proxy gönderiyorsa o yeniden kullanılır, yoksa UUIDv7 üretilir); istemciye geri yansıtılır,
+JSON access-log satırına yazılır, sunucu tarafındaki stack trace'e eklenir ve — hata takibi
+açıksa — Sentry event'ine aranabilir bir `requestId` tag'i olarak iliştirilir. "Bozuldu, sayfa
+`0198e2c1-…` yazdı" diyen bir kullanıcı, tam olarak o hatadan bir `grep` ve bir Sentry
+aramasıdır.
+
+### Log'lar
+
+Her iki uygulama da stdout'a loglar; Docker toplar. `docker compose logs -f api` ile geri
+okunur.
+
+API her tamamlanan istek için tek bir JSON nesnesi yazar — `ts`, `level`, `requestId`,
+`method`, `path`, `status`, `durationMs`, `userId`. Bu alan listesi bilerek kapalıdır: istek
+gövdeleri, query string'ler, header'lar ve cookie'ler asla loglanmaz; çünkü bu API session
+cookie'leri, davet token'ları ve task içeriği taşır.
+
+Her iki compose dosyasındaki her servis log'larını **3 dosya × 10 MB** ile sınırlar
+(`docker-compose.yml` başındaki `x-logging`). Docker'ın `json-file` varsayılanı
+_sınırsızdır_ ve dolan bir disk başlı başına bir kesintidir — üstelik bu stack'in kendi
+başına ulaşabileceği bir kesinti, çünkü access log trafikle birlikte büyür. Ayar konteyner
+**oluşturulurken** uygulanır; bu yüzden mevcut bir dağıtımda etkili olması için
+`docker compose up -d` (konteynerleri yeniden oluşturur) gerekir, düz bir `restart` yetmez.
+Doğrulama:
+
+```bash
+docker inspect kurultay-api-1 --format '{{json .HostConfig.LogConfig}}'
+# {"Type":"json-file","Config":{"max-file":"3","max-size":"10m"}}
+```
+
+### Hata takibi (Sentry) — varsayılan kapalı
+
+Kurultay hata takibi **kapalı** gelir ve kapalı olması SDK'nın hiç yüklenmemesi demektir:
+initialize yok, global handler yok, dışarı bağlantı yok ve web tarafında ziyaretçinin
+tarayıcısının istediği bir Sentry chunk'ı yok. Kimsenin talep etmediği bir telemetri hattını
+sessizce açan self-host yazılım bu projenin gönderdiği bir şey değildir; DSN'leri boş bırakmak
+desteklenen, kalıcı bir yapılandırmadır.
+
+Açmak için `.env` içinde DSN'leri ayarlayın:
+
+```bash
+SENTRY_DSN=https://<key>@<org>.ingest.sentry.io/<project>              # API
+NEXT_PUBLIC_SENTRY_DSN=https://<key>@<org>.ingest.sentry.io/<project>  # web
+SENTRY_ENVIRONMENT=production            # opsiyonel; boşsa NODE_ENV'e düşer
+SENTRY_RELEASE=v0.2.0                    # opsiyonel; dağıttığınız tag'i verin
+```
+
+ardından `docker compose up -d --build web && docker compose up -d api`. API DSN'ini
+konteyner başlarken okur, bu yüzden restart yeterlidir. Web DSN'i bir `NEXT_PUBLIC_*`
+değeridir ve Next.js bunu **build** sırasında gömer — değişikliğin etkili olması için web
+imajının yeniden build edilmesi gerekir, tıpkı `NEXT_PUBLIC_API_URL` gibi.
+
+**İki ayrı Sentry projesi** kullanın, uygulama başına bir tane. Tarayıcı DSN'i her
+ziyaretçinin indirdiği JavaScript'e derlenir, dolayısıyla yapısı gereği publiktir; sunucunuzun
+kullandığı DSN ile aynı olmamalıdır. Self-host Sentry de aynı şekilde çalışır — DSN yalnızca
+kendi host'unuzu işaret eder.
+
+**Ne raporlanır, ne raporlanmaz.** API 5xx'i ve yalnızca 5xx'i raporlar: eşlenmemiş bir Prisma
+hatası, fırlatan bir bug, `Error` olmayan bir şeyin `throw`'u. İstemci hataları — 400, 401,
+403, 404, 409, 429 — asla gönderilmez. Bunlar API'nin tasarlandığı gibi çalışmasıdır, zaten
+access log'da sayılırlar ve ayda binlercesini göndermek bir alarm kanalının okunmaz hâle
+gelme biçimidir.
+
+**Süreçten ne çıkar.** `sendDefaultPii` kapalıdır ve bir `beforeSend` hook'u her iki tarafta
+da şunları temizler:
+
+- `cookie`, `set-cookie`, `authorization` ve `proxy-authorization` header'ları — yakalanmış bir
+  session cookie'si, Sentry projesini okuyabilen herkese verilmiş bir session'dır;
+- tüm cookie'ler, istek/yanıt gövdeleri ve query string'ler (`?q=` arama terimleri taşır, ki
+  bunlar kullanıcı içeriğidir);
+- `user` üzerindeki `id` dışındaki her şey — e-posta yok, kullanıcı adı yok, IP adresi yok.
+  `id` opak bir UUIDv7'dir, access log'un zaten yazdığı değerin aynısı.
+
+Korunanlar: exception tipi, mesajı ve stack'i; istek metodu ve route path'i; `requestId`
+tag'i; ve `user.id`. **Performans tracing'i ve Session Replay kapalıya sabitlenmiştir**
+(`tracesSampleRate: 0`, her iki replay oranı `0`) ve ayar olarak sunulmazlar — replay
+render edilmiş DOM'u, yani ekrandaki her task başlığını ve yorumu gönderirdi; tracing ise
+SDK'nın uygulama açılmadan önce yüklenmiş olmasını gerektirirdi ki bu "istemediyseniz
+yüklenmez" ilkesiyle bağdaşmaz.
+
+**Source map'ler.** Sentry build eklentisi yalnızca `NEXT_PUBLIC_SENTRY_DSN` ayarlıyken
+çalışır ve o zaman bile `SENTRY_AUTH_TOKEN` da yoksa hiçbir şey yüklemez — yani token'sız bir
+build asla kırılmaz ve uyarı da vermez. Yükleme olmadan tarayıcı stack trace'leri minified
+kalır; okunabilir olmaları için build sırasında `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` ve
+`SENTRY_PROJECT` ayarlayın. Eklentinin kendi build-time telemetrisi koşulsuz kapalıdır.
+
+### Uptime izleme — kesintiyi asıl yakalayan bu, kurun
+
+Restart politikaları çöken bir konteyneri geri getirir, ama host'un kendisi düştüğünde, disk
+dolduğunda veya Postgres bağlantı kabul etmeyi bıraktığında size bunu söyleyen hiçbir şey
+yoktur. Harici bir monitör, izlediği makineden sağ çıkan tek sinyaldir ve herhangi birinin
+ücretsiz katmanı yeterlidir.
+
+**`/health`'i değil, `/health/ready`'yi izleyin.** İkisi farklı soruları yanıtlar:
+
+| Endpoint        | Soru                                                                                                | Davranış                                                                |
+| --------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `/health`       | Süreç ayakta mı ve HTTP'ye yanıt veriyor mu?                                                        | Statik `{"status":"ok"}` — hiçbir şeye dokunmaz. Node yaşıyorsa hep 200 |
+| `/health/ready` | Bu instance gerçekten istek karşılayabiliyor mu — Postgres erişilebilir mi, Redis yanıt veriyor mu? | `checks` dökümüyle `200`, ya da bir bağımlılık düştüyse `503`           |
+
+`/health` bir liveness probe'udur: bir orkestratörün süreci yeniden başlatmanın işe yarayıp
+yaramayacağına karar vermek için kullandığı şeydir ve veritabanı yanarken bilerek yeşil kalır,
+çünkü restart veritabanını iyileştiremez. Onu izlemek, hiçbir kullanıcının board açamadığı bir
+kesinti sırasında size API'nin "ayakta" olduğunu söylerdi. `/health/ready` ise ürün gerçekten
+bozulduğunda kızaran endpoint'tir ve yanıt gövdesi hangi bağımlılığın düştüğünü söyler. İkisi
+de publiktir (auth yok) ve rate limit'ten muaftır, böylece bir monitör kendini throttle edip
+yanlış alarm üretemez.
+
+Kurulum — örnek olarak [UptimeRobot](https://uptimerobot.com) veya
+[healthchecks.io](https://healthchecks.io); bir URL'yi yoklayıp e-posta gönderebilen her
+monitör olur:
+
+1. `https://<host-unuz>/health/ready` için bir **HTTP(s) monitörü** oluşturun (API henüz bir
+   reverse proxy arkasında değilse `:4000/health/ready`).
+2. **Aralık: 5 dakika.** Gece yaşanan bir kesintiyi sabaha kalmadan yakalayacak kadar hızlı,
+   her ücretsiz katmanın içinde kalacak kadar yavaş.
+3. Alarm öncesi **eşik: art arda 2 başarısız yoklama** — bir deploy veya
+   `docker compose up -d` sırasında kaçan tek bir yoklama olay değildir ve kurt masalı anlatan
+   bir alarm kanalı susturulur.
+4. **Beklenen durum: 200.** `/health/ready`'den gelen bir `503` gerçek bir bağımlılık
+   arızasıdır ve "down" sayılmalıdır; kabul edilen aralığı "herhangi bir 2xx/3xx/5xx" diye
+   genişletmeyin.
+5. **Zaman aşımı: 10 saniye.** Readiness probe'u kendi bağımlılık kontrollerini ~2s ile
+   sınırlar, dolayısıyla bundan yavaş olan her şey ağ ya da takılmış bir süreçtir.
+6. Bir **e-posta alarm kişisi** ekleyin ve "tekrar ayakta" bildirimini de açın — ne zaman
+   düzeldiğini bilmek, ne olduğunu bilmenin yarısıdır.
+7. **Bir kez bilerek tetikleyin** ve mailin geldiğini doğrulayın:
+   `docker compose stop postgres`, iki aralık bekleyin, kırmızı alarmı görün, sonra
+   `docker compose start postgres` ile toparlanma mailini bekleyin. Hiç tetiklenmemiş bir
+   alarm kurulumu bir güvence değil, bir varsayımdır.
+
+API henüz internetten erişilebilir değilse healthchecks.io'nun _push_ modeli alternatiftir:
+sizden ses **kesildiğinde** alarm verir; host tarafında bir cron
+(`*/5 * * * * curl -fsS localhost:4000/health/ready && curl -fsS <ping-url>`) hiçbir şeyi dışa
+açmadan özel bir dağıtımı kapsar.
 
 ## Günlük döngü
 
