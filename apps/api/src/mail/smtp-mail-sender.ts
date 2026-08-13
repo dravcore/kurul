@@ -39,6 +39,13 @@ interface SmtpTransporter {
 export class SmtpMailSender implements MailSender {
   readonly transport = 'smtp' as const;
 
+  /**
+   * A relay is configured, so a resolved `send` means the message was handed off. Whether the
+   * recipient's server then accepted it is not something SMTP tells the sender, and this bit
+   * does not pretend otherwise — see `MailDeliveryStatus.SENT`.
+   */
+  readonly deliversMail = true;
+
   private transporter: SmtpTransporter | undefined;
 
   constructor(

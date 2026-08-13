@@ -16,6 +16,9 @@ import type { MailMessage, MailSender } from './mail-sender';
 export class LogMailSender implements MailSender {
   readonly transport = 'log' as const;
 
+  /** The definition of this transport: `send` resolves, and nobody receives anything. */
+  readonly deliversMail = false;
+
   private readonly logger = new Logger(LogMailSender.name);
 
   constructor(private readonly from: string) {

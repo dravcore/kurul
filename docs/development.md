@@ -241,6 +241,18 @@ Kurultay sends email for one flow today: the verification link an invitee needs 
 [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
 Leaving `SMTP_HOST` unset is a valid choice — the API still boots, and the mail module logs
 the message instead of sending it — but while that's true, **no invitation can be accepted**.
+
+That state is visible in the product, not only here. `GET /config` reports
+`{ "mailEnabled": false }`, and the web app turns that into a standing notice on **Settings →
+Members** saying that invitations will not be delivered, with a link back to this section.
+`POST /workspaces/:workspaceId/invitations` also reports `"emailDelivery": "NOT_CONFIGURED"`
+on the invitation it just created, so the admin is told at the moment they send it rather than
+by a teammate who never got an email. Both are derived from the transport the mail module
+actually selected — see
+[api-conventions.md](api-conventions.md#instance-configuration). The way through without SMTP
+is the **Copy link** control on each pending invitation: the accept link works, as long as the
+invitee's address is already confirmed.
+
 To exercise the real flow locally without sending real mail, use the `mailpit` service that
 `docker-compose.dev.yml` already starts alongside `postgres` and `redis`:
 

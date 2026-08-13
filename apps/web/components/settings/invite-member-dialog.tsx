@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
+  MailDeliveryStatus,
   MemberRole,
   type CreateInvitationRequest,
   type InvitationDto,
@@ -52,7 +53,26 @@ export function InviteMemberDialog({
     // The invitation lands in a list the admin can already see, so the row *is* the
     // confirmation — but the thing that actually happened is off-screen, in someone else's
     // inbox, and only a message can report that (docs/design.md §7).
-    toast.success(t('inviteSent', { email: invitation.email }));
+    //
+    // Which message depends on whether the API watched the email go out. `emailDelivery` is
+    // absent when no send was observed, and absent is deliberately not a verdict (see the
+    // field's contract in `@kurultay/shared-types`) — so only a value that positively says
+    // "not delivered" downgrades the confirmation. Before this existed, an invitation on a
+    // deployment with no SMTP host was reported as sent, to an inbox that would never receive
+    // it (audit PM-04).
+    //
+    // The way out is the accept link, which the pending row this invitation just joined
+    // carries as **Copy link** — an on-screen control, so the message names it rather than
+    // duplicating it (docs/design.md §7).
+    const delivered =
+      invitation.emailDelivery === undefined ||
+      invitation.emailDelivery === MailDeliveryStatus.SENT;
+
+    if (delivered) {
+      toast.success(t('inviteSent', { email: invitation.email }));
+    } else {
+      toast.warning(t('inviteNotDelivered', { email: invitation.email }));
+    }
 
     // This dialog is not unmounted when it closes, only its body is, so the address has to be
     // cleared here or the next invitation opens pre-filled with the previous person's email.

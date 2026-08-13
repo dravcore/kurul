@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { InvitationDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import { authClient } from '@/lib/auth';
+import { fetchInstanceConfig } from '@/lib/instance-config';
 import { canManageMember, canManageMembers } from '@/lib/member-permissions';
 import { fetchAllWorkspaceMembers, fetchPendingInvitations } from '@/lib/member-query';
 import { formatRelativeTime } from '@/lib/relative-time';
@@ -22,24 +23,38 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChangeMemberRoleDialog } from './change-member-role-dialog';
 import { InviteMemberDialog } from './invite-member-dialog';
 import { LeaveWorkspaceDialog } from './leave-workspace-dialog';
+import { MailDisabledNotice } from './mail-disabled-notice';
 import { RemoveMemberDialog } from './remove-member-dialog';
 import { RevokeInvitationDialog } from './revoke-invitation-dialog';
 
 /**
- * The roster and the invitation queue, loaded as one value.
+ * The roster, the invitation queue, and whether invitations can be delivered at all — loaded
+ * as one value.
  *
- * They are one `useApiResource` because they are one question — "who is in this workspace, and
- * who is on the way in" — and because only one of them is readable by every caller. Split into
- * two resources, a MEMBER would see a working roster next to a failed invitation load that is
- * not a failure at all, and the screen would need a second error surface to say so.
+ * They are one `useApiResource` because they are one question — "who is in this workspace, who
+ * is on the way in, and can we even reach them" — and because only some of them are readable
+ * by every caller. Split into separate resources, a MEMBER would see a working roster next to
+ * a failed invitation load that is not a failure at all, and the screen would need a second
+ * error surface to say so.
  */
 interface MemberRoster {
   members: WorkspaceMemberDto[];
   /** Always empty for a caller who may not read it; the request is not even sent. */
   invitations: InvitationDto[];
+  /**
+   * `InstanceConfigDto.mailEnabled` — whether the API has a transport that can deliver an
+   * invitation email. Only fetched for someone who can invite, because it only decides whether
+   * to warn them.
+   */
+  mailEnabled: boolean;
 }
 
-const EMPTY_ROSTER: MemberRoster = { members: [], invitations: [] };
+/**
+ * `mailEnabled: true` before anything has loaded, so the warning appears only once the server
+ * has said it is warranted. Defaulting to `false` would flash "email isn't configured" on
+ * every load of a perfectly configured deployment, which teaches admins to ignore it.
+ */
+const EMPTY_ROSTER: MemberRoster = { members: [], invitations: [], mailEnabled: true };
 
 /** Row height matches the list/table row in docs/design.md §4. */
 const ROW = 'flex min-h-9 items-center justify-between gap-3 py-1.5';
@@ -68,7 +83,14 @@ export function MembersSettings(): React.ReactElement {
       // Not a permission the UI is *choosing* to skip — `GET .../invitations` answers 403 to
       // anyone below ADMIN, so asking would turn a screen that works into one that failed.
       const invitations = canManage ? await fetchPendingInvitations(activeId, { signal }) : [];
-      return { members, invitations };
+      // Skipped for the same shape of reason, one step softer: `GET /config` would answer
+      // anyone signed in, but a member who cannot invite has no use for the answer, and an
+      // instance-wide warning on a screen with no invite control would only puzzle them.
+      const { mailEnabled } = canManage
+        ? await fetchInstanceConfig({ signal })
+        : { mailEnabled: true };
+
+      return { members, invitations, mailEnabled };
     };
   }, [activeId, canManage]);
 
@@ -124,6 +146,11 @@ export function MembersSettings(): React.ReactElement {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Above the invite control rather than inside the dialog: it is a standing property of
+          the deployment, not a warning about the address being typed, and someone reading the
+          pending queue needs it just as much as someone about to add to it. */}
+      {canManage && !roster.mailEnabled ? <MailDisabledNotice /> : null}
+
       {canManage ? (
         <div className="flex justify-start">
           <Button type="button" onClick={() => setInviteOpen(true)}>
