@@ -15,6 +15,7 @@ How to set up a Kurultay development environment and work in it day to day.
 - [pnpm scripts](#pnpm-scripts)
 - [Database workflow](#database-workflow)
 - [Upgrading and backups](#upgrading-and-backups)
+- [Rollback](#rollback)
 - [Day-to-day loop](#day-to-day-loop)
 - [Troubleshooting](#troubleshooting)
 
@@ -268,6 +269,7 @@ docker compose exec -T postgres pg_dump -U kurultay kurultay > kurultay-$(date +
 - Read the `CHANGELOG.md` entry for the target version first — every breaking change carries
   a migration note there.
 - Then upgrade the images and run the migrations.
+- If the upgrade goes wrong, see [Rollback](#rollback).
 
 **PostgreSQL major-version upgrades need a dump and restore.** The official `postgres` image
 refuses to start when the `PGDATA` volume was initialized by a different major version
@@ -327,6 +329,96 @@ the default would hurt.
 `CREATE EXTENSION IF NOT EXISTS pg_trgm` in that same migration needs superuser or
 `pg_database_owner` rights. A managed Postgres that restricts extensions must have `pg_trgm`
 enabled by its provider before the migration runs.
+
+## Rollback
+
+What to do when an upgrade or release goes bad and the last known-good version has to come
+back. Two different things can need rolling back, and they move independently: the
+**application** (the code the containers run) and the **database schema** (the applied Prisma
+migrations). Rolling the application back is cheap and fast; rolling a migration back is not —
+read the migration part before you need it at 2 a.m.
+
+### Rolling back the application
+
+There are no published registry images — `docker compose up` builds `api` and `web` from
+whatever source tree is checked out (see `docker-compose.yml`). Rolling back the application
+therefore means checking out the previous release tag and rebuilding the images:
+
+```bash
+git fetch --tags
+git switch --detach v0.1.0        # the last known-good tag — list them with `git tag -l`
+docker compose up -d --build      # rebuild api + web from that tree and restart
+```
+
+The one-shot `migrate` service runs on every `up`, but it only **applies** migrations that
+exist in the checked-out tree (`prisma migrate deploy`) — it never reverts migrations the
+database has that the tree does not. So after a code rollback the database keeps the newer
+schema. If the bad release's migrations were purely additive (new tables, new nullable
+columns, new indexes), the older code runs fine against that schema and the code rollback
+alone is the whole procedure. If the bad release renamed or dropped something the older code
+reads, a code-only rollback will crash on boot — that is the migration-rollback case below.
+
+### Rolling back a migration
+
+**Prisma does not generate down migrations.** Every directory under
+`apps/api/prisma/migrations/` contains a forward-only `migration.sql`; there is no
+`migrate down` command and no automated revert path. The options, in order of preference:
+
+1. **Forward-fix (preferred).** Write a **new** migration that undoes or repairs the bad
+   change — drop the bad column, restore the old name, backfill the data — author it locally
+   with `pnpm db:migrate:dev`, and deploy forward as usual. History stays linear, no data is
+   thrown away beyond what the bad migration itself destroyed, and no committed migration
+   file is ever edited. Ship it through the hotfix flow below.
+2. **Restore from a backup.** Only possible if you have a dump — which is exactly why
+   [the section above](#upgrading-and-backups) says to take one before every upgrade.
+   Everything written after that dump is **permanently lost**: the recovery point is the
+   moment `pg_dump` ran, so on a live instance this trades user data for schema. Use it when
+   the bad migration itself destroyed data (dropped a column or table) that the dump still
+   has.
+
+   ```bash
+   docker compose stop api web        # stop the writers; postgres stays up
+   docker compose exec -T postgres psql -U kurultay -d postgres \
+     -c 'DROP DATABASE kurultay WITH (FORCE);' \
+     -c 'CREATE DATABASE kurultay OWNER kurultay;'
+   docker compose exec -T postgres psql -U kurultay -d kurultay < kurultay-2026-08-13.sql
+   git switch --detach v0.1.0         # the release that matches the dump
+   docker compose up -d --build
+   ```
+
+   The dump contains the `_prisma_migrations` bookkeeping table, so after the restore the
+   recorded migration state matches the restored schema, and the old release's `migrate`
+   service finds nothing left to apply.
+
+3. **`prisma migrate resolve` — marking, not reverting.** `resolve` edits only the
+   `_prisma_migrations` bookkeeping table; it changes no schema and restores no data. Its
+   scenario is a migration that **failed halfway** and now blocks every `migrate deploy`:
+   repair the database by hand (or restore it), then — from `apps/api` — either
+   `pnpm exec prisma migrate resolve --rolled-back <migration_name>` so the next deploy
+   retries it, or `--applied <migration_name>` so the next deploy skips it. Reaching for it
+   to "undo" a migration that succeeded does nothing to the schema — that misuse only makes
+   the bookkeeping lie.
+
+### Never `migrate reset` in production
+
+`prisma migrate reset` drops and recreates the entire database. It is a dev-loop convenience
+for throwaway local data, never a rollback tool, and nothing stops it from pointing at
+production except the `DATABASE_URL` in your shell. The seed is the same shape of hazard:
+`pnpm db:seed` starts by deleting **every row in every table** before inserting demo data,
+which is why [`apps/api/prisma/seed.ts`](../apps/api/prisma/seed.ts) refuses to run when
+`NODE_ENV` is `production`
+([`apps/api/src/common/seed-guard.ts`](../apps/api/src/common/seed-guard.ts)) — deliberately
+with no override flag. `migrate reset` has no such guard. The rule at 2 a.m. is absolute:
+neither command ever runs against a database you cannot afford to recreate from a dump.
+
+### Rollback and the hotfix flow
+
+A rollback buys time; it is not the fix. The durable fix ships as a `hotfix/*` branch from
+`main` — [git-strategy.md](git-strategy.md#hotfix-process): branch, fix (including any
+forward-fix migration from option 1 above), bump the patch version, PR into `main`, tag,
+back-merge to `develop`, then upgrade production onto the new tag — which is also what ends
+the rollback. If the bad release was `v0.2.0` and production is parked on `v0.1.0`, the
+hotfix ships as `v0.2.1`; do not stay parked on the old tag longer than it takes to ship it.
 
 ## Day-to-day loop
 
