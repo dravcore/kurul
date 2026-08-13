@@ -22,6 +22,10 @@ vi.mock('@/components/settings/language-settings', () => ({
   LanguageSettings: (): React.ReactElement => <div data-testid="language-settings" />,
 }));
 
+vi.mock('@/components/settings/members-settings', () => ({
+  MembersSettings: (): React.ReactElement => <div data-testid="members-settings" />,
+}));
+
 import SettingsPage from './page';
 
 afterEach(() => {
@@ -35,13 +39,24 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(messages.app.settings.title);
   });
 
-  it('heads the language section and explains what the choice affects', async () => {
+  it('heads each section and explains what the section decides', async () => {
     render(await SettingsPage());
 
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((node) => node.textContent);
+    // Members before Language: the section a new owner comes here to find leads.
+    expect(headings).toEqual([
+      messages.app.settings.members.title,
       messages.app.settings.language.title,
-    );
+    ]);
+    expect(screen.getByText(messages.app.settings.members.description)).toBeTruthy();
     expect(screen.getByText(messages.app.settings.language.description)).toBeTruthy();
+  });
+
+  it('mounts both section bodies', async () => {
+    render(await SettingsPage());
+
+    expect(screen.getByTestId('members-settings')).toBeTruthy();
+    expect(screen.getByTestId('language-settings')).toBeTruthy();
   });
 
   it('holds no hardcoded copy of its own', async () => {
@@ -52,6 +67,8 @@ describe('SettingsPage', () => {
     const rendered = container.textContent ?? '';
     const catalogued = [
       messages.app.settings.title,
+      messages.app.settings.members.title,
+      messages.app.settings.members.description,
       messages.app.settings.language.title,
       messages.app.settings.language.description,
     ];
