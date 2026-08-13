@@ -72,6 +72,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The dashboard no longer greets a first visit with "Your boards couldn't load." in
+  development. The board list and the dashboard summary share one boards `GET` so a single
+  screen does not ask twice, but the shared request was created with the abort signal of
+  whichever component happened to ask first. React StrictMode runs effects
+  mount→cleanup→mount, so that first component's cleanup aborted the request everyone was
+  waiting on, and the remount plus its sibling — which had asked for nothing to be cancelled —
+  read the cancellation as a failed load. The shared request is no longer bound to any one
+  subscriber's lifetime; unmount safety already comes from each subscriber ignoring results it
+  no longer wants.
 - Signing in returns the visitor to the page that sent them there. `/login` and `/register`
   were ignoring the `?next=…` both the route guard and the invitation screen had been writing
   into their URLs, so an invitee who followed an invitation link landed on the dashboard and

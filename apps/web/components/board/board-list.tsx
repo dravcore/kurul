@@ -36,7 +36,7 @@ export function BoardList(): React.ReactElement {
   const canRename = canCreateOrUpdateBoard(activeRole);
 
   const fetchBoards = useMemo(
-    () => (activeId ? (signal: AbortSignal) => fetchWorkspaceBoards(activeId, { signal }) : null),
+    () => (activeId ? () => fetchWorkspaceBoards(activeId) : null),
     [activeId],
   );
   const {

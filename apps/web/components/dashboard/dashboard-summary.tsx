@@ -43,7 +43,7 @@ export function DashboardSummary(): React.ReactElement {
   const boardIdParam = searchParams.get('boardId') ?? '';
 
   const fetchBoards = useMemo(
-    () => (activeId ? (signal: AbortSignal) => fetchWorkspaceBoards(activeId, { signal }) : null),
+    () => (activeId ? () => fetchWorkspaceBoards(activeId) : null),
     [activeId],
   );
   // The board picker degrades to "all boards" rather than surfacing its own error row.
