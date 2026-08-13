@@ -2,6 +2,8 @@
 
 Açık kaynak, Kanban odaklı proje yönetim aracı.
 
+![Kurultay panosu](docs/assets/board.png)
+
 > 🌐 [English (canonical)](README.md) | Türkçe
 
 ## Durum
