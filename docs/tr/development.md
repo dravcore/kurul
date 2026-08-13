@@ -15,6 +15,7 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 - [pnpm script'leri](#pnpm-scriptleri)
 - [Veritabanı iş akışı](#veritabanı-iş-akışı)
 - [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme)
+- [Geri alma (rollback)](#geri-alma-rollback)
 - [Günlük döngü](#günlük-döngü)
 - [Sorun giderme](#sorun-giderme)
 
@@ -267,6 +268,7 @@ docker compose exec -T postgres pg_dump -U kurultay kurultay > kurultay-$(date +
 - Önce hedef sürümün `CHANGELOG.md` girdisini okuyun — her kırıcı değişiklik orada bir
   migration notu taşır.
 - Sonra image'ları yükseltin ve migration'ları çalıştırın.
+- Yükseltme ters giderse, bkz. [Geri alma (rollback)](#geri-alma-rollback).
 
 **PostgreSQL major sürüm yükseltmeleri bir dump ve restore gerektirir.** Resmi `postgres`
 imajı, `PGDATA` volume'ü farklı bir major sürüm tarafından initialize edildiğinde başlamayı
@@ -326,6 +328,101 @@ notlarıyla tetiklenen bir kaçış kapısıdır.
 Aynı migration'daki `CREATE EXTENSION IF NOT EXISTS pg_trgm` superuser veya
 `pg_database_owner` yetkisi ister. Eklentileri kısıtlayan yönetilen bir Postgres'te,
 migration çalışmadan önce `pg_trgm`'in sağlayıcı tarafından etkinleştirilmiş olması gerekir.
+
+## Geri alma (rollback)
+
+Bir yükseltme veya release ters gittiğinde ve bilinen son sağlam sürümün geri gelmesi
+gerektiğinde ne yapmalı. Geri alınması gerekebilecek iki farklı şey vardır ve bunlar
+birbirinden bağımsız hareket eder: **uygulama** (container'ların çalıştırdığı kod) ve
+**veritabanı şeması** (uygulanmış Prisma migration'ları). Uygulamayı geri almak ucuz ve
+hızlıdır; bir migration'ı geri almak değildir — migration kısmını, gece 2'de ihtiyacınız
+olmadan önce okuyun.
+
+### Uygulamayı geri almak
+
+Yayınlanmış registry image'ları yok — `docker compose up`, `api` ve `web`'i checkout edilmiş
+kaynak ağacından build eder (bkz. `docker-compose.yml`). Dolayısıyla uygulamayı geri almak,
+bir önceki release tag'ini checkout edip image'ları yeniden build etmek demektir:
+
+```bash
+git fetch --tags
+git switch --detach v0.1.0        # bilinen son sağlam tag — `git tag -l` ile listeleyin
+docker compose up -d --build      # api + web'i o ağaçtan yeniden build et ve yeniden başlat
+```
+
+One-shot `migrate` servisi her `up`'ta çalışır, ama yalnızca checkout edilmiş ağaçta var olan
+migration'ları **uygular** (`prisma migrate deploy`) — veritabanında olup ağaçta olmayan
+migration'ları asla geri çevirmez. Yani bir kod geri almasından sonra veritabanı yeni şemayı
+korur. Kötü release'in migration'ları tamamen ekleyiciyse (yeni tablolar, yeni nullable
+kolonlar, yeni indeksler), eski kod o şemaya karşı sorunsuz çalışır ve kod geri alması tek
+başına tüm prosedürdür. Kötü release, eski kodun okuduğu bir şeyi yeniden adlandırdıysa veya
+düşürdüyse, yalnızca kodu geri almak açılışta çöker — bu, aşağıdaki migration geri alma
+durumudur.
+
+### Bir migration'ı geri almak
+
+**Prisma down migration üretmez.** `apps/api/prisma/migrations/` altındaki her dizin yalnızca
+ileri yönlü bir `migration.sql` içerir; bir `migrate down` komutu ve otomatik bir geri alma
+yolu yoktur. Seçenekler, tercih sırasıyla:
+
+1. **Forward-fix (tercih edilen).** Kötü değişikliği geri alan veya onaran **yeni** bir
+   migration yazın — kötü kolonu düşürün, eski adı geri getirin, veriyi backfill edin —
+   yerelde `pnpm db:migrate:dev` ile oluşturun ve her zamanki gibi ileri doğru deploy edin.
+   Tarih doğrusal kalır, kötü migration'ın kendisinin yok ettiği dışında hiçbir veri atılmaz
+   ve commit edilmiş hiçbir migration dosyası asla düzenlenmez. Aşağıdaki hotfix akışıyla
+   yayınlayın.
+2. **Yedekten restore.** Yalnızca bir dump'ınız varsa mümkündür — [yukarıdaki
+   bölümün](#yükseltme-ve-yedekleme) her yükseltmeden önce bir tane alın demesinin nedeni tam
+   olarak budur. O dump'tan sonra yazılan her şey **kalıcı olarak kaybolur**: kurtarma
+   noktası `pg_dump`'ın çalıştığı andır, dolayısıyla canlı bir kurulumda bu, şema karşılığında
+   kullanıcı verisi takas eder. Kötü migration'ın kendisi, dump'ta hâlâ bulunan veriyi yok
+   ettiyse (bir kolon veya tablo düşürdüyse) kullanın.
+
+   ```bash
+   docker compose stop api web        # yazanları durdur; postgres ayakta kalır
+   docker compose exec -T postgres psql -U kurultay -d postgres \
+     -c 'DROP DATABASE kurultay WITH (FORCE);' \
+     -c 'CREATE DATABASE kurultay OWNER kurultay;'
+   docker compose exec -T postgres psql -U kurultay -d kurultay < kurultay-2026-08-13.sql
+   git switch --detach v0.1.0         # dump'a karşılık gelen release
+   docker compose up -d --build
+   ```
+
+   Dump, `_prisma_migrations` defter tablosunu da içerir; dolayısıyla restore'dan sonra
+   kayıtlı migration durumu restore edilen şemayla eşleşir ve eski release'in `migrate`
+   servisi uygulayacak bir şey bulmaz.
+
+3. **`prisma migrate resolve` — işaretleme, geri çevirme değil.** `resolve` yalnızca
+   `_prisma_migrations` defter tablosunu düzenler; hiçbir şemayı değiştirmez ve hiçbir veriyi
+   geri getirmez. Senaryosu, **yarı yolda başarısız olmuş** ve artık her `migrate deploy`'u
+   bloke eden bir migration'dır: veritabanını elle onarın (veya restore edin), sonra —
+   `apps/api` içinden — ya `pnpm exec prisma migrate resolve --rolled-back <migration_adı>`
+   (bir sonraki deploy onu yeniden dener) ya da `--applied <migration_adı>` (bir sonraki
+   deploy onu atlar). Başarıyla tamamlanmış bir migration'ı "geri almak" için ona uzanmak
+   şemaya hiçbir şey yapmaz — bu yanlış kullanım yalnızca defterin yalan söylemesine yol açar.
+
+### Production'da asla `migrate reset`
+
+`prisma migrate reset` tüm veritabanını düşürür ve yeniden oluşturur. Atılabilir yerel veriler
+için bir geliştirme döngüsü kolaylığıdır, asla bir rollback aracı değildir — ve production'ı
+işaret etmesini engelleyen tek şey shell'inizdeki `DATABASE_URL`'dir. Seed de aynı biçimde bir
+tehlikedir: `pnpm db:seed`, demo veriyi eklemeden önce **her tablodaki her satırı** silerek
+başlar; bu yüzden [`apps/api/prisma/seed.ts`](../../apps/api/prisma/seed.ts), `NODE_ENV`
+`production` iken çalışmayı reddeder
+([`apps/api/src/common/seed-guard.ts`](../../apps/api/src/common/seed-guard.ts)) — bilinçli
+olarak hiçbir override flag'i yoktur. `migrate reset`'in böyle bir koruması yoktur. Gece
+2'deki kural mutlaktır: bu iki komuttan hiçbiri, bir dump'tan yeniden oluşturmayı göze
+alamayacağınız bir veritabanına karşı asla çalışmaz.
+
+### Rollback ve hotfix akışı
+
+Rollback zaman kazandırır; çözümün kendisi değildir. Kalıcı çözüm, `main`'den açılan bir
+`hotfix/*` branch'i olarak yayınlanır — [git-strategy.md](git-strategy.md#hotfix-süreci):
+branch aç, düzelt (yukarıdaki 1. seçenekteki forward-fix migration dahil), patch sürümünü
+yükselt, `main`'e PR aç, tag'le, `develop`'a back-merge et, sonra production'ı yeni tag'e
+yükselt — rollback'i bitiren şey de budur. Kötü release `v0.2.0` idiyse ve production
+`v0.1.0`'da park hâlindeyse, hotfix `v0.2.1` olarak yayınlanır; eski tag'de, onu yayınlamanın
+alacağı süreden daha uzun park hâlinde kalmayın.
 
 ## Günlük döngü
 
