@@ -259,6 +259,7 @@ isimleriyle):
   ],
   "path": "/workspaces/w_1/boards/b_1/tasks",
   "timestamp": "2026-08-08T09:12:31.114Z",
+  "requestId": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
 }
 ```
 
@@ -270,12 +271,44 @@ isimleriyle):
 | `details`    | array  | hayır   | Alan bazlı validation problemleri; yalnızca `400`/`422`'de mevcut                |
 | `path`       | string | evet    | Request path'i                                                                   |
 | `timestamp`  | string | evet    | ISO 8601 UTC                                                                     |
+| `requestId`  | string | evet    | Korelasyon id'si; `X-Request-Id` response header'ıyla aynı değer                 |
 
 - Tek bir global exception filter, ele alınmamışlar dahil **her** hata için bu şekli
   üretir. API'nin hiçbir yerinde ikinci bir hata formatı yoktur.
 - `message`, production'da asla ham bir exception string'i değildir, stack trace'ler
   döndürülmez, loglanır.
 - Client'lar `message` metnine değil, `statusCode` ve `error`'a göre dallanır.
+
+### Request korelasyonu
+
+Her request bir id taşır ve her response bunu `X-Request-Id` header'ında geri döndürür.
+Client kendi id'sini verebilir — bir reverse proxy ya da load balancer'ın ürettiği id
+doğrudan akıp geçer — yeter ki URL-safe ve 8–128 karakter arasında olsun; bunun dışındaki
+her şey atılır ve yerine üretilmiş bir [UUIDv7](#veri-tipleri) konur, böylece bir header
+değeri hiçbir zaman sanitize edilmeden bir log satırına veya response body'sine ulaşamaz.
+
+Aynı id üç yerde birden görünür, ki asıl mesele budur: client'ın aldığı `X-Request-Id`
+header'ı, hata zarfının `requestId` alanı ve o request'e ait sunucu log satırları. Bir
+hatayı bildiren kullanıcı tek bir id verir ve bu id tam olarak tek bir request'i seçer.
+
+Biten her request ayrıca stdout'a tek satırlık bir JSON erişim logu yazar:
+
+```jsonc
+{
+  "ts": "2026-08-13T19:03:32.070Z",
+  "level": "info", // info < 400, warn 4xx, error 5xx
+  "requestId": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
+  "method": "GET",
+  "path": "/workspaces/w_1/tasks", // yalnızca route — query string ayıklanır
+  "status": 200,
+  "durationMs": 15.444,
+  "userId": "0198e2c1-9a11-7c40-8f2b-1d3e5a7c9b02", // kimliksiz istekte yer almaz
+}
+```
+
+Bu alan listesi kapalıdır. Request body'leri, query string'ler, header'lar ve cookie'ler
+asla loglanmaz: query kullanıcının verdiği filtreleri ve arama terimlerini, header'lar ise
+session cookie'lerini ve davet token'larını taşır.
 
 ## Pagination
 
