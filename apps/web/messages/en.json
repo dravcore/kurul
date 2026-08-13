@@ -98,7 +98,8 @@
       "themeDark": "Switch to dark theme",
       "collapseSidebar": "Collapse sidebar",
       "expandSidebar": "Expand sidebar",
-      "settings": "Settings"
+      "settings": "Settings",
+      "skipToContent": "Skip to content"
     },
     "settings": {
       "title": "Settings",
