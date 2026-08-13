@@ -241,8 +241,20 @@ Kurultay bugün tek bir akış için e-posta gönderiyor: `accept-invitation`'ı
 edilenin workspace'e katılmasına izin vermeden önce ihtiyaç duyduğu doğrulama linki (bkz.
 [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
 `SMTP_HOST`'u boş bırakmak geçerli bir seçenek — API yine ayağa kalkar ve mail modülü mesajı
-göndermek yerine loglar — ama bu doğru olduğu sürece **hiçbir davet kabul edilemez**. Gerçek
-mail göndermeden akışı lokal olarak yerinde denemek için, `docker-compose.dev.yml`'in
+göndermek yerine loglar — ama bu doğru olduğu sürece **hiçbir davet kabul edilemez**.
+
+Bu durum yalnızca burada değil, üründe de görünür. `GET /config`
+`{ "mailEnabled": false }` döner ve web uygulaması bunu **Ayarlar → Üyeler** ekranında,
+davetlerin teslim edilmeyeceğini söyleyen ve bu bölüme link veren kalıcı bir uyarıya çevirir.
+`POST /workspaces/:workspaceId/invitations` ayrıca az önce oluşturduğu davet için
+`"emailDelivery": "NOT_CONFIGURED"` bildirir; böylece admin bunu, hiçbir e-posta almamış bir
+takım arkadaşından değil, daveti gönderdiği anda öğrenir. İkisi de mail modülünün gerçekten
+seçtiği transport'tan türer — bkz.
+[api-conventions.md](api-conventions.md#instance-yapılandırması). SMTP'siz geçiş yolu her
+bekleyen davetin üzerindeki **Bağlantıyı kopyala** kontrolüdür: davet edilenin adresi zaten
+doğrulanmışsa kabul bağlantısı çalışır.
+
+Gerçek mail göndermeden akışı lokal olarak yerinde denemek için, `docker-compose.dev.yml`'in
 `postgres` ve `redis`'in yanında zaten başlattığı `mailpit` servisini kullanın:
 
 ```bash

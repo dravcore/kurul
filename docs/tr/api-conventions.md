@@ -131,6 +131,7 @@ Workspace olmayan route'lar (tam liste):
 ```
 GET   /health                # liveness, kimliksiz
 GET   /health/ready          # readiness, kimliksiz
+GET   /config                # instance yetenekleri; oturum açmış her çağıran
 POST  /auth/*                # Better Auth handler'ları
 GET   /me                    # mevcut kullanıcı profili
 PATCH /me                    # kendi profili; bugün yalnızca arayüz dili
@@ -149,6 +150,58 @@ healthcheck'tir, bir istemci değil.
 dolayısıyla yetkilendirmenin tamamı session guard'ıdır. `User.locale`'in yazıldığı tek yer de
 burasıdır — bkz.
 [decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md).
+
+### Instance yapılandırması
+
+`GET /config`, **"bu deployment neyi yapacak şekilde yapılandırılmış"** sorusuna bir
+`InstanceConfigDto` ile cevap verir:
+
+```json
+{ "mailEnabled": true }
+```
+
+| Alan          | Anlamı                                                                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mailEnabled` | SMTP host'u yapılandırılmamışsa `false` — her mesaj API log'una yazılır ve hiçbir yere teslim edilmez; kimse adresini doğrulayamaz, dolayısıyla daveti kabul edemez |
+
+Bu ucun biçimini üç kural tutar ve her biri başka türlü de karar verilebilecek bir seçimdir:
+
+- **`/health`'in parçası değildir.** Bir healthcheck, orchestrator'ın süreci yeniden başlatıp
+  başlatmayacağına karar vermesi için vardır; "SMTP yapılandırılmamış" ise hiçbir zaman yeniden
+  başlatma sebebi değildir — deployment'ın kalıcı ve bilinçli bir özelliğidir. Ayrıca `/health`
+  hem `@Public()` hem `@SkipRateLimit()`'tir; bu muafiyet yalnızca belge üründen hiç söz
+  etmediği için karşılanabilir. Yapılandırmayı oraya koymak ikisini de kazara devralmak olurdu.
+- **Oturum ister, rol istemez.** Sızıntı küçüktür ama ucun public olmasına da hiçbir şeyin
+  ihtiyacı yok; kimliksiz bir uç, bir tarayıcıya self-host kurulumun neleri yapılandırmadan
+  bıraktığının instance başına listesini verirdi. Buradaki hiçbir değer workspace'e ya da role
+  göre değişmediği için ne `:workspaceId` taşır ne de rol kapısı. Rate limiting global
+  varsayılandır.
+- **Her alan bir yetenektir, asla kiracı durumu değildir.** Workspace'e, kullanıcıya veya
+  isteğe göre değişen bir değer, tarif ettiği kaynağın üzerinde durur. Bu belge "bu sunucu ne
+  yapabiliyor" olarak cache'lenebilir kalmalıdır.
+
+### Bir e-postaya ne olduğunu bildirmek
+
+`InvitationDto.emailDelivery` **opsiyoneldir**, `SENT` / `NOT_CONFIGURED` / `FAILED`
+(`MailDeliveryStatus`) taşır ve tam olarak tek bir yanıtta bulunur:
+`POST /workspaces/:workspaceId/invitations`.
+
+**Alanın yokluğu `SENT` demek değildir.** Bu API'nin o istek için hiçbir gönderim
+gözlemlemediği anlamına gelir ve istemci bunu bir hükme dönüştürmemelidir. Listelenen bir davet
+saklanmış bir satırdır, teslim ise hiçbir yerde kaydedilmeyen bir olaydır; bu yüzden
+`GET .../invitations` bu alanı hiç taşımaz.
+
+Var olma sebebi: davet e-postası Better Auth'un `sendInvitationEmail` hook'unun içinden
+gönderilir ve başarısız ya da yalnızca log'a düşen bir gönderim orada bilinçli olarak yutulur
+(zaten saklanmış bir davet, bildirimi geri döndü diye başarısız raporlanmamalıdır). Geriye
+admin'in elinde bir `201` ve hiçbir şeyin teslim edilmediğini öğrenmenin hiçbir yolu kalıyordu.
+Bu durum alanı o geri dönüş kanalıdır — istek yine başarılı olur, davet yine oluşturulur, yanıt
+sadece e-postaya ne olduğunu söyler. Gönderim hâlâ hiçbir şeyin ön koşulu değildir: SMTP'siz bir
+deployment'ta `acceptUrl` içindeki kabul bağlantısı işleyen tek yoldur ve durum `SENT` değilken
+web istemcisinin işaret ettiği şey de budur.
+
+Aynı kural mail tetikleyen her yeni uç için geçerlidir: **teslim durumunu bildir, isteği bunun
+yüzünden başarısız etme ve gözlemlemediğin bir durumu asla çıkarsama.**
 
 ### CRUD olmayan aksiyonlar
 

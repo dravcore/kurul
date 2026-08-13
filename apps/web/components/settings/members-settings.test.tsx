@@ -1,9 +1,16 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { MemberRole, type InvitationDto, type WorkspaceMemberDto } from '@kurultay/shared-types';
+import { toast } from 'sonner';
+import {
+  MailDeliveryStatus,
+  MemberRole,
+  type InvitationDto,
+  type WorkspaceMemberDto,
+} from '@kurultay/shared-types';
 import messages from '@/messages/en.json';
 import { ApiError, api } from '@/lib/api';
+import { SMTP_SETUP_DOCS_URL, fetchInstanceConfig } from '@/lib/instance-config';
 import { fetchAllWorkspaceMembers, fetchPendingInvitations } from '@/lib/member-query';
 import { MembersSettings } from './members-settings';
 
@@ -22,6 +29,12 @@ vi.mock('@/lib/member-query', () => ({
   fetchAllWorkspaceMembers: vi.fn(),
   fetchPendingInvitations: vi.fn(),
 }));
+// Only the fetch is replaced; `SMTP_SETUP_DOCS_URL` stays real so the assertion on the
+// notice's link checks the address the app actually ships.
+vi.mock('@/lib/instance-config', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/instance-config')>()),
+  fetchInstanceConfig: vi.fn(),
+}));
 vi.mock('@/components/layout/workspace-provider', () => ({
   useWorkspaceContext: () => workspace.value,
 }));
@@ -35,7 +48,7 @@ vi.mock('@/lib/socket', () => ({ disconnectSocket: vi.fn() }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
 }));
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>();
   return { ...actual, api: { post: vi.fn(), patch: vi.fn(), delete: vi.fn() } };
@@ -43,6 +56,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 
 const loadMembers = vi.mocked(fetchAllWorkspaceMembers);
 const loadInvitations = vi.mocked(fetchPendingInvitations);
+const loadConfig = vi.mocked(fetchInstanceConfig);
 const apiPost = vi.mocked(api.post);
 const apiPatch = vi.mocked(api.patch);
 const apiDelete = vi.mocked(api.delete);
@@ -102,6 +116,13 @@ function clickMenuItem(label: string): void {
   fireEvent.click(screen.getByRole('menuitem', { name: label }));
 }
 
+/** Opens the invite dialog, types an address, and submits it at the default role. */
+async function sendInvitation(email: string): Promise<void> {
+  fireEvent.click(await screen.findByRole('button', { name: copy.inviteAction }));
+  fireEvent.change(screen.getByLabelText(copy.inviteEmail), { target: { value: email } });
+  fireEvent.click(screen.getByRole('button', { name: copy.inviteSubmit }));
+}
+
 /** The last match, because a row control and the dialog it opens share the same verb. */
 function clickLastButton(label: string): void {
   const buttons = screen.getAllByRole('button', { name: label });
@@ -122,6 +143,8 @@ beforeEach(() => {
   workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.OWNER };
   loadMembers.mockReset().mockResolvedValue(ROSTER);
   loadInvitations.mockReset().mockResolvedValue([]);
+  // The configured deployment is the default, so the warning cases have to say so explicitly.
+  loadConfig.mockReset().mockResolvedValue({ mailEnabled: true });
   apiPost.mockReset();
   apiPatch.mockReset();
   apiDelete.mockReset();
@@ -154,6 +177,66 @@ describe('MembersSettings — inviting', () => {
     });
     // The point of the flow: the invitation an admin just sent is now something they can see.
     expect(await screen.findByText('yeni@kurultay.test')).toBeTruthy();
+  });
+
+  /**
+   * The third beat of the invite flow reports something the screen cannot show — what happened
+   * in someone else's inbox (docs/design.md §7). Before `emailDelivery` existed it always said
+   * "sent", including on a deployment where the message went to a log file (audit PM-04).
+   */
+  it('confirms the invitation as sent when the server delivered it', async () => {
+    apiPost.mockResolvedValue({
+      ...invitation('inv-1', 'yeni@kurultay.test'),
+      emailDelivery: MailDeliveryStatus.SENT,
+    } as never);
+    renderSection();
+
+    await sendInvitation('yeni@kurultay.test');
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  it('downgrades the confirmation when no email went out, and names the way out', async () => {
+    apiPost.mockResolvedValue({
+      ...invitation('inv-1', 'yeni@kurultay.test'),
+      emailDelivery: MailDeliveryStatus.NOT_CONFIGURED,
+    } as never);
+    renderSection();
+
+    await sendInvitation('yeni@kurultay.test');
+
+    await waitFor(() => expect(toast.warning).toHaveBeenCalled());
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(vi.mocked(toast.warning).mock.calls[0]?.[0]).toContain('yeni@kurultay.test');
+    // The exit route is the Copy link control on the row this invitation just joined.
+    expect(vi.mocked(toast.warning).mock.calls[0]?.[0]).toContain(copy.copyLink);
+  });
+
+  it('warns on a refused relay too, not only on a missing one', async () => {
+    apiPost.mockResolvedValue({
+      ...invitation('inv-1', 'yeni@kurultay.test'),
+      emailDelivery: MailDeliveryStatus.FAILED,
+    } as never);
+    renderSection();
+
+    await sendInvitation('yeni@kurultay.test');
+
+    await waitFor(() => expect(toast.warning).toHaveBeenCalled());
+  });
+
+  /**
+   * An absent field means the API observed no send — not that delivery failed. Warning on it
+   * would cry wolf on every deployment whose invitation flow works perfectly.
+   */
+  it('confirms normally when the server reported no delivery status at all', async () => {
+    apiPost.mockResolvedValue(invitation('inv-1', 'yeni@kurultay.test') as never);
+    renderSection();
+
+    await sendInvitation('yeni@kurultay.test');
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(toast.warning).not.toHaveBeenCalled();
   });
 
   it('never offers OWNER as an invitable role', async () => {
@@ -273,6 +356,76 @@ describe('MembersSettings — what a MEMBER sees', () => {
     // Leaving is self-service at every role (`@WorkspaceScoped` on `members/me/leave`).
     expect(screen.getByRole('menuitem', { name: copy.leaveAction })).toBeTruthy();
     expect(screen.queryByRole('menuitem', { name: copy.removeAction })).toBeNull();
+  });
+});
+
+/**
+ * Audit PM-04. Without SMTP no invitation email is delivered, so nobody can confirm their
+ * address, so no invitation can be accepted — a deliberate security trade-off
+ * (`docs/decisions/0013-invitation-email-verification.md`) that the product used to keep
+ * entirely to itself.
+ */
+describe('MembersSettings — a deployment that cannot send email', () => {
+  it('says so, permanently, above the invite control', async () => {
+    loadConfig.mockResolvedValue({ mailEnabled: false });
+    renderSection();
+
+    expect(await screen.findByText(copy.mailDisabledTitle)).toBeTruthy();
+    expect(screen.getByText(copy.mailDisabledBody)).toBeTruthy();
+  });
+
+  it('carries a link to the setup docs', async () => {
+    loadConfig.mockResolvedValue({ mailEnabled: false });
+    renderSection();
+
+    const link = await screen.findByRole('link', { name: copy.mailDisabledDocs });
+
+    expect(link.getAttribute('href')).toBe(SMTP_SETUP_DOCS_URL);
+  });
+
+  /**
+   * The way out has to be one the admin can take on this deployment as it stands: copying the
+   * accept link out of the pending row. The notice names that control, and the control is
+   * really there (docs/design.md §7).
+   */
+  it('points at the copy-link way out, and the control it names exists', async () => {
+    loadConfig.mockResolvedValue({ mailEnabled: false });
+    loadInvitations.mockResolvedValue([invitation('inv-1', 'bekleyen@kurultay.test')]);
+    renderSection();
+
+    expect(await screen.findByText(copy.mailDisabledBody)).toBeTruthy();
+    expect(copy.mailDisabledBody).toContain(copy.copyLink);
+    expect(screen.getByRole('button', { name: copy.copyLink })).toBeTruthy();
+  });
+
+  it('cannot be dismissed, because nothing the admin does here would make it untrue', async () => {
+    loadConfig.mockResolvedValue({ mailEnabled: false });
+    renderSection();
+
+    const notice = (await screen.findByText(copy.mailDisabledTitle)).closest('div')?.parentElement;
+
+    expect(notice?.querySelector('button')).toBeNull();
+  });
+
+  it('stays away when the deployment can send email', async () => {
+    renderSection();
+
+    expect(await screen.findByRole('button', { name: copy.inviteAction })).toBeTruthy();
+    expect(screen.queryByText(copy.mailDisabledTitle)).toBeNull();
+  });
+
+  /**
+   * A member cannot invite anyone, so an instance-wide warning about invitation email would
+   * only be noise on a screen with no invite control — and `GET /config` is not asked for.
+   */
+  it('is neither shown to nor fetched for someone who cannot invite', async () => {
+    workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.MEMBER };
+    loadConfig.mockResolvedValue({ mailEnabled: false });
+    renderSection();
+
+    expect(await screen.findByText('Bora')).toBeTruthy();
+    expect(loadConfig).not.toHaveBeenCalled();
+    expect(screen.queryByText(copy.mailDisabledTitle)).toBeNull();
   });
 });
 

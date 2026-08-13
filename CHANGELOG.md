@@ -22,6 +22,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the session's active workspace the same way `Leave workspace` does — dropping the socket and
   redirecting to the dashboard — because the workspace this whole screen was scoped to no
   longer exists to redirect back into. All copy is catalogued under `app.settings.workspace.*`.
+- **The product now says when it cannot send email.** A deployment with no `SMTP_HOST`
+  delivers nothing, so nobody can confirm an address and therefore nobody can accept an
+  invitation — a deliberate security trade-off (ADR 0013, GHSA-fmh4-wcc4-5jm3) that the
+  product used to keep entirely to itself: the admin sent an invitation, the API answered
+  `201`, the message went to a log file, and the only visible outcome was an invitation nobody
+  ever accepted. Two new signals close that. `GET /config` — a new instance capability
+  document, session-required, deliberately not part of the liveness probe — reports
+  `mailEnabled`, and Settings → Members turns `false` into a standing, non-dismissable notice
+  that names the constraint, links to the SMTP setup guide, and points at the **Copy link**
+  control that still works. `POST /workspaces/:workspaceId/invitations` now also reports
+  `emailDelivery` (`SENT` / `NOT_CONFIGURED` / `FAILED`) for the invitation it just created,
+  so an admin is told at the moment they send it rather than by a teammate who never got an
+  email; the field is absent when no send was observed, which is deliberately not the same as
+  `SENT`. Both values derive from the transport the mail module actually selected — nothing
+  reads `SMTP_HOST` a second time — so the UI and the log can no longer disagree about the
+  same deployment. Sending is still not a precondition of anything: the invitation is created
+  either way.
 - A **Members** section in Settings — the product can now start the flow it is built around.
   Every membership endpoint already existed; none of them had a screen, so inviting a teammate
   meant a `curl` call and the accept page served invitations nobody could send. Settings now

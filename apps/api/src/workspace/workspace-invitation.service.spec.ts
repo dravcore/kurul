@@ -4,10 +4,11 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { MailDeliveryStatus, MemberRole } from '@kurultay/shared-types';
 import { APIError } from 'better-auth/api';
 import type { Request } from 'express';
 import { auth } from '../auth/auth';
+import { recordMailDelivery } from '../mail/mail-delivery-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   EMAIL_NOT_VERIFIED_MESSAGE,
@@ -184,6 +185,109 @@ describe('WorkspaceInvitationService.createInvitation', () => {
     );
 
     expect(api.cancelInvitation).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * Audit PM-04. The invitation email is sent from inside `auth.api.createInvitation`, by the
+   * plugin's own hook, so these cases stand the mock in for that hook: it records a delivery
+   * outcome exactly where the real one does, and the assertion is that the outcome survives
+   * the trip back to the admin instead of ending in the log.
+   */
+  it('reports that no email went out when the deployment has no mail transport', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    api.createInvitation.mockImplementation(() => {
+      recordMailDelivery(MailDeliveryStatus.NOT_CONFIGURED);
+      return Promise.resolve(invitationRow('inv_new', MemberRole.MEMBER));
+    });
+
+    const result = await service.createInvitation(
+      WORKSPACE_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    expect(result.emailDelivery).toBe(MailDeliveryStatus.NOT_CONFIGURED);
+    // The invitation is still created: the accept link is the way in on a deployment without
+    // mail, and failing the request would take it away.
+    expect(result.id).toBe('inv_new');
+    expect(result.acceptUrl).toContain('/invite/inv_new');
+  });
+
+  it('reports a refused relay too, not only a missing one', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    api.createInvitation.mockImplementation(() => {
+      recordMailDelivery(MailDeliveryStatus.FAILED);
+      return Promise.resolve(invitationRow('inv_new', MemberRole.MEMBER));
+    });
+
+    const result = await service.createInvitation(
+      WORKSPACE_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    expect(result.emailDelivery).toBe(MailDeliveryStatus.FAILED);
+  });
+
+  it('reports a delivered invitation as sent', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    api.createInvitation.mockImplementation(() => {
+      recordMailDelivery(MailDeliveryStatus.SENT);
+      return Promise.resolve(invitationRow('inv_new', MemberRole.MEMBER));
+    });
+
+    const result = await service.createInvitation(
+      WORKSPACE_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    expect(result.emailDelivery).toBe(MailDeliveryStatus.SENT);
+  });
+
+  it('omits the field entirely when no send was observed, rather than guessing', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    api.createInvitation.mockResolvedValue(invitationRow('inv_new', MemberRole.MEMBER));
+
+    const result = await service.createInvitation(
+      WORKSPACE_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    // Absent, not `undefined` and not `SENT`: a client must not be able to read "we did not
+    // look" as "it was delivered".
+    expect('emailDelivery' in result).toBe(false);
+  });
+
+  it('does not leak one invitation delivery outcome into the next', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    api.createInvitation.mockImplementationOnce(() => {
+      recordMailDelivery(MailDeliveryStatus.NOT_CONFIGURED);
+      return Promise.resolve(invitationRow('inv_a', MemberRole.MEMBER));
+    });
+    api.createInvitation.mockImplementationOnce(() =>
+      Promise.resolve(invitationRow('inv_b', MemberRole.MEMBER)),
+    );
+
+    const first = await service.createInvitation(
+      WORKSPACE_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+    const second = await service.createInvitation(
+      WORKSPACE_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    expect(first.emailDelivery).toBe(MailDeliveryStatus.NOT_CONFIGURED);
+    expect('emailDelivery' in second).toBe(false);
   });
 
   it('looks the pending invitation up by the lower-cased email Better Auth stores', async () => {

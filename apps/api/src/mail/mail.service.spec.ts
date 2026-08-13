@@ -1,7 +1,8 @@
 import { Logger } from '@nestjs/common';
+import { MailDeliveryStatus } from '@kurultay/shared-types';
 import type { MailMessage } from './mail-sender';
 import { MailService } from './mail.service';
-import { getMailSender } from './send-mail';
+import { closeMailSender, getMailSender } from './send-mail';
 
 const MESSAGE: MailMessage = {
   to: 'invitee@example.test',
@@ -27,11 +28,29 @@ describe('MailService', () => {
     expect(send).toHaveBeenCalledWith(MESSAGE);
   });
 
-  it('does not reject when delivery fails', async () => {
+  it('does not reject when delivery fails, and says so in the resolved value', async () => {
     const service = new MailService();
     jest.spyOn(getMailSender(), 'send').mockRejectedValue(new Error('relay refused'));
 
-    await expect(service.send(MESSAGE)).resolves.toBeUndefined();
+    await expect(service.send(MESSAGE)).resolves.toBe(MailDeliveryStatus.FAILED);
+  });
+
+  /**
+   * The `mailEnabled` signal behind `GET /config`, read through the DI face a controller has.
+   * Both directions come from the transport itself, never from a second read of `SMTP_HOST` —
+   * see `send-mail.spec.ts`, which pins that down against the environment.
+   */
+  it('reports mail as disabled while the process-wide transport delivers nothing', async () => {
+    const originalHost = process.env.SMTP_HOST;
+    delete process.env.SMTP_HOST;
+    await closeMailSender();
+
+    try {
+      expect(new MailService().isEnabled()).toBe(false);
+    } finally {
+      if (originalHost !== undefined) process.env.SMTP_HOST = originalHost;
+      await closeMailSender();
+    }
   });
 
   it('closes the transport when the application shuts down', async () => {

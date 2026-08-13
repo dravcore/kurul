@@ -19,6 +19,7 @@ import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth
 import { buildInviteAcceptUrl } from '../auth/web-urls';
 import { toCursorPage } from '../common/pagination/cursor-page';
 import { MAX_PAGE_LIMIT } from '../common/pagination/page-limit';
+import { captureMailDelivery } from '../mail/mail-delivery-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateInvitationDto } from './dto/create-invitation.dto';
 import type { WorkspaceInvitationQueryDto } from './dto/workspace-invitation-query.dto';
@@ -63,6 +64,10 @@ type InvitationRow = {
  *
  * `acceptUrl` is rebuilt from the id by the same helper the invitation email uses, so the link
  * an admin copies out of the roster and the link in the invitee's inbox cannot diverge.
+ *
+ * `emailDelivery` is deliberately absent here. A listed invitation is a stored row and delivery
+ * is not stored, so this mapper has nothing to report; only `createInvitation`, which watched
+ * the send happen, sets it. See the field's contract in `@kurultay/shared-types`.
  */
 function toInvitationDto(row: InvitationRow): InvitationDto {
   return {
@@ -156,6 +161,21 @@ export class WorkspaceInvitationService {
    * - **Same role** — resend, which is exactly what the admin asked for.
    * - **Different role** — revoke the pending invitation first, so the plugin issues a fresh
    *   one at the requested role and the response (id, `acceptUrl`, role) describes it.
+   *
+   * ## Why the plugin call is wrapped in `captureMailDelivery`
+   *
+   * The invitation email is sent from inside `auth.api.createInvitation`, by the plugin's
+   * `sendInvitationEmail` hook, and its outcome used to reach nobody but the log: on a
+   * deployment with no SMTP host the API answered `201`, wrote "Email not sent (no SMTP)" to
+   * stdout, and the admin found out days later from a teammate who never got anything. The
+   * capture is the return channel that closes that gap — the response now carries
+   * `emailDelivery`, and the web app turns a non-`SENT` value into a message pointing at the
+   * copyable accept link (audit PM-04).
+   *
+   * It does **not** make delivery a precondition. An undeliverable invitation is still a
+   * created invitation: the row exists, the link works, and someone who is already verified
+   * can accept it. Failing the request here would delete the one path that still works on a
+   * deployment without mail.
    */
   async createInvitation(
     workspaceId: string,
@@ -185,15 +205,17 @@ export class WorkspaceInvitationService {
     }
 
     try {
-      const invitation = await auth.api.createInvitation({
-        body: {
-          email,
-          role: dto.role,
-          organizationId: workspaceId,
-          resend: true,
-        },
-        headers,
-      });
+      const { result: invitation, delivery } = await captureMailDelivery(() =>
+        auth.api.createInvitation({
+          body: {
+            email,
+            role: dto.role,
+            organizationId: workspaceId,
+            resend: true,
+          },
+          headers,
+        }),
+      );
 
       if (!invitation?.id || !invitation.email || !invitation.status || !invitation.expiresAt) {
         throw new BadRequestException('Failed to create invitation');
@@ -217,6 +239,11 @@ export class WorkspaceInvitationService {
         // Same builder the invitation email uses, so the link an admin copies from the UI and
         // the link in the invitee's inbox can never point at different routes.
         acceptUrl: buildInviteAcceptUrl(invitation.id),
+        // Spread rather than `emailDelivery: delivery`: `undefined` means "no send was
+        // observed", and the contract is that the *field is absent* in that case, so a client
+        // cannot read the absence as a verdict. `exactOptionalPropertyTypes` would reject the
+        // explicit `undefined` anyway.
+        ...(delivery === undefined ? {} : { emailDelivery: delivery }),
       };
     } catch (error) {
       // Deliberately generic: the plugin distinguishes "already a member" from "already

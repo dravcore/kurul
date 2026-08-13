@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { HealthModule } from './health/health.module';
+import { InstanceConfigModule } from './config/instance-config.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
@@ -23,6 +24,7 @@ import { throttlerOptions } from './common/rate-limit/rate-limit';
     ThrottlerModule.forRoot(throttlerOptions()),
     PrismaModule,
     HealthModule,
+    InstanceConfigModule,
     AuthModule,
     MailModule,
     WorkspaceModule,

@@ -129,6 +129,7 @@ Non-workspace routes (the complete list):
 ```
 GET   /health                # liveness, unauthenticated
 GET   /health/ready          # readiness, unauthenticated
+GET   /config                # instance capabilities; any signed-in caller
 POST  /auth/*                # Better Auth handlers
 GET   /me                    # current user profile
 PATCH /me                    # own profile; interface language today
@@ -145,6 +146,55 @@ document rather than the error envelope below — the caller is a healthcheck, n
 `PATCH /me` is not workspace-scoped and not role-gated: the subject is the caller, so the
 session guard is the whole authorization story. It is also the only place `User.locale` is
 written — see [decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md).
+
+### Instance configuration
+
+`GET /config` answers **"what is this deployment configured to do"** with an `InstanceConfigDto`:
+
+```json
+{ "mailEnabled": true }
+```
+
+| Field         | Meaning                                                                                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mailEnabled` | `false` when no SMTP host is configured, so every message is written to the API log and delivered nowhere — nobody can confirm an address or accept an invite |
+
+Three rules hold this endpoint's shape, and each one is a decision that was available to make
+differently:
+
+- **It is not part of `/health`.** A healthcheck exists so an orchestrator can decide whether
+  to restart the process, and "SMTP is unconfigured" is never a reason to restart anything —
+  it is a permanent, intentional property of the deployment. `/health` is also `@Public()` and
+  `@SkipRateLimit()`, an exemption that is only affordable because the document says nothing
+  about the product; publishing configuration there would inherit both by accident.
+- **It requires a session, and no role.** The leak is small, but nothing needs the endpoint to
+  be public, and an unauthenticated one would hand a scanner a per-instance list of what a
+  self-hosted install has left unconfigured. Nothing here varies by workspace or by role, so it
+  carries no `:workspaceId` and no role gate. Rate limiting is the global default.
+- **Every field is a capability, never tenant state.** A value that differs per workspace, per
+  user, or per request belongs on the resource it describes. This document must stay cacheable
+  as "what this server can do".
+
+### Reporting what happened to an email
+
+`InvitationDto.emailDelivery` is **optional**, carries `SENT` / `NOT_CONFIGURED` / `FAILED`
+(`MailDeliveryStatus`), and appears on exactly one response: `POST /workspaces/:workspaceId/invitations`.
+
+**An absent field is not `SENT`.** It means this API observed no send for the request, and a
+client must not resolve that into a verdict. A listed invitation is a stored row while delivery
+is an event that nothing records, so `GET .../invitations` never carries the field.
+
+The reason it exists at all: the invitation email is sent inside Better Auth's
+`sendInvitationEmail` hook, and a failed or log-only send is swallowed there by design (a
+stored invitation must not be reported as failed because its notification bounced). That left
+the admin with a `201` and no way to learn that nothing was delivered. The status is the
+return channel — the request still succeeds, the invitation is still created, and the response
+simply says what became of the email. Sending it is still not a precondition of anything: on a
+deployment without SMTP the accept link in `acceptUrl` is the one path that works, which is
+what the web client offers when the status is not `SENT`.
+
+The same rule applies to any future endpoint that triggers mail: **report the delivery status,
+never fail the request on it, and never infer one you did not observe.**
 
 ### Actions that are not CRUD
 

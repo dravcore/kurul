@@ -2,10 +2,32 @@ import type {
   ColumnCategory,
   InvitationStatus,
   LabelColorSlot,
+  MailDeliveryStatus,
   MemberRole,
   Priority,
 } from './enums.js';
 import type { Locale } from './locales.js';
+
+/**
+ * What this instance is configured to do — the answer to "is this feature switched on here",
+ * asked by a client that cannot see the server's environment.
+ *
+ * Deployment capability, never tenant state: nothing in here varies by workspace, by role or
+ * by caller, which is why it is served from a single account-level `GET /config` instead of
+ * being repeated inside every workspace-scoped payload that happens to care.
+ */
+export interface InstanceConfigDto {
+  /**
+   * Whether outbound email has a transport that can actually deliver it.
+   *
+   * `false` means SMTP is unconfigured and every message is written to the API log instead —
+   * so an invitee is never sent a link, cannot confirm their address, and therefore cannot
+   * accept an invitation (`docs/decisions/0013-invitation-email-verification.md`). The web
+   * app uses it to say so on the invite screen rather than letting an admin discover it from
+   * a teammate who never got the email.
+   */
+  mailEnabled: boolean;
+}
 
 export interface UserDto {
   id: string;
@@ -48,6 +70,18 @@ export interface InvitationDto {
   expiresAt: string;
   /** Computed client convenience URL — not a database column. */
   acceptUrl: string;
+  /**
+   * What happened to the invitation email, when the response is one this API watched being
+   * sent — `POST /workspaces/:workspaceId/invitations` and nothing else.
+   *
+   * **Absent is not `SENT`.** A listed invitation is a stored row, and delivery is an event
+   * that happened when it was created; nothing records it, so a list cannot honestly report
+   * one. Omitting the field is the only reading of "we did not observe this" that a client
+   * cannot mistake for a verdict — which is the whole point, because the verdict this field
+   * exists to deliver is `NOT_CONFIGURED`, and inferring it wrongly is exactly the silent
+   * failure it is here to end.
+   */
+  emailDelivery?: MailDeliveryStatus;
 }
 
 export interface BoardDto {
