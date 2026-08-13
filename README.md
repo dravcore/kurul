@@ -75,7 +75,7 @@ Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
 ```bash
 git clone https://github.com/dravcore/kurultay.git
 cd kurultay
-cp .env.example .env   # set BETTER_AUTH_SECRET (openssl rand -base64 32)
+cp .env.example .env   # set BETTER_AUTH_SECRET (openssl rand -base64 32) and POSTGRES_PASSWORD (openssl rand -hex 32)
 pnpm install
 pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access build   # shared packages, consumed from gitignored dist/
 pnpm db:generate        # generate the Prisma client (gitignored, not created automatically)
@@ -87,6 +87,15 @@ pnpm dev
 
 - Web: http://localhost:3000
 - API health: http://localhost:4000/health
+
+`POSTGRES_PASSWORD` has no default — compose refuses to start until it's set — and the
+password segment of `DATABASE_URL` a few lines above it in `.env.example` must match it by
+hand. Unlike `BETTER_AUTH_SECRET`, this value is embedded directly in a connection URL, so
+`openssl rand -base64 32` is the wrong generator here — its alphabet includes `/` and `+`,
+either of which breaks the URL if it lands in the password (`/` ends the authority section
+outright; roughly half of all base64-32 outputs contain at least one). Use
+`openssl rand -hex 32` instead, whose alphabet (`0-9a-f`) is always URL-safe; see
+[docs/development.md#database-and-cache-credentials](docs/development.md#database-and-cache-credentials).
 
 The app boots without SMTP configured, but invitations cannot be accepted until it is — the
 dev compose file above already starts [Mailpit](https://mailpit.axllent.org/) so you can test

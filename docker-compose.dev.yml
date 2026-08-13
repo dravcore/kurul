@@ -3,15 +3,17 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: kurultay
-      POSTGRES_PASSWORD: kurultay
-      POSTGRES_DB: kurultay
+      POSTGRES_USER: ${POSTGRES_USER:-kurultay}
+      # Same fail-loud requirement as docker-compose.yml (see there for why): no baked-in
+      # default, and only the *first* boot of an empty postgres_data volume applies it.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
+      POSTGRES_DB: ${POSTGRES_DB:-kurultay}
     ports:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U kurultay -d kurultay']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-kurultay} -d ${POSTGRES_DB:-kurultay}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -19,12 +21,31 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
+    # REDIS_PASSWORD is optional here too — see docker-compose.yml for the reasoning. The
+    # host port below means anything on the host can already reach this Redis at
+    # localhost:6379 regardless, so a password mainly matters once other containers share
+    # this compose project's network.
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      - sh
+      - -c
+      - >-
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          exec redis-server --requirepass "$$REDIS_PASSWORD";
+        else
+          exec redis-server;
+        fi
     ports:
       - '6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test:
+        [
+          'CMD-SHELL',
+          'if [ -n "$$REDIS_PASSWORD" ]; then redis-cli -a "$$REDIS_PASSWORD" ping; else redis-cli ping; fi',
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
