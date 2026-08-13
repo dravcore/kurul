@@ -7,6 +7,7 @@ import type {
   WorkspaceMemberDto,
 } from '@kurultay/shared-types';
 import type { Request } from 'express';
+import { CurrentMembership } from '../common/decorators/current-membership.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';
 import {
@@ -15,12 +16,14 @@ import {
   WorkspaceScoped,
 } from '../common/decorators/workspace-roles.decorator';
 import { ThrottleInvitations } from '../common/rate-limit/rate-limit';
-import type { AuthenticatedUser } from '../common/types/request-context';
+import type { AuthenticatedUser, WorkspaceMembership } from '../common/types/request-context';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
+import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 import { WorkspaceMemberQueryDto } from './dto/workspace-member-query.dto';
 import { WorkspaceInvitationService } from './workspace-invitation.service';
+import { WorkspaceMemberService } from './workspace-member.service';
 import { WorkspaceService } from './workspace.service';
 
 @Controller('workspaces')
@@ -28,6 +31,7 @@ export class WorkspaceController {
   constructor(
     private readonly workspaceService: WorkspaceService,
     private readonly invitationService: WorkspaceInvitationService,
+    private readonly memberService: WorkspaceMemberService,
   ) {}
 
   @Get()
@@ -84,6 +88,26 @@ export class WorkspaceController {
     return this.workspaceService.getMembership(workspaceId, user.id);
   }
 
+  /**
+   * Leaving is self-service, so it is `@WorkspaceScoped` and not role-gated: a GUEST who was
+   * invited by mistake must be able to walk out without asking an admin to let them.
+   *
+   * Declared ahead of `members/:userId` because `me` is not a UUIDv7 and would otherwise be
+   * rejected by `@UuidParam` before this handler was ever considered.
+   *
+   * 204: the caller's membership is gone, so there is nothing left to return about it.
+   */
+  @Post(':workspaceId/members/me/leave')
+  @HttpCode(204)
+  @WorkspaceScoped()
+  async leaveWorkspace(
+    @UuidParam('workspaceId') workspaceId: string,
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Req() request: Request,
+  ): Promise<void> {
+    await this.memberService.leave(workspaceId, membership, request);
+  }
+
   @Get(':workspaceId/members')
   @WorkspaceScoped()
   listMembers(
@@ -91,6 +115,40 @@ export class WorkspaceController {
     @Query() query: WorkspaceMemberQueryDto,
   ): Promise<CursorPage<WorkspaceMemberDto>> {
     return this.workspaceService.listMembers(workspaceId, query);
+  }
+
+  /**
+   * Revoke a member's access. Addressed by `userId`, not by membership id: the caller who
+   * wants someone out knows *who*, and the membership row id is an implementation detail of
+   * the roster response.
+   */
+  @Delete(':workspaceId/members/:userId')
+  @HttpCode(204)
+  @WorkspaceRoles(...ADMIN_ROLES)
+  async removeMember(
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('userId') userId: string,
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Req() request: Request,
+  ): Promise<void> {
+    await this.memberService.removeMember(workspaceId, userId, membership, request);
+  }
+
+  /**
+   * `PATCH .../role` rather than `PATCH .../members/:userId`: role is the only mutable field
+   * of a membership, and a sub-resource says so in the URL instead of leaving callers to
+   * discover that every other key is rejected.
+   */
+  @Patch(':workspaceId/members/:userId/role')
+  @WorkspaceRoles(...ADMIN_ROLES)
+  updateMemberRole(
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('userId') userId: string,
+    @Body() dto: UpdateMemberRoleDto,
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Req() request: Request,
+  ): Promise<WorkspaceMemberDto> {
+    return this.memberService.updateMemberRole(workspaceId, userId, dto, membership, request);
   }
 
   /**

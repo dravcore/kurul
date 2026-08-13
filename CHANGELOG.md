@@ -9,6 +9,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Membership revocation — the half of the access lifecycle that was missing. Until now a user
+  who joined a workspace could only be removed by deleting the workspace or editing the
+  database by hand, and no role could be lowered. Three routes close that:
+  `DELETE /workspaces/:workspaceId/members/:userId` and
+  `PATCH /workspaces/:workspaceId/members/:userId/role` (both OWNER/ADMIN), and
+  `POST /workspaces/:workspaceId/members/me/leave`, which every member may call for
+  themselves at any role. A workspace can never be left without an OWNER: the last one cannot
+  be removed, demoted or allowed to leave (`409`), an ADMIN can neither remove an OWNER nor
+  change their role, and only an OWNER may promote someone to OWNER (`403`). Removal is
+  addressed at another member — taking yourself out is `POST .../members/me/leave`, so an
+  admin's mistake cannot lock the admin out. Access ends immediately in both directions: the
+  next HTTP request from a removed member is a `404`, and their Socket.io board and
+  notification rooms are dropped inside the same request, so no board or notification event
+  reaches them afterwards. The Better Auth `/organization/*` HTTP paths these routes replace
+  stay blocked at the mount, as before.
 - Scheduled database backups with a rehearsed restore path. `docker compose up` now starts a
   `backup` sidecar (`postgres:18-alpine`, `restart: unless-stopped`, waits for a healthy
   `postgres`) that runs `scripts/backup.sh`: every `BACKUP_INTERVAL` seconds it writes a

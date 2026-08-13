@@ -4,7 +4,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
 import type { CursorPage, WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
@@ -16,29 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import type { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 import type { WorkspaceMemberQueryDto } from './dto/workspace-member-query.dto';
-
-/** The membership row shape both member reads map from. */
-type MemberRow = {
-  id: string;
-  workspaceId: string;
-  userId: string;
-  role: string;
-  user: { name: string; avatarUrl: string | null };
-};
-
-/** Name and avatar live on the user, so every member read joins the same two columns. */
-const memberInclude = { user: { select: { name: true, avatarUrl: true } } } as const;
-
-function toMemberDto(row: MemberRow): WorkspaceMemberDto {
-  return {
-    id: row.id,
-    workspaceId: row.workspaceId,
-    userId: row.userId,
-    role: row.role as MemberRole,
-    name: row.user.name,
-    avatarUrl: row.user.avatarUrl,
-  };
-}
+import { memberInclude, toMemberDto } from './workspace-member.mapper';
 
 /**
  * The Better Auth organization codes that mean "this slug is already in use".
