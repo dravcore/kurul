@@ -16,6 +16,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `docs/archive/roadmap-mvp-phases.md`; shipped phase design specs moved to
   `docs/archive/specs/` (CHANGELOG links updated).
 
+### Security
+
+- The API now sends baseline security headers on every response via `helmet`
+  (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options`,
+  `X-Frame-Options: DENY`, `Referrer-Policy`, and friends). The CSP is API-shaped
+  (`default-src 'none'`) because the service renders no HTML, and `Cross-Origin-Resource-Policy`
+  is `cross-origin` so the web app on `WEB_URL` keeps its CORS-gated access.
+
 ## [0.1.0] - 2026-08-12
 
 First release: roadmap Phases 1–9 — the MVP — together with the post-MVP hardening pass that
