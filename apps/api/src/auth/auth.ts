@@ -7,6 +7,7 @@ import { loadRootEnv, envString } from '../common/env';
 import { buildVerificationEmail } from '../mail/mail-templates';
 import { sendMail } from '../mail/send-mail';
 import { createSharedPrismaAdapter, registerPoolConsumer } from '../prisma/database';
+import { authRateLimitOptions } from './auth-rate-limit';
 import { organizationOptions } from './organization-options';
 import { resolveVerificationUrl, webAppUrl } from './web-urls';
 
@@ -36,6 +37,9 @@ export const auth = betterAuth({
   baseURL: betterAuthUrl,
   basePath: '/auth',
   trustedOrigins: [webUrl],
+  // `/auth/*` is served by raw Express, below the Nest router, so the global ThrottlerGuard
+  // does not cover it — see `auth-rate-limit.ts` for what this configures and why.
+  rateLimit: authRateLimitOptions(),
   session: {
     // Avoids a database round trip on every authenticated request; the signed cookie
     // is re-validated against the DB once it expires.

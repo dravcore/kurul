@@ -14,6 +14,7 @@ import {
   WorkspaceRoles,
   WorkspaceScoped,
 } from '../common/decorators/workspace-roles.decorator';
+import { ThrottleInvitations } from '../common/rate-limit/rate-limit';
 import type { AuthenticatedUser } from '../common/types/request-context';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
@@ -92,7 +93,13 @@ export class WorkspaceController {
     return this.workspaceService.listMembers(workspaceId, query);
   }
 
+  /**
+   * Rate limited below the API default: every call hands a message to the SMTP relay, aimed
+   * at an address the caller chooses, so an admin account is enough to turn this endpoint
+   * into a mail cannon pointed at someone else's inbox.
+   */
   @Post(':workspaceId/invitations')
+  @ThrottleInvitations()
   @WorkspaceRoles(...ADMIN_ROLES)
   createInvitation(
     @UuidParam('workspaceId') workspaceId: string,

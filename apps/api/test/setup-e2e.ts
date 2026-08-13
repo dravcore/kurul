@@ -30,6 +30,14 @@ function resolveTestDatabaseUrl(): string {
 
 process.env.DATABASE_URL = resolveTestDatabaseUrl();
 
+/**
+ * Integration specs drive hundreds of requests per route from a single loopback address in
+ * seconds — the exact traffic shape the rate limits exist to reject. The limits themselves are
+ * covered by `src/common/rate-limit/*.spec.ts`, which builds a module with a tiny limit rather
+ * than relying on the production numbers being small enough to trip.
+ */
+process.env.RATE_LIMIT_ENABLED = 'false';
+
 process.env.BETTER_AUTH_SECRET =
   process.env.BETTER_AUTH_SECRET?.trim() || 'test-secret-not-for-production';
 process.env.BETTER_AUTH_URL = process.env.BETTER_AUTH_URL?.trim() || 'http://localhost:4000';

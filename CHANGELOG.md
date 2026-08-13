@@ -47,6 +47,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- Rate limiting across the whole API surface. A global `ThrottlerGuard` gives every route
+  100 requests per minute per client IP, with tighter budgets where a request is expensive
+  or reaches outside the process: 10/min on invitation creation (each one hands a message to
+  the SMTP relay, addressed by the caller) and 30/min on task search (`?q=` is a trigram
+  scan — the same route without `q=` keeps the default, so ordinary board paging is
+  untouched). `/health` and `/health/ready` are exempt, because a throttled probe reports a
+  healthy API as down. Over-budget requests get `429` in the standard error envelope with a
+  `Retry-After` header. `/auth/*` bypasses the Nest router (ADR 0004), so Better Auth's own
+  limiter is now configured explicitly rather than left on its production-only default, and
+  its counters go to Redis via `rateLimit.customStorage` when `REDIS_URL` is set — shared
+  across instances and surviving restarts, without moving sessions out of Postgres the way
+  `secondaryStorage` would. No Redis is still a supported configuration: the counters stay in
+  memory and a warning says so. `RATE_LIMIT_ENABLED=false` turns both limiters off for the
+  integration suite. See [api-conventions.md](docs/api-conventions.md#rate-limiting).
 - The API now sends baseline security headers on every response via `helmet`
   (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options`,
   `X-Frame-Options: DENY`, `Referrer-Policy`, and friends). The CSP is API-shaped
