@@ -194,18 +194,37 @@ yayımlar (`api-coverage`, `web-coverage`).
 
 Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalıştırır:
 
-| Adım                | Komut                                                                                     |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| Shared paket build  | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build` |
-| Lint                | `pnpm lint`                                                                               |
-| Format kontrolü     | `pnpm format:check`                                                                       |
-| Typecheck           | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                 |
-| Unit testler (api)  | `pnpm --filter @kurultay/api test:cov`                                                    |
-| Unit testler (web)  | `pnpm --filter @kurultay/web exec vitest run --coverage`                                  |
-| Integration testler | Postgres ve Redis service container'larına karşı `pnpm --filter @kurultay/api test:e2e`   |
-| Build               | `pnpm build`                                                                              |
+| Adım                | Komut                                                                                                 |
+| ------------------- | ----------------------------------------------------------------------------------------------------- |
+| Shared paket build  | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build`             |
+| Lint                | `pnpm lint`                                                                                           |
+| Format kontrolü     | `pnpm format:check`                                                                                   |
+| Typecheck           | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                             |
+| Audit               | `pnpm audit --audit-level high`                                                                       |
+| Unit testler (api)  | `pnpm --filter @kurultay/api test:cov`                                                                |
+| Unit testler (web)  | `pnpm --filter @kurultay/web exec vitest run --coverage`                                              |
+| Unit testler (pkgs) | `pnpm --filter "./packages/*" test`                                                                   |
+| Integration testler | Postgres ve Redis service container'larına karşı `pnpm --filter @kurultay/api test:e2e`               |
+| Build               | `pnpm build`                                                                                          |
+| **Kapı** (zorunlu)  | `ci-ok` — tüm upstream job'lar (`lint`, `test`, `build`) başarıysa geçer (atlanmamış/iptal edilmemiş) |
 
-Merge öncesi tüm adımlar geçmelidir. Bkz.
+**Merge öncesi tüm adımlar geçmelidir.** Kapı job'ı (`ci-ok`) branch korumasında yapılandırılan
+tek zorunlu status kontrol — eğer herhangi bir upstream job başarısızsa, atlanırsa ya da iptal
+edilirse, kapı başarısız olur. Bu iki koruma sağlar:
+
+1. **Doğruluk**: hiç koşmamış bir job kapıyı geçemez. Dal koruması _atlanmış_ bir zorunlu
+   kontrolü karşılanmış sayar; [#89](https://github.com/dravcore/kurultay/pull/89) tam olarak
+   böyle merge oldu (`test` kırmızı, `build` atlanmış). `ci-ok` `if: always()` ile koşar ve
+   her `needs.*.result` değerinin tam olarak `success` olduğunu doğrular — `failure`, `skipped`
+   ve `cancelled` üçü de kapıyı düşürür.
+2. **Dal korumasıyla sabit bir sözleşme**: koruma artık her job adını değil tek bir bağlamı
+   (`ci-ok`) tanıyor. Job eklemek, bölmek veya yeniden adlandırmak ayar değişikliği değil
+   `ci.yml` düzenlemesi; hata yapılırsa sonuç CI'ın içinde kalır — workflow tanımadığı bir
+   `needs` girdisiyle yüklenmeyi reddeder, hiçbir kontrol raporlanmaz ve PR kilitli kalır.
+   Eskiden aynı hata, korumayı artık var olmayan bir bağlamı beklerken bırakıyordu.
+
+CI, `develop` ve `main`'e yapılan push'larda olduğu gibi herhangi bir branch'a yapılan pull
+request'lerde çalışır. Bkz.
 [git-strategy.md](git-strategy.md#pull-request-süreci).
 
 Workflow dosyası: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).

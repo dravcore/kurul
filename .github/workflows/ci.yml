@@ -129,3 +129,49 @@ jobs:
         run: pnpm db:generate
       - name: Build
         run: pnpm build
+
+  ci-ok:
+    # Gate job: the single required status check. `if: always()` is the whole point —
+    # a `needs` job that is skipped (e.g. via concurrency cancel) or cancelled still runs
+    # this job, so "skipped" or "cancelled" can never silently pass the gate the way a plain
+    # `needs` gate would. Without `if: always()`, a cancelled upstream job causes GitHub to
+    # skip the gate job entirely and report it as "passed" — the exact failure mode from
+    # PR #89 (https://github.com/dravcore/kurultay/pull/89).
+    if: always()
+    needs: [lint, test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide gate result
+        run: |
+          # Collect results for all upstream jobs. Each job runs in a context where its
+          # own result is not yet known to downstream jobs — only the result objects of
+          # `needs.*` are visible. A job that was skipped or cancelled has result="skipped"
+          # or "cancelled", not "success". The gate must reject both.
+          declare -A results
+          results[lint]="${{ needs.lint.result }}"
+          results[test]="${{ needs.test.result }}"
+          results[build]="${{ needs.build.result }}"
+
+          # Log each result for diagnosis: if a PR fails, the developer needs to know which
+          # job failed, what its result status was, and whether it was actually a failure
+          # or a skip/cancel (GitHub's skipped jobs are not a failure in the normal sense,
+          # but they halt the pipeline and must be treated as if they were).
+          echo "Gate check results:"
+          for job in lint test build; do
+            echo "  $job: ${results[$job]}"
+          done
+
+          # Reject any result that is not "success". This catches:
+          # - failure: the job failed a step.
+          # - skipped: concurrency cancel, or an upstream job that was skipped.
+          # - cancelled: the workflow was cancelled by the user or timed out.
+          # Using contains(needs.*.result, 'failure') would miss skipped and cancelled.
+          failure=0
+          for job in lint test build; do
+            if [[ "${results[$job]}" != "success" ]]; then
+              echo "ERROR: $job did not succeed (result: ${results[$job]})"
+              failure=1
+            fi
+          done
+
+          exit $failure

@@ -58,6 +58,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- CI gate job: `.github/workflows/ci.yml` now defines a single required status check, `ci-ok`,
+  instead of relying on multiple job names in branch protection. The gate runs only when all
+  upstream jobs (lint, test, build) have completed, and fails if any is not successful — even
+  if skipped or cancelled via concurrency — preventing PRs from silently passing when a job is
+  renamed or a workflow is cancelled. See [docs/testing.md](docs/testing.md#ci) and
+  [#145](https://github.com/dravcore/kurultay/issues/145).
 - Docker Compose now survives crashes and host reboots: every long-running service carries
   `restart: unless-stopped` (in `docker-compose.dev.yml` too; the one-shot `migrate` job is
   deliberately excluded), `api` gains a healthcheck against `GET /health/ready` so "healthy"
