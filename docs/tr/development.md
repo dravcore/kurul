@@ -84,22 +84,22 @@ cp .env.example .env
 
 Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit edilmemelidir.
 
-| Değişken              | Örnek                                                             | Amaç                                                                                                                       |
-| --------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay`          | Prisma bağlantı string'i                                                                                                   |
-| `REDIS_URL`           | `redis://localhost:6379`                                          | Socket.io Redis adapter'ı, caching, BullMQ due-soon worker (`due-soon` kuyruğu)                                            |
-| `BETTER_AUTH_SECRET`  | _(üret)_                                                          | Session imzalama secret'ı — zorunlu, varsayılan yok                                                                        |
-| `BETTER_AUTH_URL`     | `http://localhost:4000`                                           | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir)                                                          |
-| `API_PORT`            | `4000`                                                            | NestJS dinleme portu                                                                                                       |
-| `WEB_URL`             | `http://localhost:3000`                                           | API için CORS origin'i                                                                                                     |
-| `RATE_LIMIT_ENABLED`  | `true`                                                            | [Rate limiting](api-conventions.md#rate-limiting) ana anahtarı. Varsayılan açık; yalnızca entegrasyon testleri kapatır     |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                           | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir)          |
-| `SMTP_HOST`           | `localhost` (geliştirme, Mailpit üzerinden)                       | SMTP sunucu host'u. Tamamen boş bırakılırsa mail modülü göndermek yerine loglar — bkz. [SMTP ve Mailpit](#smtp-ve-mailpit) |
-| `SMTP_PORT`           | `1025` (geliştirme, Mailpit üzerinden) / `587` (tipik production) | SMTP sunucu portu                                                                                                          |
-| `SMTP_USER`           | _(Mailpit için boş)_                                              | SMTP auth kullanıcı adı, sunucunuz gerektiriyorsa                                                                          |
-| `SMTP_PASSWORD`       | _(Mailpit için boş)_                                              | SMTP auth şifresi, sunucunuz gerektiriyorsa                                                                                |
-| `SMTP_SECURE`         | `false`                                                           | Örtük TLS için (port 465) `true`, STARTTLS/plaintext için (587/25, ve Mailpit) `false`                                     |
-| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                                  | Giden mail'lerdeki `From:` başlığı                                                                                         |
+| Değişken              | Örnek                                                               | Amaç                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma bağlantı string'i — şifre kısmı aşağıdaki `POSTGRES_PASSWORD` ile eşleşmelidir                                      |
+| `REDIS_URL`           | `redis://localhost:6379`                                            | Socket.io Redis adapter'ı, caching, BullMQ due-soon worker (`due-soon` kuyruğu)                                            |
+| `BETTER_AUTH_SECRET`  | _(üret)_                                                            | Session imzalama secret'ı — zorunlu, varsayılan yok                                                                        |
+| `BETTER_AUTH_URL`     | `http://localhost:4000`                                             | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir)                                                          |
+| `API_PORT`            | `4000`                                                              | NestJS dinleme portu                                                                                                       |
+| `WEB_URL`             | `http://localhost:3000`                                             | API için CORS origin'i                                                                                                     |
+| `RATE_LIMIT_ENABLED`  | `true`                                                              | [Rate limiting](api-conventions.md#rate-limiting) ana anahtarı. Varsayılan açık; yalnızca entegrasyon testleri kapatır     |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                             | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir)          |
+| `SMTP_HOST`           | `localhost` (geliştirme, Mailpit üzerinden)                         | SMTP sunucu host'u. Tamamen boş bırakılırsa mail modülü göndermek yerine loglar — bkz. [SMTP ve Mailpit](#smtp-ve-mailpit) |
+| `SMTP_PORT`           | `1025` (geliştirme, Mailpit üzerinden) / `587` (tipik production)   | SMTP sunucu portu                                                                                                          |
+| `SMTP_USER`           | _(Mailpit için boş)_                                                | SMTP auth kullanıcı adı, sunucunuz gerektiriyorsa                                                                          |
+| `SMTP_PASSWORD`       | _(Mailpit için boş)_                                                | SMTP auth şifresi, sunucunuz gerektiriyorsa                                                                                |
+| `SMTP_SECURE`         | `false`                                                             | Örtük TLS için (port 465) `true`, STARTTLS/plaintext için (587/25, ve Mailpit) `false`                                     |
+| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                                    | Giden mail'lerdeki `From:` başlığı                                                                                         |
 
 `.env.example` ayrıca `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `REDIS_PASSWORD`,
 `BACKUP_INTERVAL` ve `BACKUP_KEEP` taşır. Altısı da **yalnızca compose'a aittir** —
@@ -135,6 +135,28 @@ Bu, yukarıdaki `BETTER_AUTH_SECRET` ile aynı fail-loud kalıbıdır: bir place
 `.env.example`'ı dikkatlice okumayan her self-hosted kurulumun, Docker ağını paylaşan başka
 her şeye açık bir veritabanında, diğer her Kurultay kurulumuyla aynı şifreyle ayağa kalkması
 anlamına gelirdi.
+
+**`POSTGRES_PASSWORD` ve `REDIS_PASSWORD`'ü, yukarıdaki `BETTER_AUTH_SECRET` için kullanılan
+`-base64 32` yerine `openssl rand -hex 32` ile üretin.** Fark burada
+`BETTER_AUTH_SECRET`'teki gibi önemsiz değil: bu iki değer doğrudan bir bağlantı URL'ine
+gömülür (`DATABASE_URL`/`REDIS_URL`) ve percent-encode etmiyoruz, dolayısıyla `/ @ : # ? %`
+karakterlerinden biri değere düşerse URL bozulur — en keskin durum `/`'dir, çünkü göründüğü
+yerde authority bölümünü doğrudan sonlandırır:
+
+```bash
+$ node -e "new URL('postgresql://kurultay:ab/cd@postgres:5432/kurultay')"
+TypeError: Invalid URL
+    at new URL (node:internal/url:840:25)
+  code: 'ERR_INVALID_URL'
+
+$ openssl rand -hex 32
+1b7c3785ecf7f7bd2ec4826214889d19ff17d518ce44126ab6f07393b39b98a   # yalnızca 0-9a-f, her zaman URL-güvenli
+```
+
+`-base64 32`'nin alfabesi `/` ve `+` içerir; parola başına 43 base64 karakteriyle, en az bir
+`/` veya `+`'nin düşme olasılığı `1 - (63/64)^43 ≈ %51` — yeni üretilen bir parolanın kendi
+bağlantı string'ini sessizce bozup bozmayacağı kabaca yazı tura. `openssl rand -hex 32`'de
+kaçınılması gereken böyle bir karakter yok.
 
 | Değişken            | Varsayılan      | Amaç                                                                                                                   |
 | ------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------- |

@@ -85,22 +85,22 @@ cp .env.example .env
 
 Then fill in the blanks. `.env` is git-ignored and must never be committed.
 
-| Variable              | Example                                                  | Purpose                                                                                                                     |
-| --------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string                                                                                                    |
-| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io Redis adapter, caching, BullMQ due-soon worker (`due-soon` queue)                                                 |
-| `BETTER_AUTH_SECRET`  | _(generate)_                                             | Session signing secret — required, no default                                                                               |
-| `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                                 |
-| `API_PORT`            | `4000`                                                   | NestJS listen port                                                                                                          |
-| `WEB_URL`             | `http://localhost:3000`                                  | CORS origin for the API                                                                                                     |
-| `RATE_LIMIT_ENABLED`  | `true`                                                   | Master switch for [rate limiting](api-conventions.md#rate-limiting). On by default; only the integration suite turns it off |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                  | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                       |
-| `SMTP_HOST`           | `localhost` (dev, via Mailpit)                           | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)    |
-| `SMTP_PORT`           | `1025` (dev, via Mailpit) / `587` (typical production)   | SMTP server port                                                                                                            |
-| `SMTP_USER`           | _(blank for Mailpit)_                                    | SMTP auth username, if your server requires one                                                                             |
-| `SMTP_PASSWORD`       | _(blank for Mailpit)_                                    | SMTP auth password, if your server requires one                                                                             |
-| `SMTP_SECURE`         | `false`                                                  | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                    |
-| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                         | `From:` header on outgoing mail                                                                                             |
+| Variable              | Example                                                             | Purpose                                                                                                                     |
+| --------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma connection string — password segment must match `POSTGRES_PASSWORD` below                                            |
+| `REDIS_URL`           | `redis://localhost:6379`                                            | Socket.io Redis adapter, caching, BullMQ due-soon worker (`due-soon` queue)                                                 |
+| `BETTER_AUTH_SECRET`  | _(generate)_                                                        | Session signing secret — required, no default                                                                               |
+| `BETTER_AUTH_URL`     | `http://localhost:4000`                                             | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                                 |
+| `API_PORT`            | `4000`                                                              | NestJS listen port                                                                                                          |
+| `WEB_URL`             | `http://localhost:3000`                                             | CORS origin for the API                                                                                                     |
+| `RATE_LIMIT_ENABLED`  | `true`                                                              | Master switch for [rate limiting](api-conventions.md#rate-limiting). On by default; only the integration suite turns it off |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                             | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                       |
+| `SMTP_HOST`           | `localhost` (dev, via Mailpit)                                      | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)    |
+| `SMTP_PORT`           | `1025` (dev, via Mailpit) / `587` (typical production)              | SMTP server port                                                                                                            |
+| `SMTP_USER`           | _(blank for Mailpit)_                                               | SMTP auth username, if your server requires one                                                                             |
+| `SMTP_PASSWORD`       | _(blank for Mailpit)_                                               | SMTP auth password, if your server requires one                                                                             |
+| `SMTP_SECURE`         | `false`                                                             | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                    |
+| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                                    | `From:` header on outgoing mail                                                                                             |
 
 `.env.example` also carries `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
 `REDIS_PASSWORD`, `BACKUP_INTERVAL`, and `BACKUP_KEEP`. All six are **compose-only** —
@@ -136,6 +136,28 @@ This is the same fail-loud pattern as `BETTER_AUTH_SECRET` above: a placeholder 
 mean every self-hosted instance that skips reading `.env.example` carefully starts up with a
 password every other Kurultay install also has, on a database exposed to whatever else shares
 its Docker network.
+
+**Generate `POSTGRES_PASSWORD` and `REDIS_PASSWORD` with `openssl rand -hex 32`, not the
+`-base64 32` used for `BETTER_AUTH_SECRET` above.** The difference matters here in a way it
+doesn't for `BETTER_AUTH_SECRET`: both of these values are embedded directly in a connection
+URL (`DATABASE_URL`/`REDIS_URL`), and we don't percent-encode them, so any of `/ @ : # ? %`
+landing in the value corrupts the URL — `/` is the sharpest case, since it ends the
+authority section right where it appears:
+
+```bash
+$ node -e "new URL('postgresql://kurultay:ab/cd@postgres:5432/kurultay')"
+TypeError: Invalid URL
+    at new URL (node:internal/url:840:25)
+  code: 'ERR_INVALID_URL'
+
+$ openssl rand -hex 32
+1b7c3785ecf7f7bd2ec4826214889d19ff17d518ce44126ab6f07393b39b98a   # 0-9a-f only, always URL-safe
+```
+
+`-base64 32`'s alphabet includes `/` and `+`; with 43 base64 characters per password, the
+odds of at least one `/` or `+` landing in there are `1 - (63/64)^43 ≈ 51%` — roughly a coin
+flip on whether a freshly generated password silently breaks its own connection string.
+`openssl rand -hex 32` has no such character to avoid.
 
 | Variable            | Default           | Purpose                                                                                                                 |
 | ------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------- |

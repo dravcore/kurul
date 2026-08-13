@@ -77,7 +77,7 @@ MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadma
 ```bash
 git clone https://github.com/dravcore/kurultay.git
 cd kurultay
-cp .env.example .env   # BETTER_AUTH_SECRET ve POSTGRES_PASSWORD ayarla (openssl rand -base64 32)
+cp .env.example .env   # BETTER_AUTH_SECRET ayarla (openssl rand -base64 32), POSTGRES_PASSWORD ayarla (openssl rand -hex 32)
 pnpm install
 pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access build   # paylaşılan paketler, git-ignored dist/ üzerinden tüketilir
 pnpm db:generate        # Prisma client'ı üret (git-ignored, otomatik oluşmaz)
@@ -92,7 +92,11 @@ pnpm dev
 
 `POSTGRES_PASSWORD`'ün varsayılanı yoktur — ayarlanmadan compose başlamayı reddeder — ve
 `.env.example`'da birkaç satır üstündeki `DATABASE_URL`'in şifre kısmı bununla elle
-eşleştirilmelidir; bkz.
+eşleştirilmelidir. `BETTER_AUTH_SECRET`'ten farklı olarak bu değer doğrudan bir bağlantı
+URL'ine gömülür, dolayısıyla `openssl rand -base64 32` burada yanlış üreticidir — alfabesi
+`/` ve `+` içerir, ikisi de parolaya düşerse URL'i bozar (`/` authority bölümünü doğrudan
+sonlandırır; base64-32 çıktılarının kabaca yarısı en az bir tane içerir). Bunun yerine
+alfabesi (`0-9a-f`) her zaman URL-güvenli olan `openssl rand -hex 32` kullanın; bkz.
 [docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri](docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri).
 
 Uygulama SMTP yapılandırılmadan da ayağa kalkar, ama davetler yapılandırılana kadar kabul
