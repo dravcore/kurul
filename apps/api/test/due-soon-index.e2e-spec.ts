@@ -109,6 +109,50 @@ describe('Due-soon partial unique index (e2e)', () => {
     expect(definition).toMatch(/\("userId", "taskId"\)/);
   });
 
+  it('survives in the pg_index catalog as a unique, valid, partial index on (userId, taskId)', async () => {
+    // Belt to the indexdef tests' braces: pg_indexes goes through pg_get_indexdef, whose
+    // formatting is Postgres's to change. The catalog flags and the parsed predicate are
+    // not — so a migration that recreates the index non-unique, non-partial, or over
+    // different columns fails here no matter how the definition happens to print.
+    const rows = await prisma.$queryRaw<
+      Array<{
+        indisunique: boolean;
+        indisvalid: boolean;
+        columns: string[];
+        predicate: string | null;
+      }>
+    >`
+      SELECT i.indisunique,
+             i.indisvalid,
+             ARRAY(
+               -- \`name\` is not a type Prisma's raw deserializer knows; hand it text.
+               SELECT a.attname::text
+               FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord)
+               JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+               ORDER BY k.ord
+             )::text[] AS columns,
+             pg_get_expr(i.indpred, i.indrelid) AS predicate
+      FROM pg_index i
+      JOIN pg_class c ON c.oid = i.indexrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = current_schema()
+        AND c.relname = ${INDEX_NAME}
+    `;
+
+    expect(rows).toHaveLength(1);
+    const index = rows[0]!;
+    expect(index.indisunique).toBe(true);
+    expect(index.indisvalid).toBe(true);
+    expect(index.columns).toEqual(['userId', 'taskId']);
+    // No predicate would mean someone rebuilt it as a full unique index — which does not
+    // deduplicate unread reminders, it forbids legitimate rows (read + unread pairs,
+    // repeated mentions) outright.
+    expect(index.predicate).not.toBeNull();
+    expect(index.predicate).toContain(`'due_soon'`);
+    expect(index.predicate).toMatch(/"readAt" IS NULL/);
+    expect(index.predicate).toMatch(/"taskId" IS NOT NULL/);
+  });
+
   it('makes a repeated unread reminder a no-op instead of a duplicate', async () => {
     const seed = await seedTask();
 
