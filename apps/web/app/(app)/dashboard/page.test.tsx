@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { createTranslator, type NamespaceKeys, type NestedKeyOf } from 'next-intl';
 import messages from '@/messages/en.json';
@@ -20,8 +20,19 @@ vi.mock('@/components/layout/topbar', () => ({
   ),
 }));
 
+const mocks = vi.hoisted(() => ({
+  loading: false,
+}));
+
 vi.mock('@/components/dashboard/dashboard-summary', () => ({
-  DashboardSummary: (): React.ReactElement => <div data-testid="dashboard-summary" />,
+  DashboardSummary: (): React.ReactElement => {
+    // Throwing a promise that never settles is how a component tells React it is still
+    // loading — the one way to get the page's own fallback on screen from a test.
+    if (mocks.loading) {
+      throw new Promise<void>(() => {});
+    }
+    return <div data-testid="dashboard-summary" />;
+  },
 }));
 
 vi.mock('@/components/board/board-list', () => ({
@@ -29,6 +40,10 @@ vi.mock('@/components/board/board-list', () => ({
 }));
 
 import DashboardPage from './page';
+
+beforeEach(() => {
+  mocks.loading = false;
+});
 
 afterEach(() => {
   cleanup();
@@ -40,5 +55,18 @@ describe('DashboardPage', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2, name: 'Boards' })).toBeTruthy();
+  });
+
+  it('keeps the rest of the page while only the summary is still loading', async () => {
+    mocks.loading = true;
+
+    const { container } = render(await DashboardPage());
+
+    expect(screen.queryByTestId('dashboard-summary')).toBeNull();
+    // Two stat tiles and the chart beneath them, so the summary does not push the boards
+    // list down the page when it arrives.
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(3);
+    // The boundary is around the summary alone: the board list is not waiting on it.
+    expect(screen.getByTestId('board-list')).toBeTruthy();
   });
 });

@@ -9,6 +9,7 @@ import type { WorkspaceMemberDto } from '@kurultay/shared-types';
 import { VerificationResend } from '@/components/auth/verification-resend';
 import { Button } from '@/components/ui/button';
 import { api, authClientError, resolveApiMessage } from '@/lib/api';
+import { withNextParam } from '@/lib/auth-redirect';
 import { authClient } from '@/lib/auth';
 import {
   inviteCallbackPath,
@@ -138,7 +139,12 @@ export function InviteAcceptView({
           <p className="text-body text-muted-foreground">{t('signInFirst')}</p>
         </div>
         <Button asChild>
-          <Link href={`/login?next=/invite/${invitationId}`}>{t('signInCta')}</Link>
+          {/* Signing in has to come back *here*: the invitation is the whole reason this
+              visitor is being asked for credentials, and `/login` reads the destination out
+              of this parameter (`lib/auth-redirect.ts`). */}
+          <Link href={withNextParam('/login', inviteCallbackPath(invitationId))}>
+            {t('signInCta')}
+          </Link>
         </Button>
       </>
     );

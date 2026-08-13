@@ -4,6 +4,7 @@
   },
   "auth": {
     "login": {
+      "loading": "Loading sign-in…",
       "title": "Sign in to Kurultay",
       "subtitle": "Use your email and password to continue.",
       "email": "Email",
@@ -14,6 +15,7 @@
       "error": "Could not sign in. Check your email and password."
     },
     "register": {
+      "loading": "Loading sign-up…",
       "title": "Create an account",
       "subtitle": "Start with a name, email, and password.",
       "name": "Name",
