@@ -2,6 +2,8 @@
 
 Open-source, Kanban-focused project management tool.
 
+[![CI](https://github.com/dravcore/kurultay/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurultay/actions/workflows/ci.yml) [![CodeQL](https://github.com/dravcore/kurultay/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurultay/actions/workflows/codeql.yml) [![Release](https://img.shields.io/github/v/release/dravcore/kurultay)](https://github.com/dravcore/kurultay/releases) [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
 ![Kurultay board](docs/assets/board.png)
 
 > 🌐 English (canonical) | [Türkçe](README.tr.md)

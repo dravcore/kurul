@@ -2,6 +2,8 @@
 
 Açık kaynak, Kanban odaklı proje yönetim aracı.
 
+[![CI](https://github.com/dravcore/kurultay/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurultay/actions/workflows/ci.yml) [![CodeQL](https://github.com/dravcore/kurultay/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurultay/actions/workflows/codeql.yml) [![Sürüm](https://img.shields.io/github/v/release/dravcore/kurultay)](https://github.com/dravcore/kurultay/releases) [![Lisans](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
 ![Kurultay panosu](docs/assets/board.png)
 
 > 🌐 [English (canonical)](README.md) | Türkçe
