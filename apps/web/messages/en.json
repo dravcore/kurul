@@ -180,6 +180,27 @@
         "leaveDone": "You left the workspace",
         "leaveError": "You couldn't be taken out of this workspace.",
         "leaveErrorLastOwner": "You're the only owner. Make someone else an owner first, or delete the workspace."
+      },
+      "workspace": {
+        "title": "Workspace",
+        "description": "The workspace's name, and what happens to it.",
+        "name": "Name",
+        "cancel": "Cancel",
+        "renameAction": "Rename",
+        "renameTitle": "Rename workspace",
+        "renameError": "Could not rename this workspace.",
+        "renameErrorForbidden": "You need admin access to rename the workspace. Ask a workspace owner.",
+        "renameErrorGone": "This workspace no longer exists.",
+        "deleteSectionTitle": "Delete this workspace",
+        "deleteSectionBody": "Deletes every board, task, and comment in it. This cannot be undone.",
+        "deleteAction": "Delete workspace",
+        "deleteTitle": "Delete this workspace?",
+        "deleteBody": "Deleting {name} deletes every board, task, and comment in it, for everyone in it. This cannot be undone.",
+        "deleteConfirmLabel": "Type {name} to confirm",
+        "deleteDone": "{name} was deleted",
+        "deleteError": "Could not delete this workspace.",
+        "deleteErrorForbidden": "Only an owner can delete this workspace. Ask a workspace owner.",
+        "deleteErrorGone": "This workspace no longer exists."
       }
     },
     "workspace": {

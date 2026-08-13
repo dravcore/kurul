@@ -129,6 +129,20 @@ export interface CreateWorkspaceRequest {
 }
 
 /**
+ * `PATCH /workspaces/:workspaceId`
+ *
+ * Both fields are independently optional because `UpdateWorkspaceDto`
+ * (apps/api/src/workspace/dto/update-workspace.dto.ts) treats `slug` as a value someone chooses
+ * on purpose, not something re-derived from a new `name` — renaming a workspace never moves its
+ * slug out from under it. The web client only ever sends `name`: nothing in `apps/web` resolves
+ * a route or a link by slug, so there is no product surface to build a slug editor for yet.
+ */
+export interface UpdateWorkspaceRequest {
+  name?: string;
+  slug?: string;
+}
+
+/**
  * `POST /workspaces/:workspaceId/invitations`
  *
  * `role` stays the full `MemberRole` union even though `CreateInvitationDto` rejects `OWNER`

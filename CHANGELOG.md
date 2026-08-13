@@ -9,6 +9,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A **Workspace** section in Settings — renaming and deleting a workspace no longer require
+  `curl`. `PATCH /workspaces/:workspaceId` and `DELETE /workspaces/:workspaceId` existed from
+  the start, but nothing in the product called either. Rename (OWNER/ADMIN, matching the
+  endpoint's own `@WorkspaceRoles` gate) only ever sends `name` — `slug` stays untouched,
+  because nothing under `apps/web/app/(app)` resolves a route or a link by it, so a slug
+  editor here would be a control with no visible effect. Delete (OWNER only) requires typing
+  the workspace's exact name before the button will accept a click: the cascade behind it
+  (audit finding DB-06) removes every board, column, task, and comment in one statement, with
+  no soft-delete stage and no automated backup to fall back on, so a single "Delete this
+  workspace?" click is not proportionate friction for an unrecoverable action. Deleting clears
+  the session's active workspace the same way `Leave workspace` does — dropping the socket and
+  redirecting to the dashboard — because the workspace this whole screen was scoped to no
+  longer exists to redirect back into. All copy is catalogued under `app.settings.workspace.*`.
 - A **Members** section in Settings — the product can now start the flow it is built around.
   Every membership endpoint already existed; none of them had a screen, so inviting a teammate
   meant a `curl` call and the accept page served invitations nobody could send. Settings now

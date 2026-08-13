@@ -26,6 +26,10 @@ vi.mock('@/components/settings/members-settings', () => ({
   MembersSettings: (): React.ReactElement => <div data-testid="members-settings" />,
 }));
 
+vi.mock('@/components/settings/workspace-settings', () => ({
+  WorkspaceSettings: (): React.ReactElement => <div data-testid="workspace-settings" />,
+}));
+
 import SettingsPage from './page';
 
 afterEach(() => {
@@ -43,20 +47,24 @@ describe('SettingsPage', () => {
     render(await SettingsPage());
 
     const headings = screen.getAllByRole('heading', { level: 2 }).map((node) => node.textContent);
-    // Members before Language: the section a new owner comes here to find leads.
+    // Members before Language before Workspace: the section a new owner comes here to find
+    // leads, and the one irreversible control (delete) trails everything read routinely.
     expect(headings).toEqual([
       messages.app.settings.members.title,
       messages.app.settings.language.title,
+      messages.app.settings.workspace.title,
     ]);
     expect(screen.getByText(messages.app.settings.members.description)).toBeTruthy();
     expect(screen.getByText(messages.app.settings.language.description)).toBeTruthy();
+    expect(screen.getByText(messages.app.settings.workspace.description)).toBeTruthy();
   });
 
-  it('mounts both section bodies', async () => {
+  it('mounts every section body', async () => {
     render(await SettingsPage());
 
     expect(screen.getByTestId('members-settings')).toBeTruthy();
     expect(screen.getByTestId('language-settings')).toBeTruthy();
+    expect(screen.getByTestId('workspace-settings')).toBeTruthy();
   });
 
   it('holds no hardcoded copy of its own', async () => {
@@ -71,6 +79,8 @@ describe('SettingsPage', () => {
       messages.app.settings.members.description,
       messages.app.settings.language.title,
       messages.app.settings.language.description,
+      messages.app.settings.workspace.title,
+      messages.app.settings.workspace.description,
     ];
     for (const text of catalogued) {
       expect(rendered).toContain(text);
