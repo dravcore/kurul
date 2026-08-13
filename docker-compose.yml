@@ -95,28 +95,36 @@ services:
     restart: unless-stopped
     logging: *logging
     <<: *hardened
-    # Unlike postgres above, the redis image's own entrypoint never gets a chance to drop
-    # privilege here: it only re-execs via `setpriv` when its *first* argument is literally
-    # `redis-server` (see `docker-entrypoint.sh`'s `check_for_sentinel`/`IS_REDIS_SERVER`
-    # detection), but the `command:` below hands it `sh -c '...'` instead — the shell
-    # wrapper that makes REDIS_PASSWORD optional (see comment there). So `sh` never matches,
-    # the entrypoint falls through to a plain `exec "$@"`, and redis-server ends up running
-    # as root for its entire lifetime — confirmed with `docker exec ... id` → `uid=0(root)`.
-    # That's a pre-existing side effect of the REDIS_PASSWORD conditional command, not
-    # something this change introduces; restructuring the command to restore the
-    # entrypoint's own privilege drop is a separate, larger change and out of scope here.
+    # CAP_SETUID / CAP_SETGID, not DAC_OVERRIDE: the redis image's own entrypoint drops
+    # privilege via `setpriv --reuid redis --regid redis` (see `docker-entrypoint.sh`), but
+    # only when its *first* argument is literally `redis-server` — that's how it tells "I
+    # was asked to run the server" apart from "I was asked to run some other command in
+    # this image". An earlier version of this block ran `sh -c '...'` to make
+    # `REDIS_PASSWORD` optional, which handed the entrypoint `sh` as $1 instead, so the
+    # `redis-server` check never matched, the privilege drop never ran, and the process
+    # spent its whole life as root — confirmed with `docker top` (not `docker exec ... id`,
+    # which reports the *exec session's* user from the image's `USER`, not PID 1's actual
+    # runtime user, and would have shown root either way). That was a real regression
+    # introduced when `REDIS_PASSWORD` went from a hardcoded default to an optional
+    # variable (PR #166), not something inherent to running in a container — the `command:`
+    # below now passes `redis-server` as `$1` directly (exec form, empty string included
+    # even when the array element is blank — a plain shell string would have dropped it),
+    # so the entrypoint's own detection matches again and the drop to uid 999 happens as
+    # the image intends.
     #
-    # Given that, `cap_drop: [ALL]` alone is not enough: the image bakes `/data` as owned
-    # by uid 999 (`redis`), mode 0755, so root — running with capabilities dropped — has
-    # only read+execute on it, not write. Confirmed by testing: with just the anchor's
-    # `cap_drop: [ALL]`, a `SET` + restart cycle fails at shutdown with `Failed opening the
-    # temp RDB file temp-1.rdb (in server root dir /data) for saving: Permission denied`,
-    # and the container never gets to "Redis is now ready to exit, bye bye" — a lost write
-    # from a dirty stop, not just a log line. CAP_DAC_OVERRIDE lets root bypass that
-    # ownership check for exactly the /data writes it needs; verified with the same
-    # SET-then-restart cycle: `DB saved on disk` at shutdown, `Done loading RDB, keys
-    # loaded: 1` on the next boot, value intact after `GET`.
-    cap_add: [DAC_OVERRIDE]
+    # With that fixed, `cap_drop: [ALL]` alone still isn't enough — `has_cap setuid && has_cap
+    # setgid` is exactly what gates whether the entrypoint's `setpriv` re-exec runs at all,
+    # so the two capabilities it needs to perform the drop have to survive the drop:
+    # `CAP_SETUID`/`CAP_SETGID` back on the allowlist lets `setpriv` switch to `redis`
+    # (confirmed via `docker top`: `999 ... redis-server`, not `root ...`), after which
+    # `setpriv`'s own `--bounding-set=-all` strips capabilities right back down inside the
+    # container — so the end state has *fewer* capabilities than the DAC_OVERRIDE approach
+    # this replaced, and none of them belong to root. `DAC_OVERRIDE` is no longer needed at
+    # all once the process actually owns `/data` as uid 999 instead of trying to write into
+    # it as root: verified with the same SET → restart cycle used to catch the original
+    # regression — `DB saved on disk` at shutdown, `Done loading RDB, keys loaded: 1` on the
+    # next boot, value intact after `GET`, capability set never touching DAC_OVERRIDE.
+    cap_add: [SETUID, SETGID]
     environment:
       # Optional, unlike POSTGRES_PASSWORD above: this Redis instance holds cache entries,
       # sessions, rate-limit counters and the notification queue — no board data (see
@@ -126,21 +134,25 @@ services:
       # before; set it in .env to add defense in depth against another container reachable on
       # the same Docker network.
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-    # The official image has no env var for `requirepass` — it only takes effect via a CLI
-    # flag or config file — so the entrypoint has to branch in a shell. `$$` (not `$`), so
-    # Compose leaves the reference untouched at config time and the container's own shell
-    # resolves it at runtime from the REDIS_PASSWORD set above.
-    command:
-      - sh
-      - -c
-      - >-
-        if [ -n "$$REDIS_PASSWORD" ]; then
-          exec redis-server --requirepass "$$REDIS_PASSWORD";
-        else
-          exec redis-server;
-        fi
+    # Exec form, and substituted by Compose itself (`${REDIS_PASSWORD:-}`, not the
+    # `$$REDIS_PASSWORD` escape used elsewhere in this file for values read inside a
+    # container's own shell) — there is no shell in this command line to resolve a runtime
+    # reference, and there does not need to be: `--requirepass ''` when the variable is
+    # unset is exactly `requirepass` unset, so a blank `.env` value reproduces the
+    # passwordless default this project has always shipped, without a conditional. Must
+    # stay array form: a single command *string* here would go through `sh -c` again (the
+    # same trap this replaces) and a string with a trailing blank argument silently loses
+    # it, whereas the array passes an explicit empty element through to `redis-server`.
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']
     volumes:
       - redis_data:/data
+    # Still branches on REDIS_PASSWORD, even though `redis-cli -a "" ping` was confirmed to
+    # work either way (it prints `AUTH failed: ... without any password configured` to
+    # stderr and then still answers PONG with exit 0 — the auth attempt fails but the
+    # command it's chained to doesn't). Kept conditional anyway: that stderr line would
+    # repeat on every 5s probe on every install that never sets a password, which is most
+    # of them, turning `docker compose logs` / `docker inspect`'s health log into a
+    # permanent false alarm about auth failing. Correctness alone doesn't win against that.
     healthcheck:
       test:
         [

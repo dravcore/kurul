@@ -49,27 +49,23 @@ services:
     restart: unless-stopped
     logging: *logging
     <<: *hardened
-    # See docker-compose.yml's redis service for the full derivation: the REDIS_PASSWORD
-    # conditional `command:` below bypasses the entrypoint's own privilege drop (it only
-    # triggers when its first arg is literally `redis-server`), so this runs as root for
-    # its whole life and needs DAC_OVERRIDE to write into /data, which the image bakes as
-    # owned by uid 999. Same image, same command shape, same requirement.
-    cap_add: [DAC_OVERRIDE]
+    # See docker-compose.yml's redis service for the full derivation. CAP_SETUID/CAP_SETGID
+    # (not DAC_OVERRIDE) let the image's own entrypoint drop privilege to uid 999 via
+    # `setpriv`, which it only does when its first argument is literally `redis-server` —
+    # the exec-form `command:` below (not a `sh -c` wrapper) is what makes that match again.
+    # Same image, same command shape, same requirement.
+    cap_add: [SETUID, SETGID]
     # REDIS_PASSWORD is optional here too — see docker-compose.yml for the reasoning. The
     # host port below means anything on the host can already reach this Redis at
     # localhost:6379 regardless, so a password mainly matters once other containers share
     # this compose project's network.
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-    command:
-      - sh
-      - -c
-      - >-
-        if [ -n "$$REDIS_PASSWORD" ]; then
-          exec redis-server --requirepass "$$REDIS_PASSWORD";
-        else
-          exec redis-server;
-        fi
+    # Exec form, substituted by Compose itself — see docker-compose.yml's redis service for
+    # why this replaced the `sh -c` conditional (that form silently kept the container root
+    # for its entire life) and why array form specifically is required (a plain string
+    # would drop the trailing blank argument when REDIS_PASSWORD is unset).
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']
     ports:
       - '6379:6379'
     volumes:

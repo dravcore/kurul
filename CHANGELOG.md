@@ -284,11 +284,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   capability half of SEC-02 that PR #109's `USER node` left open. `api`, `web`, `migrate`,
   and `backup` need nothing added back; `postgres` gets `CHOWN`/`FOWNER`/`SETUID`/`SETGID`/
   `DAC_OVERRIDE` back (its official entrypoint `chown`s `PGDATA` and re-execs via `gosu` on
-  every boot) and `redis` gets `DAC_OVERRIDE` back (the `REDIS_PASSWORD`-conditional
-  `command:` bypasses the entrypoint's own privilege drop, so it stays root and needs to
-  write into the uid-999-owned `/data`). See
-  [development.md#container-hardening](docs/development.md#container-hardening) for the
-  full per-service reasoning.
+  every boot); `redis` gets `SETUID`/`SETGID` back so its own entrypoint can drop privilege
+  to the `redis` user via `setpriv` (see the next entry for why that path was broken before
+  this PR). See [development.md#container-hardening](docs/development.md#container-hardening)
+  for the full per-service reasoning.
+- **Fixed:** the `redis` service ran as root for its entire life, not the `redis` user the
+  image ships. `REDIS_PASSWORD` becoming optional (below) wrapped the container's command in
+  `sh -c 'if [ -n "$REDIS_PASSWORD" ]; then …; fi'`, which handed the official image's
+  entrypoint `sh` as its first argument instead of `redis-server` — exactly what the
+  entrypoint's own privilege-drop check keys on, so the drop silently never ran. This was
+  real on `develop` between that change and this one, not merely theoretical: `docker top`
+  (not `docker exec ... id`, which reports the exec session's own user rather than PID 1's)
+  showed `redis-server` owned by `root`. Fixed by switching `command:` to exec form —
+  `['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']`, substituted by Compose itself
+  — so the entrypoint sees `redis-server` again and drops privilege as designed; verified
+  with `docker top` showing uid 999 and a `SET`-then-restart cycle surviving intact in both
+  the password and no-password cases.
 
 ## [0.1.0] - 2026-08-12
 
