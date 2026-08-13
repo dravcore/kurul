@@ -43,3 +43,6 @@ Thumbs.db
 
 # Docker volumes / local overrides
 docker-compose.override.yml
+
+# Audit artifacts (local only — reports, findings, roadmap data)
+audit/
