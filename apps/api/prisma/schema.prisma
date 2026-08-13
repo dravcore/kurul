@@ -344,4 +344,12 @@ model Notification {
   // delete's `WHERE "taskId" = $1` scan can't use. Without this, deleting a task forces a
   // sequential scan of the whole (fast-growing) notification table to find its rows.
   @@index([taskId])
+  // Same story for `activityId`, which carries `onDelete: SetNull`. The referential action
+  // Postgres runs per deleted Activity row is `UPDATE ONLY "Notification" SET "activityId" =
+  // NULL WHERE $1 = "activityId"` — a bare equality on a column that led no index. Nothing
+  // deleted an Activity on its own until the retention sweep
+  // (src/retention/cleanup.worker.ts, docs/decisions/0020-data-retention.md) started doing
+  // so nightly in batches; without this index each batch would re-scan the whole table once
+  // per row.
+  @@index([activityId])
 }

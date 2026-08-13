@@ -37,6 +37,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0017](0017-partial-indexes-outside-prisma-schema.md) | Partial Indexes Live in Migrations, Guarded by Tests                 | Accepted                                         | 2026-08-12 |
 | [0018](0018-localization-strategy.md)                 | Localization Strategy: next-intl Without URL Routing                 | Accepted                                         | 2026-08-12 |
 | [0019](0019-column-category.md)                       | Column Completion Is a Category, Not a Name                          | Accepted                                         | 2026-08-12 |
+| [0020](0020-data-retention.md)                        | Data Retention: Per-Table Windows Enforced by a Nightly Sweep        | Accepted                                         | 2026-08-14 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).

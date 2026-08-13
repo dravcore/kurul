@@ -109,6 +109,7 @@ Aşağıdaki tabloyu modül haritası olarak okuyun.
 | `dashboard`    | Grafikleri besleyen agregasyon sorguları                                  |
 | `notification` | Bildirim dağıtımı, Redis destekli kuyruk                                  |
 | `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                            |
+| `retention`    | Gecelik veri saklama süpürmesi; controller yok, dışa açılan provider yok  |
 | `mail`         | SMTP gönderimi (`nodemailer`); yapılandırılmamışsa gönderim yerine loglar |
 | `locale`       | Saklanan arayüz dili: `User.locale` okur/yazar, istek için çözümler       |
 
@@ -122,6 +123,20 @@ Cross-cutting altyapı:
 Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdır, asla tersi değil.
 `realtime`, domain event'lerinin tüketicisidir, domain logic'in yaşadığı bir yer değil —
 böylece iş kurallarını beraberinde sürüklemeden kendi process rolüne çıkarılabilir.
+
+**Zamanlanmış işler.** İki tane; ikisi de `REDIS_URL` üzerinde BullMQ job scheduler'ı, ikisi de
+sahibi olan modülden kaydedilir ve `onModuleDestroy`'da kapatılır.
+`notification/due-soon.worker.ts` yaklaşan due date'leri 15 dakikada bir tarar ve yalnızca
+INSERT üretir. `retention/cleanup.worker.ts` saklama penceresini aşmış satırları günde bir kez
+siler ([ADR 0020](decisions/0020-data-retention.md)). `REDIS_URL` boşsa ikisi de başlamaz; bu,
+ilki için desteklenen tek-instance yapılandırması, ikincisi için kapatılmış bir saklama
+politikasıdır. İkisi de [§8](#8-runtime-evrimi)'in 2. aşamasında ayrılan `worker` rolüdür;
+API'de bir isteğin dışında koşan başka hiçbir şey yok.
+
+`retention`, `notification` içinde bir provider yerine kendi modülüdür: tasarım gereği modül ve
+tenant sınırlarının ötesinde silen tek bileşen o — `Session`, `Verification`, `Notification` ve
+`Activity` üç ayrı modüle ve hiçbir workspace'e ait değil. Aynı zamanda §7'nin tek onaylı
+istisnasıdır: arkasında çağıran olmadığı için izole edilecek bir şey yok. Bkz. ADR.
 
 `locale`, `common/` altında bir yardımcı değil bir modüldür: hem `auth` hem `board` ona ihtiyaç
 duyar ve sınır kuralı, birbirlerine değil modüle bağımlı olmalarını söyler. API'nin sahip olduğu
@@ -284,6 +299,12 @@ durumda kalır); her serviste yeniden uygulanmaz:
 5. Workspace/org **mutation**'ları yalnızca Nest `/workspaces/*` üzerinden gider — Better Auth
    `/auth/organization/*` mutation HTTP'si firewall'lanır; Nest politikası bypass edilemez.
 
+**Tek bir istisna, yalnızca bir tane:** saklama süpürmesi (`retention/cleanup.worker.ts`,
+[ADR 0020](decisions/0020-data-retention.md)) `workspaceId` yüklemi olmadan, global siler.
+Yukarıdaki kural bir _çağıranın_ başka bir tenant'ın satırlarına uzanmasını engellemek için
+var; süpürmenin çağıranı, oturumu ve route'u yok — ve `Verification`'ın scope'lanacak bir
+tenant kolonu zaten hiç yok. Bir istekten erişilebilen her şey scope'lu kalır.
+
 Bunu tek bir katmana yerleştirmek, yeni bir modülün izolasyonu varsayılan olarak devralması
 demektir. Bunun etrafından dolanan bir modül, bir stil farkı değil, bir bug'dır. Üyelik
 `role`'ü (`OWNER`/`ADMIN`/`MEMBER`/`GUEST`) yetki kararları için aynı katmanda kontrol
@@ -377,25 +398,28 @@ istek başına bir veritabanı okumasıdır.
 
 Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 
-| ADR                                                                                                        | Konu                                                              |
-| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)                         | Monorepo + modüler monolit                                        |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                                 | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                    |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                               | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts           |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                                           | Organization plugin'i ile Better Auth (→ Workspace)               |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                                         | Socket.io + Redis adapter                                         |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                                     | Sıralama için Float position'lar                                  |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                                   | AGPL-3.0                                                          |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                             | Git Flow + SemVer                                                 |
-| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)                           | Board ve column Nest `@Roles` matrisi                             |
-| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                                           | Task Nest `@Roles` matrisi                                        |
-| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md)             | Label ve task-metadata Nest `@Roles` matrisi                      |
-| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)                         | Yorum silme: yazarlık veya OWNER/ADMIN                            |
-| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)                 | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde |
-| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                                       | Çift lisanslama + katkıda bulunan lisans sözleşmesi               |
-| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)                         | Dış katkı yok; CLA yürürlükte değil, hukuk masrafı ertelendi      |
-| [`0016-foreign-key-violation-status.md`](decisions/0016-foreign-key-violation-status.md)                   | Prisma `P2003`, `422`'ye değil `409`'a eşlenir                    |
-| [`0017-partial-indexes-outside-prisma-schema.md`](decisions/0017-partial-indexes-outside-prisma-schema.md) | Kısmi indeksler migration'larda yaşar, testlerle korunur          |
+| ADR                                                                                                        | Konu                                                               |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)                         | Monorepo + modüler monolit                                         |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                                 | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                     |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                               | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts            |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                                           | Organization plugin'i ile Better Auth (→ Workspace)                |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                                         | Socket.io + Redis adapter                                          |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                                     | Sıralama için Float position'lar                                   |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                                   | AGPL-3.0                                                           |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                             | Git Flow + SemVer                                                  |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)                           | Board ve column Nest `@Roles` matrisi                              |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                                           | Task Nest `@Roles` matrisi                                         |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md)             | Label ve task-metadata Nest `@Roles` matrisi                       |
+| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)                         | Yorum silme: yazarlık veya OWNER/ADMIN                             |
+| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)                 | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde  |
+| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                                       | Çift lisanslama + katkıda bulunan lisans sözleşmesi                |
+| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)                         | Dış katkı yok; CLA yürürlükte değil, hukuk masrafı ertelendi       |
+| [`0016-foreign-key-violation-status.md`](decisions/0016-foreign-key-violation-status.md)                   | Prisma `P2003`, `422`'ye değil `409`'a eşlenir                     |
+| [`0017-partial-indexes-outside-prisma-schema.md`](decisions/0017-partial-indexes-outside-prisma-schema.md) | Kısmi indeksler migration'larda yaşar, testlerle korunur           |
+| [`0018-localization-strategy.md`](decisions/0018-localization-strategy.md)                                 | Locale zinciri, `[locale]` yönlendirmesi yok, API yalnız seed/mail |
+| [`0019-column-category.md`](decisions/0019-column-category.md)                                             | Kolon tamamlanmışlığı bir kategoridir, ad değil                    |
+| [`0020-data-retention.md`](decisions/0020-data-retention.md)                                               | Tablo başına saklama pencereleri, gecelik bir süpürmeyle uygulanır |
 
 İlgili: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (tarihsel Faz 1 iskeleti) · [docs/README.md](../README.md) (docs haritası)

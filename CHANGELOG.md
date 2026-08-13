@@ -27,6 +27,28 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   GUEST reading the queue would be handed contact details the product never showed them.
   Expired and already-answered invitations are left out — the list is for rows something can
   still be done to.
+- A data-retention policy, and a nightly job that enforces it. Until now nothing in the
+  product ever deleted a row on its own: expired `Session` rows kept their `ipAddress` and
+  `userAgent` forever, expired `Verification` rows kept the e-mail address that requested
+  them, and `Notification` and `Activity` — the two fastest-growing tables in the schema —
+  grew without a ceiling. A BullMQ job on `REDIS_URL` now runs once a day and deletes expired
+  sessions and verifications (their own `expiresAt` decides), notifications more than
+  `NOTIFICATION_RETENTION_DAYS` past the moment they were **read** (default 90; unread
+  notifications are never deleted, at any age), and activity older than
+  `ACTIVITY_RETENTION_DAYS` (default 365). Either window accepts `0` for "keep forever", and
+  `CLEANUP_ENABLED=false` switches the whole sweep off — checked at the point of deletion, so
+  a job definition left in Redis by an earlier deployment cannot outlive the switch. Deletes
+  are batched at 1000 rows per statement so a first run against a long-lived instance is not
+  one long transaction holding locks and blocking autovacuum. Each run writes one JSON line to
+  stdout carrying the per-table counts and nothing else — no identifiers, no payloads — even
+  when every count is zero, so a job that stops running is visible by its silence. The sweep
+  is deliberately global rather than workspace-scoped, which is the single sanctioned
+  exception to the multi-tenant rule and is argued in the new
+  [ADR 0020](docs/decisions/0020-data-retention.md) along with the choice to delete year-old
+  activity rather than archive or keep it. One index came with it
+  (`Notification_activityId_idx`): `activityId` is `ON DELETE SET NULL`, which Postgres runs
+  per deleted row, so without it each batch of deleted activities meant one sequential scan of
+  the whole notification table per row.
 - Membership revocation — the half of the access lifecycle that was missing. Until now a user
   who joined a workspace could only be removed by deleting the workspace or editing the
   database by hand, and no role could be lowered. Three routes close that:

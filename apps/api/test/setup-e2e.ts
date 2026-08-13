@@ -38,6 +38,17 @@ process.env.DATABASE_URL = resolveTestDatabaseUrl();
  */
 process.env.RATE_LIMIT_ENABLED = 'false';
 
+/**
+ * The retention sweep is a scheduled, global `DELETE` with no tenant scope — exactly the job
+ * that must not be running in the background of a suite whose fixtures are backdated rows.
+ * BullMQ produces a scheduler's first job the moment it is registered, so leaving this on
+ * would let `createTestApp()` start deleting another spec's seed data mid-run.
+ *
+ * `test/retention-cleanup.e2e-spec.ts` turns it back on around each of its own `runCleanup`
+ * calls; the worker re-reads the switch per run precisely so that is possible.
+ */
+process.env.CLEANUP_ENABLED = 'false';
+
 process.env.BETTER_AUTH_SECRET =
   process.env.BETTER_AUTH_SECRET?.trim() || 'test-secret-not-for-production';
 process.env.BETTER_AUTH_URL = process.env.BETTER_AUTH_URL?.trim() || 'http://localhost:4000';

@@ -15,6 +15,7 @@ How to set up a Kurultay development environment and work in it day to day.
 - [Run modes](#run-modes)
 - [pnpm scripts](#pnpm-scripts)
 - [Database workflow](#database-workflow)
+- [Data retention](#data-retention)
 - [Upgrading and backups](#upgrading-and-backups)
 - [Rollback](#rollback)
 - [Day-to-day loop](#day-to-day-loop)
@@ -85,22 +86,25 @@ cp .env.example .env
 
 Then fill in the blanks. `.env` is git-ignored and must never be committed.
 
-| Variable              | Example                                                             | Purpose                                                                                                                     |
-| --------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma connection string — password segment must match `POSTGRES_PASSWORD` below                                            |
-| `REDIS_URL`           | `redis://localhost:6379`                                            | Socket.io Redis adapter, caching, BullMQ due-soon worker (`due-soon` queue)                                                 |
-| `BETTER_AUTH_SECRET`  | _(generate)_                                                        | Session signing secret — required, no default                                                                               |
-| `BETTER_AUTH_URL`     | `http://localhost:4000`                                             | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                                 |
-| `API_PORT`            | `4000`                                                              | NestJS listen port                                                                                                          |
-| `WEB_URL`             | `http://localhost:3000`                                             | CORS origin for the API                                                                                                     |
-| `RATE_LIMIT_ENABLED`  | `true`                                                              | Master switch for [rate limiting](api-conventions.md#rate-limiting). On by default; only the integration suite turns it off |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                             | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                       |
-| `SMTP_HOST`           | `localhost` (dev, via Mailpit)                                      | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)    |
-| `SMTP_PORT`           | `1025` (dev, via Mailpit) / `587` (typical production)              | SMTP server port                                                                                                            |
-| `SMTP_USER`           | _(blank for Mailpit)_                                               | SMTP auth username, if your server requires one                                                                             |
-| `SMTP_PASSWORD`       | _(blank for Mailpit)_                                               | SMTP auth password, if your server requires one                                                                             |
-| `SMTP_SECURE`         | `false`                                                             | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                    |
-| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                                    | `From:` header on outgoing mail                                                                                             |
+| Variable                      | Example                                                             | Purpose                                                                                                                                |
+| ----------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma connection string — password segment must match `POSTGRES_PASSWORD` below                                                       |
+| `REDIS_URL`                   | `redis://localhost:6379`                                            | Socket.io Redis adapter, caching, BullMQ scheduled jobs (`due-soon` and `cleanup` queues)                                              |
+| `BETTER_AUTH_SECRET`          | _(generate)_                                                        | Session signing secret — required, no default                                                                                          |
+| `BETTER_AUTH_URL`             | `http://localhost:4000`                                             | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                                            |
+| `API_PORT`                    | `4000`                                                              | NestJS listen port                                                                                                                     |
+| `WEB_URL`                     | `http://localhost:3000`                                             | CORS origin for the API                                                                                                                |
+| `RATE_LIMIT_ENABLED`          | `true`                                                              | Master switch for [rate limiting](api-conventions.md#rate-limiting). On by default; only the integration suite turns it off            |
+| `NEXT_PUBLIC_API_URL`         | `http://localhost:4000`                                             | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                                  |
+| `SMTP_HOST`                   | `localhost` (dev, via Mailpit)                                      | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)               |
+| `SMTP_PORT`                   | `1025` (dev, via Mailpit) / `587` (typical production)              | SMTP server port                                                                                                                       |
+| `SMTP_USER`                   | _(blank for Mailpit)_                                               | SMTP auth username, if your server requires one                                                                                        |
+| `SMTP_PASSWORD`               | _(blank for Mailpit)_                                               | SMTP auth password, if your server requires one                                                                                        |
+| `SMTP_SECURE`                 | `false`                                                             | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                               |
+| `MAIL_FROM`                   | `Kurultay <noreply@example.com>`                                    | `From:` header on outgoing mail                                                                                                        |
+| `CLEANUP_ENABLED`             | `true`                                                              | Master switch for the nightly [data-retention sweep](#data-retention). Off means the instance stops enforcing its own retention policy |
+| `NOTIFICATION_RETENTION_DAYS` | `90`                                                                | Days a notification is kept **after it was read**. Unread notifications are never deleted, at any age. `0` = keep forever              |
+| `ACTIVITY_RETENTION_DAYS`     | `365`                                                               | Days an activity row is kept after it was written. `0` = keep forever — set this if you have a statutory audit-trail duty              |
 
 `.env.example` also carries `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
 `REDIS_PASSWORD`, `BACKUP_INTERVAL`, and `BACKUP_KEEP`. All six are **compose-only** —
@@ -335,6 +339,57 @@ docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
 pnpm db:seed
 ```
+
+## Data retention
+
+Kurultay deletes rows it is no longer entitled to keep. A BullMQ job runs **once a day** on
+`REDIS_URL` — the same mechanism as the due-soon scan — and sweeps four tables:
+
+| Table          | Deleted when                        | Setting                                      |
+| -------------- | ----------------------------------- | -------------------------------------------- |
+| `Session`      | `expiresAt` has passed              | none — not configurable                      |
+| `Verification` | `expiresAt` has passed              | none — not configurable                      |
+| `Notification` | read, and read more than N days ago | `NOTIFICATION_RETENTION_DAYS` (default `90`) |
+| `Activity`     | written more than N days ago        | `ACTIVITY_RETENTION_DAYS` (default `365`)    |
+
+The reasoning behind each window — and why `Activity` is deleted at a year rather than
+archived or kept — is [ADR 0020](decisions/0020-data-retention.md).
+
+Two things worth knowing before you change any of this:
+
+- **Unread notifications are never deleted, at any age.** The window is measured from
+  `readAt`, not from `createdAt`.
+- **`0` means "keep forever"** for either window. Set `ACTIVITY_RETENTION_DAYS=0` if you have
+  a statutory duty to retain an audit trail. A negative value is refused at startup rather
+  than clamped — it would be a cutoff in the future, which would delete live rows.
+
+Each run writes one JSON line to stdout with the number of rows deleted per table and nothing
+else — no identifiers, no payloads:
+
+```json
+{
+  "ts": "2026-08-14T03:00:01.204Z",
+  "level": "info",
+  "event": "retention.cleanup",
+  "durationMs": 41.8,
+  "sessions": 132,
+  "verifications": 9,
+  "notifications": 2140,
+  "activities": 0
+}
+```
+
+The line is written even when every count is zero, so its absence is a signal that the job
+stopped running.
+
+`CLEANUP_ENABLED=false` disables the sweep completely, at the point of deletion rather than
+only at startup — a job definition left in Redis by an earlier deployment cannot outlive the
+switch. The integration suite runs with it off (`test/setup-e2e.ts`) and turns it on around
+its own assertions; a global scheduled `DELETE` is not something you want running in the
+background of a suite whose fixtures are backdated rows.
+
+Deleting is batched (1000 rows per statement) so a first run against a long-lived instance
+never becomes one long transaction holding locks and blocking autovacuum.
 
 ## Upgrading and backups
 
