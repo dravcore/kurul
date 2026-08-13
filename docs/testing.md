@@ -191,20 +191,38 @@ on every run, passing or failing.
 
 Every pull request runs, on `develop` and `main` as well:
 
-| Step              | Command                                                                                   |
-| ----------------- | ----------------------------------------------------------------------------------------- |
-| Build shared pkgs | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build` |
-| Lint              | `pnpm lint`                                                                               |
-| Format check      | `pnpm format:check`                                                                       |
-| Typecheck         | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                       |
-| Audit             | `pnpm audit --audit-level high`                                                           |
-| Unit tests (api)  | `pnpm --filter @kurultay/api test:cov`                                                    |
-| Unit tests (web)  | `pnpm --filter @kurultay/web exec vitest run --coverage`                                  |
-| Unit tests (pkgs) | `pnpm --filter "./packages/*" test`                                                       |
-| Integration tests | `pnpm --filter @kurultay/api test:e2e` against Postgres and Redis service containers      |
-| Build             | `pnpm build`                                                                              |
+| Step                | Command                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------- |
+| Build shared pkgs   | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build`   |
+| Lint                | `pnpm lint`                                                                                 |
+| Format check        | `pnpm format:check`                                                                         |
+| Typecheck           | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                         |
+| Audit               | `pnpm audit --audit-level high`                                                             |
+| Unit tests (api)    | `pnpm --filter @kurultay/api test:cov`                                                      |
+| Unit tests (web)    | `pnpm --filter @kurultay/web exec vitest run --coverage`                                    |
+| Unit tests (pkgs)   | `pnpm --filter "./packages/*" test`                                                         |
+| Integration tests   | `pnpm --filter @kurultay/api test:e2e` against Postgres and Redis service containers        |
+| Build               | `pnpm build`                                                                                |
+| **Gate** (required) | `ci-ok` — passes only if `lint`, `test`, and `build` all succeed (not skipped or cancelled) |
 
-All steps must pass before merge. CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on pushes to `develop` and `main`. See [git-strategy.md](git-strategy.md#pull-request-process).
+**All steps must pass before merge.** The gate job (`ci-ok`) is the single required status check
+configured in branch protection — if any upstream job fails, is skipped, or is cancelled, the
+gate fails. This provides two protections:
+
+1. **Correctness**: a job that never ran cannot pass the gate. Branch protection treats a
+   _skipped_ required check as satisfied, which is how [#89](https://github.com/dravcore/kurultay/pull/89)
+   merged with `test` red and `build` skipped. `ci-ok` runs under `if: always()` and asserts
+   every `needs.*.result` is exactly `success`, so `failure`, `skipped` and `cancelled` all
+   fail the gate.
+2. **A stable contract with branch protection**: protection now names one context, `ci-ok`,
+   instead of tracking every job name. Adding, splitting or renaming a job is a `ci.yml` edit
+   with no settings change, and the failure mode of getting it wrong stays inside CI — the
+   workflow refuses to load an unknown `needs` entry, so nothing reports and the PR stays
+   blocked. Previously the same mistake left protection waiting on a context that no longer
+   existed.
+
+CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on pushes to
+`develop` and `main`. See [git-strategy.md](git-strategy.md#pull-request-process).
 
 The workflow file is [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 

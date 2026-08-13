@@ -76,6 +76,46 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- CI gate job: `.github/workflows/ci.yml` now defines a single required status check, `ci-ok`,
+  instead of relying on multiple job names in branch protection. The gate runs only when all
+  upstream jobs (lint, test, build) have completed, and fails if any is not successful — even
+  if skipped or cancelled via concurrency — preventing PRs from silently passing when a job is
+  renamed or a workflow is cancelled. See [docs/testing.md](docs/testing.md#ci) and
+  [#145](https://github.com/dravcore/kurultay/issues/145).
+- **BREAKING:** `docker-compose.yml` and `docker-compose.dev.yml` no longer bake a fixed
+  `kurultay`/`kurultay` Postgres password (or a passwordless Redis by omission of any choice)
+  into the compose files themselves — every container on the same Docker network could
+  previously connect to the database with a password identical across every Kurultay install,
+  with no separate secret to guess. `POSTGRES_PASSWORD` is now a required `.env` value with no
+  default, using the same fail-loud pattern as `BETTER_AUTH_SECRET`: `docker compose config`/
+  `up` refuses to start until it is set. `POSTGRES_USER`/`POSTGRES_DB` keep the `kurultay`
+  default so an otherwise-unmodified `.env` still works once the password is filled in, and
+  `REDIS_PASSWORD` is new and optional — leaving it unset keeps `redis` passwordless exactly
+  as before, so this half is not a breaking change on its own. See
+  [docs/development.md#database-and-cache-credentials](docs/development.md#database-and-cache-credentials).
+
+  **Migration for existing installs:** add `POSTGRES_PASSWORD=<your-password>` to `.env`
+  before the next `docker compose up` — without it, compose now fails before creating a single
+  container. **Picking a value here does not, by itself, change anything about an already
+  initialized database:** the official Postgres image applies `POSTGRES_PASSWORD` only during
+  `initdb`, i.e. only the very first time the `postgres_data` volume is created, so an existing
+  volume keeps the role's original password no matter what `.env` now says. Two ways to bring
+  them back in sync:
+  - Set `POSTGRES_PASSWORD` in `.env` to whatever the running role's password **already is**
+    (`kurultay`, if this is the first time upgrading past this change) — the value only needs
+    to be present and correct, not different from today.
+  - Or actually rotate the role's password to a new value, on the running instance, before
+    updating `.env` to match:
+
+    ```bash
+    docker compose exec -T postgres psql -U kurultay -d postgres \
+      -c "ALTER USER kurultay WITH PASSWORD 'the-new-password';"
+    ```
+
+    then set `POSTGRES_PASSWORD=the-new-password` in `.env` and restart the stack. Doing this
+    out of order — restarting with a `.env` password that does not match the volume's actual
+    role password — makes `migrate`/`api` fail to authenticate against a Postgres container
+    that otherwise reports healthy.
 - Docker Compose now survives crashes and host reboots: every long-running service carries
   `restart: unless-stopped` (in `docker-compose.dev.yml` too; the one-shot `migrate` job is
   deliberately excluded), `api` gains a healthcheck against `GET /health/ready` so "healthy"
