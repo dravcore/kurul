@@ -212,11 +212,16 @@ Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalı
 tek zorunlu status kontrol — eğer herhangi bir upstream job başarısızsa, atlanırsa ya da iptal
 edilirse, kapı başarısız olur. Bu iki koruma sağlar:
 
-1. **Sağlamlık**: Eğer bir job yeniden adlandırılırsa, kapı yine de PR'ı engeller (düz bir
-   `needs` kapısı, eksik bir job'ı sessizce geçerdi).
-2. **Doğruluk**: Eğer eşzamanlılık (concurrency) bir job'ı iptal ederse, kapı yine de başarısız
-   olur (`if: always()` olmadan, GitHub iptal edilen bir kapıyı "atlandı" = "geçti" olarak
-   raporlardı).
+1. **Doğruluk**: hiç koşmamış bir job kapıyı geçemez. Dal koruması _atlanmış_ bir zorunlu
+   kontrolü karşılanmış sayar; [#89](https://github.com/dravcore/kurultay/pull/89) tam olarak
+   böyle merge oldu (`test` kırmızı, `build` atlanmış). `ci-ok` `if: always()` ile koşar ve
+   her `needs.*.result` değerinin tam olarak `success` olduğunu doğrular — `failure`, `skipped`
+   ve `cancelled` üçü de kapıyı düşürür.
+2. **Dal korumasıyla sabit bir sözleşme**: koruma artık her job adını değil tek bir bağlamı
+   (`ci-ok`) tanıyor. Job eklemek, bölmek veya yeniden adlandırmak ayar değişikliği değil
+   `ci.yml` düzenlemesi; hata yapılırsa sonuç CI'ın içinde kalır — workflow tanımadığı bir
+   `needs` girdisiyle yüklenmeyi reddeder, hiçbir kontrol raporlanmaz ve PR kilitli kalır.
+   Eskiden aynı hata, korumayı artık var olmayan bir bağlamı beklerken bırakıyordu.
 
 CI, `develop` ve `main`'e yapılan push'larda olduğu gibi herhangi bir branch'a yapılan pull
 request'lerde çalışır. Bkz.

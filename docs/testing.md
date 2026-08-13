@@ -209,10 +209,17 @@ Every pull request runs, on `develop` and `main` as well:
 configured in branch protection — if any upstream job fails, is skipped, or is cancelled, the
 gate fails. This provides two protections:
 
-1. **Robustness**: If a job is renamed, the gate still blocks the PR (a plain `needs` gate
-   would silently pass a missing job).
-2. **Correctness**: If concurrency cancels a job, the gate still fails (without `if: always()`,
-   GitHub would report a cancelled gate as "skipped" = "passed").
+1. **Correctness**: a job that never ran cannot pass the gate. Branch protection treats a
+   _skipped_ required check as satisfied, which is how [#89](https://github.com/dravcore/kurultay/pull/89)
+   merged with `test` red and `build` skipped. `ci-ok` runs under `if: always()` and asserts
+   every `needs.*.result` is exactly `success`, so `failure`, `skipped` and `cancelled` all
+   fail the gate.
+2. **A stable contract with branch protection**: protection now names one context, `ci-ok`,
+   instead of tracking every job name. Adding, splitting or renaming a job is a `ci.yml` edit
+   with no settings change, and the failure mode of getting it wrong stays inside CI — the
+   workflow refuses to load an unknown `needs` entry, so nothing reports and the PR stays
+   blocked. Previously the same mistake left protection waiting on a context that no longer
+   existed.
 
 CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on pushes to
 `develop` and `main`. See [git-strategy.md](git-strategy.md#pull-request-process).
