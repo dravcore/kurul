@@ -45,6 +45,7 @@ git clone https://github.com/dravcore/kurultay.git
 cd kurultay
 cp .env.example .env   # BETTER_AUTH_SECRET ayarla (openssl rand -base64 32)
 pnpm install
+pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access build   # paylaşılan paketler, git-ignored dist/ üzerinden tüketilir
 pnpm db:generate        # Prisma client'ı üret (git-ignored, otomatik oluşmaz)
 docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
