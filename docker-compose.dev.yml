@@ -9,11 +9,25 @@ x-logging: &logging
     max-size: '10m'
     max-file: '3'
 
+# Same capability baseline as docker-compose.yml, and for the same SEC-02 reasoning (see
+# there for the full writeup) — a developer's laptop process-isolates a compromised
+# container from the rest of the machine no less than a server does. postgres and redis
+# below carry the identical `cap_add` this file's production counterpart needed, verified
+# against this file's own images/tags (postgres:18-alpine, redis:8-alpine) the same way.
+x-hardened: &hardened
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
+
 services:
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
     logging: *logging
+    <<: *hardened
+    # See docker-compose.yml's postgres service for the full derivation of this set
+    # (chown on every boot + gosu re-exec, DAC_OVERRIDE only bites on the *second* boot
+    # onward once PGDATA is 0700 postgres-owned) — identical image, identical requirement.
+    cap_add: [CHOWN, FOWNER, SETUID, SETGID, DAC_OVERRIDE]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kurultay}
       # Same fail-loud requirement as docker-compose.yml (see there for why): no baked-in
@@ -34,6 +48,13 @@ services:
     image: redis:8-alpine
     restart: unless-stopped
     logging: *logging
+    <<: *hardened
+    # See docker-compose.yml's redis service for the full derivation: the REDIS_PASSWORD
+    # conditional `command:` below bypasses the entrypoint's own privilege drop (it only
+    # triggers when its first arg is literally `redis-server`), so this runs as root for
+    # its whole life and needs DAC_OVERRIDE to write into /data, which the image bakes as
+    # owned by uid 999. Same image, same command shape, same requirement.
+    cap_add: [DAC_OVERRIDE]
     # REDIS_PASSWORD is optional here too — see docker-compose.yml for the reasoning. The
     # host port below means anything on the host can already reach this Redis at
     # localhost:6379 regardless, so a password mainly matters once other containers share
@@ -71,6 +92,12 @@ services:
     image: axllent/mailpit:latest
     restart: unless-stopped
     logging: *logging
+    <<: *hardened
+    # Mailpit has no chown/setuid dance of its own — it's a single static Go binary that
+    # opens two listen sockets (SMTP 1025, HTTP 8025, both unprivileged) and writes its
+    # sqlite store into its own volume. Verified standalone with `cap_drop: [ALL]` and no
+    # `cap_add`: both listeners came up and the healthcheck (`/mailpit readyz`) passed
+    # immediately.
     ports:
       - '8025:8025' # Web UI
       - '1025:1025' # SMTP

@@ -279,6 +279,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `X-Frame-Options: DENY`, `Referrer-Policy`, and friends). The CSP is API-shaped
   (`default-src 'none'`) because the service renders no HTML, and `Cross-Origin-Resource-Policy`
   is `cross-origin` so the web app on `WEB_URL` keeps its CORS-gated access.
+- Every service in `docker-compose.yml` and `docker-compose.dev.yml` now runs with the full
+  Linux capability set dropped (`cap_drop: [ALL]`) and `no-new-privileges:true` set — the
+  capability half of SEC-02 that PR #109's `USER node` left open. `api`, `web`, `migrate`,
+  and `backup` need nothing added back; `postgres` gets `CHOWN`/`FOWNER`/`SETUID`/`SETGID`/
+  `DAC_OVERRIDE` back (its official entrypoint `chown`s `PGDATA` and re-execs via `gosu` on
+  every boot) and `redis` gets `DAC_OVERRIDE` back (the `REDIS_PASSWORD`-conditional
+  `command:` bypasses the entrypoint's own privilege drop, so it stays root and needs to
+  write into the uid-999-owned `/data`). See
+  [development.md#container-hardening](docs/development.md#container-hardening) for the
+  full per-service reasoning.
 
 ## [0.1.0] - 2026-08-12
 

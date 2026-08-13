@@ -14,6 +14,7 @@ How to set up a Kurultay development environment and work in it day to day.
 - [Database connection pool](#database-connection-pool)
 - [SMTP and Mailpit](#smtp-and-mailpit)
 - [Run modes](#run-modes)
+- [Container hardening](#container-hardening)
 - [pnpm scripts](#pnpm-scripts)
 - [Database workflow](#database-workflow)
 - [Data retention](#data-retention)
@@ -337,6 +338,34 @@ service: the dev loop's database is throwaway by design.
 | Startup after a code change | seconds              | tens of seconds                                   |
 | Matches production          | Partially            | Yes                                               |
 | Use for                     | Everyday development | Verifying images, release checks, running the app |
+
+## Container hardening
+
+Every service in both compose files runs with the full Linux capability set dropped
+(`cap_drop: [ALL]`) and `no-new-privileges:true` set, via the `x-hardened` YAML anchor at
+the top of each file. A default container capability set — `CAP_NET_RAW`, `CAP_SYS_PTRACE`,
+`CAP_CHOWN`, and a dozen others — is attack surface regardless of which OS user the process
+runs as: a code-execution bug inherits whatever the kernel handed the container, not
+whatever the application dropped on its own initiative. This is the second half of SEC-02
+(`audit/findings/security.md`); the first half — `USER node` in both Dockerfiles' runner
+stages, so `api`/`web` don't run as root in the first place — landed in PR #109.
+
+A capability is re-added only where a service was actually run with just the drop and
+observed to fail, never because it "seems like it might need it." The comments beside each
+`cap_add:` in the compose files carry the failure that justified it; the short version:
+
+| Service      | `cap_add`                                             | Why                                                                                                                                                                                                                                                                                                                                       |
+| ------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api`, `web` | none                                                  | Already `USER node` — no `chown`, `setuid`, or privileged port bind at any point in the container's life                                                                                                                                                                                                                                  |
+| `migrate`    | none                                                  | The `migrate` build target has no `USER` (it's the pre-`runner` `build` stage), so it runs as root, but it only opens a DB connection and reads its own already-built `/app`                                                                                                                                                              |
+| `backup`     | none                                                  | `entrypoint:` replaces the postgres image's own entrypoint outright, so its chown/re-exec logic never runs — the sidecar stays root but never touches ownership of anything                                                                                                                                                               |
+| `postgres`   | `CHOWN`, `FOWNER`, `SETUID`, `SETGID`, `DAC_OVERRIDE` | The official entrypoint always starts as root, `chown`s `PGDATA` to the `postgres` user on _every_ boot (not just the first), then `gosu postgres` re-execs itself — `DAC_OVERRIDE` specifically is needed from the second boot onward, once `PGDATA` is `chmod 0700` and root can no longer `find` its way in without it                 |
+| `redis`      | `DAC_OVERRIDE`                                        | The `REDIS_PASSWORD`-conditional `command:` (see the compose file) doesn't match the entrypoint's own `redis-server` detection, so the entrypoint's privilege drop never triggers and the process runs as root for its whole life — it still needs to write into `/data`, which the image bakes as owned by uid 999, hence `DAC_OVERRIDE` |
+
+Out of scope for this hardening pass: a read-only root filesystem (`read_only: true`) and
+seccomp profiles. Both are stricter constraints that need a per-service audit of which
+paths must stay writable (temp dirs, node's own `/tmp` use, etc.) — tracked as a follow-up,
+not bundled in here.
 
 ## pnpm scripts
 
