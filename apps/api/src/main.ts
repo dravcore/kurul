@@ -29,3 +29,6 @@ void bootstrap().catch((error: unknown) => {
   logger.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
   process.exit(1);
 });
+
+// eslint gate proof: deliberate violation, PR is closed without merging
+const unusedGateProof: any = 1;
