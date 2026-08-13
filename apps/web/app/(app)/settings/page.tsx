@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { Topbar } from '@/components/layout/topbar';
 import { LanguageSettings } from '@/components/settings/language-settings';
 import { MembersSettings } from '@/components/settings/members-settings';
+import { WorkspaceSettings } from '@/components/settings/workspace-settings';
 
 /**
  * One section of the settings screen: a heading, one sentence about what it decides, and the
@@ -47,6 +48,13 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
           </SettingsSection>
           <SettingsSection title={t('language.title')} description={t('language.description')}>
             <LanguageSettings />
+          </SettingsSection>
+          {/* Last: it holds the one control on this screen with no undo (delete), and every
+              other section is either read constantly (members) or set once and forgotten
+              (language). Nothing about "workspace" being alphabetically first should put a
+              delete button above sections people open every day. */}
+          <SettingsSection title={t('workspace.title')} description={t('workspace.description')}>
+            <WorkspaceSettings />
           </SettingsSection>
         </div>
       </div>

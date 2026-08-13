@@ -166,4 +166,26 @@ describe('WorkspaceProvider bootstrap', () => {
     expect(result.current.activeRole).toBe(MemberRole.MEMBER);
     expect(result.current.workspaces).toHaveLength(1);
   });
+
+  /**
+   * `RenameWorkspaceDialog` hands the `PATCH` response straight to this — no second fetch — so
+   * `WorkspaceSwitcher` (which reads the same `workspaces` array) shows the new name without a
+   * full bootstrap. The other workspace stays untouched, matched by id rather than position.
+   */
+  it('folds a rename into the matching workspace by id, and only that one', async () => {
+    const other: WorkspaceDto = { ...workspace, id: 'other-workspace', name: 'Bugs' };
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/workspaces') return Promise.resolve([workspace, other]) as never;
+      return Promise.resolve(membership) as never;
+    });
+
+    const { result } = renderProvider();
+    await waitFor(() => expect(result.current.bootstrapped).toBe(true));
+
+    act(() => {
+      result.current.renameActiveWorkspace({ ...workspace, name: 'Kurultay Labs' });
+    });
+
+    expect(result.current.workspaces).toEqual([{ ...workspace, name: 'Kurultay Labs' }, other]);
+  });
 });
