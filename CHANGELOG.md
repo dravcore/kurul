@@ -16,6 +16,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `docs/archive/roadmap-mvp-phases.md`; shipped phase design specs moved to
   `docs/archive/specs/` (CHANGELOG links updated).
 
+### Fixed
+
+- Signing in returns the visitor to the page that sent them there. `/login` and `/register`
+  were ignoring the `?next=…` both the route guard and the invitation screen had been writing
+  into their URLs, so an invitee who followed an invitation link landed on the dashboard and
+  had to find the invitation email again. The destination is now honoured on both screens and
+  carried across the link between them — but only when it is a same-origin path, so a crafted
+  `?next=https://evil.com` cannot turn the sign-in form into a phishing hop.
+
 ### Security
 
 - The API now sends baseline security headers on every response via `helmet`
