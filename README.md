@@ -2,6 +2,8 @@
 
 Open-source, Kanban-focused project management tool.
 
+![Kurultay board](docs/assets/board.png)
+
 > 🌐 English (canonical) | [Türkçe](README.tr.md)
 
 ## Status
