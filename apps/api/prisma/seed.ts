@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import { assertSeedAllowed } from '../src/common/seed-guard';
 import { Priority, PrismaClient } from '../src/generated/prisma';
 import { auth } from '../src/auth/auth';
 
@@ -9,6 +10,9 @@ const DEMO_PASSWORD = 'demo-password-change-me';
 const DEMO_NAME = 'Demo User';
 
 async function main(): Promise<void> {
+  // The seed wipes every table below — refuse before touching anything in production.
+  assertSeedAllowed(process.env.NODE_ENV);
+
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error('DATABASE_URL is required');
