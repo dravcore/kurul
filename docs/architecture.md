@@ -16,6 +16,7 @@ The shape of the Kurultay system: how the code is stored, how it runs, and how t
 - [8. Runtime evolution](#8-runtime-evolution)
 - [9. Accepted runtime trade-offs](#9-accepted-runtime-trade-offs)
 - [10. Decision records](#10-decision-records)
+- [11. Security headers](#11-security-headers)
 
 ---
 
@@ -98,6 +99,7 @@ Treat the table below as the module map.
 | `dashboard`    | Aggregation queries feeding the charts                                           |
 | `notification` | Notification fan-out, Redis-backed queue                                         |
 | `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                   |
+| `retention`    | Nightly data-retention sweep; no controller, no exported provider                |
 | `mail`         | SMTP delivery (`nodemailer`); logs instead of sending when unconfigured          |
 | `locale`       | Stored interface language: reads/writes `User.locale`, resolves it for a request |
 | `health`       | Liveness probe (`GET /health`), unauthenticated                                  |
@@ -110,6 +112,21 @@ Cross-cutting infrastructure:
 | `prisma` | Shared `pg` pool + Nest `PrismaService`; Better Auth uses the same pool                                                                                   |
 
 Dependency direction: feature modules depend on `common` and `prisma`, never the reverse. `realtime` is a consumer of domain events, not a place where domain logic lives — so it can be lifted into its own process role without dragging business rules with it.
+
+**Scheduled jobs.** Two, both BullMQ job schedulers on `REDIS_URL`, both registered from the
+module that owns them and closed on `onModuleDestroy`. `notification/due-soon.worker.ts`
+scans for approaching due dates every 15 minutes and only ever inserts.
+`retention/cleanup.worker.ts` deletes rows past their retention window once a day
+([ADR 0020](decisions/0020-data-retention.md)). With `REDIS_URL` unset neither starts, which
+is a supported single-instance configuration for the first and a disabled retention policy
+for the second. Both are the `worker` role that stage 2 of [§8](#8-runtime-evolution) splits
+out; nothing else in the API runs off a request.
+
+`retention` is its own module rather than a provider inside `notification` because it is the
+one component that deletes across module and tenant boundaries by design — `Session`,
+`Verification`, `Notification` and `Activity` belong to three modules and to no workspace.
+It is also the single sanctioned exception to §7: it runs with no caller, so there is nothing
+to isolate. See the ADR.
 
 `locale` is a module rather than a `common/` helper because `auth` and `board` both need it and the boundary rule says they depend on the module, not on each other. It is the only locale awareness the API has, and it is confined to the two cases [ADR 0018](decisions/0018-localization-strategy.md) allows: content written into the database on the user's behalf (a new board's seed columns) and outbound email. Interface translation stays entirely on the web.
 
@@ -250,6 +267,12 @@ bug, not something the guard can paper over:
 4. Nested resources are validated through their parent chain (task → board → workspace) so a valid id from another tenant cannot be smuggled in.
 5. Workspace/org **mutations** go through Nest `/workspaces/*` only — Better Auth `/auth/organization/*` mutation HTTP is firewalled so Nest policy cannot be bypassed.
 
+**One exception, and only one:** the retention sweep
+(`retention/cleanup.worker.ts`, [ADR 0020](decisions/0020-data-retention.md)) deletes
+globally, with no `workspaceId` predicate. The rule above exists to stop a _caller_ reaching
+another tenant's rows; the sweep has no caller, no session and no route — and `Verification`
+has no tenant column to scope by at all. Anything reachable from a request stays scoped.
+
 Membership `role` (`OWNER`/`ADMIN`/`MEMBER`/`GUEST`) is checked in the same layer for permission decisions. Scaffold controllers use `/workspaces/:workspaceId/...` so `WorkspaceGuard` can read `params.workspaceId` when handlers arrive. Coding review treats any query without workspace scoping as blocking ([coding-standards.md](coding-standards.md#multi-tenant-isolation)).
 
 ---
@@ -358,6 +381,32 @@ The reasoning behind each of these choices is recorded as an ADR:
 | [`0017-partial-indexes-outside-prisma-schema.md`](decisions/0017-partial-indexes-outside-prisma-schema.md) | Partial indexes live in migrations, guarded by tests             |
 | [`0018-localization-strategy.md`](decisions/0018-localization-strategy.md)                                 | Locale chain, no `[locale]` routing, API seeds/email only        |
 | [`0019-column-category.md`](decisions/0019-column-category.md)                                             | Column completion is a category, not a name                      |
+| [`0020-data-retention.md`](decisions/0020-data-retention.md)                                               | Per-table retention windows, enforced by a nightly sweep         |
+
+---
+
+## 11. Security headers
+
+Both processes set a fixed set of hardening headers on every response — `apps/api` via
+`helmet` (`apps/api/src/common/configure-app.ts`), `apps/web` via Next's `headers()`
+(`apps/web/next.config.ts`, backed by `apps/web/lib/security-headers.ts` so a vitest suite can
+assert on the real source). They are configured separately rather than sharing one policy
+object, because they are not the same kind of process: the API answers only JSON and is never
+rendered, the web app is the browser surface that actually executes script and paints a page.
+
+| Header                      | `apps/api`                                                                                                         | `apps/web`                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Content-Security-Policy`   | `default-src 'none'` — an API renders nothing, so nothing is allowed to load, frame, or set a `<base>`/form target | `default-src 'self'`; `script-src`/`style-src` add `'unsafe-inline'` (App Router hydration + `next-themes` inline script, and Radix/`@dnd-kit` inline `style` attributes — see `lib/security-headers.ts` for why a nonce was not used and how `'unsafe-inline'` was verified necessary); `connect-src` names the API's `http(s)` origin and its derived `ws(s)` origin, because `lib/socket.ts` dials both |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`                                                                              | Same value. Both are inert on plain HTTP — browsers ignore the header outside HTTPS — so it costs nothing in local/dev and only takes effect once a deployment terminates TLS in front of the process                                                                                                                                                                                                      |
+| `X-Frame-Options`           | `DENY`                                                                                                             | `DENY`, backed by CSP `frame-ancestors 'none'` for browsers that honour CSP over the legacy header                                                                                                                                                                                                                                                                                                         |
+| `X-Content-Type-Options`    | `nosniff`                                                                                                          | `nosniff`                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `Referrer-Policy`           | `no-referrer` (helmet's default, left unchanged — the API is never a navigation target)                            | `strict-origin-when-cross-origin` — same-origin navigation keeps the full path, cross-origin gets only the origin, and a downgrade to plain HTTP gets nothing                                                                                                                                                                                                                                              |
+| `Permissions-Policy`        | Not set — a JSON API has no page context for a browser feature-permission policy to govern                         | Denies `camera`, `microphone`, `geolocation`, `payment`, `usb`, and `interest-cohort` (the FLoC/Topics-API opt-out) — none of which any board, task, or dashboard view ever requests                                                                                                                                                                                                                       |
+
+`Cross-Origin-Resource-Policy` on the API is `cross-origin` rather than helmet's default
+`same-origin`, because the web app is a separate origin (`WEB_URL`/`NEXT_PUBLIC_API_URL`) that
+legitimately reads it; that access stays gated by the CORS allowlist in `configure-app.ts`, not
+by CORP.
 
 Related: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (historical Phase 1 scaffold) · [docs/README.md](README.md) (docs map)

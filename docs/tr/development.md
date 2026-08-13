@@ -11,10 +11,12 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 - [Klonlama ve kurulum](#klonlama-ve-kurulum)
 - [Ortam değişkenleri](#ortam-değişkenleri)
 - [Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri)
+- [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)
 - [SMTP ve Mailpit](#smtp-ve-mailpit)
 - [Çalışma modları](#çalışma-modları)
 - [pnpm script'leri](#pnpm-scriptleri)
 - [Veritabanı iş akışı](#veritabanı-iş-akışı)
+- [Veri saklama](#veri-saklama)
 - [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme)
 - [Geri alma (rollback)](#geri-alma-rollback)
 - [Günlük döngü](#günlük-döngü)
@@ -84,22 +86,29 @@ cp .env.example .env
 
 Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit edilmemelidir.
 
-| Değişken              | Örnek                                                               | Amaç                                                                                                                       |
-| --------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma bağlantı string'i — şifre kısmı aşağıdaki `POSTGRES_PASSWORD` ile eşleşmelidir                                      |
-| `REDIS_URL`           | `redis://localhost:6379`                                            | Socket.io Redis adapter'ı, caching, BullMQ due-soon worker (`due-soon` kuyruğu)                                            |
-| `BETTER_AUTH_SECRET`  | _(üret)_                                                            | Session imzalama secret'ı — zorunlu, varsayılan yok                                                                        |
-| `BETTER_AUTH_URL`     | `http://localhost:4000`                                             | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir)                                                          |
-| `API_PORT`            | `4000`                                                              | NestJS dinleme portu                                                                                                       |
-| `WEB_URL`             | `http://localhost:3000`                                             | API için CORS origin'i                                                                                                     |
-| `RATE_LIMIT_ENABLED`  | `true`                                                              | [Rate limiting](api-conventions.md#rate-limiting) ana anahtarı. Varsayılan açık; yalnızca entegrasyon testleri kapatır     |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                             | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir)          |
-| `SMTP_HOST`           | `localhost` (geliştirme, Mailpit üzerinden)                         | SMTP sunucu host'u. Tamamen boş bırakılırsa mail modülü göndermek yerine loglar — bkz. [SMTP ve Mailpit](#smtp-ve-mailpit) |
-| `SMTP_PORT`           | `1025` (geliştirme, Mailpit üzerinden) / `587` (tipik production)   | SMTP sunucu portu                                                                                                          |
-| `SMTP_USER`           | _(Mailpit için boş)_                                                | SMTP auth kullanıcı adı, sunucunuz gerektiriyorsa                                                                          |
-| `SMTP_PASSWORD`       | _(Mailpit için boş)_                                                | SMTP auth şifresi, sunucunuz gerektiriyorsa                                                                                |
-| `SMTP_SECURE`         | `false`                                                             | Örtük TLS için (port 465) `true`, STARTTLS/plaintext için (587/25, ve Mailpit) `false`                                     |
-| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                                    | Giden mail'lerdeki `From:` başlığı                                                                                         |
+| Değişken                              | Örnek                                                               | Amaç                                                                                                                                                                                                                                               |
+| ------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma bağlantı string'i — şifre kısmı aşağıdaki `POSTGRES_PASSWORD` ile eşleşmelidir                                                                                                                                                              |
+| `REDIS_URL`                           | `redis://localhost:6379`                                            | Socket.io Redis adapter'ı, caching, BullMQ zamanlanmış işler (`due-soon` ve `cleanup` kuyrukları)                                                                                                                                                  |
+| `BETTER_AUTH_SECRET`                  | _(üret)_                                                            | Session imzalama secret'ı — zorunlu, varsayılan yok                                                                                                                                                                                                |
+| `BETTER_AUTH_URL`                     | `http://localhost:4000`                                             | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir)                                                                                                                                                                                  |
+| `API_PORT`                            | `4000`                                                              | NestJS dinleme portu                                                                                                                                                                                                                               |
+| `WEB_URL`                             | `http://localhost:3000`                                             | API için CORS origin'i                                                                                                                                                                                                                             |
+| `RATE_LIMIT_ENABLED`                  | `true`                                                              | [Rate limiting](api-conventions.md#rate-limiting) ana anahtarı. Varsayılan açık; yalnızca entegrasyon testleri kapatır                                                                                                                             |
+| `TRUST_PROXY`                         | `false`                                                             | Gerçek client IP'si için güvenilecek reverse proxy hop'(lar)ı — `false` (varsayılan), hop sayısı (`1`) veya IP/CIDR listesi. Bkz. [rate limiting](api-conventions.md#rate-limiting) — doğrudan expose edilen bir kurulumda **asla `true` olmasın** |
+| `NEXT_PUBLIC_API_URL`                 | `http://localhost:4000`                                             | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir)                                                                                                                                  |
+| `SMTP_HOST`                           | `localhost` (geliştirme, Mailpit üzerinden)                         | SMTP sunucu host'u. Tamamen boş bırakılırsa mail modülü göndermek yerine loglar — bkz. [SMTP ve Mailpit](#smtp-ve-mailpit)                                                                                                                         |
+| `SMTP_PORT`                           | `1025` (geliştirme, Mailpit üzerinden) / `587` (tipik production)   | SMTP sunucu portu                                                                                                                                                                                                                                  |
+| `SMTP_USER`                           | _(Mailpit için boş)_                                                | SMTP auth kullanıcı adı, sunucunuz gerektiriyorsa                                                                                                                                                                                                  |
+| `SMTP_PASSWORD`                       | _(Mailpit için boş)_                                                | SMTP auth şifresi, sunucunuz gerektiriyorsa                                                                                                                                                                                                        |
+| `SMTP_SECURE`                         | `false`                                                             | Örtük TLS için (port 465) `true`, STARTTLS/plaintext için (587/25, ve Mailpit) `false`                                                                                                                                                             |
+| `MAIL_FROM`                           | `Kurultay <noreply@example.com>`                                    | Giden mail'lerdeki `From:` başlığı                                                                                                                                                                                                                 |
+| `CLEANUP_ENABLED`                     | `true`                                                              | Gecelik [veri saklama süpürmesi](#veri-saklama) ana anahtarı. Kapalıysa instance kendi saklama politikasını uygulamayı bırakır                                                                                                                     |
+| `NOTIFICATION_RETENTION_DAYS`         | `90`                                                                | Bir bildirimin **okunduktan sonra** saklandığı gün sayısı. Okunmamış bildirimler hangi yaşta olursa olsun silinmez. `0` = sonsuza dek                                                                                                              |
+| `ACTIVITY_RETENTION_DAYS`             | `365`                                                               | Bir aktivite satırının yazıldıktan sonra saklandığı gün sayısı. `0` = sonsuza dek — yasal denetim izi yükümlülüğünüz varsa bunu kullanın                                                                                                           |
+| `DATABASE_POOL_MAX`                   | `20`                                                                | Paylaşılan `pg` havuzunun Postgres'e açtığı azami eşzamanlı bağlantı sayısı — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                       |
+| `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                             | Tüm `DATABASE_POOL_MAX` bağlantılar meşgulken bir isteğin havuzdan bağlantı için ne kadar bekleyeceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                             |
+| `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                             | Postgres'in tek bir SQL ifadesini öldürmeden önce ne kadar çalışmasına izin vereceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                              |
 
 `.env.example` ayrıca `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `REDIS_PASSWORD`,
 `BACKUP_INTERVAL` ve `BACKUP_KEEP` taşır. Altısı da **yalnızca compose'a aittir** —
@@ -187,6 +196,44 @@ veritabanının şifresini döndürmez.** Resmi Postgres image'ı `POSTGRES_PASS
 initialize edilmiş bir stack'i yeniden başlatmak, rolün şifresini tam olarak eskisi gibi
 bırakır. Çalışan bir instance'ta şifreyi döndüren `ALTER USER ... PASSWORD` komutu için
 `CHANGELOG.md`'deki `[Unreleased]` girdisine bakın.
+
+## Veritabanı bağlantı havuzu
+
+`apps/api/src/prisma/database.ts` process genelinde tek bir `pg` `Pool` açar ve bunu
+`PrismaService` ile Better Auth (`apps/api/src/auth/auth.ts`) arasında paylaştırır — neden ayrı
+ayrı değil de paylaşmaları gerektiği için modülün kendisine bakın. Üç ortam değişkeni bunu
+şekillendirir; üçü de opsiyoneldir ve varsayılanları normal trafiğin asla tetiklemeyeceği kadar
+cömert seçilmiştir:
+
+| Değişken                              | Varsayılan | Amaç                                                                                   |
+| ------------------------------------- | ---------- | -------------------------------------------------------------------------------------- |
+| `DATABASE_POOL_MAX`                   | `20`       | Bu instance'ın Postgres'e açtığı azami eşzamanlı bağlantı sayısı                       |
+| `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`    | Tüm `DATABASE_POOL_MAX` bağlantılar meşgulken bir isteğin bağlantı için beklediği süre |
+| `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`    | Postgres'in tek bir SQL ifadesini öldürmeden önce ne kadar çalışmasına izin verdiği    |
+
+`DATABASE_POOL_CONNECTION_TIMEOUT_MS` var olmadan önce, havuz zaten `DATABASE_POOL_MAX`
+bağlantıda dolu haldeyken gelen bir istek sınırsız kuyrukta bekliyordu — `pg`'nin kendi
+varsayılanı burada `0`'dır, yani sonsuza dek bekle. Sürekli yük altında bu, havuz doygunluğunu
+net, loglanmış bir hata yerine hiç sonuçlanmayan isteklere dönüştürüyordu.
+`DATABASE_STATEMENT_TIMEOUT_MS` sorgu tarafındaki eşdeğer boşluğu kapatır: bu olmadan, kaçak
+bir ifade (eksik bir index'e çarpan büyük bir tarama, patolojik bir filtre) bir bağlantıyı — ve
+`DATABASE_POOL_MAX` slotlarından birini — süresiz tutar.
+
+`DATABASE_STATEMENT_TIMEOUT_MS`, bu havuzun açtığı **her bağlantıya**, bir Postgres başlangıç
+parametresi olarak uygulanır (`pg`'nin kendi handshake'i, bu kod tabanının gönderdiği bir sorgu
+değil) — dolayısıyla yalnızca `getSharedPool()` üzerinden geçen trafiğe ulaşır:
+
+- `prisma migrate deploy` / `prisma migrate dev` etkilenmez — migration'lar Prisma'nın kendi
+  engine sürecinden, `DATABASE_URL`'e doğrudan bağlanarak çalışır, bu havuz üzerinden asla.
+- `pnpm db:seed` (`apps/api/prisma/seed.ts`) kendi toplu silme/ekleme işlemleri için
+  etkilenmez — bunlar için ayrı bir `Pool` açar. Seed'in paylaşılan havuzu geçen tek kısmı,
+  Better Auth çağrılarıdır (`signUpEmail`, `createOrganization`); bunlar da 30 saniyelik
+  varsayılana hiç yaklaşmayan sıradan, hafif sorgulardır.
+
+Bir instance spike'lar dışında normal yük altında da sürekli kuyruğa giriyorsa,
+`DATABASE_POOL_MAX`'ı Postgres'in kendi `max_connections`'ıyla birlikte artırın; sınırsız bir
+havuz bunu düzeltmez, sadece tükenmeyi bu uygulamadan veritabanını paylaşan başka bir şeye
+taşır.
 
 ## SMTP ve Mailpit
 
@@ -333,6 +380,57 @@ docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
 pnpm db:seed
 ```
+
+## Veri saklama
+
+Kurultay artık saklamaya hakkı olmayan satırları siler. Bir BullMQ işi `REDIS_URL` üzerinde
+**günde bir kez** koşar — due-soon taramasıyla aynı mekanizma — ve dört tabloyu süpürür:
+
+| Tablo          | Ne zaman silinir                     | Ayar                                            |
+| -------------- | ------------------------------------ | ----------------------------------------------- |
+| `Session`      | `expiresAt` geçtiğinde               | yok — yapılandırılabilir değil                  |
+| `Verification` | `expiresAt` geçtiğinde               | yok — yapılandırılabilir değil                  |
+| `Notification` | okunmuşsa ve N günden önce okunmuşsa | `NOTIFICATION_RETENTION_DAYS` (varsayılan `90`) |
+| `Activity`     | N günden önce yazılmışsa             | `ACTIVITY_RETENTION_DAYS` (varsayılan `365`)    |
+
+Her pencerenin ardındaki gerekçe — ve `Activity`'nin neden arşivlenmek ya da süresiz
+saklanmak yerine bir yıl sonra silindiği — [ADR 0020](decisions/0020-data-retention.md)'de.
+
+Bunlardan birini değiştirmeden önce bilinmesi gereken iki şey:
+
+- **Okunmamış bildirimler hangi yaşta olursa olsun silinmez.** Pencere `createdAt`'ten değil,
+  `readAt`'ten ölçülür.
+- Her iki pencere için de **`0` "sonsuza dek sakla" demektir.** Yasal bir denetim izi
+  yükümlülüğünüz varsa `ACTIVITY_RETENTION_DAYS=0` yapın. Negatif bir değer kırpılmaz,
+  başlangıçta reddedilir — gelecekte bir kesim noktası olurdu ve canlı satırları silerdi.
+
+Her koşu stdout'a, tablo başına silinen satır sayısını taşıyan tek bir JSON satırı yazar —
+başka hiçbir şey yok: kimlik yok, payload yok:
+
+```json
+{
+  "ts": "2026-08-14T03:00:01.204Z",
+  "level": "info",
+  "event": "retention.cleanup",
+  "durationMs": 41.8,
+  "sessions": 132,
+  "verifications": 9,
+  "notifications": 2140,
+  "activities": 0
+}
+```
+
+Satır her sayı sıfır olsa bile yazılır; böylece satırın yokluğu, işin koşmayı bıraktığının
+işareti olur.
+
+`CLEANUP_ENABLED=false` süpürmeyi tamamen kapatır ve bunu yalnızca başlangıçta değil, silme
+anında yapar — daha eski bir deployment'ın Redis'te bıraktığı bir iş tanımı anahtarı
+aşamaz. Entegrasyon suite'i bu anahtar kapalı koşar (`test/setup-e2e.ts`) ve yalnızca kendi
+doğrulamalarının çevresinde açar; global ve zamanlanmış bir `DELETE`, fixture'ları geçmişe
+tarihlenmiş bir suite'in arka planında koşmasını isteyeceğiniz bir şey değil.
+
+Silme batch'lidir (statement başına 1000 satır); böylece uzun süredir çalışan bir instance'ta
+ilk koşu, kilitleri tutan ve autovacuum'u engelleyen tek bir uzun transaction'a dönüşmez.
 
 ## Yükseltme ve yedekleme
 

@@ -4,10 +4,19 @@ import { mountBetterAuth } from '../auth/mount-better-auth';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
 import { createAccessLogMiddleware } from './logging/access-log.middleware';
 import { requestIdMiddleware } from './logging/request-id';
+import { configureTrustProxy } from './trust-proxy';
 import { validationExceptionFactory } from './validation/validation-exception.factory';
 
 /** Shared Nest bootstrap (HTTP app + e2e) so pipes/filters/CORS/auth stay in sync. */
-export function configureApp(app: INestApplication, options: { corsOrigin: string }): void {
+export function configureApp(
+  app: INestApplication,
+  options: { corsOrigin: string; trustProxy: boolean | number | string },
+): void {
+  // Settles who the client actually is before anything else runs: `req.ip` (read by the
+  // access log below and by the Nest `ThrottlerGuard`'s default tracker) and the header Better
+  // Auth's independent rate limiter is configured to trust (`auth/auth.ts`) both depend on it.
+  configureTrustProxy(app, options.trustProxy);
+
   // Registered first so every response — Nest routes, the Better Auth mount below, and CORS
   // preflights — carries the same baseline headers.
   app.use(

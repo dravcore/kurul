@@ -11,10 +11,12 @@ How to set up a Kurultay development environment and work in it day to day.
 - [Clone and install](#clone-and-install)
 - [Environment variables](#environment-variables)
 - [Database and cache credentials](#database-and-cache-credentials)
+- [Database connection pool](#database-connection-pool)
 - [SMTP and Mailpit](#smtp-and-mailpit)
 - [Run modes](#run-modes)
 - [pnpm scripts](#pnpm-scripts)
 - [Database workflow](#database-workflow)
+- [Data retention](#data-retention)
 - [Upgrading and backups](#upgrading-and-backups)
 - [Rollback](#rollback)
 - [Day-to-day loop](#day-to-day-loop)
@@ -85,22 +87,29 @@ cp .env.example .env
 
 Then fill in the blanks. `.env` is git-ignored and must never be committed.
 
-| Variable              | Example                                                             | Purpose                                                                                                                     |
-| --------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma connection string — password segment must match `POSTGRES_PASSWORD` below                                            |
-| `REDIS_URL`           | `redis://localhost:6379`                                            | Socket.io Redis adapter, caching, BullMQ due-soon worker (`due-soon` queue)                                                 |
-| `BETTER_AUTH_SECRET`  | _(generate)_                                                        | Session signing secret — required, no default                                                                               |
-| `BETTER_AUTH_URL`     | `http://localhost:4000`                                             | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                                 |
-| `API_PORT`            | `4000`                                                              | NestJS listen port                                                                                                          |
-| `WEB_URL`             | `http://localhost:3000`                                             | CORS origin for the API                                                                                                     |
-| `RATE_LIMIT_ENABLED`  | `true`                                                              | Master switch for [rate limiting](api-conventions.md#rate-limiting). On by default; only the integration suite turns it off |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                             | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                       |
-| `SMTP_HOST`           | `localhost` (dev, via Mailpit)                                      | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)    |
-| `SMTP_PORT`           | `1025` (dev, via Mailpit) / `587` (typical production)              | SMTP server port                                                                                                            |
-| `SMTP_USER`           | _(blank for Mailpit)_                                               | SMTP auth username, if your server requires one                                                                             |
-| `SMTP_PASSWORD`       | _(blank for Mailpit)_                                               | SMTP auth password, if your server requires one                                                                             |
-| `SMTP_SECURE`         | `false`                                                             | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                    |
-| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                                    | `From:` header on outgoing mail                                                                                             |
+| Variable                              | Example                                                             | Purpose                                                                                                                                                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma connection string — password segment must match `POSTGRES_PASSWORD` below                                                                                                                                         |
+| `REDIS_URL`                           | `redis://localhost:6379`                                            | Socket.io Redis adapter, caching, BullMQ scheduled jobs (`due-soon` and `cleanup` queues)                                                                                                                                |
+| `BETTER_AUTH_SECRET`                  | _(generate)_                                                        | Session signing secret — required, no default                                                                                                                                                                            |
+| `BETTER_AUTH_URL`                     | `http://localhost:4000`                                             | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                                                                                                                              |
+| `API_PORT`                            | `4000`                                                              | NestJS listen port                                                                                                                                                                                                       |
+| `WEB_URL`                             | `http://localhost:3000`                                             | CORS origin for the API                                                                                                                                                                                                  |
+| `RATE_LIMIT_ENABLED`                  | `true`                                                              | Master switch for [rate limiting](api-conventions.md#rate-limiting). On by default; only the integration suite turns it off                                                                                              |
+| `TRUST_PROXY`                         | `false`                                                             | Reverse-proxy hop(s) to trust for the real client IP — `false` (default), a hop count (`1`), or an IP/CIDR list. See [rate limiting](api-conventions.md#rate-limiting) — **never `true` on a directly-exposed instance** |
+| `NEXT_PUBLIC_API_URL`                 | `http://localhost:4000`                                             | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                                                                                                                    |
+| `SMTP_HOST`                           | `localhost` (dev, via Mailpit)                                      | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)                                                                                                 |
+| `SMTP_PORT`                           | `1025` (dev, via Mailpit) / `587` (typical production)              | SMTP server port                                                                                                                                                                                                         |
+| `SMTP_USER`                           | _(blank for Mailpit)_                                               | SMTP auth username, if your server requires one                                                                                                                                                                          |
+| `SMTP_PASSWORD`                       | _(blank for Mailpit)_                                               | SMTP auth password, if your server requires one                                                                                                                                                                          |
+| `SMTP_SECURE`                         | `false`                                                             | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                                                                                                                 |
+| `MAIL_FROM`                           | `Kurultay <noreply@example.com>`                                    | `From:` header on outgoing mail                                                                                                                                                                                          |
+| `CLEANUP_ENABLED`                     | `true`                                                              | Master switch for the nightly [data-retention sweep](#data-retention). Off means the instance stops enforcing its own retention policy                                                                                   |
+| `NOTIFICATION_RETENTION_DAYS`         | `90`                                                                | Days a notification is kept **after it was read**. Unread notifications are never deleted, at any age. `0` = keep forever                                                                                                |
+| `ACTIVITY_RETENTION_DAYS`             | `365`                                                               | Days an activity row is kept after it was written. `0` = keep forever — set this if you have a statutory audit-trail duty                                                                                                |
+| `DATABASE_POOL_MAX`                   | `20`                                                                | Max simultaneous connections the shared `pg` pool opens to Postgres — see [Database connection pool](#database-connection-pool)                                                                                          |
+| `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                             | How long a request waits for a pool connection before failing, once all `DATABASE_POOL_MAX` are busy — see [Database connection pool](#database-connection-pool)                                                         |
+| `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                             | How long a single SQL statement may run before Postgres kills it — see [Database connection pool](#database-connection-pool)                                                                                             |
 
 `.env.example` also carries `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
 `REDIS_PASSWORD`, `BACKUP_INTERVAL`, and `BACKUP_KEEP`. All six are **compose-only** —
@@ -188,6 +197,42 @@ running database's password.** The official Postgres image only applies
 and restarting an already-initialized stack leaves the role's password exactly as it was. See
 the `[Unreleased]` entry in `CHANGELOG.md` for the `ALTER USER ... PASSWORD` command that
 rotates it on a running instance.
+
+## Database connection pool
+
+`apps/api/src/prisma/database.ts` opens one process-wide `pg` `Pool` and shares it between
+`PrismaService` and Better Auth (`apps/api/src/auth/auth.ts`) — see the module for why they
+have to share rather than each opening their own. Three environment variables shape it, all
+optional with defaults chosen to be generous enough that ordinary traffic never trips them:
+
+| Variable                              | Default | Purpose                                                                         |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------- |
+| `DATABASE_POOL_MAX`                   | `20`    | Max simultaneous connections this instance opens to Postgres                    |
+| `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000` | How long a request waits for a connection once all `DATABASE_POOL_MAX` are busy |
+| `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000` | How long a single SQL statement may run before Postgres kills it                |
+
+Before `DATABASE_POOL_CONNECTION_TIMEOUT_MS` existed, a request that arrived once the pool was
+already at `DATABASE_POOL_MAX` connections queued with no ceiling — `pg`'s own default there is
+`0`, i.e. wait forever. Under sustained load that turned pool saturation into requests that
+never resolved instead of a clear, logged error. `DATABASE_STATEMENT_TIMEOUT_MS` closes the
+matching gap on the query side: without it, one runaway statement (a missing index hit by a
+large scan, a pathological filter) holds a connection — and one of the `DATABASE_POOL_MAX`
+slots — indefinitely.
+
+`DATABASE_STATEMENT_TIMEOUT_MS` is applied **per connection this pool opens**, as a Postgres
+startup parameter (`pg`'s own handshake, not a query this codebase issues), so it reaches only
+traffic that goes through `getSharedPool()`:
+
+- `prisma migrate deploy` / `prisma migrate dev` are unaffected — migrations run through
+  Prisma's own engine process against `DATABASE_URL` directly, never through this pool.
+- `pnpm db:seed` (`apps/api/prisma/seed.ts`) is unaffected for its own bulk deletes and
+  inserts — it opens a separate `Pool` for those. The one part of seeding that _does_ cross
+  the shared pool is the Better Auth calls it makes (`signUpEmail`, `createOrganization`),
+  which are ordinary lightweight queries nowhere near the 30s default.
+
+Raise `DATABASE_POOL_MAX` alongside Postgres's own `max_connections` if an instance is
+consistently queuing under normal load rather than only during spikes; an unbounded pool does
+not fix that, it just moves the exhaustion from this app to whatever else shares the database.
 
 ## SMTP and Mailpit
 
@@ -335,6 +380,57 @@ docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
 pnpm db:seed
 ```
+
+## Data retention
+
+Kurultay deletes rows it is no longer entitled to keep. A BullMQ job runs **once a day** on
+`REDIS_URL` — the same mechanism as the due-soon scan — and sweeps four tables:
+
+| Table          | Deleted when                        | Setting                                      |
+| -------------- | ----------------------------------- | -------------------------------------------- |
+| `Session`      | `expiresAt` has passed              | none — not configurable                      |
+| `Verification` | `expiresAt` has passed              | none — not configurable                      |
+| `Notification` | read, and read more than N days ago | `NOTIFICATION_RETENTION_DAYS` (default `90`) |
+| `Activity`     | written more than N days ago        | `ACTIVITY_RETENTION_DAYS` (default `365`)    |
+
+The reasoning behind each window — and why `Activity` is deleted at a year rather than
+archived or kept — is [ADR 0020](decisions/0020-data-retention.md).
+
+Two things worth knowing before you change any of this:
+
+- **Unread notifications are never deleted, at any age.** The window is measured from
+  `readAt`, not from `createdAt`.
+- **`0` means "keep forever"** for either window. Set `ACTIVITY_RETENTION_DAYS=0` if you have
+  a statutory duty to retain an audit trail. A negative value is refused at startup rather
+  than clamped — it would be a cutoff in the future, which would delete live rows.
+
+Each run writes one JSON line to stdout with the number of rows deleted per table and nothing
+else — no identifiers, no payloads:
+
+```json
+{
+  "ts": "2026-08-14T03:00:01.204Z",
+  "level": "info",
+  "event": "retention.cleanup",
+  "durationMs": 41.8,
+  "sessions": 132,
+  "verifications": 9,
+  "notifications": 2140,
+  "activities": 0
+}
+```
+
+The line is written even when every count is zero, so its absence is a signal that the job
+stopped running.
+
+`CLEANUP_ENABLED=false` disables the sweep completely, at the point of deletion rather than
+only at startup — a job definition left in Redis by an earlier deployment cannot outlive the
+switch. The integration suite runs with it off (`test/setup-e2e.ts`) and turns it on around
+its own assertions; a global scheduled `DELETE` is not something you want running in the
+background of a suite whose fixtures are backdated rows.
+
+Deleting is batched (1000 rows per statement) so a first run against a long-lived instance
+never becomes one long transaction holding locks and blocking autovacuum.
 
 ## Upgrading and backups
 

@@ -40,6 +40,52 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   GUEST reading the queue would be handed contact details the product never showed them.
   Expired and already-answered invitations are left out — the list is for rows something can
   still be done to.
+- A data-retention policy, and a nightly job that enforces it. Until now nothing in the
+  product ever deleted a row on its own: expired `Session` rows kept their `ipAddress` and
+  `userAgent` forever, expired `Verification` rows kept the e-mail address that requested
+  them, and `Notification` and `Activity` — the two fastest-growing tables in the schema —
+  grew without a ceiling. A BullMQ job on `REDIS_URL` now runs once a day and deletes expired
+  sessions and verifications (their own `expiresAt` decides), notifications more than
+  `NOTIFICATION_RETENTION_DAYS` past the moment they were **read** (default 90; unread
+  notifications are never deleted, at any age), and activity older than
+  `ACTIVITY_RETENTION_DAYS` (default 365). Either window accepts `0` for "keep forever", and
+  `CLEANUP_ENABLED=false` switches the whole sweep off — checked at the point of deletion, so
+  a job definition left in Redis by an earlier deployment cannot outlive the switch. Deletes
+  are batched at 1000 rows per statement so a first run against a long-lived instance is not
+  one long transaction holding locks and blocking autovacuum. Each run writes one JSON line to
+  stdout carrying the per-table counts and nothing else — no identifiers, no payloads — even
+  when every count is zero, so a job that stops running is visible by its silence. The sweep
+  is deliberately global rather than workspace-scoped, which is the single sanctioned
+  exception to the multi-tenant rule and is argued in the new
+  [ADR 0020](docs/decisions/0020-data-retention.md) along with the choice to delete year-old
+  activity rather than archive or keep it. One index came with it
+  (`Notification_activityId_idx`): `activityId` is `ON DELETE SET NULL`, which Postgres runs
+  per deleted row, so without it each batch of deleted activities meant one sequential scan of
+  the whole notification table per row.
+- The web app now sends the same class of baseline security headers the API already did
+  (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`), via
+  `apps/web/next.config.ts`'s `headers()`. Unlike the API's `default-src 'none'` — it renders
+  no HTML — the web CSP is shaped for a real App Router application: `script-src`/`style-src`
+  allow `'unsafe-inline'`, verified empirically to be required (Next's RSC hydration script and
+  `next-themes`'s FOUC-prevention script are both inline, and Radix/`@dnd-kit` position
+  elements via an inline `style` attribute CSP nonces cannot cover), and `connect-src` names
+  the configured API origin plus its derived `ws(s)` origin so both the REST client and the
+  Socket.io transport keep working. `Permissions-Policy` denies `camera`, `microphone`,
+  `geolocation`, `payment`, `usb`, and `interest-cohort` (FLoC/Topics-API opt-out) — none of
+  which the app ever requests. See `docs/architecture.md#11-security-headers` for the full
+  header table across both processes.
+- Bounded timeouts on the shared database connection pool (`apps/api/src/prisma/database.ts`):
+  `DATABASE_POOL_CONNECTION_TIMEOUT_MS` (default `10000`) caps how long a request waits for a
+  connection once the pool is at `DATABASE_POOL_MAX`, and `DATABASE_STATEMENT_TIMEOUT_MS`
+  (default `30000`) caps how long a single statement may run before Postgres kills it. Neither
+  existed before: `pg`'s own default for the former is `0` (wait forever), so a saturated pool
+  turned into requests that never resolved instead of a clear error, and with no statement cap
+  a runaway query could hold a connection indefinitely. Applied per connection this pool opens,
+  so `prisma migrate deploy`/`dev` and `pnpm db:seed`'s own bulk operations — neither goes
+  through this pool — are unaffected. `DATABASE_POOL_MAX` itself (already the pool's size knob)
+  is now also documented in `.env.example` and `docs/development.md`, which it previously was
+  not. See [docs/development.md#database-connection-pool](docs/development.md#database-connection-pool).
 - Membership revocation — the half of the access lifecycle that was missing. Until now a user
   who joined a workspace could only be removed by deleting the workspace or editing the
   database by hand, and no role could be lowered. Three routes close that:
@@ -175,6 +221,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `secondaryStorage` would. No Redis is still a supported configuration: the counters stay in
   memory and a warning says so. `RATE_LIMIT_ENABLED=false` turns both limiters off for the
   integration suite. See [api-conventions.md](docs/api-conventions.md#rate-limiting).
+- Rate limiting now counts the real client behind a reverse proxy, instead of the proxy's own
+  address for every request. A new `TRUST_PROXY` variable (off by default — safe for a
+  directly-exposed instance) sets Express's `trust proxy`, which both the `ThrottlerGuard`'s
+  default tracker and the access log's new `ip` field read from `req.ip`. Better Auth's own
+  rate limiter turned out not to consult that setting at all — it re-parses
+  `X-Forwarded-For` itself and, without further configuration, accepted a single-value header
+  outright even with no proxy in front of the app, letting a directly-exposed instance's
+  `/auth/*` sign-in limit be bypassed by rotating a fabricated header. It is now pointed at a
+  private header the app stamps with the same Express-resolved address on every request,
+  overwriting anything a client sent, so both routers key on one value computed once. See
+  [api-conventions.md](docs/api-conventions.md#rate-limiting).
 - The API now sends baseline security headers on every response via `helmet`
   (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options`,
   `X-Frame-Options: DENY`, `Referrer-Policy`, and friends). The CSP is API-shaped

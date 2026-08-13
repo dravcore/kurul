@@ -4,6 +4,7 @@ import { organization } from 'better-auth/plugins';
 import { uuidv7 } from 'uuidv7';
 import { PrismaClient } from '../generated/prisma';
 import { loadRootEnv, envString } from '../common/env';
+import { RESOLVED_CLIENT_IP_HEADER } from '../common/trust-proxy';
 import { buildVerificationEmail } from '../mail/mail-templates';
 import { sendMail } from '../mail/send-mail';
 import { createSharedPrismaAdapter, registerPoolConsumer } from '../prisma/database';
@@ -56,6 +57,25 @@ export const auth = betterAuth({
     // locally Better Auth defaults work with credentialed fetch on different ports.
     crossSubDomainCookies: {
       enabled: false,
+    },
+    // Better Auth's rate limiter (`authRateLimitOptions` above) keys its counters by client
+    // IP, resolved by re-parsing headers itself — it never consults Express's `trust proxy`
+    // setting. Left at Better Auth's default (`x-forwarded-for`), that resolution accepts a
+    // single-value header outright even with no `trustedProxies` configured, so a directly
+    // exposed instance — no reverse proxy in front of it at all — is still spoofable through
+    // `/auth/*`: any client can send `X-Forwarded-For: 1.2.3.4`, rotate the value per request,
+    // and walk straight past the per-IP sign-in limit.
+    //
+    // Pointing this at `RESOLVED_CLIENT_IP_HEADER` instead closes that: `configureTrustProxy`
+    // (`common/trust-proxy.ts`) stamps that header, on every request, with Express's own
+    // `req.ip` — the same trust-proxy-aware resolution the Nest `ThrottlerGuard` and the
+    // access log use — and a client cannot influence it because the middleware overwrites
+    // whatever value it finds. No separate `trustedProxies` list is configured here: it would
+    // duplicate `TRUST_PROXY`'s hop-count/CIDR parsing in a second library's format for no
+    // benefit, since by the time Better Auth sees this header the trust decision has already
+    // been made once, by Express, for both routers.
+    ipAddress: {
+      ipAddressHeaders: [RESOLVED_CLIENT_IP_HEADER],
     },
   },
   user: {
