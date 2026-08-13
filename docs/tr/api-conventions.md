@@ -59,6 +59,7 @@ GET    /workspaces/:workspaceId/members/me     # çağıranın kendi üyeliği
 POST   /workspaces/:workspaceId/members/me/leave      # workspace'ten ayrıl (her rol)
 DELETE /workspaces/:workspaceId/members/:userId       # üyeyi çıkar (OWNER/ADMIN)
 PATCH  /workspaces/:workspaceId/members/:userId/role  # üyenin rolünü değiştir (OWNER/ADMIN)
+GET    /workspaces/:workspaceId/invitations     # bekleyen davetlerin cursor sayfası (OWNER/ADMIN)
 POST   /workspaces/:workspaceId/invitations
 DELETE /workspaces/:workspaceId/invitations/:invitationId
 

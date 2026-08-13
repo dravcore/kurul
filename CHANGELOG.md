@@ -9,6 +9,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A **Members** section in Settings — the product can now start the flow it is built around.
+  Every membership endpoint already existed; none of them had a screen, so inviting a teammate
+  meant a `curl` call and the accept page served invitations nobody could send. Settings now
+  carries the whole lifecycle: an email + role invite form, the queue of invitations still
+  waiting to be accepted (with a copy-link control for installs whose outbound mail is not
+  configured yet, and revoke), the roster with role changes and removal, and **Leave
+  workspace** on the signed-in user's own row. What the API refuses, the UI does not offer: a
+  MEMBER sees the roster and no management control at all, an ADMIN sees no menu on an OWNER's
+  row, and OWNER is never an invitable role. The refusals that remain are stated as the move
+  that would work — the last-OWNER `409` reads "This is the only owner. Make someone else an
+  owner first." rather than a generic failure. All copy is catalogued under
+  `app.settings.members.*`.
+- `GET /workspaces/:workspaceId/invitations` — a cursor page of the invitations still awaiting
+  an answer, so an admin can see and withdraw what they sent. OWNER/ADMIN only, unlike the
+  roster beside it: an invited address belongs to someone who has agreed to nothing yet, and a
+  GUEST reading the queue would be handed contact details the product never showed them.
+  Expired and already-answered invitations are left out — the list is for rows something can
+  still be done to.
 - Membership revocation — the half of the access lifecycle that was missing. Until now a user
   who joined a workspace could only be removed by deleting the workspace or editing the
   database by hand, and no role could be lowered. Three routes close that:
