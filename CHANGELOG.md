@@ -62,6 +62,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `geolocation`, `payment`, `usb`, and `interest-cohort` (FLoC/Topics-API opt-out) — none of
   which the app ever requests. See `docs/architecture.md#11-security-headers` for the full
   header table across both processes.
+- Bounded timeouts on the shared database connection pool (`apps/api/src/prisma/database.ts`):
+  `DATABASE_POOL_CONNECTION_TIMEOUT_MS` (default `10000`) caps how long a request waits for a
+  connection once the pool is at `DATABASE_POOL_MAX`, and `DATABASE_STATEMENT_TIMEOUT_MS`
+  (default `30000`) caps how long a single statement may run before Postgres kills it. Neither
+  existed before: `pg`'s own default for the former is `0` (wait forever), so a saturated pool
+  turned into requests that never resolved instead of a clear error, and with no statement cap
+  a runaway query could hold a connection indefinitely. Applied per connection this pool opens,
+  so `prisma migrate deploy`/`dev` and `pnpm db:seed`'s own bulk operations — neither goes
+  through this pool — are unaffected. `DATABASE_POOL_MAX` itself (already the pool's size knob)
+  is now also documented in `.env.example` and `docs/development.md`, which it previously was
+  not. See [docs/development.md#database-connection-pool](docs/development.md#database-connection-pool).
 - Membership revocation — the half of the access lifecycle that was missing. Until now a user
   who joined a workspace could only be removed by deleting the workspace or editing the
   database by hand, and no role could be lowered. Three routes close that:
