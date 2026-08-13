@@ -23,6 +23,36 @@ Kurultay, verisinin ve iş akışının sahibi olmak isteyen ekipler için ticar
 araçlarına (Trello, Linear, Jira) kendi kendine barındırılabilir, AGPL lisanslı bir
 alternatif olmayı hedefliyor.
 
+## Neden Kurultay
+
+Kendi kendine barındırılan bir board seçen ekipler bunu genelde Trello ile değil, diğer
+self-host seçenekleriyle kıyaslar. Bugün o alanın durumu:
+
+| Proje                                                            | Durumu                                                                                                                                        |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Planka](https://github.com/plankanban/planka)                   | Kaynağı görünür ama artık OSI uyumlu açık kaynak değil — "fair-code distributed under the Fair Use License and PLANKA Pro/Enterprise License" |
+| [WeKan](https://github.com/wekan/wekan)                          | Tümüyle açık kaynak (MIT), ücretli katman yok; Meteor tabanlı stack (Meteor 3.5 / Node.js 24)                                                 |
+| [Focalboard](https://github.com/mattermost-community/focalboard) | "This repository is currently not maintained" — geliştirme yalnızca Mattermost eklentisi olarak sürüyor                                       |
+| [Vikunja](https://vikunja.io/pricing/)                           | Çekirdek AGPLv3, ama admin paneli, audit log'ları ve zaman takibi kendi barındırdığınız instance'ta bile yalnız Pro'da                        |
+| [OpenProject](https://www.openproject.org/pricing/)              | GPLv3 Community Edition, Rails tabanlı ve kurumsal ölçekli; bir grup özellik Enterprise'a özel kalıyor                                        |
+
+Kurultay'ın cevabı bilinçli olarak dar:
+
+- **Tek lisans, tek katman.** Kod tabanının tamamı AGPL-3.0, hiçbir şey saklı değil. Ticari
+  model, aynı kodun ikili lisanslanması; ücretli bir özellik sürümü değil
+  ([ADR 0014](docs/tr/decisions/0014-dual-licensing-cla.md)).
+- **Güncel stack, tek compose dosyası.** Next.js 16 / NestJS 11 / PostgreSQL 18, uçtan uca
+  TypeScript, tamamı için `docker compose up --build`.
+- **Realtime ve çok-kiracılılık çekirdekte.** Socket.io board senkronu ve workspace'e
+  scope'lanmış sorgular sonradan eklenmedi, baştan tasarlandı.
+
+Ve `v0.1.0` itibarıyla olmayanlar: task ek dosyaları yok, checklist ve subtask yok, zaman
+takibi yok, public API token'ları ve webhook'lar yok, UI yalnız İngilizce. Ek dosyalar, API
+token'ları, webhook'lar ve ek dil paketleri [MVP ötesi](docs/tr/roadmap.md#mvp-ötesi) altında,
+her biri kendisini bekleten açık soruyla listeli; checklist, subtask ve zaman takibi ise o
+listede hiç yok. Bunlara bugün ihtiyacınız varsa yukarıdaki daha olgun projelerden biri daha
+iyi bir seçim.
+
 ## Özellikler
 
 MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadmap.md):
