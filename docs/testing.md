@@ -191,20 +191,31 @@ on every run, passing or failing.
 
 Every pull request runs, on `develop` and `main` as well:
 
-| Step              | Command                                                                                   |
-| ----------------- | ----------------------------------------------------------------------------------------- |
-| Build shared pkgs | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build` |
-| Lint              | `pnpm lint`                                                                               |
-| Format check      | `pnpm format:check`                                                                       |
-| Typecheck         | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                       |
-| Audit             | `pnpm audit --audit-level high`                                                           |
-| Unit tests (api)  | `pnpm --filter @kurultay/api test:cov`                                                    |
-| Unit tests (web)  | `pnpm --filter @kurultay/web exec vitest run --coverage`                                  |
-| Unit tests (pkgs) | `pnpm --filter "./packages/*" test`                                                       |
-| Integration tests | `pnpm --filter @kurultay/api test:e2e` against Postgres and Redis service containers      |
-| Build             | `pnpm build`                                                                              |
+| Step                | Command                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------- |
+| Build shared pkgs   | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build`   |
+| Lint                | `pnpm lint`                                                                                 |
+| Format check        | `pnpm format:check`                                                                         |
+| Typecheck           | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                         |
+| Audit               | `pnpm audit --audit-level high`                                                             |
+| Unit tests (api)    | `pnpm --filter @kurultay/api test:cov`                                                      |
+| Unit tests (web)    | `pnpm --filter @kurultay/web exec vitest run --coverage`                                    |
+| Unit tests (pkgs)   | `pnpm --filter "./packages/*" test`                                                         |
+| Integration tests   | `pnpm --filter @kurultay/api test:e2e` against Postgres and Redis service containers        |
+| Build               | `pnpm build`                                                                                |
+| **Gate** (required) | `ci-ok` — passes only if `lint`, `test`, and `build` all succeed (not skipped or cancelled) |
 
-All steps must pass before merge. CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on pushes to `develop` and `main`. See [git-strategy.md](git-strategy.md#pull-request-process).
+**All steps must pass before merge.** The gate job (`ci-ok`) is the single required status check
+configured in branch protection — if any upstream job fails, is skipped, or is cancelled, the
+gate fails. This provides two protections:
+
+1. **Robustness**: If a job is renamed, the gate still blocks the PR (a plain `needs` gate
+   would silently pass a missing job).
+2. **Correctness**: If concurrency cancels a job, the gate still fails (without `if: always()`,
+   GitHub would report a cancelled gate as "skipped" = "passed").
+
+CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on pushes to
+`develop` and `main`. See [git-strategy.md](git-strategy.md#pull-request-process).
 
 The workflow file is [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 
