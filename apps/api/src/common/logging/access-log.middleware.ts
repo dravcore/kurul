@@ -10,7 +10,7 @@ import { getRequestId } from './request-id';
  * The field list is deliberately closed. Request bodies, query strings, headers and cookies
  * never appear: this API carries session cookies, invitation tokens and task content, none of
  * which belongs in a log aggregator. What is here is the minimum needed to answer "which
- * request, how did it end, how long did it take, and who made it".
+ * request, how did it end, how long did it take, who made it, and where from".
  */
 export interface AccessLogLine {
   ts: string;
@@ -21,6 +21,7 @@ export interface AccessLogLine {
   status: number;
   durationMs: number;
   userId?: string;
+  ip: string;
 }
 
 // Re-exported so existing importers (and this file's own spec) keep their import path while
@@ -75,6 +76,11 @@ export function createAccessLogMiddleware(write: LogWriter = stdoutWriter) {
         status: res.statusCode,
         durationMs: Math.round(durationMs * 1000) / 1000,
         ...(userId !== undefined ? { userId } : {}),
+        // Express's own trust-proxy-aware resolution (`common/trust-proxy.ts` configures
+        // `app.set('trust proxy', ...)`), not a raw header — unconfigured, this is always the
+        // TCP peer, immune to a client-supplied X-Forwarded-For. Never undefined for a real
+        // socket connection, so unlike userId/requestId it is not conditionally omitted.
+        ip: req.ip ?? 'unknown',
       };
 
       write(JSON.stringify(line));

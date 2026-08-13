@@ -53,7 +53,7 @@ describe('configureApp security headers', () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
-    configureApp(app, { corsOrigin: 'http://localhost:3000' });
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
     await app.init();
   });
 
