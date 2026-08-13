@@ -34,7 +34,7 @@ sit outside `docs/` because GitHub treats them specially.
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
 | [architecture.md](architecture.md)         | Module map, data model, runtime evolution                                                                   |
 | [tech-stack.md](tech-stack.md)             | Stack choices and rationale (pins: see root / app `package.json`)                                           |
-| [development.md](development.md)           | Env setup, Compose, pnpm scripts, day-to-day                                                                |
+| [development.md](development.md)           | Env setup, Compose, pnpm scripts, day-to-day, upgrade & rollback                                            |
 | [coding-standards.md](coding-standards.md) | TS / NestJS / Next.js conventions                                                                           |
 | [design.md](design.md)                     | UI/UX language                                                                                              |
 | [git-strategy.md](git-strategy.md)         | Git Flow, Conventional Commits, releases                                                                    |
