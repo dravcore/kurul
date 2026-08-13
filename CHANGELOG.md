@@ -7,6 +7,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `GET /health/ready` — an unauthenticated readiness probe that checks Postgres (`SELECT 1`)
+  and Redis (`PING`) in parallel, each bounded by a 2s timeout so a wedged dependency answers
+  `down` instead of leaving the probe hanging. `200` when the instance can serve traffic,
+  `503` when it cannot, with the same `{ status, checks }` body either way so the caller can
+  see which dependency failed. Redis reports `skipped` where `REDIS_URL` is unset, which is a
+  supported single-instance configuration and does not make the instance unready. `GET /health`
+  stays exactly as it was — liveness, dependency-free, so a dependency blip never gets a
+  healthy API restarted.
+
 ### Changed
 
 - Docs consistency pass: Node ≥24, i18n status, squash policy, archive links,
