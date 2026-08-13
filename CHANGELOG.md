@@ -103,6 +103,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   through this pool — are unaffected. `DATABASE_POOL_MAX` itself (already the pool's size knob)
   is now also documented in `.env.example` and `docs/development.md`, which it previously was
   not. See [docs/development.md#database-connection-pool](docs/development.md#database-connection-pool).
+- Observability baseline — until now a production failure or outage was only discovered when
+  a user complained, and container logs grew without a ceiling until the disk filled. Three
+  pieces close that, none of which is a metrics stack:
+  - **Error tracking via Sentry, off by default.** With `SENTRY_DSN` (API) and
+    `NEXT_PUBLIC_SENTRY_DSN` (web) blank — the shipped default — neither app loads the SDK at
+    all: no initialization, no global handlers, no outbound connection, and no Sentry chunk
+    requested by a visitor's browser. Turning it on is a deliberate, documented choice, and
+    self-hosted Sentry works the same way. The API reports 5xx only (4xx client errors are
+    noise, and are already in the access log), every event carries the request's `requestId`
+    tag so a Sentry issue and a log line join with one grep, and `release`/`environment` are
+    settable via `SENTRY_RELEASE`/`SENTRY_ENVIRONMENT`. `sendDefaultPii` is off and a
+    `beforeSend` hook additionally strips cookie/authorization headers, cookies, request
+    bodies, query strings, and everything on `user` except the opaque id. Performance tracing
+    and Session Replay are pinned off and not exposed as settings. The web build plugin runs
+    only when a DSN is configured and uploads source maps only when `SENTRY_AUTH_TOKEN` is
+    also present, so a token-less build never fails.
+  - **Log rotation on every compose service.** Docker's `json-file` driver is unbounded by
+    default; every service in `docker-compose.yml` and `docker-compose.dev.yml` now caps at
+    3 files × 10 MB via a shared `x-logging` anchor. This applies at container *creation*, so
+    an existing deployment needs `docker compose up -d` (not a plain restart) to pick it up.
+  - **An uptime-monitoring procedure** in `docs/development.md#observability`: which endpoint
+    to poll (`/health/ready`, not `/health` — the liveness probe stays green while the
+    database is down, by design), at what interval and threshold, and how to verify the alert
+    actually fires. The monitor itself lives outside this repository, in a free external
+    service.
 - Membership revocation — the half of the access lifecycle that was missing. Until now a user
   who joined a workspace could only be removed by deleting the workspace or editing the
   database by hand, and no role could be lowered. Three routes close that:

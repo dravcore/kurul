@@ -1,7 +1,30 @@
+# Log rotation, applied to every service below via `logging: *logging`.
+#
+# Docker's default `json-file` driver has **no size limit**: container stdout accumulates in
+# /var/lib/docker/containers until the disk fills, and a full disk takes the whole host down —
+# a second outage vector on top of whatever produced the log volume in the first place. This
+# API writes one JSON line per request (`apps/api/src/common/logging/access-log.middleware.ts`),
+# so the volume scales with traffic and there is no natural ceiling.
+#
+# 10 MB × 3 files ≈ 30 MB per container, ~180 MB for the stack — enough history to debug an
+# incident from yesterday, small enough that no self-hoster has to think about it. It applies
+# at container *creation*, so an existing deployment needs `docker compose up -d` (which
+# recreates containers) for it to take effect, not just a restart.
+#
+# A YAML anchor rather than six copies: a rotation policy that drifts between services is
+# worse than none, because the one service you forgot is the one that fills the disk. Compose
+# merges `<<`-free anchors like this one by value, so `logging: *logging` is exact.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
 services:
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kurultay}
       # No baked-in default: compose fails loudly instead of initializing (or, on every later
@@ -23,6 +46,7 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
+    logging: *logging
     environment:
       # Optional, unlike POSTGRES_PASSWORD above: this Redis instance holds cache entries,
       # sessions, rate-limit counters and the notification queue — no board data (see
@@ -67,6 +91,7 @@ services:
   # table", not "the disk died". Copy the volume off-host as well; see the same section.
   backup:
     image: postgres:18-alpine
+    logging: *logging
     environment:
       # postgres:5432 is the in-network address, same as the api/migrate services above —
       # unrelated to the host .env DATABASE_URL used by the dev loop.
@@ -95,6 +120,10 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
       target: migrate
+    # Included even though this one is short-lived: its container is reused on every
+    # `up`, so its log file accumulates one migration run's output per deploy forever.
+    # Uniformity also means nobody has to re-derive which services were exempt.
+    logging: *logging
     environment:
       # postgres:5432 (not localhost) — this is the in-network address, unrelated to
       # whatever DATABASE_URL a developer has in their host .env for the dev loop.
@@ -111,6 +140,7 @@ services:
     # reboot or daemon restart, not only after an in-container crash. `migrate` is the
     # deliberate exception: it is a one-shot job that must stay exited.
     restart: unless-stopped
+    logging: *logging
     environment:
       # postgres:5432 / redis:6379 are the in-network addresses; they're intentionally not
       # sourced from the host .env, whose DATABASE_URL/REDIS_URL point at localhost for the
@@ -135,6 +165,14 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_SECURE: ${SMTP_SECURE:-false}
       MAIL_FROM: ${MAIL_FROM:-}
+      # Error tracking. Blank — the default — means the API never loads the Sentry SDK at
+      # all: no third-party connection is opened by an install that did not ask for one
+      # (apps/api/src/common/observability/sentry.ts). Unlike the web variables below this
+      # is read at container *start*, so switching it on is a restart, not a rebuild.
+      # See docs/development.md#observability.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
     ports:
       - '4000:4000'
     # /health/ready probes DB + Redis (200 only when both respond within 2s), so "healthy"
@@ -163,7 +201,16 @@ services:
         # Next.js inlines NEXT_PUBLIC_* at build time, so it must be a build arg, not just a
         # runtime environment variable — see apps/web/Dockerfile.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+        # Same build-time rule as NEXT_PUBLIC_API_URL: blank (the default) means the Sentry
+        # chunk is never requested by a visitor's browser, and turning error tracking on or
+        # off requires `docker compose build web`, not just a restart. Deliberately separate
+        # from the API's SENTRY_DSN — a browser DSN is public by construction (it ships in
+        # the bundle) and should point at a browser-scoped Sentry project.
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-}
+        NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-}
     restart: unless-stopped
+    logging: *logging
     ports:
       - '3000:3000'
     # busybox wget follows 3xx redirects, so a redirecting root page still counts as healthy;

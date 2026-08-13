@@ -2,6 +2,8 @@ import { ArgumentsHost, HttpException, HttpStatus, Logger, ValidationPipe } from
 import { IsInt, IsNotEmpty, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AllExceptionsFilter } from './all-exceptions.filter';
+import { Prisma } from '../../generated/prisma';
+import { initSentry, resetSentryForTesting } from '../observability/sentry';
 import { validationExceptionFactory } from '../validation/validation-exception.factory';
 
 interface CapturedResponse {
@@ -354,6 +356,128 @@ describe('AllExceptionsFilter', () => {
 
       const problem = body(response);
       expect('requestId' in problem).toBe(false);
+    });
+  });
+
+  /**
+   * The signal/noise policy documented on `reportFailure`. These assertions are the reason a
+   * self-hoster's Sentry quota stays readable: without them, a refactor that moved the
+   * capture one level up (to the top of `catch`) would ship every `404` and `403` and nobody
+   * would notice until the free tier ran out.
+   */
+  describe('error tracking', () => {
+    beforeEach(() => {
+      resetSentryForTesting();
+    });
+
+    afterEach(() => {
+      resetSentryForTesting();
+    });
+
+    /** Installs a fake SDK through the loader seam and returns its `captureException` spy. */
+    async function enableFakeSentry(): Promise<{
+      captureException: jest.Mock;
+      scope: { setTag: jest.Mock; setContext: jest.Mock };
+    }> {
+      const scope = { setTag: jest.fn(), setContext: jest.fn() };
+      const captureException = jest.fn();
+      const api = {
+        init: jest.fn(),
+        captureException,
+        close: jest.fn(() => Promise.resolve(true)),
+        withScope: (callback: (s: typeof scope) => void) => {
+          callback(scope);
+        },
+      } as unknown as typeof import('@sentry/node');
+
+      process.env.SENTRY_DSN = 'https://k@o.ingest.sentry.io/1';
+      try {
+        await initSentry(() => Promise.resolve(api));
+      } finally {
+        delete process.env.SENTRY_DSN;
+      }
+
+      return { captureException, scope };
+    }
+
+    it.each<[string, number]>([
+      ['400', HttpStatus.BAD_REQUEST],
+      ['401', HttpStatus.UNAUTHORIZED],
+      ['403', HttpStatus.FORBIDDEN],
+      ['404', HttpStatus.NOT_FOUND],
+      ['409', HttpStatus.CONFLICT],
+      ['429', HttpStatus.TOO_MANY_REQUESTS],
+    ])('does not report a %s — client errors are noise, not signal', async (_label, status) => {
+      const { captureException } = await enableFakeSentry();
+      const { host } = createHost();
+
+      filter.catch(new HttpException('nope', status), host);
+
+      expect(captureException).not.toHaveBeenCalled();
+    });
+
+    it('reports a 500 HttpException with the request id attached', async () => {
+      const { captureException, scope } = await enableFakeSentry();
+      const { host } = createHost();
+      const exception = new HttpException('upstream broke', HttpStatus.INTERNAL_SERVER_ERROR);
+
+      filter.catch(exception, host);
+
+      expect(captureException).toHaveBeenCalledWith(exception);
+      expect(scope.setTag).toHaveBeenCalledWith('requestId', REQUEST_ID);
+      expect(scope.setTag).toHaveBeenCalledWith('http.status_code', '500');
+    });
+
+    it('reports an unmapped Prisma error but not one that maps onto a 4xx', async () => {
+      const { captureException } = await enableFakeSentry();
+
+      filter.catch(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '7.0.0',
+        }),
+        createHost().host,
+      );
+      expect(captureException).not.toHaveBeenCalled();
+
+      filter.catch(
+        new Prisma.PrismaClientKnownRequestError('Transaction failed', {
+          code: 'P2034',
+          clientVersion: '7.0.0',
+        }),
+        createHost().host,
+      );
+      expect(captureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports a plain Error', async () => {
+      const { captureException } = await enableFakeSentry();
+      const error = new Error('database unreachable');
+
+      filter.catch(error, createHost().host);
+
+      expect(captureException).toHaveBeenCalledWith(error);
+    });
+
+    it('wraps a non-Error throw so Sentry has something to group by', async () => {
+      const { captureException } = await enableFakeSentry();
+
+      filter.catch('boom', createHost().host);
+
+      const [reported] = captureException.mock.calls[0] as [unknown];
+      expect(reported).toBeInstanceOf(Error);
+      expect((reported as Error).message).toBe('Non-Error exception thrown: boom');
+    });
+
+    it('still logs everything it always logged when error tracking is off', () => {
+      // The default install: no DSN, so `captureServerError` no-ops and the log line — the
+      // only observability a self-hoster gets out of the box — must be unchanged.
+      filter.catch(new Error('database unreachable'), createHost().host);
+
+      expect(logError).toHaveBeenCalledWith(
+        `database unreachable (requestId=${REQUEST_ID})`,
+        expect.any(String),
+      );
     });
   });
 });

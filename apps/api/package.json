@@ -27,6 +27,7 @@
     "@prisma/adapter-pg": "^7.0.0",
     "@prisma/client": "^7.0.0",
     "@prisma/client-runtime-utils": "^7.9.1",
+    "@sentry/node": "^10.70.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "better-auth": "1.6.26",
     "bullmq": "^6.1.0",

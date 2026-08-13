@@ -1,7 +1,19 @@
+# Same rotation policy as docker-compose.yml (see there for the full reasoning), and applied
+# here for the same reason it is applied there: every service in this file carries
+# `restart: unless-stopped`, so these are the containers a developer starts once and leaves
+# running for months. A laptop's disk fills exactly as a server's does, and an unbounded
+# Postgres log on a developer machine is a support question nobody enjoys.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
 services:
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kurultay}
       # Same fail-loud requirement as docker-compose.yml (see there for why): no baked-in
@@ -21,6 +33,7 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
+    logging: *logging
     # REDIS_PASSWORD is optional here too — see docker-compose.yml for the reasoning. The
     # host port below means anything on the host can already reach this Redis at
     # localhost:6379 regardless, so a password mainly matters once other containers share
@@ -57,6 +70,7 @@ services:
   mailpit:
     image: axllent/mailpit:latest
     restart: unless-stopped
+    logging: *logging
     ports:
       - '8025:8025' # Web UI
       - '1025:1025' # SMTP

@@ -19,6 +19,7 @@
     "@dnd-kit/utilities": "3.2.2",
     "@kurultay/auth-access": "workspace:*",
     "@kurultay/shared-types": "workspace:*",
+    "@sentry/nextjs": "^10.70.0",
     "better-auth": "1.6.26",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

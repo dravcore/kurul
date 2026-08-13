@@ -8,6 +8,18 @@ FROM base AS build
 # does for the API) would bake in the fallback below instead of the real value.
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Error tracking, same build-time rule and the same empty default. Empty is not merely
+# "Sentry sends nothing": `instrumentation-client.ts` guards the dynamic import on this
+# value, so an empty DSN means the SDK chunk is never emitted into a loaded path and a
+# visitor's browser makes no third-party request. `SENTRY_AUTH_TOKEN` is intentionally *not*
+# a build arg — see the source-map note in apps/web/next.config.ts and
+# docs/development.md#observability.
+ARG NEXT_PUBLIC_SENTRY_DSN=
+ARG NEXT_PUBLIC_SENTRY_ENVIRONMENT=
+ARG NEXT_PUBLIC_SENTRY_RELEASE=
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
+ENV NEXT_PUBLIC_SENTRY_ENVIRONMENT=$NEXT_PUBLIC_SENTRY_ENVIRONMENT
+ENV NEXT_PUBLIC_SENTRY_RELEASE=$NEXT_PUBLIC_SENTRY_RELEASE
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml prisma.config.ts ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/

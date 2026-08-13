@@ -19,6 +19,7 @@ How to set up a Kurultay development environment and work in it day to day.
 - [Data retention](#data-retention)
 - [Upgrading and backups](#upgrading-and-backups)
 - [Rollback](#rollback)
+- [Observability](#observability)
 - [Day-to-day loop](#day-to-day-loop)
 - [Troubleshooting](#troubleshooting)
 
@@ -110,6 +111,17 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `DATABASE_POOL_MAX`                   | `20`                                                                | Max simultaneous connections the shared `pg` pool opens to Postgres — see [Database connection pool](#database-connection-pool)                                                                                          |
 | `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                             | How long a request waits for a pool connection before failing, once all `DATABASE_POOL_MAX` are busy — see [Database connection pool](#database-connection-pool)                                                         |
 | `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                             | How long a single SQL statement may run before Postgres kills it — see [Database connection pool](#database-connection-pool)                                                                                             |
+| `SENTRY_DSN`                          | _(blank)_                                                           | API error tracking. **Blank = off, and off means the SDK is never loaded** — see [Observability](#observability)                                                                                                         |
+| `SENTRY_ENVIRONMENT`                  | _(blank)_ / `production`                                            | Label on API events; blank falls back to `NODE_ENV`. Set it if staging and production run the same image                                                                                                                 |
+| `SENTRY_RELEASE`                      | _(blank)_ / `v0.2.0`                                                | Version label on API events; best set to the deployed tag. Blank sends none                                                                                                                                              |
+| `NEXT_PUBLIC_SENTRY_DSN`              | _(blank)_                                                           | Web error tracking, same opt-in rule — **baked at build time**, so rebuild the web image after changing it                                                                                                               |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(blank)_ / `production`                                            | `SENTRY_ENVIRONMENT`'s web counterpart, also build-time                                                                                                                                                                  |
+| `NEXT_PUBLIC_SENTRY_RELEASE`          | _(blank)_ / `v0.2.0`                                                | `SENTRY_RELEASE`'s web counterpart, also build-time                                                                                                                                                                      |
+
+`SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` are read only by `next build` when
+uploading source maps, and only when they are set; they are absent from `.env.example`
+because a build without them succeeds silently. See
+[Observability](#observability).
 
 `.env.example` also carries `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
 `REDIS_PASSWORD`, `BACKUP_INTERVAL`, and `BACKUP_KEEP`. All six are **compose-only** —
@@ -724,6 +736,149 @@ forward-fix migration from option 1 above), bump the patch version, PR into `mai
 back-merge to `develop`, then upgrade production onto the new tag — which is also what ends
 the rollback. If the bad release was `v0.2.0` and production is parked on `v0.1.0`, the
 hotfix ships as `v0.2.1`; do not stay parked on the old tag longer than it takes to ship it.
+
+## Observability
+
+Three signals, three destinations. Nothing here is a metrics stack — no Prometheus, no
+Grafana, no log shipper. At Kurultay's scale the question worth answering is "did something
+break, and did anyone notice", and that needs exactly this much:
+
+| Signal                   | Where it goes                                             | Configured in                                   |
+| ------------------------ | --------------------------------------------------------- | ----------------------------------------------- |
+| Request and process logs | container stdout → Docker `json-file`, capped and rotated | `docker-compose.yml` (`x-logging`)              |
+| Unhandled errors (5xx)   | Sentry, **only if you configure a DSN**                   | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`         |
+| The instance being down  | an external uptime monitor polling `/health/ready`        | your monitor's dashboard — nothing in this repo |
+
+The three join up on one identifier. Every request gets an `X-Request-Id` (reused from an
+upstream proxy when it sends one, minted as a UUIDv7 otherwise); it is echoed to the client,
+written into the JSON access-log line, appended to the server-side stack trace, and — when
+error tracking is on — attached to the Sentry event as a searchable `requestId` tag. A user
+reporting "it broke, the page said `0198e2c1-…`" is one `grep` and one Sentry search away
+from the exact failure.
+
+### Logs
+
+Both apps log to stdout; Docker collects it. `docker compose logs -f api` reads it back.
+
+The API writes one JSON object per finished request — `ts`, `level`, `requestId`, `method`,
+`path`, `status`, `durationMs`, `userId`. That field list is closed on purpose: request
+bodies, query strings, headers and cookies are never logged, because this API carries session
+cookies, invitation tokens and task content.
+
+Every service in both compose files caps its logs at **3 files × 10 MB** (`x-logging` at the
+top of `docker-compose.yml`). Docker's `json-file` default is _unbounded_, and a full disk is
+its own outage — one this stack could reach on its own, since the access log grows with
+traffic. The setting is applied when a container is **created**, so an existing deployment
+needs a `docker compose up -d` (which recreates containers) for it to take effect; a plain
+`restart` will not do it. Verify with:
+
+```bash
+docker inspect kurultay-api-1 --format '{{json .HostConfig.LogConfig}}'
+# {"Type":"json-file","Config":{"max-file":"3","max-size":"10m"}}
+```
+
+### Error tracking (Sentry) — off by default
+
+Kurultay ships with error tracking **disabled**, and disabled means the SDK is never loaded:
+no initialization, no global handlers, no outbound connection, and on the web side no Sentry
+chunk requested by the visitor's browser. Self-hosted software that quietly opens a telemetry
+pipeline nobody asked for is not something this project ships; leaving the DSNs blank is a
+supported, permanent configuration.
+
+To turn it on, set the DSNs in `.env`:
+
+```bash
+SENTRY_DSN=https://<key>@<org>.ingest.sentry.io/<project>              # API
+NEXT_PUBLIC_SENTRY_DSN=https://<key>@<org>.ingest.sentry.io/<project>  # web
+SENTRY_ENVIRONMENT=production            # optional; falls back to NODE_ENV
+SENTRY_RELEASE=v0.2.0                    # optional; set it to the tag you deployed
+```
+
+then `docker compose up -d --build web && docker compose up -d api`. The API reads its DSN at
+container start, so a restart is enough. The web DSN is a `NEXT_PUBLIC_*` value, which Next.js
+inlines at **build** time — the web image must be rebuilt for a change to take effect, exactly
+like `NEXT_PUBLIC_API_URL`.
+
+Use **two Sentry projects**, one per app. The browser DSN is compiled into JavaScript every
+visitor downloads, so it is public by construction; it should not be the same DSN your server
+uses. Self-hosted Sentry works the same way — the DSN just points at your own host.
+
+**What is reported, and what is not.** The API reports 5xx and only 5xx: an unmapped Prisma
+error, a bug that threw, a `throw` of something that is not an `Error`. Client errors — 400,
+401, 403, 404, 409, 429 — are never sent. They are the API working as designed, they are
+already counted in the access log, and shipping thousands of them a month is how an alerting
+channel stops being read.
+
+**What leaves the process.** `sendDefaultPii` is off, and a `beforeSend` hook strips, on both
+sides:
+
+- the `cookie`, `set-cookie`, `authorization` and `proxy-authorization` headers — a captured
+  session cookie is a session handed to anyone who can read the Sentry project;
+- all cookies, request/response bodies, and query strings (`?q=` carries search terms, which
+  are user content);
+- everything on `user` except `id` — no email, no username, no IP address. The `id` is an
+  opaque UUIDv7, the same one the access log already writes.
+
+What is kept: the exception type, message and stack; the request method and route path; the
+`requestId` tag; and `user.id`. **Performance tracing and Session Replay are pinned off**
+(`tracesSampleRate: 0`, both replay rates `0`) and are not exposed as settings — replay would
+ship the rendered DOM, meaning every task title and comment on screen, and tracing would need
+the SDK preloaded before the app boots, which is incompatible with "not loaded unless you
+asked for it".
+
+**Source maps.** The Sentry build plugin runs only when `NEXT_PUBLIC_SENTRY_DSN` is set, and
+even then it uploads nothing unless `SENTRY_AUTH_TOKEN` is also present — so a build without a
+token never fails and never warns. Without upload, browser stack traces stay minified; set
+`SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` at build time for readable ones. The
+plugin's own build-time telemetry is disabled unconditionally.
+
+### Uptime monitoring — set this up, it is the one that catches an outage
+
+Restart policies bring a crashed container back, but nothing tells you when the host itself is
+down, the disk filled, or Postgres stopped accepting connections. An external monitor is the
+only signal that survives the machine it is watching, and the free tier of any of them is
+enough.
+
+**Monitor `/health/ready`, not `/health`.** They answer different questions:
+
+| Endpoint        | Question                                                                               | Behaviour                                                               |
+| --------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `/health`       | Is the process up and answering HTTP?                                                  | Static `{"status":"ok"}` — touches nothing. Always 200 if Node is alive |
+| `/health/ready` | Can this instance actually serve requests — is Postgres reachable, is Redis answering? | `200` with a `checks` breakdown, or `503` when a dependency is down     |
+
+`/health` is a liveness probe: it is what an orchestrator uses to decide whether restarting
+the process would help, and it deliberately stays green while the database is on fire, because
+a restart cannot heal the database. Monitoring it would tell you the API is "up" during an
+outage in which no user can load a board. `/health/ready` is the one that goes red when the
+product is actually broken, and its response body names the dependency that failed. Both are
+public (no auth) and exempt from rate limiting, so a monitor cannot throttle itself into a
+false alarm.
+
+Setup, with [UptimeRobot](https://uptimerobot.com) or
+[healthchecks.io](https://healthchecks.io) as examples — any monitor that can poll a URL and
+send email works:
+
+1. Create an **HTTP(s) monitor** for `https://<your-host>/health/ready` (or `:4000/health/ready`
+   if the API is not behind a reverse proxy yet).
+2. **Interval: 5 minutes.** Fast enough that a nightly outage is caught before morning, slow
+   enough to stay inside every free tier.
+3. **Failure threshold: 2 consecutive failures** before alerting — one missed poll during a
+   deploy or a `docker compose up -d` is not an incident, and an alert channel that cries wolf
+   gets muted.
+4. **Expected status: 200.** A `503` from `/health/ready` is a real dependency failure and must
+   count as down; do not widen the accepted range to "any 2xx/3xx/5xx".
+5. **Timeout: 10 seconds.** The readiness probe bounds its own dependency checks at ~2s, so
+   anything slower is the network or a wedged process.
+6. Attach an **email alert contact** and enable the "back up" notification too — knowing when
+   it recovered is half of knowing what happened.
+7. **Trigger it once on purpose** and confirm the mail arrives: `docker compose stop postgres`,
+   wait for two intervals, expect a red alert, then `docker compose start postgres` and expect
+   the recovery mail. An alerting setup that has never fired is a hypothesis, not a safeguard.
+
+If the API is not yet reachable from the internet, healthchecks.io's _push_ model is the
+alternative: it alerts when it **stops** hearing from you, so a host-side cron
+(`*/5 * * * * curl -fsS localhost:4000/health/ready && curl -fsS <ping-url>`) covers a private
+deployment without exposing anything.
 
 ## Day-to-day loop
 
