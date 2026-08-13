@@ -197,6 +197,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `secondaryStorage` would. No Redis is still a supported configuration: the counters stay in
   memory and a warning says so. `RATE_LIMIT_ENABLED=false` turns both limiters off for the
   integration suite. See [api-conventions.md](docs/api-conventions.md#rate-limiting).
+- Rate limiting now counts the real client behind a reverse proxy, instead of the proxy's own
+  address for every request. A new `TRUST_PROXY` variable (off by default — safe for a
+  directly-exposed instance) sets Express's `trust proxy`, which both the `ThrottlerGuard`'s
+  default tracker and the access log's new `ip` field read from `req.ip`. Better Auth's own
+  rate limiter turned out not to consult that setting at all — it re-parses
+  `X-Forwarded-For` itself and, without further configuration, accepted a single-value header
+  outright even with no proxy in front of the app, letting a directly-exposed instance's
+  `/auth/*` sign-in limit be bypassed by rotating a fabricated header. It is now pointed at a
+  private header the app stamps with the same Express-resolved address on every request,
+  overwriting anything a client sent, so both routers key on one value computed once. See
+  [api-conventions.md](docs/api-conventions.md#rate-limiting).
 - The API now sends baseline security headers on every response via `helmet`
   (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options`,
   `X-Frame-Options: DENY`, `Referrer-Policy`, and friends). The CSP is API-shaped

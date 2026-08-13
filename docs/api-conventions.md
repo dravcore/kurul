@@ -304,12 +304,15 @@ Each finished request also writes a single-line JSON access log to stdout:
   "status": 200,
   "durationMs": 15.444,
   "userId": "0198e2c1-9a11-7c40-8f2b-1d3e5a7c9b02", // omitted when unauthenticated
+  "ip": "203.0.113.7", // Express's resolved client IP — see TRUST_PROXY below
 }
 ```
 
 That field list is closed. Request bodies, query strings, headers and cookies are never
 logged: the query carries user-supplied filters and search terms, and the headers carry
-session cookies and invitation tokens.
+session cookies and invitation tokens. `ip` is Express's own `req.ip`, not a raw header —
+unconfigured, this is always the TCP peer, so behind an unconfigured reverse proxy it is the
+proxy's address for every request. See `TRUST_PROXY` below.
 
 ## Rate limiting
 
@@ -335,10 +338,22 @@ it. Better Auth's counters live in Redis when `REDIS_URL` is set — shared acro
 surviving restarts — and in process memory otherwise, which is a supported single-instance
 configuration. The Nest throttler's counters are always per-instance.
 
-Behind a reverse proxy, budgets are only per-client if the proxy's client IP reaches the app:
-configure `trust proxy` on Express and `advanced.ipAddress.ipAddressHeaders` for Better Auth,
-and only for headers your proxy actually sets — trusting a spoofable header hands every
-client an unlimited budget.
+Both limiters key on the same resolved client IP, driven by one setting: `TRUST_PROXY`
+(unset/`false` by default). Off, the app trusts nothing about a request beyond the raw TCP
+connection — `req.ip` is always the socket peer, and any `X-Forwarded-For` a client sends is
+ignored outright, which is what makes a directly-exposed instance safe from a client spoofing
+its way into its own rate-limit bucket. Behind a reverse proxy (Caddy/Traefik terminating TLS
+in front of the app), leaving it off means every request looks like it came from the proxy —
+one shared budget for every real client, and the access log's `ip` field is equally useless.
+Set `TRUST_PROXY` to the hop count (`1` for a single proxy) or the proxy's IP/CIDR, and Express
+resolves the real client from `X-Forwarded-For` the same way for both routers. Better Auth
+never consults this setting on its own — it re-parses `X-Forwarded-For` itself and would
+otherwise accept a spoofed single-value header even with no proxy in front of the app at all —
+so `auth/auth.ts` instead points Better Auth's `advanced.ipAddress.ipAddressHeaders` at a
+private header the app stamps with the same Express-resolved address on every request,
+overwriting anything a client sent. `TRUST_PROXY=true` trusts the entire forwarded chain with
+no verification and must only be used when the API is unreachable except through the proxy —
+on a directly-exposed instance it hands every attacker an unlimited budget.
 
 `RATE_LIMIT_ENABLED=false` turns both limiters off. It exists for the integration suite,
 which drives hundreds of requests per route from one address; a deployment that sets it has
