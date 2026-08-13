@@ -11,10 +11,10 @@
  *
  * Only the endpoints the web client actually calls are mirrored here. A shape nothing imports
  * buys no type safety and silently drifts from the DTO it claims to mirror, so the entry is
- * added with the first caller — `PATCH /labels/:labelId`, `PATCH /workspaces/:workspaceId` and
- * `POST /workspaces/:workspaceId/invitations` exist on the server but have no UI yet.
+ * added with the first caller — `PATCH /labels/:labelId` and `PATCH /workspaces/:workspaceId`
+ * exist on the server but have no UI yet.
  */
-import type { ColumnCategory, LabelColorSlot, Priority } from './enums.js';
+import type { ColumnCategory, LabelColorSlot, MemberRole, Priority } from './enums.js';
 import type { Locale } from './locales.js';
 
 /**
@@ -126,4 +126,30 @@ export interface CreateLabelRequest {
 export interface CreateWorkspaceRequest {
   name: string;
   slug: string;
+}
+
+/**
+ * `POST /workspaces/:workspaceId/invitations`
+ *
+ * `role` stays the full `MemberRole` union even though `CreateInvitationDto` rejects `OWNER`
+ * outright (`@IsNotIn`): ownership is handed to someone who is already a member, never mailed
+ * to an address that has not accepted anything yet. Narrowing it here would move that rule
+ * into the type system, where the client could no longer see — or explain — the `400` the
+ * server answers with. Same division as everywhere else in this file: shape here, constraints
+ * on the server.
+ */
+export interface CreateInvitationRequest {
+  email: string;
+  role: MemberRole;
+}
+
+/**
+ * `PATCH /workspaces/:workspaceId/members/:userId/role`
+ *
+ * `OWNER` *is* reachable here — promotion is how ownership is transferred — but only for a
+ * caller who is already an OWNER, which is a question about the caller and not about the
+ * body, so it is answered by `WorkspaceMemberService` with a `403`.
+ */
+export interface UpdateMemberRoleRequest {
+  role: MemberRole;
 }

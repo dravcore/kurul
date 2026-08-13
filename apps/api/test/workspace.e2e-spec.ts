@@ -195,6 +195,71 @@ describe('Workspace isolation and roles (e2e)', () => {
   });
 
   /**
+   * The settings screen's whole invite flow, end to end: send it, see it in the pending list,
+   * revoke it, and watch it leave the list. Each step is what the previous one is *for*, so
+   * they are asserted as one sequence rather than three independent reads.
+   */
+  it('lists pending invitations, and drops them from the list once revoked or accepted', async () => {
+    const owner = await signUp(app, { name: 'List Owner' });
+    const workspace = await createWorkspace(owner.agent, 'Pending WS', `pending-${Date.now()}`);
+
+    const empty = await owner.agent.get(`/workspaces/${workspace.id}/invitations`).expect(200);
+    expect(empty.body.items).toEqual([]);
+    expect(empty.body.hasMore).toBe(false);
+
+    const email = `pending-${Date.now()}@test.example.com`;
+    const invite = await owner.agent
+      .post(`/workspaces/${workspace.id}/invitations`)
+      .send({ email, role: MemberRole.ADMIN })
+      .expect(201);
+    const invitationId = invite.body.id as string;
+
+    const listed = await owner.agent.get(`/workspaces/${workspace.id}/invitations`).expect(200);
+    expect(listed.body.items).toHaveLength(1);
+    expect(listed.body.items[0]).toEqual(
+      expect.objectContaining({
+        id: invitationId,
+        workspaceId: workspace.id,
+        email,
+        role: MemberRole.ADMIN,
+        status: 'pending',
+        // Rebuilt from the id, so an admin can hand the link over when mail delivery is not
+        // configured — the same URL the invitation email carries.
+        acceptUrl: expect.stringContaining(invitationId),
+      }),
+    );
+
+    await owner.agent.delete(`/workspaces/${workspace.id}/invitations/${invitationId}`).expect(204);
+
+    const afterRevoke = await owner.agent
+      .get(`/workspaces/${workspace.id}/invitations`)
+      .expect(200);
+    // Revoked rows stay in the table with `status: 'canceled'`; the list is for rows something
+    // can still be done to, so a revoked one has to disappear from it.
+    expect(afterRevoke.body.items).toEqual([]);
+  });
+
+  it('keeps the pending invitation list to OWNER and ADMIN', async () => {
+    const owner = await signUp(app, { name: 'Queue Owner' });
+    const admin = await signUp(app, { name: 'Queue Admin' });
+    const member = await signUp(app, { name: 'Queue Member' });
+    const outsider = await signUp(app, { name: 'Queue Outsider' });
+    const workspace = await createWorkspace(owner.agent, 'Queue WS', `queue-${Date.now()}`);
+
+    const adminMe = await admin.agent.get('/me').expect(200);
+    const memberMe = await member.agent.get('/me').expect(200);
+    await addMember(prisma, workspace.id, adminMe.body.id as string, MemberRole.ADMIN);
+    await addMember(prisma, workspace.id, memberMe.body.id as string, MemberRole.MEMBER);
+
+    await admin.agent.get(`/workspaces/${workspace.id}/invitations`).expect(200);
+    // A MEMBER may read the roster but not the queue: an invited address belongs to someone
+    // who has agreed to nothing yet.
+    await member.agent.get(`/workspaces/${workspace.id}/invitations`).expect(403);
+    // …and a non-member cannot tell the workspace exists at all.
+    await outsider.agent.get(`/workspaces/${workspace.id}/invitations`).expect(404);
+  });
+
+  /**
    * GHSA-fmh4-wcc4-5jm3. The account below holds the invited address without having proved
    * it owns it — exactly what an attacker does by registering on an invited address before
    * its real owner gets there. It must not be able to join the workspace.

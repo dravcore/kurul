@@ -335,3 +335,87 @@ describe('WorkspaceInvitationService invitation error mapping', () => {
     expect(api.acceptInvitation).not.toHaveBeenCalled();
   });
 });
+
+describe('WorkspaceInvitationService.listPendingInvitations', () => {
+  /** A stored row as Prisma hands it back, before the service maps it to a DTO. */
+  function storedRow(id: string, role: string | null) {
+    return {
+      id,
+      workspaceId: WORKSPACE_ID,
+      email: EMAIL,
+      role,
+      status: 'pending',
+      expiresAt: new Date('2026-09-01T00:00:00.000Z'),
+    };
+  }
+
+  it('asks only for live, pending rows of this workspace, ordered by id', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([storedRow('inv_1', MemberRole.MEMBER)]);
+
+    const page = await service.listPendingInvitations(WORKSPACE_ID, { limit: 100 });
+
+    const args = prisma.workspaceInvitation.findMany.mock.calls[0]?.[0] as {
+      where: { workspaceId: string; status: string; expiresAt: { gt: Date } };
+      orderBy: { id: string };
+      take: number;
+    };
+    expect(args.where.workspaceId).toBe(WORKSPACE_ID);
+    expect(args.where.status).toBe('pending');
+    // Expired rows are excluded rather than offered as revocable: revoking one changes nothing.
+    expect(args.where.expiresAt.gt).toBeInstanceOf(Date);
+    expect(args.orderBy).toEqual({ id: 'asc' });
+    // `limit + 1` is the probe that answers `hasMore` without a second count query.
+    expect(args.take).toBe(101);
+    expect(page.items).toHaveLength(1);
+    expect(page.hasMore).toBe(false);
+  });
+
+  it('pages by id and reports the cursor the client should continue from', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([
+      storedRow('inv_1', MemberRole.MEMBER),
+      storedRow('inv_2', MemberRole.ADMIN),
+    ]);
+
+    const page = await service.listPendingInvitations(WORKSPACE_ID, { limit: 1 });
+
+    expect(page.items.map((item) => item.id)).toEqual(['inv_1']);
+    expect(page.hasMore).toBe(true);
+    expect(page.nextCursor).toBe('inv_1');
+  });
+
+  it('carries the cursor into the query as a keyset bound', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+
+    await service.listPendingInvitations(WORKSPACE_ID, { limit: 100, cursor: 'inv_1' });
+
+    const args = prisma.workspaceInvitation.findMany.mock.calls[0]?.[0] as {
+      where: { id?: { gt: string } };
+    };
+    expect(args.where.id).toEqual({ gt: 'inv_1' });
+  });
+
+  it('rebuilds the accept URL from the id rather than storing a second copy of it', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([storedRow('inv_1', MemberRole.ADMIN)]);
+
+    const page = await service.listPendingInvitations(WORKSPACE_ID, { limit: 100 });
+
+    expect(page.items[0]?.acceptUrl).toContain('inv_1');
+    expect(page.items[0]?.role).toBe(MemberRole.ADMIN);
+    expect(page.items[0]?.email).toBe(EMAIL);
+  });
+
+  it('reads a row with no recorded role as the least privileged one', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([storedRow('inv_1', null)]);
+
+    const page = await service.listPendingInvitations(WORKSPACE_ID, { limit: 100 });
+
+    // Nothing this API writes leaves `role` null, so a null row is not ours — reading it as
+    // MEMBER would show an admin a grant the row cannot prove was sent.
+    expect(page.items[0]?.role).toBe(MemberRole.GUEST);
+  });
+});

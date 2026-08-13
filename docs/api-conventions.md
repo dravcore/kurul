@@ -57,6 +57,7 @@ GET    /workspaces/:workspaceId/members/me     # the caller's own membership
 POST   /workspaces/:workspaceId/members/me/leave      # leave the workspace (any role)
 DELETE /workspaces/:workspaceId/members/:userId       # remove a member (OWNER/ADMIN)
 PATCH  /workspaces/:workspaceId/members/:userId/role  # change a member's role (OWNER/ADMIN)
+GET    /workspaces/:workspaceId/invitations     # cursor page of pending invitations (OWNER/ADMIN)
 POST   /workspaces/:workspaceId/invitations
 DELETE /workspaces/:workspaceId/invitations/:invitationId
 

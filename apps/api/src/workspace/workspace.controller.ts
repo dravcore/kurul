@@ -21,6 +21,7 @@ import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import { WorkspaceInvitationQueryDto } from './dto/workspace-invitation-query.dto';
 import { WorkspaceMemberQueryDto } from './dto/workspace-member-query.dto';
 import { WorkspaceInvitationService } from './workspace-invitation.service';
 import { WorkspaceMemberService } from './workspace-member.service';
@@ -149,6 +150,25 @@ export class WorkspaceController {
     @Req() request: Request,
   ): Promise<WorkspaceMemberDto> {
     return this.memberService.updateMemberRole(workspaceId, userId, dto, membership, request);
+  }
+
+  /**
+   * The invitations still awaiting an answer. OWNER / ADMIN only, unlike the roster beside it.
+   *
+   * `@WorkspaceScoped` would have been the consistent-looking choice — both are lists of
+   * people attached to the workspace — and it is the wrong one. A member has joined and is
+   * visible to the workspace by their own decision; an invited address belongs to someone who
+   * has agreed to nothing yet, and publishing the queue to every GUEST would hand out contact
+   * details the product was never given permission to share. The gate also matches what the
+   * list is *for*: revoking, which is admin-only anyway.
+   */
+  @Get(':workspaceId/invitations')
+  @WorkspaceRoles(...ADMIN_ROLES)
+  listInvitations(
+    @UuidParam('workspaceId') workspaceId: string,
+    @Query() query: WorkspaceInvitationQueryDto,
+  ): Promise<CursorPage<InvitationDto>> {
+    return this.invitationService.listPendingInvitations(workspaceId, query);
   }
 
   /**
