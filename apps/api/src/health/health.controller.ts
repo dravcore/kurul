@@ -1,9 +1,13 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { Public } from '../common/decorators/public.decorator';
+import { SkipRateLimit } from '../common/rate-limit/rate-limit';
 import { HealthService, type ReadinessReport } from './health.service';
 
 @Controller('health')
+// Applied to the controller, not to each handler: everything under `/health` is a probe, and
+// a probe that gets throttled reports the API as unhealthy for a reason unrelated to health.
+@SkipRateLimit()
 export class HealthController {
   constructor(private readonly health: HealthService) {}
 

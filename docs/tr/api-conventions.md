@@ -12,6 +12,7 @@ pagination ve DTO'lar.
 - [HTTP verb'leri ve status kodları](#http-verbleri-ve-status-kodları)
 - [Request ve response body'leri](#request-ve-response-bodyleri)
 - [Hatalar](#hatalar)
+- [Rate limiting](#rate-limiting)
 - [Pagination](#pagination)
 - [Filtreleme, sıralama, alan seçimi](#filtreleme-sıralama-alan-seçimi)
 - [DTO adlandırma](#dto-adlandırma)
@@ -309,6 +310,39 @@ Biten her request ayrıca stdout'a tek satırlık bir JSON erişim logu yazar:
 Bu alan listesi kapalıdır. Request body'leri, query string'ler, header'lar ve cookie'ler
 asla loglanmaz: query kullanıcının verdiği filtreleri ve arama terimlerini, header'lar ise
 session cookie'lerini ve davet token'larını taşır.
+
+## Rate limiting
+
+Her endpoint'in bir istek bütçesi vardır. Bütçe aşıldığında yukarıdaki hata zarfıyla `429`
+döner; `Retry-After` header'ı kaç saniye beklenmesi gerektiğini söyler. Bütçe içindeki
+istekler `X-RateLimit-Limit`, `X-RateLimit-Remaining` ve `X-RateLimit-Reset` taşır.
+
+Bütçeler **client IP'si ve route başına**, kayan bir dakikalık pencerede sayılır — yoğun
+çalışan bir endpoint asla başka bir endpoint'in payını harcamaz.
+
+| Endpoint                                    | Bütçe    | Neden                                                                       |
+| ------------------------------------------- | -------- | --------------------------------------------------------------------------- |
+| Aşağıda sayılmayan her endpoint             | 100 / dk | Bir insanın üreteceğinin çok üstünde; script'i sınırlar                     |
+| `POST /workspaces/:workspaceId/invitations` | 10 / dk  | Her çağrı, adresini çağıranın seçtiği bir mesajı SMTP relay'ine verir       |
+| `GET .../boards/:boardId/tasks?q=`          | 30 / dk  | `q=` bir trigram taramasıdır; aynı route `q=` olmadan varsayılanda kalır    |
+| `/auth/sign-in*`, `/auth/sign-up*`          | 3 / 10sn | Better Auth'un kimlik endpoint'leri için yerleşik kuralı                    |
+| Diğer `/auth/*`                             | 100 / dk | Better Auth'un kendi limiter'ı — `/auth/*` Nest router'ını atlar (ADR 0004) |
+| `GET /health`, `GET /health/ready`          | muaf     | Throttle edilen bir probe, sağlıklı bir API'yi çökmüş gösterir              |
+
+İki router olduğu için iki limiter var. `/auth/*` Nest'in altındaki ham Express tarafından
+sunulur, dolayısıyla `ThrottlerGuard` onu hiç görmez ve işi Better Auth'un kendi limiter'ı
+yapar. Better Auth'un sayaçları `REDIS_URL` tanımlıysa Redis'te tutulur — instance'lar arası
+paylaşılır, restart'ı atlatır — değilse process belleğinde, ki bu da desteklenen tek-instance
+konfigürasyonudur. Nest throttler'ının sayaçları her zaman instance başınadır.
+
+Reverse proxy arkasında bütçelerin client başına olması, ancak proxy'nin client IP'sini
+uygulamaya iletmesiyle mümkündür: Express'te `trust proxy`, Better Auth'ta
+`advanced.ipAddress.ipAddressHeaders` ayarlanmalı — ve yalnızca proxy'nizin gerçekten yazdığı
+header'lar için; taklit edilebilir bir header'a güvenmek her client'a sınırsız bütçe verir.
+
+`RATE_LIMIT_ENABLED=false` her iki limiter'ı da kapatır. Tek bir adresten route başına
+yüzlerce istek süren entegrasyon testleri için vardır; bunu ayarlayan bir deployment'ın
+brute-force tavanı yoktur.
 
 ## Pagination
 

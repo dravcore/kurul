@@ -7,6 +7,7 @@ import {
   WorkspaceRoles,
   WorkspaceScoped,
 } from '../common/decorators/workspace-roles.decorator';
+import { ThrottleTaskList } from '../common/rate-limit/rate-limit';
 import type { AuthenticatedUser } from '../common/types/request-context';
 import { AddAssigneeDto } from './dto/add-assignee.dto';
 import { AddTaskLabelDto } from './dto/add-task-label.dto';
@@ -24,7 +25,12 @@ import { TaskService } from './task.service';
 export class TaskController {
   constructor(private readonly taskService: TaskService) {}
 
+  /**
+   * Rate limited on a curve: `?q=` runs a trigram scan and gets a tighter ceiling than the
+   * board's ordinary paging, which shares this handler — see `taskListRateLimit`.
+   */
   @Get('boards/:boardId/tasks')
+  @ThrottleTaskList()
   @WorkspaceScoped()
   list(
     @UuidParam('workspaceId') workspaceId: string,

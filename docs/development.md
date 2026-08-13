@@ -84,21 +84,22 @@ cp .env.example .env
 
 Then fill in the blanks. `.env` is git-ignored and must never be committed.
 
-| Variable              | Example                                                  | Purpose                                                                                                                  |
-| --------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string                                                                                                 |
-| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io Redis adapter, caching, BullMQ due-soon worker (`due-soon` queue)                                              |
-| `BETTER_AUTH_SECRET`  | _(generate)_                                             | Session signing secret — required, no default                                                                            |
-| `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                              |
-| `API_PORT`            | `4000`                                                   | NestJS listen port                                                                                                       |
-| `WEB_URL`             | `http://localhost:3000`                                  | CORS origin for the API                                                                                                  |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                  | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                    |
-| `SMTP_HOST`           | `localhost` (dev, via Mailpit)                           | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit) |
-| `SMTP_PORT`           | `1025` (dev, via Mailpit) / `587` (typical production)   | SMTP server port                                                                                                         |
-| `SMTP_USER`           | _(blank for Mailpit)_                                    | SMTP auth username, if your server requires one                                                                          |
-| `SMTP_PASSWORD`       | _(blank for Mailpit)_                                    | SMTP auth password, if your server requires one                                                                          |
-| `SMTP_SECURE`         | `false`                                                  | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                 |
-| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                         | `From:` header on outgoing mail                                                                                          |
+| Variable              | Example                                                  | Purpose                                                                                                                     |
+| --------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | `postgresql://kurultay:kurultay@localhost:5432/kurultay` | Prisma connection string                                                                                                    |
+| `REDIS_URL`           | `redis://localhost:6379`                                 | Socket.io Redis adapter, caching, BullMQ due-soon worker (`due-soon` queue)                                                 |
+| `BETTER_AUTH_SECRET`  | _(generate)_                                             | Session signing secret — required, no default                                                                               |
+| `BETTER_AUTH_URL`     | `http://localhost:4000`                                  | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                                 |
+| `API_PORT`            | `4000`                                                   | NestJS listen port                                                                                                          |
+| `WEB_URL`             | `http://localhost:3000`                                  | CORS origin for the API                                                                                                     |
+| `RATE_LIMIT_ENABLED`  | `true`                                                   | Master switch for [rate limiting](api-conventions.md#rate-limiting). On by default; only the integration suite turns it off |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000`                                  | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                       |
+| `SMTP_HOST`           | `localhost` (dev, via Mailpit)                           | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)    |
+| `SMTP_PORT`           | `1025` (dev, via Mailpit) / `587` (typical production)   | SMTP server port                                                                                                            |
+| `SMTP_USER`           | _(blank for Mailpit)_                                    | SMTP auth username, if your server requires one                                                                             |
+| `SMTP_PASSWORD`       | _(blank for Mailpit)_                                    | SMTP auth password, if your server requires one                                                                             |
+| `SMTP_SECURE`         | `false`                                                  | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                    |
+| `MAIL_FROM`           | `Kurultay <noreply@example.com>`                         | `From:` header on outgoing mail                                                                                             |
 
 Generate a secret with:
 

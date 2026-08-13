@@ -11,6 +11,7 @@ REST conventions for the Kurultay API: URLs, verbs, payloads, errors, pagination
 - [HTTP verbs and status codes](#http-verbs-and-status-codes)
 - [Request and response bodies](#request-and-response-bodies)
 - [Errors](#errors)
+- [Rate limiting](#rate-limiting)
 - [Pagination](#pagination)
 - [Filtering, sorting, field selection](#filtering-sorting-field-selection)
 - [DTO naming](#dto-naming)
@@ -305,6 +306,39 @@ Each finished request also writes a single-line JSON access log to stdout:
 That field list is closed. Request bodies, query strings, headers and cookies are never
 logged: the query carries user-supplied filters and search terms, and the headers carry
 session cookies and invitation tokens.
+
+## Rate limiting
+
+Every endpoint has a request budget. Going over it returns `429` in the error envelope above,
+with a `Retry-After` header giving the seconds to wait. Requests still under budget carry
+`X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
+
+Budgets are counted **per client IP and per route** over a rolling minute — one endpoint
+running hot never spends another endpoint's allowance.
+
+| Endpoint                                    | Budget    | Why                                                                       |
+| ------------------------------------------- | --------- | ------------------------------------------------------------------------- |
+| Any endpoint, unless listed below           | 100 / min | Well clear of what a person generates; caps a script                      |
+| `POST /workspaces/:workspaceId/invitations` | 10 / min  | Each call hands a message to the SMTP relay, addressed by the caller      |
+| `GET .../boards/:boardId/tasks?q=`          | 30 / min  | `q=` is a trigram scan; the same route without `q=` keeps the default     |
+| `/auth/sign-in*`, `/auth/sign-up*`          | 3 / 10s   | Better Auth's built-in rule for credential endpoints                      |
+| `/auth/*` otherwise                         | 100 / min | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004) |
+| `GET /health`, `GET /health/ready`          | exempt    | A throttled probe would report a healthy API as down                      |
+
+Two limiters cover the surface because there are two routers. `/auth/*` is served by raw
+Express below Nest, so `ThrottlerGuard` never sees it and Better Auth's own limiter handles
+it. Better Auth's counters live in Redis when `REDIS_URL` is set — shared across instances,
+surviving restarts — and in process memory otherwise, which is a supported single-instance
+configuration. The Nest throttler's counters are always per-instance.
+
+Behind a reverse proxy, budgets are only per-client if the proxy's client IP reaches the app:
+configure `trust proxy` on Express and `advanced.ipAddress.ipAddressHeaders` for Better Auth,
+and only for headers your proxy actually sets — trusting a spoofable header hands every
+client an unlimited budget.
+
+`RATE_LIMIT_ENABLED=false` turns both limiters off. It exists for the integration suite,
+which drives hundreds of requests per route from one address; a deployment that sets it has
+no brute-force ceiling.
 
 ## Pagination
 
