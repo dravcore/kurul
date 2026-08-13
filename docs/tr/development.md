@@ -100,6 +100,11 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `SMTP_SECURE`         | `false`                                                           | Örtük TLS için (port 465) `true`, STARTTLS/plaintext için (587/25, ve Mailpit) `false`                                     |
 | `MAIL_FROM`           | `Kurultay <noreply@example.com>`                                  | Giden mail'lerdeki `From:` başlığı                                                                                         |
 
+`.env.example` ayrıca `BACKUP_INTERVAL` ve `BACKUP_KEEP` taşır. Bunlar **yalnızca compose'a
+aittir** — `docker-compose.yml` onları `backup` sidecar'ına enterpolasyon eder ve hiçbir
+uygulama kodu okumaz; bu yüzden yukarıdaki tabloda yer almazlar ve `apps/api` tarafında
+bağlanmaları gerekmez. Bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme).
+
 Bir secret üretmek için:
 
 ```bash
@@ -180,6 +185,10 @@ doğrulamak için, veya Kurultay'ı geliştirmek değil sadece çalıştırmak i
 docker compose up --build
 ```
 
+Bu aynı zamanda veritabanını zamanlanmış olarak dump'layan `backup` sidecar'ını da başlatır —
+bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme). `docker-compose.dev.yml`'de böyle bir
+servis yok: geliştirme döngüsünün veritabanı tasarım gereği atılabilir.
+
 |                                 | Geliştirme döngüsü | Tam Docker                                                       |
 | ------------------------------- | ------------------ | ---------------------------------------------------------------- |
 | Hot reload                      | Evet               | Hayır — rebuild gerekir                                          |
@@ -258,18 +267,134 @@ pnpm db:seed
 Bu, önemsediği veriyle Kurultay çalıştıran herkes için geçerlidir, atılabilir yerel
 veritabanları için değil. 1.0 öncesi, kırıcı şema değişiklikleri herhangi bir `0.y.0`
 release'inde gelebilir ([git-strategy.md](git-strategy.md#versiyonlama-politikası-semver)),
-dolayısıyla kural basit:
+dolayısıyla iki kural var: zamanlanmış yedeğin çalışmasına izin verin ve **her yükseltmeden
+hemen önce bir dump daha alın.**
 
-**Her yükseltmeden önce veritabanını dump'layın.**
+### Zamanlanmış yedekleme sidecar'ı
+
+`docker compose up`, `postgres`'in yanında bir `backup` servisi de başlatır.
+[`scripts/backup.sh`](../../scripts/backup.sh)'i bir `postgres:18-alpine` container'ında
+çalıştırır — sunucuyla aynı image, yani `pg_dump`/`pg_restore` her zaman sunucu major'ıyla
+eşleşir — ve döngüye girer:
+
+1. `pg_dump --format=custom` ile `backup_data` volume'üne
+   `/backups/kurultay-<UTC timestamp>.dump` yazar (önce `.part` olarak yazılır, başarıda
+   yeniden adlandırılır; yarıda kesilen bir dump asla tamamlanmış bir arşiv gibi görünmez),
+2. en yeni `BACKUP_KEEP` arşivinden eskisini siler,
+3. `BACKUP_INTERVAL` saniye uyur, tekrarlar.
+
+Varsayılanlar — günde bir dump, yedi tanesi saklanır — **en fazla 24 saatlik bir kurtarma
+noktası (RPO ≤ 24 sa) ve bir haftalık geçmiş** demektir; host'ta cron yok, hatırlanacak bir
+şey yok. Servis `restart: unless-stopped`: yeniden başlatmadan sonra ayağa kalkmayan bir
+yedekleme sidecar'ı sessizce kurtarma noktası üretmeyi bırakır ki bu bölümün var olma sebebi
+tam olarak bu hatadır. `docker-compose.dev.yml`'de bilinçli olarak **yok** — `pnpm db:seed`'in
+istendiğinde sildiği yerel bir veritabanında saklanmaya değer bir şey yoktur.
+
+İki ayar, ikisi de compose tarafından `.env`'den okunur (yalnızca compose'a aittir — hiçbir
+uygulama kodu okumaz, dolayısıyla API'nin yüklediği [ortam
+değişkenlerinin](#ortam-değişkenleri) parçası değildirler):
+
+| Değişken          | Varsayılan | Amaç                                                                      |
+| ----------------- | ---------- | ------------------------------------------------------------------------- |
+| `BACKUP_INTERVAL` | `86400`    | Dump'lar arası saniye. `86400` = günlük; bu **doğrudan** sizin RPO'nuzdur |
+| `BACKUP_KEEP`     | `7`        | Saklanan arşiv sayısı; her yeni dump'tan sonra daha eskileri silinir      |
+
+Kontrol edin — test edilmemiş bir yedek yedek değildir, okunmamış bir log da öyle:
 
 ```bash
-docker compose exec -T postgres pg_dump -U kurultay kurultay > kurultay-$(date +%F).sql
+docker compose logs backup | tail            # "wrote /backups/kurultay-….dump (… bytes)"
+docker compose exec backup ls -lh /backups   # en yeni arşiv ve kaç tanesi saklanıyor
+```
+
+**Arşivleri host dışına kopyalayın.** `backup_data`, `postgres_data` ile aynı diskte durur;
+yani "yanlış tabloyu düşürdüm"ü kapsar, ölen bir diski veya kaybolan bir sunucuyu hiç
+kapsamaz — volume'ü düzenli olarak başka bir yere aynalayın
+(`docker compose exec -T backup cat /backups/<arşiv>` üzerinden ya da doğrudan volume'ün host
+yolundan `rsync`/`rclone`), yoksa felaket senaryosu yine her şeyi kaybettirir.
+
+### Elle dump almak
+
+Bir yükseltmeden önce ya da kurtarma noktasını `BACKUP_INTERVAL` sonra değil şimdi istediğiniz
+her an, aynı script'i bir kez çalıştırın — aynı volume'e yazar ve aynı kurala göre budar:
+
+```bash
+docker compose exec backup /bin/sh /usr/local/bin/backup.sh once
+```
+
+Volume dışında bir kopya tutmak için (yükseltme öncesi önerilir, çünkü
+`docker compose down -v`'den sağ çıkar):
+
+```bash
+docker compose exec -T postgres \
+  pg_dump -U kurultay --format=custom kurultay > kurultay-$(date -u +%Y%m%dT%H%M%SZ).dump
 ```
 
 - Önce hedef sürümün `CHANGELOG.md` girdisini okuyun — her kırıcı değişiklik orada bir
   migration notu taşır.
 - Sonra image'ları yükseltin ve migration'ları çalıştırın.
 - Yükseltme ters giderse, bkz. [Geri alma (rollback)](#geri-alma-rollback).
+
+### Yedekten geri dönme
+
+**Hedef: restore kararından itibaren iki saatin altında ayakta olmak (RTO ≤ 2 sa).**
+Aşağıdaki prosedür küçük bir kurulumda saniyeler sürer; bütçe karar vermek, doğru arşivi
+bulmak ve doğrulamak içindir. Uçtan uca prova edilmiştir — `scripts/backup.sh` ile
+dump'lanan seed'li bir veritabanı boş bir sunucuya restore edildiğinde 17 tablonun tamamını,
+her satır sayısını, 59 indeksin hepsini, `pg_trgm`'i ve `_prisma_migrations` tablosunu
+eksiksiz üretti.
+
+Restore `pg_restore` iledir (arşivler SQL metni değil `--format=custom`) ve **boş** bir
+veritabanı ister — dolu bir veritabanının üzerine restore etmek temiz bir üzerine yazma
+değil, duplicate-key hataları üretir.
+
+```bash
+# 1. Yazan her şeyi durdurun — yarı restore edilmiş veritabanını dump'layıp iyi bir arşivi
+#    rotasyonla düşürmesin diye yedekleme sidecar'ı dahil. Postgres'in kendisi ayakta kalır.
+docker compose stop web api backup
+
+# 2. Restore edilecek arşivi seçin. Sidecar durduğu için `run --rm`; tek kullanımlık
+#    container aynı backup_data volume'ünü mount eder.
+docker compose run --rm --entrypoint ls backup -1 /backups
+
+# 3. Veritabanını boş olarak yeniden oluşturun. Yıkıcı adım budur — arşiv alındıktan sonra
+#    yazılan her şey buradan itibaren gitmiştir.
+docker compose exec -T postgres psql -U kurultay -d postgres \
+  -c 'DROP DATABASE kurultay WITH (FORCE);' \
+  -c 'CREATE DATABASE kurultay OWNER kurultay;'
+
+# 4. Restore edin. --exit-on-error, kısmi bir restore'u iyi görünen yarı dolu bir veritabanı
+#    yerine gürültülü bir hataya çevirir.
+docker compose run --rm --entrypoint pg_restore backup \
+  --host=postgres --username=kurultay --dbname=kurultay \
+  --no-owner --exit-on-error /backups/kurultay-<timestamp>.dump
+
+# 5. Migration durumunu kontrol edin. Arşiv _prisma_migrations'ı taşıdığı için kayıtlı durum
+#    restore edilen şemayla eşleşir ve bunun yapacak bir şey bulmaması beklenir.
+docker compose run --rm migrate
+
+# 6. Trafiği geri almadan önce doğrulayın.
+docker compose exec -T postgres psql -U kurultay -d kurultay \
+  -c '\dt' \
+  -c 'SELECT count(*) FROM "User";' \
+  -c 'SELECT count(*) FROM "Workspace";' \
+  -c 'SELECT count(*) FROM "Task";' \
+  -c 'SELECT count(*) FROM "_prisma_migrations";'
+
+# 7. Stack'i geri getirin.
+docker compose up -d
+```
+
+Checkout edilmiş kod arşivin şemasından yeniyse, 5. adım eksik migration'ları ileri doğru
+uygular; bu doğrudur. **Eskiyse**, 5. adımdan önce arşive karşılık gelen release tag'ine
+geçin — bkz. [Geri alma (rollback)](#geri-alma-rollback).
+
+Volume'dekinin yerine host tarafındaki bir dosyadan restore (4. adımın varyantı):
+
+```bash
+docker compose run --rm -T --entrypoint pg_restore backup \
+  --host=postgres --username=kurultay --dbname=kurultay --no-owner \
+  --exit-on-error < kurultay-20260813T194856Z.dump
+```
 
 **PostgreSQL major sürüm yükseltmeleri bir dump ve restore gerektirir.** Resmi `postgres`
 imajı, `PGDATA` volume'ü farklı bir major sürüm tarafından initialize edildiğinde başlamayı
@@ -372,24 +497,24 @@ yolu yoktur. Seçenekler, tercih sırasıyla:
    Tarih doğrusal kalır, kötü migration'ın kendisinin yok ettiği dışında hiçbir veri atılmaz
    ve commit edilmiş hiçbir migration dosyası asla düzenlenmez. Aşağıdaki hotfix akışıyla
    yayınlayın.
-2. **Yedekten restore.** Yalnızca bir dump'ınız varsa mümkündür — [yukarıdaki
-   bölümün](#yükseltme-ve-yedekleme) her yükseltmeden önce bir tane alın demesinin nedeni tam
-   olarak budur. O dump'tan sonra yazılan her şey **kalıcı olarak kaybolur**: kurtarma
-   noktası `pg_dump`'ın çalıştığı andır, dolayısıyla canlı bir kurulumda bu, şema karşılığında
-   kullanıcı verisi takas eder. Kötü migration'ın kendisi, dump'ta hâlâ bulunan veriyi yok
+2. **Yedekten restore.** `backup` sidecar'ı size en fazla `BACKUP_INTERVAL` eskilikte
+   (varsayılan 24 saat) bir arşiv verir ve [yukarıdaki bölüm](#yükseltme-ve-yedekleme) her
+   yükseltmeden hemen önce bir tane daha alın der — burada isteyeceğiniz, o taze arşivdir.
+   Arşiv alındıktan sonra yazılan her şey **kalıcı olarak kaybolur**: kurtarma noktası
+   `pg_dump`'ın çalıştığı andır, dolayısıyla canlı bir kurulumda bu, şema karşılığında
+   kullanıcı verisi takas eder. Kötü migration'ın kendisi, arşivde hâlâ bulunan veriyi yok
    ettiyse (bir kolon veya tablo düşürdüyse) kullanın.
 
+   [Yedekten geri dönme](#yedekten-geri-dönme) adımlarını eksiksiz uygulayın; tek eklemeyle —
+   stack'i geri getirmeden önce arşive karşılık gelen release tag'ine geçin ki kod ve şema
+   uyuşsun:
+
    ```bash
-   docker compose stop api web        # yazanları durdur; postgres ayakta kalır
-   docker compose exec -T postgres psql -U kurultay -d postgres \
-     -c 'DROP DATABASE kurultay WITH (FORCE);' \
-     -c 'CREATE DATABASE kurultay OWNER kurultay;'
-   docker compose exec -T postgres psql -U kurultay -d kurultay < kurultay-2026-08-13.sql
-   git switch --detach v0.1.0         # dump'a karşılık gelen release
+   git switch --detach v0.1.0         # arşive karşılık gelen release
    docker compose up -d --build
    ```
 
-   Dump, `_prisma_migrations` defter tablosunu da içerir; dolayısıyla restore'dan sonra
+   Arşiv, `_prisma_migrations` defter tablosunu da içerir; dolayısıyla restore'dan sonra
    kayıtlı migration durumu restore edilen şemayla eşleşir ve eski release'in `migrate`
    servisi uygulayacak bir şey bulmaz.
 

@@ -101,6 +101,11 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `SMTP_SECURE`         | `false`                                                  | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                    |
 | `MAIL_FROM`           | `Kurultay <noreply@example.com>`                         | `From:` header on outgoing mail                                                                                             |
 
+`.env.example` also carries `BACKUP_INTERVAL` and `BACKUP_KEEP`. They are **compose-only** —
+`docker-compose.yml` interpolates them into the `backup` sidecar and no application code
+reads them, so they are absent from the table above and need no wiring in `apps/api`. See
+[Upgrading and backups](#upgrading-and-backups).
+
 Generate a secret with:
 
 ```bash
@@ -181,6 +186,10 @@ compose wiring, or when you just want to run Kurultay rather than develop it.
 docker compose up --build
 ```
 
+This also starts the `backup` sidecar, which dumps the database on a schedule — see
+[Upgrading and backups](#upgrading-and-backups). `docker-compose.dev.yml` has no such
+service: the dev loop's database is throwaway by design.
+
 |                             | Dev loop             | Full Docker                                       |
 | --------------------------- | -------------------- | ------------------------------------------------- |
 | Hot reload                  | Yes                  | No — rebuild required                             |
@@ -259,18 +268,133 @@ pnpm db:seed
 
 This applies to anyone running Kurultay with data they care about, not to throwaway local
 databases. Pre-1.0, breaking schema changes can ship in any `0.y.0` release
-([git-strategy.md](git-strategy.md#versioning-policy-semver)), so the rule is simple:
+([git-strategy.md](git-strategy.md#versioning-policy-semver)), so there are two rules: let
+the scheduled backup run, and **take one more dump immediately before every upgrade.**
 
-**Dump the database before every upgrade.**
+### The scheduled backup sidecar
+
+`docker compose up` starts a `backup` service alongside `postgres`. It runs
+[`scripts/backup.sh`](../scripts/backup.sh) from a `postgres:18-alpine` container — the same
+image as the server, so `pg_dump`/`pg_restore` always match the server major — and loops:
+
+1. `pg_dump --format=custom` into the `backup_data` volume as
+   `/backups/kurultay-<UTC timestamp>.dump` (written as `.part` and renamed on success, so an
+   interrupted dump never looks like a finished archive),
+2. delete everything past the newest `BACKUP_KEEP` archives,
+3. sleep `BACKUP_INTERVAL` seconds, repeat.
+
+The defaults — one dump a day, seven kept — mean **a recovery point at most 24 hours old
+(RPO ≤ 24 h) and a week of history**, with no cron on the host and nothing to remember. The
+service is `restart: unless-stopped`: a backup sidecar that stays down after a reboot
+silently stops producing recovery points, which is the failure this whole section exists to
+prevent. It is deliberately **not** in `docker-compose.dev.yml` — a local database that
+`pnpm db:seed` wipes on demand has nothing worth keeping.
+
+Two settings, both read from `.env` by compose (they are compose-only — no application code
+reads them, so they are not part of the [environment variables](#environment-variables) the
+API loads):
+
+| Variable          | Default | Purpose                                                       |
+| ----------------- | ------- | ------------------------------------------------------------- |
+| `BACKUP_INTERVAL` | `86400` | Seconds between dumps. `86400` = daily; this **is** your RPO  |
+| `BACKUP_KEEP`     | `7`     | Archives retained; older ones are deleted after each new dump |
+
+Check on it — an untested backup is not a backup, and neither is an unread log:
 
 ```bash
-docker compose exec -T postgres pg_dump -U kurultay kurultay > kurultay-$(date +%F).sql
+docker compose logs backup | tail            # "wrote /backups/kurultay-….dump (… bytes)"
+docker compose exec backup ls -lh /backups   # newest archive, and how many are kept
+```
+
+**Copy the archives off-host.** `backup_data` sits on the same disk as `postgres_data`, so it
+covers "I dropped the wrong table" and covers nothing about a dead disk or a lost server —
+mirror the volume somewhere else on a schedule (`rsync`/`rclone` from
+`docker compose exec -T backup cat /backups/<archive>`, or straight from the volume's host
+path) or the disaster case still loses everything.
+
+### Taking a dump by hand
+
+Before an upgrade, or any time you want a recovery point now rather than up to
+`BACKUP_INTERVAL` from now, run the same script once — it writes into the same volume and
+prunes by the same rule:
+
+```bash
+docker compose exec backup /bin/sh /usr/local/bin/backup.sh once
+```
+
+To hold a copy outside the volume (recommended before an upgrade, since it survives a
+`docker compose down -v`):
+
+```bash
+docker compose exec -T postgres \
+  pg_dump -U kurultay --format=custom kurultay > kurultay-$(date -u +%Y%m%dT%H%M%SZ).dump
 ```
 
 - Read the `CHANGELOG.md` entry for the target version first — every breaking change carries
   a migration note there.
 - Then upgrade the images and run the migrations.
 - If the upgrade goes wrong, see [Rollback](#rollback).
+
+### Restoring from a backup
+
+**Target: back up in under two hours (RTO ≤ 2 h) from the decision to restore.** The
+procedure below runs in seconds on a small instance; the budget is for the deciding, the
+finding of the right archive, and the verifying. It has been rehearsed end to end — a seeded
+database dumped by `scripts/backup.sh` and restored into an empty server reproduced all 17
+tables, every row count, all 59 indexes, `pg_trgm`, and the `_prisma_migrations` table intact.
+
+Restore is `pg_restore` (the archives are `--format=custom`, not SQL text), and it wants an
+**empty** database — restoring over a populated one produces duplicate-key errors, not a
+clean overwrite.
+
+```bash
+# 1. Stop everything that writes — including the backup sidecar, so it cannot dump the
+#    half-restored database and rotate a good archive out. Postgres itself stays up.
+docker compose stop web api backup
+
+# 2. Pick the archive to restore. `run --rm` because the sidecar is stopped now; the
+#    throwaway container mounts the same backup_data volume.
+docker compose run --rm --entrypoint ls backup -1 /backups
+
+# 3. Recreate the database empty. This is the destructive step — everything written after
+#    the archive was taken is gone from here on.
+docker compose exec -T postgres psql -U kurultay -d postgres \
+  -c 'DROP DATABASE kurultay WITH (FORCE);' \
+  -c 'CREATE DATABASE kurultay OWNER kurultay;'
+
+# 4. Restore. --exit-on-error turns a partial restore into a loud failure instead of a
+#    half-populated database that looks fine.
+docker compose run --rm --entrypoint pg_restore backup \
+  --host=postgres --username=kurultay --dbname=kurultay \
+  --no-owner --exit-on-error /backups/kurultay-<timestamp>.dump
+
+# 5. Check the migration state. The archive carries _prisma_migrations, so the recorded
+#    state matches the restored schema and this should report nothing to do.
+docker compose run --rm migrate
+
+# 6. Verify before letting traffic back in.
+docker compose exec -T postgres psql -U kurultay -d kurultay \
+  -c '\dt' \
+  -c 'SELECT count(*) FROM "User";' \
+  -c 'SELECT count(*) FROM "Workspace";' \
+  -c 'SELECT count(*) FROM "Task";' \
+  -c 'SELECT count(*) FROM "_prisma_migrations";'
+
+# 7. Bring the stack back.
+docker compose up -d
+```
+
+If the checked-out code is newer than the archive's schema, step 5 applies the missing
+migrations forward, which is correct. If it is **older**, check out the release tag that
+matches the archive before step 5 — see [Rollback](#rollback).
+
+Restoring from a host-side file instead of one in the volume (step 4 variant):
+
+```bash
+docker compose run --rm -T --entrypoint pg_restore backup \
+  --host=postgres --username=kurultay --dbname=kurultay --no-owner \
+  --exit-on-error < kurultay-20260813T194856Z.dump
+```
 
 **PostgreSQL major-version upgrades need a dump and restore.** The official `postgres` image
 refuses to start when the `PGDATA` volume was initialized by a different major version
@@ -370,24 +494,24 @@ reads, a code-only rollback will crash on boot — that is the migration-rollbac
    with `pnpm db:migrate:dev`, and deploy forward as usual. History stays linear, no data is
    thrown away beyond what the bad migration itself destroyed, and no committed migration
    file is ever edited. Ship it through the hotfix flow below.
-2. **Restore from a backup.** Only possible if you have a dump — which is exactly why
-   [the section above](#upgrading-and-backups) says to take one before every upgrade.
-   Everything written after that dump is **permanently lost**: the recovery point is the
-   moment `pg_dump` ran, so on a live instance this trades user data for schema. Use it when
-   the bad migration itself destroyed data (dropped a column or table) that the dump still
-   has.
+2. **Restore from a backup.** The `backup` sidecar gives you one at most `BACKUP_INTERVAL`
+   old (24 hours by default), and [the section above](#upgrading-and-backups) says to take
+   one more immediately before every upgrade — that fresher archive is the one you want here.
+   Everything written after the archive was taken is **permanently lost**: the recovery point
+   is the moment `pg_dump` ran, so on a live instance this trades user data for schema. Use
+   it when the bad migration itself destroyed data (dropped a column or table) that the
+   archive still has.
+
+   Follow [Restoring from a backup](#restoring-from-a-backup) in full, with one addition —
+   check out the release tag that matches the archive before you bring the stack back, so the
+   code and the schema agree:
 
    ```bash
-   docker compose stop api web        # stop the writers; postgres stays up
-   docker compose exec -T postgres psql -U kurultay -d postgres \
-     -c 'DROP DATABASE kurultay WITH (FORCE);' \
-     -c 'CREATE DATABASE kurultay OWNER kurultay;'
-   docker compose exec -T postgres psql -U kurultay -d kurultay < kurultay-2026-08-13.sql
-   git switch --detach v0.1.0         # the release that matches the dump
+   git switch --detach v0.1.0         # the release that matches the archive
    docker compose up -d --build
    ```
 
-   The dump contains the `_prisma_migrations` bookkeeping table, so after the restore the
+   The archive contains the `_prisma_migrations` bookkeeping table, so after the restore the
    recorded migration state matches the restored schema, and the old release's `migrate`
    service finds nothing left to apply.
 

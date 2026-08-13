@@ -9,6 +9,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Scheduled database backups with a rehearsed restore path. `docker compose up` now starts a
+  `backup` sidecar (`postgres:18-alpine`, `restart: unless-stopped`, waits for a healthy
+  `postgres`) that runs `scripts/backup.sh`: every `BACKUP_INTERVAL` seconds it writes a
+  `pg_dump --format=custom` archive to `/backups/kurultay-<UTC timestamp>.dump` in the new
+  `backup_data` volume — via a `.part` file renamed on success, so an interrupted dump never
+  looks like a finished archive — and prunes to the newest `BACKUP_KEEP` archives. The
+  defaults (`86400`/`7`, both compose-only settings in `.env.example`) give a recovery point
+  at most 24 hours old and a week of history on a self-hosted instance that nobody has to
+  remember to back up. `docker-compose.dev.yml` is deliberately unchanged. The restore
+  procedure in `docs/development.md` is now step-by-step and was rehearsed end to end —
+  a seeded database dumped by the script and restored with `pg_restore` into an empty server
+  reproduced all 17 tables, every row count, all 59 indexes, `pg_trgm`, and
+  `_prisma_migrations` — with stated RPO ≤ 24 h / RTO ≤ 2 h targets and a warning that a
+  volume on the same disk is not disaster protection.
 - Structured HTTP access logging and request correlation. Every request is assigned an id —
   a safe inbound `X-Request-Id` is reused so an id minted by a proxy survives, anything else
   is replaced by a generated UUIDv7 — and it comes back in the `X-Request-Id` response

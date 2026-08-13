@@ -23,6 +23,37 @@ services:
       timeout: 5s
       retries: 10
 
+  # Scheduled logical backups. Every BACKUP_INTERVAL seconds `scripts/backup.sh` writes one
+  # `pg_dump -Fc` archive into the backup_data volume and prunes it to BACKUP_KEEP archives,
+  # so a self-hosted instance has a recovery point without anyone remembering to take one.
+  # The image is the same postgres:18-alpine as the server, so pg_dump/pg_restore always
+  # match the server major. Restore procedure: docs/development.md#upgrading-and-backups.
+  #
+  # backup_data lives on the same host as postgres_data — that covers "I dropped the wrong
+  # table", not "the disk died". Copy the volume off-host as well; see the same section.
+  backup:
+    image: postgres:18-alpine
+    environment:
+      # postgres:5432 is the in-network address, same as the api/migrate services above —
+      # unrelated to the host .env DATABASE_URL used by the dev loop.
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: kurultay
+      PGPASSWORD: kurultay
+      PGDATABASE: kurultay
+      BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
+    volumes:
+      - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
+      - backup_data:/backups
+    entrypoint: ['/bin/sh', '/usr/local/bin/backup.sh']
+    # The one service that must come back by itself: a backup sidecar that stays down after
+    # a reboot silently stops producing recovery points.
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # One-shot: applies pending Prisma migrations, then exits. `api` waits for it to finish
   # successfully before starting, so the schema is never missing on first boot.
   migrate:
@@ -89,3 +120,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  backup_data:
