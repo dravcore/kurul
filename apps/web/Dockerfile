@@ -23,6 +23,10 @@ FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
+# Next.js standalone binds to $HOSTNAME, and Docker sets HOSTNAME to the container ID —
+# leaving this unset makes server.js listen only on eth0, so the in-container healthcheck
+# (wget against localhost) gets connection refused. 0.0.0.0 listens on every interface.
+ENV HOSTNAME=0.0.0.0
 COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./
 COPY --from=build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=node:node /app/apps/web/public ./apps/web/public

@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:18-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: kurultay
       POSTGRES_PASSWORD: kurultay
@@ -15,6 +16,7 @@ services:
 
   redis:
     image: redis:8-alpine
+    restart: unless-stopped
     volumes:
       - redis_data:/data
     healthcheck:
@@ -73,6 +75,10 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    # `unless-stopped` (not `on-failure`) so the whole stack comes back after a host
+    # reboot or daemon restart, not only after an in-container crash. `migrate` is the
+    # deliberate exception: it is a one-shot job that must stay exited.
+    restart: unless-stopped
     environment:
       # postgres:5432 / redis:6379 are the in-network addresses; they're intentionally not
       # sourced from the host .env, whose DATABASE_URL/REDIS_URL point at localhost for the
@@ -96,6 +102,16 @@ services:
       MAIL_FROM: ${MAIL_FROM:-}
     ports:
       - '4000:4000'
+    # /health/ready probes DB + Redis (200 only when both respond within 2s), so "healthy"
+    # means "actually able to serve requests", not just "process is up". busybox wget ships
+    # in node:24-alpine — no curl needed. 127.0.0.1, not localhost: busybox wget resolves
+    # localhost to ::1 first, which a v4-only listener refuses.
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:4000/health/ready >/dev/null 2>&1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,10 +128,22 @@ services:
         # Next.js inlines NEXT_PUBLIC_* at build time, so it must be a build arg, not just a
         # runtime environment variable — see apps/web/Dockerfile.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    restart: unless-stopped
     ports:
       - '3000:3000'
+    # busybox wget follows 3xx redirects, so a redirecting root page still counts as healthy;
+    # only a non-2xx final response (or no response) fails the probe. 127.0.0.1, not
+    # localhost: Next.js standalone listens IPv4-only on 0.0.0.0, and busybox wget resolves
+    # localhost to ::1 first — connection refused despite a healthy server.
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   postgres_data:

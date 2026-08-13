@@ -43,6 +43,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Docker Compose now survives crashes and host reboots: every long-running service carries
+  `restart: unless-stopped` (in `docker-compose.dev.yml` too; the one-shot `migrate` job is
+  deliberately excluded), `api` gains a healthcheck against `GET /health/ready` so "healthy"
+  means DB and Redis actually answer, `web` gains a root-page healthcheck, and `web` now waits
+  on `api` being *healthy* rather than merely started.
 - Docs consistency pass: Node ≥24, i18n status, squash policy, archive links,
   project-skeleton archived, TR design status synced.
 - Documentation map sharpened for post-MVP: `docs/README.md` is a five-minute reading guide;
