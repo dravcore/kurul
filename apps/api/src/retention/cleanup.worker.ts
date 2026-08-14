@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { Queue, Worker, type Job } from 'bullmq';
 import { envBool, envInt, envString } from '../common/env';
 import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
+import { captureServerError } from '../common/observability/sentry';
 import { parseRedisUrl } from '../common/redis-url';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -14,6 +15,25 @@ const JOB_ID = 'retention-cleanup';
  * that long past its stated window, which is the thing the policy promises not to do.
  */
 const REPEAT_EVERY_MS = 24 * 60 * 60 * 1000;
+/**
+ * Attempts BullMQ makes at one scheduled run before giving up on it. Sized for this job's own
+ * cadence, not copied from `due-soon.worker.ts`'s `attempts: 3` — that worker self-heals in 15
+ * minutes either way, so its budget only has to beat "wait for the next tick". This one skips a
+ * full *day* of retention enforcement on the next tick, so the retry budget is worth spending
+ * more generously: see {@link JOB_BACKOFF_DELAY_MS} for why 5 attempts still finishes in about
+ * an hour, well inside the 24h window.
+ */
+const JOB_ATTEMPTS = 5;
+/**
+ * Base delay for the exponential backoff between retries (BullMQ doubles this per attempt: 5m,
+ * 10m, 20m, 40m — roughly 75 minutes of retrying before the run is given up on). Due-soon uses
+ * 30s because its whole recovery budget has to fit inside a 15-minute tick; this job has a full
+ * day of slack, so the delay is minutes rather than seconds on purpose — a longer gap gives a
+ * DB restart or a Redis failover realistic time to finish before the next attempt lands on it,
+ * and 75 minutes worst-case still leaves over 22 hours of margin before the next scheduled run,
+ * which is the actual fallback this retry budget exists to make unnecessary.
+ */
+const JOB_BACKOFF_DELAY_MS = 5 * 60 * 1000;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -176,9 +196,30 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
     this.worker = new Worker(QUEUE_NAME, (job) => this.process(job), { connection });
 
     this.worker.on('failed', (job, error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const attemptsMade = job?.attemptsMade ?? 0;
+      // Read back off the job rather than closing over `JOB_ATTEMPTS`, same as due-soon's
+      // handler — this stays honest if a job ever ends up scheduled with a different policy.
+      const attemptsAllowed = job?.opts.attempts ?? 1;
+
+      if (attemptsMade < attemptsAllowed) {
+        // BullMQ already has the next attempt queued per the exponential backoff above — this
+        // is expected noise from a transient blip, not something to page anyone for.
+        this.logger.warn(
+          `cleanup job ${job?.id ?? '?'} failed (attempt ${attemptsMade}/${attemptsAllowed}), retrying: ${message}`,
+        );
+        return;
+      }
+
+      // Every configured attempt is spent: the run that was supposed to enforce the retention
+      // policy tonight did not happen, and the next chance is a full day away. `removeOnFail:
+      // 50` keeps the job in Redis for later inspection, but that only helps someone who
+      // already knew to look — `captureServerError` is what surfaces it instead (issue #191,
+      // same shape as BE-06/#189's due-soon fix).
       this.logger.error(
-        `cleanup job ${job?.id ?? '?'} failed: ${error instanceof Error ? error.message : String(error)}`,
+        `cleanup job ${job?.id ?? '?'} exhausted all ${attemptsAllowed} attempt(s), giving up: ${message}`,
       );
+      captureServerError(error, { path: 'cleanup-worker' });
     });
 
     // Same reasoning as the due-soon scan: `add` with `repeat` keys the schedule on the
@@ -190,7 +231,12 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
       { every: REPEAT_EVERY_MS },
       {
         name: JOB_NAME,
-        opts: { removeOnComplete: 100, removeOnFail: 50 },
+        opts: {
+          removeOnComplete: 100,
+          removeOnFail: 50,
+          attempts: JOB_ATTEMPTS,
+          backoff: { type: 'exponential', delay: JOB_BACKOFF_DELAY_MS },
+        },
       },
     );
 
@@ -360,6 +406,17 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
     return total;
   }
 
+  /**
+   * BullMQ's retry always re-invokes this whole method, never a single {@link deleteInBatches}
+   * call — job-level retry, not batch-level. That is a deliberate choice, not the path of
+   * least resistance: `deleteInBatches`'s signature (`() => Promise<number>`) has no way to
+   * report which pass it died on, so a batch-level retry would need new plumbing to resume mid
+   * table. Retrying the whole run instead costs nothing extra, because every `DELETE …WHERE
+   * expiresAt < now` / `…createdAt < cutoff` predicate here is naturally idempotent: a retry
+   * re-selects whatever is still eligible — rows an earlier, successful table in the same
+   * attempt already removed simply match zero rows the second time — so re-running the run from
+   * the top never double-deletes or double-counts anything the log line reports.
+   */
   private async process(_job: Job): Promise<void> {
     await this.runCleanup();
   }
