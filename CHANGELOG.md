@@ -355,6 +355,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the column row — a concurrency contract the column path had simply never picked up. The
   observable symptom was never data loss (`(position, id)` keeps ordering deterministic even
   on a tie) — only two users seeing a different column order than either expected.
+- The due-soon scan no longer gives up for a full 15-minute tick on a single failed run.
+  `DueSoonWorker`'s scheduler asked BullMQ for the queue defaults — one attempt, no backoff —
+  so a run that landed on a momentary Postgres or Redis blip simply waited for the next
+  scheduled tick instead of retrying inside the same one. It now gets three attempts with an
+  exponential backoff (30s, then 60s), so a transient blip is absorbed in under two minutes
+  instead of up to fifteen. The `failed` handler used to log every failure at `error` whether
+  or not BullMQ was about to retry it; a mid-retry failure is now `warn`-level noise, and only
+  the final failure — every configured attempt spent, nothing left to retry it — logs at
+  `error` and is reported through `captureServerError` (opt-in Sentry, `docs/development.md`),
+  since `removeOnFail: 50` alone only helps someone who already knew to go looking. Closes
+  audit finding BE-06 ([#148](https://github.com/dravcore/kurultay/issues/148)).
 
 ### Security
 
