@@ -3,6 +3,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { MemberRole } from '@kurultay/shared-types';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { DAY_COUNT_SELECT } from '../src/dashboard/dashboard.service';
 import { createTestApp } from './helpers/app';
 import { addMember, createWorkspace, signUp } from './helpers/auth';
 import { resetDatabase } from './helpers/db';
@@ -115,6 +116,79 @@ describe('Dashboard (e2e)', () => {
 
     const anonymous = request(app.getHttpServer());
     await anonymous.get(`/workspaces/${workspace.id}/dashboard/summary`).expect(401);
+  });
+
+  describe('timezone resilience — date_trunc bucketing', () => {
+    /**
+     * Regression test for P2-13 (audit finding DB-08). The three-argument form of
+     * `date_trunc('day', ..., 'UTC')` ensures bucket boundaries align with UTC midnight
+     * regardless of the session's timezone setting.
+     *
+     * This test proves the fix by running the date_trunc query with a fixed activity timestamp
+     * under two different session timezones (UTC and Europe/Istanbul, +03:00 offset).
+     *
+     * Setup: Activity timestamp = 2026-08-14T22:00:00Z (UTC)
+     * - In UTC session: date_trunc('day', ...) → 2026-08-14
+     * - In Istanbul session (+03:00): 22:00 UTC = 01:00 next day
+     *   - With 2-arg form (buggy): truncates in session TZ → 2026-08-15 (WRONG)
+     *   - With 3-arg form (fixed): truncates in explicit UTC → 2026-08-14 (CORRECT)
+     *
+     * Test assertion: for 3-arg form, results are identical regardless of session timezone.
+     * (For 2-arg form, results would differ, demonstrating the bug.)
+     */
+    it('proves three-arg date_trunc is timezone-independent', async () => {
+      // Use existing test infrastructure (owner, workspace) to satisfy foreign keys.
+      const owner = await signUp(app, { name: 'Owner' });
+      const ownerMe = await owner.agent.get('/me').expect(200);
+      const workspace = await createWorkspace(owner.agent, 'TZ Regression', `tz-${Date.now()}`);
+
+      // Manually insert activity with a fixed timestamp at a UTC day boundary.
+      // Activity at 2026-08-14 22:00 UTC. In Istanbul this is 2026-08-15 01:00.
+      // - With 2-arg form (buggy, truncates in session TZ): Istanbul session → 2026-08-15
+      // - With 3-arg form (fixed, truncates in explicit UTC): both sessions → 2026-08-14
+      const activityTime = new Date('2026-08-14T22:00:00Z');
+      await prisma.activity.create({
+        data: {
+          id: `activity-tz-${Date.now()}`,
+          workspaceId: workspace.id,
+          userId: ownerMe.body.id as string,
+          type: 'TaskCreated',
+          payload: {},
+          createdAt: activityTime,
+        },
+      });
+
+      // Query using the exported DAY_COUNT_SELECT from the service.
+      // This ensures the test uses the actual service's date_trunc form.
+      const dayUtc = await prisma.$queryRaw<Array<{ day: Date; count: number }>>`
+        ${DAY_COUNT_SELECT}
+        WHERE a."workspaceId" = ${workspace.id}
+        GROUP BY 1
+        LIMIT 1
+      `;
+
+      // Query in Istanbul session using the same form.
+      // SET LOCAL is transaction-scoped, so it affects only this query.
+      const dayIstanbul = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SET LOCAL TIME ZONE 'Europe/Istanbul'`;
+        return tx.$queryRaw<Array<{ day: Date; count: number }>>`
+          ${DAY_COUNT_SELECT}
+          WHERE a."workspaceId" = ${workspace.id}
+          GROUP BY 1
+          LIMIT 1
+        `;
+      });
+
+      // With 2-arg form (current SQL), results differ — demonstrating the bug.
+      // With 3-arg form (after fix), results are identical.
+      expect(dayUtc).toHaveLength(1);
+      expect(dayIstanbul).toHaveLength(1);
+      // Compare as date strings to avoid timezone interpretation issues with Date objects.
+      const dayUtcDateStr = dayUtc[0]!.day.toISOString().split('T')[0];
+      const dayIstanbulDateStr = dayIstanbul[0]!.day.toISOString().split('T')[0];
+      expect(dayIstanbulDateStr).toEqual(dayUtcDateStr); // Will FAIL with 2-arg form
+      expect(dayUtcDateStr).toBe('2026-08-14');
+    });
   });
 
   describe('completion follows the column category, not the column name', () => {
