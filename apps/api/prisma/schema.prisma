@@ -183,9 +183,16 @@ model Column {
   tasks Task[]
 
   @@unique([boardId, id])
-  @@index([boardId])
   /// Completion metrics resolve "which columns of this board are done" on every dashboard
   /// read; boardId alone would still have to filter the category in the heap.
+  ///
+  /// No separate `@@index([boardId])` — every read this table serves (board detail's
+  /// column list, dashboard's completed-column lookup, the FK cascade Postgres runs when a
+  /// Board is deleted) issues a bare `boardId` equality, and this index's `(boardId,
+  /// category)` prefix and `@@unique([boardId, id])`'s `boardId` prefix already both satisfy
+  /// that — see migration 20260814150000_drop_unused_indexes for the load-tested proof
+  /// (pg_stat_user_indexes.idx_scan stayed 0 for the narrower index across three seeded
+  /// trials at production-like volume).
   @@index([boardId, category])
 }
 
@@ -235,6 +242,16 @@ model TaskAssignee {
 
   @@unique([taskId, userId])
   @@index([userId])
+  // Looks like a strict prefix of `@@unique([taskId, userId])` and was flagged as redundant
+  // by that reasoning (audit finding DB-07) — load-tested before touching it and kept: the
+  // task board's list/detail views load assignees with `taskId IN (...)`/`taskId = $1`
+  // (task.include.ts via task.service.ts), and Postgres's planner consistently prefers this
+  // narrower single-column index over the wider unique one for that lookup — fewer bytes per
+  // index tuple means fewer pages for a bitmap/index scan matching the same rows, even though
+  // both share the same leading column. pg_stat_user_indexes.idx_scan confirmed real,
+  // repeated use (~1700+ scans per seeded trial) — see migration
+  // 20260814150000_drop_unused_indexes for the full methodology and why only two of the
+  // finding's five candidates were actually safe to drop.
   @@index([taskId])
 }
 
@@ -260,6 +277,11 @@ model TaskLabel {
 
   @@unique([taskId, labelId])
   @@index([labelId])
+  // Same story and same load-tested outcome as `TaskAssignee.@@index([taskId])` above: the
+  // task board's list/detail views load labels with `taskId IN (...)`/`taskId = $1`, and
+  // Postgres's planner picks this narrower index over `@@unique([taskId, labelId])` for that
+  // lookup. Kept despite audit finding DB-07 flagging it as a strict-prefix duplicate — see
+  // migration 20260814150000_drop_unused_indexes.
   @@index([taskId])
 }
 
@@ -291,6 +313,16 @@ model Activity {
   user          User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   notifications Notification[]
 
+  // Flagged as redundant by audit finding DB-07 on the theory that
+  // `@@index([workspaceId, type, createdAt])` below always subsumes a lookup this index could
+  // serve. Load-tested before dropping it and kept: across three seeded trials at
+  // production-like volume, `countActivitiesByDay`'s `workspaceId = ? AND type = ? AND
+  // createdAt >= ?` picked *this* narrower index over the wider one in some workspaces —
+  // Postgres's planner will take the cheaper-looking index when its per-workspace type/date
+  // selectivity estimate makes the trade-off close, and that happened often enough
+  // (pg_stat_user_indexes.idx_scan nonzero in 2 of 3 trials) that "always subsumed" doesn't
+  // hold in practice. See migration 20260814150000_drop_unused_indexes for the methodology
+  // and why only two of the finding's five candidates were actually safe to drop.
   @@index([workspaceId, createdAt])
   @@index([workspaceId, id])
   // Backs the dashboard throughput aggregates (dashboard.service.ts `countActivitiesByDay`:
@@ -327,7 +359,14 @@ model Notification {
   // on. Scoping it to `due_soon` keeps legitimate repeats of other types (several mentions
   // on one task) legal; scoping it to unread rows lets a task be re-notified once the
   // previous reminder has been read. Do not let a generated migration drop it.
-  @@index([userId, createdAt])
+  //
+  // No separate `@@index([userId, createdAt])` — nothing ever lists or counts notifications
+  // ordered by `createdAt` without `workspaceId` in the predicate too (see the workspace-scoped
+  // indexes below), and the `onDelete: Cascade` FK cascade a deleted User triggers is a bare
+  // `userId` equality, already covered by `@@index([userId, type, taskId])`'s `userId` prefix.
+  // See migration 20260814150000_drop_unused_indexes for the load-tested proof
+  // (pg_stat_user_indexes.idx_scan stayed 0 across three seeded trials at production-like
+  // volume).
   // Backs notification.service.ts `list`: `workspaceId` and `userId` are always equality
   // predicates, `id` carries both the cursor (`id < cursor`) and the sort (`orderBy: id
   // desc`). Equality columns first, ordering column last, so a page is a backwards index
