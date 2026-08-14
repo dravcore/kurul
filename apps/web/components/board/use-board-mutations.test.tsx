@@ -162,6 +162,8 @@ describe('useBoardMutations commitTaskMove', () => {
       estimatedMinutes: null,
       assignees: [],
       labels: [],
+      checklistSummary: { total: 0, done: 0 },
+      checklists: null,
       createdById: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d53',
       createdAt: '2026-08-01T00:00:00.000Z',
       updatedAt: '2026-08-01T00:00:00.000Z',
