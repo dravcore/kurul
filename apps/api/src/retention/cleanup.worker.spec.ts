@@ -75,22 +75,51 @@ describe('CleanupWorker', () => {
   }
 
   describe('what it selects', () => {
-    it('sweeps all four tables in one run and reports each table separately', async () => {
+    it('sweeps all five tables in one run and reports each table separately', async () => {
       process.env.CLEANUP_ENABLED = 'true';
-      const { worker, executeRaw } = buildWorker([3, 2, 7, 5]);
+      const { worker, executeRaw } = buildWorker([3, 2, 7, 5, 4]);
 
       await expect(worker.runCleanup(NOW)).resolves.toEqual({
         sessions: 3,
         verifications: 2,
         notifications: 7,
         activities: 5,
+        usagePings: 4,
       });
 
       // One statement per table: each batch came back short, so no table looped.
-      expect(executeRaw).toHaveBeenCalledTimes(4);
-      for (const table of ['Session', 'Verification', 'Notification', 'Activity']) {
+      expect(executeRaw).toHaveBeenCalledTimes(5);
+      for (const table of ['Session', 'Verification', 'Notification', 'Activity', 'UsagePing']) {
         expect(callsFor(executeRaw, table)).toHaveLength(1);
       }
+    });
+
+    /**
+     * Usage pings share ACTIVITY_RETENTION_DAYS rather than carrying a window of their own —
+     * same class of row, one decision for the operator to make. The window runs from
+     * `createdAt`, which is what "kept for N days after it was written" means.
+     */
+    it('sweeps UsagePing on the activity window, measured from createdAt', async () => {
+      process.env.CLEANUP_ENABLED = 'true';
+      process.env.ACTIVITY_RETENTION_DAYS = '30';
+      const { worker, executeRaw } = buildWorker();
+
+      await worker.runCleanup(NOW);
+
+      const [call] = callsFor(executeRaw, 'UsagePing');
+      expect(statementOf(call!)).toContain('WHERE "createdAt" < ?');
+      expect(call![1]).toEqual(new Date(NOW.getTime() - 30 * DAY_MS));
+    });
+
+    /** `0` means "keep forever" for pings exactly as it does for the activity rows. */
+    it('issues no UsagePing statement when the activity window is disabled', async () => {
+      process.env.CLEANUP_ENABLED = 'true';
+      process.env.ACTIVITY_RETENTION_DAYS = '0';
+      const { worker, executeRaw } = buildWorker();
+
+      await worker.runCleanup(NOW);
+
+      expect(callsFor(executeRaw, 'UsagePing')).toHaveLength(0);
     });
 
     it('deletes a Session strictly before its own expiry, never one expiring exactly now', async () => {
@@ -216,6 +245,7 @@ describe('CleanupWorker', () => {
         verifications: 0,
         notifications: 0,
         activities: 0,
+        usagePings: 0,
       });
       expect(executeRaw).not.toHaveBeenCalled();
       expect(lines).toEqual([]);
@@ -263,7 +293,7 @@ describe('CleanupWorker', () => {
   describe('the log line', () => {
     it('emits one JSON line carrying the per-table counts and nothing from the rows', async () => {
       process.env.CLEANUP_ENABLED = 'true';
-      const { worker, lines } = buildWorker([3, 2, 7, 5]);
+      const { worker, lines } = buildWorker([3, 2, 7, 5, 4]);
 
       await worker.runCleanup(NOW);
 
@@ -276,6 +306,7 @@ describe('CleanupWorker', () => {
         verifications: 2,
         notifications: 7,
         activities: 5,
+        usagePings: 4,
       });
       expect(typeof line.ts).toBe('string');
       expect(typeof line.durationMs).toBe('number');
@@ -290,6 +321,7 @@ describe('CleanupWorker', () => {
         'notifications',
         'sessions',
         'ts',
+        'usagePings',
         'verifications',
       ]);
     });

@@ -216,6 +216,34 @@
         "deleteError": "Could not delete this workspace.",
         "deleteErrorForbidden": "Only an owner can delete this workspace. Ask a workspace owner.",
         "deleteErrorGone": "This workspace no longer exists."
+      },
+      "activation": {
+        "title": "Instance activation",
+        "description": "How far people get on this server, from signing up to a team that keeps coming back. Counted from what this instance already stores; nothing here is sent anywhere.",
+        "northStar": {
+          "activeTeams": "Active teams ({days}d)",
+          "activeWorkspaces": "Active workspaces ({days}d)",
+          "teamWorkspaces": "Workspaces with 2+ members",
+          "help": "A workspace counts as an active team when two or more of its current members did something in it — edited a card, or simply opened a board. The two figures beside it are the context: how many workspaces saw any activity at all, and how many have more than one member to begin with."
+        },
+        "steps": {
+          "user_registered": "Created an account",
+          "workspace_created": "Owns a workspace",
+          "board_created": "Created a board",
+          "first_task_created": "Added a card",
+          "first_drag": "Moved a card",
+          "invite_sent": "Invited someone",
+          "smtp_configured": "Outbound email",
+          "invite_accepted": "Joined by invitation",
+          "dashboard_viewed": "Opened the dashboard",
+          "task_completed": "Completed a card",
+          "wau_board_view": "Opened a board"
+        },
+        "peopleCount": "{count, plural, =0 {no one} one {# person} other {# people}}",
+        "windowSuffix": "in the last {days} days",
+        "configured": "configured",
+        "notConfigured": "not configured",
+        "localOnly": "These numbers are computed on this server and shown only to the accounts you listed as instance administrators. Kurultay sends nothing outside this server unless you switch telemetry on yourself."
       }
     },
     "workspace": {

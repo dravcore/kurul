@@ -59,6 +59,7 @@ model User {
   comments         Comment[]
   activities       Activity[]
   notifications    Notification[]
+  usagePings       UsagePing[]
 }
 
 model Session {
@@ -119,6 +120,7 @@ model Workspace {
   boards      Board[]
   activities  Activity[]
   notifications Notification[]
+  usagePings  UsagePing[]
 }
 
 model WorkspaceMember {
@@ -391,4 +393,65 @@ model Notification {
   // so nightly in batches; without this index each batch would re-scan the whole table once
   // per row.
   @@index([activityId])
+}
+
+/// One row per (user, workspace, kind, UTC day): "this person opened this thing that day".
+///
+/// The activation funnel is otherwise derived entirely from rows that already existed —
+/// `User`, `WorkspaceMember`, `Activity` — and adding a table was a decision, not a default.
+/// Two of the eleven questions cannot be answered from writes at all: `Activity` records what
+/// somebody *changed*, and a team that reads its board every morning and moves nothing changes
+/// nothing. Measuring retention from `Activity` alone reports the quietest healthy instances as
+/// dead, which is the specific way this metric would have lied.
+///
+/// Everything about the shape is chosen to store as little as a "did they show up" answer
+/// needs:
+///
+/// - **Deduplicated to one row per UTC day** by `@@unique`, written with `ON CONFLICT DO
+///   NOTHING`. Not a counter and not a log: a row says the day happened, never how many times,
+///   so no session-by-session browsing history accumulates here even in principle.
+/// - **`day` is a `DATE`, not a timestamp.** The time of day is not in the answer, so it is not
+///   in the table. It is also what makes the unique constraint able to collapse a day's views.
+/// - **No board id, no path, no user agent, no address.** `workspaceId` is the coarsest scope
+///   that still lets the North Star ask "were two members of *this* workspace active", which is
+///   the only question the column exists for.
+/// - **`onDelete: Cascade` on both sides**, unlike `Activity.user` (`Restrict`). An activity row
+///   is evidence and must survive its actor; a record that somebody once looked at a page is
+///   not evidence of anything and must not outlive the account it describes.
+///
+/// Swept by the nightly retention job under `ACTIVITY_RETENTION_DAYS`
+/// (docs/decisions/0020-data-retention.md): same class of row as an activity — instance history
+/// about a named user — so it inherits the same window rather than growing a switch of its own.
+model UsagePing {
+  id          String   @id @default(uuid(7))
+  userId      String
+  workspaceId String
+  /// `UsagePingKind` in @kurultay/shared-types — `board_view` or `dashboard_view`. A string
+  /// rather than an enum for the same reason `Activity.type` is one: adding the next kind must
+  /// be an insert, not a migration that locks the table.
+  kind        String
+  /// UTC midnight of the day being recorded. Written from `Date.UTC(...)`, never from a local
+  /// date, so an instance running with `TZ=Europe/Istanbul` buckets identically to one in UTC —
+  /// the same trap `DAY_COUNT_SELECT` in dashboard.service.ts documents at length.
+  day         DateTime @db.Date
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  /// The dedupe. Also the index the `ON CONFLICT` insert probes, so the write costs one index
+  /// lookup and nothing else.
+  @@unique([userId, workspaceId, kind, day])
+  /// Deliberately one index and deliberately not `(kind, day)`. Both readers of this table are
+  /// day-range scans: the funnel reads the last seven days across both kinds at once, and the
+  /// retention sweep deletes everything older than its cutoff across both kinds at once.
+  /// `kind` has two values, so leading with it would halve a scan that a date range has already
+  /// cut to a fraction of a percent — see DB-07 in the audit for what happens when index
+  /// columns are added on the theory that a predicate mentions them.
+  @@index([day])
+  /// Cascade support. A deleted workspace runs `DELETE FROM "UsagePing" WHERE "workspaceId" =
+  /// $1`, which no other index here leads with (`@@unique` leads with `userId`). Without it,
+  /// deleting one workspace scans the whole table. `userId` needs no twin: the unique index
+  /// already leads with it.
+  @@index([workspaceId])
 }

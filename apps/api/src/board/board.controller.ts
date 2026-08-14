@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, Headers, HttpCode, Patch, Post } from '@nestjs/common';
+import { UsagePingKind } from '@kurultay/shared-types';
 import type { BoardDto } from '@kurultay/shared-types';
+import { UsagePingService } from '../activation/usage-ping.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';
 import type { AuthenticatedUser } from '../common/types/request-context';
@@ -18,7 +20,10 @@ import { UpdateBoardDto } from './dto/update-board.dto';
  */
 @Controller('workspaces/:workspaceId/boards')
 export class BoardController {
-  constructor(private readonly boardService: BoardService) {}
+  constructor(
+    private readonly boardService: BoardService,
+    private readonly usagePing: UsagePingService,
+  ) {}
 
   @Get()
   @WorkspaceScoped()
@@ -42,12 +47,26 @@ export class BoardController {
     return this.boardService.create(workspaceId, user.id, dto, acceptLanguage);
   }
 
+  /**
+   * Also the `wau_board_view` signal, and therefore half of the North Star metric.
+   *
+   * Recorded on the controller rather than inside `BoardService.get` on purpose: the service is
+   * called from places that are not a person looking at a board, and a metric named "weekly
+   * active" must count visits, not internal reads. Not awaited, cannot fail the request, and
+   * deduplicated to one row per user per workspace per UTC day — see `UsagePingService`.
+   *
+   * The ping carries the workspace, never the board: "were two members of this workspace active
+   * this week" is the only question it exists to answer, and a per-board trail would be a
+   * browsing history the funnel has no use for.
+   */
   @Get(':boardId')
   @WorkspaceScoped()
   get(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('boardId') boardId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<BoardDto> {
+    this.usagePing.recordQuietly(user.id, workspaceId, UsagePingKind.BoardView);
     return this.boardService.get(workspaceId, boardId);
   }
 

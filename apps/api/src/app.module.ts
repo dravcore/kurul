@@ -12,10 +12,12 @@ import { TaskModule } from './task/task.module';
 import { LabelModule } from './label/label.module';
 import { CommentModule } from './comment/comment.module';
 import { ActivityModule } from './activity/activity.module';
+import { ActivationModule } from './activation/activation.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationModule } from './notification/notification.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RetentionModule } from './retention/retention.module';
+import { TelemetryModule } from './telemetry/telemetry.module';
 import { SessionAuthGuard } from './common/guards/session-auth.guard';
 import { throttlerOptions } from './common/rate-limit/rate-limit';
 
@@ -33,10 +35,12 @@ import { throttlerOptions } from './common/rate-limit/rate-limit';
     LabelModule,
     CommentModule,
     ActivityModule,
+    ActivationModule,
     DashboardModule,
     NotificationModule,
     RealtimeModule,
     RetentionModule,
+    TelemetryModule,
   ],
   providers: [
     // Order matters: global guards run in registration order, and the throttler has to come
