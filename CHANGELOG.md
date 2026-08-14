@@ -325,6 +325,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   breakpoint default regardless of what was chosen last time. The toggle now writes to
   `localStorage`, and the breakpoint listener defers to a stored preference instead of
   overwriting it.
+- Two columns created or moved into the same gap on the same board at the same time can no
+  longer land on the same `position`. `ColumnService.create` read its siblings outside any
+  transaction and, when the gap did not need a rebalance, ran a single unguarded insert;
+  `move` opened a transaction but never locked the board row inside it. Both now take the
+  same `SELECT … FOR UPDATE` lock on the board row that `createDefaults` already took when
+  seeding a new board's starting columns, and that the task create/move path already took on
+  the column row — a concurrency contract the column path had simply never picked up. The
+  observable symptom was never data loss (`(position, id)` keeps ordering deterministic even
+  on a tie) — only two users seeing a different column order than either expected.
 
 ### Security
 

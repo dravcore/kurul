@@ -93,25 +93,31 @@ export class ColumnService {
     dto: CreateColumnDto,
   ): Promise<ColumnDto> {
     await assertBoard(this.prisma, workspaceId, boardId);
-    // Ordering math only: id and position are the whole input to the neighbour lookup and the
-    // rebalance that may follow.
-    const columns = await this.prisma.column.findMany({
-      where: { boardId },
-      orderBy: [{ position: 'asc' }, { id: 'asc' }],
-      select: { id: true, position: true },
-    });
-    // `afterColumnId` is the client's word for "insert after this column", which in position
-    // order makes that column the new row's `prev` — the DTO name is translated here, once.
-    const { insertionIndex, prev, next } = resolveCreateNeighbors(
-      columns,
-      dto.afterColumnId,
-      'Column not found',
-    );
-    const position = midpoint(prev?.position ?? null, next?.position ?? null);
 
-    let created: ColumnDto;
-    if (needsRebalance(prev?.position ?? null, next?.position ?? null)) {
-      created = await this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
+      // Lock before reading siblings so concurrent creates/moves into the same gap cannot
+      // both compute the same midpoint from a shared snapshot. Matches the lock `move` takes
+      // below and the one `createDefaults` takes on this same board row when seeding — the
+      // rows being guarded there don't exist yet either, so the board row stands in for them.
+      await tx.$executeRaw`SELECT id FROM "Board" WHERE id = ${boardId} FOR UPDATE`;
+
+      // Ordering math only: id and position are the whole input to the neighbour lookup and the
+      // rebalance that may follow.
+      const columns = await tx.column.findMany({
+        where: { boardId },
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        select: { id: true, position: true },
+      });
+      // `afterColumnId` is the client's word for "insert after this column", which in position
+      // order makes that column the new row's `prev` — the DTO name is translated here, once.
+      const { insertionIndex, prev, next } = resolveCreateNeighbors(
+        columns,
+        dto.afterColumnId,
+        'Column not found',
+      );
+      const position = midpoint(prev?.position ?? null, next?.position ?? null);
+
+      if (needsRebalance(prev?.position ?? null, next?.position ?? null)) {
         const positions = rebalancePositions(columns.length + 1);
         const updates = columns.map((column, index) => ({
           id: column.id,
@@ -129,14 +135,14 @@ export class ColumnService {
           include: { _count: { select: { tasks: true } } },
         });
         return this.toDto(row);
-      });
-    } else {
-      const row = await this.prisma.column.create({
+      }
+
+      const row = await tx.column.create({
         data: { boardId, name: dto.name, color: dto.color, category: dto.category, position },
         include: { _count: { select: { tasks: true } } },
       });
-      created = this.toDto(row);
-    }
+      return this.toDto(row);
+    });
 
     this.emitChanged(workspaceId, actorId, created.boardId, created.id);
     return created;
@@ -285,6 +291,11 @@ export class ColumnService {
       if (dto.beforeColumnId === columnId || dto.afterColumnId === columnId) {
         throw new BadRequestException('A column cannot be its own neighbor');
       }
+
+      // Lock before reading siblings so concurrent creates/moves into the same gap cannot both
+      // compute the same midpoint from a shared snapshot. Matches the lock `create` takes above
+      // and the one `createDefaults` takes on this same board row when seeding.
+      await tx.$executeRaw`SELECT id FROM "Board" WHERE id = ${column.boardId} FOR UPDATE`;
 
       // Same two columns as on create; the moved column itself was read in full above, and the
       // response is re-read with `_count` after the write.
