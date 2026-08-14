@@ -1,0 +1,62 @@
+-- Audit finding DB-07 flagged five indexes as unused/redundant on structural grounds: three
+-- looked like strict prefixes of a unique/composite index on the same table
+-- (`Column_boardId_idx`, `TaskAssignee_taskId_idx`, `TaskLabel_taskId_idx`), and two had no
+-- application query that appeared to match their column order
+-- (`Activity_workspaceId_createdAt_idx`, `Notification_userId_createdAt_idx`).
+--
+-- Per the finding's own recommendation ("verify against a production-like DB with
+-- pg_stat_user_indexes.idx_scan before dropping"), all five were load-tested rather than
+-- dropped on the strength of the structural argument alone: seed ~120k rows across 15
+-- workspaces (users, boards, columns, tasks, task assignees, labels, task labels, activities,
+-- notifications) at the fan-out the real schema implies, run every read query shape the
+-- affected services actually issue (activity.service.ts, dashboard.service.ts,
+-- notification.service.ts, task.service.ts's `taskInclude` relation loads), exercise the FK
+-- cascades their `onDelete` rules rely on (board delete, task delete, user delete), then read
+-- `pg_stat_user_indexes.idx_scan`. Repeated across three independent seeds because a single
+-- run isn't enough to trust a zero — see the two outcomes below.
+--
+-- Two of the five came back idx_scan = 0 in all three trials, with no code path found that
+-- could plausibly reach them either:
+--
+--   * `Column_boardId_idx` — `@@unique([boardId, id])` and `@@index([boardId, category])`
+--     both lead with `boardId` and already serve every real lookup (board detail's column
+--     list, dashboard's completed-column query, the FK cascade a deleted Board triggers).
+--   * `Notification_userId_createdAt_idx` — nothing lists or counts notifications by
+--     `createdAt` without `workspaceId` in the predicate too (every real query is
+--     workspace-scoped); the `onDelete: Cascade` FK cascade a deleted User triggers is a bare
+--     `userId` equality, already covered by `@@index([userId, type, taskId])`'s `userId`
+--     prefix.
+--
+-- Those two are dropped below. The other three are NOT — the load test found them actually
+-- in use, which invalidates the finding's structural argument for those specific indexes even
+-- though the prefix relationship it points at is real:
+--
+--   * `TaskAssignee_taskId_idx` and `TaskLabel_taskId_idx` — `task.service.ts` loads a
+--     board's task list (and a single task's detail) with `taskInclude`, which issues
+--     `WHERE "taskId" IN (...)` / `WHERE "taskId" = $1` against both join tables. Postgres
+--     consistently chose the narrower single-column index over the wider unique composite
+--     for that lookup (confirmed with EXPLAIN: `Bitmap Index Scan on "TaskAssignee_taskId_idx"`)
+--     — fewer bytes per index tuple means fewer pages to scan for the same matching rows,
+--     even though both indexes share the same leading column. idx_scan landed around 1700+
+--     per trial; this is a hot, frequent read path (every board and task-detail view), not
+--     an edge case.
+--   * `Activity_workspaceId_createdAt_idx` — `dashboard.service.ts`'s `countActivitiesByDay`
+--     (`workspaceId = ? AND type = ? AND createdAt >= ?`) picked this narrower index over
+--     `@@index([workspaceId, type, createdAt])` in some workspaces during 2 of the 3 trials.
+--     When a workspace's `type` selectivity estimate makes the two indexes look close in
+--     cost, Postgres's planner will pick either — "the wider composite index always subsumes
+--     this one" doesn't hold up under an actual cost-based planner making a close call
+--     per-workspace.
+--
+-- (Unrelated to this migration, but noticed while tracing every "reads by Activity.createdAt"
+-- call site for this investigation: `retention/cleanup.worker.ts`'s nightly sweep deletes
+-- Activity rows with a bare `WHERE "createdAt" < cutoff`, which has no workspaceId equality
+-- and so cannot use either the dropped or the kept `workspaceId`-leading index — that sweep
+-- likely does a sequential scan today regardless of this migration. Flagged for the
+-- retention/cleanup worker's owner, not fixed here — out of DB-07's scope.)
+--
+-- DropIndex
+DROP INDEX "Column_boardId_idx";
+
+-- DropIndex
+DROP INDEX "Notification_userId_createdAt_idx";
