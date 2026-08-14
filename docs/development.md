@@ -118,6 +118,7 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `NEXT_PUBLIC_SENTRY_DSN`              | _(blank)_                                                           | Web error tracking, same opt-in rule — **baked at build time**, so rebuild the web image after changing it                                                                                                               |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(blank)_ / `production`                                            | `SENTRY_ENVIRONMENT`'s web counterpart, also build-time                                                                                                                                                                  |
 | `NEXT_PUBLIC_SENTRY_RELEASE`          | _(blank)_ / `v0.2.0`                                                | `SENTRY_RELEASE`'s web counterpart, also build-time                                                                                                                                                                      |
+| `SEED_LARGE_BOARD_TASKS`              | _(blank)_ / `1000`                                                  | Read only by `pnpm db:seed`. Adds a synthetic board of this many tasks next to the demo one. Blank or `0` skips it — see [Seeding a large board](#seeding-a-large-board)                                                 |
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` are read only by `next build` when
 uploading source maps, and only when they are set; they are absent from `.env.example`
@@ -492,6 +493,28 @@ docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
 pnpm db:seed
 ```
+
+### Seeding a large board
+
+The default seed is four tasks, which is the right size for developing a feature and the wrong
+size for finding out what the board does under load. `SEED_LARGE_BOARD_TASKS` adds a second
+board — "Load Test Board", five columns, the largest holding about a third of the tasks —
+alongside the demo one:
+
+```bash
+SEED_LARGE_BOARD_TASKS=1000 pnpm db:seed
+```
+
+Unset or `0` (the default) skips it entirely, so nobody pays for it who did not ask. Anything
+that is not a positive integer is treated the same as unset rather than clamped: a typo must
+not quietly seed a board of some size other than the one you are about to measure against.
+
+The rows are realistic rather than uniform — mixed priorities, labels on about half the cards,
+assignees on a quarter, due dates spread across and past the due-soon window — because a board
+where every card is the same shape measures one shape of card. This is the board the per-column
+render budget in
+[`apps/web/components/board/board-column.tsx`](../apps/web/components/board/board-column.tsx)
+was measured against.
 
 ## Data retention
 
