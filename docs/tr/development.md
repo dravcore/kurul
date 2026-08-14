@@ -117,6 +117,7 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `NEXT_PUBLIC_SENTRY_DSN`              | _(boş)_                                                             | Web hata takibi, aynı opt-in kuralı — **build sırasında gömülür**, değiştirdikten sonra web imajını yeniden build edin                                                                                                                             |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(boş)_ / `production`                                              | `SENTRY_ENVIRONMENT`'ın web karşılığı, o da build zamanlı                                                                                                                                                                                          |
 | `NEXT_PUBLIC_SENTRY_RELEASE`          | _(boş)_ / `v0.2.0`                                                  | `SENTRY_RELEASE`'in web karşılığı, o da build zamanlı                                                                                                                                                                                              |
+| `SEED_LARGE_BOARD_TASKS`              | _(boş)_ / `1000`                                                    | Yalnızca `pnpm db:seed` okur. Demo board'un yanına bu kadar task taşıyan sentetik bir board ekler. Boş ya da `0` atlar — bkz. [Büyük board seed'lemek](#büyük-board-seedlemek)                                                                     |
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` ve `SENTRY_PROJECT` yalnızca `next build` tarafından, source
 map yüklenirken ve yalnızca ayarlanmışlarsa okunur; bunlar olmadan build sessizce başarılı
@@ -496,6 +497,27 @@ docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
 pnpm db:seed
 ```
+
+### Büyük board seed'lemek
+
+Varsayılan seed dört task'tır; bir özellik geliştirmek için doğru, board'un yük altında ne
+yaptığını görmek için yanlış boyuttur. `SEED_LARGE_BOARD_TASKS`, demo board'un yanına ikinci
+bir board ekler — "Load Test Board", beş column, en büyüğü task'ların yaklaşık üçte birini
+tutar:
+
+```bash
+SEED_LARGE_BOARD_TASKS=1000 pnpm db:seed
+```
+
+Boş ya da `0` (varsayılan) bunu tamamen atlar; istemeyen kimse bedelini ödemez. Pozitif tam
+sayı olmayan her değer clamp'lenmek yerine "boş" sayılır: bir yazım hatası, ölçmek üzere
+olduğunuzdan başka boyutta bir board'u sessizce seed'lememelidir.
+
+Satırlar tekdüze değil gerçekçidir — karışık öncelikler, kartların yaklaşık yarısında label,
+dörtte birinde atanan kişi, due-soon penceresinin içine ve gerisine yayılmış son tarihler —
+çünkü her kartın aynı şekilde olduğu bir board tek bir kart şeklini ölçer.
+[`apps/web/components/board/board-column.tsx`](../../apps/web/components/board/board-column.tsx)
+içindeki column başına render bütçesi bu board'a karşı ölçüldü.
 
 ## Veri saklama
 
