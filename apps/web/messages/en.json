@@ -415,6 +415,7 @@
           "addItem": "Add item",
           "removeItem": "Delete item {content}",
           "progress": "Checklist: {done} of {total} items done",
+          "complete": "Checklist complete: all {total} items done",
           "saveError": "Could not save this checklist.",
           "forbidden": "You don't have access to change this task. Ask a workspace admin."
         },
