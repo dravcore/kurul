@@ -32,8 +32,11 @@ type DayCountRow = { day: Date; count: number | bigint };
  * instead, causing midnight boundaries to misalign with throughput keys (which are always UTC).
  * This was masked in development by Docker's UTC default but would break in self-hosted
  * deployments setting TZ=Europe/Istanbul or similar.
+ *
+ * Exported for regression testing: tests can import and verify that this form produces
+ * timezone-independent results.
  */
-const DAY_COUNT_SELECT = Prisma.sql`
+export const DAY_COUNT_SELECT = Prisma.sql`
   SELECT date_trunc('day', a."createdAt" AT TIME ZONE 'UTC', 'UTC') AS day,
          COUNT(*)::int AS count
   FROM "Activity" a

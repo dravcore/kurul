@@ -3,6 +3,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { MemberRole } from '@kurultay/shared-types';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { DAY_COUNT_SELECT } from '../src/dashboard/dashboard.service';
 import { createTestApp } from './helpers/app';
 import { addMember, createWorkspace, signUp } from './helpers/auth';
 import { resetDatabase } from './helpers/db';
@@ -157,22 +158,23 @@ describe('Dashboard (e2e)', () => {
         },
       });
 
-      // Query using the three-argument form (the fix), cast to date to avoid timezone interpretation.
-      const dayUtc = await prisma.$queryRaw<Array<{ day: Date }>>`
-        SELECT (date_trunc('day', a."createdAt" AT TIME ZONE 'UTC', 'UTC'))::date AS day
-        FROM "Activity" a
+      // Query using the exported DAY_COUNT_SELECT from the service.
+      // This ensures the test uses the actual service's date_trunc form.
+      const dayUtc = await prisma.$queryRaw<Array<{ day: Date; count: number }>>`
+        ${DAY_COUNT_SELECT}
         WHERE a."workspaceId" = ${workspace.id}
+        GROUP BY 1
         LIMIT 1
       `;
 
-      // Query in Istanbul session using the same three-argument form.
+      // Query in Istanbul session using the same form.
       // SET LOCAL is transaction-scoped, so it affects only this query.
       const dayIstanbul = await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SET LOCAL TIME ZONE 'Europe/Istanbul'`;
-        return tx.$queryRaw<Array<{ day: Date }>>`
-          SELECT (date_trunc('day', a."createdAt" AT TIME ZONE 'UTC', 'UTC'))::date AS day
-          FROM "Activity" a
+        return tx.$queryRaw<Array<{ day: Date; count: number }>>`
+          ${DAY_COUNT_SELECT}
           WHERE a."workspaceId" = ${workspace.id}
+          GROUP BY 1
           LIMIT 1
         `;
       });
@@ -181,8 +183,11 @@ describe('Dashboard (e2e)', () => {
       // With 3-arg form (after fix), results are identical.
       expect(dayUtc).toHaveLength(1);
       expect(dayIstanbul).toHaveLength(1);
-      expect(dayIstanbul[0]!.day).toEqual(dayUtc[0]!.day); // This will FAIL with 2-arg form
-      expect(dayUtc[0]!.day.toISOString()).toContain('2026-08-14');
+      // Compare as date strings to avoid timezone interpretation issues with Date objects.
+      const dayUtcDateStr = dayUtc[0]!.day.toISOString().split('T')[0];
+      const dayIstanbulDateStr = dayIstanbul[0]!.day.toISOString().split('T')[0];
+      expect(dayIstanbulDateStr).toEqual(dayUtcDateStr); // Will FAIL with 2-arg form
+      expect(dayUtcDateStr).toBe('2026-08-14');
     });
   });
 
