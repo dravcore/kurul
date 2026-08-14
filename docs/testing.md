@@ -165,7 +165,7 @@ These floors keep already-covered code from sliding back. Each fails CI.
 
 | Scope                             | Floor                                                 | Set in                      |
 | --------------------------------- | ----------------------------------------------------- | --------------------------- |
-| `apps/api` global                 | statements 55 / branches 45 / functions 57 / lines 56 | `apps/api/jest.config.cjs`  |
+| `apps/api` global                 | statements 75 / branches 66 / functions 77 / lines 76 | `apps/api/jest.config.cjs`  |
 | `apps/web` `app/**`               | statements 85 / branches 90 / functions 85 / lines 85 | `apps/web/vitest.config.ts` |
 | `apps/web` `components/board/**`  | statements 65 / branches 54 / functions 54 / lines 70 | `apps/web/vitest.config.ts` |
 | `apps/web` `components/task/**`   | statements 60 / branches 60 / functions 58 / lines 62 | `apps/web/vitest.config.ts` |

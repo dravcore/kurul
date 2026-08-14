@@ -1,4 +1,9 @@
-import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ActivityType, MemberRole } from '@kurultay/shared-types';
 import { APIError } from 'better-auth/api';
 import type { Request } from 'express';
@@ -142,6 +147,150 @@ describe('WorkspaceService Better Auth error mapping', () => {
     api.deleteOrganization.mockRejectedValue(failure);
 
     await expect(service.remove(WORKSPACE_ID, ACTOR_ID, request)).rejects.toBe(failure);
+  });
+});
+
+describe('WorkspaceService.listForUser', () => {
+  it('maps each membership to the workspace it belongs to, oldest join first', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceMember.findMany.mockResolvedValue([
+      {
+        workspace: {
+          id: WORKSPACE_ID,
+          name: 'Acme',
+          slug: 'acme',
+          createdAt: new Date('2026-01-01'),
+        },
+      },
+      {
+        workspace: {
+          id: 'other-workspace',
+          name: 'Other',
+          slug: 'other',
+          createdAt: new Date('2026-02-01'),
+        },
+      },
+    ]);
+
+    const workspaces = await service.listForUser(ACTOR_ID);
+
+    expect(prisma.workspaceMember.findMany).toHaveBeenCalledWith({
+      where: { userId: ACTOR_ID },
+      include: { workspace: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(workspaces).toEqual([
+      { id: WORKSPACE_ID, name: 'Acme', slug: 'acme', createdAt: '2026-01-01T00:00:00.000Z' },
+      {
+        id: 'other-workspace',
+        name: 'Other',
+        slug: 'other',
+        createdAt: '2026-02-01T00:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('returns an empty list for a user with no memberships', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceMember.findMany.mockResolvedValue([]);
+
+    await expect(service.listForUser(ACTOR_ID)).resolves.toEqual([]);
+  });
+});
+
+describe('WorkspaceService.create', () => {
+  it('refuses a slug already taken, without ever calling Better Auth', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspace.findUnique.mockResolvedValue({ id: 'existing', slug: 'acme' });
+
+    await expect(
+      service.create(ACTOR_ID, { name: 'Acme', slug: 'acme' }, request),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(api.createOrganization).not.toHaveBeenCalled();
+  });
+
+  it('creates the workspace when the slug is free', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspace.findUnique.mockResolvedValue(null);
+    api.createOrganization.mockResolvedValue({
+      id: WORKSPACE_ID,
+      name: 'Acme',
+      slug: 'acme',
+      createdAt: new Date('2026-01-01'),
+    });
+
+    const created = await service.create(ACTOR_ID, { name: 'Acme', slug: 'acme' }, request);
+
+    expect(api.createOrganization).toHaveBeenCalledWith({
+      body: { name: 'Acme', slug: 'acme', keepCurrentActiveOrganization: false },
+      headers: expect.any(Headers),
+    });
+    expect(created).toEqual({
+      id: WORKSPACE_ID,
+      name: 'Acme',
+      slug: 'acme',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('rejects a plugin response with no organization, rather than returning an empty workspace', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspace.findUnique.mockResolvedValue(null);
+    api.createOrganization.mockResolvedValue(null);
+
+    await expect(
+      service.create(ACTOR_ID, { name: 'Acme', slug: 'acme' }, request),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('WorkspaceService.getById', () => {
+  it('returns the workspace when it exists', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspace.findUnique.mockResolvedValue({
+      id: WORKSPACE_ID,
+      name: 'Acme',
+      slug: 'acme',
+      createdAt: new Date('2026-01-01'),
+    });
+
+    await expect(service.getById(WORKSPACE_ID)).resolves.toEqual({
+      id: WORKSPACE_ID,
+      name: 'Acme',
+      slug: 'acme',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('404s when the workspace does not exist', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspace.findUnique.mockResolvedValue(null);
+
+    await expect(service.getById(WORKSPACE_ID)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('WorkspaceService.update slug uniqueness pre-check', () => {
+  it('refuses a slug already used by another workspace, without calling Better Auth', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspace.findFirst.mockResolvedValue({ id: 'clash' });
+
+    await expect(
+      service.update(WORKSPACE_ID, ACTOR_ID, { slug: 'taken' }, request),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.workspace.findFirst).toHaveBeenCalledWith({
+      where: { slug: 'taken', NOT: { id: WORKSPACE_ID } },
+    });
+    expect(api.updateOrganization).not.toHaveBeenCalled();
+  });
+
+  it('rejects a plugin response with no organization, rather than returning an empty workspace', async () => {
+    const { service } = buildService();
+    api.updateOrganization.mockResolvedValue(null);
+
+    await expect(
+      service.update(WORKSPACE_ID, ACTOR_ID, { name: 'Renamed' }, request),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 
