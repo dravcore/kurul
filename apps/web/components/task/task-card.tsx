@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import type { TaskDto } from '@kurultay/shared-types';
 import { formatEstimate } from '@/lib/duration';
 import { cn } from '@/lib/utils';
+import { ChecklistBadge } from './checklist-badge';
 import { LabelDots } from './label-chip';
 import { PriorityIcon } from './priority-icon';
 
@@ -64,8 +65,17 @@ export function TaskCard({
         <span className="line-clamp-2 min-w-0 flex-1 text-body text-foreground">{task.title}</span>
       </span>
       <LabelDots labels={task.labels} className="mt-1.5" />
-      {task.dueDate || task.estimatedMinutes !== null || task.assignees.length > 0 ? (
+      {task.dueDate ||
+      task.estimatedMinutes !== null ||
+      task.assignees.length > 0 ||
+      task.checklistSummary.total > 0 ? (
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro text-muted-foreground">
+          {/*
+            Kept inside the existing meta row rather than given a line of its own: the row is
+            already the card's "everything else" strip, and a card that grows a second row per
+            feature is the shape the column's 56px intrinsic-size guess was measured against.
+          */}
+          <ChecklistBadge summary={task.checklistSummary} />
           {task.dueDate ? (
             <span className={cn(overdue && 'text-status-danger')}>
               {formatDueDate(task.dueDate, locale)}

@@ -75,6 +75,28 @@ export interface AddTaskLabelRequest {
   labelId: string;
 }
 
+/** `POST /workspaces/:workspaceId/tasks/:taskId/checklists` */
+export interface CreateChecklistRequest {
+  title: string;
+}
+
+/** `POST /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId/items` */
+export interface CreateChecklistItemRequest {
+  content: string;
+}
+
+/**
+ * `PATCH /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId`
+ *
+ * Both fields optional because the two edits are independent: ticking a box must not resend
+ * the content, and renaming an item must not restate whether it is done. An empty body is
+ * accepted by the server and deliberately writes nothing.
+ */
+export interface UpdateChecklistItemRequest {
+  content?: string;
+  isDone?: boolean;
+}
+
 /** `POST /workspaces/:workspaceId/boards` */
 export interface CreateBoardRequest {
   name: string;
