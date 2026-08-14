@@ -217,6 +217,30 @@ describe('ColumnService', () => {
     );
   });
 
+  it('locks the board row before reading siblings, so two concurrent creates cannot land on the same position', async () => {
+    const { service, prisma } = buildService();
+    prisma.column.findMany.mockResolvedValue([{ id: 'last', position: 3000 }]);
+    prisma.column.create.mockResolvedValue({
+      id: 'new',
+      boardId: BOARD_ID,
+      name: 'Review',
+      position: 4000,
+      color: null,
+      category: ColumnCategory.UNSTARTED,
+      _count: { tasks: 0 },
+    });
+
+    await service.create(WORKSPACE_ID, BOARD_ID, ACTOR_ID, { name: 'Review' });
+
+    // BE-05: `create` used to read siblings and run its single-row insert outside any
+    // transaction at all. Matches the lock `createDefaults` already takes on this same board
+    // row, and the one the task path takes on the column row.
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$executeRaw).toHaveBeenCalled();
+    const [fragments] = prisma.$executeRaw.mock.calls[0] as [TemplateStringsArray];
+    expect(fragments.join('?')).toContain('FOR UPDATE');
+  });
+
   it('passes an explicit category straight through on create', async () => {
     const { service, prisma } = buildService();
     prisma.column.findMany.mockResolvedValue([{ id: 'last', position: 3000 }]);
@@ -493,6 +517,56 @@ describe('ColumnService', () => {
     await expect(rejected).rejects.toThrow('A column cannot be its own neighbor');
   });
 
+  it('locks the board row before reading siblings on move, after the neighbor check', async () => {
+    const { service, prisma } = buildService();
+    const column = { id: COLUMN_ID, boardId: BOARD_ID, name: 'Todo', position: 2000, color: null };
+    const before = {
+      id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d54',
+      boardId: BOARD_ID,
+      position: 1000,
+    };
+    const after = {
+      id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d55',
+      boardId: BOARD_ID,
+      position: 3000,
+    };
+    const callOrder: string[] = [];
+    const tx = {
+      column: {
+        findFirst: jest.fn().mockImplementation(async () => {
+          callOrder.push('findFirst');
+          return column;
+        }),
+        findMany: jest.fn().mockImplementation(async () => {
+          callOrder.push('findMany');
+          return [before, after, column];
+        }),
+        update: jest.fn().mockResolvedValue({ ...column, position: 2000, _count: { tasks: 0 } }),
+      },
+      $executeRaw: jest.fn().mockImplementation(async () => {
+        callOrder.push('lock');
+        return 1;
+      }),
+    };
+    prisma.$transaction.mockImplementation(async (callback: (client: typeof tx) => unknown) =>
+      callback(tx),
+    );
+
+    await service.move(WORKSPACE_ID, COLUMN_ID, ACTOR_ID, {
+      beforeColumnId: before.id,
+      afterColumnId: after.id,
+    });
+
+    // BE-05: `move` opened a transaction but never locked the board row inside it — the read
+    // and write it wraps are consistent with each other but not with a second, concurrent
+    // move into the same gap. The lock has to come after the neighbor-check read (which needs
+    // no consistency guarantee, only the row's existence) and before the sibling scan that
+    // feeds the midpoint math.
+    expect(callOrder).toEqual(['findFirst', 'lock', 'findMany']);
+    const [fragments] = tx.$executeRaw.mock.calls[0] as [TemplateStringsArray];
+    expect(fragments.join('?')).toContain('FOR UPDATE');
+  });
+
   it('preserves taskCount when move rebalances positions', async () => {
     const { service, prisma, realtime } = buildService();
     const column = {
@@ -535,7 +609,12 @@ describe('ColumnService', () => {
             _count: { tasks: 7 },
           }),
         },
-        $executeRaw: jest.fn().mockImplementation(async () => {
+        // Two different statements now share `tx.$executeRaw`: the board-row lock this test
+        // isn't about, and the sibling rebalance write it is. Only the latter should show up
+        // in `writeOrder` — telling them apart by their SQL keeps this test asserting the same
+        // thing it always did instead of also becoming a lock-ordering test.
+        $executeRaw: jest.fn().mockImplementation(async (fragments: TemplateStringsArray) => {
+          if (fragments.join('?').includes('FOR UPDATE')) return 1;
           writeOrder.push('siblings:start');
           await Promise.resolve();
           writeOrder.push('siblings:done');
