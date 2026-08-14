@@ -1,4 +1,6 @@
-import { Queue } from 'bullmq';
+import { Logger } from '@nestjs/common';
+import { Queue, Worker, type Job } from 'bullmq';
+import { initSentry, resetSentryForTesting } from '../common/observability/sentry';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CLEANUP_BATCH_SIZE,
@@ -355,7 +357,15 @@ describe('CleanupWorker', () => {
       expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
         'retention-cleanup',
         { every: 24 * 60 * 60 * 1000 },
-        { name: 'purge-expired', opts: { removeOnComplete: 100, removeOnFail: 50 } },
+        {
+          name: 'purge-expired',
+          opts: {
+            removeOnComplete: 100,
+            removeOnFail: 50,
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 5 * 60 * 1000 },
+          },
+        },
       );
 
       await worker.onModuleDestroy();
@@ -377,6 +387,107 @@ describe('CleanupWorker', () => {
       await buildWorker().worker.onModuleInit();
 
       expect(Queue).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Mirrors the BE-06 tests in `due-soon.worker.spec.ts`, sized to this worker's own retry
+   * policy: 5 attempts, not 3. A mid-retry failure is `warn`-level noise BullMQ is already
+   * handling; only the failure of the last configured attempt is `error`-level and reported
+   * to Sentry, since a skipped cleanup run is otherwise invisible until someone happens to
+   * notice a table that should have shrunk did not.
+   */
+  describe('failed handler', () => {
+    beforeEach(() => {
+      process.env.CLEANUP_ENABLED = 'true';
+      resetSentryForTesting();
+    });
+
+    afterEach(() => {
+      resetSentryForTesting();
+    });
+
+    /**
+     * Starts a worker and hands back the `on('failed', ...)` callback BullMQ would invoke —
+     * read off the mocked `Worker`'s own `.on` calls, not a copy the test wrote itself, so
+     * this exercises the exact closure `cleanup.worker.ts` registers.
+     */
+    async function registerAndGetFailedHandler(): Promise<
+      (job: Job | undefined, error: Error) => void
+    > {
+      process.env.REDIS_URL = 'redis://localhost:6379';
+      const prisma = { $executeRaw: jest.fn() } as unknown as PrismaService;
+      const worker = new CleanupWorker(prisma);
+
+      await worker.onModuleInit();
+
+      const workerInstance = (Worker as unknown as jest.Mock).mock.results[0]!.value as {
+        on: jest.Mock;
+      };
+      const [, handler] = workerInstance.on.mock.calls.find(([event]) => event === 'failed') as [
+        string,
+        (job: Job | undefined, error: Error) => void,
+      ];
+      return handler;
+    }
+
+    /** Installs a fake Sentry SDK through the loader seam, same pattern as due-soon's spec. */
+    async function enableFakeSentry(): Promise<{ captureException: jest.Mock }> {
+      const captureException = jest.fn();
+      const api = {
+        init: jest.fn(),
+        captureException,
+        close: jest.fn(() => Promise.resolve(true)),
+        withScope: (callback: (scope: { setTag: jest.Mock; setContext: jest.Mock }) => void) => {
+          callback({ setTag: jest.fn(), setContext: jest.fn() });
+        },
+      } as unknown as typeof import('@sentry/node');
+
+      process.env.SENTRY_DSN = 'https://k@o.ingest.sentry.io/1';
+      try {
+        await initSentry(() => Promise.resolve(api));
+      } finally {
+        delete process.env.SENTRY_DSN;
+      }
+
+      return { captureException };
+    }
+
+    it('logs a warning, not an error, when a failed run still has attempts left', async () => {
+      const { captureException } = await enableFakeSentry();
+      const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const logWarn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const handler = await registerAndGetFailedHandler();
+      const job = { id: 'j1', attemptsMade: 1, opts: { attempts: 5 } } as unknown as Job;
+
+      handler(job, new Error('ECONNRESET'));
+
+      expect(logWarn).toHaveBeenCalledWith(expect.stringContaining('attempt 1/5'));
+      expect(logError).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    });
+
+    it('logs an error and reports to Sentry once every configured attempt is spent', async () => {
+      const { captureException } = await enableFakeSentry();
+      const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const handler = await registerAndGetFailedHandler();
+      const error = new Error('relation "Session" does not exist');
+      const job = { id: 'j1', attemptsMade: 5, opts: { attempts: 5 } } as unknown as Job;
+
+      handler(job, error);
+
+      expect(logError).toHaveBeenCalledWith(expect.stringContaining('exhausted all 5 attempt(s)'));
+      expect(captureException).toHaveBeenCalledWith(error);
+    });
+
+    it('does not report to Sentry when Sentry is off (no SENTRY_DSN)', async () => {
+      const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const handler = await registerAndGetFailedHandler();
+      const job = { id: 'j1', attemptsMade: 5, opts: { attempts: 5 } } as unknown as Job;
+
+      // Must not throw even though nothing is listening on the Sentry side.
+      expect(() => handler(job, new Error('boom'))).not.toThrow();
+      expect(logError).toHaveBeenCalled();
     });
   });
 
