@@ -76,7 +76,7 @@ export function resolveApiBaseUrl(value: string | undefined): string {
  * Scheme, host and port of the API — with any path the base carries deliberately dropped.
  *
  * This exists for Better Auth's client, the one caller that can take neither the relative base
- * nor a based-with-path one, for two separate reasons that both turned up by running the app
+ * nor a base carrying a path, for two separate reasons that both turned up by running the app
  * rather than by reading the docs:
  *
  * 1. `createAuthClient` runs `new URL()` over `baseURL` in its constructor and throws
