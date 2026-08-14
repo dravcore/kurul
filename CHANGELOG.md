@@ -251,6 +251,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   had to find the invitation email again. The destination is now honoured on both screens and
   carried across the link between them — but only when it is a same-origin path, so a crafted
   `?next=https://evil.com` cannot turn the sign-in form into a phishing hop.
+- Switching workspaces twice in quick succession no longer risks landing on the wrong role.
+  `onSwitch` used to write whichever `fetchOwnMembership` reply arrived last in wall time, not
+  whichever switch was requested last, so a slow first response could overwrite the second
+  workspace's role with the first workspace's — most visibly as a moment of ADMIN-only
+  controls, and their `403` toasts, flashing inside a workspace where the user is only a
+  VIEWER. Each call now stamps a generation counter before awaiting anything and only the
+  call that still holds it when its reply lands is allowed to write `activeRole`, the same
+  pattern `use-board-mutations.ts`'s `moveGenerationRef` uses to drop overtaken drag results.
+- The sidebar's collapsed/expanded state survives a reload and no longer resets itself when
+  the viewport crosses the 1280px breakpoint. Previously every `matchMedia` `change` event
+  unconditionally reapplied the breakpoint's answer, silently reverting a click made while on
+  the other side of it, and nothing was persisted, so every session started back at the
+  breakpoint default regardless of what was chosen last time. The toggle now writes to
+  `localStorage`, and the breakpoint listener defers to a stored preference instead of
+  overwriting it.
 
 ### Security
 
