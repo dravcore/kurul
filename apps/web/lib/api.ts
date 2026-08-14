@@ -1,5 +1,15 @@
+import { resolveApiBaseUrl } from './api-url';
+
+/**
+ * The base every browser-side request is prefixed with.
+ *
+ * May be a same-origin path (`/api`, the shipped image's default) or a full origin — see
+ * `lib/api-url.ts` for why both shapes exist. Server-side callers must use
+ * `getServerApiBaseUrl()` from that module instead: a path has nothing to resolve against
+ * inside Node.
+ */
 export function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+  return resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
 }
 
 /** Nest `AllExceptionsFilter` JSON body. */

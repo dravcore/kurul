@@ -84,6 +84,23 @@ describe('buildContentSecurityPolicy', () => {
     expect(directive(csp, 'connect-src')).toContain('ws://localhost:4000');
   });
 
+  it('collapses connect-src to self for a same-origin API, naming no origin at all', () => {
+    // The shipped image bakes `/api`. This header is static Next config evaluated once at
+    // build time, so anything host-specific in it would make the image deployment-specific
+    // again — the exact coupling audit finding PM-02 is about. `'self'` is the only value
+    // that is already correct on every domain, and per CSP Level 3 it also covers the
+    // same-origin WebSocket upgrade Socket.io needs.
+    expect(directive(buildContentSecurityPolicy('/api'), 'connect-src')).toEqual(["'self'"]);
+    expect(directive(buildContentSecurityPolicy(''), 'connect-src')).toEqual(["'self'"]);
+  });
+
+  it('does not try to derive a ws origin from a path, which has none', () => {
+    // `new URL('/api')` throws. Reaching it would take down `next build` itself rather than
+    // produce a wrong header, but the failure would be a stack trace in a config file — worth
+    // a test that says which input must never get there.
+    expect(() => buildContentSecurityPolicy('/api')).not.toThrow();
+  });
+
   it('allows inline script and style, which the app measurably needs', () => {
     const csp = buildContentSecurityPolicy(API_URL);
     expect(directive(csp, 'script-src')).toEqual(["'self'", "'unsafe-inline'"]);

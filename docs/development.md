@@ -95,12 +95,14 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `DATABASE_URL`                        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma connection string — password segment must match `POSTGRES_PASSWORD` below                                                                                                                                         |
 | `REDIS_URL`                           | `redis://localhost:6379`                                            | Socket.io Redis adapter, caching, BullMQ scheduled jobs (`due-soon` and `cleanup` queues)                                                                                                                                |
 | `BETTER_AUTH_SECRET`                  | _(generate)_                                                        | Session signing secret — required, no default                                                                                                                                                                            |
-| `BETTER_AUTH_URL`                     | `http://localhost:4000`                                             | Public URL of the API (Better Auth is mounted at `/auth/*`)                                                                                                                                                              |
+| `BETTER_AUTH_URL`                     | `http://localhost:4000`                                             | Public URL of the API (Better Auth is mounted at `/auth/*`). Dev loop only — `docker-compose.yml` derives it from `SITE_URL`                                                                                             |
 | `API_PORT`                            | `4000`                                                              | NestJS listen port                                                                                                                                                                                                       |
-| `WEB_URL`                             | `http://localhost:3000`                                             | CORS origin for the API                                                                                                                                                                                                  |
+| `WEB_URL`                             | `http://localhost:3000`                                             | CORS origin for the API. Dev loop only — `docker-compose.yml` derives it from `SITE_URL`                                                                                                                                 |
+| `SITE_URL`                            | `http://localhost`                                                  | **Compose only.** The one public origin the whole stack answers on, scheme included; `https://…` turns on Caddy's automatic HTTPS. See [Self-hosting](self-hosting.md)                                                   |
+| `INTERNAL_API_URL`                    | `http://api:4000`                                                   | Absolute API address the **web server** uses for middleware and SSR (a same-origin `/api` has no origin to resolve against inside Node). Set by `docker-compose.yml`; read at container start, not baked                 |
 | `RATE_LIMIT_ENABLED`                  | `true`                                                              | Master switch for [rate limiting](api-conventions.md#rate-limiting). On by default; only the integration suite turns it off                                                                                              |
 | `TRUST_PROXY`                         | `false`                                                             | Reverse-proxy hop(s) to trust for the real client IP — `false` (default), a hop count (`1`), or an IP/CIDR list. See [rate limiting](api-conventions.md#rate-limiting) — **never `true` on a directly-exposed instance** |
-| `NEXT_PUBLIC_API_URL`                 | `http://localhost:4000`                                             | API URL compiled into the web bundle — **baked at build time** (Docker builds pass it as a build arg)                                                                                                                    |
+| `NEXT_PUBLIC_API_URL`                 | `http://localhost:4000`                                             | API URL compiled into the web bundle — **baked at build time**. Dev loop only; the Docker image bakes the same-origin path `/api` instead, which is why one image serves every domain                                    |
 | `SMTP_HOST`                           | `localhost` (dev, via Mailpit)                                      | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)                                                                                                 |
 | `SMTP_PORT`                           | `1025` (dev, via Mailpit) / `587` (typical production)              | SMTP server port                                                                                                                                                                                                         |
 | `SMTP_USER`                           | _(blank for Mailpit)_                                               | SMTP auth username, if your server requires one                                                                                                                                                                          |
@@ -334,6 +336,13 @@ compose wiring, or when you just want to run Kurultay rather than develop it.
 docker compose pull && docker compose up -d
 ```
 
+Then open **http://localhost** — not `localhost:3000`. A `proxy` service (Caddy) is the stack's
+only published entrance: it serves the web app and the API from one origin, routing `/api/*`
+and `/auth/*` to `api` and everything else to `web`. `api` and `web` publish no host ports of
+their own. Point the whole thing at a domain by setting `SITE_URL=https://kurultay.example.com`
+in `.env`, which also switches automatic HTTPS on — the walkthrough for that, SMTP and backups
+included, is [Self-hosting](self-hosting.md).
+
 `api` and `web` in `docker-compose.yml` declare both `image:` and `build:`. Every tagged
 release publishes both to GHCR (`.github/workflows/release-images.yml`, `linux/amd64` +
 `linux/arm64`), so `pull` fetches a ready-built image and the following `up -d` starts it —
@@ -358,16 +367,23 @@ that pulls `api`/`web` from GHCR still pays that one service's build cost once. 
 [audit finding OPS-04](https://github.com/dravcore/kurultay/issues/126) for the full scoping
 rationale.
 
-The web image is published with its Dockerfile's default `NEXT_PUBLIC_API_URL`
-(`http://localhost:4000`) and Sentry DSNs baked in, because Next.js inlines `NEXT_PUBLIC_*`
-into the client bundle at build time — a published image cannot pick these up at container
-start the way `api`'s `DATABASE_URL` can. If your deployment needs a different
-`NEXT_PUBLIC_API_URL` (the API reachable at anything other than `localhost:4000` from the
-browser), build `web` locally instead of pulling it:
+Next.js inlines `NEXT_PUBLIC_*` into the client bundle at build time, so a published image
+cannot pick those up at container start the way `api`'s `DATABASE_URL` can. That is a property
+of the framework and has not changed — what changed is that the value being baked is no longer
+deployment-specific. The image carries `NEXT_PUBLIC_API_URL=/api`, a path on whatever origin
+served the page, which is correct behind `proxy` on every hostname; **the same image runs on
+any domain with no rebuild**. See [Why there is no rebuild](self-hosting.md#why-there-is-no-rebuild)
+for the full reasoning, and `apps/web/lib/api-url.ts` for the code.
+
+The Sentry DSNs are still genuinely build-time: turning browser error tracking on or off means
+rebuilding `web` (`docker compose build web`, which reads `NEXT_PUBLIC_SENTRY_*` from your
+`.env`), not just restarting it. `NEXT_PUBLIC_API_URL` is deliberately _not_ among that
+`args:` block, so a local build produces the same bundle the release image does rather than
+quietly baking whatever the dev loop left in `.env`. A deployment that really does want the API
+on its own hostname overrides the build arg directly and accepts a domain-specific image:
 
 ```bash
-docker compose build web   # bakes NEXT_PUBLIC_API_URL / NEXT_PUBLIC_SENTRY_* from your .env
-docker compose up -d
+docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.example.com .
 ```
 
 This also starts the `backup` sidecar, which dumps the database on a schedule — see
@@ -396,13 +412,14 @@ A capability is re-added only where a service was actually run with just the dro
 observed to fail, never because it "seems like it might need it." The comments beside each
 `cap_add:` in the compose files carry the failure that justified it; the short version:
 
-| Service      | `cap_add`                                             | Why                                                                                                                                                                                                                                                                                                                       |
-| ------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api`, `web` | none                                                  | Already `USER node` — no `chown`, `setuid`, or privileged port bind at any point in the container's life                                                                                                                                                                                                                  |
-| `migrate`    | none                                                  | The `migrate` build target has no `USER` (it's the pre-`runner` `build` stage), so it runs as root, but it only opens a DB connection and reads its own already-built `/app`                                                                                                                                              |
-| `backup`     | none                                                  | `entrypoint:` replaces the postgres image's own entrypoint outright, so its chown/re-exec logic never runs — the sidecar stays root but never touches ownership of anything                                                                                                                                               |
-| `postgres`   | `CHOWN`, `FOWNER`, `SETUID`, `SETGID`, `DAC_OVERRIDE` | The official entrypoint always starts as root, `chown`s `PGDATA` to the `postgres` user on _every_ boot (not just the first), then `gosu postgres` re-execs itself — `DAC_OVERRIDE` specifically is needed from the second boot onward, once `PGDATA` is `chmod 0700` and root can no longer `find` its way in without it |
-| `redis`      | `SETUID`, `SETGID`                                    | The entrypoint drops privilege to uid 999 via `setpriv`, but only when its first argument is literally `redis-server` — see below                                                                                                                                                                                         |
+| Service      | `cap_add`                                             | Why                                                                                                                                                                                                                                                                                                                            |
+| ------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `api`, `web` | none                                                  | Already `USER node` — no `chown`, `setuid`, or privileged port bind at any point in the container's life                                                                                                                                                                                                                       |
+| `migrate`    | none                                                  | The `migrate` build target has no `USER` (it's the pre-`runner` `build` stage), so it runs as root, but it only opens a DB connection and reads its own already-built `/app`                                                                                                                                                   |
+| `backup`     | none                                                  | `entrypoint:` replaces the postgres image's own entrypoint outright, so its chown/re-exec logic never runs — the sidecar stays root but never touches ownership of anything                                                                                                                                                    |
+| `postgres`   | `CHOWN`, `FOWNER`, `SETUID`, `SETGID`, `DAC_OVERRIDE` | The official entrypoint always starts as root, `chown`s `PGDATA` to the `postgres` user on _every_ boot (not just the first), then `gosu postgres` re-execs itself — `DAC_OVERRIDE` specifically is needed from the second boot onward, once `PGDATA` is `chmod 0700` and root can no longer `find` its way in without it      |
+| `redis`      | `SETUID`, `SETGID`                                    | The entrypoint drops privilege to uid 999 via `setpriv`, but only when its first argument is literally `redis-server` — see below                                                                                                                                                                                              |
+| `proxy`      | `NET_BIND_SERVICE`                                    | Caddy binds ports 80 and 443 inside the container. With the capability dropped it does not fail at bind time but at exec (`exec /usr/bin/caddy: operation not permitted`): the image ships the binary with `cap_net_bind_service=+ep` file capabilities, and the kernel refuses to exec such a binary outside the bounding set |
 
 **redis's `command:` is exec form, not a shell wrapper, and that isn't cosmetic.** An
 earlier draft of this hardening pass used `command: ['sh', '-c', 'if [ -n "$REDIS_PASSWORD" ]; then …; fi']`
@@ -1036,8 +1053,10 @@ SENTRY_RELEASE=v0.2.0                    # optional; set it to the tag you deplo
 
 then `docker compose up -d --build web && docker compose up -d api`. The API reads its DSN at
 container start, so a restart is enough. The web DSN is a `NEXT_PUBLIC_*` value, which Next.js
-inlines at **build** time — the web image must be rebuilt for a change to take effect, exactly
-like `NEXT_PUBLIC_API_URL`.
+inlines at **build** time — the web image must be rebuilt for a change to take effect. (This is
+the same mechanism that used to force a rebuild for `NEXT_PUBLIC_API_URL`; that one no longer
+does, because the value baked into it is a same-origin path rather than a deployment's
+hostname — see [Full stack in Docker](#full-stack-in-docker).)
 
 Use **two Sentry projects**, one per app. The browser DSN is compiled into JavaScript every
 visitor downloads, so it is public by construction; it should not be the same DSN your server
@@ -1164,6 +1183,7 @@ specified in [git-strategy.md](git-strategy.md).
 
 - [project-skeleton.md](project-skeleton.md) — the layout and acceptance criteria this
   document is the contract for
+- [self-hosting.md](self-hosting.md) — putting a release on your own domain: DNS, HTTPS, SMTP
 - [roadmap.md](roadmap.md) — phase order
 - [git-strategy.md](git-strategy.md) — branches, commits, releases
 - [coding-standards.md](coding-standards.md) — how the code inside these apps is written

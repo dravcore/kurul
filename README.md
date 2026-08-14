@@ -104,13 +104,19 @@ dev compose file above already starts [Mailpit](https://mailpit.axllent.org/) so
 that flow locally without a real mail provider; see
 [docs/development.md#smtp-and-mailpit](docs/development.md#smtp-and-mailpit).
 
-Full stack in Docker, pull-based: `docker compose pull && docker compose up -d`. Every
-tagged release publishes `api`/`web` images to GHCR (`ghcr.io/dravcore/kurultay-api`,
-`ghcr.io/dravcore/kurultay-web`), so this installs and upgrades without a local build; set
-`TAG=vX.Y.Z` in `.env` to pin a release instead of `latest`. No image published yet for your
-`TAG` (or no network route to `ghcr.io`)? `docker compose up -d` still falls back to building
-from source automatically — `docker compose up --build` keeps working exactly as before, for
-building on purpose. Day-to-day details: [docs/development.md](docs/development.md).
+Full stack in Docker, pull-based: `docker compose pull && docker compose up -d`, then open
+http://localhost. Every tagged release publishes `api`/`web` images to GHCR
+(`ghcr.io/dravcore/kurultay-api`, `ghcr.io/dravcore/kurultay-web`), so this installs and
+upgrades without a local build; set `TAG=vX.Y.Z` in `.env` to pin a release instead of
+`latest`. No image published yet for your `TAG` (or no network route to `ghcr.io`)?
+`docker compose up -d` still falls back to building from source automatically —
+`docker compose up --build` keeps working exactly as before, for building on purpose.
+Day-to-day details: [docs/development.md](docs/development.md).
+
+Both apps are served from one origin behind a bundled Caddy reverse proxy, so the **same
+published image runs on any domain with no rebuild** — put it on your own by setting
+`SITE_URL=https://kurultay.example.com` in `.env`, which also turns on automatic HTTPS.
+The one-page walkthrough, SMTP included: [docs/self-hosting.md](docs/self-hosting.md).
 
 ## Stack
 

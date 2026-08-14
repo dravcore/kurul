@@ -78,13 +78,41 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`.github/workflows/e2e.yml`) nightly and on pull requests into `main` — i.e. before every
   release and hotfix — deliberately **outside** the required `ci-ok` gate, so an infrastructure
   hiccup in a full-stack browser run can never block every merge in the repository. The suite
-  isolates itself completely: ports 3110/4110, database `kurultay_test_playwright`, Redis
-  logical database 8, and no new environment variables (the Postgres/Redis connections are
-  derived from `DATABASE_URL`/`REDIS_URL` with only the database name and index swapped). Run
+  isolates itself completely: ports 3110/4110, database `kurultay_test_playwright`, no Redis at
+  all, and no new environment variables (the Postgres connection is derived from `DATABASE_URL`
+  with only the database name swapped). A Redis logical database index was the obvious boundary
+  and does not hold — `parseRedisUrl` drops the URL's pathname, so `redis://…/8` reaches database
+  0 ([#190](https://github.com/dravcore/kurultay/issues/190)) — so the suite runs the API with no
+  Redis, which it supports, and which is the only option here that is isolated rather than merely
+  documented as such. Run
   it with `pnpm test:browser`. Closes audit finding QA-01
   ([#129](https://github.com/dravcore/kurultay/issues/129)); `docs/testing.md` (EN + TR) now
   names these four flows as the concrete definition of the "critical flows later" it had been
   reserving Playwright for.
+- **One image, any domain — and a one-page guide for putting it on yours.** The published
+  `web` image no longer has a deployment's API URL compiled into it, so
+  `docker compose pull && docker compose up -d` now works on `kurultay.example.com` exactly as
+  it does on `localhost`, with no rebuild. Verified by running two independent stacks from the
+  same image ID side by side on two hostnames — sign-up, email verification, boards and the
+  realtime WebSocket all working on both. Closes audit finding PM-02
+  ([#119](https://github.com/dravcore/kurultay/issues/119)).
+  - `docker-compose.yml` gains a **`proxy` service (Caddy)** that is now the stack's only
+    published entrance. It serves the web app and the API from one origin — `/auth/*` and
+    `/api/*` to `api`, everything else to `web` — with automatic HTTPS once a domain is set.
+    Its routing contract, and why the two API rules differ, is documented in `docker/Caddyfile`
+    for anyone replacing it with their own proxy.
+  - **`SITE_URL`** is the new (compose-only) `.env` variable for that origin, scheme included:
+    `http://localhost` by default, `https://kurultay.example.com` to go live. The API's
+    `WEB_URL` and `BETTER_AUTH_URL` are derived from it, so app, API and cookies agree on one
+    origin without three variables to keep in sync.
+  - **New guide: `docs/self-hosting.md`** (EN + TR) — DNS, HTTPS, SMTP, backups, upgrades,
+    bring-your-own-reverse-proxy and troubleshooting, on one page.
+- **`INTERNAL_API_URL`** — the absolute API address the web *server* uses for its auth
+  middleware and server-side rendering, since a same-origin `/api` has no origin to resolve
+  against inside Node. Unlike `NEXT_PUBLIC_*` it is read at container start, and
+  `docker-compose.yml` points it straight at `http://api:4000` over the container network, so a
+  server render never leaves the compose network.
+
 - **Register form now shows field-level error messages** — when sign-up fails, the error is no
   longer reported as a generic "could not create your account" message. Better Auth error codes
   like `PASSWORD_TOO_SHORT` and `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` now map to their
@@ -100,12 +128,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   when no image exists for the configured `TAG` or the registry is unreachable. `TAG` is a new
   compose-only `.env` variable (see `.env.example`) for pinning a specific release instead of
   tracking `latest`. `migrate` (the one-shot migration runner) still always builds from source
-  — see the comment beside it in `docker-compose.yml` for why that's scoped out of this change
-  — and the published `web` image only has its `NEXT_PUBLIC_API_URL` set to the Dockerfile's
-  `http://localhost:4000` default, since Next.js bakes `NEXT_PUBLIC_*` into the client bundle
-  at build time; a deployment needing a different API origin still runs `docker compose build
-  web` until the runtime-configurable API URL that follows this change lands. Closes audit
-  finding OPS-04 ([#126](https://github.com/dravcore/kurultay/issues/126)); README (EN + TR)
+  — see the comment beside it in `docker-compose.yml` for why that's scoped out of this change.
+  Closes audit finding OPS-04 ([#126](https://github.com/dravcore/kurultay/issues/126)); README (EN + TR)
   and `docs/development.md` (EN + TR) now document the pull-based flow as the default, with
   `docker compose up --build` kept as the explicit build-on-purpose path.
 - `SEED_LARGE_BOARD_TASKS` — `pnpm db:seed` can now build a board of arbitrary size next to the
@@ -291,6 +315,30 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   can only ever disagree with each other. `0` still means "keep forever" for both. The job's
   nightly JSON log line gains a `usagePings` count alongside the four it already carried; it is
   still counts only, with nothing from the rows themselves.
+- **`api` and `web` no longer publish host ports in `docker-compose.yml`.** Both are reached
+  through the new `proxy` service on port 80/443, so a Docker install is now at
+  `http://localhost`, not `http://localhost:3000`. This closes a real gap rather than just
+  tidying: with no route around the proxy, the API's `TRUST_PROXY` can be fixed at `1` (it is),
+  which restores the per-client rate-limit buckets and access-log IPs that would otherwise have
+  collapsed onto the proxy's own container address. `docker-compose.dev.yml` and the `pnpm dev`
+  loop are unchanged — they still run the two apps on `:3000`/`:4000` as separate origins.
+- **The `web` image bakes `NEXT_PUBLIC_API_URL=/api`** instead of `http://localhost:4000`, and
+  the variable was removed from `docker-compose.yml`'s build `args:` so a local
+  `docker compose build web` produces the same bundle as the release image rather than baking
+  whatever the dev loop left in `.env`. Next.js still inlines `NEXT_PUBLIC_*` at build time —
+  that cannot change — but the value being inlined is now correct on every domain. A deployment
+  that wants the API on its own hostname can still build with
+  `--build-arg NEXT_PUBLIC_API_URL=https://api.example.com` and accept a domain-specific image.
+- The web app's CSP `connect-src` collapses to `'self'` for a same-origin API instead of naming
+  an origin and a derived `ws(s)://` one. `'self'` covers the same-origin WebSocket upgrade
+  (CSP Level 3), confirmed in a browser against the real stack rather than taken from the
+  spec — had it not, Socket.io would have quietly fallen back to its polling transport.
+
+  **Upgrading an existing Docker install:** set `SITE_URL` in `.env` (`http://localhost` keeps
+  today's behaviour, on the standard port), then `docker compose pull && docker compose up -d`.
+  `WEB_URL` and `BETTER_AUTH_URL` in `.env` no longer affect the compose stack — they belong to
+  the dev loop now — so a deployment that set them must move that value to `SITE_URL`. If port
+  80 is taken on your host, override `proxy`'s `ports:` rather than re-publishing `web`'s.
 
 - **A board column now mounts 40 cards at a time instead of all of them**, revealing the next
   batch as the reader scrolls toward the end of the current one, and cards are marked

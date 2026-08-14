@@ -94,12 +94,14 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `DATABASE_URL`                        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma bağlantı string'i — şifre kısmı aşağıdaki `POSTGRES_PASSWORD` ile eşleşmelidir                                                                                                                                                              |
 | `REDIS_URL`                           | `redis://localhost:6379`                                            | Socket.io Redis adapter'ı, caching, BullMQ zamanlanmış işler (`due-soon` ve `cleanup` kuyrukları)                                                                                                                                                  |
 | `BETTER_AUTH_SECRET`                  | _(üret)_                                                            | Session imzalama secret'ı — zorunlu, varsayılan yok                                                                                                                                                                                                |
-| `BETTER_AUTH_URL`                     | `http://localhost:4000`                                             | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir)                                                                                                                                                                                  |
+| `BETTER_AUTH_URL`                     | `http://localhost:4000`                                             | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir). Yalnızca geliştirme döngüsü — `docker-compose.yml` bunu `SITE_URL`'den türetir                                                                                                  |
 | `API_PORT`                            | `4000`                                                              | NestJS dinleme portu                                                                                                                                                                                                                               |
-| `WEB_URL`                             | `http://localhost:3000`                                             | API için CORS origin'i                                                                                                                                                                                                                             |
+| `WEB_URL`                             | `http://localhost:3000`                                             | API için CORS origin'i. Yalnızca geliştirme döngüsü — `docker-compose.yml` bunu `SITE_URL`'den türetir                                                                                                                                             |
+| `SITE_URL`                            | `http://localhost`                                                  | **Yalnızca compose.** Tüm stack'in yanıt verdiği tek public origin, şema dahil; `https://…` Caddy'nin otomatik HTTPS'ini açar. Bkz. [Self-hosting](self-hosting.md)                                                                                |
+| `INTERNAL_API_URL`                    | `http://api:4000`                                                   | **Web sunucusunun** middleware ve SSR için kullandığı mutlak API adresi (aynı origin'deki `/api`'nin Node içinde çözülecek bir origin'i yoktur). `docker-compose.yml` ayarlar; gömülmez, container başlangıcında okunur                            |
 | `RATE_LIMIT_ENABLED`                  | `true`                                                              | [Rate limiting](api-conventions.md#rate-limiting) ana anahtarı. Varsayılan açık; yalnızca entegrasyon testleri kapatır                                                                                                                             |
 | `TRUST_PROXY`                         | `false`                                                             | Gerçek client IP'si için güvenilecek reverse proxy hop'(lar)ı — `false` (varsayılan), hop sayısı (`1`) veya IP/CIDR listesi. Bkz. [rate limiting](api-conventions.md#rate-limiting) — doğrudan expose edilen bir kurulumda **asla `true` olmasın** |
-| `NEXT_PUBLIC_API_URL`                 | `http://localhost:4000`                                             | Web bundle'ına derlenen API URL'i — **build sırasında gömülür** (Docker build'leri bunu build arg olarak geçirir)                                                                                                                                  |
+| `NEXT_PUBLIC_API_URL`                 | `http://localhost:4000`                                             | Web bundle'ına derlenen API URL'i — **build sırasında gömülür**. Yalnızca geliştirme döngüsü; Docker imajı bunun yerine aynı origin'deki `/api` yolunu gömer — tek imajın her domain'de çalışmasının nedeni budur                                  |
 | `SMTP_HOST`                           | `localhost` (geliştirme, Mailpit üzerinden)                         | SMTP sunucu host'u. Tamamen boş bırakılırsa mail modülü göndermek yerine loglar — bkz. [SMTP ve Mailpit](#smtp-ve-mailpit)                                                                                                                         |
 | `SMTP_PORT`                           | `1025` (geliştirme, Mailpit üzerinden) / `587` (tipik production)   | SMTP sunucu portu                                                                                                                                                                                                                                  |
 | `SMTP_USER`                           | _(Mailpit için boş)_                                                | SMTP auth kullanıcı adı, sunucunuz gerektiriyorsa                                                                                                                                                                                                  |
@@ -335,6 +337,13 @@ doğrulamak için, veya Kurultay'ı geliştirmek değil sadece çalıştırmak i
 docker compose pull && docker compose up -d
 ```
 
+Ardından **http://localhost** adresini açın — `localhost:3000` değil. Stack'in tek yayınlanmış
+girişi bir `proxy` (Caddy) servisidir: web uygulamasını ve API'yi tek origin'den sunar, `/api/*`
+ile `/auth/*`'ı `api`'ye, geri kalan her şeyi `web`'e yönlendirir. `api` ve `web` kendi host
+portlarını yayınlamaz. Tamamını bir domain'e taşımak için `.env`'de
+`SITE_URL=https://kurultay.example.com` ayarlayın; bu aynı zamanda otomatik HTTPS'i de açar —
+SMTP ve yedekler dahil adım adım rehber: [Self-hosting](self-hosting.md).
+
 `docker-compose.yml`'de `api` ve `web`, hem `image:` hem `build:` bildirir. Her etiketli
 release ikisini de GHCR'a yayınlar (`.github/workflows/release-images.yml`, `linux/amd64` +
 `linux/arm64`), böylece `pull` hazır build edilmiş imajı çeker, ardından gelen `up -d` de
@@ -360,16 +369,25 @@ yorumda açıklanıyor), dolayısıyla her zaman kaynaktan build eder — `api`/
 gerekçesinin tamamı için bkz.
 [denetim bulgusu OPS-04](https://github.com/dravcore/kurultay/issues/126).
 
-Web imajı, Dockerfile'ının varsayılan `NEXT_PUBLIC_API_URL`'i (`http://localhost:4000`) ve
-boş Sentry DSN'leriyle yayınlanır, çünkü Next.js `NEXT_PUBLIC_*` değerlerini build zamanında
-client bundle'a gömer — yayınlanmış bir imaj, `api`'nin `DATABASE_URL`'i gibi bunları
-container başlangıcında alamaz. Deploy'unuz farklı bir `NEXT_PUBLIC_API_URL` gerektiriyorsa
-(API'ye tarayıcıdan `localhost:4000` dışında bir adresten erişiliyorsa), `web`'i çekmek yerine
-lokal build edin:
+Next.js, `NEXT_PUBLIC_*` değerlerini build zamanında client bundle'a gömer; dolayısıyla
+yayınlanmış bir imaj bunları `api`'nin `DATABASE_URL`'i gibi container başlangıcında alamaz. Bu
+framework'ün bir özelliği ve değişmedi — değişen şey, gömülen değerin artık dağıtıma özgü
+olmaması. İmaj `NEXT_PUBLIC_API_URL=/api` taşır; bu, sayfayı sunan origin üzerindeki bir yoldur
+ve `proxy` arkasında her hostname'de doğrudur — **aynı imaj her domain'de yeniden build
+edilmeden çalışır**. Gerekçenin tamamı:
+[Neden yeniden build gerekmiyor](self-hosting.md#neden-yeniden-build-gerekmiyor); kodu için
+`apps/web/lib/api-url.ts`.
+
+Sentry DSN'leri hâlâ gerçekten build zamanlıdır: tarayıcı hata takibini açıp kapatmak `web`'i
+yeniden build etmeyi gerektirir (`docker compose build web`, `NEXT_PUBLIC_SENTRY_*`'i
+`.env`'den okur), yalnızca yeniden başlatmayı değil. `NEXT_PUBLIC_API_URL` bilinçli olarak o
+`args:` bloğunda **değildir**; böylece lokal bir build, geliştirme döngüsünün `.env`'de
+bıraktığını sessizce gömmek yerine release imajıyla aynı bundle'ı üretir. API'yi gerçekten kendi
+hostname'inde isteyen bir dağıtım build arg'ını doğrudan geçer ve domain'e özgü bir imajı kabul
+eder:
 
 ```bash
-docker compose build web   # NEXT_PUBLIC_API_URL / NEXT_PUBLIC_SENTRY_*'i .env'den gömer
-docker compose up -d
+docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.example.com .
 ```
 
 Bu aynı zamanda veritabanını zamanlanmış olarak dump'layan `backup` sidecar'ını da başlatır —
@@ -407,6 +425,7 @@ kısa özeti:
 | `backup`     | yok                                                   | `entrypoint:`, postgres imajının kendi entrypoint'ini tamamen değiştiriyor, dolayısıyla chown/re-exec mantığı hiç çalışmıyor — sidecar root kalır ama hiçbir sahiplik değiştirmiyor                                                                                                                                                                   |
 | `postgres`   | `CHOWN`, `FOWNER`, `SETUID`, `SETGID`, `DAC_OVERRIDE` | Resmî entrypoint her zaman root olarak başlar, _her_ açılışta (yalnızca ilkinde değil) `PGDATA`'yı `postgres` kullanıcısına `chown`'lar, sonra `gosu postgres` ile kendini yeniden exec eder — `DAC_OVERRIDE` özellikle ikinci açılıştan itibaren gerekir: `PGDATA` artık `chmod 0700` olduğunda root bu izin olmadan içine `find` ile bile giremiyor |
 | `redis`      | `SETUID`, `SETGID`                                    | Entrypoint, `setpriv` ile uid 999'a ayrıcalık düşürür — ama yalnızca ilk argümanı harfiyen `redis-server` olduğunda; aşağıya bakın                                                                                                                                                                                                                    |
+| `proxy`      | `NET_BIND_SERVICE`                                    | Caddy container içinde 80 ve 443 portlarını bind eder. Yetenek düşürüldüğünde bind anında değil exec anında başarısız olur (`exec /usr/bin/caddy: operation not permitted`): imaj binary'yi `cap_net_bind_service=+ep` dosya yetenekleriyle gönderir ve çekirdek, bounding set dışındaki böyle bir binary'yi exec etmeyi reddeder                     |
 
 **redis'in `command:`'i exec form'dur, shell wrapper değil — ve bu kozmetik bir tercih değil.**
 Bu sertleştirme turunun ilk taslağı, `REDIS_PASSWORD`'u opsiyonel tutmak için
@@ -1048,7 +1067,10 @@ SENTRY_RELEASE=v0.2.0                    # opsiyonel; dağıttığınız tag'i v
 ardından `docker compose up -d --build web && docker compose up -d api`. API DSN'ini
 konteyner başlarken okur, bu yüzden restart yeterlidir. Web DSN'i bir `NEXT_PUBLIC_*`
 değeridir ve Next.js bunu **build** sırasında gömer — değişikliğin etkili olması için web
-imajının yeniden build edilmesi gerekir, tıpkı `NEXT_PUBLIC_API_URL` gibi.
+imajının yeniden build edilmesi gerekir. (Bu, eskiden `NEXT_PUBLIC_API_URL` için de yeniden
+build'i zorunlu kılan aynı mekanizmadır; o artık zorunlu kılmıyor, çünkü gömülen değer bir
+dağıtımın hostname'i değil aynı origin'deki bir yol —
+bkz. [Docker'da tam stack](#dockerda-tam-stack).)
 
 **İki ayrı Sentry projesi** kullanın, uygulama başına bir tane. Tarayıcı DSN'i her
 ziyaretçinin indirdiği JavaScript'e derlenir, dolayısıyla yapısı gereği publiktir; sunucunuzun
@@ -1178,6 +1200,7 @@ PR/release süreci [git-strategy.md](git-strategy.md)'de belirtilmiştir.
 
 - [project-skeleton.md](project-skeleton.md) — bu dokümanın kontratı olduğu yerleşim ve
   kabul kriterleri
+- [self-hosting.md](self-hosting.md) — bir release'i kendi domain'inize kurmak: DNS, HTTPS, SMTP
 - [roadmap.md](roadmap.md) — faz sırası
 - [git-strategy.md](git-strategy.md) — branch'ler, commit'ler, release'ler
 - [coding-standards.md](coding-standards.md) — bu uygulamaların içindeki kodun nasıl
