@@ -18,7 +18,9 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { TaskChecklists } from './task-checklists';
 import { TaskMetadataPanel } from './task-metadata-panel';
+import { useTaskChecklists } from './use-task-checklists';
 
 interface TaskPanelProps {
   workspaceId: string;
@@ -68,6 +70,11 @@ export function TaskPanel({
   const [title, setTitle] = useState(task?.title ?? '');
   const [description, setDescription] = useState(task?.description ?? '');
   const [pending, setPending] = useState(false);
+
+  // Its own hook rather than more handlers in this component: the task a board row hands over
+  // carries `checklists: null` — the summary only — so the checklist surface owns a read as
+  // well as five writes, and this file is already the widest in the folder.
+  const checklists = useTaskChecklists({ workspaceId, task, canMutate, onUpdated });
 
   // Re-seed the editable fields when the panel switches task, or when the stored title or
   // description changes under it (our own PATCH coming back, or a realtime edit). Done during
@@ -335,6 +342,18 @@ export function TaskPanel({
                 className="min-h-32"
               />
             </div>
+            <TaskChecklists
+              checklists={checklists.checklists}
+              canMutate={canMutate}
+              pending={checklists.pending}
+              loading={checklists.loading}
+              loadFailed={checklists.loadFailed}
+              onToggle={(itemId, isDone) => void checklists.toggleItem(itemId, isDone)}
+              onAddChecklist={checklists.addChecklist}
+              onRemoveChecklist={(checklistId) => void checklists.removeChecklist(checklistId)}
+              onAddItem={checklists.addItem}
+              onRemoveItem={(itemId) => void checklists.removeItem(itemId)}
+            />
             <TaskMetadataPanel
               workspaceId={workspaceId}
               boardId={boardId}

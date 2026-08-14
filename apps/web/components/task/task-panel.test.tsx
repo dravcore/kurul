@@ -1,14 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { Priority, type TaskDto } from '@kurultay/shared-types';
+import { api } from '@/lib/api';
 import messages from '@/messages/en.json';
 import { TaskPanel } from './task-panel';
 
 const push = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('@/lib/api', () => ({
-  api: { patch: vi.fn() },
+  // `get` is here for the checklist surface: a task the board handed over carries
+  // `checklists: null`, so the panel goes and reads the items itself.
+  api: { get: vi.fn(), patch: vi.fn(), post: vi.fn(), delete: vi.fn() },
   apiStatus: () => null,
   resolveApiMessage: () => 'error',
 }));
@@ -258,5 +261,43 @@ describe('TaskPanel close', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
 
     expect(push).toHaveBeenCalledWith('/board/b1', { scroll: false });
+  });
+});
+
+describe('TaskPanel checklists', () => {
+  it('reads the items the board row did not carry', async () => {
+    // The board's list query answers with the summary only (ADR 0023 K3), so `checklists` is
+    // `null` on the row the panel is handed — "not loaded", never "none". A panel that took
+    // that at face value would tell the reader a task with three checklists has none.
+    vi.mocked(api.get).mockResolvedValue({
+      ...task,
+      checklistSummary: { total: 2, done: 1 },
+      checklists: [
+        {
+          id: 'cl1',
+          title: 'Preparation',
+          position: 1000,
+          items: [
+            { id: 'i1', content: 'Design', isDone: true, position: 1000 },
+            { id: 'i2', content: 'API', isDone: false, position: 2000 },
+          ],
+        },
+      ],
+    } satisfies TaskDto);
+
+    render(<Board open />);
+
+    await waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith(`/workspaces/w1/tasks/${TASK_ID}`, expect.anything()),
+    );
+  });
+
+  it('offers the checklist surface inside the panel rather than behind another click', () => {
+    render(<Board open selected={{ ...task, checklists: [] }} />);
+
+    expect(
+      screen.getByRole('region', { name: messages.app.board.task.checklist.sectionLabel }),
+    ).toBeDefined();
+    expect(screen.getByLabelText(messages.app.board.task.checklist.newChecklist)).toBeDefined();
   });
 });
