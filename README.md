@@ -50,12 +50,11 @@ Kurultay's answer is deliberately narrow:
 - **Realtime and multi-tenancy in the core.** Socket.io board sync and workspace-scoped queries
   were designed in, not added on top.
 
-And what it is not, at `v0.1.0`: no task attachments, no checklists or subtasks, no time
-tracking, no public API tokens or webhooks, and an English-only UI. Attachments, API tokens,
-webhooks and further language packs are listed under [Beyond MVP](docs/roadmap.md#beyond-mvp),
-each with the open question holding it up; checklists, subtasks and time tracking are not on
-that list at all. If you need them today, one of the more mature projects above is the better
-choice.
+And what it is not, at `v0.1.0`: no task attachments, no subtasks, no time tracking, no public
+API tokens or webhooks, and an English-only UI. Attachments, API tokens, webhooks and further
+language packs are listed under [Beyond MVP](docs/roadmap.md#beyond-mvp), each with the open
+question holding it up; subtasks and time tracking are not on that list at all. If you need
+them today, one of the more mature projects above is the better choice.
 
 ## Features
 
@@ -64,6 +63,9 @@ Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
 - **Boards and columns** — classic Kanban layout with drag-and-drop reordering
 - **Tasks** — multi-assignee, labels, priority (kept independent of labels), due date and
   time estimate as separate fields
+- **Checklists** — multiple named checklists per task, each with its own items; a progress
+  badge (`3/5`) shows on the board card and disappears when a task has none
+  ([ADR 0023](docs/decisions/0023-checklist-data-model.md))
 - **Fractional-indexed ordering** — reordering a card only touches that card's position,
   never a full-list renumber
 - **Workspaces** — multi-tenant from the ground up, every query scoped by workspace

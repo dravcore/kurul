@@ -9,6 +9,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Task checklists.** A task can now carry multiple named checklists, each with its own items
+  — the shape Trello uses, chosen because Trello import (P3-3, the next roadmap item) targets a
+  source that is itself multi-list, and because a single flat list would need re-modelling the
+  moment that importer landed ([ADR 0023](docs/decisions/0023-checklist-data-model.md)). The
+  task panel adds and removes checklists, adds and removes items, and ticks items off; the
+  board card shows a `done/total` badge and renders nothing at all on a task with no checklist.
+  Completion is counted at read time from whichever items are loaded — never stored on the task
+  — so a board badge can't drift out of sync with the items it summarizes. No new socket event
+  was added: a checklist or item change calls the same `TaskEventsService.emitUpdated` every
+  other task sub-resource already uses, so `task:updated` plus a REST re-read carries it, the
+  same way label changes do. `Checklist.position` and `ChecklistItem.position` follow every
+  other position field in the schema — `Float`, fractional-indexed — and the API exposes a move
+  endpoint for each, but **the panel does not yet offer drag-and-drop reordering for checklists
+  or items**; only creation, deletion and toggling are wired up on the client. Subtasks — a
+  task-shaped child with its own board column, position and assignee — remain out of scope:
+  ADR 0023 treats that as a different data model from a checklist item, not a deeper one.
+
 - **An activation funnel you can read about your own instance, and telemetry that is off.**
   Kurultay measured nothing about its own use — a grep for `telemetry`, `analytics`, `posthog`,
   `plausible` or `umami` across `apps/` and `docs/` returned zero matches in source — so where

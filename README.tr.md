@@ -53,12 +53,11 @@ Kurultay'ın cevabı bilinçli olarak dar:
 - **Realtime ve çok-kiracılılık çekirdekte.** Socket.io board senkronu ve workspace'e
   scope'lanmış sorgular sonradan eklenmedi, baştan tasarlandı.
 
-Ve `v0.1.0` itibarıyla olmayanlar: task ek dosyaları yok, checklist ve subtask yok, zaman
-takibi yok, public API token'ları ve webhook'lar yok, UI yalnız İngilizce. Ek dosyalar, API
-token'ları, webhook'lar ve ek dil paketleri [MVP ötesi](docs/tr/roadmap.md#mvp-ötesi) altında,
-her biri kendisini bekleten açık soruyla listeli; checklist, subtask ve zaman takibi ise o
-listede hiç yok. Bunlara bugün ihtiyacınız varsa yukarıdaki daha olgun projelerden biri daha
-iyi bir seçim.
+Ve `v0.1.0` itibarıyla olmayanlar: task ek dosyaları yok, subtask yok, zaman takibi yok,
+public API token'ları ve webhook'lar yok, UI yalnız İngilizce. Ek dosyalar, API token'ları,
+webhook'lar ve ek dil paketleri [MVP ötesi](docs/tr/roadmap.md#mvp-ötesi) altında, her biri
+kendisini bekleten açık soruyla listeli; subtask ve zaman takibi ise o listede hiç yok. Bunlara
+bugün ihtiyacınız varsa yukarıdaki daha olgun projelerden biri daha iyi bir seçim.
 
 ## Özellikler
 
@@ -67,6 +66,9 @@ MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadma
 - **Board'lar ve kolonlar** — sürükle-bırakla yeniden sıralanabilen klasik Kanban düzeni
 - **Task'lar** — çoklu atanan kişi, label'lar, (label'lardan bağımsız tutulan) priority,
   ayrı alanlar olarak due date ve süre tahmini
+- **Checklist'ler** — bir task'ta birden çok adlandırılmış checklist, her birinin kendi
+  item'ları; board kartında ilerleme rozeti (`3/5`) görünür, task'ta checklist yoksa hiç
+  görünmez ([ADR 0023](docs/tr/decisions/0023-checklist-data-model.md))
 - **Fractional-indexed sıralama** — bir kartı yeniden sıralamak yalnızca o kartın position'ına
   dokunur, tüm listeyi yeniden numaralandırmaz
 - **Workspace'ler** — temelden itibaren multi-tenant; her sorgu workspace'e göre scope'lanır
