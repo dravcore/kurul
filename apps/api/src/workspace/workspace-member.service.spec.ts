@@ -286,6 +286,70 @@ describe('WorkspaceMemberService.removeMember', () => {
       ),
     ).rejects.toBe(failure);
   });
+
+  /**
+   * The pre-check above only proves an OWNER-removing-OWNER call is not blocked *by
+   * authorization* — the class comment on `removeMember` calls this invariant "unreachable
+   * while `targetUserId !== actor.userId` holds and the caller is the sole OWNER", but states it
+   * as the invariant rather than a consequence of the checks above. A roster stub therefore has
+   * to fake the race directly: two OWNER rows resolve `findUnique`, but `count` — read a moment
+   * later, after a concurrent request already demoted the other one — reports only one OWNER
+   * left. `removeMember` must still refuse rather than trust the stale read that let it in.
+   */
+  it('refuses to remove the last OWNER even when the caller is also an OWNER', async () => {
+    const target = {
+      id: '0198e2c0-9a1b-7f04-8c3d-100000000000',
+      workspaceId: WORKSPACE_ID,
+      userId: SECOND_OWNER_USER,
+      role: MemberRole.OWNER as string,
+      user: { name: 'Second Owner', avatarUrl: null },
+    };
+    const prisma: PrismaStub = {
+      workspaceMember: {
+        findUnique: jest.fn().mockResolvedValue(target),
+        // Simulates the race: by the time this runs, only one OWNER remains.
+        count: jest.fn().mockResolvedValue(1),
+      },
+    };
+    const activityService = { record: jest.fn().mockResolvedValue({ id: 'activity' }) };
+    const service = new WorkspaceMemberService(
+      prisma as unknown as PrismaService,
+      activityService as unknown as ActivityService,
+    );
+
+    const thrown = await service
+      .removeMember(WORKSPACE_ID, SECOND_OWNER_USER, actorOf(OWNER_USER, MemberRole.OWNER), request)
+      .catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(ConflictException);
+    expect((thrown as ConflictException).message).toContain('last OWNER');
+    expect(api.removeMember).not.toHaveBeenCalled();
+    expect(activityService.record).not.toHaveBeenCalled();
+  });
+
+  /**
+   * `MEMBER_NOT_FOUND` is the plugin's answer to the same race from the other direction: the
+   * pre-check's `findUnique` still saw the row, but the member was gone by the time
+   * `auth.api.removeMember` ran (e.g. they left concurrently). This is the one Better Auth code
+   * `rethrowMemberWriteError` maps by hand rather than leaving to `rethrowBetterAuthError`'s
+   * generic 4xx pass-through, because the plugin reports it as a `500`.
+   */
+  it('maps a concurrent MEMBER_NOT_FOUND from the plugin to 404', async () => {
+    const { service } = buildService(OWNER_AND_ADMIN);
+    api.removeMember.mockRejectedValue(
+      new APIError('INTERNAL_SERVER_ERROR', {
+        message: 'Member not found',
+        code: 'MEMBER_NOT_FOUND',
+      }),
+    );
+
+    const thrown = await service
+      .removeMember(WORKSPACE_ID, MEMBER_USER, actorOf(ADMIN_USER, MemberRole.ADMIN), request)
+      .catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    expect((thrown as NotFoundException).message).toBe('Workspace member not found');
+  });
 });
 
 describe('WorkspaceMemberService.updateMemberRole', () => {
@@ -436,6 +500,34 @@ describe('WorkspaceMemberService.updateMemberRole', () => {
     );
 
     expect(evictMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Every other `updateMemberRole` case above resolves the plugin call — none of them exercise
+   * what happens when `auth.api.updateMemberRole` itself fails, e.g. a permission the pre-checks
+   * did not catch because it depends on state only the plugin holds.
+   */
+  it("translates the plugin's write-forbidden code into 403", async () => {
+    const { service, activityService } = buildService(OWNER_AND_ADMIN);
+    api.updateMemberRole.mockRejectedValue(
+      new APIError('UNAUTHORIZED', {
+        message: 'You are not allowed to update this member',
+        code: 'YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_MEMBER',
+      }),
+    );
+
+    const thrown = await service
+      .updateMemberRole(
+        WORKSPACE_ID,
+        MEMBER_USER,
+        { role: MemberRole.GUEST },
+        actorOf(ADMIN_USER, MemberRole.ADMIN),
+        request,
+      )
+      .catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(ForbiddenException);
+    expect(activityService.record).not.toHaveBeenCalled();
   });
 });
 

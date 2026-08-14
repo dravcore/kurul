@@ -87,4 +87,25 @@ describe('ActivityService', () => {
       NotFoundException,
     );
   });
+
+  it('lists a task activities once the tenant-scoped lookup finds it', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue({ id: TASK_ID });
+    const row = activityRow('0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d71');
+    prisma.activity.findMany.mockResolvedValue([row]);
+
+    const page = await service.listForTask(WORKSPACE_ID, TASK_ID, { limit: 10 });
+
+    expect(prisma.task.findFirst).toHaveBeenCalledWith({
+      where: { id: TASK_ID, board: { workspaceId: WORKSPACE_ID } },
+      select: { id: true },
+    });
+    expect(prisma.activity.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { workspaceId: WORKSPACE_ID, taskId: TASK_ID },
+      }),
+    );
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]!.id).toBe(row.id);
+  });
 });
