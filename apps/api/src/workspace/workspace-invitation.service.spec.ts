@@ -211,6 +211,48 @@ describe('WorkspaceInvitationService.createInvitation', () => {
     expect(api.cancelInvitation).toHaveBeenCalledTimes(2);
   });
 
+  it('lets a cancelInvitation failure abort the role-change replace instead of proceeding past it', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([
+      { id: 'inv_a', role: MemberRole.GUEST },
+    ]);
+    api.cancelInvitation.mockRejectedValue(
+      new APIError('FORBIDDEN', { message: 'not allowed to cancel invitation' }),
+    );
+
+    const thrown = await service
+      .createInvitation(WORKSPACE_ID, ACTOR_ID, { email: EMAIL, role: MemberRole.MEMBER }, request)
+      .catch((error: unknown) => error);
+
+    // If this fell through silently, `createInvitation` would go on to call the plugin with
+    // the old invitation still pending — reissuing the same offer twice instead of replacing it.
+    expect(thrown).toBeInstanceOf(ForbiddenException);
+    expect(api.createInvitation).not.toHaveBeenCalled();
+  });
+
+  it('rejects a plugin response missing a required field instead of returning a half-built invitation', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    // `expiresAt` absent — a shape the plugin should never produce, but the guard exists
+    // because "produce a dangling accept link with no expiry" is a worse failure than a 400.
+    api.createInvitation.mockResolvedValue({
+      id: 'inv_new',
+      email: EMAIL,
+      role: MemberRole.MEMBER,
+      status: 'pending',
+      expiresAt: undefined,
+    });
+
+    await expect(
+      service.createInvitation(
+        WORKSPACE_ID,
+        ACTOR_ID,
+        { email: EMAIL, role: MemberRole.MEMBER },
+        request,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   /**
    * Audit PM-04. The invitation email is sent from inside `auth.api.createInvitation`, by the
    * plugin's own hook, so these cases stand the mock in for that hook: it records a delivery
@@ -432,6 +474,17 @@ describe('WorkspaceInvitationService invitation error mapping', () => {
     expect(thrown).toBeInstanceOf(ForbiddenException);
     expect((thrown as ForbiddenException).message).toBe('Failed to revoke invitation');
   });
+
+  it('404s a revoke for an invitation outside the workspace, before calling Better Auth', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.revokeInvitation(WORKSPACE_ID, ACTOR_ID, 'inv_missing', request),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(api.cancelInvitation).not.toHaveBeenCalled();
+  });
+
   it('maps a 400 from acceptInvitation to 400 with our message', async () => {
     const { service, prisma } = buildService();
     prisma.workspaceInvitation.findUnique.mockResolvedValue({
@@ -483,6 +536,21 @@ describe('WorkspaceInvitationService invitation error mapping', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
 
     expect(api.acceptInvitation).not.toHaveBeenCalled();
+  });
+
+  it('rejects a plugin response with no member, rather than returning a phantom membership', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findUnique.mockResolvedValue({
+      id: 'inv_1',
+      workspaceId: WORKSPACE_ID,
+      status: 'pending',
+    });
+    api.acceptInvitation.mockResolvedValue({ member: undefined });
+
+    await expect(service.acceptInvitation(WORKSPACE_ID, 'inv_1', request)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.user.findUniqueOrThrow).not.toHaveBeenCalled();
   });
 });
 

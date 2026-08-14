@@ -42,15 +42,19 @@ module.exports = {
   coveragePathIgnorePatterns: ['/generated/'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
-  // Floor set a few points below the measured baseline (2026-08-09, `pnpm --filter
-  // @kurultay/api test:cov`: stmts 57.19 / branch 48.29 / funcs 59.68 / lines 58.12) so CI
-  // fails on real regressions without being so tight that routine refactors trip it.
+  // Floor set a few points below the measured baseline (2026-08-14, `pnpm --filter
+  // @kurultay/api test:cov`: stmts 77.86 / branch 69.31 / funcs 79.64 / lines 79.24 — raised
+  // from the 2026-08-09 baseline of 57.19/48.29/59.68/58.12 after closing the workspace/
+  // activity/label/common-pipes-and-decorators cold zones tracked as audit finding QA-03) so
+  // CI fails on real regressions without being so tight that routine refactors trip it. Raise
+  // this again the same way once the next baseline moves: measure, then set floor a few points
+  // under the new number rather than under the old one.
   coverageThreshold: {
     global: {
-      statements: 55,
-      branches: 45,
-      functions: 57,
-      lines: 56,
+      statements: 75,
+      branches: 66,
+      functions: 77,
+      lines: 76,
     },
   },
 };

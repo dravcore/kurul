@@ -136,6 +136,58 @@ describe('LabelService', () => {
     });
   });
 
+  it('updates only the color, leaving the name field out of the write entirely', async () => {
+    const { service, prisma } = buildService();
+    prisma.label.findFirst.mockResolvedValue({
+      id: LABEL_ID,
+      boardId: BOARD_ID,
+      name: 'Bug',
+      color: 'slot-1',
+    });
+    prisma.label.update.mockResolvedValue({
+      id: LABEL_ID,
+      boardId: BOARD_ID,
+      name: 'Bug',
+      color: 'slot-4',
+    });
+
+    await service.update(WORKSPACE_ID, LABEL_ID, ACTOR_ID, { color: 'slot-4' } as never);
+
+    // Not `data: { name: undefined, color: 'slot-4' }` — an explicit `undefined` key would
+    // still overwrite the column with Prisma's own semantics for some drivers, so the branch
+    // has to omit the key rather than null it out.
+    expect(prisma.label.update).toHaveBeenCalledWith({
+      where: { id: LABEL_ID, board: { workspaceId: WORKSPACE_ID } },
+      data: { color: 'slot-4' },
+    });
+  });
+
+  it('updates both fields together in a single write', async () => {
+    const { service, prisma } = buildService();
+    prisma.label.findFirst.mockResolvedValue({
+      id: LABEL_ID,
+      boardId: BOARD_ID,
+      name: 'Bug',
+      color: 'slot-1',
+    });
+    prisma.label.update.mockResolvedValue({
+      id: LABEL_ID,
+      boardId: BOARD_ID,
+      name: 'Renamed',
+      color: 'slot-5',
+    });
+
+    await service.update(WORKSPACE_ID, LABEL_ID, ACTOR_ID, {
+      name: 'Renamed',
+      color: 'slot-5',
+    } as never);
+
+    expect(prisma.label.update).toHaveBeenCalledWith({
+      where: { id: LABEL_ID, board: { workspaceId: WORKSPACE_ID } },
+      data: { name: 'Renamed', color: 'slot-5' },
+    });
+  });
+
   it('removes a label after tenant-scoped lookup', async () => {
     const { service, prisma } = buildService();
     prisma.label.findFirst.mockResolvedValue({
