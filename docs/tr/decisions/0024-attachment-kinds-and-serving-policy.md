@@ -292,10 +292,21 @@ boşluk değil, doğru davranış. Cascade'i, ek başına activity yayması içi
 geçirmek, 0022'nin sahipsiz dosya süpürmesini üzerine kurduğu özelliği — "orphan production is
 bulk and silent" — tersine çevirme denemesi olurdu; toplu silmenin cevabı süpürme ve onun
 `CleanupCounts`'ı (`apps/api/src/retention/cleanup.worker.ts:71`), tek bir tıklamayı anlatan
-binlerce denetim satırı değil. Toplu olay zaten bir kez, `board.deleted` ya da `task.deleted`
-olarak kaydediliyor. Dolayısıyla denetim alt kümesinin burada cevapladığı soru "kim bir dosyayı
-karttan ayırdı", "hangi dosyalar var olmayı bıraktı" değil; ikincisinin cevabı
-`board.deleted`/`task.deleted` artı süpürmenin sayaçları.
+binlerce denetim satırı değil. Toplu yollardan geriye ne kaldığı ise seviyeye göre değişiyor ve bu
+farkı tam olarak söylemek gerekiyor. Bir **task** ya da **board** silmek olayın kendisini kayda
+bırakıyor — `task.service.ts:233` `ActivityType.TaskDeleted`, `board.service.ts:166`
+`ActivityType.BoardDeleted` yazıyor — yani ekler tek tek sayılmıyor ama onları götüren silme
+kaydediliyor. Bir **workspace** silmek ise `Activity`'de hiçbir şey bırakmıyor: her satır tenant'la
+birlikte cascade ediyor ve o `board.deleted` satırlarını da götürüyor; `workspace.deleted` ise
+bilinçli olarak bir `ActivityType` değil — "that constant is the set of values written to
+`Activity.type`, and this event is never written there"
+(`apps/api/src/workspace/workspace.service.ts:36-37`). Tek izi, `WorkspaceService.remove`'un yazdığı
+JSON uygulama-logu satırı. Bu sınır bu ADR'dan öncesine ait ve verildiği yerde gerekçelendirilmiş;
+burada yalnızca yukarıdaki cümlenin onu kapsıyormuş gibi okunmaması için adlandırılıyor.
+Dolayısıyla denetim alt kümesinin cevapladığı soru "kim bir dosyayı karttan ayırdı", "hangi dosyalar
+var olmayı bıraktı" değil — ve ikincisinin cevabı task ve board seviyesinde
+`task.deleted`/`board.deleted` artı süpürmenin sayaçları, workspace seviyesinde ise yalnızca
+uygulama logu.
 
 `attachment.created`'ı da almanın argümanı ters yönde işliyordu: "ele geçirilmiş bu hesap burada ne
 yaptı" diye soran bir olay müdahalecisi, ne alındığı kadar ne konduğunu da ister. Bu argüman, ancak

@@ -293,9 +293,19 @@ the cascade through application code to emit per-attachment activity would be an
 the very property 0022 built the orphan sweep around, that "orphan production is bulk and silent";
 the answer to bulk deletion is the sweep and its `CleanupCounts`
 (`apps/api/src/retention/cleanup.worker.ts:71`), not thousands of audit rows describing one click.
-The bulk event is already recorded, once, as `board.deleted` or `task.deleted`. So the question the
-audit subset answers here is "who detached a file from a card", not "which files stopped existing";
-the second question is answered by `board.deleted`/`task.deleted` plus the sweep's counts.
+What survives the bulk paths differs by level, and the difference is worth stating exactly. Deleting
+a **task** or a **board** leaves the event itself on record — `task.service.ts:233` writes
+`ActivityType.TaskDeleted` and `board.service.ts:166` writes `ActivityType.BoardDeleted` — so the
+attachments are not enumerated but the deletion that took them is. Deleting a **workspace** leaves
+nothing in `Activity` at all: every row cascades with the tenant, taking those `board.deleted` rows
+with it, and `workspace.deleted` is deliberately not an `ActivityType` — "that constant is the set
+of values written to `Activity.type`, and this event is never written there"
+(`apps/api/src/workspace/workspace.service.ts:36-37`). Its only trace is the JSON application-log
+line `WorkspaceService.remove` writes. That limit predates this ADR and is argued where it was
+made; it is named here only so the sentence above is not read as covering it. So the audit subset
+answers "who detached a file from a card", not "which files stopped existing" — and the second
+question is answered by `task.deleted`/`board.deleted` plus the sweep's counts at task and board
+level, and by the application log alone at workspace level.
 
 The argument for including `attachment.created` ran the other way: an incident responder asking
 "what did this compromised account do here" wants what was put there as well as what was taken.
