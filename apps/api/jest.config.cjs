@@ -2,6 +2,16 @@
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts', 'mjs', 'cjs'],
   rootDir: 'src',
+  // `test/helpers/*.ts` (e.g. `auth.ts`, used by every `*.e2e-spec.ts`) lives outside
+  // `src` on purpose — it's test-only code, not part of the shipped API — but its slug/
+  // email uniqueness logic (`buildUniqueSlug`, `uniqueEmail`, `uniqueSuffix`; see the
+  // doc comment on `uniqueSuffix` for why it exists — #173) is worth covering with a
+  // fast, DB-free unit test rather than only indirectly through e2e runs. Extending
+  // `roots` (discovery only — `rootDir` above still governs module resolution/coverage)
+  // lets `test/helpers/*.spec.ts` run under the ordinary `pnpm test` alongside `src`'s
+  // unit tests, without pulling in the `*.e2e-spec.ts` files next to it (those don't
+  // match `testRegex` below: it requires a literal `.spec.ts`, not `.e2e-spec.ts`).
+  roots: ['<rootDir>', '<rootDir>/../test/helpers'],
   testRegex: '.*\\.spec\\.ts$',
   transform: {
     '^.+\\.(t|j|mj)sx?$': [
