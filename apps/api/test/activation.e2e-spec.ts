@@ -72,6 +72,19 @@ describe('Activation funnel (e2e)', () => {
     return response.body.id as string;
   }
 
+  /**
+   * Waits until at least `count` pings of this kind exist.
+   *
+   * `UsagePingService.recordQuietly` is deliberately not awaited by the handler that triggers
+   * it — that is the property that keeps a metrics table from being able to slow down or fail a
+   * board load — so a `200` is not evidence the row is there yet. Every assertion that reads a
+   * ping-derived number has to wait for the write it depends on; skipping this passed on a fast
+   * developer machine and failed on CI, which is the only interesting kind of flake.
+   */
+  async function waitForPings(kind: UsagePingKind, count: number): Promise<void> {
+    await waitFor(async () => (await prisma.usagePing.count({ where: { kind } })) >= count);
+  }
+
   // ---------------------------------------------------------------------------------------
   // Who may read it
   // ---------------------------------------------------------------------------------------
@@ -201,12 +214,18 @@ describe('Activation funnel (e2e)', () => {
     expect(step(await funnel(operator), ActivationEvent.InviteAccepted).count).toBe(1);
 
     // --- dashboard_viewed ----------------------------------------------------------------
+    // The only two steps whose write the request does not wait for, so the assertion has to.
+    // The response returning is not evidence the ping landed — that is the whole design — and
+    // reading the funnel straight afterwards is a race this suite lost on CI while passing
+    // locally, which is exactly the class of flake `waitForPings` exists to remove.
     await founder.agent.get(`/workspaces/${workspace.id}/dashboard/summary`).expect(200);
+    await waitForPings(UsagePingKind.DashboardView, 1);
     expect(step(await funnel(operator), ActivationEvent.DashboardViewed).count).toBe(1);
 
     // --- wau_board_view -------------------------------------------------------------------
     await founder.agent.get(`/workspaces/${workspace.id}/boards/${boardId}`).expect(200);
     await teammate.agent.get(`/workspaces/${workspace.id}/boards/${boardId}`).expect(200);
+    await waitForPings(UsagePingKind.BoardView, 2);
     expect(step(await funnel(operator), ActivationEvent.WauBoardView).count).toBe(2);
 
     // --- task_completed --------------------------------------------------------------------
@@ -264,6 +283,7 @@ describe('Activation funnel (e2e)', () => {
       await founder.agent.get(`/workspaces/${workspace.id}/boards/${boardId}`).expect(200);
     }
 
+    await waitForPings(UsagePingKind.BoardView, 1);
     const dto = await funnel(operator);
     expect(step(dto, ActivationEvent.BoardCreated).count).toBe(1);
     expect(step(dto, ActivationEvent.FirstTaskCreated).count).toBe(1);
@@ -291,8 +311,10 @@ describe('Activation funnel (e2e)', () => {
       await founder.agent.get(`/workspaces/${workspace.id}/dashboard/summary`).expect(200);
     }
 
-    // Fire-and-forget: the inserts are not awaited by the handler, so give them a beat.
-    await waitFor(async () => (await prisma.usagePing.count()) >= 2);
+    // Both kinds have to have landed before "there are exactly two rows" means anything —
+    // waiting for a total of two would be satisfied by two board views and no dashboard one.
+    await waitForPings(UsagePingKind.BoardView, 1);
+    await waitForPings(UsagePingKind.DashboardView, 1);
 
     const rows = await prisma.usagePing.findMany();
     expect(rows).toHaveLength(2);
@@ -373,7 +395,7 @@ describe('Activation funnel (e2e)', () => {
       .get(`/workspaces/${teamWorkspace.id}/boards/${teamBoard.body.id as string}`)
       .expect(200);
 
-    await waitFor(async () => (await prisma.usagePing.count()) >= 3);
+    await waitForPings(UsagePingKind.BoardView, 3);
 
     const { northStar } = await funnel(operator);
     expect(northStar).toEqual({
@@ -407,7 +429,7 @@ describe('Activation funnel (e2e)', () => {
       .get(`/workspaces/${workspace.id}/boards/${board.body.id as string}`)
       .expect(200);
 
-    await waitFor(async () => (await prisma.usagePing.count()) >= 1);
+    await waitForPings(UsagePingKind.BoardView, 1);
     expect((await funnel(operator)).northStar.weeklyActiveTeamWorkspaces).toBe(1);
 
     const longAgo = new Date(Date.now() - (ACTIVATION_WINDOW_DAYS + 3) * 24 * 60 * 60 * 1000);
@@ -453,7 +475,7 @@ describe('Activation funnel (e2e)', () => {
       .get(`/workspaces/${workspace.id}/boards/${board.body.id as string}`)
       .expect(200);
 
-    await waitFor(async () => (await prisma.usagePing.count()) >= 1);
+    await waitForPings(UsagePingKind.BoardView, 1);
     expect((await funnel(operator)).northStar.weeklyActiveTeamWorkspaces).toBe(1);
 
     await lead.agent.delete(`/workspaces/${workspace.id}/members/${leaverId}`).expect(204);
@@ -502,7 +524,7 @@ describe('Activation funnel (e2e)', () => {
  * condition is the honest way to wait for one: a fixed `sleep` is either flaky on a loaded
  * machine or slow on every run.
  */
-async function waitFor(condition: () => Promise<boolean>, timeoutMs = 2000): Promise<void> {
+async function waitFor(condition: () => Promise<boolean>, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     if (await condition()) return;
