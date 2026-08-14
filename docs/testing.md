@@ -167,18 +167,22 @@ misconfigured variable here would mean a suite that silently ran against the dev
 database, which is the one failure this arrangement is built to make impossible. The reasoning
 is written out in `e2e/stack-env.ts`.
 
-**Why no Redis.** A logical database index would have been the obvious boundary, but the index
-does not reach the client: `parseRedisUrl` returns only host, port and password and drops the
-URL's pathname, and every ioredis/BullMQ construction in `apps/api` goes through it — so
-`redis://…/8` connects to database 0 (issue [#190](https://github.com/dravcore/kurultay/issues/190)).
-A key prefix is not available either; BullMQ's prefix and the Socket.io adapter's channel names
-are chosen in `apps/api` source. Two API instances on database 0 share the `due-soon` _queue_,
-which means a `pnpm dev` server and this suite would take turns running each other's scheduled
-scans against the wrong database. The API supports running with no Redis at all — readiness
-reports it `skipped`, the gateway logs that the adapter was not attached, the due-soon worker
-declines to start — and with a single API process the adapter would only be fanning messages
-back to their own publisher, so nothing under test loses coverage. When #190 is fixed, an index
-becomes a real boundary and is worth reinstating.
+**Why no Redis.** A logical database index was the obvious boundary and it used to be a fiction:
+`parseRedisUrl` dropped the URL's pathname, and every ioredis/BullMQ construction in `apps/api`
+goes through it, so `redis://…/8` connected to database 0
+(issue [#190](https://github.com/dravcore/kurultay/issues/190)). That is fixed — the index now
+reaches every consumer — but it separates a _keyspace_, not a channel: Redis pub/sub ignores the
+database, so the Socket.io fan-out channel is shared by every client of that server whichever
+index it selected, and a key prefix is not available either since BullMQ's prefix and the
+adapter's channel names are chosen in `apps/api` source. An index would therefore separate the
+part that actually bit — two API instances sharing the `due-soon` _queue_ take turns running
+each other's scheduled scans against the wrong database — at the cost of booting the adapter and
+the worker inside the suite, which is a behaviour change worth its own verification rather than
+an assumption. Until then the suite runs with none, which the API supports outright: readiness
+reports Redis `skipped`, the gateway logs that the adapter was not attached, the due-soon worker
+declines to start. With a single API process the adapter would only be fanning messages back to
+their own publisher, so nothing under test loses coverage. The database index itself is covered
+where it belongs, against a live server, in `apps/api/test/redis-database-index.e2e-spec.ts`.
 
 ### How these tests are written
 

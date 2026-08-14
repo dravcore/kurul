@@ -93,7 +93,7 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | Variable                              | Example                                                             | Purpose                                                                                                                                                                                                                  |
 | ------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `DATABASE_URL`                        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma connection string — password segment must match `POSTGRES_PASSWORD` below                                                                                                                                         |
-| `REDIS_URL`                           | `redis://localhost:6379`                                            | Socket.io Redis adapter, caching, BullMQ scheduled jobs (`due-soon` and `cleanup` queues)                                                                                                                                |
+| `REDIS_URL`                           | `redis://localhost:6379`                                            | Socket.io Redis adapter, caching, BullMQ scheduled jobs (`due-soon` and `cleanup` queues). A database index is honoured — see [Database and cache credentials](#database-and-cache-credentials)                          |
 | `BETTER_AUTH_SECRET`                  | _(generate)_                                                        | Session signing secret — required, no default                                                                                                                                                                            |
 | `BETTER_AUTH_URL`                     | `http://localhost:4000`                                             | Public URL of the API (Better Auth is mounted at `/auth/*`). Dev loop only — `docker-compose.yml` derives it from `SITE_URL`                                                                                             |
 | `API_PORT`                            | `4000`                                                              | NestJS listen port                                                                                                                                                                                                       |
@@ -211,6 +211,21 @@ up"](#upgrading-and-backups)) — so making it required would break every existi
 `docker-compose.yml` on upgrade for comparatively little gain. Leave it blank to keep the
 previous passwordless behavior; set it to add defense in depth against another container that
 lands on the same Docker network.
+
+**A `REDIS_URL` may name a database index, and it is honoured.** `redis://localhost:6379/3`
+puts this instance's keys — auth rate-limit counters and both BullMQ queues — on index 3, which
+is how several apps share one Redis without stepping on each other's keyspace. Until
+[#190](https://github.com/dravcore/kurultay/issues/190) the
+index was parsed off and thrown away, so such a URL was accepted and then used database 0
+anyway; if you set one before that fix and something in database 0 looked like it belonged to
+another app, it probably did. Two limits are worth knowing. **Pub/sub is not scoped by
+database:** Redis delivers a published message to every subscriber of that channel whatever
+index each connection selected, so two Kurultay instances on different indexes still share the
+Socket.io fan-out channel — the index separates keyspaces, not channels. And an index that is
+not a plain non-negative integer (`redis://host:6379/staging`), or a path and a `?db=` that
+disagree (`redis://host:6379/3?db=4`), is refused at connection time rather than quietly read
+as 0 — the whole point of the setting is keeping two apps apart, so a typo in it must not put
+them together.
 
 **Changing `POSTGRES_PASSWORD` on an existing `postgres_data` volume does not rotate the
 running database's password.** The official Postgres image only applies

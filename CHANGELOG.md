@@ -455,6 +455,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`REDIS_URL`'s database index was accepted and then quietly ignored.** Every ioredis and
+  BullMQ connection in the API is built by one function, `parseRedisUrl`, and it returned only
+  `{ host, port, password }` — the URL's path segment (`redis://redis:6379/3`) and any `?db=`
+  went nowhere. An operator who points several apps at one Redis and separates them by index —
+  which is what the index is for — got database 0 anyway, with no warning and no error, on top
+  of whatever was already living there. Redis `SELECT` is per connection, so it could not be
+  corrected from outside the process either. The index is now carried through to every consumer:
+  auth rate-limit counters, both BullMQ queues (`due-soon`, `cleanup`) and the Socket.io
+  adapter's pair of clients. An index that is not a plain non-negative integer, or a path and a
+  `?db=` that disagree, now fails loudly at connection time instead of being coerced to 0 — a
+  typo in the one setting that exists to keep two apps apart must not silently put them
+  together. **The separation an index buys is a keyspace, not a channel:** Redis pub/sub is not
+  scoped by database, so two instances on different indexes still share the Socket.io fan-out
+  channel while their queues and counters no longer collide (measured, and now asserted in
+  `apps/api/test/redis-database-index.e2e-spec.ts`, which connects on index 3 and asks the
+  server — `CLIENT LIST`, plus observer clients on 3 and 0 — where each connection and key
+  actually landed, rather than asserting what the parser returned).
+  Closes [#190](https://github.com/dravcore/kurultay/issues/190).
 - **The uptime monitor the docs tell you to build was pointed at a URL that is not the API.**
   `docs/development.md` said to monitor `https://<your-host>/health/ready`, which predates the
   reverse proxy: behind `proxy` that path matches the catch-all rule, reaches the web app and

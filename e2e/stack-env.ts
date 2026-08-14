@@ -53,31 +53,34 @@ const SMTP_PORT = '1025';
  *
  * The intent was a logical database index nobody else uses — `redis://…/8` — on the theory
  * that both Redis consumers (the Socket.io fan-out adapter and the BullMQ queues) are
- * namespaced by index. The index does not survive: `apps/api/src/common/redis-url.ts`
- * `parseRedisUrl` returns only `{ host, port, password }` and drops the URL's pathname, and
- * every ioredis/BullMQ construction in `apps/api` goes through it. Measured with the compiled
- * API booted on `redis://localhost:6379/8`: `CLIENT LIST` reported six connections, all
- * `db=0`, `dbsize` on 8 was zero, and the suite's own `bull:due-soon:repeat:due-soon-scan`
- * scheduler key was sitting in database 0 next to the developer's. That is issue #190, it is
- * an API defect rather than a test-harness one, and it is not fixed from here.
+ * namespaced by index. Half of that theory was wrong and the other half was broken.
  *
- * So an index is not available, and a key prefix is not either: BullMQ's `prefix` and the
- * adapter's channel names are chosen in `apps/api` source, which this suite does not touch.
- * What is left is the fact that the API supports running with no Redis at all — `HealthService`
- * grades it `skipped` rather than `down`, the gateway logs that the adapter was not attached,
- * and the due-soon worker declines to start — so that is what the suite does. It is the only
- * option here that is actually isolated instead of merely documented as such.
+ * Broken: `parseRedisUrl` dropped the URL's pathname, and every ioredis/BullMQ construction in
+ * `apps/api` goes through it, so an API booted on `redis://localhost:6379/8` put all six of its
+ * connections and its `bull:due-soon:repeat:due-soon-scan` scheduler key on database 0, beside
+ * the developer's. That was #190 and it is fixed: the index now reaches every consumer, asserted
+ * against a live server in `apps/api/test/redis-database-index.e2e-spec.ts`.
+ *
+ * Wrong: an index namespaces a *keyspace*, not a channel. Redis delivers a published message to
+ * every subscriber of that channel whatever database each connection selected (measured, and
+ * asserted in the same spec), so the Socket.io adapter — which is pub/sub and nothing else —
+ * would still be shared with a `pnpm dev` API on the same server no matter which index this
+ * suite picked. A key prefix is not available either: BullMQ's `prefix` and the adapter's
+ * channel names are chosen in `apps/api` source, which this suite does not touch.
+ *
+ * So `redis://…/8` would now genuinely separate the *queue* — the part that actually bit, since
+ * two API instances sharing the `due-soon` queue take turns consuming one another's scheduled
+ * scans against the wrong database — while leaving the fan-out channel shared. That is a real
+ * improvement over blanking and it is not free: it would boot the adapter and the worker inside
+ * the suite, which is a behaviour change for every scenario and wants its own verification
+ * rather than a comment saying it should be fine. Until someone does that, this stays blank,
+ * which is the option that is isolated rather than merely documented as such: the API supports
+ * running with no Redis at all — `HealthService` grades it `skipped` rather than `down`, the
+ * gateway logs that the adapter was not attached, and the due-soon worker declines to start.
  *
  * Nothing under test loses coverage by it. The stack is a single API process, so the Redis
  * adapter would only be fanning messages out to the process that published them; the realtime
- * scenario exercises the same gateway either way. Keeping Redis on would have cost something
- * real: two API instances sharing database 0 share the `due-soon` *queue*, so a `pnpm dev`
- * server and this suite would take turns consuming one another's scheduled scans and running
- * them against the wrong database.
- *
- * When #190 lands, `REDIS_URL: redis://…/8` becomes a genuine boundary and is worth
- * reinstating — attaching the adapter and registering the queue would then be part of what a
- * boot failure is caught by.
+ * scenario exercises the same gateway either way.
  */
 export function apiEnv(): Record<string, string> {
   return {
@@ -92,8 +95,9 @@ export function apiEnv(): Record<string, string> {
     BETTER_AUTH_SECRET: 'kurultay-playwright-e2e-secret-not-a-real-secret',
     RATE_LIMIT_ENABLED: 'false',
     CLEANUP_ENABLED: 'false',
-    // See the long note above: an inherited Redis is a shared Redis, because `parseRedisUrl`
-    // drops the database index (#190). Blanking it is what makes the suite's isolation real.
+    // See the long note above: an index would now separate the queues (#190 is fixed) but not
+    // the Socket.io channel, and switching this suite onto a Redis is its own change. Blanking
+    // it is still what makes the isolation real.
     REDIS_URL: '',
     SMTP_HOST,
     SMTP_PORT,

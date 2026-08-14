@@ -168,18 +168,23 @@ türetilir. Buradaki yanlış ayarlanmış bir değişken, suite'in sessizce gel
 karşı koşması demek olurdu — bu düzenin imkânsız kılmak için var olduğu tek hata da budur.
 Gerekçe `e2e/stack-env.ts` içinde yazılı.
 
-**Neden Redis yok.** Bariz sınır bir logical database indeksi olurdu, ama indeks istemciye
-ulaşmıyor: `parseRedisUrl` yalnızca host, port ve password döndürüp URL'in pathname'ini düşürüyor
-ve `apps/api`'deki her ioredis/BullMQ kurulumu oradan geçiyor — dolayısıyla `redis://…/8`
-database 0'a bağlanıyor (issue [#190](https://github.com/dravcore/kurultay/issues/190)).
-Anahtar öneki de kullanılabilir değil; BullMQ'nun prefix'i ve Socket.io adaptörünün kanal adları
-`apps/api` kaynağında seçiliyor. Database 0'daki iki API instance'ı `due-soon` _kuyruğunu_
-paylaşır, yani bir `pnpm dev` sunucusu ile bu suite sırayla birbirinin zamanlanmış taramalarını
-yanlış veritabanına karşı koşardı. API hiç Redis olmadan çalışmayı destekliyor — readiness onu
-`skipped` olarak raporluyor, gateway adaptörün bağlanmadığını logluyor, due-soon worker'ı
-başlamayı reddediyor — ve tek bir API süreciyle adaptör mesajları yalnızca kendi yayıncısına
-geri dağıtacağından test edilen hiçbir şey kapsam kaybetmiyor. #190 düzeldiğinde indeks gerçek
-bir sınır hâline gelir ve geri konmaya değer.
+**Neden Redis yok.** Bariz sınır bir logical database indeksiydi ve bir zamanlar kurgudan
+ibaretti: `parseRedisUrl` URL'in pathname'ini düşürüyordu ve `apps/api`'deki her ioredis/BullMQ
+kurulumu oradan geçtiği için `redis://…/8` database 0'a bağlanıyordu
+(issue [#190](https://github.com/dravcore/kurultay/issues/190)). Bu düzeldi — indeks artık her
+tüketiciye ulaşıyor — ama bir _keyspace_ ayırıyor, kanal değil: Redis pub/sub veritabanını
+yok sayar, dolayısıyla Socket.io fan-out kanalı, hangi indeksi seçmiş olursa olsun o sunucunun
+tüm istemcileri arasında paylaşılır; anahtar öneki de kullanılabilir değil, çünkü BullMQ'nun
+prefix'i ve adaptörün kanal adları `apps/api` kaynağında seçiliyor. Yani bir indeks, asıl canımızı
+yakan kısmı — `due-soon` _kuyruğunu_ paylaşan iki API instance'ı sırayla birbirinin zamanlanmış
+taramalarını yanlış veritabanına karşı koşar — ayırırdı; bedeli ise adaptörü ve worker'ı suite'in
+içinde başlatmak olurdu ki bu, varsayımla geçiştirilecek değil kendi doğrulamasını hak eden bir
+davranış değişikliğidir. O zamana kadar suite Redis'siz koşuyor ve API bunu doğrudan destekliyor:
+readiness Redis'i `skipped` raporluyor, gateway adaptörün bağlanmadığını logluyor, due-soon
+worker'ı başlamayı reddediyor. Tek bir API süreciyle adaptör mesajları yalnızca kendi yayıncısına
+geri dağıtacağından test edilen hiçbir şey kapsam kaybetmiyor. Veritabanı indeksinin kendisi ise
+ait olduğu yerde, canlı bir sunucuya karşı, `apps/api/test/redis-database-index.e2e-spec.ts`
+içinde kapsanıyor.
 
 ### Bu testler nasıl yazılır
 
