@@ -50,6 +50,14 @@ function taskRow(
     updatedAt: now,
     assignees: [] as Array<{ user: { id: string; name: string; avatarUrl: string | null } }>,
     labels: [] as Array<{ label: { id: string; boardId: string; name: string; color: string } }>,
+    // Both includes carry a `checklists` array; the detail shape is the wider of the two, so a
+    // fixture built with it satisfies whichever mapper the code under test reaches for.
+    checklists: [] as Array<{
+      id: string;
+      title: string;
+      position: number;
+      items: Array<{ id: string; content: string; isDone: boolean; position: number }>;
+    }>,
   };
 }
 
