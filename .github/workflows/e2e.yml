@@ -94,7 +94,7 @@ jobs:
       # Keyed on the lockfile so the cache is invalidated exactly when the Playwright version
       # changes — a browser build that does not match the client is worse than no cache.
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
