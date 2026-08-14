@@ -117,6 +117,7 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `NEXT_PUBLIC_SENTRY_DSN`              | _(boş)_                                                             | Web hata takibi, aynı opt-in kuralı — **build sırasında gömülür**, değiştirdikten sonra web imajını yeniden build edin                                                                                                                             |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(boş)_ / `production`                                              | `SENTRY_ENVIRONMENT`'ın web karşılığı, o da build zamanlı                                                                                                                                                                                          |
 | `NEXT_PUBLIC_SENTRY_RELEASE`          | _(boş)_ / `v0.2.0`                                                  | `SENTRY_RELEASE`'in web karşılığı, o da build zamanlı                                                                                                                                                                                              |
+| `SEED_LARGE_BOARD_TASKS`              | _(boş)_ / `1000`                                                    | Yalnızca `pnpm db:seed` okur. Demo board'un yanına bu kadar task taşıyan sentetik bir board ekler. Boş ya da `0` atlar — bkz. [Büyük board seed'lemek](#büyük-board-seedlemek)                                                                     |
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` ve `SENTRY_PROJECT` yalnızca `next build` tarafından, source
 map yüklenirken ve yalnızca ayarlanmışlarsa okunur; bunlar olmadan build sessizce başarılı
@@ -326,7 +327,44 @@ Her şey container'da, production'a en yakın hâl. Dockerfile'ları ve compose 
 doğrulamak için, veya Kurultay'ı geliştirmek değil sadece çalıştırmak istediğinizde kullanın.
 
 ```bash
-docker compose up --build
+docker compose pull && docker compose up -d
+```
+
+`docker-compose.yml`'de `api` ve `web`, hem `image:` hem `build:` bildirir. Her etiketli
+release ikisini de GHCR'a yayınlar (`.github/workflows/release-images.yml`, `linux/amd64` +
+`linux/arm64`), böylece `pull` hazır build edilmiş imajı çeker, ardından gelen `up -d` de
+onu başlatır — lokal build yok, `pnpm install` yok, Docker layer cache ısıtması yok. Belirli
+bir release'i `latest` yerine sabitlemek için `.env`'de `TAG` ayarlayın:
+
+```bash
+TAG=v0.2.0   # release-images.yml'in yayınladığı bir tag ile eşleşmeli; liste için `git tag -l`
+```
+
+Compose'un varsayılan pull politikası bir servisi yalnızca `image:` tag'i lokalde veya
+registry'de çözülemediğinde build eder, dolayısıyla `pull` adımını atlarsanız da hiçbir şey
+bozulmaz: `docker compose up -d` tek başına da önce registry'yi dener ve `TAG`'iniz için henüz
+yayınlanmış bir imaj yoksa (release öncesi, veya hiç yayınlanmamış bir `TAG`) ya da
+`ghcr.io`'ya ağ erişimi yoksa otomatik olarak `build:`'e döner — bu repo'nun her zaman yaptığı
+aynı kaynak build'i. `docker compose up --build` (veya `up -d --build`) bilinçli olarak build
+etmek için (örn. bir Dockerfile'ı düzenledikten sonra veya `api`/`web`'de yayınlanmamış bir
+değişikliği test ederken) değişmeden çalışmaya devam eder.
+
+Tek istisna `migrate`: `image:` eşleniği yok (neden olmadığı `docker-compose.yml`'de yanındaki
+yorumda açıklanıyor), dolayısıyla her zaman kaynaktan build eder — `api`/`web`'i GHCR'dan
+çeken bir `docker compose up -d` bile bu tek servisin build maliyetini bir kez öder. Kapsam
+gerekçesinin tamamı için bkz.
+[denetim bulgusu OPS-04](https://github.com/dravcore/kurultay/issues/126).
+
+Web imajı, Dockerfile'ının varsayılan `NEXT_PUBLIC_API_URL`'i (`http://localhost:4000`) ve
+boş Sentry DSN'leriyle yayınlanır, çünkü Next.js `NEXT_PUBLIC_*` değerlerini build zamanında
+client bundle'a gömer — yayınlanmış bir imaj, `api`'nin `DATABASE_URL`'i gibi bunları
+container başlangıcında alamaz. Deploy'unuz farklı bir `NEXT_PUBLIC_API_URL` gerektiriyorsa
+(API'ye tarayıcıdan `localhost:4000` dışında bir adresten erişiliyorsa), `web`'i çekmek yerine
+lokal build edin:
+
+```bash
+docker compose build web   # NEXT_PUBLIC_API_URL / NEXT_PUBLIC_SENTRY_*'i .env'den gömer
+docker compose up -d
 ```
 
 Bu aynı zamanda veritabanını zamanlanmış olarak dump'layan `backup` sidecar'ını da başlatır —
@@ -459,6 +497,27 @@ docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
 pnpm db:seed
 ```
+
+### Büyük board seed'lemek
+
+Varsayılan seed dört task'tır; bir özellik geliştirmek için doğru, board'un yük altında ne
+yaptığını görmek için yanlış boyuttur. `SEED_LARGE_BOARD_TASKS`, demo board'un yanına ikinci
+bir board ekler — "Load Test Board", beş column, en büyüğü task'ların yaklaşık üçte birini
+tutar:
+
+```bash
+SEED_LARGE_BOARD_TASKS=1000 pnpm db:seed
+```
+
+Boş ya da `0` (varsayılan) bunu tamamen atlar; istemeyen kimse bedelini ödemez. Pozitif tam
+sayı olmayan her değer clamp'lenmek yerine "boş" sayılır: bir yazım hatası, ölçmek üzere
+olduğunuzdan başka boyutta bir board'u sessizce seed'lememelidir.
+
+Satırlar tekdüze değil gerçekçidir — karışık öncelikler, kartların yaklaşık yarısında label,
+dörtte birinde atanan kişi, due-soon penceresinin içine ve gerisine yayılmış son tarihler —
+çünkü her kartın aynı şekilde olduğu bir board tek bir kart şeklini ölçer.
+[`apps/web/components/board/board-column.tsx`](../../apps/web/components/board/board-column.tsx)
+içindeki column başına render bütçesi bu board'a karşı ölçüldü.
 
 ## Veri saklama
 
@@ -715,9 +774,22 @@ olmadan önce okuyun.
 
 ### Uygulamayı geri almak
 
-Yayınlanmış registry image'ları yok — `docker compose up`, `api` ve `web`'i checkout edilmiş
-kaynak ağacından build eder (bkz. `docker-compose.yml`). Dolayısıyla uygulamayı geri almak,
-bir önceki release tag'ini checkout edip image'ları yeniden build etmek demektir:
+`api`/`web`, her etiketli release'te GHCR'a yayınlanır (bkz.
+[Docker'da tam stack](#dockerda-tam-stack)), dolayısıyla geri almak bir rebuild değil, bir tag
+değişikliğidir:
+
+```bash
+# .env
+TAG=v0.1.0   # bilinen son sağlam tag — yayınlanmış sürümleri `git tag -l` ile listeleyin
+```
+
+```bash
+docker compose pull && docker compose up -d   # v0.1.0'ın image'larını çeker ve onlarla yeniden başlatır
+```
+
+O tag için yayınlanmış bir image yok mu (bu workflow var olmadan önce yükseltilmiş eski
+kurulumlar, veya `ghcr.io`'ya erişilemiyor)? O zaman daha önce tek seçenek olan kaynak
+rebuild'e dönün:
 
 ```bash
 git fetch --tags
@@ -756,12 +828,9 @@ yolu yoktur. Seçenekler, tercih sırasıyla:
 
    [Yedekten geri dönme](#yedekten-geri-dönme) adımlarını eksiksiz uygulayın; tek eklemeyle —
    stack'i geri getirmeden önce arşive karşılık gelen release tag'ine geçin ki kod ve şema
-   uyuşsun:
-
-   ```bash
-   git switch --detach v0.1.0         # arşive karşılık gelen release
-   docker compose up -d --build
-   ```
+   uyuşsun: `.env`'de `TAG=v0.1.0` ayarlayıp `docker compose pull` çalıştırın (bkz.
+   [Uygulamayı geri almak](#uygulamayı-geri-almak)), o tag için yayınlanmış image yoksa
+   `git switch --detach v0.1.0 && docker compose up -d --build`.
 
    Arşiv, `_prisma_migrations` defter tablosunu da içerir; dolayısıyla restore'dan sonra
    kayıtlı migration durumu restore edilen şemayla eşleşir ve eski release'in `migrate`

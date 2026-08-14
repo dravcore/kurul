@@ -46,7 +46,8 @@ Kurultay'ın cevabı bilinçli olarak dar:
   model, aynı kodun ikili lisanslanması; ücretli bir özellik sürümü değil
   ([ADR 0014](docs/tr/decisions/0014-dual-licensing-cla.md)).
 - **Güncel stack, tek compose dosyası.** Next.js 16 / NestJS 11 / PostgreSQL 18, uçtan uca
-  TypeScript, tamamı için `docker compose up --build`.
+  TypeScript, tamamı için `docker compose pull && docker compose up -d` — yayınlanmış
+  image'lar, lokal build gerekmiyor.
 - **Realtime ve çok-kiracılılık çekirdekte.** Socket.io board senkronu ve workspace'e
   scope'lanmış sorgular sonradan eklenmedi, baştan tasarlandı.
 
@@ -104,7 +105,13 @@ edilemez — yukarıdaki dev compose dosyası [Mailpit](https://mailpit.axllent.
 başlatır, böylece bu akışı gerçek bir mail sağlayıcısı olmadan lokal olarak test edebilirsiniz;
 bkz. [docs/tr/development.md#smtp-ve-mailpit](docs/tr/development.md#smtp-ve-mailpit).
 
-Tam stack Docker: `docker compose up --build`. Günlük detaylar:
+Tam stack Docker, pull tabanlı: `docker compose pull && docker compose up -d`. Her etiketli
+release, `api`/`web` imajlarını GHCR'a yayınlar (`ghcr.io/dravcore/kurultay-api`,
+`ghcr.io/dravcore/kurultay-web`) — bu sayede kurulum ve upgrade lokal build gerektirmez;
+`latest` yerine belirli bir sürümü sabitlemek için `.env`'de `TAG=vX.Y.Z` ayarlayın.
+`TAG`'iniz için henüz yayınlanmış bir imaj yoksa (veya `ghcr.io`'ya ağ erişimi yoksa)
+`docker compose up -d` otomatik olarak kaynaktan build'e döner — `docker compose up --build`
+de bilinçli olarak build etmek isteyenler için aynen çalışmaya devam eder. Günlük detaylar:
 [docs/tr/development.md](docs/tr/development.md).
 
 ## Stack

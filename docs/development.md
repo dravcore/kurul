@@ -118,6 +118,7 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `NEXT_PUBLIC_SENTRY_DSN`              | _(blank)_                                                           | Web error tracking, same opt-in rule — **baked at build time**, so rebuild the web image after changing it                                                                                                               |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(blank)_ / `production`                                            | `SENTRY_ENVIRONMENT`'s web counterpart, also build-time                                                                                                                                                                  |
 | `NEXT_PUBLIC_SENTRY_RELEASE`          | _(blank)_ / `v0.2.0`                                                | `SENTRY_RELEASE`'s web counterpart, also build-time                                                                                                                                                                      |
+| `SEED_LARGE_BOARD_TASKS`              | _(blank)_ / `1000`                                                  | Read only by `pnpm db:seed`. Adds a synthetic board of this many tasks next to the demo one. Blank or `0` skips it — see [Seeding a large board](#seeding-a-large-board)                                                 |
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` are read only by `next build` when
 uploading source maps, and only when they are set; they are absent from `.env.example`
@@ -325,7 +326,43 @@ Everything containerized, closest to production. Use it to verify the Dockerfile
 compose wiring, or when you just want to run Kurultay rather than develop it.
 
 ```bash
-docker compose up --build
+docker compose pull && docker compose up -d
+```
+
+`api` and `web` in `docker-compose.yml` declare both `image:` and `build:`. Every tagged
+release publishes both to GHCR (`.github/workflows/release-images.yml`, `linux/amd64` +
+`linux/arm64`), so `pull` fetches a ready-built image and the following `up -d` starts it —
+no local build, no `pnpm install`, no Docker layer cache warm-up. Set `TAG` in `.env` to pin
+a specific release instead of the default `latest`:
+
+```bash
+TAG=v0.2.0   # matches a tag published by release-images.yml; see `git tag -l` for the list
+```
+
+Compose's default pull policy only builds a service when its `image:` tag cannot be resolved
+locally or from the registry, so nothing below breaks if you skip the `pull`: `docker compose
+up -d` alone still tries the registry first and falls back to `build:` automatically — the
+exact same source build this repo has always done — when there's no image for your `TAG` yet
+(pre-release, or a `TAG` you've never had published) or no route to `ghcr.io`. `docker compose
+up --build` (or `up -d --build`) keeps working unchanged for building on purpose, e.g. after
+editing a Dockerfile or testing an unreleased change to `api`/`web`.
+
+The one exception is `migrate`: it has no `image:` pair (see the comment beside it in
+`docker-compose.yml` for why), so it always builds from source — a `docker compose up -d`
+that pulls `api`/`web` from GHCR still pays that one service's build cost once. See
+[audit finding OPS-04](https://github.com/dravcore/kurultay/issues/126) for the full scoping
+rationale.
+
+The web image is published with its Dockerfile's default `NEXT_PUBLIC_API_URL`
+(`http://localhost:4000`) and Sentry DSNs baked in, because Next.js inlines `NEXT_PUBLIC_*`
+into the client bundle at build time — a published image cannot pick these up at container
+start the way `api`'s `DATABASE_URL` can. If your deployment needs a different
+`NEXT_PUBLIC_API_URL` (the API reachable at anything other than `localhost:4000` from the
+browser), build `web` locally instead of pulling it:
+
+```bash
+docker compose build web   # bakes NEXT_PUBLIC_API_URL / NEXT_PUBLIC_SENTRY_* from your .env
+docker compose up -d
 ```
 
 This also starts the `backup` sidecar, which dumps the database on a schedule — see
@@ -456,6 +493,28 @@ docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
 pnpm db:seed
 ```
+
+### Seeding a large board
+
+The default seed is four tasks, which is the right size for developing a feature and the wrong
+size for finding out what the board does under load. `SEED_LARGE_BOARD_TASKS` adds a second
+board — "Load Test Board", five columns, the largest holding about a third of the tasks —
+alongside the demo one:
+
+```bash
+SEED_LARGE_BOARD_TASKS=1000 pnpm db:seed
+```
+
+Unset or `0` (the default) skips it entirely, so nobody pays for it who did not ask. Anything
+that is not a positive integer is treated the same as unset rather than clamped: a typo must
+not quietly seed a board of some size other than the one you are about to measure against.
+
+The rows are realistic rather than uniform — mixed priorities, labels on about half the cards,
+assignees on a quarter, due dates spread across and past the due-soon window — because a board
+where every card is the same shape measures one shape of card. This is the board the per-column
+render budget in
+[`apps/web/components/board/board-column.tsx`](../apps/web/components/board/board-column.tsx)
+was measured against.
 
 ## Data retention
 
@@ -709,9 +768,22 @@ read the migration part before you need it at 2 a.m.
 
 ### Rolling back the application
 
-There are no published registry images — `docker compose up` builds `api` and `web` from
-whatever source tree is checked out (see `docker-compose.yml`). Rolling back the application
-therefore means checking out the previous release tag and rebuilding the images:
+`api`/`web` are published to GHCR on every tagged release (see
+[Full stack in Docker](#full-stack-in-docker)), so rolling back is a tag change, not a
+rebuild:
+
+```bash
+# .env
+TAG=v0.1.0   # the last known-good tag — list published versions with `git tag -l`
+```
+
+```bash
+docker compose pull && docker compose up -d   # pulls v0.1.0's images and restarts on them
+```
+
+No image published for that tag (older installs upgraded before this workflow existed, or
+`ghcr.io` is unreachable from this host)? Fall back to the source rebuild this used to be the
+only option for:
 
 ```bash
 git fetch --tags
@@ -747,13 +819,10 @@ reads, a code-only rollback will crash on boot — that is the migration-rollbac
    archive still has.
 
    Follow [Restoring from a backup](#restoring-from-a-backup) in full, with one addition —
-   check out the release tag that matches the archive before you bring the stack back, so the
-   code and the schema agree:
-
-   ```bash
-   git switch --detach v0.1.0         # the release that matches the archive
-   docker compose up -d --build
-   ```
+   move the stack onto the release tag that matches the archive before you bring it back, so
+   the code and the schema agree: set `TAG=v0.1.0` in `.env` and `docker compose pull` (see
+   [Rolling back the application](#rolling-back-the-application)), or, if that tag has no
+   published image, `git switch --detach v0.1.0 && docker compose up -d --build`.
 
    The archive contains the `_prisma_migrations` bookkeeping table, so after the restore the
    recorded migration state matches the restored schema, and the old release's `migrate`

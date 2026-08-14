@@ -14,6 +14,32 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   like `PASSWORD_TOO_SHORT` and `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` now map to their
   relevant field (password, email) with a message that tells the user exactly what to fix.
   Unknown errors fall back to the generic message to avoid leaking unnecessary details.
+- **GHCR image publishing** — `.github/workflows/release-images.yml` builds and pushes
+  `ghcr.io/dravcore/kurultay-api` and `ghcr.io/dravcore/kurultay-web` (`linux/amd64` +
+  `linux/arm64`, tagged with the release's SemVer, its `major.minor`, and `latest`) on every
+  `vX.Y.Z` tag push. `docker-compose.yml`'s `api`/`web` services now declare `image:
+  ghcr.io/dravcore/kurultay-{api,web}:${TAG:-latest}` alongside their existing `build:`, so
+  `docker compose pull && docker compose up -d` installs and upgrades from a published image
+  with no local build — falling back to `build:` automatically (same source build as before)
+  when no image exists for the configured `TAG` or the registry is unreachable. `TAG` is a new
+  compose-only `.env` variable (see `.env.example`) for pinning a specific release instead of
+  tracking `latest`. `migrate` (the one-shot migration runner) still always builds from source
+  — see the comment beside it in `docker-compose.yml` for why that's scoped out of this change
+  — and the published `web` image only has its `NEXT_PUBLIC_API_URL` set to the Dockerfile's
+  `http://localhost:4000` default, since Next.js bakes `NEXT_PUBLIC_*` into the client bundle
+  at build time; a deployment needing a different API origin still runs `docker compose build
+  web` until the runtime-configurable API URL that follows this change lands. Closes audit
+  finding OPS-04 ([#126](https://github.com/dravcore/kurultay/issues/126)); README (EN + TR)
+  and `docs/development.md` (EN + TR) now document the pull-based flow as the default, with
+  `docker compose up --build` kept as the explicit build-on-purpose path.
+- `SEED_LARGE_BOARD_TASKS` — `pnpm db:seed` can now build a board of arbitrary size next to the
+  four-task demo one (`SEED_LARGE_BOARD_TASKS=1000 pnpm db:seed`). Blank or `0`, the default,
+  skips it, so the everyday seed is unchanged. The rows are deliberately uneven — five columns
+  with the largest holding about a third of them, mixed priorities, labels on half the cards,
+  assignees on a quarter, due dates spread across and past the due-soon window — because a
+  board where every card is the same shape measures one shape of card. This is what the board
+  render budget below was measured against. See
+  [docs/development.md](docs/development.md#seeding-a-large-board).
 - A **Workspace** section in Settings — renaming and deleting a workspace no longer require
   `curl`. `PATCH /workspaces/:workspaceId` and `DELETE /workspaces/:workspaceId` existed from
   the start, but nothing in the product called either. Rename (OWNER/ADMIN, matching the
@@ -182,6 +208,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **A board column now mounts 40 cards at a time instead of all of them**, revealing the next
+  batch as the reader scrolls toward the end of the current one, and cards are marked
+  `content-visibility: auto` so the mounted ones nobody is looking at cost no paint. Nothing
+  about loading changed: every task page still drains into state, the column header still
+  reports the column's true total, and the board still paints on the first page. What changed
+  is how many of those rows exist as DOM at once — which is the number the cost of *dragging*
+  scales with, because every mounted card is a dnd-kit sortable that re-runs on every pointer
+  move. Measured on a seeded 1 000-task board (`SEED_LARGE_BOARD_TASKS=1000`, five columns,
+  the largest holding 333), production build, drag driven at ~120 pointer moves per second for
+  four seconds: the main thread went from **99.9% busy with 28 long tasks totalling 3.8 s** to
+  **34.1% busy with none**, per processed pointer move from **84 ms to 2.6 ms**, DOM nodes from
+  **18 421 to 3 854**, and heap after a drag from **117 MB to 19 MB**. Time to the board's first
+  paint was already good and is unchanged (~130–165 ms, first page then stream). Dragging,
+  keyboard reordering and drops all behave as before, including onto and out of columns whose
+  tail is not mounted. `content-visibility` alone was measured too and is not a substitute: it
+  halved the frame time and left the main thread saturated (audit finding FE-03,
+  [#125](https://github.com/dravcore/kurultay/issues/125)).
 - CI gate job: `.github/workflows/ci.yml` now defines a single required status check, `ci-ok`,
   instead of relying on multiple job names in branch protection. The gate runs only when all
   upstream jobs (lint, test, build) have completed, and fails if any is not successful — even
@@ -266,6 +309,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   breakpoint default regardless of what was chosen last time. The toggle now writes to
   `localStorage`, and the breakpoint listener defers to a stored preference instead of
   overwriting it.
+- Two columns created or moved into the same gap on the same board at the same time can no
+  longer land on the same `position`. `ColumnService.create` read its siblings outside any
+  transaction and, when the gap did not need a rebalance, ran a single unguarded insert;
+  `move` opened a transaction but never locked the board row inside it. Both now take the
+  same `SELECT … FOR UPDATE` lock on the board row that `createDefaults` already took when
+  seeding a new board's starting columns, and that the task create/move path already took on
+  the column row — a concurrency contract the column path had simply never picked up. The
+  observable symptom was never data loss (`(position, id)` keeps ordering deterministic even
+  on a tie) — only two users seeing a different column order than either expected.
 
 ### Security
 
