@@ -23,7 +23,7 @@ deleted after merge.
 | Branch      | Lifetime    | Branches from | Merges into        | Purpose                                                 |
 | ----------- | ----------- | ------------- | ------------------ | ------------------------------------------------------- |
 | `main`      | permanent   | —             | —                  | Released code only. Every commit is a tagged release.   |
-| `develop`   | permanent   | `main`        | —                  | Integration branch. Always deployable to staging.       |
+| `develop`   | permanent   | `main`        | —                  | Integration branch. Always startable (see below).       |
 | `feature/*` | short-lived | `develop`     | `develop`          | New functionality                                       |
 | `fix/*`     | short-lived | `develop`     | `develop`          | Bug fixes that are not urgent                           |
 | `docs/*`    | short-lived | `develop`     | `develop`          | Documentation-only changes                              |
@@ -41,6 +41,24 @@ develop  ──────●──●──●────●─────�
 feature          ●          └─ back-merge
 
 ```
+
+**There is no staging environment.** This table used to promise `develop` was "always deployable
+to staging", and no such deployment has ever existed — there is no host, no workflow and no
+secret anywhere in this repository that points at one (audit finding OPS-08). A standing claim
+that nothing enforces is worse than no claim, so here is the one that is actually checked:
+`develop` must **start**, and the check is a command anyone can run on their own machine.
+
+```bash
+docker compose up -d --build
+docker compose ps -a                              # every service up; migrate Exited (0)
+curl -s http://localhost/api/health/ready         # {"status":"ok","checks":{…}}
+```
+
+That is the same stack a self-hoster runs ([Self-hosting](self-hosting.md)) with `SITE_URL` left
+at its `http://localhost` default, so "it starts" is verified against the real deployment shape
+rather than a staging-only approximation. CI does not run it — the pipeline builds, lints, types
+and tests, and a full compose boot on every pull request would cost more than it catches — which
+makes this a release-time step, and it is [step 4 of the release process](#release-process).
 
 **No direct commits to `main` or `develop`.** All work reaches them through a branch and a
 pull request. This holds for maintainers too.
@@ -215,9 +233,21 @@ git commit -am "chore(release): 0.2.0"
 # 3. Only release-blocking fixes may land on this branch.
 #    Everything else keeps going to develop as usual.
 
-# 4. Open a PR: release/0.2.0 -> main. Merge with a merge commit (--no-ff).
+# 4. Boot the stack once from this branch, then open a PR:
+#    release/0.2.0 -> main. Merge with a merge commit (--no-ff).
+#
+#    CI never boots anything: it builds, lints, types and tests the code, and
+#    none of that would notice a docker-compose.yml or Caddyfile that no longer
+#    starts. This is the check behind "always startable" in the branch table,
+#    and the last point at which a broken one is still cheap to fix.
+docker compose up -d --build
+docker compose ps -a                       # -a, or the one-shot migrate row is hidden
+curl -s http://localhost/api/health/ready  # {"status":"ok","checks":{…}}
+docker compose down -v                     # -v: leave no volume behind for the next run
 
-# 5. Tag the merge commit on main
+# 5. Tag the merge commit on main. This is also what publishes the container
+#    images (.github/workflows/release-images.yml) — no tag, no images, and
+#    `docker compose pull` fails for everyone following docs/self-hosting.md.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0

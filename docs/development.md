@@ -1117,8 +1117,17 @@ Setup, with [UptimeRobot](https://uptimerobot.com) or
 [healthchecks.io](https://healthchecks.io) as examples — any monitor that can poll a URL and
 send email works:
 
-1. Create an **HTTP(s) monitor** for `https://<your-host>/health/ready` (or `:4000/health/ready`
-   if the API is not behind a reverse proxy yet).
+1. Create an **HTTP(s) monitor** for `https://<your-host>/api/health/ready`.
+
+   The `/api` prefix is not optional on a deployed stack, and leaving it off fails in the way
+   that is hardest to notice. The bundled `proxy` routes `/api/*` to the API and everything else
+   to the web app (`docker/Caddyfile`), so `https://<your-host>/health/ready` matches the
+   catch-all rule, reaches Next.js, and answers `307` with a redirect to `/login`. Against rule
+   4 below that monitor is red on a perfectly healthy instance — and the natural fix, widening
+   the accepted statuses until it goes quiet, makes it green during a real outage too. Only a
+   dev-loop API running on its own port, with no proxy in front of it, is reachable at
+   `http://localhost:4000/health/ready`.
+
 2. **Interval: 5 minutes.** Fast enough that a nightly outage is caught before morning, slow
    enough to stay inside every free tier.
 3. **Failure threshold: 2 consecutive failures** before alerting — one missed poll during a
@@ -1135,9 +1144,14 @@ send email works:
    the recovery mail. An alerting setup that has never fired is a hypothesis, not a safeguard.
 
 If the API is not yet reachable from the internet, healthchecks.io's _push_ model is the
-alternative: it alerts when it **stops** hearing from you, so a host-side cron
-(`*/5 * * * * curl -fsS localhost:4000/health/ready && curl -fsS <ping-url>`) covers a private
-deployment without exposing anything.
+alternative: it alerts when it **stops** hearing from you, so a host-side cron covers a private
+deployment without exposing anything. Probe it the same way the container's own healthcheck
+does, from inside the network rather than through a published port — on a Docker deployment the
+API has none:
+
+```cron
+*/5 * * * * cd /opt/kurultay && docker compose exec -T api wget -qO- http://127.0.0.1:4000/health/ready >/dev/null && curl -fsS <ping-url>
+```
 
 ## Day-to-day loop
 

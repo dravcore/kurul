@@ -15,6 +15,19 @@ the same image works on every domain — the API URL is not compiled into it (se
   Let's Encrypt validates over port 80, browsers use 443.
 - An SMTP account. Kurultay needs outgoing mail before anyone can accept an invitation — see
   [Email](#email-smtp) for why, and what happens if you skip it.
+- A host firewall that allows nothing inbound beyond SSH, 80 and 443. Everything else this
+  stack runs stays off the public internet on its own: `proxy` is the only service in
+  `docker-compose.yml` with a `ports:` entry, so Postgres, Redis, the API and the web app are
+  reachable only over Docker's internal network. `docker compose ps` is how you confirm that on
+  your own machine — every row except `proxy` should show a bare container port
+  (`4000/tcp`, `5432/tcp`, …) with no `0.0.0.0:` mapping in front of it.
+
+  The firewall still earns its place, for one reason worth knowing before you trust it: on
+  Linux, Docker publishes ports by writing its own iptables rules, and those are consulted
+  _before_ ufw's. A container port you publish — in a `docker-compose.override.yml`, say, to
+  "temporarily" reach Postgres — is exposed to the internet even with `ufw deny 5432` in place.
+  The firewall protects the things Docker is not managing; the `ports:` list is what protects
+  the rest, which is why this stack keeps it to one service.
 
 ## 1. DNS
 
@@ -72,8 +85,27 @@ default) is the local, no-domain install.
 ```bash
 docker compose pull
 docker compose up -d
-docker compose ps        # every service healthy? (migrate is expected to show "exited")
+docker compose ps -a     # see below for what "right" looks like
 ```
+
+`ps -a`, not a plain `ps`: `migrate` is a one-shot job that has already exited by the time you
+look, and a plain `ps` lists running containers only, so it omits the row you most want to
+check. A healthy stack reads like this:
+
+```
+api        Up 27 seconds (healthy)
+backup     Up 28 seconds
+migrate    Exited (0) 27 seconds ago
+postgres   Up 34 seconds (healthy)
+proxy      Up 16 seconds
+redis      Up 34 seconds (healthy)
+web        Up 22 seconds (healthy)
+```
+
+`Exited (0)` on `migrate` is success — migrations applied, job done. A non-zero exit there is
+the one to chase (`docker compose logs migrate`), and `api` will not have started at all.
+`backup` and `proxy` show no `(healthy)` because neither declares a healthcheck, not because
+anything is wrong with them.
 
 The first request to `https://kurultay.example.com` may take a few seconds while Caddy
 completes the ACME challenge. Watch it happen if it does not:
@@ -95,6 +127,80 @@ curl -s  https://kurultay.example.com/api/health/ready   # {"status":"ok", …}
 Then, in the browser, open a board and drag a card. If the card moves for a second browser
 window without a refresh, the realtime WebSocket is connected through the proxy — which is the
 one part of the stack a naive reverse-proxy configuration tends to break silently.
+
+Last, check the thing HTTPS was actually for. Sign in and look at the cookie you get back:
+
+```bash
+curl -si https://kurultay.example.com/auth/sign-in/email \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"<your password>"}' | grep -i '^set-cookie'
+```
+
+You want to see the name prefixed and the attribute present:
+
+```
+set-cookie: __Secure-better-auth.session_token=…; Path=/; HttpOnly; Secure; SameSite=Lax
+```
+
+`Secure` means the browser will refuse to send that token over plain HTTP, and `__Secure-`
+means it will refuse to _accept_ the cookie at all unless the connection was HTTPS. Neither is
+a setting you turn on: Better Auth derives both from the scheme of the URL it is configured
+with, which `docker-compose.yml` takes from `SITE_URL`. That makes the scheme in `SITE_URL` the
+single switch that decides whether session tokens are protected in transit — with
+`SITE_URL=http://…` the same request answers `set-cookie: better-auth.session_token=…;
+HttpOnly; SameSite=Lax`, no prefix and no `Secure`, and the session token crosses the network in
+clear text on every request. If you see the unprefixed form on a domain you believe is HTTPS,
+`SITE_URL` still has `http://` in it; fix it and `docker compose up -d`.
+
+## 5. Point a monitor at it
+
+This is a step of the deployment, not an optional extra, and it is the last one because it is
+the first one that needs a running instance to watch. `restart: unless-stopped` brings a crashed
+container back; nothing in this stack tells you when the host is down, the disk filled, or
+Postgres stopped accepting connections. An external monitor is the only signal that survives the
+machine it is watching.
+
+Monitor this URL:
+
+```
+https://kurultay.example.com/api/health/ready
+```
+
+Two details in that URL are easy to get wrong, and both fail quietly.
+
+**The `/api` prefix is required.** `/health/ready` without it is not the API — it matches the
+proxy's catch-all rule and lands on the web app, which answers `307` and redirects to `/login`.
+A monitor configured that way is red forever on a healthy instance, and if you widen its
+accepted status codes to stop the noise it becomes green forever instead, including during an
+outage.
+
+**`/health/ready`, not `/health`.** `/health` is a liveness probe: it answers `200` as long as
+Node is alive, deliberately including while the database is unreachable, because restarting the
+process cannot heal a database. `/health/ready` is the one that goes red when the product is
+actually broken, and its body names the dependency that failed:
+
+```json
+{ "status": "error", "checks": { "database": "down", "redis": "up" } }
+```
+
+The full parameter list — 5-minute interval, 2 consecutive failures before alerting, accept only
+`200`, 10-second timeout, e-mail contact with the "back up" notification enabled — is in
+[Uptime monitoring](development.md#uptime-monitoring--set-this-up-it-is-the-one-that-catches-an-outage),
+along with the push-based alternative for an instance that is not reachable from the internet.
+
+Then fire it once on purpose, because an alerting setup that has never fired is a hypothesis:
+
+```bash
+docker compose stop postgres
+curl -s https://kurultay.example.com/api/health/ready   # 503, "database":"down"
+# wait two intervals, expect the red alert
+docker compose start postgres
+curl -s https://kurultay.example.com/api/health/ready   # 200, "database":"up"
+# expect the recovery mail
+```
+
+`/health/ready` returning `503` while `/health` stays `200` during that window is the correct
+behaviour, not a bug — it is the difference the two endpoints exist to express.
 
 ## Email (SMTP)
 
@@ -201,6 +307,26 @@ That image is then specific to `api.example.com`, and you are back to rebuilding
 deployment — which is the trade-off, not an oversight.
 
 ## Troubleshooting
+
+**`docker compose pull` ends in `denied`.** The `api` and `web` images are published by a
+workflow that runs on a release tag, so they exist for `v0.2.0` and later and not for anything
+older. Two things follow while you are on a release that predates them. `docker compose pull`
+exits non-zero after successfully pulling `postgres`, `redis` and `caddy` — read the tail of its
+output, not just the exit code, because the three that worked scroll the two that did not off
+the screen. And the files you fetch in step 2 come from the `main` branch, which only carries
+what the newest release carried: if `docker-compose.yml` has no `proxy:` service and there is no
+`docker/Caddyfile` to download, you are ahead of the release, and none of the HTTPS in this
+guide applies to what you just downloaded. Either wait for the release, or build from source
+instead of pulling:
+
+```bash
+git clone https://github.com/dravcore/kurultay.git && cd kurultay
+docker compose up -d --build
+```
+
+That is slower — the api image is a minute or so of build — and it is the only difference.
+`docker-compose.yml` carries `image:` and `build:` for both services on purpose, so the same
+file installs from a published image when one is resolvable and from source when it is not.
 
 **Certificate never issues.** Ports 80 and 443 must both reach the server from the public
 internet, and DNS must already resolve. `docker compose logs proxy` names the failure. Hitting
