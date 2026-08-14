@@ -107,6 +107,33 @@ export interface ColumnDto {
   taskCount: number;
 }
 
+export interface ChecklistItemDto {
+  id: string;
+  content: string;
+  isDone: boolean;
+  position: number;
+}
+
+export interface ChecklistDto {
+  id: string;
+  title: string;
+  position: number;
+  items: ChecklistItemDto[];
+}
+
+/**
+ * The board card's progress badge, carried on every task read.
+ *
+ * Counted at read time rather than stored: a denormalized counter drifts from its items the
+ * first time a delete misses it, and the count is cheap next to the join that already fetches
+ * the task. The board list reads items with the narrowest projection there is (`isDone` only)
+ * so the badge costs a boolean per item, not a row — see `task.include.ts`.
+ */
+export interface ChecklistSummaryDto {
+  total: number;
+  done: number;
+}
+
 export interface TaskDto {
   id: string;
   boardId: string;
@@ -122,6 +149,9 @@ export interface TaskDto {
   updatedAt: string;
   assignees: TaskAssigneeDto[];
   labels: LabelDto[];
+  checklistSummary: ChecklistSummaryDto;
+  /** Full checklists on a single-task read; `null` on list reads, where only the summary is loaded. */
+  checklists: ChecklistDto[] | null;
 }
 
 export interface TaskAssigneeDto {
