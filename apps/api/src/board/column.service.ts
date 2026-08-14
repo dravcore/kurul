@@ -4,9 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SocketEvents, type ColumnCategory, type ColumnDto } from '@kurultay/shared-types';
+import {
+  ActivityType,
+  SocketEvents,
+  type ColumnCategory,
+  type ColumnDto,
+} from '@kurultay/shared-types';
+import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
 import { defaultColumnsFor } from '../common/board-defaults';
+import { fieldChanges } from '../common/field-changes';
 import { resolveCreateNeighbors, resolveMoveNeighbors } from '../common/position/apply-insertion';
 import { midpoint, needsRebalance, rebalancePositions } from '../common/position/fractional-index';
 import { batchUpdateColumnPositions } from '../common/position/rebalance-sql';
@@ -38,6 +45,7 @@ export class ColumnService {
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeService,
     private readonly localeService: LocaleService,
+    private readonly activityService: ActivityService,
   ) {}
 
   private toDto(row: ColumnRow): ColumnDto {
@@ -144,6 +152,24 @@ export class ColumnService {
       return this.toDto(row);
     });
 
+    // Written after the create rather than inside it: the audited writes join the transaction
+    // the mutation already owns and open none where there was none, and only one of the two
+    // branches above has one to join. That leaves a *creation* unpaired, which is the case it
+    // can afford — a lost `column.created` row still has the column itself standing as
+    // evidence, whereas a lost deletion entry leaves nothing behind, which is why `remove`
+    // records inside the transaction that performs the delete.
+    await this.activityService.record(this.prisma, {
+      workspaceId,
+      userId: actorId,
+      type: ActivityType.ColumnCreated,
+      payload: {
+        columnId: created.id,
+        boardId: created.boardId,
+        name: created.name,
+        category: created.category,
+      },
+    });
+
     this.emitChanged(workspaceId, actorId, created.boardId, created.id);
     return created;
   }
@@ -192,7 +218,7 @@ export class ColumnService {
 
       // Re-read rather than trusting `createMany`'s count: `_count` is required on `ColumnRow`
       // precisely so a caller cannot report `taskCount: 0` it never actually looked up.
-      return tx.column.findMany({
+      const rows = await tx.column.findMany({
         where: { boardId },
         select: {
           id: true,
@@ -205,6 +231,28 @@ export class ColumnService {
         },
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
       });
+
+      // One audit row per column, for the same reason the socket emit below is per column:
+      // these stages exist because an operator asked for them on a board that had none, which
+      // is a different act from the seed `BoardService.create` writes as part of `board.created`.
+      // Sequential inside the transaction, which is one connection anyway — the board row is
+      // already locked and this endpoint fires at most once per board.
+      for (const column of rows) {
+        await this.activityService.record(tx, {
+          workspaceId,
+          userId: actorId,
+          type: ActivityType.ColumnCreated,
+          payload: {
+            columnId: column.id,
+            boardId,
+            name: column.name,
+            category: column.category,
+            seeded: true,
+          },
+        });
+      }
+
+      return rows;
     });
 
     // One event per column, matching what a client would have seen from the loop this
@@ -225,15 +273,19 @@ export class ColumnService {
     const column = await this.prisma.$transaction(async (tx) => {
       // Read inside the transaction: a read outside it leaves a window in which the column can
       // be deleted, or its board moved to another workspace, before the write runs.
+      // `category` and the rest are selected as well as the id: they are what the audit row
+      // reports as `from`, and reading them here means that value is the one this transaction
+      // is replacing. `category` is the field that moves a column across the Done boundary the
+      // dashboard measures throughput on, so a silent change to it is worth a name.
       const scoped = await tx.column.findFirst({
         where: { id: columnId, board: { workspaceId } },
-        select: { id: true },
+        select: { id: true, name: true, color: true, category: true },
       });
       if (!scoped) throw new NotFoundException('Column not found');
 
       // The write predicate repeats the tenant scope: the check above only proves the row was
       // in the workspace when it ran, the predicate is what the database enforces.
-      return tx.column.update({
+      const updated = await tx.column.update({
         where: { id: columnId, board: { workspaceId } },
         data: {
           ...(dto.name !== undefined ? { name: dto.name } : {}),
@@ -242,6 +294,20 @@ export class ColumnService {
         },
         include: { _count: { select: { tasks: true } } },
       });
+
+      await this.activityService.record(tx, {
+        workspaceId,
+        userId: actorId,
+        type: ActivityType.ColumnUpdated,
+        payload: {
+          columnId,
+          boardId: updated.boardId,
+          name: updated.name,
+          changes: fieldChanges(scoped, updated, ['name', 'color', 'category']),
+        },
+      });
+
+      return updated;
     });
     const dtoOut = this.toDto(column);
     this.emitChanged(workspaceId, actorId, dtoOut.boardId, dtoOut.id);
@@ -262,6 +328,21 @@ export class ColumnService {
       if (taskCount > 0) {
         throw new ConflictException('Column has tasks; move or delete them first');
       }
+
+      // Recorded before the delete, inside the transaction that performs it: the name and
+      // category stop existing the moment the row does, and a `NotFoundException` from the
+      // check below rolls this entry back with the rest of the statement.
+      await this.activityService.record(tx, {
+        workspaceId,
+        userId: actorId,
+        type: ActivityType.ColumnDeleted,
+        payload: {
+          columnId,
+          boardId: row.boardId,
+          name: row.name,
+          category: row.category,
+        },
+      });
 
       // deleteMany, not delete: it takes the same tenant predicate as the check above, so the
       // scope travels with the write instead of resting on the read.

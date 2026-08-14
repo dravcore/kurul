@@ -219,6 +219,51 @@ paths use **Workspace** — see [ADR 0004](decisions/0004-auth-better-auth.md#do
 
 Better Auth also manages the auth infrastructure tables `Session`, `Account`, and `Verification`, which are plugin-managed and deliberately omitted from the domain model table above.
 
+### Audit trail
+
+`Activity` carries two kinds of row. The task feed — created, updated, moved, assigned,
+commented — is what a board member reads. The administrative events are what an operator reads
+after an account is compromised or someone leaves badly: they record every act that changes
+**who can reach a workspace**, or that **destroys work**.
+
+| Event                                                               | Written by                   | Payload beyond the actor                                          |
+| ------------------------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------- |
+| `board.created` · `board.updated` · `board.deleted`                 | `BoardService`               | board id, name, `changes`, deleted board's `taskCount`            |
+| `column.created` · `column.updated` · `column.deleted`              | `ColumnService`              | column id, board id, name, `category`, `changes`                  |
+| `label.created` · `label.updated` · `label.deleted`                 | `LabelService`               | label id, board id, name, colour slot, `changes`                  |
+| `workspace.updated`                                                 | `WorkspaceService`           | name, slug, `changes`                                             |
+| `member.removed` · `member.left` · `member.role_changed`            | `WorkspaceMemberService`     | target user, target name, `previousRole`, `newRole`, actor's role |
+| `invitation.created` · `invitation.revoked` · `invitation.accepted` | `WorkspaceInvitationService` | invitation id, invited address, granted role, `emailDelivery`     |
+| `task.deleted`                                                      | `TaskService`                | task id, title, board and column                                  |
+
+Three properties are deliberate:
+
+- **`changes` records both sides.** Administrative events store `{ field: { from, to } }`, not
+  the `{ field: newValue }` shape the task feed uses. An audit entry is read backwards by
+  someone reconstructing what an account did, and the interesting half is usually the value
+  that is gone: "renamed the board to Archive" does not identify what was hidden.
+- **Deletions are recorded inside the transaction that performs them, before the delete.** The
+  name of a deleted board or label exists nowhere else afterwards. Creations may be recorded
+  immediately after the insert instead, because a lost creation entry still leaves the created
+  row standing as evidence.
+- **`AUDIT_ACTIVITY_TYPES`** (`@kurultay/shared-types`) is the exported list of these types, so
+  "who removed, granted or destroyed something here?" is one statement —
+  `WHERE "workspaceId" = $1 AND type = ANY($2) ORDER BY id DESC`, served by the existing
+  `(workspaceId, type, createdAt)` index.
+
+**One event cannot live in the table: `workspace.deleted`.** `Activity` cascades on
+`workspaceId`, so the row would be deleted by the statement it describes.
+`WorkspaceService.remove` therefore writes it to the JSON-line log instead
+(`common/logging/json-log.ts`, the same transport the access log and the retention sweep use):
+`{ ts, level: 'warn', event: 'workspace.deleted', workspaceId, actorId, name, slug, memberCount, boardCount }`,
+gathered before the delete because none of it can be looked up afterwards. Read it with
+`docker logs … | jq 'select(.event == "workspace.deleted")'`. On a deployment that must retain
+deletion records, ship the application log.
+
+Audit rows are swept by the same retention window as any other activity
+(`ACTIVITY_RETENTION_DAYS`, default 365; `0` keeps them forever —
+[ADR 0020](decisions/0020-data-retention.md)).
+
 ### Critical field rules
 
 These are non-negotiable; they are also recorded in `CLAUDE.md`.

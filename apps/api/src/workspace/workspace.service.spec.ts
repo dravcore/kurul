@@ -1,10 +1,11 @@
 import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { ActivityType, MemberRole } from '@kurultay/shared-types';
 import { APIError } from 'better-auth/api';
 import type { Request } from 'express';
+import { ActivityService } from '../activity/activity.service';
 import { auth } from '../auth/auth';
 import { PrismaService } from '../prisma/prisma.service';
-import { WorkspaceService } from './workspace.service';
+import { WorkspaceService, type WorkspaceDeletedLogLine } from './workspace.service';
 
 // `auth.ts` opens a Postgres pool and demands DATABASE_URL / BETTER_AUTH_SECRET at import
 // time, so the whole module is replaced — these tests are about what the service does with
@@ -26,12 +27,21 @@ const api = auth.api as unknown as {
 };
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
+const ACTOR_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d5a';
 interface PrismaStub {
   workspace: { findUnique: jest.Mock; findFirst: jest.Mock };
   workspaceMember: { findMany: jest.Mock; findUnique: jest.Mock };
 }
 
-function buildService(): { service: WorkspaceService; prisma: PrismaStub } {
+interface ActivityStub {
+  record: jest.Mock;
+}
+
+function buildService(): {
+  service: WorkspaceService;
+  prisma: PrismaStub;
+  activityService: ActivityStub;
+} {
   const prisma: PrismaStub = {
     workspace: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -42,10 +52,17 @@ function buildService(): { service: WorkspaceService; prisma: PrismaStub } {
       findUnique: jest.fn().mockResolvedValue(null),
     },
   };
+  const activityService: ActivityStub = {
+    record: jest.fn().mockResolvedValue({ id: 'activity' }),
+  };
 
   return {
-    service: new WorkspaceService(prisma as unknown as PrismaService),
+    service: new WorkspaceService(
+      prisma as unknown as PrismaService,
+      activityService as unknown as ActivityService,
+    ),
     prisma,
+    activityService,
   };
 }
 
@@ -98,7 +115,7 @@ describe('WorkspaceService Better Auth error mapping', () => {
     );
 
     const thrown = await service
-      .update(WORKSPACE_ID, { slug: 'taken' }, request)
+      .update(WORKSPACE_ID, ACTOR_ID, { slug: 'taken' }, request)
       .catch((error: unknown) => error);
 
     expect(thrown).toBeInstanceOf(ConflictException);
@@ -112,7 +129,7 @@ describe('WorkspaceService Better Auth error mapping', () => {
     );
 
     const thrown = await service
-      .update(WORKSPACE_ID, { name: 'Renamed' }, request)
+      .update(WORKSPACE_ID, ACTOR_ID, { name: 'Renamed' }, request)
       .catch((error: unknown) => error);
 
     expect(thrown).toBeInstanceOf(NotFoundException);
@@ -124,7 +141,101 @@ describe('WorkspaceService Better Auth error mapping', () => {
     const failure = new Error('pool drained');
     api.deleteOrganization.mockRejectedValue(failure);
 
-    await expect(service.remove(WORKSPACE_ID, request)).rejects.toBe(failure);
+    await expect(service.remove(WORKSPACE_ID, ACTOR_ID, request)).rejects.toBe(failure);
+  });
+});
+
+describe('WorkspaceService audit trail', () => {
+  it('records a slug change with the value it replaced', async () => {
+    const { service, prisma, activityService } = buildService();
+    prisma.workspace.findUnique.mockResolvedValue({ name: 'Acme', slug: 'acme' });
+    api.updateOrganization.mockResolvedValue({
+      id: WORKSPACE_ID,
+      name: 'Acme',
+      slug: 'acme-2',
+      createdAt: new Date('2026-01-01'),
+    });
+
+    await service.update(WORKSPACE_ID, ACTOR_ID, { slug: 'acme-2' }, request);
+
+    // Every invitation link in circulation is built from the slug, so the old value is the
+    // half of this record that matters.
+    expect(activityService.record).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        workspaceId: WORKSPACE_ID,
+        userId: ACTOR_ID,
+        type: ActivityType.WorkspaceUpdated,
+        payload: expect.objectContaining({
+          changes: { slug: { from: 'acme', to: 'acme-2' } },
+        }),
+      }),
+    );
+  });
+
+  it('writes no entry when the update is refused', async () => {
+    const { service, activityService } = buildService();
+    api.updateOrganization.mockRejectedValue(
+      new APIError('NOT_FOUND', { message: 'organization row missing' }),
+    );
+
+    await expect(
+      service.update(WORKSPACE_ID, ACTOR_ID, { name: 'Renamed' }, request),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(activityService.record).not.toHaveBeenCalled();
+  });
+
+  it('logs the deletion instead of writing an activity row the cascade would eat', async () => {
+    const { service, prisma, activityService } = buildService();
+    prisma.workspace.findUnique.mockResolvedValue({
+      name: 'Acme',
+      slug: 'acme',
+      _count: { members: 41, boards: 9 },
+    });
+    api.deleteOrganization.mockResolvedValue(undefined);
+    const lines: string[] = [];
+    service.setLogWriter((line) => lines.push(line));
+
+    await service.remove(WORKSPACE_ID, ACTOR_ID, request);
+
+    // `Activity.workspaceId` cascades, so a row here would delete itself. The JSON line is the
+    // only record that can outlive the tenant — asserted after a round trip through
+    // `JSON.stringify`, because that string is what a log aggregator actually receives.
+    expect(activityService.record).not.toHaveBeenCalled();
+    expect(lines).toHaveLength(1);
+    const line = JSON.parse(lines[0]!) as WorkspaceDeletedLogLine;
+    expect(line).toMatchObject({
+      level: 'warn',
+      event: 'workspace.deleted',
+      workspaceId: WORKSPACE_ID,
+      actorId: ACTOR_ID,
+      name: 'Acme',
+      slug: 'acme',
+      // The size of what was destroyed, read before the delete because nothing can count it
+      // afterwards.
+      memberCount: 41,
+      boardCount: 9,
+    });
+    expect(Date.parse(line.ts)).not.toBeNaN();
+  });
+
+  it('does not log a deletion that never happened', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspace.findUnique.mockResolvedValue({
+      name: 'Acme',
+      slug: 'acme',
+      _count: { members: 1, boards: 0 },
+    });
+    api.deleteOrganization.mockRejectedValue(
+      new APIError('NOT_FOUND', { message: 'organization row missing' }),
+    );
+    const lines: string[] = [];
+    service.setLogWriter((line) => lines.push(line));
+
+    await expect(service.remove(WORKSPACE_ID, ACTOR_ID, request)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(lines).toEqual([]);
   });
 });
 

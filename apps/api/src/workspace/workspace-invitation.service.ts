@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { ActivityType, MemberRole } from '@kurultay/shared-types';
 import type {
   CursorPage,
   InvitationDto,
@@ -14,6 +14,7 @@ import type {
 } from '@kurultay/shared-types';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
+import { ActivityService } from '../activity/activity.service';
 import { auth } from '../auth/auth';
 import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth-error';
 import { buildInviteAcceptUrl } from '../auth/web-urls';
@@ -81,9 +82,24 @@ function toInvitationDto(row: InvitationRow): InvitationDto {
   };
 }
 
+/**
+ * Invitation lifecycle.
+ *
+ * ## The invited address is in the audit payload on purpose
+ *
+ * An invitation is how someone who is not yet a member acquires access, so "who was invited"
+ * is the whole point of the record — an entry naming only an invitation id would be unreadable
+ * once the row is accepted or revoked and Better Auth stops surfacing it. The address is
+ * already stored in `WorkspaceInvitation` and is only ever visible to OWNER/ADMIN through the
+ * pending list, so this adds no reader who could not already see it; it only makes the fact
+ * survive the row. `ACTIVITY_RETENTION_DAYS` sweeps these like any other activity.
+ */
 @Injectable()
 export class WorkspaceInvitationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+  ) {}
 
   private headersFrom(request: Request): Headers {
     return fromNodeHeaders(request.headers);
@@ -179,6 +195,7 @@ export class WorkspaceInvitationService {
    */
   async createInvitation(
     workspaceId: string,
+    actorId: string,
     dto: CreateInvitationDto,
     request: Request,
   ): Promise<InvitationDto> {
@@ -229,6 +246,22 @@ export class WorkspaceInvitationService {
         throw new ConflictException('Invitation was changed concurrently, please try again');
       }
 
+      // Written after the concurrency check, so no entry claims a grant the response refused.
+      // `emailDelivery` is recorded next to the grant because the two answer one question
+      // together: an invitation whose mail never left the building was still an offer of
+      // access, and the link in the response works whether or not it was delivered.
+      await this.activityService.record(this.prisma, {
+        workspaceId,
+        userId: actorId,
+        type: ActivityType.InvitationCreated,
+        payload: {
+          invitationId: invitation.id,
+          email: invitation.email,
+          role: dto.role,
+          ...(delivery === undefined ? {} : { emailDelivery: delivery }),
+        },
+      });
+
       return {
         id: invitation.id,
         workspaceId,
@@ -257,6 +290,7 @@ export class WorkspaceInvitationService {
 
   async revokeInvitation(
     workspaceId: string,
+    actorId: string,
     invitationId: string,
     request: Request,
   ): Promise<void> {
@@ -277,6 +311,20 @@ export class WorkspaceInvitationService {
         404: 'Invitation not found',
       });
     }
+
+    // Cancelling only flips `status`, so the row survives — but it stops being listed, and an
+    // invitation that was withdrawn one minute after it was sent is a different story from one
+    // that was left standing. The pair of entries is what tells them apart.
+    await this.activityService.record(this.prisma, {
+      workspaceId,
+      userId: actorId,
+      type: ActivityType.InvitationRevoked,
+      payload: {
+        invitationId,
+        email: invitation.email,
+        role: invitation.role,
+      },
+    });
   }
 
   async acceptInvitation(
@@ -310,6 +358,21 @@ export class WorkspaceInvitationService {
       const user = await this.prisma.user.findUniqueOrThrow({
         where: { id: member.userId },
         select: { name: true, avatarUrl: true },
+      });
+
+      // The other half of `invitation.created`: an offer of access and its acceptance are two
+      // separate acts, days apart, and only the second one actually granted anything. The actor
+      // is the invitee, who at the moment of writing has just become a member — which is why
+      // this is the one audited event whose actor is not an administrator.
+      await this.activityService.record(this.prisma, {
+        workspaceId: memberWorkspaceId,
+        userId: member.userId,
+        type: ActivityType.InvitationAccepted,
+        payload: {
+          invitationId,
+          email: invitation.email,
+          role: member.role,
+        },
       });
 
       return {

@@ -9,6 +9,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Administrative actions now leave an audit trail.** `Activity` recorded only what happened to
+  cards and comments, so board, column and label creation and deletion, workspace renames,
+  member removals, role changes and the whole invitation lifecycle passed through the API
+  without leaving a trace. After a compromised account or a bad departure there was no way to
+  answer "who deleted that, and who gave them the role that let them" (audit finding SEC-05).
+  Seventeen event types are now written — `board.*`, `column.*`, `label.*`, `workspace.updated`,
+  `member.removed` / `member.left` / `member.role_changed`, `invitation.created` /
+  `invitation.revoked` / `invitation.accepted` — each carrying the actor, the target, and both
+  sides of every changed field, so a role change records the role that was held as well as the
+  one that was granted, and a deleted board records the name and task count that stop existing
+  with it. Deletions are written inside the transaction that performs them, before the delete,
+  so a refused delete leaves no entry and a successful one cannot lose its record.
+  `AUDIT_ACTIVITY_TYPES` in `@kurultay/shared-types` makes the whole question a single
+  tenant-scoped query. Workspace *deletion* is the one act that cannot be stored this way —
+  `Activity` cascades on `workspaceId`, so the row would delete itself — and is emitted on the
+  JSON-line log instead, as a `workspace.deleted` event carrying the name, slug, member count
+  and board count gathered before the delete.
+
 - **Register form now shows field-level error messages** — when sign-up fails, the error is no
   longer reported as a generic "could not create your account" message. Better Auth error codes
   like `PASSWORD_TOO_SHORT` and `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` now map to their

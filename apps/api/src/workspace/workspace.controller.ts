@@ -59,10 +59,11 @@ export class WorkspaceController {
   @WorkspaceRoles(...ADMIN_ROLES)
   update(
     @UuidParam('workspaceId') workspaceId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateWorkspaceDto,
     @Req() request: Request,
   ): Promise<WorkspaceDto> {
-    return this.workspaceService.update(workspaceId, dto, request);
+    return this.workspaceService.update(workspaceId, user.id, dto, request);
   }
 
   @Delete(':workspaceId')
@@ -70,9 +71,10 @@ export class WorkspaceController {
   @WorkspaceRoles(MemberRole.OWNER)
   async remove(
     @UuidParam('workspaceId') workspaceId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ): Promise<void> {
-    await this.workspaceService.remove(workspaceId, request);
+    await this.workspaceService.remove(workspaceId, user.id, request);
   }
 
   /**
@@ -181,10 +183,11 @@ export class WorkspaceController {
   @WorkspaceRoles(...ADMIN_ROLES)
   createInvitation(
     @UuidParam('workspaceId') workspaceId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateInvitationDto,
     @Req() request: Request,
   ): Promise<InvitationDto> {
-    return this.invitationService.createInvitation(workspaceId, dto, request);
+    return this.invitationService.createInvitation(workspaceId, user.id, dto, request);
   }
 
   @Delete(':workspaceId/invitations/:invitationId')
@@ -193,9 +196,10 @@ export class WorkspaceController {
   async revokeInvitation(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('invitationId') invitationId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ): Promise<void> {
-    await this.invitationService.revokeInvitation(workspaceId, invitationId, request);
+    await this.invitationService.revokeInvitation(workspaceId, user.id, invitationId, request);
   }
 
   /**
