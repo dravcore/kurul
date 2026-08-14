@@ -33,6 +33,18 @@ enum ColumnCategory {
   CANCELED
 }
 
+/// Whether an attachment carries bytes this instance stores, or only a URL it points at.
+///
+/// Not derived from nullability: the kind is the column, and the nullability of `storageKey`,
+/// `mimeType`, `size` and `url` is derived *from it*. A row with both a URL and a storage key —
+/// or with neither — is the failure this enum exists to make unwritable, including from a bulk
+/// importer that never runs the application's own create path.
+/// See docs/decisions/0024-attachment-kinds-and-serving-policy.md.
+enum AttachmentKind {
+  FILE
+  LINK
+}
+
 model User {
   id            String   @id @default(uuid(7))
   email         String   @unique
@@ -50,16 +62,17 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions         Session[]
-  accounts         Account[]
-  memberships      WorkspaceMember[]
-  invitationsSent  WorkspaceInvitation[]
-  createdTasks     Task[]                @relation("TaskCreatedBy")
-  assignees        TaskAssignee[]
-  comments         Comment[]
-  activities       Activity[]
-  notifications    Notification[]
-  usagePings       UsagePing[]
+  sessions        Session[]
+  accounts        Account[]
+  memberships     WorkspaceMember[]
+  invitationsSent WorkspaceInvitation[]
+  createdTasks    Task[]                @relation("TaskCreatedBy")
+  assignees       TaskAssignee[]
+  comments        Comment[]
+  attachments     Attachment[]          @relation("AttachmentUploadedBy")
+  activities      Activity[]
+  notifications   Notification[]
+  usagePings      UsagePing[]
 }
 
 model Session {
@@ -224,14 +237,15 @@ model Task {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  board      Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  column     Column         @relation(fields: [boardId, columnId], references: [boardId, id], onDelete: Cascade)
-  createdBy  User           @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  assignees  TaskAssignee[]
-  labels     TaskLabel[]
-  comments   Comment[]
-  checklists Checklist[]
-  activities Activity[]
+  board         Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column        Column         @relation(fields: [boardId, columnId], references: [boardId, id], onDelete: Cascade)
+  createdBy     User           @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  assignees     TaskAssignee[]
+  labels        TaskLabel[]
+  comments      Comment[]
+  attachments   Attachment[]
+  checklists    Checklist[]
+  activities    Activity[]
   notifications Notification[]
 
   @@index([boardId, columnId, position])
@@ -312,6 +326,46 @@ model Comment {
 
   @@index([taskId])
   @@index([userId])
+}
+
+/// A file or a link attached to a task.
+///
+/// `onDelete: Cascade` on the task is deliberate, and it is also the reason the orphan sweep
+/// exists: `Workspace → Board → Task` cascades entirely inside Postgres, so thousands of these
+/// rows can disappear without a single line of application code running. Deleting the bytes is
+/// therefore never a side effect of a delete path — see retention/cleanup.worker.ts and ADR 0022.
+///
+/// `uploadedById` is `Restrict`, matching `Comment.user` (schema.prisma:311). The cost is stated
+/// where it lands: P3-4 (account deletion / anonymisation, finding DB-05) has one more relation
+/// to route around. ADR 0024 argues why an uploaded file is an authored object and a ticked
+/// checkbox is not.
+model Attachment {
+  id           String         @id @default(uuid(7))
+  taskId       String
+  uploadedById String
+  kind         AttachmentKind
+  /// What the user sees. For a FILE this is the name the browser sent; it is a *display* field
+  /// and never a path segment — `storageKey` is derived from `id`, so traversal is not a
+  /// validation problem here, it is unexpressible (ADR 0024).
+  filename     String
+  /// FILE only: the key `StorageBackend` was handed. Derived from `id` on the server.
+  storageKey   String?
+  /// FILE only: the type `file-type` read from the magic bytes — never the declared one.
+  mimeType     String?
+  /// FILE only: bytes on disk.
+  size         Int?
+  /// LINK only: an `http:`/`https:` URL the server has never requested and never will (ADR 0024).
+  url          String?
+  createdAt    DateTime       @default(now())
+
+  task       Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy User @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  /// The panel's list read: `taskId` equality plus `id desc` ordering, served from one index.
+  @@index([taskId, id])
+  /// What the `Restrict` FK makes Postgres scan on every user delete, and what P3-4's
+  /// anonymisation pass will query. The same pair `Comment` carries (schema.prisma:313-314).
+  @@index([uploadedById])
 }
 
 /// A named list of items inside a task. A task may carry several (the Trello model), which is
