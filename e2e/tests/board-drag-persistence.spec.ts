@@ -81,6 +81,13 @@ test('a dragged card keeps its new order after a reload', async ({ stack, page }
     'the new order must survive a reload — this is what fails when the move is not persisted',
   );
 
-  // And nothing leaked sideways: the other columns are still empty.
-  expect(await cardOrder(column(page, columns[1]!.name))).toEqual([]);
+  // And nothing leaked sideways: the neighbouring column is still empty.
+  //
+  // Asserted on a column that is *proved to be on screen* first. An empty result from
+  // `cardOrder` cannot distinguish "this column holds no cards" from "this column never
+  // rendered", so without the visibility check the emptiness assertion would also pass on a
+  // board that failed to paint at all.
+  const inProgress = column(page, columns[1]!.name);
+  await expect(inProgress).toBeVisible();
+  expect(await cardOrder(inProgress)).toEqual([]);
 });
