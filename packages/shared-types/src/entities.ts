@@ -27,6 +27,15 @@ export interface InstanceConfigDto {
    * a teammate who never got the email.
    */
   mailEnabled: boolean;
+  /**
+   * Whether this deployment stores attachments at all — i.e. whether `STORAGE_PATH` is set.
+   *
+   * A capability, like `mailEnabled`, never tenant state (`docs/api-conventions.md:175-177`).
+   * The web reads it to decide whether to render the upload control. The *link* control does
+   * not depend on it: a LINK needs no storage, so an instance with no `STORAGE_PATH` can still
+   * attach links.
+   */
+  attachmentsEnabled: boolean;
 }
 
 export interface UserDto {
@@ -134,6 +143,47 @@ export interface ChecklistSummaryDto {
   done: number;
 }
 
+/**
+ * Whether an attachment carries stored bytes or only points at a URL.
+ *
+ * A `const` object rather than a TS `enum`, matching every other enum in this package: the
+ * values are the strings Prisma writes and the API sends, and a structural type keeps
+ * `@kurultay/shared-types` free of emitted runtime code the web bundle would have to carry.
+ */
+export const AttachmentKind = {
+  File: 'FILE',
+  Link: 'LINK',
+} as const;
+
+export type AttachmentKind = (typeof AttachmentKind)[keyof typeof AttachmentKind];
+
+/**
+ * One attachment on a task.
+ *
+ * The three FILE-only fields are `null` on a `LINK` and `url` is `null` on a `FILE`; `kind` is
+ * what says which, and it is never inferred from the nulls (ADR 0024).
+ *
+ * There is deliberately no download URL in this DTO. The client builds it from `id` — the
+ * endpoint is published in ADR 0022, and a server-rendered absolute URL would bake the
+ * deployment's origin into a payload that the same-origin image goes out of its way not to
+ * carry (`apps/web/lib/api-url.ts`).
+ */
+export interface AttachmentDto {
+  id: string;
+  taskId: string;
+  kind: AttachmentKind;
+  /** Display name. For a FILE this is what the browser sent; it never appears in a path. */
+  filename: string;
+  /** FILE only: the sniffed media type, never the one the client declared. */
+  mimeType: string | null;
+  /** FILE only: bytes. */
+  size: number | null;
+  /** LINK only: an `http:`/`https:` URL the server has never requested and never will. */
+  url: string | null;
+  uploadedById: string;
+  createdAt: string;
+}
+
 export interface TaskDto {
   id: string;
   boardId: string;
@@ -152,6 +202,14 @@ export interface TaskDto {
   checklistSummary: ChecklistSummaryDto;
   /** Full checklists on a single-task read; `null` on list reads, where only the summary is loaded. */
   checklists: ChecklistDto[] | null;
+  /**
+   * How many attachments the task has, on every task read.
+   *
+   * A count and not a list, unlike `checklists`: the card needs the number and the panel reads
+   * the full list from its own endpoint. Loading attachment rows into the board list would hand
+   * back what P2-8 bought, and unlike a checklist there is no badge that needs their contents.
+   */
+  attachmentCount: number;
 }
 
 export interface TaskAssigneeDto {

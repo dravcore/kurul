@@ -117,7 +117,7 @@ export class TaskService {
         position = midpoint(prevPos, nextPos);
       }
 
-      const created: Omit<TaskDetailRow, 'assignees' | 'labels' | 'checklists'> =
+      const created: Omit<TaskDetailRow, 'assignees' | 'labels' | 'checklists' | '_count'> =
         await tx.task.create({
           data: {
             boardId,
