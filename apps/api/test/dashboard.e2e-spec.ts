@@ -117,6 +117,59 @@ describe('Dashboard (e2e)', () => {
     await anonymous.get(`/workspaces/${workspace.id}/dashboard/summary`).expect(401);
   });
 
+  describe('timezone resilience', () => {
+    /**
+     * Regression test for P2-13 (denetim bulgulu DB-08): the three-argument form of
+     * `date_trunc(..., 'UTC')` ensures throughput day boundaries align with UTC midnight
+     * regardless of the database session's timezone setting. This test verifies that
+     * `TZ=Europe/Istanbul` (or any non-UTC override) does not shift the bucketing.
+     */
+    it('returns identical throughput buckets when session timezone is changed from UTC to Istanbul', async () => {
+      const owner = await signUp(app, { name: 'Owner' });
+      const workspace = await createWorkspace(owner.agent, 'TZ Test', `tz-${Date.now()}`);
+      const board = await owner.agent
+        .post(`/workspaces/${workspace.id}/boards`)
+        .send({ name: 'Tasks' })
+        .expect(201);
+      const columns = await owner.agent
+        .get(`/workspaces/${workspace.id}/boards/${board.body.id}/columns`)
+        .expect(200);
+      const todo = columns.body.find((column: { name: string }) => column.name === 'To Do')!;
+
+      // Create a task to generate an activity record.
+      await owner.agent
+        .post(`/workspaces/${workspace.id}/boards/${board.body.id}/tasks`)
+        .send({ title: 'Test task', columnId: todo.id })
+        .expect(201);
+
+      // Fetch dashboard summary with default (UTC) session timezone.
+      const summaryUtc = await owner.agent
+        .get(`/workspaces/${workspace.id}/dashboard/summary`)
+        .expect(200);
+
+      // Change the database session timezone to Europe/Istanbul.
+      // This session-level setting affects only subsequent queries in this connection.
+      await prisma.$executeRaw`SET timezone = 'Europe/Istanbul'`;
+
+      // Fetch dashboard summary again with Istanbul timezone active.
+      const summaryIstanbul = await owner.agent
+        .get(`/workspaces/${workspace.id}/dashboard/summary`)
+        .expect(200);
+
+      // The throughput array keys (YYYY-MM-DD dates) and counts must be identical,
+      // because the database query uses three-argument date_trunc(..., 'UTC') to
+      // explicitly truncate in UTC regardless of session timezone.
+      expect(summaryIstanbul.body.throughput).toHaveLength(summaryUtc.body.throughput.length);
+      for (let i = 0; i < summaryUtc.body.throughput.length; i++) {
+        const utcRow = summaryUtc.body.throughput[i]!;
+        const istanbulRow = summaryIstanbul.body.throughput[i]!;
+        expect(istanbulRow.date).toBe(utcRow.date);
+        expect(istanbulRow.created).toBe(utcRow.created);
+        expect(istanbulRow.completed).toBe(utcRow.completed);
+      }
+    });
+  });
+
   describe('completion follows the column category, not the column name', () => {
     const today = (): string => new Date().toISOString().slice(0, 10);
 
