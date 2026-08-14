@@ -247,6 +247,59 @@ tablolarından Kurultay adlarına map edilir. Ürün dili ve REST path'leri
 
 Better Auth ayrıca auth altyapısı tablolarını `Session`, `Account` ve `Verification` yönetir; bunlar plugin tarafından yönetilir ve yukarıdaki domain model tablosundan bilerek hariç tutulur.
 
+### Denetim izi
+
+`Activity` iki tür satır taşır. Task feed'i — oluşturuldu, güncellendi, taşındı, atandı, yorum
+yapıldı — board üyesinin okuduğu şeydir. Yönetim olayları ise bir hesap ele geçirildikten ya da
+biri kötü ayrıldıktan sonra operatörün okuduğu şeydir: **bir workspace'e kimin erişebileceğini**
+değiştiren veya **işi yok eden** her eylemi kaydeder.
+
+| Olay                                                                | Yazan                        | Aktörün ötesindeki payload                                           |
+| ------------------------------------------------------------------- | ---------------------------- | -------------------------------------------------------------------- |
+| `board.created` · `board.updated` · `board.deleted`                 | `BoardService`               | board id, ad, `changes`, silinen board'un `taskCount`'u              |
+| `column.created` · `column.updated` · `column.deleted`              | `ColumnService`              | column id, board id, ad, `category`, `changes`                       |
+| `label.created` · `label.updated` · `label.deleted`                 | `LabelService`               | label id, board id, ad, renk slotu, `changes`                        |
+| `workspace.updated`                                                 | `WorkspaceService`           | ad, slug, `changes`                                                  |
+| `member.removed` · `member.left` · `member.role_changed`            | `WorkspaceMemberService`     | hedef kullanıcı, hedef adı, `previousRole`, `newRole`, aktörün rolü  |
+| `invitation.created` · `invitation.revoked` · `invitation.accepted` | `WorkspaceInvitationService` | davet id, verilen rol, `emailDelivery` — **davet edilen adres asla** |
+| `task.deleted`                                                      | `TaskService`                | task id, başlık, board ve column                                     |
+
+Dört özellik bilinçlidir:
+
+- **`changes` her iki tarafı da kaydeder.** Yönetim olayları task feed'inin kullandığı
+  `{ alan: yeniDeğer }` biçimini değil, `{ alan: { from, to } }` biçimini saklar. Bir denetim
+  kaydı, bir hesabın ne yaptığını yeniden kuran biri tarafından geriye doğru okunur ve ilginç
+  olan yarısı genellikle kaybolmuş değerdir: "board'u Archive olarak yeniden adlandırdı" neyin
+  gizlendiğini söylemez.
+- **Silmeler, silme işlemini yapan transaction'ın içinde ve silmeden önce kaydedilir.** Silinen
+  bir board'un veya etiketin adı sonrasında başka hiçbir yerde yoktur. Oluşturmalar bunun
+  yerine insert'ten hemen sonra kaydedilebilir; çünkü kaybolan bir oluşturma kaydında bile
+  oluşturulan satırın kendisi kanıt olarak ayakta kalır.
+- **Bir payload, bir şeyi kimin okuyabileceğini asla genişletmez.**
+  `GET /workspaces/:workspaceId/activities` `@WorkspaceScoped()`'tur ve `payload`'ı olduğu gibi
+  döner; yani oraya yazılan her şey GUEST dahil her üye tarafından okunabilir. Bekleyen davet
+  listesi tam da bu yüzden `@WorkspaceRoles(...ADMIN_ROLES)`'tur: davet edilen adres, henüz
+  hiçbir şeye rıza göstermemiş birine aittir. Bu nedenle `invitation.*` payload'ları **yalnızca
+  davet id'sini ve rolü** taşır — adres gerektiğinde admin `WorkspaceInvitation`'a join eder.
+  Adli değer korunur, kitle genişlemez.
+- **`AUDIT_ACTIVITY_TYPES`** (`@kurultay/shared-types`) bu tiplerin dışa aktarılan listesidir;
+  böylece "burada kim neyi kaldırdı, yetkilendirdi ya da yok etti?" tek bir sorgudur —
+  `WHERE "workspaceId" = $1 AND type = ANY($2) ORDER BY id DESC`, mevcut
+  `(workspaceId, type, createdAt)` indeksiyle karşılanır.
+
+**Bir olay tabloda yaşayamaz: `workspace.deleted`.** `Activity`, `workspaceId` üzerinden cascade
+edilir; yani satır, kendisini tarif eden ifadenin ta kendisi tarafından silinir.
+`WorkspaceService.remove` bu yüzden onu JSON satır log'una yazar
+(`common/logging/json-log.ts` — access log'un ve saklama süpürmesinin kullandığı taşıyıcı):
+`{ ts, level: 'warn', event: 'workspace.deleted', workspaceId, actorId, name, slug, memberCount, boardCount }`.
+Bunlar silmeden **önce** toplanır, çünkü sonrasında hiçbiri sorgulanamaz.
+`docker logs … | jq 'select(.event == "workspace.deleted")'` ile okunur. Silme kayıtlarını
+saklaması gereken bir kurulumda uygulama log'unu bir toplayıcıya yönlendirin.
+
+Denetim satırları da diğer aktiviteler gibi aynı saklama penceresiyle temizlenir
+(`ACTIVITY_RETENTION_DAYS`, varsayılan 365; `0` sonsuza kadar saklar —
+[ADR 0020](decisions/0020-data-retention.md)).
+
 ### Kritik alan kuralları
 
 Bunlar pazarlığa açık değildir; ayrıca `CLAUDE.md` içinde de kayıtlıdır.

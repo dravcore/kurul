@@ -56,9 +56,10 @@ export class BoardController {
   update(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('boardId') boardId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateBoardDto,
   ): Promise<BoardDto> {
-    return this.boardService.update(workspaceId, boardId, dto);
+    return this.boardService.update(workspaceId, boardId, user.id, dto);
   }
 
   @Delete(':boardId')
@@ -67,7 +68,8 @@ export class BoardController {
   async remove(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('boardId') boardId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
-    await this.boardService.remove(workspaceId, boardId);
+    await this.boardService.remove(workspaceId, boardId, user.id);
   }
 }

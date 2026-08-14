@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { ActivityType, MemberRole } from '@kurultay/shared-types';
 import type {
   CursorPage,
   InvitationDto,
@@ -14,6 +14,7 @@ import type {
 } from '@kurultay/shared-types';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
+import { ActivityService } from '../activity/activity.service';
 import { auth } from '../auth/auth';
 import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth-error';
 import { buildInviteAcceptUrl } from '../auth/web-urls';
@@ -81,9 +82,44 @@ function toInvitationDto(row: InvitationRow): InvitationDto {
   };
 }
 
+/**
+ * Invitation lifecycle.
+ *
+ * ## The invited address is deliberately **not** in the audit payload
+ *
+ * The obvious payload for `invitation.created` is the address it was aimed at, and it is the
+ * wrong one. The two endpoints are gated differently on purpose:
+ *
+ * - `GET /workspaces/:workspaceId/invitations` — `@WorkspaceRoles(...ADMIN_ROLES)`
+ * - `GET /workspaces/:workspaceId/activities` — `@WorkspaceScoped()`, so every member reads it
+ *
+ * and `ActivityService.list` returns `payload` verbatim. Putting the address on the activity
+ * row would therefore republish the pending-invitation queue to every MEMBER and GUEST in the
+ * workspace, through a feed that was never gated for it. That is exactly the exposure the
+ * comment above `WorkspaceController.listInvitations` refuses: an invited address belongs to
+ * someone who has agreed to nothing yet, and handing it to the whole workspace shares contact
+ * details the product was never given permission to share. An audit trail must not open that
+ * door from behind.
+ *
+ * So these payloads carry `invitationId` and the granted role, and stop there. Nothing forensic
+ * is lost: `WorkspaceInvitation` still holds the address, an admin joins the two by id, and the
+ * join is available to exactly the readers the invitation list already serves. `ACTIVITY_RETENTION_DAYS`
+ * sweeps these rows like any other activity, which is a second reason not to copy personal data
+ * into them — the copy would outlive nothing and expose more.
+ *
+ * ## The audit rows are written after the plugin call, and that gap is deliberate
+ *
+ * Better Auth owns the invitation row and no transaction spans the two writes, so a crash
+ * between them loses the record of something that happened. Recording *first* would be worse:
+ * it would fabricate entries for invitations the plugin went on to refuse, and an audit trail
+ * that reports access which was never granted is not a weaker trail, it is a misleading one.
+ */
 @Injectable()
 export class WorkspaceInvitationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+  ) {}
 
   private headersFrom(request: Request): Headers {
     return fromNodeHeaders(request.headers);
@@ -179,6 +215,7 @@ export class WorkspaceInvitationService {
    */
   async createInvitation(
     workspaceId: string,
+    actorId: string,
     dto: CreateInvitationDto,
     request: Request,
   ): Promise<InvitationDto> {
@@ -229,6 +266,23 @@ export class WorkspaceInvitationService {
         throw new ConflictException('Invitation was changed concurrently, please try again');
       }
 
+      // Written after the concurrency check, so no entry claims a grant the response refused.
+      // `emailDelivery` is recorded next to the grant because the two answer one question
+      // together: an invitation whose mail never left the building was still an offer of
+      // access, and the link in the response works whether or not it was delivered. It is a
+      // verdict about the send, not the address — see the class comment for why the address
+      // itself stays in `WorkspaceInvitation`, joined by `invitationId`.
+      await this.activityService.record(this.prisma, {
+        workspaceId,
+        userId: actorId,
+        type: ActivityType.InvitationCreated,
+        payload: {
+          invitationId: invitation.id,
+          role: dto.role,
+          ...(delivery === undefined ? {} : { emailDelivery: delivery }),
+        },
+      });
+
       return {
         id: invitation.id,
         workspaceId,
@@ -257,6 +311,7 @@ export class WorkspaceInvitationService {
 
   async revokeInvitation(
     workspaceId: string,
+    actorId: string,
     invitationId: string,
     request: Request,
   ): Promise<void> {
@@ -277,6 +332,20 @@ export class WorkspaceInvitationService {
         404: 'Invitation not found',
       });
     }
+
+    // Cancelling only flips `status`, so the row survives — but it stops being listed, and an
+    // invitation that was withdrawn one minute after it was sent is a different story from one
+    // that was left standing. The pair of entries is what tells them apart, and because the row
+    // is still there, `invitationId` is all an admin needs to recover the address.
+    await this.activityService.record(this.prisma, {
+      workspaceId,
+      userId: actorId,
+      type: ActivityType.InvitationRevoked,
+      payload: {
+        invitationId,
+        role: invitation.role,
+      },
+    });
   }
 
   async acceptInvitation(
@@ -310,6 +379,23 @@ export class WorkspaceInvitationService {
       const user = await this.prisma.user.findUniqueOrThrow({
         where: { id: member.userId },
         select: { name: true, avatarUrl: true },
+      });
+
+      // The other half of `invitation.created`: an offer of access and its acceptance are two
+      // separate acts, days apart, and only the second one actually granted anything. The actor
+      // is the invitee, who at the moment of writing has just become a member — which is why
+      // this is the one audited event whose actor is not an administrator.
+      //
+      // No address here either, and here it is not even a trade-off: the invitee is now a
+      // member, so `userId` names them directly and joins to `User` for anything else.
+      await this.activityService.record(this.prisma, {
+        workspaceId: memberWorkspaceId,
+        userId: member.userId,
+        type: ActivityType.InvitationAccepted,
+        payload: {
+          invitationId,
+          role: member.role,
+        },
       });
 
       return {
