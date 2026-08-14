@@ -9,6 +9,7 @@ What Kurultay tests, with which tools, and what CI enforces.
 - [Strategy](#strategy)
 - [The pyramid](#the-pyramid)
 - [What must be tested](#what-must-be-tested)
+- [Browser end-to-end](#browser-end-to-end)
 - [File conventions](#file-conventions)
 - [Running tests](#running-tests)
 - [Writing tests](#writing-tests)
@@ -26,21 +27,22 @@ Kurultay’s MVP feature set is complete; the testing strategy stays deliberatel
   catching at this stage live in the query, not in the TypeScript.
 - Do **not** chase a coverage number. Do not write tests that only restate the
   implementation.
-- Browser e2e is deferred until the UI stops changing shape weekly.
+- Browser e2e covers **four flows, and deliberately no more** — the ones where the stack
+  either holds together or does not. See [Browser end-to-end](#browser-end-to-end).
 
 The cost of a test is not writing it — it is maintaining it through every refactor. Tests
 are written where that cost buys real confidence.
 
 ## The pyramid
 
-| Layer           | Tool                                   | Scope                                                                                     | Status                                                    |
-| --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Services, guards, pure functions, board/permission logic, DnD hooks. Dependencies mocked. | Required from day one                                     |
-| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`)    | Required for every endpoint                               |
-| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | **Not set up in MVP** — reserved for critical flows later |
+| Layer           | Tool                                   | Scope                                                                                     | Status                                                     |
+| --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Services, guards, pure functions, board/permission logic, DnD hooks. Dependencies mocked. | Required from day one                                      |
+| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`)    | Required for every endpoint                                |
+| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | Four scenarios (`e2e/`) — nightly and before every release |
 
 ```
-        /\        e2e — deferred (Playwright)
+        /\        e2e — four critical flows (Playwright, real Chromium)
        /  \
       /────\      integration — every endpoint (Supertest + real Postgres)
      /      \
@@ -50,8 +52,8 @@ are written where that cost buys real confidence.
 Full component-tree rendering tests are not part of the MVP. Web unit tests cover pure logic
 (`lib/*.test.ts` — permissions, position math, mentions, query params) and the board
 drag-and-drop hook in isolation; type safety plus integration coverage of the API is the
-trade-off for everything else, and when the board UI stabilizes, Playwright covers it end to
-end rather than more component tests covering it in pieces.
+trade-off for everything else, and the board's own behaviour is covered end to end by the
+four browser scenarios below rather than by component tests covering it in pieces.
 
 ## What must be tested
 
@@ -100,6 +102,114 @@ tests are the only mechanical enforcement it has.
 - Expired or tampered session → **401**
 - Invite acceptance grants exactly the intended role
 
+## Browser end-to-end
+
+Browser e2e was deferred through the MVP for a reason that held: the board UI changed shape
+weekly, and a suite written against it would have been rewritten three times. What the
+deferral left behind was a gap nothing else could cover — the flows that make this product
+what it is were verified by well over a thousand unit tests and an integration test for every
+endpoint, and **not once in a real browser**. Both of those suites pass against a board that
+never renders.
+
+The suite lives in [`e2e/`](../e2e), runs a real Chromium against a compiled API and a
+production web build, and is exactly four scenarios.
+
+### The four scenarios
+
+| Scenario                                                                   | File                                   | What it is the only coverage of                                                                                                                                  |
+| -------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign in → open a board → drag a card → **reload and find it still moved**  | `tests/board-drag-persistence.spec.ts` | That a pointer gesture in a browser produces the move request at all, and that the board reads back what it wrote                                                |
+| A move in one browser appears **in a second browser**, with no reload      | `tests/board-realtime.spec.ts`         | Socket.io handshake auth, board-room membership, and the client applying an id-only payload                                                                      |
+| Invite from settings → **read the mail in Mailpit** → accept from the link | `tests/invitation.spec.ts`             | That the invitation mail is sent and carries a link that works — `acceptUrl` is built from `WEB_URL`, and the API's own tests assert on the DTO, not the message |
+| Click a notification → **the right task opens**                            | `tests/notification.spec.ts`           | A notification carries `taskId` but no `boardId`; the web resolves the board with a second request, in the browser, with the recipient's session                 |
+
+Anything outside those four belongs in a unit or integration test. Every test added here is
+one more thing to keep green through a UI refactor, and this suite exists to notice when the
+**stack** comes apart — not to re-check what the layers below already cover.
+
+### Running it
+
+Postgres **and Mailpit** must be up (`docker compose -f docker-compose.dev.yml up -d`);
+without Mailpit three of the four scenarios cannot confirm an address or read an invitation.
+Redis is not needed — see [Isolation](#isolation) for why the suite runs without it.
+
+```bash
+pnpm --filter @kurultay/e2e browsers   # once: downloads Chromium
+pnpm test:browser                      # builds the stack, then runs all four
+```
+
+`pnpm test:browser` runs `e2e/build-stack.mjs` first — it builds `shared-types`,
+`auth-access`, the API and a standalone web bundle, then migrates the suite's database.
+Playwright starts and stops both servers itself. To iterate on a test without rebuilding, run
+`pnpm --filter @kurultay/e2e exec playwright test` directly; locally it reuses a stack that is
+already listening.
+
+**The web build is not interchangeable with `pnpm build`.** `NEXT_PUBLIC_API_URL` is inlined
+at build time, so the suite's build hard-codes port 4110 into the client bundle and overwrites
+`apps/web/.next`. After running the suite locally, rebuild before using
+`pnpm --filter @kurultay/web start`.
+
+### Isolation
+
+The suite boots a second copy of the application next to whatever is already running, and
+never touches it:
+
+| Thing           | Value                      | Why                                                                               |
+| --------------- | -------------------------- | --------------------------------------------------------------------------------- |
+| Web / API ports | 3110 / 4110                | 3000/4000 belong to `pnpm dev`                                                    |
+| Database        | `kurultay_test_playwright` | Not `kurultay_test` — the Jest integration suite truncates that one between tests |
+| Redis           | none — `REDIS_URL` blank   | See below; running without Redis is a supported configuration                     |
+| Mail            | the shared Mailpit         | Nothing is ever deleted; every lookup is scoped to an address the suite generated |
+
+None of it is configurable through `.env`, and it adds no environment variables: the Postgres
+_connection_ is derived from `DATABASE_URL` with only the database name swapped. A
+misconfigured variable here would mean a suite that silently ran against the development
+database, which is the one failure this arrangement is built to make impossible. The reasoning
+is written out in `e2e/stack-env.ts`.
+
+**Why no Redis.** A logical database index would have been the obvious boundary, but the index
+does not reach the client: `parseRedisUrl` returns only host, port and password and drops the
+URL's pathname, and every ioredis/BullMQ construction in `apps/api` goes through it — so
+`redis://…/8` connects to database 0 (issue [#190](https://github.com/dravcore/kurultay/issues/190)).
+A key prefix is not available either; BullMQ's prefix and the Socket.io adapter's channel names
+are chosen in `apps/api` source. Two API instances on database 0 share the `due-soon` _queue_,
+which means a `pnpm dev` server and this suite would take turns running each other's scheduled
+scans against the wrong database. The API supports running with no Redis at all — readiness
+reports it `skipped`, the gateway logs that the adapter was not attached, the due-soon worker
+declines to start — and with a single API process the adapter would only be fanning messages
+back to their own publisher, so nothing under test loses coverage. When #190 is fixed, an index
+becomes a real boundary and is worth reinstating.
+
+### How these tests are written
+
+- **Setup goes over HTTP, behaviour goes through the UI.** Accounts, workspaces, boards and
+  cards are created with API calls; only the behaviour under test is clicked. Driving setup
+  with clicks would make every scenario also a test of registration and workspace creation,
+  so one change would turn all four red and none of them would be saying anything true.
+- **No `data-testid`.** There is not one in this application's production code and the suite
+  adds none. Columns are `<section aria-label>`, cards carry `aria-label="Reorder <title>"` on
+  their grip — asserting through the accessible surface means a change that breaks a
+  screen-reader user also breaks this suite.
+- **No fixed waits, anywhere.** `expect.poll` and web-first assertions only. A `sleep` is
+  either too short on the busiest machine or wasted time on every other one.
+- **No retries, including in CI.** A retry turns a flake into a green run, which is the
+  fastest way to make a suite stop meaning anything.
+- **Never assert on `Task.position`.** It is a Float produced by fractional indexing and
+  rebalancing may change it at any time. The _order_ is the contract.
+- **A drop assertion before a reload proves nothing.** The board applies moves optimistically,
+  so the order changes on screen whether or not anything was persisted. The reload is the
+  test.
+
+### Prove the test can fail
+
+A passing browser test is unusually easy to be wrong about: an un-awaited assertion is always
+green, and a scenario can quietly assert on the optimistic UI instead of the stored state.
+Before a scenario is considered done, **break the thing it protects and watch it go red.**
+Each of the four was checked exactly that way — removing the position PATCH, the
+`task:moved` emit, the accept link from the invitation mail, and the task segment from the
+notification's navigation target. Three of the four kept passing up to their final
+assertion, which is the point: that final assertion is the whole test.
+
 ## File conventions
 
 | Kind                   | Location                       | Pattern                                              |
@@ -107,7 +217,8 @@ tests are the only mechanical enforcement it has.
 | Unit                   | Colocated with the source file | `apps/api/src/task/task.service.spec.ts`             |
 | Integration            | Separate test root             | `apps/api/test/task.e2e-spec.ts`                     |
 | Test helpers/factories | Shared under the test root     | `apps/api/test/helpers/`, `apps/api/test/factories/` |
-| Playwright (later)     | Repository-level               | `e2e/`                                               |
+| Browser e2e            | Repository-level package       | `e2e/tests/board-realtime.spec.ts`                   |
+| Browser e2e helpers    | Beside them                    | `e2e/support/`, `e2e/stack-env.ts`                   |
 
 Nest's generator calls integration tests `*.e2e-spec.ts`; that name is kept for tooling
 compatibility even though these are API integration tests, not browser e2e.
@@ -125,10 +236,13 @@ pnpm --filter @kurultay/api test:cov      # api coverage report
 
 pnpm --filter @kurultay/web test          # web unit (Vitest)
 pnpm --filter @kurultay/web test:watch    # web unit, watch mode
+
+pnpm test:browser                         # browser e2e (needs Mailpit too)
 ```
 
 Integration tests run against a **separate database** (`kurultay_test`), created and
-migrated by the test setup. They never touch the development database.
+migrated by the test setup. They never touch the development database. The browser suite
+uses a third one — see [Isolation](#isolation).
 
 ## Writing tests
 
@@ -142,7 +256,8 @@ migrated by the test setup. They never touch the development database.
   `afterEach` or wrap the test in a transaction that is rolled back. Order-dependent test
   suites are a bug.
 - Mock only what crosses a process boundary you do not control (email, third-party HTTP).
-  Do not mock Prisma in integration tests — that is the point of them.
+  Do not mock Prisma in integration tests — that is the point of them. The browser suite
+  mocks nothing at all, including mail: it reads what was sent out of Mailpit.
 - No `setTimeout`-based waiting. Await the thing.
 - A bug fix ships with a regression test that fails before the fix.
 
@@ -226,10 +341,34 @@ CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on 
 
 The workflow file is [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 
+### Browser e2e in CI
+
+The browser suite runs in its own workflow,
+[`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml), on a different schedule and
+**outside the `ci-ok` gate**:
+
+| Trigger                   | Why                                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Nightly, 03:00 UTC        | Late enough to include the day's merges, early enough that a red run is waiting in the morning       |
+| Pull requests into `main` | Only `release/*` and `hotfix/*` open those, so this is exactly once per release candidate and hotfix |
+| `workflow_dispatch`       | On demand                                                                                            |
+
+It is not a required check on purpose. This suite starts Postgres, Redis, Mailpit, a compiled
+API and a production web build, then drives Chromium through all of it — the project's most
+valuable signal and also the most expensive one to be wrong about. Wired into the required
+gate, one infrastructure hiccup would block every merge in the repository. `ci.yml` stays the
+fast, required loop; a failure here means "look at this before shipping", not "stop".
+
+The whole suite is capped at **five minutes** by `globalTimeout` in
+`e2e/playwright.config.ts` — enforced rather than aspired to, and enforced locally as well as
+in CI, so the run that first exceeds the budget is the one on the author's machine. The HTML
+report is uploaded on every run and the traces on failure, which is what makes a nightly
+failure diagnosable the next morning without reproducing it.
+
 ## See also
 
 - [development.md](development.md) — running services locally
 - [coding-standards.md](coding-standards.md) — code conventions tests assume
 - [api-conventions.md](api-conventions.md) — status codes and error shapes to assert on
 - [git-strategy.md](git-strategy.md) — PR requirements
-- [roadmap.md](roadmap.md) — MVP status and Beyond MVP (Playwright e2e still deferred)
+- [roadmap.md](roadmap.md) — MVP status and Beyond MVP

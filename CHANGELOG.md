@@ -60,7 +60,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `Activity` cascades on `workspaceId`, so the row would delete itself — and is emitted on the
   JSON-line log instead, as a `workspace.deleted` event carrying the name, slug, member count
   and board count gathered before the delete.
-
+- **Browser end-to-end suite (Playwright)** — a new repository-level `e2e/` package runs four
+  scenarios against a real Chromium, a compiled API and a production web build: sign in → open
+  a board → drag a card → **reload and find it still moved**; a move made in one browser
+  appearing in a **second browser** with no reload; an invitation sent from the settings dialog
+  → read out of **Mailpit** → accepted from the link in the message; and clicking a
+  notification opening **the task it refers to**. These four were the largest single gap in the
+  project's testing: the unit suites and the API integration suite all pass against a board
+  that never renders, and until now nothing exercised drag-and-drop, Socket.io, mail delivery
+  or notification navigation in a browser at all. Scope is capped at four on purpose, and the run
+  is capped at five minutes by `globalTimeout` — this suite exists to notice when the *stack*
+  comes apart, not to re-check the layers below it. Setup is done over HTTP and only the
+  behaviour under test is clicked; there are no `data-testid` attributes (columns are
+  `<section aria-label>`, cards carry `aria-label="Reorder <title>"` on their grip), no fixed
+  waits, and no retries — including in CI. Each scenario was verified by breaking the thing it
+  protects and confirming it goes red. It runs in its own workflow
+  (`.github/workflows/e2e.yml`) nightly and on pull requests into `main` — i.e. before every
+  release and hotfix — deliberately **outside** the required `ci-ok` gate, so an infrastructure
+  hiccup in a full-stack browser run can never block every merge in the repository. The suite
+  isolates itself completely: ports 3110/4110, database `kurultay_test_playwright`, Redis
+  logical database 8, and no new environment variables (the Postgres/Redis connections are
+  derived from `DATABASE_URL`/`REDIS_URL` with only the database name and index swapped). Run
+  it with `pnpm test:browser`. Closes audit finding QA-01
+  ([#129](https://github.com/dravcore/kurultay/issues/129)); `docs/testing.md` (EN + TR) now
+  names these four flows as the concrete definition of the "critical flows later" it had been
+  reserving Playwright for.
 - **Register form now shows field-level error messages** — when sign-up fails, the error is no
   longer reported as a generic "could not create your account" message. Better Auth error codes
   like `PASSWORD_TOO_SHORT` and `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` now map to their

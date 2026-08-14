@@ -9,6 +9,7 @@ Kurultay'ın neyi, hangi araçlarla test ettiği ve CI'ın neyi zorunlu kıldı�
 - [Strateji](#strateji)
 - [Piramit](#piramit)
 - [Neler test edilmeli](#neler-test-edilmeli)
+- [Browser uçtan uca](#browser-uçtan-uca)
 - [Dosya konvansiyonları](#dosya-konvansiyonları)
 - [Testleri çalıştırma](#testleri-çalıştırma)
 - [Test yazma](#test-yazma)
@@ -26,21 +27,22 @@ pragmatik** kalır:
   test edin. Bu aşamada yakalanmaya değer çoğu bug TypeScript'te değil, sorguda yaşıyor.
 - Bir coverage sayısının peşinden **koşmayın**. Yalnızca implementasyonu yeniden ifade eden
   testler yazmayın.
-- Browser e2e, UI haftalık şekil değiştirmeyi bırakana kadar ertelenir.
+- Browser e2e **dört akışı kapsar, bilinçli olarak daha fazlasını değil** — stack'in ya
+  tuttuğu ya da tutmadığı akışlar. Bkz. [Browser uçtan uca](#browser-uçtan-uca).
 
 Bir testin maliyeti onu yazmak değildir — her refactor boyunca onu bakımda tutmaktır.
 Testler, bu maliyetin gerçek güven satın aldığı yerlerde yazılır.
 
 ## Piramit
 
-| Katman          | Araç                                   | Kapsam                                                                                               | Durum                                                             |
-| --------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Servisler, guard'lar, saf fonksiyonlar, board/izin logic'i, DnD hook'ları. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu                                           |
-| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden)       | Her endpoint için zorunlu                                         |
-| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | **MVP'de kurulu değil** — ileride kritik akışlar için ayrılmıştır |
+| Katman          | Araç                                   | Kapsam                                                                                               | Durum                                                |
+| --------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Servisler, guard'lar, saf fonksiyonlar, board/izin logic'i, DnD hook'ları. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu                              |
+| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden)       | Her endpoint için zorunlu                            |
+| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | Dört senaryo (`e2e/`) — her gece ve her sürüm öncesi |
 
 ```
-        /\        e2e — ertelendi (Playwright)
+        /\        e2e — dört kritik akış (Playwright, gerçek Chromium)
        /  \
       /────\      integration — her endpoint (Supertest + gerçek Postgres)
      /      \
@@ -50,8 +52,8 @@ Testler, bu maliyetin gerçek güven satın aldığı yerlerde yazılır.
 Tam component-tree render testleri MVP'nin parçası değil. Web unit testleri saf logic'i
 (`lib/*.test.ts` — izinler, position matematiği, mention'lar, query parametreleri) ve board
 drag-and-drop hook'unu izole şekilde kapsar; geri kalan her şey için yapılan takas tip
-güvenliği artı API'nin integration coverage'ı, ve board UI'ı oturduğunda onu daha fazla
-component testi değil, uçtan uca Playwright kapsar.
+güvenliği artı API'nin integration coverage'ı; board'un kendi davranışını ise parça parça
+component testleri değil, aşağıdaki dört browser senaryosu uçtan uca kapsar.
 
 ## Neler test edilmeli
 
@@ -100,6 +102,115 @@ tek mekanik zorlaması olur.
 - Süresi dolmuş veya kurcalanmış session → **401**
 - Davet kabulü, tam olarak amaçlanan rolü verir
 
+## Browser uçtan uca
+
+Browser e2e MVP boyunca ertelendi ve gerekçesi geçerliydi: board UI'ı haftalık şekil
+değiştiriyordu, o dönemde yazılmış bir suite üç kez yeniden yazılırdı. Ertelemenin geride
+bıraktığı şey başka hiçbir katmanın kapatamayacağı bir boşluktu — bu ürünü ürün yapan
+akışlar binden fazla unit testi ve her endpoint için bir integration testiyle doğrulanıyordu
+ve **bir kez bile gerçek bir tarayıcıda değil**. İki suite de hiç render olmayan bir board
+ile yeşil kalır.
+
+Suite [`e2e/`](../../e2e) altında yaşar, derlenmiş bir API ve production web build'i
+üzerinde gerçek bir Chromium koşturur, ve tam olarak dört senaryodur.
+
+### Dört senaryo
+
+| Senaryo                                                               | Dosya                                  | Tek başına neyi kapsar                                                                                                                              |
+| --------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Giriş → board aç → kart sürükle → **reload sonrası hâlâ yeni sırada** | `tests/board-drag-persistence.spec.ts` | Tarayıcıdaki pointer hareketinin move isteğini gerçekten üretmesi ve board'un yazdığını geri okuması                                                |
+| Bir tarayıcıdaki taşıma **ikinci tarayıcıda** reload olmadan görünür  | `tests/board-realtime.spec.ts`         | Socket.io handshake auth'u, board-room üyeliği, ve client'ın yalnızca id taşıyan payload'ı uygulaması                                               |
+| Ayarlar'dan davet → **Mailpit'te postayı oku** → linkten kabul et     | `tests/invitation.spec.ts`             | Davet postasının gönderildiği ve çalışan bir link taşıdığı — `acceptUrl` `WEB_URL`'den üretilir, API'nin kendi testleri DTO'ya bakar, gövdeye değil |
+| Bildirime tıkla → **doğru task açılır**                               | `tests/notification.spec.ts`           | Bildirimde `taskId` var ama `boardId` yok; board'u web ikinci bir istekle, tarayıcıda, alıcının session'ıyla çözer                                  |
+
+Bu dördünün dışındaki her şey unit ya da integration testine aittir. Buraya eklenen her test,
+bir UI refactor'ü boyunca yeşil tutulacak bir şey daha demektir; bu suite alt katmanların
+zaten kapsadığını tekrar kontrol etmek için değil, **stack** dağıldığında bunu fark etmek
+için vardır.
+
+### Çalıştırma
+
+Postgres **ve Mailpit** ayakta olmalı (`docker compose -f docker-compose.dev.yml up -d`);
+Mailpit olmadan dört senaryonun üçü adresini doğrulayamaz veya daveti okuyamaz. Redis
+gerekmez — suite'in onsuz koşmasının nedeni için [İzolasyon](#i̇zolasyon) bölümüne bakın.
+
+```bash
+pnpm --filter @kurultay/e2e browsers   # bir kez: Chromium'u indirir
+pnpm test:browser                      # stack'i build eder, sonra dördünü de koşar
+```
+
+`pnpm test:browser` önce `e2e/build-stack.mjs`'i çalıştırır — `shared-types`, `auth-access`,
+API ve standalone web bundle'ını build eder, ardından suite'in veritabanını migrate eder. İki
+sunucuyu Playwright kendi başlatıp durdurur. Build etmeden bir test üzerinde çalışmak için
+doğrudan `pnpm --filter @kurultay/e2e exec playwright test` koşun; yerelde zaten dinleyen bir
+stack'i yeniden kullanır.
+
+**Web build'i `pnpm build` ile birbirinin yerine geçmez.** `NEXT_PUBLIC_API_URL` build
+zamanında gömülür, yani suite'in build'i client bundle'ına 4110 portunu sabitler ve
+`apps/web/.next`'in üzerine yazar. Suite'i yerelde koştuktan sonra
+`pnpm --filter @kurultay/web start` kullanmadan önce yeniden build edin.
+
+### İzolasyon
+
+Suite, halihazırda çalışan neyse onun yanına uygulamanın ikinci bir kopyasını açar ve ona
+asla dokunmaz:
+
+| Şey                | Değer                      | Neden                                                                               |
+| ------------------ | -------------------------- | ----------------------------------------------------------------------------------- |
+| Web / API portları | 3110 / 4110                | 3000/4000 `pnpm dev`'in                                                             |
+| Veritabanı         | `kurultay_test_playwright` | `kurultay_test` değil — Jest integration suite'i onu testler arasında truncate eder |
+| Redis              | yok — `REDIS_URL` boş      | Aşağıya bakın; Redis'siz koşmak desteklenen bir yapılandırmadır                     |
+| Posta              | paylaşılan Mailpit         | Hiçbir şey silinmez; her arama suite'in ürettiği bir adrese göre daraltılır         |
+
+Bunların hiçbiri `.env` üzerinden ayarlanabilir değil ve hiç yeni environment değişkeni
+eklemiyor: Postgres _bağlantısı_ `DATABASE_URL`'den, yalnızca veritabanı adı değiştirilerek
+türetilir. Buradaki yanlış ayarlanmış bir değişken, suite'in sessizce geliştirme veritabanına
+karşı koşması demek olurdu — bu düzenin imkânsız kılmak için var olduğu tek hata da budur.
+Gerekçe `e2e/stack-env.ts` içinde yazılı.
+
+**Neden Redis yok.** Bariz sınır bir logical database indeksi olurdu, ama indeks istemciye
+ulaşmıyor: `parseRedisUrl` yalnızca host, port ve password döndürüp URL'in pathname'ini düşürüyor
+ve `apps/api`'deki her ioredis/BullMQ kurulumu oradan geçiyor — dolayısıyla `redis://…/8`
+database 0'a bağlanıyor (issue [#190](https://github.com/dravcore/kurultay/issues/190)).
+Anahtar öneki de kullanılabilir değil; BullMQ'nun prefix'i ve Socket.io adaptörünün kanal adları
+`apps/api` kaynağında seçiliyor. Database 0'daki iki API instance'ı `due-soon` _kuyruğunu_
+paylaşır, yani bir `pnpm dev` sunucusu ile bu suite sırayla birbirinin zamanlanmış taramalarını
+yanlış veritabanına karşı koşardı. API hiç Redis olmadan çalışmayı destekliyor — readiness onu
+`skipped` olarak raporluyor, gateway adaptörün bağlanmadığını logluyor, due-soon worker'ı
+başlamayı reddediyor — ve tek bir API süreciyle adaptör mesajları yalnızca kendi yayıncısına
+geri dağıtacağından test edilen hiçbir şey kapsam kaybetmiyor. #190 düzeldiğinde indeks gerçek
+bir sınır hâline gelir ve geri konmaya değer.
+
+### Bu testler nasıl yazılır
+
+- **Kurulum HTTP üzerinden, davranış UI üzerinden.** Hesaplar, workspace'ler, board'lar ve
+  kartlar API çağrılarıyla yaratılır; yalnızca test edilen davranış tıklanır. Kurulumu da
+  tıklayarak yapmak her senaryoyu aynı zamanda kayıt ve workspace yaratma testine çevirirdi;
+  o zaman tek bir değişiklik dördünü birden kırar ve hiçbiri doğru bir şey söylemezdi.
+- **`data-testid` yok.** Bu uygulamanın production kodunda bir tane bile yok ve suite de
+  eklemiyor. Kolonlar `<section aria-label>`, kartların tutamağında
+  `aria-label="Reorder <title>"` var — erişilebilir yüzey üzerinden assert etmek, ekran
+  okuyucu kullanıcısını kıran bir değişikliğin bu suite'i de kırması demektir.
+- **Hiçbir yerde sabit bekleme yok.** Sadece `expect.poll` ve web-first assertion'lar. Bir
+  `sleep` ya en meşgul makinede çok kısadır ya da diğer her koşuda boşa harcanan zamandır.
+- **CI dahil, retry yok.** Retry bir flake'i yeşil koşuya çevirir; bir suite'in anlamını
+  yitirmesinin en hızlı yolu budur.
+- **`Task.position`'a asla assert etmeyin.** O, fractional indexing'in ürettiği bir Float'tır
+  ve rebalancing onu her an değiştirebilir. Sözleşme _sıradır_.
+- **Reload'dan önceki bir drop assertion'ı hiçbir şey kanıtlamaz.** Board taşımayı optimistik
+  uygular, yani bir şey kalıcılaşsa da kalıcılaşmasa da ekrandaki sıra değişir. Test,
+  reload'un kendisidir.
+
+### Testin kırmızıya dönebildiğini kanıtlayın
+
+Geçen bir browser testi hakkında yanılmak alışılmadık ölçüde kolaydır: `await` edilmemiş bir
+assertion her zaman yeşildir, ve bir senaryo saklanan durum yerine sessizce optimistik UI'a
+assert ediyor olabilir. Bir senaryo bitmiş sayılmadan önce **koruduğu şeyi bozun ve kırmızıya
+dönmesini izleyin.** Dördü de tam olarak böyle kontrol edildi — position PATCH'i,
+`task:moved` emit'i, davet postasındaki kabul linki ve bildirimin yönlendirme hedefindeki
+task segmenti sırayla kaldırıldı. Dördünün üçü son assertion'a kadar geçmeye devam etti;
+mesele de bu: o son assertion testin kendisidir.
+
 ## Dosya konvansiyonları
 
 | Tür                          | Konum                               | Desen                                                |
@@ -107,7 +218,8 @@ tek mekanik zorlaması olur.
 | Unit                         | Kaynak dosyayla yerinde (colocated) | `apps/api/src/task/task.service.spec.ts`             |
 | Integration                  | Ayrı bir test kökü                  | `apps/api/test/task.e2e-spec.ts`                     |
 | Test helper'ları/factory'ler | Test kökü altında paylaşılır        | `apps/api/test/helpers/`, `apps/api/test/factories/` |
-| Playwright (ileride)         | Repository seviyesinde              | `e2e/`                                               |
+| Browser e2e                  | Repository seviyesinde paket        | `e2e/tests/board-realtime.spec.ts`                   |
+| Browser e2e helper'ları      | Onların yanında                     | `e2e/support/`, `e2e/stack-env.ts`                   |
 
 Nest'in generator'ı integration testlerini `*.e2e-spec.ts` olarak adlandırıyor; bunlar
 browser e2e değil API integration testleri olsa da bu isim tooling uyumluluğu için
@@ -126,10 +238,13 @@ pnpm --filter @kurultay/api test:cov      # api coverage raporu
 
 pnpm --filter @kurultay/web test          # web unit (Vitest)
 pnpm --filter @kurultay/web test:watch    # web unit, watch modu
+
+pnpm test:browser                         # browser e2e (Mailpit de gerekir)
 ```
 
 Integration testler, test setup'ı tarafından oluşturulan ve migrate edilen **ayrı bir
 veritabanına** (`kurultay_test`) karşı çalışır. Geliştirme veritabanına asla dokunmazlar.
+Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#izolasyon).
 
 ## Test yazma
 
@@ -145,7 +260,7 @@ veritabanına** (`kurultay_test`) karşı çalışır. Geliştirme veritabanına
   içine sarın. Sıraya bağımlı test suite'leri bir bug'dır.
 - Yalnızca kontrol etmediğiniz bir process sınırını geçen şeyleri mock'layın (email,
   üçüncü parti HTTP). Integration testlerinde Prisma'yı mock'lamayın — onların amacı tam
-  olarak bu.
+  olarak bu. Browser suite'i hiçbir şeyi mock'lamaz, postayı da: gönderileni Mailpit'ten okur.
 - `setTimeout` tabanlı bekleme yok. Şeyin kendisini await edin.
 - Bir bug fix'i, fix'ten önce başarısız olan bir regresyon testiyle birlikte gelir.
 
@@ -229,10 +344,34 @@ request'lerde çalışır. Bkz.
 
 Workflow dosyası: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
 
+### CI'da browser e2e
+
+Browser suite'i kendi workflow'unda,
+[`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml), farklı bir takvimle ve
+**`ci-ok` kapısının dışında** koşar:
+
+| Tetikleyici                      | Neden                                                                                                |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Her gece 03:00 UTC               | Günün merge'lerini içerecek kadar geç, kırmızı bir koşu sabah sizi beklesin diye yeterince erken     |
+| `main`'e açılan pull request'ler | Onları yalnızca `release/*` ve `hotfix/*` açar, yani tam olarak sürüm adayı ve hotfix başına bir kez |
+| `workflow_dispatch`              | İhtiyaç oldukça                                                                                      |
+
+Zorunlu kontrol olmaması bilinçli. Bu suite Postgres, Redis, Mailpit, derlenmiş bir API ve
+production web build'i başlatır, sonra Chromium'u hepsinin içinden geçirir — projenin en
+değerli sinyali ve aynı zamanda hakkında yanılması en pahalı olanı. Zorunlu kapıya bağlansa,
+tek bir altyapı aksaklığı depodaki her merge'i bloke ederdi. Hızlı ve zorunlu döngü `ci.yml`
+olarak kalır; buradaki bir hata "dur" değil, "sürümden önce buna bak" demektir.
+
+Suite'in tamamı `e2e/playwright.config.ts` içindeki `globalTimeout` ile **beş dakikayla**
+sınırlıdır — temenni değil, zorlanan bir sınır, ve CI'da olduğu kadar yerelde de geçerli;
+böylece bütçeyi ilk aşan koşu yazarın makinesindeki koşu olur. HTML raporu her koşuda,
+trace'ler hata durumunda yüklenir; geceki bir hatayı ertesi sabah yeniden üretmeden teşhis
+edilebilir kılan da budur.
+
 ## Ayrıca bakınız
 
 - [development.md](development.md) — servisleri yerelde çalıştırma
 - [coding-standards.md](coding-standards.md) — testlerin varsaydığı kod konvansiyonları
 - [api-conventions.md](api-conventions.md) — assert edilecek status kodları ve hata şekilleri
 - [git-strategy.md](git-strategy.md) — PR gereksinimleri
-- [roadmap.md](roadmap.md) — MVP durumu ve Beyond MVP (Playwright e2e hâlâ erteli)
+- [roadmap.md](roadmap.md) — MVP durumu ve Beyond MVP
