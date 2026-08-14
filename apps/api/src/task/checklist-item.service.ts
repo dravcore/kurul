@@ -37,18 +37,30 @@ export class ChecklistItemService {
     });
     if (!checklist) throw new NotFoundException('Checklist not found');
 
-    const last = await this.prisma.checklistItem.findMany({
-      where: { checklistId },
-      orderBy: { position: 'desc' },
-      take: 1,
-      select: { id: true, position: true },
-    });
-    await this.prisma.checklistItem.create({
-      data: {
-        checklistId,
-        content: dto.content,
-        position: (last[0]?.position ?? 0) + POSITION_GAP,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      // Serialize appends per checklist: the position is derived from the current last row, so
+      // two concurrent adds that both read the same last row would both write the same
+      // position. Measured, not assumed — twenty concurrent adds produced nine distinct
+      // positions before this lock existed (see `checklist.e2e-spec.ts`).
+      //
+      // The lock is on the parent checklist rather than on the items, because the thing being
+      // protected is the *end of the list*, which no single item owns. Same shape as the
+      // Column lock `TaskService.create` takes before reading its siblings.
+      await tx.$executeRaw`SELECT id FROM "Checklist" WHERE id = ${checklistId} FOR UPDATE`;
+
+      const last = await tx.checklistItem.findMany({
+        where: { checklistId },
+        orderBy: { position: 'desc' },
+        take: 1,
+        select: { id: true, position: true },
+      });
+      await tx.checklistItem.create({
+        data: {
+          checklistId,
+          content: dto.content,
+          position: (last[0]?.position ?? 0) + POSITION_GAP,
+        },
+      });
     });
     return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
   }

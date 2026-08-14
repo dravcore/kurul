@@ -31,16 +31,24 @@ export class ChecklistService {
   ): Promise<TaskDto> {
     const task = await this.taskRead.findTaskBasic(workspaceId, taskId);
 
-    const siblings = await this.prisma.checklist.findMany({
-      where: { taskId: task.id },
-      orderBy: { position: 'desc' },
-      take: 1,
-      select: { id: true, position: true },
-    });
-    const position = (siblings[0]?.position ?? 0) + POSITION_GAP;
+    await this.prisma.$transaction(async (tx) => {
+      // Same race, one level up: the new checklist's position comes from the current last one,
+      // so concurrent adds to the same task must not read that row at the same time. Ten
+      // concurrent adds produced five distinct positions before this lock existed. The lock is
+      // on the task, because the task owns the end of *its* list of checklists.
+      await tx.$executeRaw`SELECT id FROM "Task" WHERE id = ${task.id} FOR UPDATE`;
 
-    await this.prisma.checklist.create({
-      data: { taskId: task.id, title: dto.title, position },
+      const siblings = await tx.checklist.findMany({
+        where: { taskId: task.id },
+        orderBy: { position: 'desc' },
+        take: 1,
+        select: { id: true, position: true },
+      });
+      const position = (siblings[0]?.position ?? 0) + POSITION_GAP;
+
+      await tx.checklist.create({
+        data: { taskId: task.id, title: dto.title, position },
+      });
     });
 
     return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);

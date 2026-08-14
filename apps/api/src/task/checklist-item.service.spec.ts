@@ -12,6 +12,11 @@ const ACTOR_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d54';
 
 function build() {
   const prisma = {
+    // See the same fake in `checklist.service.spec.ts`: the transaction is transparent here so
+    // these tests keep answering "what was written". That the lock inside it serializes
+    // concurrent writers is proved in `test/checklist.e2e-spec.ts`, not here.
+    $transaction: jest.fn(),
+    $executeRaw: jest.fn().mockResolvedValue(0),
     checklist: { findFirst: jest.fn().mockResolvedValue({ id: CHECKLIST_ID }) },
     checklistItem: {
       findFirst: jest.fn().mockResolvedValue({ checklistId: CHECKLIST_ID }),
@@ -22,6 +27,9 @@ function build() {
       update: jest.fn().mockResolvedValue({}),
     },
   } as unknown as PrismaService;
+  (prisma.$transaction as unknown as jest.Mock).mockImplementation(
+    (fn: (tx: PrismaService) => unknown) => fn(prisma),
+  );
   const taskRead = {
     findTaskBasic: jest.fn().mockResolvedValue({ id: TASK_ID }),
   } as unknown as TaskReadService;
@@ -53,6 +61,15 @@ describe('ChecklistItemService', () => {
     expect(prisma.checklistItem.create).toHaveBeenCalledWith({
       data: { checklistId: CHECKLIST_ID, content: 'API sözleşmesi', position: 4000 },
     });
+  });
+
+  it('locks the parent checklist before reading the last position', async () => {
+    const { service, prisma } = build();
+
+    await service.create(WORKSPACE_ID, TASK_ID, ACTOR_ID, CHECKLIST_ID, { content: 'Kilit' });
+
+    const [fragments] = (prisma.$executeRaw as unknown as jest.Mock).mock.calls[0] as [string[]];
+    expect(fragments.join('?')).toContain('FOR UPDATE');
   });
 
   it('carries the tenant scope two relations deep when toggling', async () => {

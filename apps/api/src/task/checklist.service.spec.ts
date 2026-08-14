@@ -12,6 +12,14 @@ const CHECKLIST_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d56';
 
 function build() {
   const prisma = {
+    // Transparent transaction: the interactive callback gets the same fake back, so an
+    // assertion about which row was written reads the same whether the write happened inside
+    // a transaction or not. That is deliberately *not* a test of the transaction — that the
+    // lock inside it does any work is proved by `test/checklist.e2e-spec.ts`, which races
+    // twenty real requests. The two answer different questions: this one guards what is
+    // written, that one guards what happens when writers collide.
+    $transaction: jest.fn(),
+    $executeRaw: jest.fn().mockResolvedValue(0),
     checklist: {
       findMany: jest.fn(),
       create: jest.fn(),
@@ -20,6 +28,9 @@ function build() {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
   } as unknown as PrismaService;
+  (prisma.$transaction as unknown as jest.Mock).mockImplementation(
+    (fn: (tx: PrismaService) => unknown) => fn(prisma),
+  );
   const taskRead = {
     findTaskBasic: jest.fn().mockResolvedValue({ id: TASK_ID, boardId: BOARD_ID }),
   } as unknown as TaskReadService;
@@ -46,6 +57,17 @@ describe('ChecklistService.create', () => {
       data: { taskId: TASK_ID, title: 'Hazırlık', position: 2000 },
     });
     expect(taskEvents.emitUpdated).toHaveBeenCalledWith(WORKSPACE_ID, TASK_ID, ACTOR_ID);
+  });
+
+  it('locks the task row before reading the last position', async () => {
+    const { service, prisma } = build();
+    (prisma.checklist.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.checklist.create as jest.Mock).mockResolvedValue({ id: 'new' });
+
+    await service.create(WORKSPACE_ID, TASK_ID, ACTOR_ID, { title: 'Kilit' });
+
+    const [fragments] = (prisma.$executeRaw as unknown as jest.Mock).mock.calls[0] as [string[]];
+    expect(fragments.join('?')).toContain('FOR UPDATE');
   });
 
   it('starts the list at the first gap when the task has no checklist yet', async () => {
