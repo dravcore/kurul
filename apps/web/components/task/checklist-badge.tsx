@@ -38,9 +38,10 @@ export function ChecklistBadge({
       {/*
         `SquareCheckBig` rather than a fuller checklist glyph on purpose. Lucide's `ListChecks`
         draws five SVG children; this one draws a single path. Measured on the seeded 1 000-task
-        board with a checklist on every card, that difference is the badge costing 8.4 DOM nodes
-        per mounted card instead of 4.4 — 1 679 extra nodes against 878, on the surface P2-8
-        brought down from 18 421 to 3 854. The glyph still says "checklist" and not "count".
+        board with a checklist on every card, that difference is the badge costing 5.4 DOM nodes
+        per mounted card instead of 8.4 — a board of 4 920 nodes instead of 5 520, against the
+        3 841 it renders with no checklist anywhere. The glyph still says "checklist" and not
+        "count", which is why it is not simply dropped.
       */}
       <SquareCheckBig className="size-3 shrink-0" aria-hidden />
       <span>
