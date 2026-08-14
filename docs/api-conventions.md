@@ -11,6 +11,7 @@ REST conventions for the Kurultay API: URLs, verbs, payloads, errors, pagination
 - [HTTP verbs and status codes](#http-verbs-and-status-codes)
 - [Request and response bodies](#request-and-response-bodies)
 - [Errors](#errors)
+- [Cross-origin requests](#cross-origin-requests)
 - [Rate limiting](#rate-limiting)
 - [Pagination](#pagination)
 - [Filtering, sorting, field selection](#filtering-sorting-field-selection)
@@ -363,6 +364,49 @@ logged: the query carries user-supplied filters and search terms, and the header
 session cookies and invitation tokens. `ip` is Express's own `req.ip`, not a raw header —
 unconfigured, this is always the TCP peer, so behind an unconfigured reverse proxy it is the
 proxy's address for every request. See `TRUST_PROXY` below.
+
+## Cross-origin requests
+
+Authentication is a **cookie**, so every request a browser makes to this API carries the
+caller's session automatically — including one initiated by a page the caller did not intend
+to act on. Three rules decide what the API does about that.
+
+**Reads are governed by CORS.** `WEB_URL` is the single allowed origin, with
+`credentials: true`. A `GET` from anywhere else still reaches a handler, but the browser
+refuses to hand the response to the calling script.
+
+**Writes must also announce an allowed origin.** `POST`, `PUT`, `PATCH` and `DELETE` are
+checked server-side against an allowlist — the same one value, `WEB_URL`, so the browser-side
+and server-side lists cannot drift. A request that announces a different origin, in `Origin`
+or (when that is absent) in `Referer`, is refused with `403` and the standard error envelope
+before it reaches a handler. `Origin: null` — what a sandboxed document or a laundering
+redirect sends — is not on the list either. The check covers `/auth/*` as well as the Nest
+routes, and Better Auth's own `originCheck` still runs underneath it.
+
+**A request that announces no origin at all is allowed.** That is a deliberate boundary, not
+an oversight: browsers are required to send `Origin` on every request whose method is not
+`GET`/`HEAD`, `fetch`, XHR and form submissions alike, so there is no cross-site request
+shape that carries a victim's cookie _and_ omits the header. Everything left in the
+header-less case — `curl`, a CI script, a native client, the web app's own server-side
+session lookup in `apps/web/middleware.ts` — cannot be induced by a hostile page to replay
+someone else's ambient credentials, which is the entire mechanism the rule defends against.
+Rejecting it would break every non-browser caller and close nothing.
+
+The reason the second rule exists at all is that the first is not a fallback for it. A
+cross-site `<form method="POST" enctype="application/x-www-form-urlencoded">` is a _simple
+request_: the browser sends it with no preflight, so CORS never gets to decide anything, and
+the body is parsed and acted on before the response the attacker never needed to read is
+discarded. In a deployment where the session cookie is `SameSite=Lax` — which is what
+[self-hosting](self-hosting.md)'s single-origin reverse proxy produces, and what Better Auth
+emits by default — that request never carries the cookie and the point is moot. The origin
+allowlist is what keeps the answer the same in a deployment that publishes the API on its own
+domain, where the cookie has to be `SameSite=None` and `Lax` protects nothing.
+
+Operator-facing consequence: **`WEB_URL` must be the exact origin the browser loads the app
+from.** A wrong value now costs writes as well as reads. Any spelling of the right origin
+works — trailing slash, a path, an explicit `:443` — because the value is reduced to the
+origin serialisation a browser sends. A value that is not a URL fails the process at start
+rather than producing an allowlist nothing matches.
 
 ## Rate limiting
 
