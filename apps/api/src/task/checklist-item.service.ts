@@ -7,6 +7,7 @@ import type { MoveChecklistItemDto } from './dto/move-checklist-item.dto';
 import type { UpdateChecklistItemDto } from './dto/update-checklist-item.dto';
 import { TaskEventsService } from './task-events.service';
 import { TaskReadService } from './task-read.service';
+import { toTaskDetailDto } from './task.mapper';
 
 /**
  * Items inside a task's checklists.
@@ -73,10 +74,33 @@ export class ChecklistItemService {
     dto: UpdateChecklistItemDto,
   ): Promise<TaskDto> {
     await this.taskRead.findTaskBasic(workspaceId, taskId);
-    const result = await this.prisma.checklistItem.updateMany({
-      where: { id: itemId, checklist: { taskId, task: { board: { workspaceId } } } },
-      data: dto,
-    });
+    const where = { id: itemId, checklist: { taskId, task: { board: { workspaceId } } } };
+
+    // The two fields named one at a time rather than handing the request object to Prisma.
+    // Spreading the DTO is safe only for as long as the global pipe keeps `whitelist` +
+    // `forbidNonWhitelisted` on — a setting in another file, which nothing here would notice
+    // being relaxed. Naming them costs two lines and makes this line true on its own.
+    const data: { content?: string; isDone?: boolean } = {};
+    if (dto.content !== undefined) data.content = dto.content;
+    if (dto.isDone !== undefined) data.isDone = dto.isDone;
+
+    // A PATCH with an empty body is not an edit. Writing nothing and then broadcasting anyway
+    // fans a `task:updated` out to every member watching the board, each of whom re-reads the
+    // task over REST to discover nothing changed — invisible in a test, noise under load. The
+    // row is still looked up under the full tenant path, so an unknown or foreign item is
+    // still a 404 rather than a silent 200.
+    //
+    // Narrower than `TaskService.update`'s suppression, deliberately: that one compares values
+    // and skips a PATCH that re-sends what is already stored. This one only recognises an
+    // absent payload. Whether re-sending `isDone: true` on an item that is already done should
+    // also be silent is a separate question, and not one an empty body answers.
+    if (Object.keys(data).length === 0) {
+      const existing = await this.prisma.checklistItem.findFirst({ where, select: { id: true } });
+      if (!existing) throw new NotFoundException('Checklist item not found');
+      return toTaskDetailDto(await this.taskRead.findTask(workspaceId, taskId));
+    }
+
+    const result = await this.prisma.checklistItem.updateMany({ where, data });
     if (result.count === 0) throw new NotFoundException('Checklist item not found');
     return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
   }

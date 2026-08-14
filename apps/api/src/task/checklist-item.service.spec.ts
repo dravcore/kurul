@@ -32,6 +32,25 @@ function build() {
   );
   const taskRead = {
     findTaskBasic: jest.fn().mockResolvedValue({ id: TASK_ID }),
+    // Only the empty-payload path reaches this: it returns the task unchanged rather than
+    // broadcasting, so it needs a row the detail mapper can map.
+    findTask: jest.fn().mockResolvedValue({
+      id: TASK_ID,
+      boardId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f',
+      columnId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4e',
+      title: 'Task',
+      description: null,
+      priority: 'MEDIUM',
+      position: 1000,
+      dueDate: null,
+      estimatedMinutes: null,
+      createdById: ACTOR_ID,
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-01'),
+      assignees: [],
+      labels: [],
+      checklists: [],
+    }),
   } as unknown as TaskReadService;
   const taskEvents = {
     emitUpdated: jest.fn().mockResolvedValue({ id: TASK_ID }),
@@ -85,6 +104,41 @@ describe('ChecklistItemService', () => {
       data: { isDone: true },
     });
     expect(taskEvents.emitUpdated).toHaveBeenCalledWith(WORKSPACE_ID, TASK_ID, ACTOR_ID);
+  });
+
+  it('names the fields it writes instead of forwarding the request object', async () => {
+    const { service, prisma } = build();
+
+    await service.update(WORKSPACE_ID, TASK_ID, ACTOR_ID, ITEM_ID, {
+      // A field no DTO declares. The global pipe strips it before a controller ever sees it;
+      // this asserts the service would not write it even if the pipe stopped doing that.
+      ...({ createdAt: new Date(0) } as object),
+      content: 'yeni içerik',
+    });
+
+    expect(prisma.checklistItem.updateMany).toHaveBeenCalledWith({
+      where: expect.anything(),
+      data: { content: 'yeni içerik' },
+    });
+  });
+
+  it('writes nothing and broadcasts nothing for an empty payload', async () => {
+    const { service, prisma, taskEvents } = build();
+
+    await service.update(WORKSPACE_ID, TASK_ID, ACTOR_ID, ITEM_ID, {});
+
+    expect(prisma.checklistItem.updateMany).not.toHaveBeenCalled();
+    expect(taskEvents.emitUpdated).not.toHaveBeenCalled();
+  });
+
+  it('still answers not found for an empty payload against a foreign item', async () => {
+    const { service, prisma, taskEvents } = build();
+    (prisma.checklistItem.findFirst as jest.Mock).mockResolvedValue(null);
+
+    await expect(service.update(WORKSPACE_ID, TASK_ID, ACTOR_ID, ITEM_ID, {})).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(taskEvents.emitUpdated).not.toHaveBeenCalled();
   });
 
   it('raises not found when the toggle matches no row in this tenant', async () => {

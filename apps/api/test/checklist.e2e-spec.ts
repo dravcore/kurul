@@ -198,6 +198,33 @@ describe('Checklists (e2e)', () => {
     emit.mockRestore();
   });
 
+  it('does not broadcast for a PATCH that carries no fields', async () => {
+    const owner = await signUp(app, { name: 'Owner' });
+    const workspace = await createWorkspace(owner.agent, 'NoOp', 'noop');
+    const { taskId } = await boardWithTask(owner.agent, workspace.id);
+    const checklistId = await createChecklist(owner.agent, workspace.id, taskId, 'Sessiz');
+    const withItem = await owner.agent
+      .post(`/workspaces/${workspace.id}/tasks/${taskId}/checklists/${checklistId}/items`)
+      .send({ content: 'madde' })
+      .expect(201);
+    const itemId = (withItem.body.checklists as Array<{ items: Array<{ id: string }> }>)[0]!
+      .items[0]!.id;
+
+    const emit = jest.spyOn(realtime, 'emitToBoard');
+    emit.mockClear();
+
+    const response = await owner.agent
+      .patch(`/workspaces/${workspace.id}/tasks/${taskId}/checklist-items/${itemId}`)
+      .send({})
+      .expect(200);
+
+    // Still the task, so the client has nothing to re-fetch — but nobody else was woken up.
+    expect(emit).not.toHaveBeenCalled();
+    expect(response.body.id).toBe(taskId);
+    expect(response.body.checklistSummary).toEqual({ total: 1, done: 0 });
+    emit.mockRestore();
+  });
+
   it('reports 0/0 for a task with no checklist instead of dividing by zero', async () => {
     const owner = await signUp(app, { name: 'Owner' });
     const workspace = await createWorkspace(owner.agent, 'Empty', 'empty');
