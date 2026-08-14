@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { NotificationType } from '@kurultay/shared-types';
 import { Queue, Worker, type Job } from 'bullmq';
 import { envString } from '../common/env';
+import { captureServerError } from '../common/observability/sentry';
 import { parseRedisUrl } from '../common/redis-url';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationService } from './notification.service';
@@ -13,6 +14,21 @@ const REPEAT_EVERY_MS = 15 * 60 * 1000;
 export const DUE_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Page size for the due-task scan — bounds memory/row-count per query instead of loading the whole window at once. */
 export const SCAN_BATCH_SIZE = 500;
+/**
+ * Attempts BullMQ makes at one scheduled run before giving up on it (the first try plus
+ * two retries). Without this the queue default is a single attempt, so a scan that lands on
+ * a momentary Postgres or Redis blip does not get a second try of its own — it just waits out
+ * the next scheduled tick 15 minutes later. Three attempts absorbs a blip inside the same run;
+ * see {@link JOB_BACKOFF_DELAY_MS} for the spacing between them.
+ */
+const JOB_ATTEMPTS = 3;
+/**
+ * Base delay for the exponential backoff between retries (`BullMQ` doubles this per attempt:
+ * 30s, then 60s). Long enough that a retry is not fired back at infrastructure that is still
+ * mid-restart, short enough that all three attempts are spent well inside the 24h due-window
+ * and the audit's ≤5m recovery target — worst case here is under two minutes, not 15.
+ */
+const JOB_BACKOFF_DELAY_MS = 30_000;
 
 type ScanTaskRow = {
   id: string;
@@ -52,9 +68,32 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
     this.worker = new Worker(QUEUE_NAME, (job) => this.process(job), { connection });
 
     this.worker.on('failed', (job, error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const attemptsMade = job?.attemptsMade ?? 0;
+      // `job.opts.attempts` is what the *scheduler* asked for, not a guess — reading it back
+      // off the job (rather than closing over `JOB_ATTEMPTS`) is what keeps this check honest
+      // if BullMQ is ever asked to retry a job scheduled elsewhere with a different policy.
+      const attemptsAllowed = job?.opts.attempts ?? 1;
+
+      if (attemptsMade < attemptsAllowed) {
+        // BullMQ has already scheduled the next attempt per the exponential backoff above —
+        // this is expected noise from a transient blip, not something an operator needs
+        // paged for, so it stays at `warn` instead of `error`.
+        this.logger.warn(
+          `due-soon job ${job?.id ?? '?'} failed (attempt ${attemptsMade}/${attemptsAllowed}), retrying: ${message}`,
+        );
+        return;
+      }
+
+      // Every attempt BullMQ was configured to make is spent: this is no longer a blip that
+      // resolves itself, it is a scan that has silently stopped running until a human
+      // intervenes. `removeOnFail: 50` keeps the job in Redis to inspect, but that is only
+      // ever consulted after the fact by someone who thought to look — `captureServerError`
+      // is what turns this into something surfaced instead of merely retained (audit BE-06).
       this.logger.error(
-        `due-soon job ${job?.id ?? '?'} failed: ${error instanceof Error ? error.message : String(error)}`,
+        `due-soon job ${job?.id ?? '?'} exhausted all ${attemptsAllowed} attempt(s), giving up: ${message}`,
       );
+      captureServerError(error, { path: 'due-soon-worker' });
     });
 
     // `add` with `repeat` is the deprecated repeatable-job API: it leaves a repeat *key* behind
@@ -66,7 +105,12 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
       { every: REPEAT_EVERY_MS },
       {
         name: JOB_NAME,
-        opts: { removeOnComplete: 100, removeOnFail: 50 },
+        opts: {
+          removeOnComplete: 100,
+          removeOnFail: 50,
+          attempts: JOB_ATTEMPTS,
+          backoff: { type: 'exponential', delay: JOB_BACKOFF_DELAY_MS },
+        },
       },
     );
 
