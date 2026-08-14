@@ -3,7 +3,7 @@ import { Queue, Worker, type Job } from 'bullmq';
 import { envBool, envInt, envString } from '../common/env';
 import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
 import { captureServerError } from '../common/observability/sentry';
-import { parseRedisUrl } from '../common/redis-url';
+import { parseRedisUrl, type RedisConnectionOptions } from '../common/redis-url';
 import { PrismaService } from '../prisma/prisma.service';
 
 const QUEUE_NAME = 'cleanup';
@@ -184,7 +184,7 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    let connection: { host: string; port: number; password?: string };
+    let connection: RedisConnectionOptions;
     try {
       connection = parseRedisUrl(redisUrl);
     } catch {

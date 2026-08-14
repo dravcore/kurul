@@ -3,7 +3,7 @@ import { NotificationType } from '@kurultay/shared-types';
 import { Queue, Worker, type Job } from 'bullmq';
 import { envString } from '../common/env';
 import { captureServerError } from '../common/observability/sentry';
-import { parseRedisUrl } from '../common/redis-url';
+import { parseRedisUrl, type RedisConnectionOptions } from '../common/redis-url';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationService } from './notification.service';
 
@@ -56,7 +56,7 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    let connection: { host: string; port: number; password?: string };
+    let connection: RedisConnectionOptions;
     try {
       connection = parseRedisUrl(redisUrl);
     } catch {

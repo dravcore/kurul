@@ -92,7 +92,7 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | Değişken                              | Örnek                                                               | Amaç                                                                                                                                                                                                                                               |
 | ------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma bağlantı string'i — şifre kısmı aşağıdaki `POSTGRES_PASSWORD` ile eşleşmelidir                                                                                                                                                              |
-| `REDIS_URL`                           | `redis://localhost:6379`                                            | Socket.io Redis adapter'ı, caching, BullMQ zamanlanmış işler (`due-soon` ve `cleanup` kuyrukları)                                                                                                                                                  |
+| `REDIS_URL`                           | `redis://localhost:6379`                                            | Socket.io Redis adapter'ı, caching, BullMQ zamanlanmış işler (`due-soon` ve `cleanup` kuyrukları). Veritabanı indeksi dikkate alınır — bkz. [Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri)                          |
 | `BETTER_AUTH_SECRET`                  | _(üret)_                                                            | Session imzalama secret'ı — zorunlu, varsayılan yok                                                                                                                                                                                                |
 | `BETTER_AUTH_URL`                     | `http://localhost:4000`                                             | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir). Yalnızca geliştirme döngüsü — `docker-compose.yml` bunu `SITE_URL`'den türetir                                                                                                  |
 | `API_PORT`                            | `4000`                                                              | NestJS dinleme portu                                                                                                                                                                                                                               |
@@ -210,6 +210,23 @@ bildirim kuyruğunu tutar; hepsi yeniden inşa edilebilir, hiçbiri board verisi
 görece az bir kazanç için her mevcut `docker-compose.yml`'i yükseltmede bozardı. Boş
 bırakmak önceki şifresiz davranışı korur; ayarlamak, aynı Docker ağına düşen başka bir
 konteynere karşı savunma derinliği ekler.
+
+**Bir `REDIS_URL` veritabanı indeksi taşıyabilir ve bu indeks dikkate alınır.**
+`redis://localhost:6379/3`, bu instance'ın anahtarlarını — auth rate-limit sayaçları ve her iki
+BullMQ kuyruğu — 3 numaralı indekse koyar; birkaç uygulamanın tek bir Redis'i birbirinin
+keyspace'ine basmadan paylaşma yolu budur.
+[#190](https://github.com/dravcore/kurultay/issues/190) öncesinde indeks ayrıştırılıp atılıyordu:
+böyle bir URL kabul ediliyor ama yine de 0 numaralı veritabanı kullanılıyordu; o düzeltmeden
+önce bir indeks belirlediyseniz ve 0 numaralı veritabanındaki bir şey başka bir uygulamaya
+aitmiş gibi görünüyorsa, muhtemelen öyleydi. Bilinmesi gereken iki sınır var. **Pub/sub
+veritabanına göre ayrılmaz:** Redis, yayımlanan bir mesajı, her bağlantının hangi indeksi
+seçtiğinden bağımsız olarak o kanalın tüm abonelerine iletir; dolayısıyla farklı indekslerdeki
+iki Kurultay instance'ı Socket.io fan-out kanalını yine paylaşır — indeks keyspace'leri ayırır,
+kanalları değil. Bir de: indeks negatif olmayan düz bir tam sayı değilse
+(`redis://host:6379/staging`) ya da path ile `?db=` birbiriyle çelişiyorsa
+(`redis://host:6379/3?db=4`), sessizce 0 diye okunmak yerine bağlantı anında reddedilir — bu
+ayarın tüm amacı iki uygulamayı ayrı tutmak olduğuna göre, içindeki bir yazım hatası onları bir
+araya getirmemelidir.
 
 **`POSTGRES_PASSWORD`'ü mevcut bir `postgres_data` volume'unda değiştirmek, çalışan
 veritabanının şifresini döndürmez.** Resmi Postgres image'ı `POSTGRES_PASSWORD`'ü yalnızca
