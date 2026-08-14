@@ -4,7 +4,7 @@ Where Kurultay is, and what is explicitly out of scope for now.
 
 > 🌐 English (canonical) | [Türkçe](tr/roadmap.md)
 
-**Last updated:** 2026-08-13
+**Last updated:** 2026-08-15
 
 ## Status
 
@@ -48,7 +48,7 @@ Not scheduled. Listed so the architecture stays compatible with them, not as com
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `[-]` Broader E2E suite (Playwright)                   | The four-scenario smoke pack **shipped** — drag persistence, realtime, invitation by mail, notification navigation ([testing.md](testing.md#browser-end-to-end)). Widening it beyond those four is not scheduled            |
 | `[-]` Gantt / timeline view                            | `dueDate` + `estimatedMinutes` are kept separate for this                                                                                                                                                                   |
-| `[-]` Task attachments                                 | Needs an object-storage decision (ADR)                                                                                                                                                                                      |
+| `[-]` Task attachments                                 | Storage decided — local disk, served from the API origin ([ADR 0022](decisions/0022-attachment-storage.md)); implementation is planned but not yet shipped                                                                  |
 | `[-]` Board templates                                  |                                                                                                                                                                                                                             |
 | `[-]` Public API tokens + `/v1` prefix                 | Post-1.0 — [api-conventions.md](api-conventions.md#versioning)                                                                                                                                                              |
 | `[-]` Webhooks                                         |                                                                                                                                                                                                                             |

@@ -97,6 +97,15 @@ GET    /workspaces/:workspaceId/tasks/:taskId/comments
 POST   /workspaces/:workspaceId/tasks/:taskId/comments
 DELETE /workspaces/:workspaceId/comments/:commentId
 
+POST   /workspaces/:workspaceId/tasks/:taskId/checklists
+PATCH  /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId
+PATCH  /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId/position
+DELETE /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId
+POST   /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId/items
+PATCH  /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId
+PATCH  /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId/position
+DELETE /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId  # no GET: checklists come back inside GET tasks/:taskId
+
 GET    /workspaces/:workspaceId/activities                 # workspace activity feed
 GET    /workspaces/:workspaceId/tasks/:taskId/activities    # task activity feed
 

@@ -4,7 +4,7 @@ Kurultay’ın durumu ve şimdilik bilinçli olarak kapsam dışı bırakılanla
 
 > 🌐 [English (canonical)](../roadmap.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
-**Son güncelleme:** 2026-08-13
+**Son güncelleme:** 2026-08-15
 
 ## Durum
 
@@ -47,7 +47,7 @@ Planlanmadı. Mimariyi bunlara açık tutmak için listelenir; taahhüt değildi
 | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `[-]` Geniş E2E suite (Playwright)           | Dört senaryoluk smoke paketi **geldi** — sürükleme kalıcılığı, realtime, e-postayla davet, bildirim yönlendirmesi ([testing.md](testing.md#browser-uçtan-uca)). Bu dördünün ötesine genişletmek planlanmadı |
 | `[-]` Gantt / timeline view                  | `dueDate` + `estimatedMinutes` bunun için ayrı tutuluyor                                                                                                                                                    |
-| `[-]` Task attachments                       | Object-storage ADR gerekir                                                                                                                                                                                  |
+| `[-]` Task attachments                       | Depolama kararı verildi — yerel disk, API origin'inden servis edilir ([ADR 0022](decisions/0022-attachment-storage.md)); uygulama planlandı ama henüz sevk edilmedi                                         |
 | `[-]` Board templates                        |                                                                                                                                                                                                             |
 | `[-]` Public API tokens + `/v1` prefix       | 1.0 sonrası — [api-conventions.md](api-conventions.md#versiyonlama)                                                                                                                                         |
 | `[-]` Webhooks                               |                                                                                                                                                                                                             |
