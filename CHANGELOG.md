@@ -480,6 +480,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- **State-changing requests are now checked against an origin allowlist, server-side.** Until
+  now every CSRF defence the API had lived in the browser: a `SameSite=Lax` session cookie and
+  a single-origin CORS allowlist. Server-side there was nothing, and that was measurable — a
+  `POST /workspaces` carrying a valid session cookie and `Origin: https://evil.example` was
+  answered `201` with a created workspace, and so was the same request form-encoded, which is
+  the case that matters most: `application/x-www-form-urlencoded` makes a cross-site POST a
+  *simple request*, so no preflight is sent and CORS never gets to decide anything at all. For
+  the single most CSRF-prone request shape there were zero layers, not one. `POST`, `PUT`,
+  `PATCH` and `DELETE` are now refused with `403` when they announce an origin — in `Origin`,
+  or in `Referer` when `Origin` is absent — outside the allowlist, which is derived from the
+  same `WEB_URL` that configures CORS so the two can never drift apart. `Origin: null`, what a
+  sandboxed document sends, is not on the list. A request announcing no origin at all still
+  passes: browsers must send `Origin` on every non-`GET`/`HEAD` request, so no cross-site shape
+  both carries a victim's cookie and omits it, and refusing the header-less case would break
+  `curl`, CI, native clients and the web app's own server-side session lookup while closing
+  nothing. Implemented as Express middleware rather than a Nest guard because `/auth/*` bypasses
+  the Nest router (ADR 0004) and needed the check just as much — Better Auth's `originCheck`
+  guards redirect targets, not credential endpoints, and cross-site `POST /auth/sign-in/email`
+  and `POST /auth/sign-out` were both measured answering `200`. Better Auth's own check is left
+  intact underneath. Reads are untouched and still governed by CORS. Serving the app and the API
+  from one origin (`docker/Caddyfile`) keeps the cookie `SameSite=Lax` and remains the
+  recommended deployment; this is the layer that survives the deployments that leave that path,
+  where the cookie has to be `SameSite=None` and `SameSite` protects nothing. Operator
+  consequence: `WEB_URL` must be the exact origin the browser loads the app from — any spelling
+  of it (trailing slash, path, explicit `:443`) works, a non-URL now fails the process at start.
+  See [api-conventions.md](docs/api-conventions.md#cross-origin-requests). Closes audit finding
+  SEC-04.
 - Rate limiting across the whole API surface. A global `ThrottlerGuard` gives every route
   100 requests per minute per client IP, with tighter budgets where a request is expensive
   or reaches outside the process: 10/min on invitation creation (each one hands a message to

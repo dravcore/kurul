@@ -12,6 +12,7 @@ pagination ve DTO'lar.
 - [HTTP verb'leri ve status kodları](#http-verbleri-ve-status-kodları)
 - [Request ve response body'leri](#request-ve-response-bodyleri)
 - [Hatalar](#hatalar)
+- [Cross-origin istekler](#cross-origin-istekler)
 - [Rate limiting](#rate-limiting)
 - [Pagination](#pagination)
 - [Filtreleme, sıralama, alan seçimi](#filtreleme-sıralama-alan-seçimi)
@@ -371,6 +372,52 @@ asla loglanmaz: query kullanıcının verdiği filtreleri ve arama terimlerini, 
 session cookie'lerini ve davet token'larını taşır. `ip`, ham bir header değil Express'in kendi
 `req.ip`'sidir — yapılandırılmamışsa bu her zaman TCP peer'ıdır, yani yapılandırılmamış bir
 reverse proxy arkasında her istek için proxy'nin adresidir. Aşağıda `TRUST_PROXY`'ye bakın.
+
+## Cross-origin istekler
+
+Kimlik doğrulama bir **cookie**'dir, dolayısıyla tarayıcının bu API'ye yaptığı her istek
+çağıranın session'ını otomatik olarak taşır — çağıranın üzerinde işlem yapmayı hiç
+istemediği bir sayfanın başlattığı istek dahil. Bu konuda API'nin ne yaptığına üç kural
+karar verir.
+
+**Okumaları CORS yönetir.** `WEB_URL` tek izinli origin'dir ve `credentials: true` ile
+gelir. Başka bir yerden gelen `GET` yine bir handler'a ulaşır, ancak tarayıcı yanıtı çağıran
+script'e vermeyi reddeder.
+
+**Yazmalar ayrıca izinli bir origin bildirmek zorundadır.** `POST`, `PUT`, `PATCH` ve
+`DELETE` sunucu tarafında bir allowlist'e karşı denetlenir — aynı tek değer, `WEB_URL`, öyle
+ki tarayıcı tarafındaki ve sunucu tarafındaki listeler birbirinden ayrışamaz. Farklı bir
+origin bildiren istek — `Origin`'de ya da o yoksa `Referer`'da — bir handler'a ulaşmadan
+`403` ve standart hata zarfıyla reddedilir. Sandbox'lanmış bir dokümanın ya da origin'i
+silen bir yönlendirmenin gönderdiği `Origin: null` de listede değildir. Denetim Nest
+route'larının yanı sıra `/auth/*`'ı da kapsar ve Better Auth'un kendi `originCheck`'i altında
+çalışmaya devam eder.
+
+**Hiçbir origin bildirmeyen istek geçer.** Bu bir gözden kaçırma değil, bilinçli bir
+sınırdır: tarayıcılar metodu `GET`/`HEAD` olmayan her istekte `Origin` göndermek
+zorundadır — `fetch`, XHR ve form gönderimleri dahil — yani kurbanın cookie'sini taşıyıp
+_aynı zamanda_ header'ı atlayan bir cross-site istek şekli yoktur. Header'sız durumda geriye
+kalan her şey — `curl`, bir CI script'i, native bir istemci, web uygulamasının
+`apps/web/middleware.ts` içindeki kendi sunucu tarafı session sorgusu — düşmanca bir sayfa
+tarafından başkasının ambient kimlik bilgilerini tekrar oynatmaya ikna edilemez; kuralın
+savunduğu mekanizma tam olarak budur. Bu durumu reddetmek her tarayıcı-dışı çağıranı kırar
+ve hiçbir şeyi kapatmaz.
+
+İkinci kuralın var olma sebebi, birincisinin onun yerine geçemiyor olmasıdır. Cross-site bir
+`<form method="POST" enctype="application/x-www-form-urlencoded">` bir _simple request_'tir:
+tarayıcı preflight göndermeden yollar, yani CORS hiçbir şeye karar verme fırsatı bulamaz ve
+saldırganın zaten okumaya ihtiyaç duymadığı yanıt atılmadan önce body ayrıştırılıp işlenir.
+Session cookie'sinin `SameSite=Lax` olduğu bir dağıtımda — [self-hosting](self-hosting.md)
+rehberindeki tek origin'li reverse proxy'nin ürettiği ve Better Auth'un varsayılan olarak
+gönderdiği durum — o istek cookie'yi hiç taşımaz ve mesele ortadan kalkar. Origin allowlist,
+API'yi kendi domain'inde yayınlayan bir dağıtımda — cookie'nin `SameSite=None` olmak zorunda
+kaldığı ve `Lax`'ın hiçbir şey korumadığı yerde — cevabın aynı kalmasını sağlayan şeydir.
+
+Operatör açısından sonucu: **`WEB_URL`, tarayıcının uygulamayı yüklediği origin'in tam
+kendisi olmalıdır.** Yanlış bir değer artık okumaların yanı sıra yazmalara da mal olur. Doğru
+origin'in her yazımı çalışır — sondaki slash, bir path, açıkça yazılmış `:443` — çünkü değer
+tarayıcının gönderdiği origin serileştirmesine indirgenir. URL olmayan bir değer, hiçbir
+şeyin eşleşmediği bir allowlist üretmek yerine süreci başlangıçta düşürür.
 
 ## Rate limiting
 
