@@ -22,11 +22,16 @@ import type { TaskQueryDto } from './dto/task-query.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
 import { createTaskAttributes, planTaskUpdate } from './task-fields';
 import { TaskAssigneeService } from './task-assignee.service';
-import { taskInclude, type TaskWithRelations } from './task.include';
+import {
+  taskDetailInclude,
+  taskListInclude,
+  type TaskDetailRow,
+  type TaskListRow,
+} from './task.include';
 import { TaskLabelService } from './task-label.service';
 import { buildListWhere } from './task-query-where';
 import { TaskReadService } from './task-read.service';
-import { emptyTaskRelations, toTaskDto } from './task.mapper';
+import { emptyTaskRelations, toTaskDetailDto, toTaskListDto } from './task.mapper';
 
 @Injectable()
 export class TaskService {
@@ -49,15 +54,17 @@ export class TaskService {
     const where = buildListWhere(boardId, query);
     const limit = query.limit ?? 50;
 
-    const rows = await this.prisma.task.findMany({
+    const rows: TaskListRow[] = await this.prisma.task.findMany({
       where,
-      include: taskInclude,
+      // The list include, not the detail one: a board page reads up to `limit` tasks at once,
+      // and the card only needs `done/total` from their checklists.
+      include: taskListInclude,
       // Cursor walks by immutable id (api-conventions); display sort is the client's job.
       orderBy: { id: 'asc' },
       take: limit + 1,
     });
 
-    return toCursorPage(rows, limit, (task) => toTaskDto(task));
+    return toCursorPage(rows, limit, (task) => toTaskListDto(task));
   }
 
   async create(
@@ -110,15 +117,16 @@ export class TaskService {
         position = midpoint(prevPos, nextPos);
       }
 
-      const created: Omit<TaskWithRelations, 'assignees' | 'labels'> = await tx.task.create({
-        data: {
-          boardId,
-          columnId: column.id,
-          ...attributes,
-          position,
-          createdById: userId,
-        },
-      });
+      const created: Omit<TaskDetailRow, 'assignees' | 'labels' | 'checklists'> =
+        await tx.task.create({
+          data: {
+            boardId,
+            columnId: column.id,
+            ...attributes,
+            position,
+            createdById: userId,
+          },
+        });
 
       await this.activityService.record(tx, {
         workspaceId,
@@ -132,7 +140,7 @@ export class TaskService {
         },
       });
 
-      return toTaskDto(emptyTaskRelations(created));
+      return toTaskDetailDto(emptyTaskRelations(created));
     });
 
     this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_CREATED, {
@@ -145,7 +153,7 @@ export class TaskService {
   }
 
   async get(workspaceId: string, taskId: string): Promise<TaskDto> {
-    return toTaskDto(await this.taskRead.findTask(workspaceId, taskId));
+    return toTaskDetailDto(await this.taskRead.findTask(workspaceId, taskId));
   }
 
   async update(
@@ -164,7 +172,7 @@ export class TaskService {
     // was the one thing still leaking. The row was read under the workspace predicate, so
     // returning it needs no further check.
     if (Object.keys(changes).length === 0) {
-      return toTaskDto(existing);
+      return toTaskDetailDto(existing);
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -181,7 +189,7 @@ export class TaskService {
       const updated = await tx.task.update({
         where: { id: taskId, board: { workspaceId } },
         data,
-        include: taskInclude,
+        include: taskDetailInclude,
       });
 
       await this.activityService.record(tx, {
@@ -195,7 +203,7 @@ export class TaskService {
         },
       });
 
-      return toTaskDto(updated);
+      return toTaskDetailDto(updated);
     });
 
     this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_UPDATED, {
@@ -259,7 +267,7 @@ export class TaskService {
     const result = await this.prisma.$transaction(async (tx) => {
       const task = await tx.task.findFirst({
         where: { id: taskId, board: { workspaceId } },
-        include: taskInclude,
+        include: taskDetailInclude,
       });
       if (!task) throw new NotFoundException('Task not found');
 
@@ -333,7 +341,7 @@ export class TaskService {
           },
         });
         await batchUpdateTaskPositions(tx, targetColumn.id, otherUpdates);
-        result = toTaskDto({
+        result = toTaskDetailDto({
           ...task,
           columnId: targetColumn.id,
           position: positions[insertionIndex]!,
@@ -346,9 +354,9 @@ export class TaskService {
             columnId: targetColumn.id,
             position: midpoint(prev?.position ?? null, next?.position ?? null),
           },
-          include: taskInclude,
+          include: taskDetailInclude,
         });
-        result = toTaskDto(updated);
+        result = toTaskDetailDto(updated);
       }
 
       await this.activityService.record(tx, {

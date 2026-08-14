@@ -3,7 +3,7 @@ import { SocketEvents } from '@kurultay/shared-types';
 import type { TaskDto } from '@kurultay/shared-types';
 import { RealtimeService } from '../realtime/realtime.service';
 import { TaskReadService } from './task-read.service';
-import { toTaskDto } from './task.mapper';
+import { toTaskDetailDto } from './task.mapper';
 
 /**
  * Realtime side effects of a task mutation.
@@ -27,7 +27,7 @@ export class TaskEventsService {
    * post-mutation state, read once.
    */
   async emitUpdated(workspaceId: string, taskId: string, actorId: string): Promise<TaskDto> {
-    const dto = toTaskDto(await this.taskRead.findTask(workspaceId, taskId));
+    const dto = toTaskDetailDto(await this.taskRead.findTask(workspaceId, taskId));
     this.realtime.emitToBoard(dto.boardId, SocketEvents.TASK_UPDATED, {
       workspaceId,
       boardId: dto.boardId,

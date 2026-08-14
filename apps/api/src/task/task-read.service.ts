@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { taskInclude, type TaskWithRelations } from './task.include';
+import { taskDetailInclude, type TaskDetailRow } from './task.include';
 
 /**
  * The task module's scoped reads.
@@ -14,10 +14,15 @@ import { taskInclude, type TaskWithRelations } from './task.include';
 export class TaskReadService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findTask(workspaceId: string, taskId: string): Promise<TaskWithRelations> {
+  /**
+   * The single-task read, and the one every mutation's response goes through — so it uses
+   * the detail include: a caller who just edited a task gets the full checklists back, not
+   * the board's summary projection.
+   */
+  async findTask(workspaceId: string, taskId: string): Promise<TaskDetailRow> {
     const task = await this.prisma.task.findFirst({
       where: { id: taskId, board: { workspaceId } },
-      include: taskInclude,
+      include: taskDetailInclude,
     });
     if (!task) throw new NotFoundException('Task not found');
     return task;

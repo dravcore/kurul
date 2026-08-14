@@ -230,6 +230,7 @@ model Task {
   assignees  TaskAssignee[]
   labels     TaskLabel[]
   comments   Comment[]
+  checklists Checklist[]
   activities Activity[]
   notifications Notification[]
 
@@ -311,6 +312,41 @@ model Comment {
 
   @@index([taskId])
   @@index([userId])
+}
+
+/// A named list of items inside a task. A task may carry several (the Trello model), which is
+/// what keeps a Trello import from having to flatten several lists into one and lose their
+/// names — see docs/decisions/0023-checklist-data-model.md.
+///
+/// `onDelete: Cascade` is deliberate: a checklist is part of a task's content, not a record
+/// with a life of its own, so it goes when the task goes. There is no FK to `User` anywhere in
+/// this model or the next — nothing here records *who* ticked an item.
+model Checklist {
+  id        String   @id @default(uuid(7))
+  taskId    String
+  title     String
+  position  Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task  Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  items ChecklistItem[]
+
+  @@index([taskId, position])
+}
+
+model ChecklistItem {
+  id          String   @id @default(uuid(7))
+  checklistId String
+  content     String
+  isDone      Boolean  @default(false)
+  position    Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId, position])
 }
 
 model Activity {
