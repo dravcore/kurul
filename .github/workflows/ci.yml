@@ -108,6 +108,18 @@ jobs:
           if-no-files-found: ignore
       - name: Migrate test database
         run: pnpm db:migrate
+      # The database was just built from the checked-in migrations, which is exactly the state
+      # this compares against the schema. Drift is silent by nature: it breaks nothing at
+      # runtime and only surfaces as unrelated statements the next `prisma migrate dev` wants
+      # to emit — which is how issue #196 sat unnoticed until a metrics table needed a
+      # migration. `--exit-code` returns 2 when the diff is non-empty, so the gate is the
+      # command's own answer rather than a grep over its prose.
+      - name: Check for migration drift
+        run: >
+          pnpm exec prisma migrate diff
+          --from-config-datasource
+          --to-schema apps/api/prisma/schema.prisma
+          --exit-code
       - name: Integration tests
         run: pnpm --filter @kurultay/api test:e2e
 
