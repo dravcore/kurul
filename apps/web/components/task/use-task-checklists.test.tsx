@@ -8,6 +8,7 @@ import { useTaskChecklists } from './use-task-checklists';
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00';
 const TASK_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60';
+const OTHER_TASK_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d61';
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>();
@@ -90,7 +91,7 @@ describe('useTaskChecklists loading', () => {
     const detail = task();
     apiGet.mockResolvedValue(detail);
 
-    const { result, onUpdated } = renderChecklists(
+    const { result, rerender, onUpdated } = renderChecklists(
       task({ checklists: null, checklistSummary: { total: 2, done: 1 } }),
     );
 
@@ -99,7 +100,15 @@ describe('useTaskChecklists loading', () => {
       `/workspaces/${WORKSPACE_ID}/tasks/${TASK_ID}`,
       expect.anything(),
     );
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    // Still loading until the merged row comes back down — `loading` is derived from the task
+    // the panel is holding, not from a flag the hook lowers on its own. The board's merge is
+    // what ends it, which is the same thing the reader sees.
+    expect(result.current.loading).toBe(true);
+
+    rerender({ current: detail });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.checklists).toEqual(CHECKLISTS);
   });
 
   it('does not re-read a task whose checklists are already in hand', async () => {
@@ -115,6 +124,67 @@ describe('useTaskChecklists loading', () => {
 
     await waitFor(() => expect(result.current.loadFailed).toBe(true));
     expect(result.current.loading).toBe(false);
+  });
+
+  it('reads again when a board refetch puts the summary-only row back', async () => {
+    // A filter change re-runs the board's list query, and its rows carry `checklists: null`.
+    // A once-per-task guard would leave the open panel rendering the empty state for a task
+    // whose checklists it had already read — the "not loaded means none" mistake, arrived at
+    // from the other direction.
+    apiGet.mockResolvedValue(task());
+    const { rerender } = renderChecklists(task({ checklists: null }));
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
+
+    rerender({ current: task() });
+    rerender({ current: task({ checklists: null }) });
+
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+  });
+
+  it('does not turn a failed read into a request per render', async () => {
+    apiGet.mockRejectedValue(new Error('offline'));
+
+    const { result, rerender } = renderChecklists(task({ checklists: null }));
+    await waitFor(() => expect(result.current.loadFailed).toBe(true));
+
+    // A failure leaves `checklists` null, so every render still "needs" the detail. What stops
+    // the loop is that nothing the read depends on changed — not a remembered failure.
+    rerender({ current: task({ checklists: null, title: 'renamed' }) });
+    rerender({ current: task({ checklists: null, title: 'renamed twice' }) });
+
+    expect(apiGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not tell the next task about the previous one's failure", async () => {
+    apiGet
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockImplementation(() => new Promise(() => {}));
+
+    const { result, rerender } = renderChecklists(task({ checklists: null }));
+    await waitFor(() => expect(result.current.loadFailed).toBe(true));
+
+    // The reader moves to another card. Its read is still in flight, so the section owes them
+    // "loading" — a failure carried across would say "the checklists couldn't load" about a
+    // task nothing has been asked about yet.
+    rerender({ current: task({ id: OTHER_TASK_ID, checklists: null }) });
+
+    expect(result.current.loadFailed).toBe(false);
+    expect(result.current.loading).toBe(true);
+  });
+
+  it('tries again for a task the reader comes back to', async () => {
+    apiGet.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(task());
+
+    const { result, rerender } = renderChecklists(task({ checklists: null }));
+    await waitFor(() => expect(result.current.loadFailed).toBe(true));
+
+    // Away to another task and back. A remembered failure would make one bad moment of network
+    // stick to this task for the rest of the session.
+    rerender({ current: null });
+    rerender({ current: task({ checklists: null }) });
+
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.loadFailed).toBe(false));
   });
 });
 
