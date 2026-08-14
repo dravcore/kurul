@@ -277,6 +277,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `docs/archive/roadmap-mvp-phases.md`; shipped phase design specs moved to
   `docs/archive/specs/` (CHANGELOG links updated).
 
+### Removed
+
+- Two never-used indexes: `Column_boardId_idx` and `Notification_userId_createdAt_idx`
+  (audit finding DB-07). Both looked redundant on structural grounds — a strict prefix of an
+  existing unique/composite index, or no matching application query — but the finding also
+  called for verifying that against `pg_stat_user_indexes.idx_scan` on production-like volume
+  before dropping anything, so all five originally flagged candidates were load-tested first.
+  Three came back genuinely in use (`TaskAssignee_taskId_idx` and `TaskLabel_taskId_idx` back
+  the task board's assignee/label loading and were kept because Postgres's planner
+  consistently prefers the narrower index over the wider unique one for that lookup;
+  `Activity_workspaceId_createdAt_idx` was kept because the dashboard's throughput query
+  picked it over its three-column sibling often enough across repeated trials that "always
+  subsumed" didn't hold) and are staying. Only the two with zero measured scans across three
+  independent seeded trials were dropped. See
+  `apps/api/prisma/migrations/20260814150000_drop_unused_indexes` for the full methodology.
+
 ### Fixed
 
 - The dashboard no longer greets a first visit with "Your boards couldn't load." in
