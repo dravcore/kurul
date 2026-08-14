@@ -281,10 +281,33 @@ services:
       # service's own entrypoint took above without a second flag to keep in sync.
       REDIS_URL: redis://${REDIS_PASSWORD:+:${REDIS_PASSWORD}@}redis:6379
       API_PORT: 4000
-      WEB_URL: ${WEB_URL:-http://localhost:3000}
+      # Both derive from SITE_URL — the one public origin the `proxy` service answers on —
+      # because that is now the only address a browser ever uses for either app (see
+      # docker/Caddyfile). `WEB_URL` is the CORS origin and the base for links in outgoing
+      # mail; `BETTER_AUTH_URL` is where Better Auth believes it is mounted — the bare origin,
+      # with no `/api` prefix, because Better Auth appends its own `/auth` basePath and the
+      # proxy forwards that path unchanged (the `/api` prefix, which the proxy strips, is only
+      # for the Nest routes). A `/api` here would make it expect `/api/auth/…` on requests that
+      # arrive as `/auth/…` and answer every one of them 404.
+      #
+      # Deliberately *not* `${WEB_URL:-…}` / `${BETTER_AUTH_URL:-…}` as they were before this
+      # became a proxied stack: those two names belong to the dev loop, where the apps are on
+      # separate ports (`.env.example`), and reading them here meant a developer's
+      # `WEB_URL=http://localhost:3000` silently became a deployment's CORS origin.
+      WEB_URL: ${SITE_URL:-http://localhost}
       # No baked-in default: compose fails loudly instead of booting with a known secret.
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env — see docs/development.md#environment-variables}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:4000}
+      BETTER_AUTH_URL: ${SITE_URL:-http://localhost}
+      # Exactly one proxy hop stands in front of this service, and there is no route around it:
+      # the port below is not published, so nothing outside the compose network can reach the
+      # API directly to forge an X-Forwarded-For. That is what makes a fixed `1` correct here
+      # and what makes it safe — the warning in `.env.example` is about `true` (trust the whole
+      # chain) on a *directly exposed* instance, which this no longer is. Without it every
+      # rate-limit bucket and every access-log `ip` would collapse onto the proxy's container
+      # address, i.e. one bucket for the entire internet. Add a hop for each additional proxy
+      # you put in front (a CDN in front of `proxy` makes this `2`) — see
+      # docs/self-hosting.md.
+      TRUST_PROXY: 1
       # SMTP is optional — unlike BETTER_AUTH_SECRET above, compose does not fail loudly when
       # it's unset. The mail module falls back to logging instead of sending, so the API still
       # boots, but no invitation can be accepted until these are set in .env (see
@@ -303,8 +326,13 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
       SENTRY_RELEASE: ${SENTRY_RELEASE:-}
-    ports:
-      - '4000:4000'
+    # No `ports:` — the API is reached only through `proxy` below, at ${SITE_URL}/api. This is
+    # not merely tidiness: an API also published on a host port would be a second, unproxied
+    # way in, which would invalidate the `TRUST_PROXY: 1` above (anyone could connect straight
+    # to :4000 and hand themselves a fabricated client IP) and would put a second origin —
+    # http://localhost:4000 — in play for cookies that are now scoped to the proxy's. Reach it
+    # for debugging with `docker compose exec api wget -qO- http://127.0.0.1:4000/health/ready`
+    # or by publishing a port in a local `docker-compose.override.yml`.
     # /health/ready probes DB + Redis (200 only when both respond within 2s), so "healthy"
     # means "actually able to serve requests", not just "process is up". busybox wget ships
     # in node:24-alpine — no curl needed. 127.0.0.1, not localhost: busybox wget resolves
@@ -324,27 +352,30 @@ services:
         condition: service_completed_successfully
 
   web:
-    # Same `image:` + `build:` fallback as api above, with one caveat specific to this
-    # service: `.github/workflows/release-images.yml` publishes this image built with the
-    # `args:` block's Dockerfile defaults (`NEXT_PUBLIC_API_URL=http://localhost:4000`, Sentry
-    # DSNs blank), because Next.js inlines `NEXT_PUBLIC_*` into the client bundle at build
-    # time — a published image cannot have its API URL swapped at container start the way
-    # api's DATABASE_URL can. Pulling this tag therefore only works out of the box for the
-    # common case of the browser reaching the API at localhost:4000; any other
-    # NEXT_PUBLIC_API_URL still needs `docker compose build web` (this file's own `build:`
-    # below with the `args:` filled from `.env`) until the runtime-configurable API URL that
-    # OPS-04's own follow-up tracks replaces this constraint.
+    # Same `image:` + `build:` fallback as api above. Next.js still inlines `NEXT_PUBLIC_*`
+    # into the client bundle at build time — that has not changed and cannot be changed — but
+    # the value that gets inlined is no longer deployment-specific: apps/web/Dockerfile bakes
+    # the same-origin path `/api`, which is correct behind `proxy` on every domain. Pulling
+    # this tag therefore works out of the box for any hostname, which is what makes the
+    # published image worth publishing (audit finding PM-02).
+    #
+    # `NEXT_PUBLIC_API_URL` is deliberately absent from `args:` below, so a local
+    # `docker compose build web` produces the same bundle as the released image rather than
+    # quietly baking whatever a developer left in `.env` for the dev loop. A deployment that
+    # really does want the API on a separate domain overrides the ARG directly
+    # (`docker build --build-arg NEXT_PUBLIC_API_URL=https://api.example.com …`) and accepts
+    # that the resulting image is specific to that domain.
     image: ghcr.io/dravcore/kurultay-web:${TAG:-latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        # Next.js inlines NEXT_PUBLIC_* at build time, so it must be a build arg, not just a
-        # runtime environment variable — see apps/web/Dockerfile.
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
-        # Same build-time rule as NEXT_PUBLIC_API_URL: blank (the default) means the Sentry
-        # chunk is never requested by a visitor's browser, and turning error tracking on or
-        # off requires `docker compose build web`, not just a restart. Deliberately separate
+        # Next.js inlines NEXT_PUBLIC_* at build time, so these have to be build args rather
+        # than runtime environment variables — see apps/web/Dockerfile. Blank (the default)
+        # means the Sentry chunk is never requested by a visitor's browser, and turning error
+        # tracking on or off requires `docker compose build web`, not just a restart. Unlike
+        # NEXT_PUBLIC_API_URL above, there is no deployment-independent value these could take:
+        # a DSN names one project. Deliberately separate
         # from the API's SENTRY_DSN — a browser DSN is public by construction (it ships in
         # the bundle) and should point at a browser-scoped Sentry project.
         NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
@@ -357,8 +388,21 @@ services:
     # node` and the Next.js standalone server needs nothing beyond the default-safe
     # baseline. Verified: full stack up with `cap_drop: [ALL]` and no `cap_add`, web
     # healthcheck reports healthy.
-    ports:
-      - '3000:3000'
+    environment:
+      # The one address the *server* half of Next.js uses — middleware's session probe and the
+      # locale lookup during a render. It has to be absolute (a `/api` prefix has no origin to
+      # resolve against inside Node) and it is deliberately the container-network address, not
+      # the public one: a server render then never leaves the compose network, does not depend
+      # on the public hostname resolving from inside this container, and does not pay a TLS
+      # handshake to talk to a service one hop away.
+      #
+      # Unlike NEXT_PUBLIC_*, this is read at container *start*: it is not a `NEXT_PUBLIC_`
+      # name, so Next.js leaves it as a runtime lookup instead of inlining it. See
+      # apps/web/lib/api-url.ts.
+      INTERNAL_API_URL: http://api:4000
+    # No `ports:` — same reasoning as api above: `proxy` is the only entrance, so there is no
+    # second origin (http://localhost:3000) for a session cookie to be scoped to and no way to
+    # bypass the hop the API's TRUST_PROXY setting counts on.
     # busybox wget follows 3xx redirects, so a redirecting root page still counts as healthy;
     # only a non-2xx final response (or no response) fails the probe. 127.0.0.1, not
     # localhost: Next.js standalone listens IPv4-only on 0.0.0.0, and busybox wget resolves
@@ -373,7 +417,68 @@ services:
       api:
         condition: service_healthy
 
+  # The stack's only published entrance: one origin serving both the app and the API, with TLS
+  # obtained and renewed automatically once SITE_URL names a real domain. `docker/Caddyfile`
+  # explains the routing and why the same-origin shape is what makes the published web image
+  # reusable across deployments (audit finding PM-02); docs/self-hosting.md is the operator
+  # walkthrough.
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # The only service in this file that needs a capability for the reason capabilities exist:
+    # Caddy binds 80 and 443 *inside* the container, and ports below 1024 need
+    # CAP_NET_BIND_SERVICE. Verified the same way the postgres/redis sets above were, and the
+    # failure mode is worth writing down because it is not the one you would predict: with
+    # `cap_drop: [ALL]` and nothing added the container does not fail at bind time, it fails
+    # before Caddy runs at all — `exec /usr/bin/caddy: operation not permitted`. The official
+    # image ships the binary with file capabilities (`cap_net_bind_service=+ep`), and the
+    # kernel refuses to exec a file-capability binary when the requested set is not a subset of
+    # the bounding set, `no-new-privileges` included. So this entry is what makes the process
+    # start, not merely what lets it listen. Adding only NET_BIND_SERVICE: `server running …
+    # addr ":80"` and the stack serves. Confirmed standalone (`docker run --cap-drop ALL
+    # --cap-add NET_BIND_SERVICE --security-opt no-new-privileges caddy:2-alpine` with this
+    # Caddyfile and SITE_URL=http://localhost), since the side-by-side two-domain test ran on
+    # high ports where the capability would not have been exercised.
+    #
+    # PID 1 stays root — the official image ships no USER directive — confirmed with
+    # `docker top` (`root … caddy run --config /etc/caddy/Caddyfile`) rather than
+    # `docker exec … id`, which reports the exec session's user and not PID 1's.
+    cap_add: [NET_BIND_SERVICE]
+    environment:
+      # The public origin, scheme included — `http://localhost` (the default) for a local
+      # stack with no domain, `https://kurultay.example.com` to switch automatic HTTPS on.
+      # This is the single value an operator changes to put the stack on their own domain;
+      # nothing has to be rebuilt for it, which is the entire point of this service existing.
+      SITE_URL: ${SITE_URL:-http://localhost}
+    ports:
+      - '80:80'
+      # 443 is published even for a plain-HTTP SITE_URL: the ports are fixed at container
+      # creation, so leaving it out would mean recreating the container — not just editing
+      # .env — the day the operator points a domain at it. Nothing listens on it until
+      # SITE_URL is https, and TCP/443 in that state simply refuses connections.
+      - '443:443'
+      # QUIC/HTTP3, which Caddy serves on the same port over UDP when TLS is on. Harmless when
+      # it is off; omitting it would silently cap HTTP/3-capable browsers at HTTP/2.
+      - '443:443/udp'
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Issued certificates and ACME account keys. Without this volume every restart would
+      # request fresh certificates and walk straight into Let's Encrypt's rate limit (5 per
+      # domain per week) — the classic way a self-hosted stack locks itself out of TLS.
+      - caddy_data:/data
+      # Caddy's autosaved config. Separate from /data because it is regenerated state, not
+      # something whose loss costs anything, but it belongs in a volume rather than the
+      # container's writable layer so a `docker compose up -d` recreation is silent.
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
   backup_data:
+  caddy_data:
+  caddy_config:

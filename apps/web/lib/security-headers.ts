@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from './api';
+import { isSameOriginApiBaseUrl } from './api-url';
 
 /**
  * `{ key, value }` is the exact shape `next.config.ts`'s `headers()` expects for each entry it
@@ -29,6 +30,35 @@ function websocketOrigin(apiBaseUrl: string): string {
   const url = new URL(apiBaseUrl);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   return url.origin;
+}
+
+/**
+ * `connect-src` sources for whichever API topology this build was configured for.
+ *
+ * The same-origin build (`NEXT_PUBLIC_API_URL=/api`, what the published image ships — see
+ * `lib/api-url.ts`) gets `'self'` and nothing else, and that is not a shortcut: this header is
+ * static Next config, evaluated once at build time, so there is no request whose `Host` a
+ * per-deployment origin could be derived from. It has to be a value that is already correct on
+ * every domain, which is exactly what `'self'` is.
+ *
+ * `'self'` also covers the WebSocket upgrade, which is the part worth stating because the
+ * absolute branch below needs an explicit `ws(s)://` source for the same connection. CSP
+ * Level 3 defines `'self'` as matching a URL whose host and port match the protected
+ * document's and whose scheme is `ws`/`wss` when the document is `http`/`https`
+ * (https://www.w3.org/TR/CSP3/#match-url-to-source-expression, step 4.2) — the scheme upgrade
+ * that CSP2 lacked, and the reason the older, absolute topology had to name `wss://…`
+ * separately. Verified empirically rather than taken from the spec: a production build served
+ * behind the reverse proxy under this exact header opened its Socket.io connection on the
+ * `websocket` transport (HTTP 101 on `/api/socket.io/?…&transport=websocket`) with no CSP
+ * violation reported — see `docs/self-hosting.md`. Had it been wrong, the failure would have
+ * been the quiet kind: socket.io would have fallen back to the `polling` transport, which
+ * `'self'` allows as ordinary HTTP, and the app would have looked fine while running degraded.
+ */
+function connectSources(apiBaseUrl: string): string[] {
+  if (isSameOriginApiBaseUrl(apiBaseUrl)) {
+    return ["'self'"];
+  }
+  return ["'self'", apiBaseUrl, websocketOrigin(apiBaseUrl)];
 }
 
 /**
@@ -71,11 +101,10 @@ function websocketOrigin(apiBaseUrl: string): string {
  *   attributes at all (only to `<style>`/`<script>` elements), so there is no nonce variant of
  *   this trade-off to make — allowing inline styles is the only way these libraries function
  *   under any CSP.
- * - `connect-src 'self' <apiBaseUrl> <wsOrigin>` — every `fetch` goes through `lib/api.ts` to
- *   `NEXT_PUBLIC_API_URL`, which Next inlines at build time (see `.env.example`), and the
- *   Socket.io client in `lib/socket.ts` dials the same origin over `ws(s)`. Both need to be
- *   named explicitly: `'self'` alone would not cover a Nest API that is deliberately a
- *   separate origin in every non-dev deployment.
+ * - `connect-src` — every `fetch` goes through `lib/api.ts` to `NEXT_PUBLIC_API_URL`, which
+ *   Next inlines at build time (see `.env.example`), and the Socket.io client in
+ *   `lib/socket.ts` dials the same base over `ws(s)`. What that expands to depends on which
+ *   API topology the build was configured for; see {@link connectSources}.
  * - `img-src 'self'`, `font-src 'self'` — the app loads no remote images (no avatar upload,
  *   no `next/image` remote patterns configured) and self-hosts its three typefaces via
  *   `next/font/google`, which downloads them at build time and serves them from this origin —
@@ -97,7 +126,7 @@ export function buildContentSecurityPolicy(apiBaseUrl: string): string {
     ['style-src', ["'self'", "'unsafe-inline'"]],
     ['img-src', ["'self'"]],
     ['font-src', ["'self'"]],
-    ['connect-src', ["'self'", apiBaseUrl, websocketOrigin(apiBaseUrl)]],
+    ['connect-src', connectSources(apiBaseUrl)],
     ['frame-ancestors', ["'none'"]],
     ['frame-src', ["'none'"]],
     ['object-src', ["'none'"]],

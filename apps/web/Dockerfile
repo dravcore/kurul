@@ -3,10 +3,24 @@ RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 
 FROM base AS build
-# Next.js inlines NEXT_PUBLIC_* into the client bundle at build time, so it must be
-# available before `next build` runs — setting it only at container runtime (as compose
-# does for the API) would bake in the fallback below instead of the real value.
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000
+# Next.js inlines NEXT_PUBLIC_* into the client bundle at build time, so it must be available
+# before `next build` runs — setting it only at container runtime (as compose does for the API)
+# would bake in the fallback below instead of the real value.
+#
+# The default is a *path*, not an origin, and that is what makes one published image work on
+# every domain (audit finding PM-02): `/api` is correct whether the deployment answers on
+# kurultay.example.com or on localhost, so nothing about this build is deployment-specific and
+# nobody has to rebuild the image to change their API URL. It relies on a reverse proxy in
+# front of the stack routing `/api/*` to the API and everything else here — `docker/Caddyfile`
+# ships one, and `docs/self-hosting.md` documents the contract for operators who bring their
+# own. Server-side rendering cannot use a path (no origin to resolve against inside Node) and
+# reads the runtime-settable `INTERNAL_API_URL` instead; see `apps/web/lib/api-url.ts` for the
+# full split.
+#
+# Overriding this with an absolute origin still works, for a deployment that genuinely wants
+# the API on its own domain — such a build is then specific to that domain, exactly as every
+# build was before this default changed.
+ARG NEXT_PUBLIC_API_URL=/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # Error tracking, same build-time rule and the same empty default. Empty is not merely
 # "Sentry sends nothing": `instrumentation-client.ts` guards the dynamic import on this

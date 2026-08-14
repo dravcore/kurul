@@ -497,9 +497,18 @@ uygulaması ise script'i gerçekten çalıştıran ve sayfayı çizen tarayıcı
 | `Permissions-Policy`        | Ayarlı değil — bir JSON API'nin, bir tarayıcı özellik-izin politikasının yöneteceği bir sayfa bağlamı yoktur                                                  | `camera`, `microphone`, `geolocation`, `payment`, `usb` ve `interest-cohort`'u (FLoC/Topics-API opt-out) reddeder — hiçbirini hiçbir board, task veya dashboard görünümü talep etmez                                                                                                                                                                                                                                                                       |
 
 API'de `Cross-Origin-Resource-Policy`, helmet'in varsayılanı `same-origin` yerine
-`cross-origin`'dir, çünkü web uygulaması onu meşru olarak okuyan ayrı bir origin'dir
+`cross-origin`'dir, çünkü web uygulaması onu meşru olarak okuyan ayrı bir origin **olabilir**
 (`WEB_URL`/`NEXT_PUBLIC_API_URL`); bu erişim CORP tarafından değil,
 `configure-app.ts`'teki CORS allowlist'i tarafından kapılanır.
+
+**Docker dağıtımı aynı origin'dedir.** Bir reverse proxy (`docker/Caddyfile`) web uygulamasını
+ve API'yi tek hostname'den sunar — `/auth/*` ve `/api/*` API'ye, geri kalan her şey web
+uygulamasına gider — dolayısıyla tarayıcı istekleri artık cross-origin değildir ve web bundle'ı
+build zamanında derlenmiş bir hostname yerine göreli bir API tabanı (`/api`) taşıyabilir. Tek
+bir yayınlanmış imajın her domain'de çalışmasını sağlayan şey budur (denetim bulgusu PM-02,
+`apps/web/lib/api-url.ts`, [self-hosting.md](self-hosting.md)). Yukarıdaki cross-origin
+mekanizması yerinde kalır: geliştirme döngüsü iki uygulamayı hâlâ ayrı portlarda çalıştırır ve
+bir dağıtım API'yi hâlâ kendi hostname'ine koyabilir.
 
 İlgili: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (tarihsel Faz 1 iskeleti) · [docs/README.md](../README.md) (docs haritası)

@@ -13,6 +13,7 @@ Five-minute map of Kurultay docs. English is canonical; Turkish copies live unde
 | What the product is / quick start | [../README.md](../README.md)                                                  |
 | How the system is shaped          | [architecture.md](architecture.md) · [design.md](design.md)                   |
 | Day-to-day coding                 | [development.md](development.md) · [coding-standards.md](coding-standards.md) |
+| Running it on your own domain     | [self-hosting.md](self-hosting.md)                                            |
 | REST shapes and errors            | [api-conventions.md](api-conventions.md)                                      |
 | Tests and CI gates                | [testing.md](testing.md)                                                      |
 | Branches, PRs, releases           | [git-strategy.md](git-strategy.md)                                            |
@@ -35,6 +36,7 @@ sit outside `docs/` because GitHub treats them specially.
 | [architecture.md](architecture.md)         | Module map, data model, runtime evolution                                                                   |
 | [tech-stack.md](tech-stack.md)             | Stack choices and rationale (pins: see root / app `package.json`)                                           |
 | [development.md](development.md)           | Env setup, Compose, pnpm scripts, day-to-day, upgrade & rollback                                            |
+| [self-hosting.md](self-hosting.md)         | Deploying a release to your own domain: DNS, HTTPS via Caddy, SMTP, backups, bring-your-own proxy           |
 | [coding-standards.md](coding-standards.md) | TS / NestJS / Next.js conventions                                                                           |
 | [design.md](design.md)                     | UI/UX language                                                                                              |
 | [git-strategy.md](git-strategy.md)         | Git Flow, Conventional Commits, releases                                                                    |

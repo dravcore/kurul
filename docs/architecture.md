@@ -455,9 +455,18 @@ rendered, the web app is the browser surface that actually executes script and p
 | `Permissions-Policy`        | Not set — a JSON API has no page context for a browser feature-permission policy to govern                         | Denies `camera`, `microphone`, `geolocation`, `payment`, `usb`, and `interest-cohort` (the FLoC/Topics-API opt-out) — none of which any board, task, or dashboard view ever requests                                                                                                                                                                                                                       |
 
 `Cross-Origin-Resource-Policy` on the API is `cross-origin` rather than helmet's default
-`same-origin`, because the web app is a separate origin (`WEB_URL`/`NEXT_PUBLIC_API_URL`) that
-legitimately reads it; that access stays gated by the CORS allowlist in `configure-app.ts`, not
-by CORP.
+`same-origin`, because the web app may be a separate origin
+(`WEB_URL`/`NEXT_PUBLIC_API_URL`) that legitimately reads it; that access stays gated by the
+CORS allowlist in `configure-app.ts`, not by CORP.
+
+**The Docker deployment is same-origin.** A reverse proxy (`docker/Caddyfile`) serves the web
+app and the API from one hostname — `/auth/*` and `/api/*` reach the API, everything else the
+web app — so browser requests are no longer cross-origin at all, and the web bundle can carry
+a relative API base (`/api`) instead of a hostname compiled in at build time. That is what lets
+one published image run on any domain (audit finding PM-02, `apps/web/lib/api-url.ts`,
+[self-hosting.md](self-hosting.md)). The cross-origin machinery above stays in place: the dev
+loop still runs the two apps on separate ports, and a deployment may still put the API on its
+own hostname.
 
 Related: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
 (historical Phase 1 scaffold) · [docs/README.md](README.md) (docs map)

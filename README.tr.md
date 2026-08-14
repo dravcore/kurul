@@ -107,14 +107,20 @@ edilemez — yukarıdaki dev compose dosyası [Mailpit](https://mailpit.axllent.
 başlatır, böylece bu akışı gerçek bir mail sağlayıcısı olmadan lokal olarak test edebilirsiniz;
 bkz. [docs/tr/development.md#smtp-ve-mailpit](docs/tr/development.md#smtp-ve-mailpit).
 
-Tam stack Docker, pull tabanlı: `docker compose pull && docker compose up -d`. Her etiketli
-release, `api`/`web` imajlarını GHCR'a yayınlar (`ghcr.io/dravcore/kurultay-api`,
-`ghcr.io/dravcore/kurultay-web`) — bu sayede kurulum ve upgrade lokal build gerektirmez;
-`latest` yerine belirli bir sürümü sabitlemek için `.env`'de `TAG=vX.Y.Z` ayarlayın.
-`TAG`'iniz için henüz yayınlanmış bir imaj yoksa (veya `ghcr.io`'ya ağ erişimi yoksa)
-`docker compose up -d` otomatik olarak kaynaktan build'e döner — `docker compose up --build`
-de bilinçli olarak build etmek isteyenler için aynen çalışmaya devam eder. Günlük detaylar:
-[docs/tr/development.md](docs/tr/development.md).
+Tam stack Docker, pull tabanlı: `docker compose pull && docker compose up -d`, ardından
+http://localhost adresini açın. Her etiketli release, `api`/`web` imajlarını GHCR'a yayınlar
+(`ghcr.io/dravcore/kurultay-api`, `ghcr.io/dravcore/kurultay-web`) — bu sayede kurulum ve
+upgrade lokal build gerektirmez; `latest` yerine belirli bir sürümü sabitlemek için `.env`'de
+`TAG=vX.Y.Z` ayarlayın. `TAG`'iniz için henüz yayınlanmış bir imaj yoksa (veya `ghcr.io`'ya ağ
+erişimi yoksa) `docker compose up -d` otomatik olarak kaynaktan build'e döner —
+`docker compose up --build` de bilinçli olarak build etmek isteyenler için aynen çalışmaya
+devam eder. Günlük detaylar: [docs/tr/development.md](docs/tr/development.md).
+
+Her iki uygulama da pakete dahil Caddy reverse proxy'sinin arkasında **tek origin**'den
+sunulur; bu sayede **aynı yayınlanmış imaj her domain'de yeniden build edilmeden çalışır** —
+kendi domain'inize taşımak için `.env`'de `SITE_URL=https://kurultay.example.com` ayarlamanız
+yeterli, bu aynı zamanda otomatik HTTPS'i de açar. SMTP dahil tek sayfalık rehber:
+[docs/tr/self-hosting.md](docs/tr/self-hosting.md).
 
 ## Stack
 
