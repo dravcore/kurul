@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { Topbar } from '@/components/layout/topbar';
+import { ActivationFunnel } from '@/components/settings/activation-funnel';
 import { LanguageSettings } from '@/components/settings/language-settings';
 import { MembersSettings } from '@/components/settings/members-settings';
 import { WorkspaceSettings } from '@/components/settings/workspace-settings';
@@ -56,6 +57,12 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
           <SettingsSection title={t('workspace.title')} description={t('workspace.description')}>
             <WorkspaceSettings />
           </SettingsSection>
+          {/* Below the delete button and outside `SettingsSection`, both on purpose. It is the
+              only block here that is about the *server* rather than about this workspace, and
+              it renders nothing at all for anyone who is not the instance operator — which is
+              everyone, until `INSTANCE_ADMIN_EMAILS` says otherwise. A section wrapper would
+              draw a heading over that emptiness; see the component's own comment. */}
+          <ActivationFunnel />
         </div>
       </div>
     </>

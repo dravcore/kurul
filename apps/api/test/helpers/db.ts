@@ -2,6 +2,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 
 /** Truncate auth + workspace tables between integration tests. */
 export async function resetDatabase(prisma: PrismaService): Promise<void> {
+  await prisma.usagePing.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.activity.deleteMany();
   await prisma.comment.deleteMany();

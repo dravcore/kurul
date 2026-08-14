@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { ActivityType, NotificationType } from '@kurultay/shared-types';
+import { ActivityType, NotificationType, UsagePingKind } from '@kurultay/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CleanupWorker } from '../src/retention/cleanup.worker';
@@ -146,6 +146,22 @@ describe('Retention cleanup (e2e)', () => {
         taskId: s.taskId,
         type: ActivityType.TaskCreated,
         payload: { title: 'Ship it' },
+        createdAt,
+      },
+      select: { id: true },
+    });
+    return row.id;
+  }
+
+  async function insertUsagePing(s: Seed, createdAt: Date): Promise<string> {
+    const row = await prisma.usagePing.create({
+      data: {
+        workspaceId: s.workspaceId,
+        userId: s.userId,
+        kind: UsagePingKind.BoardView,
+        day: new Date(
+          Date.UTC(createdAt.getUTCFullYear(), createdAt.getUTCMonth(), createdAt.getUTCDate()),
+        ),
         createdAt,
       },
       select: { id: true },
@@ -393,6 +409,7 @@ describe('Retention cleanup (e2e)', () => {
         readAt: new Date(now.getTime() - 200 * DAY_MS),
       });
       const activity = await insertActivity(s, new Date(now.getTime() - 400 * DAY_MS));
+      const ping = await insertUsagePing(s, new Date(now.getTime() - 400 * DAY_MS));
 
       // No `sweep()` helper here — the point is that the switch is honoured at the moment of
       // deletion, not only at registration.
@@ -402,12 +419,48 @@ describe('Retention cleanup (e2e)', () => {
         verifications: 0,
         notifications: 0,
         activities: 0,
+        usagePings: 0,
       });
 
       expect(await prisma.session.findUnique({ where: { id: session } })).not.toBeNull();
       expect(await prisma.verification.findUnique({ where: { id: verification } })).not.toBeNull();
       expect(await prisma.notification.findUnique({ where: { id: notification } })).not.toBeNull();
       expect(await prisma.activity.findUnique({ where: { id: activity } })).not.toBeNull();
+      expect(await prisma.usagePing.findUnique({ where: { id: ping } })).not.toBeNull();
+    });
+  });
+
+  /**
+   * Usage pings are the newest thing this sweep is responsible for, and the one most easily
+   * forgotten: they name a user and a day and would otherwise accumulate for the life of the
+   * instance. They deliberately share ACTIVITY_RETENTION_DAYS — same class of row, one decision
+   * for the operator — so these two tests are about that window applying, and about `0` still
+   * meaning "keep forever".
+   */
+  describe('usage pings', () => {
+    it('deletes a ping older than the activity window and keeps a recent one', async () => {
+      const s = await seed();
+      const now = new Date();
+      const old = await insertUsagePing(s, new Date(now.getTime() - 400 * DAY_MS));
+      const recent = await insertUsagePing(s, new Date(now.getTime() - 2 * DAY_MS));
+
+      const counts = await sweep(now);
+
+      expect(counts.usagePings).toBe(1);
+      expect(await prisma.usagePing.findUnique({ where: { id: old } })).toBeNull();
+      expect(await prisma.usagePing.findUnique({ where: { id: recent } })).not.toBeNull();
+    });
+
+    it('keeps every ping when the activity window is 0', async () => {
+      const s = await seed();
+      const now = new Date();
+      const ancient = await insertUsagePing(s, new Date(now.getTime() - 4000 * DAY_MS));
+      process.env.ACTIVITY_RETENTION_DAYS = '0';
+
+      const counts = await sweep(now);
+
+      expect(counts.usagePings).toBe(0);
+      expect(await prisma.usagePing.findUnique({ where: { id: ancient } })).not.toBeNull();
     });
   });
 
