@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ActivityModule } from '../activity/activity.module';
 import { NotificationModule } from '../notification/notification.module';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { ChecklistItemService } from './checklist-item.service';
+import { ChecklistService } from './checklist.service';
 import { TaskAssigneeService } from './task-assignee.service';
 import { TaskController } from './task.controller';
 import { TaskEventsService } from './task-events.service';
@@ -18,6 +20,8 @@ import { TaskService } from './task.service';
     TaskService,
     TaskAssigneeService,
     TaskLabelService,
+    ChecklistService,
+    ChecklistItemService,
     TaskReadService,
     TaskEventsService,
   ],
