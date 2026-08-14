@@ -9,9 +9,9 @@
  * `.env` — a mis-set variable here would be a suite that silently ran against the wrong
  * database, which is exactly the failure this file exists to make impossible.
  *
- * The one thing that *is* inherited is the Postgres/Redis *connection* (host, port,
- * credentials), because those belong to the machine, not to the suite. Only the database
- * name and the Redis logical database are swapped.
+ * The one thing that *is* inherited is the Postgres *connection* (host, port, credentials),
+ * because that belongs to the machine, not to the suite. Only the database name is swapped.
+ * Redis is not inherited at all — see `apiEnv` for why the suite runs without it.
  */
 
 import './load-env.mjs';
@@ -34,28 +34,6 @@ const SMTP_HOST = 'localhost';
 const SMTP_PORT = '1025';
 
 /**
- * Redis logical database 8. The API only needs Redis for the Socket.io fan-out adapter and
- * the BullMQ queues; both are namespaced by database index, so an index nobody else uses is
- * enough isolation and needs no separate server.
- */
-const E2E_REDIS_DB = '8';
-
-/**
- * The suite's Redis URL: the machine's connection with only the logical database swapped.
- * Empty when `REDIS_URL` is unset, which is a supported configuration — the API logs that the
- * Socket.io Redis adapter was not attached and single-instance realtime works regardless.
- */
-function e2eRedisUrl(): string {
-  const base = process.env.REDIS_URL;
-  if (!base) {
-    return '';
-  }
-  const parsed = new URL(base);
-  parsed.pathname = `/${E2E_REDIS_DB}`;
-  return parsed.toString();
-}
-
-/**
  * Environment for the API process the suite boots.
  *
  * `RATE_LIMIT_ENABLED=false` is not cosmetic: Better Auth caps `/sign-in*` and `/sign-up*` at
@@ -65,10 +43,44 @@ function e2eRedisUrl(): string {
  * integration suite disables it for the same reason (`apps/api/test/setup-e2e.ts`).
  *
  * `CLEANUP_ENABLED=false` keeps the nightly retention sweep from starting a BullMQ worker
- * that would outlive the test run and hold the Redis connection open.
+ * that would outlive the test run and hold a connection open.
+ *
+ * **`REDIS_URL` is deliberately blanked**, and this is the one decision here that is not
+ * obvious. Blanked rather than omitted: Playwright spawns a `webServer` with
+ * `{ ...process.env, ...env }`, so leaving the key out would hand the API whatever the
+ * developer's `.env` put in `process.env` — the exact value this is refusing. `envString`
+ * reads an empty string as unset, the same way `SENTRY_DSN` is switched off below.
+ *
+ * The intent was a logical database index nobody else uses — `redis://…/8` — on the theory
+ * that both Redis consumers (the Socket.io fan-out adapter and the BullMQ queues) are
+ * namespaced by index. The index does not survive: `apps/api/src/common/redis-url.ts`
+ * `parseRedisUrl` returns only `{ host, port, password }` and drops the URL's pathname, and
+ * every ioredis/BullMQ construction in `apps/api` goes through it. Measured with the compiled
+ * API booted on `redis://localhost:6379/8`: `CLIENT LIST` reported six connections, all
+ * `db=0`, `dbsize` on 8 was zero, and the suite's own `bull:due-soon:repeat:due-soon-scan`
+ * scheduler key was sitting in database 0 next to the developer's. That is issue #190, it is
+ * an API defect rather than a test-harness one, and it is not fixed from here.
+ *
+ * So an index is not available, and a key prefix is not either: BullMQ's `prefix` and the
+ * adapter's channel names are chosen in `apps/api` source, which this suite does not touch.
+ * What is left is the fact that the API supports running with no Redis at all — `HealthService`
+ * grades it `skipped` rather than `down`, the gateway logs that the adapter was not attached,
+ * and the due-soon worker declines to start — so that is what the suite does. It is the only
+ * option here that is actually isolated instead of merely documented as such.
+ *
+ * Nothing under test loses coverage by it. The stack is a single API process, so the Redis
+ * adapter would only be fanning messages out to the process that published them; the realtime
+ * scenario exercises the same gateway either way. Keeping Redis on would have cost something
+ * real: two API instances sharing database 0 share the `due-soon` *queue*, so a `pnpm dev`
+ * server and this suite would take turns consuming one another's scheduled scans and running
+ * them against the wrong database.
+ *
+ * When #190 lands, `REDIS_URL: redis://…/8` becomes a genuine boundary and is worth
+ * reinstating — attaching the adapter and registering the queue would then be part of what a
+ * boot failure is caught by.
  */
 export function apiEnv(): Record<string, string> {
-  const env: Record<string, string> = {
+  return {
     DATABASE_URL: e2eDatabaseUrl(),
     API_PORT: String(API_PORT),
     WEB_URL,
@@ -80,6 +92,9 @@ export function apiEnv(): Record<string, string> {
     BETTER_AUTH_SECRET: 'kurultay-playwright-e2e-secret-not-a-real-secret',
     RATE_LIMIT_ENABLED: 'false',
     CLEANUP_ENABLED: 'false',
+    // See the long note above: an inherited Redis is a shared Redis, because `parseRedisUrl`
+    // drops the database index (#190). Blanking it is what makes the suite's isolation real.
+    REDIS_URL: '',
     SMTP_HOST,
     SMTP_PORT,
     SMTP_SECURE: 'false',
@@ -89,13 +104,6 @@ export function apiEnv(): Record<string, string> {
     SENTRY_DSN: '',
     NODE_ENV: 'production',
   };
-
-  const redisUrl = e2eRedisUrl();
-  if (redisUrl) {
-    env.REDIS_URL = redisUrl;
-  }
-
-  return env;
 }
 
 /**

@@ -129,8 +129,9 @@ one more thing to keep green through a UI refactor, and this suite exists to not
 
 ### Running it
 
-Postgres, Redis **and Mailpit** must be up (`docker compose -f docker-compose.dev.yml up -d`);
+Postgres **and Mailpit** must be up (`docker compose -f docker-compose.dev.yml up -d`);
 without Mailpit three of the four scenarios cannot confirm an address or read an invitation.
+Redis is not needed — see [Isolation](#isolation) for why the suite runs without it.
 
 ```bash
 pnpm --filter @kurultay/e2e browsers   # once: downloads Chromium
@@ -157,14 +158,27 @@ never touches it:
 | --------------- | -------------------------- | --------------------------------------------------------------------------------- |
 | Web / API ports | 3110 / 4110                | 3000/4000 belong to `pnpm dev`                                                    |
 | Database        | `kurultay_test_playwright` | Not `kurultay_test` — the Jest integration suite truncates that one between tests |
-| Redis           | logical database 8         | Namespaced by index; no second server needed                                      |
+| Redis           | none — `REDIS_URL` blank   | See below; running without Redis is a supported configuration                     |
 | Mail            | the shared Mailpit         | Nothing is ever deleted; every lookup is scoped to an address the suite generated |
 
 None of it is configurable through `.env`, and it adds no environment variables: the Postgres
-and Redis _connections_ are derived from `DATABASE_URL` / `REDIS_URL` with only the database
-name and the Redis index swapped. A misconfigured variable here would mean a suite that
-silently ran against the development database, which is the one failure this arrangement is
-built to make impossible. The reasoning is written out in `e2e/stack-env.ts`.
+_connection_ is derived from `DATABASE_URL` with only the database name swapped. A
+misconfigured variable here would mean a suite that silently ran against the development
+database, which is the one failure this arrangement is built to make impossible. The reasoning
+is written out in `e2e/stack-env.ts`.
+
+**Why no Redis.** A logical database index would have been the obvious boundary, but the index
+does not reach the client: `parseRedisUrl` returns only host, port and password and drops the
+URL's pathname, and every ioredis/BullMQ construction in `apps/api` goes through it — so
+`redis://…/8` connects to database 0 (issue [#190](https://github.com/dravcore/kurultay/issues/190)).
+A key prefix is not available either; BullMQ's prefix and the Socket.io adapter's channel names
+are chosen in `apps/api` source. Two API instances on database 0 share the `due-soon` _queue_,
+which means a `pnpm dev` server and this suite would take turns running each other's scheduled
+scans against the wrong database. The API supports running with no Redis at all — readiness
+reports it `skipped`, the gateway logs that the adapter was not attached, the due-soon worker
+declines to start — and with a single API process the adapter would only be fanning messages
+back to their own publisher, so nothing under test loses coverage. When #190 is fixed, an index
+becomes a real boundary and is worth reinstating.
 
 ### How these tests are written
 

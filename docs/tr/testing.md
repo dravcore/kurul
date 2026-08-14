@@ -130,8 +130,9 @@ için vardır.
 
 ### Çalıştırma
 
-Postgres, Redis **ve Mailpit** ayakta olmalı (`docker compose -f docker-compose.dev.yml up -d`);
-Mailpit olmadan dört senaryonun üçü adresini doğrulayamaz veya daveti okuyamaz.
+Postgres **ve Mailpit** ayakta olmalı (`docker compose -f docker-compose.dev.yml up -d`);
+Mailpit olmadan dört senaryonun üçü adresini doğrulayamaz veya daveti okuyamaz. Redis
+gerekmez — suite'in onsuz koşmasının nedeni için [İzolasyon](#i̇zolasyon) bölümüne bakın.
 
 ```bash
 pnpm --filter @kurultay/e2e browsers   # bir kez: Chromium'u indirir
@@ -158,14 +159,27 @@ asla dokunmaz:
 | ------------------ | -------------------------- | ----------------------------------------------------------------------------------- |
 | Web / API portları | 3110 / 4110                | 3000/4000 `pnpm dev`'in                                                             |
 | Veritabanı         | `kurultay_test_playwright` | `kurultay_test` değil — Jest integration suite'i onu testler arasında truncate eder |
-| Redis              | logical database 8         | İndeksle namespace'lenir; ikinci bir sunucu gerekmez                                |
+| Redis              | yok — `REDIS_URL` boş      | Aşağıya bakın; Redis'siz koşmak desteklenen bir yapılandırmadır                     |
 | Posta              | paylaşılan Mailpit         | Hiçbir şey silinmez; her arama suite'in ürettiği bir adrese göre daraltılır         |
 
 Bunların hiçbiri `.env` üzerinden ayarlanabilir değil ve hiç yeni environment değişkeni
-eklemiyor: Postgres ve Redis _bağlantıları_ `DATABASE_URL` / `REDIS_URL`'den, yalnızca
-veritabanı adı ve Redis indeksi değiştirilerek türetilir. Buradaki yanlış ayarlanmış bir
-değişken, suite'in sessizce geliştirme veritabanına karşı koşması demek olurdu — bu düzenin
-imkânsız kılmak için var olduğu tek hata da budur. Gerekçe `e2e/stack-env.ts` içinde yazılı.
+eklemiyor: Postgres _bağlantısı_ `DATABASE_URL`'den, yalnızca veritabanı adı değiştirilerek
+türetilir. Buradaki yanlış ayarlanmış bir değişken, suite'in sessizce geliştirme veritabanına
+karşı koşması demek olurdu — bu düzenin imkânsız kılmak için var olduğu tek hata da budur.
+Gerekçe `e2e/stack-env.ts` içinde yazılı.
+
+**Neden Redis yok.** Bariz sınır bir logical database indeksi olurdu, ama indeks istemciye
+ulaşmıyor: `parseRedisUrl` yalnızca host, port ve password döndürüp URL'in pathname'ini düşürüyor
+ve `apps/api`'deki her ioredis/BullMQ kurulumu oradan geçiyor — dolayısıyla `redis://…/8`
+database 0'a bağlanıyor (issue [#190](https://github.com/dravcore/kurultay/issues/190)).
+Anahtar öneki de kullanılabilir değil; BullMQ'nun prefix'i ve Socket.io adaptörünün kanal adları
+`apps/api` kaynağında seçiliyor. Database 0'daki iki API instance'ı `due-soon` _kuyruğunu_
+paylaşır, yani bir `pnpm dev` sunucusu ile bu suite sırayla birbirinin zamanlanmış taramalarını
+yanlış veritabanına karşı koşardı. API hiç Redis olmadan çalışmayı destekliyor — readiness onu
+`skipped` olarak raporluyor, gateway adaptörün bağlanmadığını logluyor, due-soon worker'ı
+başlamayı reddediyor — ve tek bir API süreciyle adaptör mesajları yalnızca kendi yayıncısına
+geri dağıtacağından test edilen hiçbir şey kapsam kaybetmiyor. #190 düzeldiğinde indeks gerçek
+bir sınır hâline gelir ve geri konmaya değer.
 
 ### Bu testler nasıl yazılır
 
