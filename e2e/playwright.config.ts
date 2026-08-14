@@ -13,7 +13,7 @@ import { apiEnv, API_URL, webEnv, WEB_URL } from './stack-env';
  *
  * The scope stays four scenarios on purpose. Every test added here is one more thing to keep
  * green through a UI refactor, and the point of this suite is to notice when the *stack*
- * comes apart, not to re-check what 873 unit tests and 90 integration tests already cover.
+ * comes apart, not to re-check what the unit and integration suites already cover.
  */
 export default defineConfig({
   testDir: './tests',

@@ -35,9 +35,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   appearing in a **second browser** with no reload; an invitation sent from the settings dialog
   → read out of **Mailpit** → accepted from the link in the message; and clicking a
   notification opening **the task it refers to**. These four were the largest single gap in the
-  project's testing: 873 unit tests and 90 API integration tests all pass against a board that
-  never renders, and until now nothing exercised drag-and-drop, Socket.io, mail delivery or
-  notification navigation in a browser at all. Scope is capped at four on purpose, and the run
+  project's testing: the unit suites and the API integration suite all pass against a board
+  that never renders, and until now nothing exercised drag-and-drop, Socket.io, mail delivery
+  or notification navigation in a browser at all. Scope is capped at four on purpose, and the run
   is capped at five minutes by `globalTimeout` — this suite exists to notice when the *stack*
   comes apart, not to re-check the layers below it. Setup is done over HTTP and only the
   behaviour under test is clicked; there are no `data-testid` attributes (columns are

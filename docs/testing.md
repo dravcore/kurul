@@ -107,8 +107,9 @@ tests are the only mechanical enforcement it has.
 Browser e2e was deferred through the MVP for a reason that held: the board UI changed shape
 weekly, and a suite written against it would have been rewritten three times. What the
 deferral left behind was a gap nothing else could cover — the flows that make this product
-what it is were verified by 873 unit tests and 90 integration tests, and **not once in a real
-browser**. Both of those suites pass against a board that never renders.
+what it is were verified by well over a thousand unit tests and an integration test for every
+endpoint, and **not once in a real browser**. Both of those suites pass against a board that
+never renders.
 
 The suite lives in [`e2e/`](../e2e), runs a real Chromium against a compiled API and a
 production web build, and is exactly four scenarios.

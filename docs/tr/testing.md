@@ -107,8 +107,9 @@ tek mekanik zorlaması olur.
 Browser e2e MVP boyunca ertelendi ve gerekçesi geçerliydi: board UI'ı haftalık şekil
 değiştiriyordu, o dönemde yazılmış bir suite üç kez yeniden yazılırdı. Ertelemenin geride
 bıraktığı şey başka hiçbir katmanın kapatamayacağı bir boşluktu — bu ürünü ürün yapan
-akışlar 873 unit ve 90 integration testiyle doğrulanıyordu ve **bir kez bile gerçek bir
-tarayıcıda değil**. İki suite de hiç render olmayan bir board ile yeşil kalır.
+akışlar binden fazla unit testi ve her endpoint için bir integration testiyle doğrulanıyordu
+ve **bir kez bile gerçek bir tarayıcıda değil**. İki suite de hiç render olmayan bir board
+ile yeşil kalır.
 
 Suite [`e2e/`](../../e2e) altında yaşar, derlenmiş bir API ve production web build'i
 üzerinde gerçek bir Chromium koşturur, ve tam olarak dört senaryodur.
