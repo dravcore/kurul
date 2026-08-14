@@ -268,10 +268,11 @@ and `TaskEventsService`, and nothing else — and that was right for checklists.
 recoverability. A checklist item deleted by mistake is a sentence someone retypes; the record of
 its deletion would be a row about an event with no lasting consequence. An attachment deleted by
 mistake is gone, and 0022's own orphan sweep is what makes it gone — the row disappears from
-Postgres, and the nightly sweep removes the bytes from disk once the grace period passes. After
-that, the only remaining evidence that the file ever existed is the activity row. That asymmetry —
-a checklist item is retypable, a swept file is not — is why one feature writes activity and the
-other does not, and it is also what decides which of the two new types belongs in the audit subset.
+Postgres, and the nightly sweep removes the bytes from disk once the grace period passes. When a
+user removes one attachment from one card, that activity row is the last remaining evidence the
+file existed. That asymmetry — a checklist item is retypable, a swept file is not — is why one
+feature writes activity and the other does not, and it is also what decides which of the two new
+types belongs in the audit subset.
 
 **Why only the delete side is in the audit subset.** `activity.ts:51-64` states what the subset is
 for in one sentence — "who removed, granted or destroyed something here?" — and uploading a file is
@@ -279,9 +280,22 @@ none of those three. It is content creation, which puts it in `comment.created`'
 `board.created`'s: the board and label events are in the subset because they are structural
 administration whose rows are "often the only surviving evidence that the work existed at all"
 (`activity.ts:24-25`), and `task.deleted` is in it because, as the same comment says, it is "the
-one content event that destroys rather than edits". `attachment.deleted` is a second such event and
-a stronger one — a deleted task's rows are still in last night's dump, while a swept attachment's
-bytes are not on the disk the dump does not cover.
+one content event that destroys rather than edits". `attachment.deleted` is a second such event,
+and on the path it covers it is the stronger one — a deleted task's rows are still in last night's
+dump, while a swept attachment's bytes are on a disk the dump does not cover.
+
+**What `attachment.deleted` does and does not record.** It covers the singular path only: a user
+removing one attachment from one card. It does not fire when a workspace, board or task is deleted,
+because those cascade inside Postgres — 0022 states it plainly, "one `DELETE FROM \"Workspace\"`
+removes thousands of attachment rows inside Postgres with no application code involved" — and no
+application code runs to write a row. That is the correct behaviour, not a gap to close. Routing
+the cascade through application code to emit per-attachment activity would be an attempt to reverse
+the very property 0022 built the orphan sweep around, that "orphan production is bulk and silent";
+the answer to bulk deletion is the sweep and its `CleanupCounts`
+(`apps/api/src/retention/cleanup.worker.ts:71`), not thousands of audit rows describing one click.
+The bulk event is already recorded, once, as `board.deleted` or `task.deleted`. So the question the
+audit subset answers here is "who detached a file from a card", not "which files stopped existing";
+the second question is answered by `board.deleted`/`task.deleted` plus the sweep's counts.
 
 The argument for including `attachment.created` ran the other way: an incident responder asking
 "what did this compromised account do here" wants what was put there as well as what was taken.
@@ -368,6 +382,20 @@ still exists. There is deliberately no workspace-wide "everything uploaded here"
 incident ever needs one, the fix is a query against `Activity` filtered on the single
 `attachment.created` type — not a change to the subset, which would reopen the import-volume
 problem this decision closed.
+
+**`activity.ts`'s own comments stop being true, and must be rewritten in the same PR.** That file
+explains itself positionally: the header (`activity.ts:1-13`) says "the first seven names all
+describe something that happened to a card" and "the rest of the list is the audit trail", and the
+subset's comment (`activity.ts:51-64`) sorts events into ordinary content versus access-and-
+destruction. `attachment.created` fits neither half of either sentence — it is a card event that is
+not among the first seven, and it sits beside the audit trail without being in it. Left alone, the
+file would document a two-way split its own constant list no longer has. The comments therefore
+state the membership rule the split actually rests on, which was always the real criterion and was
+never written down: an event joins `AUDIT_ACTIVITY_TYPES` when it is **destructive or
+access-changing and low-volume**, not because of where it sits in the list. Writing the criterion
+into the file is what lets the next person add a type without re-deriving this ADR — and it is
+the only reason the board and label entries can be explained at all, since position never
+explained them.
 
 **P3-4 gets harder in a way this ADR chose.** One more `Restrict` FK to `User` is one more relation
 an anonymization design has to route around, and `audit/ROADMAP.md:372` already lists `Restrict`

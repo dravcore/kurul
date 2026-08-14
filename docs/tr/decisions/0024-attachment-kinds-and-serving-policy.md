@@ -268,10 +268,10 @@ doğruydu. Fark geri getirilebilirlikte. Yanlışlıkla silinen bir checklist ma
 yazdığı bir cümledir; silinmesinin kaydı, kalıcı sonucu olmayan bir olay hakkında bir satır olurdu.
 Yanlışlıkla silinen bir dosya eki gitmiştir ve onu gitmiş yapan şey 0022'nin kendi sahipsiz dosya
 süpürmesidir — satır Postgres'ten kaybolur ve gecelik süpürme, mühlet dolduğunda baytları diskten
-alır. Ondan sonra dosyanın var olduğuna dair geriye kalan tek kanıt activity satırıdır. Bu
-asimetri — bir checklist maddesi yeniden yazılabilir, süpürülmüş bir dosya yazılamaz — hem bir
-özelliğin activity yazıp diğerinin yazmamasının sebebi, hem de iki yeni tipten hangisinin denetim
-alt kümesine ait olduğunu belirleyen şey.
+alır. Bir kullanıcı tek bir eki tek bir karttan kaldırdığında, o activity satırı dosyanın var
+olduğuna dair geriye kalan son kanıttır. Bu asimetri — bir checklist maddesi yeniden yazılabilir,
+süpürülmüş bir dosya yazılamaz — hem bir özelliğin activity yazıp diğerinin yazmamasının sebebi,
+hem de iki yeni tipten hangisinin denetim alt kümesine ait olduğunu belirleyen şey.
 
 **Denetim alt kümesine neden yalnız silme tarafı giriyor.** `activity.ts:51-64` alt kümenin ne işe
 yaradığını tek cümlede söylüyor — "buradan kim bir şey kaldırdı, verdi ya da yok etti?" — ve bir
@@ -279,8 +279,23 @@ dosya yüklemek bu üçünden hiçbiri değil. O bir içerik yaratmadır; yani s
 değil, `comment.created`. Board ve label olayları alt kümede, çünkü onlar yapısal yönetimdir ve
 satırları "çoğu zaman o işin var olduğuna dair hayatta kalan tek kanıttır" (`activity.ts:24-25`);
 `task.deleted` ise aynı yorumun dediği gibi "düzenlemek yerine yok eden tek içerik olayı" olduğu
-için orada. `attachment.deleted` bunun ikincisi ve daha güçlüsü: silinen bir task'ın satırları hâlâ
-dün geceki dump'ta durur, süpürülmüş bir ekin baytları ise dump'ın kapsamadığı diskte yoktur.
+için orada. `attachment.deleted` bunun ikincisi ve kapsadığı yolda daha güçlüsü: silinen bir task'ın
+satırları hâlâ dün geceki dump'ta durur, süpürülmüş bir ekin baytları ise dump'ın kapsamadığı bir
+diskte.
+
+**`attachment.deleted` neyi kaydeder, neyi kaydetmez.** Yalnız tekil yolu kapsar: bir kullanıcının
+tek bir eki tek bir karttan kaldırmasını. Bir workspace, board ya da task silindiğinde
+tetiklenmez, çünkü onlar Postgres'in içinde cascade ediyor — 0022 bunu açıkça yazıyor: "one
+`DELETE FROM \"Workspace\"` removes thousands of attachment rows inside Postgres with no
+application code involved" — ve satırı yazacak hiçbir uygulama kodu koşmuyor. Bu kapatılacak bir
+boşluk değil, doğru davranış. Cascade'i, ek başına activity yayması için uygulama kodundan
+geçirmek, 0022'nin sahipsiz dosya süpürmesini üzerine kurduğu özelliği — "orphan production is
+bulk and silent" — tersine çevirme denemesi olurdu; toplu silmenin cevabı süpürme ve onun
+`CleanupCounts`'ı (`apps/api/src/retention/cleanup.worker.ts:71`), tek bir tıklamayı anlatan
+binlerce denetim satırı değil. Toplu olay zaten bir kez, `board.deleted` ya da `task.deleted`
+olarak kaydediliyor. Dolayısıyla denetim alt kümesinin burada cevapladığı soru "kim bir dosyayı
+karttan ayırdı", "hangi dosyalar var olmayı bıraktı" değil; ikincisinin cevabı
+`board.deleted`/`task.deleted` artı süpürmenin sayaçları.
 
 `attachment.created`'ı da almanın argümanı ters yönde işliyordu: "ele geçirilmiş bu hesap burada ne
 yaptı" diye soran bir olay müdahalecisi, ne alındığı kadar ne konduğunu da ister. Bu argüman, ancak
@@ -371,6 +386,19 @@ kendi activity akışından, görev görev gelecek; ya da hâlâ duran bir dosya
 olarak yok. Bir olay gerçekten böyle bir şey gerektirirse çare, `Activity`'ye karşı tek bir
 `attachment.created` tipiyle filtrelenmiş bir sorgudur — alt kümeyi değiştirmek değil; o, bu
 kararın kapattığı import-hacmi sorununu yeniden açardı.
+
+**`activity.ts`'in kendi yorumları doğru olmaktan çıkıyor ve aynı PR'da yeniden yazılmalı.** O
+dosya kendini konuma göre anlatıyor: başlığı (`activity.ts:1-13`) "ilk yedi ismin hepsi bir karta
+olan bir şeyi anlatır" ve "listenin geri kalanı audit trail'dir" diyor; alt kümenin yorumu
+(`activity.ts:51-64`) ise olayları sıradan içerik ile erişim-ve-yıkım diye ayırıyor.
+`attachment.created` bu cümlelerin hiçbirinin hiçbir yarısına oturmuyor — ilk yediden olmayan bir
+kart olayı ve audit trail'in içinde olmadan onun yanında duruyor. Dokunulmazsa dosya, kendi sabit
+listesinde artık bulunmayan ikili bir ayrımı belgelemiş olur. Bu yüzden yorumlar, ayrımın gerçekte
+dayandığı üyelik kuralını yazacak — ki bu hep gerçek ölçüttü ve hiç yazılmamıştı: bir olay
+`AUDIT_ACTIVITY_TYPES`'a **yıkıcı ya da erişim-değiştirici ve düşük hacimli** olduğu için girer,
+listede nerede durduğu için değil. Ölçütü dosyaya yazmak, bir sonraki kişinin bu ADR'ı yeniden
+türetmeden yeni bir tip ekleyebilmesini sağlayan şey — ve board ile label girdilerinin
+açıklanabilmesinin de tek yolu, çünkü konum onları hiçbir zaman açıklamıyordu.
 
 **P3-4, bu ADR'ın seçtiği bir biçimde zorlaşıyor.** `User`'a giden bir `Restrict` FK daha, bir
 anonimleştirme tasarımının etrafından dolaşması gereken bir ilişki daha demek ve
