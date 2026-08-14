@@ -53,8 +53,22 @@ export const auth = betterAuth({
     database: {
       generateId: () => uuidv7(),
     },
-    // Cross-origin SPA (web :3000 → api :4000) needs SameSite=None in production HTTPS;
-    // locally Better Auth defaults work with credentialed fetch on different ports.
+    // Left off, and that is now a deployment decision rather than a local-dev convenience.
+    //
+    // A published Kurultay serves the web app and this API from one hostname
+    // (`docker/Caddyfile`), so the session cookie is same-site with the page that reads it and
+    // Better Auth's defaults apply: both `session_token` and `session_data` go out
+    // `HttpOnly; SameSite=Lax` (measured, not assumed). Turning this on would widen the cookie
+    // to `Domain=.example.com`, which makes every sibling subdomain same-site with the API —
+    // `Lax` would keep sending the session for requests one of them initiates, and an operator
+    // does not control all of them. A split-domain deployment (api on its own registrable
+    // domain) is worse still: it needs `SameSite=None`, which removes the `SameSite` defence
+    // outright.
+    //
+    // Neither shape is unsupported — `WEB_URL`, `BETTER_AUTH_URL` and `NEXT_PUBLIC_API_URL` are
+    // independent settings and the dev loop itself runs two ports — so the API no longer relies
+    // on the cookie attribute alone: `common/origin-check.ts` refuses state-changing requests
+    // that announce an origin outside the allowlist, on both routers, whatever `SameSite` says.
     crossSubDomainCookies: {
       enabled: false,
     },

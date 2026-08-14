@@ -4,6 +4,7 @@ import { mountBetterAuth } from '../auth/mount-better-auth';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
 import { createAccessLogMiddleware } from './logging/access-log.middleware';
 import { requestIdMiddleware } from './logging/request-id';
+import { createOriginCheckMiddleware, resolveAllowedOrigins } from './origin-check';
 import { configureTrustProxy } from './trust-proxy';
 import { validationExceptionFactory } from './validation/validation-exception.factory';
 
@@ -62,6 +63,23 @@ export function configureApp(
     origin: options.corsOrigin,
     credentials: true,
   });
+
+  // The server-side half of the cross-origin story, and the only half that survives a
+  // deployment where the session cookie is not `SameSite=Lax` — see `origin-check.ts` for the
+  // measurements behind that. Two things about its position here are load-bearing:
+  //
+  //   * **After `enableCors`**, so the CORS middleware still answers and ends preflight
+  //     `OPTIONS` requests itself. A rejection issued before the browser has been told the
+  //     policy turns a readable 403 into an unexplainable network error.
+  //   * **Before `mountBetterAuth`**, so it covers the Better Auth mount too. That mount
+  //     bypasses the Nest router (ADR 0004), which is why this is a middleware and not a
+  //     guard: `/auth/sign-in/email` and `/auth/sign-out` were both measured answering `200`
+  //     to a cross-site POST, so the auth routes needed this at least as much as `/workspaces`
+  //     did. Better Auth's own `originCheck` is untouched and still runs underneath.
+  //
+  // The allowlist is derived from the CORS origin rather than configured separately, so the
+  // browser-side and server-side allowlists cannot drift apart.
+  app.use(createOriginCheckMiddleware(resolveAllowedOrigins(options.corsOrigin)));
 
   mountBetterAuth(app);
 
