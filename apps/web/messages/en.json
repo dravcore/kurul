@@ -24,7 +24,18 @@
       "submit": "Create account",
       "hasAccount": "Already have an account?",
       "loginLink": "Sign in",
-      "error": "Could not create your account. Check your details and try again."
+      "error": "Could not create your account. Check your details and try again.",
+      "fieldErrors": {
+        "email": {
+          "invalidEmail": "Please enter a valid email address.",
+          "alreadyExists": "This email address is already in use. Sign in instead, or use a different address."
+        },
+        "password": {
+          "invalidPassword": "Password is required.",
+          "tooShort": "Password must be at least 8 characters long.",
+          "tooLong": "Password is too long."
+        }
+      }
     },
     "invite": {
       "title": "Accept invitation",

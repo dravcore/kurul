@@ -8,6 +8,7 @@ import { AuthFormField } from '@/components/auth/auth-form-field';
 import { Button } from '@/components/ui/button';
 import { AFTER_REGISTER_PATH, NEXT_PARAM, safeNextPath, withNextParam } from '@/lib/auth-redirect';
 import { authClient } from '@/lib/auth';
+import { resolveRegisterErrorMapping } from '@/lib/auth-error';
 
 /**
  * The sign-up form.
@@ -16,6 +17,10 @@ import { authClient } from '@/lib/auth';
  * have nothing in it. An invitee is the exception: they arrived from an invitation, have a
  * workspace waiting, and `?next=…` is what carries them back to it instead of asking them to
  * create one they do not want.
+ *
+ * Errors are shown at the field level when the error code maps to a specific field
+ * (e.g., `PASSWORD_TOO_SHORT` → password field). Unmapped codes fall back to a generic
+ * message shown above the form.
  */
 export function RegisterView(): React.ReactElement {
   const t = useTranslations('auth.register');
@@ -25,6 +30,7 @@ export function RegisterView(): React.ReactElement {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email' | 'password', string>>>({});
   const [pending, setPending] = useState(false);
 
   const next = safeNextPath(searchParams.get(NEXT_PARAM));
@@ -33,6 +39,7 @@ export function RegisterView(): React.ReactElement {
     event.preventDefault();
     setPending(true);
     setError(null);
+    setFieldErrors({});
 
     try {
       const result = await authClient.signUp.email({
@@ -42,7 +49,16 @@ export function RegisterView(): React.ReactElement {
       });
 
       if (result.error) {
-        setError(t('error'));
+        const mapping = resolveRegisterErrorMapping(result.error.code);
+
+        if (mapping && mapping.field) {
+          // Map to a field-level error using the i18n message key.
+          const fieldError = t(mapping.messageKey);
+          setFieldErrors({ [mapping.field]: fieldError });
+        } else {
+          // Fall back to generic error for unmapped codes.
+          setError(t('error'));
+        }
         return;
       }
 
@@ -73,6 +89,7 @@ export function RegisterView(): React.ReactElement {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          error={fieldErrors.email}
         />
         <AuthFormField
           label={t('password')}
@@ -81,6 +98,7 @@ export function RegisterView(): React.ReactElement {
           minLength={8}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          error={fieldErrors.password}
         />
         {error ? <p className="text-body text-destructive">{error}</p> : null}
         <Button type="submit" disabled={pending}>
