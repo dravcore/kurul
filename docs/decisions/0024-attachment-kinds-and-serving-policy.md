@@ -106,19 +106,27 @@ Which object performs that emit is a module-boundary question, settled below rat
 and P3-2 shipped first and said "attachments and import inherit the same decision"; P3-2 shipped it
 as [ADR 0023](0023-checklist-data-model.md). This paragraph is the link 0022 never drew.
 
-**Adding and removing an attachment each write an `Activity` row: `attachment.created` and
-`attachment.deleted`, and both enter `AUDIT_ACTIVITY_TYPES`.** The two constants are
-`AttachmentCreated: 'attachment.created'` and `AttachmentDeleted: 'attachment.deleted'`, joining
-`ActivityType` in `packages/shared-types/src/activity.ts` and the audit subset at
+**Adding and removing an attachment each write an `Activity` row — `attachment.created` and
+`attachment.deleted` — but only `attachment.deleted` enters `AUDIT_ACTIVITY_TYPES`.** The two
+constants are `AttachmentCreated: 'attachment.created'` and
+`AttachmentDeleted: 'attachment.deleted'`, both joining `ActivityType` in
+`packages/shared-types/src/activity.ts`; only the second is added to the audit subset at
 `activity.ts:65-83`. The strings are fixed here rather than left to the implementation, because
 that file's own header states the constraint that makes them one-shot: the names "are written into
 the database, so they are a storage format and not display text: renaming one orphans every row
 already carrying the old string. Add, never rename" (`activity.ts:11-13`). The verbs are
 `created`/`deleted` rather than `added`/`removed` to match the existing `<subject>.<past-tense
 verb>` vocabulary — `comment.created` and `task.deleted` are the direct precedents, and no name in
-the list uses `added`. `audit/phase-3-plan.md` §4.1b asked this question and proposed this answer
-(lines 332-333: "Attachment ekleme/silme `AUDIT_ACTIVITY_TYPES`'a girer mi? (Öneri: evet,
-ekleme+silme.)"); this ADR is where it is settled.
+the list uses `added`.
+
+**`audit/phase-3-plan.md` §4.1b proposed both types for the audit subset, and that half of the
+proposal is rejected here.** Its line 333 reads "(Öneri: evet, ekleme+silme.)" — yes, both add and
+delete. This ADR takes the delete and declines the add. The proposal was written before two things
+that decide the question: §7 decision 4 (line 910), which gave P3-3 a bulk import that creates an
+attachment record per imported URL, and the volume criterion `activity.ts:51-64` states for the
+subset. The narrowing is recorded rather than applied quietly, because a later reader comparing the
+plan to the code would otherwise find a silent discrepancy and have to guess which one was
+intended.
 
 **The server never fetches a `LINK`'s URL. Not once, for any reason.** No preview, no favicon, no
 `<title>` scrape, no metadata, no unfurl, no link-health check. The URL is stored, returned and
@@ -261,20 +269,32 @@ recoverability. A checklist item deleted by mistake is a sentence someone retype
 its deletion would be a row about an event with no lasting consequence. An attachment deleted by
 mistake is gone, and 0022's own orphan sweep is what makes it gone — the row disappears from
 Postgres, and the nightly sweep removes the bytes from disk once the grace period passes. After
-that, the only remaining evidence that the file ever existed is the activity row. That is the same
-argument `activity.ts:51-64` already makes for including `task.deleted` in the audit subset: it is
-"the one content event that destroys rather than edits". Attachment deletion is a second one.
+that, the only remaining evidence that the file ever existed is the activity row. That asymmetry —
+a checklist item is retypable, a swept file is not — is why one feature writes activity and the
+other does not, and it is also what decides which of the two new types belongs in the audit subset.
 
-**Why the create side is in the audit subset too, on that file's own criterion.** The subset
-excludes `comment.created`, and `activity.ts:51-64` gives the reason explicitly: ordinary content
-events "outnumber everything else here by orders of magnitude and none of them changes anyone's
-access". The first half of that test does not transfer. An upload is rate-limited by the
-`ThrottleUploads()` decorator 0022 already specified and capped by `ATTACHMENT_MAX_BYTES`, so it
-is not in the volume class a comment is — nobody uploads a hundred files in the time they write a
-hundred comments. The second half is answered by what an incident responder is actually asking:
-"what did this compromised account do here" is one question with two halves, what was taken and
-what was put there, and an attacker who plants a file is not caught by a list that records only
-removals. Excluding the create side would make the audit query answer half of its own question.
+**Why only the delete side is in the audit subset.** `activity.ts:51-64` states what the subset is
+for in one sentence — "who removed, granted or destroyed something here?" — and uploading a file is
+none of those three. It is content creation, which puts it in `comment.created`'s class, not
+`board.created`'s: the board and label events are in the subset because they are structural
+administration whose rows are "often the only surviving evidence that the work existed at all"
+(`activity.ts:24-25`), and `task.deleted` is in it because, as the same comment says, it is "the
+one content event that destroys rather than edits". `attachment.deleted` is a second such event and
+a stronger one — a deleted task's rows are still in last night's dump, while a swept attachment's
+bytes are not on the disk the dump does not cover.
+
+The argument for including `attachment.created` ran the other way: an incident responder asking
+"what did this compromised account do here" wants what was put there as well as what was taken.
+That argument was rejected for two reasons that only appear when the rest of Phase 3 is in view.
+First, it would have to rest on uploads being low-volume, which would make an audit-query decision
+depend on a rate limit whose value 0022 never set and this ADR deliberately does not set either —
+a decision resting on an unwritten number is the exact defect this ADR was opened to fix in 0022.
+Second, and decisively, P3-3's importer creates an attachment record per imported URL (§7 decision
+4, line 910), so one board import writes `attachment.created` rows in bulk. That is precisely the
+volume behaviour `comment.created` is excluded for, and it would arrive through a code path no rate
+limit governs. Keeping the create side out means the importer can write as many rows as it likes
+and the incident-response query never sees them. The responder loses nothing they cannot get from
+the task's own activity feed, which still records every upload.
 
 **Why the `User` foreign key is worth a cost ADR 0023 refused to pay.** 0023 declined
 `completedById` on a checklist item because ticking a box is not an attributed act and the field
@@ -337,13 +357,17 @@ alternative was discovering it during P3-3.
 **`attachment.created` and `attachment.deleted` are permanent from the first row written.**
 `activity.ts:11-13` makes the names unrenameable once a row exists, so the review of this ADR is
 the last cheap moment to argue about them; after it, a rename is a data migration over rows the
-audit query depends on. Adding them to `AUDIT_ACTIVITY_TYPES` also changes what that query returns
-for every existing workspace the day attachments ship. The Rationale argues the create side belongs
-there on `activity.ts`'s own volume criterion, and that argument is a prediction: it holds only
-while uploads stay rate-limited and size-capped. If a future bulk-import path writes
-`attachment.created` rows at comment-like volume — P3-3 is the obvious candidate, since it creates
-a `LINK` per imported attachment — the audit subset gets noisy in exactly the way `comment.created`
-was excluded to avoid, and the fix is to reconsider the membership, not the rate limit.
+audit query depends on.
+
+**"Who uploaded this file?" is not a one-query answer.** Keeping `attachment.created` out of
+`AUDIT_ACTIVITY_TYPES` is what makes the audit subset immune to P3-3's bulk import, and the price
+is paid by whoever asks the upload question later: the audit query
+(`WHERE workspaceId = $1 AND type = ANY($2)`) will not return uploads, so the answer comes from the
+task's own activity feed, one task at a time, or from `Attachment.uploadedById` for a file that
+still exists. There is deliberately no workspace-wide "everything uploaded here" query. If an
+incident ever needs one, the fix is a query against `Activity` filtered on the single
+`attachment.created` type — not a change to the subset, which would reopen the import-volume
+problem this decision closed.
 
 **P3-4 gets harder in a way this ADR chose.** One more `Restrict` FK to `User` is one more relation
 an anonymization design has to route around, and `audit/ROADMAP.md:372` already lists `Restrict`
@@ -390,23 +414,24 @@ already requires.
 
 ## Alternatives considered
 
-| Alternative                                                                  | Why not                                                                                                                                                                                                         |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Distinguish a link by leaving `mimeType` null instead of adding `kind`       | Turns a database-enforceable invariant into one only the application remembers; nothing prevents a row with both a URL and a storage key, or with neither, and a bulk importer writes the first one             |
-| A separate `TaskLink` model beside `Attachment`                              | Two models, two endpoint families, two activity vocabularies and two list queries the panel has to merge and order, to represent one thing users already call "the stuff attached to this card"                 |
-| Allow `image/svg+xml` on the allowlist                                       | SVG is markup that can carry `<script>`, and images are the one family served `inline` — admitting it converts the inline-preview decision into stored XSS on the API origin                                    |
-| Serve everything with `Content-Disposition: attachment`, no inline at all    | Removes image preview from the task panel, which 0022 already decided to support; the security gain is available more cheaply through `nosniff`, CORP and the sniffed `Content-Type`                            |
-| Server-side link preview or unfurl (title, favicon, metadata)                | A server-side fetch of a user-supplied URL is an SSRF primitive inside a Compose network where `postgres` and `redis` resolve by name; the feature is cosmetic, the capability is not                           |
-| Use Nest's `FileTypeValidator` with `NODE_OPTIONS=--experimental-vm-modules` | Its own warning text suggests this, but the flag would have to be right in every runner, CI job and IDE; when it is not, the validator returns `false` silently and a valid PNG is rejected as the user's fault |
-| Keep the size limit only at the proxy                                        | Multer's `limits.fileSize` defaults to unlimited, so the API would accept whatever a replaced or misconfigured proxy let through, and the limit would vanish entirely for anyone swapping Caddy out             |
-| Independently tunable API and proxy limits                                   | Different numbers reproduce exactly the untraceable `413` that made 0022 add the proxy row: one direction logs a successful proxy request for a failed upload, the other logs nothing at all                    |
-| A denormalized `Attachment.workspaceId` column                               | `Task` does not carry one either; the relation path is the shape every task sub-resource already uses, and a copied tenant id is a second source of truth that can disagree with the first                      |
-| Build the storage path from the uploaded filename                            | Makes path traversal a validation problem that has to be solved on every write path forever, instead of one that cannot be expressed because the key comes from the row's own UUIDv7                            |
-| No `uploadedById`; read the uploader from the activity trail                 | Makes "who uploaded this" a query against the audit log rather than a property of the object — the trail records that an event happened, the row is what the event produced                                     |
-| Name the activity types `attachment.added` / `attachment.removed`            | No name in `ActivityType` uses `added`; `comment.created` and `task.deleted` are the precedents, and the names are unrenameable once written, so matching the existing vocabulary is a one-time free choice     |
-| Export `TaskEventsService` from `task.module.ts` so the new module can emit  | Widens an encapsulation `task.module.ts:17-19` states deliberately, to avoid one `emitToBoard` call the comment module already makes directly with the same payload                                             |
-| Return `TaskDto` from the attachment endpoints, as checklist endpoints do    | Checklist returns `TaskDto` because its controller _is_ `TaskController`; in a separate module that reason is gone, and the client re-reads the task on `task:updated` anyway                                   |
-| No activity rows for attachments, following the checklist precedent          | A deleted checklist item can be retyped; a deleted file is removed from disk by the orphan sweep and the activity row becomes the only evidence it existed                                                      |
-| A new `attachment:added` / `attachment:removed` socket event                 | ADR 0023 already decided this for both features and the phase plan assigned the decision to whichever shipped first; re-deciding it would fork the realtime contract for no new requirement                     |
-| Mount the endpoints on `TaskController` per the checklist shape              | Three of the five published endpoints are not addressed through a task, and the module carries a storage port, a multer interceptor and the API's only byte-streaming handler                                   |
-| Leave `file-type` as a transitive dependency of `@nestjs/common`             | It is exact-pinned there, so its version is Nest's to change; a routine patch bump could move a package our validation path imports by name with nothing in our `package.json` to review it against             |
+| Alternative                                                                         | Why not                                                                                                                                                                                                               |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Distinguish a link by leaving `mimeType` null instead of adding `kind`              | Turns a database-enforceable invariant into one only the application remembers; nothing prevents a row with both a URL and a storage key, or with neither, and a bulk importer writes the first one                   |
+| A separate `TaskLink` model beside `Attachment`                                     | Two models, two endpoint families, two activity vocabularies and two list queries the panel has to merge and order, to represent one thing users already call "the stuff attached to this card"                       |
+| Allow `image/svg+xml` on the allowlist                                              | SVG is markup that can carry `<script>`, and images are the one family served `inline` — admitting it converts the inline-preview decision into stored XSS on the API origin                                          |
+| Serve everything with `Content-Disposition: attachment`, no inline at all           | Removes image preview from the task panel, which 0022 already decided to support; the security gain is available more cheaply through `nosniff`, CORP and the sniffed `Content-Type`                                  |
+| Server-side link preview or unfurl (title, favicon, metadata)                       | A server-side fetch of a user-supplied URL is an SSRF primitive inside a Compose network where `postgres` and `redis` resolve by name; the feature is cosmetic, the capability is not                                 |
+| Use Nest's `FileTypeValidator` with `NODE_OPTIONS=--experimental-vm-modules`        | Its own warning text suggests this, but the flag would have to be right in every runner, CI job and IDE; when it is not, the validator returns `false` silently and a valid PNG is rejected as the user's fault       |
+| Keep the size limit only at the proxy                                               | Multer's `limits.fileSize` defaults to unlimited, so the API would accept whatever a replaced or misconfigured proxy let through, and the limit would vanish entirely for anyone swapping Caddy out                   |
+| Independently tunable API and proxy limits                                          | Different numbers reproduce exactly the untraceable `413` that made 0022 add the proxy row: one direction logs a successful proxy request for a failed upload, the other logs nothing at all                          |
+| A denormalized `Attachment.workspaceId` column                                      | `Task` does not carry one either; the relation path is the shape every task sub-resource already uses, and a copied tenant id is a second source of truth that can disagree with the first                            |
+| Build the storage path from the uploaded filename                                   | Makes path traversal a validation problem that has to be solved on every write path forever, instead of one that cannot be expressed because the key comes from the row's own UUIDv7                                  |
+| No `uploadedById`; read the uploader from the activity trail                        | Makes "who uploaded this" a query against the audit log rather than a property of the object — the trail records that an event happened, the row is what the event produced                                           |
+| Name the activity types `attachment.added` / `attachment.removed`                   | No name in `ActivityType` uses `added`; `comment.created` and `task.deleted` are the precedents, and the names are unrenameable once written, so matching the existing vocabulary is a one-time free choice           |
+| `attachment.created` in the audit subset, as `audit/phase-3-plan.md` §4.1b proposed | Uploading is content creation, not the "removed, granted or destroyed" the subset collects; and P3-3's importer writes one row per imported URL, which is the bulk-volume behaviour `comment.created` is excluded for |
+| Export `TaskEventsService` from `task.module.ts` so the new module can emit         | Widens an encapsulation `task.module.ts:17-19` states deliberately, to avoid one `emitToBoard` call the comment module already makes directly with the same payload                                                   |
+| Return `TaskDto` from the attachment endpoints, as checklist endpoints do           | Checklist returns `TaskDto` because its controller _is_ `TaskController`; in a separate module that reason is gone, and the client re-reads the task on `task:updated` anyway                                         |
+| No activity rows for attachments, following the checklist precedent                 | A deleted checklist item can be retyped; a deleted file is removed from disk by the orphan sweep and the activity row becomes the only evidence it existed                                                            |
+| A new `attachment:added` / `attachment:removed` socket event                        | ADR 0023 already decided this for both features and the phase plan assigned the decision to whichever shipped first; re-deciding it would fork the realtime contract for no new requirement                           |
+| Mount the endpoints on `TaskController` per the checklist shape                     | Three of the five published endpoints are not addressed through a task, and the module carries a storage port, a multer interceptor and the API's only byte-streaming handler                                         |
+| Leave `file-type` as a transitive dependency of `@nestjs/common`                    | It is exact-pinned there, so its version is Nest's to change; a routine patch bump could move a package our validation path imports by name with nothing in our `package.json` to review it against                   |
