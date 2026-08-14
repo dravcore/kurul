@@ -9,6 +9,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Register form now shows field-level error messages** — when sign-up fails, the error is no
+  longer reported as a generic "could not create your account" message. Better Auth error codes
+  like `PASSWORD_TOO_SHORT` and `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` now map to their
+  relevant field (password, email) with a message that tells the user exactly what to fix.
+  Unknown errors fall back to the generic message to avoid leaking unnecessary details.
 - A **Workspace** section in Settings — renaming and deleting a workspace no longer require
   `curl`. `PATCH /workspaces/:workspaceId` and `DELETE /workspaces/:workspaceId` existed from
   the start, but nothing in the product called either. Rename (OWNER/ADMIN, matching the
