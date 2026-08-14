@@ -1,0 +1,24 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // Bundler resolution, not the repo-wide NodeNext: Playwright's own loader resolves
+    // extensionless relative imports, and NodeNext would demand a `.js` suffix on every one
+    // of them purely to satisfy `tsc --noEmit`. Nothing here is ever emitted or published,
+    // so the stricter module semantics buy nothing.
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    // The suite runs in Node but reads the page's DOM through `evaluate` callbacks, which
+    // are type-checked against the browser lib.
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "noEmit": true,
+    // `stack-shared.mjs` and `load-env.mjs` are shared with `build-stack.mjs`, which runs
+    // under bare Node with no transpiler.
+    "allowJs": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "**/*.mjs"],
+  "exclude": ["node_modules"]
+}

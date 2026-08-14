@@ -81,6 +81,11 @@ export default tseslint.config(
       '**/.next/**',
       '**/coverage/**',
       'apps/api/src/generated/**',
+      // Playwright's generated output. `e2e/playwright-report` in particular is a bundled
+      // HTML app with its own JavaScript, which ESLint would happily spend a minute parsing.
+      'e2e/test-results/**',
+      'e2e/playwright-report/**',
+      'e2e/blob-report/**',
     ],
   },
   eslint.configs.recommended,
