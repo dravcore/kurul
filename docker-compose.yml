@@ -207,6 +207,18 @@ services:
 
   # One-shot: applies pending Prisma migrations, then exits. `api` waits for it to finish
   # successfully before starting, so the schema is never missing on first boot.
+  #
+  # `build:` only, deliberately no `image:` fallback pair like api/web below: OPS-04
+  # (audit/findings/devops.md) scopes GHCR publishing to the two long-running services, and
+  # `.github/workflows/release-images.yml` only builds `runner` targets, not this Dockerfile's
+  # `migrate` stage. A source build still runs on every `docker compose up -d` for this one
+  # service — it reuses the same `build` stage the `api` image already paid for above it in
+  # the Dockerfile, ~45-50s uncached, so it does not fully deliver a build-free install on its
+  # own. It does not block the ≤5-minute pull-based install target either (that budget has
+  # headroom for one 45-50s build), and the `migrate` container's own logs make it obvious
+  # when this is what's happening, unlike a silent full rebuild of api or web would be. A
+  # published `kurultay-migrate` image is a reasonable next step if this ever needs to shrink
+  # further, not something this fix requires.
   migrate:
     build:
       context: .
@@ -233,6 +245,19 @@ services:
         condition: service_healthy
 
   api:
+    # OPS-04 (audit/findings/devops.md): `image:` alongside `build:` is not an either/or —
+    # Compose's default pull_policy (`missing`) means `docker compose up -d` only builds when
+    # the tag below isn't already resolvable, so `docker compose pull && docker compose up -d`
+    # (docs/development.md#full-stack-in-docker) now installs and upgrades from a published
+    # image with no local build at all, while a plain `docker compose up -d --build` (or `up
+    # -d` on a host that can't reach ghcr.io) still falls all the way back to `build:` below,
+    # unchanged from before this image existed — verified empirically: pointing this pattern
+    # at a deliberately unpublished tag, `docker compose pull` fails loudly, and the immediately
+    # following `docker compose up -d` builds from `build:` and starts anyway, exit 0.
+    # `${TAG:-latest}` (not a hardcoded version) so an operator pins a release with `TAG=v0.2.0`
+    # in `.env` and gets `latest` — the tag `.github/workflows/release-images.yml` always
+    # publishes alongside every numbered release — when they leave it unset.
+    image: ghcr.io/dravcore/kurultay-api:${TAG:-latest}
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -299,6 +324,17 @@ services:
         condition: service_completed_successfully
 
   web:
+    # Same `image:` + `build:` fallback as api above, with one caveat specific to this
+    # service: `.github/workflows/release-images.yml` publishes this image built with the
+    # `args:` block's Dockerfile defaults (`NEXT_PUBLIC_API_URL=http://localhost:4000`, Sentry
+    # DSNs blank), because Next.js inlines `NEXT_PUBLIC_*` into the client bundle at build
+    # time — a published image cannot have its API URL swapped at container start the way
+    # api's DATABASE_URL can. Pulling this tag therefore only works out of the box for the
+    # common case of the browser reaching the API at localhost:4000; any other
+    # NEXT_PUBLIC_API_URL still needs `docker compose build web` (this file's own `build:`
+    # below with the `args:` filled from `.env`) until the runtime-configurable API URL that
+    # OPS-04's own follow-up tracks replaces this constraint.
+    image: ghcr.io/dravcore/kurultay-web:${TAG:-latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile

@@ -44,7 +44,8 @@ Kurultay's answer is deliberately narrow:
   model is dual licensing of that same code, not a paid feature build
   ([ADR 0014](docs/decisions/0014-dual-licensing-cla.md)).
 - **Current stack, one compose file.** Next.js 16 / NestJS 11 / PostgreSQL 18, TypeScript end to
-  end, `docker compose up --build` for the whole thing.
+  end, `docker compose pull && docker compose up -d` for the whole thing — published images, no
+  local build required.
 - **Realtime and multi-tenancy in the core.** Socket.io board sync and workspace-scoped queries
   were designed in, not added on top.
 
@@ -102,8 +103,13 @@ dev compose file above already starts [Mailpit](https://mailpit.axllent.org/) so
 that flow locally without a real mail provider; see
 [docs/development.md#smtp-and-mailpit](docs/development.md#smtp-and-mailpit).
 
-Full stack in Docker: `docker compose up --build`. Day-to-day details:
-[docs/development.md](docs/development.md).
+Full stack in Docker, pull-based: `docker compose pull && docker compose up -d`. Every
+tagged release publishes `api`/`web` images to GHCR (`ghcr.io/dravcore/kurultay-api`,
+`ghcr.io/dravcore/kurultay-web`), so this installs and upgrades without a local build; set
+`TAG=vX.Y.Z` in `.env` to pin a release instead of `latest`. No image published yet for your
+`TAG` (or no network route to `ghcr.io`)? `docker compose up -d` still falls back to building
+from source automatically — `docker compose up --build` keeps working exactly as before, for
+building on purpose. Day-to-day details: [docs/development.md](docs/development.md).
 
 ## Stack
 
