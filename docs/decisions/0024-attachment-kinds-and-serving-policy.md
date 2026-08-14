@@ -71,9 +71,12 @@ through the same path a user does, rather than through a private one.
 
 **One size number, `ATTACHMENT_MAX_BYTES`, default 25 MiB (`26214400`), written in both layers.**
 The API sets multer's `limits.fileSize` from it, and the published proxy contract gains a body-size
-row carrying the same value — `request_body { max_size 25MiB }` in `docker/Caddyfile` and the
+row carrying the same value — `request_body { max_size 25MiB }` in `docker/Caddyfile`, placed
+**inside the `handle_path /api/*` block and before its `reverse_proxy` line**, and the
 `client_max_body_size 25m;` equivalent in the nginx block of
-[self-hosting.md](../self-hosting.md). The two layers are not independently tunable and are not
+[self-hosting.md](../self-hosting.md). That placement was run through `caddy validate` on the
+image the stack pins (`caddy:2-alpine`, `docker-compose.yml:426`) rather than inferred from the
+directive's documentation. The two layers are not independently tunable and are not
 documented as if they were: a deployment that raises one without the other is misconfigured, and
 the documentation says so where the number appears. This is a value, not a feature flag, so 0022's
 `_ENABLED` rule is untouched — `STORAGE_PATH` still decides whether attachments exist at all.
@@ -94,22 +97,28 @@ attachment response regardless of kind or disposition: `X-Content-Type-Options: 
 globally at `apps/api/src/common/configure-app.ts:46`), and a `Content-Type` taken from the
 **sniffed** type, never from the client's declared one.
 
-**No new socket event. ADR 0023's call is inherited, not re-made.** An attachment mutation calls
-`TaskEventsService.emitUpdated` (`apps/api/src/task/task-events.service.ts:29-38`), which emits
-`SocketEvents.TASK_UPDATED` with `{ workspaceId, boardId, actorId, taskId }`, and the client
-re-reads the task over REST. `audit/phase-3-plan.md` §4.2 decision 3 (lines 411-412) assigned this
-choice to whichever of P3-1 and P3-2 shipped first and said "attachments and import inherit the
-same decision"; P3-2 shipped it as [ADR 0023](0023-checklist-data-model.md). This paragraph is the
-link 0022 never drew.
+**No new socket event. ADR 0023's call is inherited, not re-made.** An attachment mutation announces
+itself as `SocketEvents.TASK_UPDATED` carrying `{ workspaceId, boardId, actorId, taskId }` — the
+payload `TaskEventsService.emitUpdated` produces at
+`apps/api/src/task/task-events.service.ts:29-38` — and the client re-reads the task over REST.
+Which object performs that emit is a module-boundary question, settled below rather than here.
+`audit/phase-3-plan.md` §4.2 decision 3 (lines 411-412) assigned this choice to whichever of P3-1
+and P3-2 shipped first and said "attachments and import inherit the same decision"; P3-2 shipped it
+as [ADR 0023](0023-checklist-data-model.md). This paragraph is the link 0022 never drew.
 
-**Adding and removing an attachment each write an `Activity` row, and both types enter
-`AUDIT_ACTIVITY_TYPES`.** Two new constants join `ActivityType` in
-`packages/shared-types/src/activity.ts` and both are added to the audit subset at
-`activity.ts:65-83`. That file's own header states the constraint that makes this a one-shot
-decision: the names "are written into the database, so they are a storage format and not display
-text: renaming one orphans every row already carrying the old string. Add, never rename"
-(`activity.ts:11-13`). The names are therefore chosen once, in the established
-`<subject>.<past-tense verb>` form, and never revised.
+**Adding and removing an attachment each write an `Activity` row: `attachment.created` and
+`attachment.deleted`, and both enter `AUDIT_ACTIVITY_TYPES`.** The two constants are
+`AttachmentCreated: 'attachment.created'` and `AttachmentDeleted: 'attachment.deleted'`, joining
+`ActivityType` in `packages/shared-types/src/activity.ts` and the audit subset at
+`activity.ts:65-83`. The strings are fixed here rather than left to the implementation, because
+that file's own header states the constraint that makes them one-shot: the names "are written into
+the database, so they are a storage format and not display text: renaming one orphans every row
+already carrying the old string. Add, never rename" (`activity.ts:11-13`). The verbs are
+`created`/`deleted` rather than `added`/`removed` to match the existing `<subject>.<past-tense
+verb>` vocabulary — `comment.created` and `task.deleted` are the direct precedents, and no name in
+the list uses `added`. `audit/phase-3-plan.md` §4.1b asked this question and proposed this answer
+(lines 332-333: "Attachment ekleme/silme `AUDIT_ACTIVITY_TYPES`'a girer mi? (Öneri: evet,
+ekleme+silme.)"); this ADR is where it is settled.
 
 **The server never fetches a `LINK`'s URL. Not once, for any reason.** No preview, no favicon, no
 `<title>` scrape, no metadata, no unfurl, no link-health check. The URL is stored, returned and
@@ -148,11 +157,26 @@ This is a deviation from the guidance written into `apps/api/src/task/task.modul
 ends "New sub-resources should follow the checklist shape"; the deviation is named as one and
 argued below rather than left for a reviewer to notice.
 
+**The separate module emits `TASK_UPDATED` itself, and its endpoints return `AttachmentDto`, not
+`TaskDto`.** `task.module.ts` deliberately exports only `TaskService` — its comment at lines 17-19
+says `TaskReadService` and `TaskEventsService` "are the module's internals", citing
+`docs/coding-standards.md` — so an `AttachmentModule` cannot reach `emitUpdated`. The comment
+module already solved this: `CommentModule` imports `RealtimeModule` itself
+(`apps/api/src/comment/comment.module.ts:9`) and `CommentService` publishes directly through
+`this.realtime.emitToBoard(...)` (`apps/api/src/comment/comment.service.ts:141-147`).
+`AttachmentModule` does the same, emitting `SocketEvents.TASK_UPDATED` with a payload byte-identical
+to `TaskEventsService.emitUpdated`'s — `{ workspaceId, boardId, actorId, taskId }` — so D5 holds
+without `task.module.ts`'s encapsulation being reopened. The endpoints then return `AttachmentDto`,
+following the same precedent: checklist endpoints return `TaskDto` because their controller _is_
+`TaskController`, and that reason does not survive the move to a separate module. The client
+re-reads the task over REST when `task:updated` arrives, which is ADR 0023's design, so nothing
+depends on the mutation response carrying the whole task.
+
 **Left to the implementation plan, explicitly and not by omission:** the `Attachment` model's full
-field list; its index set; the DTO shapes and whether list and detail reads carry different ones;
-the query shape of the orphan sweep 0022 already decided to build; and how the web surface splits
-into components. Each is a shape question with no cross-cutting consequence, and none of them can
-be got wrong in a way another ADR would have to undo.
+field list; its index set; `AttachmentDto`'s field list; the query shape of the orphan sweep 0022
+already decided to build; and how the web surface splits into components. Each is a shape question
+with no cross-cutting consequence, and none of them can be got wrong in a way another ADR would
+have to undo.
 
 ## Rationale
 
@@ -239,10 +263,18 @@ mistake is gone, and 0022's own orphan sweep is what makes it gone — the row d
 Postgres, and the nightly sweep removes the bytes from disk once the grace period passes. After
 that, the only remaining evidence that the file ever existed is the activity row. That is the same
 argument `activity.ts:51-64` already makes for including `task.deleted` in the audit subset: it is
-"the one content event that destroys rather than edits". Attachment deletion is a second one. Both
-types enter `AUDIT_ACTIVITY_TYPES` rather than only the delete, because an incident responder
-asking "what did this compromised account do here" needs the upload too — an attacker who plants a
-file is not helped by a list that only records removals.
+"the one content event that destroys rather than edits". Attachment deletion is a second one.
+
+**Why the create side is in the audit subset too, on that file's own criterion.** The subset
+excludes `comment.created`, and `activity.ts:51-64` gives the reason explicitly: ordinary content
+events "outnumber everything else here by orders of magnitude and none of them changes anyone's
+access". The first half of that test does not transfer. An upload is rate-limited by the
+`ThrottleUploads()` decorator 0022 already specified and capped by `ATTACHMENT_MAX_BYTES`, so it
+is not in the volume class a comment is — nobody uploads a hundred files in the time they write a
+hundred comments. The second half is answered by what an incident responder is actually asking:
+"what did this compromised account do here" is one question with two halves, what was taken and
+what was put there, and an attacker who plants a file is not caught by a list that records only
+removals. Excluding the create side would make the audit query answer half of its own question.
 
 **Why the `User` foreign key is worth a cost ADR 0023 refused to pay.** 0023 declined
 `completedById` on a checklist item because ticking a box is not an attributed act and the field
@@ -302,12 +334,16 @@ coming — §7 decision 4 committed to it — but it was committed to in a plan 
 the ADR, so the estimate attached to 0022 does not include it. Naming it here is the point; the
 alternative was discovering it during P3-3.
 
-**Two `ActivityType` constants are now permanent.** `activity.ts:11-13` makes the names
-unrenameable once a row exists, so the review of this ADR is the last cheap moment to argue about
-them. Adding them to `AUDIT_ACTIVITY_TYPES` also changes what the audit query returns for every
-existing workspace the day attachments ship — a feed that was previously access-and-destruction
-events gains ordinary content events, and anyone reading that list as "security-relevant only"
-sees a volume change without a corresponding incident.
+**`attachment.created` and `attachment.deleted` are permanent from the first row written.**
+`activity.ts:11-13` makes the names unrenameable once a row exists, so the review of this ADR is
+the last cheap moment to argue about them; after it, a rename is a data migration over rows the
+audit query depends on. Adding them to `AUDIT_ACTIVITY_TYPES` also changes what that query returns
+for every existing workspace the day attachments ship. The Rationale argues the create side belongs
+there on `activity.ts`'s own volume criterion, and that argument is a prediction: it holds only
+while uploads stay rate-limited and size-capped. If a future bulk-import path writes
+`attachment.created` rows at comment-like volume — P3-3 is the obvious candidate, since it creates
+a `LINK` per imported attachment — the audit subset gets noisy in exactly the way `comment.created`
+was excluded to avoid, and the fix is to reconsider the membership, not the rate limit.
 
 **P3-4 gets harder in a way this ADR chose.** One more `Restrict` FK to `User` is one more relation
 an anonymization design has to route around, and `audit/ROADMAP.md:372` already lists `Restrict`
@@ -328,18 +364,29 @@ open. A future contributor who wants them has to either accept an SSRF surface d
 an allowlist and a resolver check argued in a new ADR, or push the fetch to the client where the
 API is not the one making the request. The paragraph exists so that choice is made in the open.
 
-**The office-format entries are the allowlist's maintenance cost.** OpenXML and OpenDocument media
-types are long, easy to mistype, and their magic bytes are all a ZIP container — `file-type`
-reports `application/zip` for a `.docx` unless it inspects further. That interaction is the one
-part of D3 with a real chance of being implemented incorrectly, and it is the reason
-`application/zip` being on the list is convenient rather than accidental: the fallback for an
-office document that sniffs as a plain archive is still an accepted type, not a 415 at the user.
+**The office formats sniff correctly, and `application/zip` on the list is the safety net for when
+they do not.** Every office document is a ZIP container, so the obvious worry is that `file-type`
+reports `application/zip` for all of them and D3's office entries never match. Measured against the
+pinned `file-type@21.3.4`, that worry is unfounded: a `.docx`, `.xlsx` and `.pptx` each return
+their own OOXML media type, and an `.odt` returns
+`application/vnd.oasis.opendocument.text`. The detection is not a magic-byte match — `core.js:1320-1343`
+reads and parses the archive's `[Content_Types].xml` entry, and `core.js:1306-1318` reads ODF's
+stored `mimetype` entry. That is also where the residual risk lives, and it was reproduced rather
+than imagined: an archive whose `[Content_Types].xml` is unparseable or too large to read falls
+through to a directory-name heuristic that `core.js:727-738` deliberately declines to run in that
+case, and the result is a plain `application/zip`. A probe built with a stub `[Content_Types].xml`
+did exactly that. `application/zip` being on the allowlist is therefore load-bearing rather than
+incidental: an office document from an unusual producer lands on an accepted type instead of a 415
+the user cannot act on.
 
-**A third module now depends on the task module's read path.** `attachment/` needs the same tenant
-resolution `ChecklistService` gets from `TaskReadService`, which `task.module.ts` deliberately does
-not export. Either `TaskService` grows a narrow method for it or the attachment module resolves the
-task through Prisma itself with the same relation-path `where`. The implementation plan picks one;
-this ADR notes that the deviation in D11 has this as its price.
+**The attachment module resolves its own tenant scope.** `attachment/` needs the tenant resolution
+`ChecklistService` gets from `TaskReadService`, and `task.module.ts` exports neither that nor
+`TaskEventsService`. Per D11 the module reaches neither: it resolves the task through Prisma with
+the same relation-path `where` and emits through `RealtimeModule` directly, the way `CommentService`
+already does. The cost is one more copy of the `task: { board: { workspaceId } }` predicate in the
+codebase, which is the price of not widening `task.module.ts`'s exports — and the predicate is the
+one piece of this feature most covered by the tenant-isolation e2e tests `audit/ROADMAP.md:364`
+already requires.
 
 ## Alternatives considered
 
@@ -356,6 +403,9 @@ this ADR notes that the deviation in D11 has this as its price.
 | A denormalized `Attachment.workspaceId` column                               | `Task` does not carry one either; the relation path is the shape every task sub-resource already uses, and a copied tenant id is a second source of truth that can disagree with the first                      |
 | Build the storage path from the uploaded filename                            | Makes path traversal a validation problem that has to be solved on every write path forever, instead of one that cannot be expressed because the key comes from the row's own UUIDv7                            |
 | No `uploadedById`; read the uploader from the activity trail                 | Makes "who uploaded this" a query against the audit log rather than a property of the object — the trail records that an event happened, the row is what the event produced                                     |
+| Name the activity types `attachment.added` / `attachment.removed`            | No name in `ActivityType` uses `added`; `comment.created` and `task.deleted` are the precedents, and the names are unrenameable once written, so matching the existing vocabulary is a one-time free choice     |
+| Export `TaskEventsService` from `task.module.ts` so the new module can emit  | Widens an encapsulation `task.module.ts:17-19` states deliberately, to avoid one `emitToBoard` call the comment module already makes directly with the same payload                                             |
+| Return `TaskDto` from the attachment endpoints, as checklist endpoints do    | Checklist returns `TaskDto` because its controller _is_ `TaskController`; in a separate module that reason is gone, and the client re-reads the task on `task:updated` anyway                                   |
 | No activity rows for attachments, following the checklist precedent          | A deleted checklist item can be retyped; a deleted file is removed from disk by the orphan sweep and the activity row becomes the only evidence it existed                                                      |
 | A new `attachment:added` / `attachment:removed` socket event                 | ADR 0023 already decided this for both features and the phase plan assigned the decision to whichever shipped first; re-deciding it would fork the realtime contract for no new requirement                     |
 | Mount the endpoints on `TaskController` per the checklist shape              | Three of the five published endpoints are not addressed through a task, and the module carries a storage port, a multer interceptor and the API's only byte-streaming handler                                   |

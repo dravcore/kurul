@@ -72,8 +72,11 @@ arayüzünün yanında karta link ekleme arayüzünü de gönderir. P3-3'ün imp
 **Tek bir boyut sayısı: `ATTACHMENT_MAX_BYTES`, varsayılan 25 MiB (`26214400`), iki katmana da
 yazılır.** API multer'ın `limits.fileSize`'ını bundan kurar ve yayınlanmış proxy sözleşmesi aynı
 değeri taşıyan bir gövde-boyutu satırı kazanır — `docker/Caddyfile`'da
-`request_body { max_size 25MiB }` ve [self-hosting.md](../self-hosting.md)'nin nginx bloğunda
-`client_max_body_size 25m;` karşılığı. İki katman bağımsız ayarlanabilir değildir ve öyleymiş gibi
+`request_body { max_size 25MiB }`, **`handle_path /api/*` bloğunun içinde ve onun `reverse_proxy`
+satırından önce**, ve [self-hosting.md](../self-hosting.md)'nin nginx bloğunda
+`client_max_body_size 25m;` karşılığı. Bu yerleşim, direktifin dokümantasyonundan çıkarılmadı;
+yığının pinlediği imajla (`caddy:2-alpine`, `docker-compose.yml:426`) `caddy validate` koşularak
+doğrulandı. İki katman bağımsız ayarlanabilir değildir ve öyleymiş gibi
 belgelenmez: birini diğeri olmadan yükselten bir kurulum hatalı yapılandırılmıştır ve sayının
 geçtiği yerde dokümantasyon bunu söyler. Bu bir değerdir, bayrak değil; dolayısıyla 0022'nin
 `_ENABLED` kuralına dokunulmaz — dosya eklerinin var olup olmadığına hâlâ `STORAGE_PATH` karar
@@ -96,20 +99,28 @@ satırında global olarak kurduğu `cross-origin` politikasını override ederek
 ettiğinden değil **koklanmış** tipten alınan bir `Content-Type`.
 
 **Yeni socket event yok. ADR 0023'ün kararı yeniden verilmez, miras alınır.** Bir dosya eki
-mutasyonu `TaskEventsService.emitUpdated`'ı çağırır (`apps/api/src/task/task-events.service.ts:29-38`),
-o da `{ workspaceId, boardId, actorId, taskId }` ile `SocketEvents.TASK_UPDATED` yayar ve istemci
-görevi REST üzerinden yeniden okur. `audit/phase-3-plan.md` §4.2 karar 3 (satır 411-412) bu seçimi
+mutasyonu kendini `{ workspaceId, boardId, actorId, taskId }` taşıyan bir
+`SocketEvents.TASK_UPDATED` olarak duyurur — `TaskEventsService.emitUpdated`'ın
+`apps/api/src/task/task-events.service.ts:29-38`'de ürettiği payload'ın aynısı — ve istemci
+görevi REST üzerinden yeniden okur. O yayını hangi nesnenin yaptığı bir modül-sınırı sorusudur ve
+burada değil aşağıda karara bağlanır. `audit/phase-3-plan.md` §4.2 karar 3 (satır 411-412) bu seçimi
 P3-1 ile P3-2'den hangisi önce teslim ederse ona vermiş ve "Attachments ve import aynı kararı miras
 alır" demişti; P3-2 onu [ADR 0023](0023-checklist-data-model.md) olarak teslim etti. Bu paragraf,
 0022'nin hiç kurmadığı bağdır.
 
-**Dosya eki eklemek ve silmek birer `Activity` satırı yazar ve iki tip de `AUDIT_ACTIVITY_TYPES`'a
-girer.** `packages/shared-types/src/activity.ts`'teki `ActivityType`'a iki yeni sabit katılır ve
-ikisi de `activity.ts:65-83`'teki denetim alt kümesine eklenir. O dosyanın kendi başlığı bunu tek
-seferlik bir karar yapan kısıtı söylüyor: isimler "veritabanına yazılır, dolayısıyla bir depolama
-formatıdır, görüntülenen metin değil: birini yeniden adlandırmak eski dizeyi taşıyan her satırı
-öksüz bırakır. Ekle, asla yeniden adlandırma" (`activity.ts:11-13`). İsimler bu yüzden yerleşik
-`<özne>.<geçmiş zaman fiil>` biçiminde bir kez seçilir ve bir daha gözden geçirilmez.
+**Dosya eki eklemek ve silmek birer `Activity` satırı yazar: `attachment.created` ve
+`attachment.deleted`, ve ikisi de `AUDIT_ACTIVITY_TYPES`'a girer.** İki sabit
+`AttachmentCreated: 'attachment.created'` ve `AttachmentDeleted: 'attachment.deleted'`;
+`packages/shared-types/src/activity.ts`'teki `ActivityType`'a ve `activity.ts:65-83`'teki denetim
+alt kümesine katılırlar. Dizeler uygulamaya bırakılmayıp burada sabitleniyor, çünkü o dosyanın kendi
+başlığı onları tek seferlik yapan kısıtı söylüyor: isimler "veritabanına yazılır, dolayısıyla bir
+depolama formatıdır, görüntülenen metin değil: birini yeniden adlandırmak eski dizeyi taşıyan her
+satırı öksüz bırakır. Ekle, asla yeniden adlandırma" (`activity.ts:11-13`). Fiiller
+`added`/`removed` değil `created`/`deleted`, çünkü mevcut `<özne>.<geçmiş zaman fiil>` sözlüğü
+böyle — doğrudan emsaller `comment.created` ve `task.deleted`, ve listedeki hiçbir isim `added`
+kullanmıyor. `audit/phase-3-plan.md` §4.1b bu soruyu sormuş ve bu cevabı önermişti (satır 332-333:
+"Attachment ekleme/silme `AUDIT_ACTIVITY_TYPES`'a girer mi? (Öneri: evet, ekleme+silme.)"); bu ADR
+onun karara bağlandığı yer.
 
 **Sunucu bir `LINK`'in URL'sine hiç istek atmaz. Hiçbir gerekçeyle, bir kez bile.** Önizleme yok,
 favicon yok, `<title>` kazıma yok, metadata yok, unfurl yok, link sağlık kontrolü yok. URL
@@ -148,11 +159,27 @@ Bu, `apps/api/src/task/task.module.ts:17-32`'ye yazılmış, "New sub-resources 
 checklist shape" diye biten yönlendirmeden bir sapmadır; sapma bir sapma olarak adlandırılır ve
 aşağıda gerekçelendirilir, bir gözden geçirenin fark etmesine bırakılmaz.
 
+**Ayrı modül `TASK_UPDATED`'ı kendisi yayar ve uçları `TaskDto` değil `AttachmentDto` döndürür.**
+`task.module.ts` bilinçli olarak yalnızca `TaskService`'i export ediyor — 17-19 satırlarındaki
+yorumu, `docs/coding-standards.md` atfıyla, `TaskReadService` ve `TaskEventsService` için "modülün
+iç işleri" diyor — dolayısıyla bir `AttachmentModule` `emitUpdated`'a erişemez. Comment modülü bunu
+zaten çözmüş: `CommentModule` `RealtimeModule`'ü kendisi import ediyor
+(`apps/api/src/comment/comment.module.ts:9`) ve `CommentService` yayını doğrudan
+`this.realtime.emitToBoard(...)` ile yapıyor (`apps/api/src/comment/comment.service.ts:141-147`).
+`AttachmentModule` aynısını yapar; `SocketEvents.TASK_UPDATED`'ı, payload'ı
+`TaskEventsService.emitUpdated`'ınkiyle bayt bayt aynı olacak şekilde
+(`{ workspaceId, boardId, actorId, taskId }`) yayar; böylece D5, `task.module.ts`'in kapsüllemesi
+yeniden açılmadan korunur. Uçlar da aynı emsali izleyerek `AttachmentDto` döndürür: checklist
+uçlarının `TaskDto` döndürmesinin sebebi controller'ın _`TaskController` olması_ ve bu sebep ayrı
+modüle taşınınca ortadan kalkıyor. İstemci `task:updated` geldiğinde görevi REST'ten yeniden
+okuyor — ADR 0023'ün tasarımı bu — dolayısıyla hiçbir şey mutasyon cevabının tüm görevi
+taşımasına bağlı değil.
+
 **Uygulama planına bırakılanlar — açıkça, gözden kaçırılarak değil:** `Attachment` modelinin tam
-alan listesi; indeks seti; DTO şekilleri ve liste ile detay okumalarının farklı şekiller taşıyıp
-taşımayacağı; 0022'nin inşasına zaten karar verdiği sahipsiz dosya süpürmesinin sorgu şekli; ve web
-yüzeyinin bileşenlere nasıl bölüneceği. Her biri kesişen bir sonucu olmayan bir şekil sorusudur ve
-hiçbiri, başka bir ADR'ın geri almak zorunda kalacağı biçimde yanlış yapılamaz.
+alan listesi; indeks seti; `AttachmentDto`'nun alan listesi; 0022'nin inşasına zaten karar verdiği
+sahipsiz dosya süpürmesinin sorgu şekli; ve web yüzeyinin bileşenlere nasıl bölüneceği. Her biri
+kesişen bir sonucu olmayan bir şekil sorusudur ve hiçbiri, başka bir ADR'ın geri almak zorunda
+kalacağı biçimde yanlış yapılamaz.
 
 ## Gerekçe
 
@@ -237,10 +264,18 @@ Yanlışlıkla silinen bir dosya eki gitmiştir ve onu gitmiş yapan şey 0022'n
 süpürmesidir — satır Postgres'ten kaybolur ve gecelik süpürme, mühlet dolduğunda baytları diskten
 alır. Ondan sonra dosyanın var olduğuna dair geriye kalan tek kanıt activity satırıdır. Bu,
 `activity.ts:51-64`'ün `task.deleted`'ı denetim alt kümesine almak için zaten kurduğu argümanın
-aynısıdır: o, "düzenlemek yerine yok eden tek içerik olayı"dır. Dosya eki silme ikincisidir. Yalnız
-silme değil iki tip de `AUDIT_ACTIVITY_TYPES`'a girer, çünkü "ele geçirilmiş bu hesap burada ne
-yaptı" diye soran bir olay müdahalecisinin yüklemeye de ihtiyacı vardır — dosya yerleştiren bir
-saldırganın karşısında yalnızca kaldırmaları kaydeden bir liste işe yaramaz.
+aynısıdır: o, "düzenlemek yerine yok eden tek içerik olayı"dır. Dosya eki silme ikincisidir.
+
+**Yaratma tarafı da denetim alt kümesinde, hem de o dosyanın kendi ölçütüyle.** Alt küme
+`comment.created`'ı dışarıda bırakıyor ve `activity.ts:51-64` sebebini açıkça veriyor: sıradan
+içerik olayları "buradaki her şeyden kat kat fazladır ve hiçbiri kimsenin erişimini
+değiştirmez". Bu testin ilk yarısı taşınmıyor. Bir yükleme, 0022'nin zaten belirttiği
+`ThrottleUploads()` dekoratörüyle rate-limit'li ve `ATTACHMENT_MAX_BYTES` ile boyut-kapalı;
+dolayısıyla bir yorumun hacim sınıfında değil — kimse yüz yorum yazacağı sürede yüz dosya
+yüklemiyor. İkinci yarısını ise bir olay müdahalecisinin gerçekte ne sorduğu cevaplıyor: "ele
+geçirilmiş bu hesap burada ne yaptı" iki yarısı olan tek bir sorudur — ne alındı ve ne kondu — ve
+dosya yerleştiren bir saldırgan yalnızca kaldırmaları kaydeden bir listeye takılmaz. Yaratma
+tarafını dışarıda bırakmak, denetim sorgusunu kendi sorusunun yarısını cevaplar hâle getirirdi.
 
 **`User` yabancı anahtarı, ADR 0023'ün ödemeyi reddettiği bir maliyeti neden hak ediyor.** 0023
 checklist maddesinde `completedById`'yi reddetti, çünkü bir kutuyu işaretlemek atfedilen bir eylem
@@ -302,13 +337,18 @@ karar 4 ona söz vermişti — ama bir ADR'da değil bir plan belgesinde söz ve
 0022'ye iliştirilmiş tahmin onu içermiyor. Burada adlandırılması meselenin kendisi; alternatifi onu
 P3-3 sırasında keşfetmekti.
 
-**İki `ActivityType` sabiti artık kalıcı.** `activity.ts:11-13`, bir satır var olduktan sonra
-isimleri yeniden adlandırılamaz kılıyor; dolayısıyla bu ADR'ın gözden geçirilmesi, onlar hakkında
-tartışmanın ucuz olduğu son an. Onları `AUDIT_ACTIVITY_TYPES`'a eklemek ayrıca, dosya ekleri
-teslim edildiği gün her mevcut workspace için denetim sorgusunun ne döndürdüğünü değiştiriyor —
-önce erişim ve yok etme olaylarından ibaret olan bir akış sıradan içerik olayları kazanıyor ve o
-listeyi "yalnızca güvenlikle ilgili" diye okuyan biri, karşılığında bir olay olmadan bir hacim
-değişimi görüyor.
+**`attachment.created` ve `attachment.deleted` ilk satır yazıldığı andan itibaren kalıcı.**
+`activity.ts:11-13`, bir satır var olduktan sonra isimleri yeniden adlandırılamaz kılıyor;
+dolayısıyla bu ADR'ın gözden geçirilmesi, onlar hakkında tartışmanın ucuz olduğu son an —
+sonrasında bir yeniden adlandırma, denetim sorgusunun dayandığı satırlar üzerinde bir veri
+migration'ı demek. Onları `AUDIT_ACTIVITY_TYPES`'a eklemek ayrıca, dosya ekleri teslim edildiği gün
+her mevcut workspace için o sorgunun ne döndürdüğünü değiştiriyor. Gerekçe, yaratma tarafının
+`activity.ts`'in kendi hacim ölçütüyle oraya ait olduğunu savunuyor ve bu savunma bir öngörü:
+yalnızca yüklemeler rate-limit'li ve boyut-kapalı kaldığı sürece geçerli. İleride bir toplu import
+yolu `attachment.created` satırlarını yorum benzeri hacimde yazarsa — her içe aktarılan ek için bir
+`LINK` oluşturduğu düşünülürse P3-3 bariz aday — denetim alt kümesi tam da `comment.created`'ın
+dışarıda bırakılarak kaçınıldığı biçimde gürültülenir; ve çare rate limit'i değil üyeliği yeniden
+düşünmektir.
 
 **P3-4, bu ADR'ın seçtiği bir biçimde zorlaşıyor.** `User`'a giden bir `Restrict` FK daha, bir
 anonimleştirme tasarımının etrafından dolaşması gereken bir ilişki daha demek ve
@@ -329,35 +369,49 @@ isteyen bir gelecek katkıcı ya bir SSRF yüzeyini bilinçli olarak, yeni bir A
 allowlist ve resolver kontrolüyle kabul etmek ya da isteği API'nin atmadığı istemci tarafına itmek
 zorunda. Paragraf, o seçimin açıkta yapılması için var.
 
-**Ofis formatı girdileri allowlist'in bakım maliyeti.** OpenXML ve OpenDocument medya tipleri uzun,
-yanlış yazması kolay ve magic byte'larının hepsi bir ZIP kabı — `file-type`, daha derine bakmadığı
-sürece bir `.docx` için `application/zip` raporlar. Bu etkileşim, D3'ün yanlış uygulanma şansı
-gerçek olan tek parçası ve `application/zip`'in listede olmasının tesadüf değil kolaylık olmasının
-sebebi: düz bir arşiv gibi koklanan bir ofis belgesinin geri düşüşü hâlâ kabul edilen bir tip
-oluyor, kullanıcıya çıkan bir 415 değil.
+**Ofis formatları doğru koklanıyor; `application/zip`'in listede olması onlar koklanmadığındaki
+emniyet ağı.** Her ofis belgesi bir ZIP kabı olduğu için bariz endişe, `file-type`'ın hepsi için
+`application/zip` raporlaması ve D3'ün ofis girdilerinin hiç eşleşmemesidir. Pinlenmiş
+`file-type@21.3.4` ile ölçüldüğünde bu endişe yersiz çıktı: bir `.docx`, `.xlsx` ve `.pptx` kendi
+OOXML medya tiplerini, bir `.odt` ise `application/vnd.oasis.opendocument.text` döndürüyor.
+Algılama bir magic-byte eşleşmesi değil — `core.js:1320-1343` arşivin `[Content_Types].xml`
+girdisini okuyup ayrıştırıyor, `core.js:1306-1318` ise ODF'in saklanmış `mimetype` girdisini
+okuyor. Artık risk de tam olarak orada ve hayal edilmedi, yeniden üretildi:
+`[Content_Types].xml`'i ayrıştırılamayan ya da okunamayacak kadar büyük olan bir arşiv, dizin-adı
+sezgiseline düşüyor ve `core.js:727-738` o durumda o sezgiseli bilinçli olarak koşmayı reddediyor;
+sonuç düz bir `application/zip`. Saplama bir `[Content_Types].xml` ile kurulmuş bir prob tam
+olarak bunu yaptı. `application/zip`'in allowlist'te olması bu yüzden tesadüf değil taşıyıcı:
+sıra dışı bir üreticiden gelen bir ofis belgesi, kullanıcının hiçbir şey yapamayacağı bir 415
+yerine kabul edilen bir tipe düşüyor.
 
-**Artık üçüncü bir modül görev modülünün okuma yoluna bağımlı.** `attachment/`,
-`ChecklistService`'in `TaskReadService`'ten aldığı tenant çözümlemesinin aynısına ihtiyaç duyuyor
-ve `task.module.ts` onu bilinçli olarak export etmiyor. Ya `TaskService` bunun için dar bir metot
-kazanır ya da attachment modülü görevi aynı ilişki-yolu `where`'i ile kendisi Prisma üzerinden
-çözer. Uygulama planı birini seçer; bu ADR, D11'deki sapmanın bedelinin bu olduğunu not eder.
+**Attachment modülü kendi tenant scope'unu kendisi çözüyor.** `attachment/`, `ChecklistService`'in
+`TaskReadService`'ten aldığı tenant çözümlemesine ihtiyaç duyuyor ve `task.module.ts` ne onu ne
+`TaskEventsService`'i export ediyor. D11 gereği modül ikisine de uzanmıyor: görevi aynı ilişki-yolu
+`where`'i ile Prisma üzerinden kendisi çözüyor ve yayını `CommentService`'in zaten yaptığı gibi
+doğrudan `RealtimeModule` üzerinden yapıyor. Bedeli, kod tabanında `task: { board: { workspaceId } }`
+yükleminin bir kopyası daha — `task.module.ts`'in export'larını genişletmemenin fiyatı bu; ve o
+yüklem, `audit/ROADMAP.md:364`'ün zaten şart koştuğu tenant izolasyonu e2e testlerinin bu
+özellikte en çok kapsadığı parça.
 
 ## Değerlendirilen alternatifler
 
-| Alternatif                                                                             | Neden olmaz                                                                                                                                                                                                               |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kind` eklemek yerine linki `mimeType`'ın null olmasıyla ayırt etmek                   | Veritabanının zorlayabileceği bir değişmezi yalnızca uygulamanın hatırladığı bir değişmeze çevirir; hem URL'i hem depolama anahtarı olan ya da ikisi de olmayan satırı hiçbir şey engellemez ve ilkini bir importer yazar |
-| `Attachment`'ın yanında ayrı bir `TaskLink` modeli                                     | İki model, iki uç ailesi, iki activity sözlüğü ve panelin birleştirip sıralaması gereken iki liste sorgusu — kullanıcıların zaten "bu karta iliştirilmiş şeyler" dediği tek bir şeyi temsil etmek için                    |
-| `image/svg+xml`'e allowlist'te izin vermek                                             | SVG, `<script>` taşıyabilen bir işaretlemedir ve `inline` servis edilen tek aile görsellerdir — onu içeri almak inline önizleme kararını API origin'inde saklanan XSS'e çevirir                                           |
-| Her şeyi `Content-Disposition: attachment` ile servis etmek, hiç inline olmasın        | 0022'nin desteklemeye zaten karar verdiği görsel önizlemesini görev panelinden kaldırır; güvenlik kazancı `nosniff`, CORP ve koklanan `Content-Type` ile çok daha ucuza elde edilebiliyor                                 |
-| Sunucu tarafı link önizlemesi ya da unfurl (başlık, favicon, metadata)                 | `postgres` ve `redis`'in isimle çözüldüğü bir Compose ağının içinde, kullanıcının verdiği bir URL'e sunucu tarafı istek bir SSRF primitifidir; özellik kozmetik, yetenek değil                                            |
-| Nest'in `FileTypeValidator`'ını `NODE_OPTIONS=--experimental-vm-modules` ile kullanmak | Kendi uyarı metni bunu öneriyor, ama bayrağın her koşucuda, her CI işinde ve her IDE'de doğru olması gerekirdi; olmadığında validator sessizce `false` döner ve geçerli bir PNG kullanıcının hatasıymış gibi reddedilir   |
-| Boyut limitini yalnız proxy'de tutmak                                                  | Multer'ın `limits.fileSize`'ı varsayılan olarak sınırsız, dolayısıyla API değiştirilmiş ya da hatalı yapılandırılmış bir proxy'nin geçirdiği her şeyi kabul eder ve Caddy'yi değiştiren için limit tamamen kaybolur       |
-| API ve proxy limitlerinin bağımsız ayarlanabilmesi                                     | Farklı sayılar, 0022'nin proxy satırını eklemesine yol açan izi sürülemeyen `413`'ü aynen üretir: bir yön başarısız bir yükleme için başarılı bir vekil isteği loglar, diğeri hiçbir şey loglamaz                         |
-| Denormalize bir `Attachment.workspaceId` kolonu                                        | `Task` da taşımıyor; ilişki yolu her görev alt kaynağının zaten kullandığı şekildir ve kopyalanmış bir tenant id'si, ilkiyle çelişebilen ikinci bir doğruluk kaynağıdır                                                   |
-| Depolama yolunu yüklenen dosya adından kurmak                                          | Path traversal'ı, anahtarın satırın kendi UUIDv7'sinden geldiği için ifade bile edilemeyen bir sorun olmaktan çıkarıp sonsuza dek her yazma yolunda doğru çözülmesi gereken bir doğrulama sorunu yapar                    |
-| `uploadedById` olmasın; yükleyen activity izinden okunsun                              | "Bunu kim yükledi"yi nesnenin bir özelliği olmaktan çıkarıp denetim loguna karşı bir sorguya çevirir — iz bir olayın olduğunu kaydeder, satır ise o olayın ürettiği şeydir                                                |
-| Checklist emsalini izleyip dosya ekleri için activity satırı yazmamak                  | Silinen bir checklist maddesi yeniden yazılabilir; silinen bir dosya sahipsiz dosya süpürmesiyle diskten de alınır ve activity satırı onun var olduğuna dair tek kanıt hâline gelir                                       |
-| Yeni bir `attachment:added` / `attachment:removed` socket event'i                      | ADR 0023 bunu iki özellik için de karara bağladı ve faz planı kararı önce teslim edene vermişti; yeniden karar vermek, yeni bir gereksinim olmadan realtime sözleşmesini çatallardı                                       |
-| Uçları checklist şekline uyup `TaskController`'a bağlamak                              | Yayınlanan beş uçtan üçü bir görev üzerinden adreslenmiyor ve modül bir depolama portu, bir multer interceptor'ı ve API'nin bayt akıtan tek handler'ını taşıyor                                                           |
-| `file-type`'ı `@nestjs/common`'ın transitive bağımlılığı olarak bırakmak               | Orada tam sürümle sabitlenmiş, dolayısıyla sürümü değiştirmek Nest'in elinde; rutin bir yama, doğrulama yolumuzun isimle import ettiği paketi kendi `package.json`'ımızda karşılaştıracak bir kayıt olmadan oynatabilir   |
+| Alternatif                                                                               | Neden olmaz                                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind` eklemek yerine linki `mimeType`'ın null olmasıyla ayırt etmek                     | Veritabanının zorlayabileceği bir değişmezi yalnızca uygulamanın hatırladığı bir değişmeze çevirir; hem URL'i hem depolama anahtarı olan ya da ikisi de olmayan satırı hiçbir şey engellemez ve ilkini bir importer yazar |
+| `Attachment`'ın yanında ayrı bir `TaskLink` modeli                                       | İki model, iki uç ailesi, iki activity sözlüğü ve panelin birleştirip sıralaması gereken iki liste sorgusu — kullanıcıların zaten "bu karta iliştirilmiş şeyler" dediği tek bir şeyi temsil etmek için                    |
+| `image/svg+xml`'e allowlist'te izin vermek                                               | SVG, `<script>` taşıyabilen bir işaretlemedir ve `inline` servis edilen tek aile görsellerdir — onu içeri almak inline önizleme kararını API origin'inde saklanan XSS'e çevirir                                           |
+| Her şeyi `Content-Disposition: attachment` ile servis etmek, hiç inline olmasın          | 0022'nin desteklemeye zaten karar verdiği görsel önizlemesini görev panelinden kaldırır; güvenlik kazancı `nosniff`, CORP ve koklanan `Content-Type` ile çok daha ucuza elde edilebiliyor                                 |
+| Sunucu tarafı link önizlemesi ya da unfurl (başlık, favicon, metadata)                   | `postgres` ve `redis`'in isimle çözüldüğü bir Compose ağının içinde, kullanıcının verdiği bir URL'e sunucu tarafı istek bir SSRF primitifidir; özellik kozmetik, yetenek değil                                            |
+| Nest'in `FileTypeValidator`'ını `NODE_OPTIONS=--experimental-vm-modules` ile kullanmak   | Kendi uyarı metni bunu öneriyor, ama bayrağın her koşucuda, her CI işinde ve her IDE'de doğru olması gerekirdi; olmadığında validator sessizce `false` döner ve geçerli bir PNG kullanıcının hatasıymış gibi reddedilir   |
+| Boyut limitini yalnız proxy'de tutmak                                                    | Multer'ın `limits.fileSize`'ı varsayılan olarak sınırsız, dolayısıyla API değiştirilmiş ya da hatalı yapılandırılmış bir proxy'nin geçirdiği her şeyi kabul eder ve Caddy'yi değiştiren için limit tamamen kaybolur       |
+| API ve proxy limitlerinin bağımsız ayarlanabilmesi                                       | Farklı sayılar, 0022'nin proxy satırını eklemesine yol açan izi sürülemeyen `413`'ü aynen üretir: bir yön başarısız bir yükleme için başarılı bir vekil isteği loglar, diğeri hiçbir şey loglamaz                         |
+| Denormalize bir `Attachment.workspaceId` kolonu                                          | `Task` da taşımıyor; ilişki yolu her görev alt kaynağının zaten kullandığı şekildir ve kopyalanmış bir tenant id'si, ilkiyle çelişebilen ikinci bir doğruluk kaynağıdır                                                   |
+| Depolama yolunu yüklenen dosya adından kurmak                                            | Path traversal'ı, anahtarın satırın kendi UUIDv7'sinden geldiği için ifade bile edilemeyen bir sorun olmaktan çıkarıp sonsuza dek her yazma yolunda doğru çözülmesi gereken bir doğrulama sorunu yapar                    |
+| `uploadedById` olmasın; yükleyen activity izinden okunsun                                | "Bunu kim yükledi"yi nesnenin bir özelliği olmaktan çıkarıp denetim loguna karşı bir sorguya çevirir — iz bir olayın olduğunu kaydeder, satır ise o olayın ürettiği şeydir                                                |
+| Activity tiplerini `attachment.added` / `attachment.removed` diye adlandırmak            | `ActivityType`'ta `added` kullanan hiçbir isim yok; emsaller `comment.created` ve `task.deleted`, ve isimler bir kez yazıldıktan sonra değiştirilemiyor — mevcut sözlüğe uymak tek seferlik ve bedava bir seçim           |
+| Yeni modül yayın yapabilsin diye `TaskEventsService`'i `task.module.ts`'ten export etmek | `task.module.ts:17-19`'un bilinçle koyduğu bir kapsüllemeyi, comment modülünün aynı payload ile zaten doğrudan yaptığı tek bir `emitToBoard` çağrısı uğruna genişletir                                                    |
+| Attachment uçları checklist uçları gibi `TaskDto` döndürsün                              | Checklist `TaskDto` döndürüyor çünkü controller'ı _`TaskController`_; ayrı modülde o sebep yok ve istemci `task:updated` geldiğinde görevi zaten yeniden okuyor                                                           |
+| Checklist emsalini izleyip dosya ekleri için activity satırı yazmamak                    | Silinen bir checklist maddesi yeniden yazılabilir; silinen bir dosya sahipsiz dosya süpürmesiyle diskten de alınır ve activity satırı onun var olduğuna dair tek kanıt hâline gelir                                       |
+| Yeni bir `attachment:added` / `attachment:removed` socket event'i                        | ADR 0023 bunu iki özellik için de karara bağladı ve faz planı kararı önce teslim edene vermişti; yeniden karar vermek, yeni bir gereksinim olmadan realtime sözleşmesini çatallardı                                       |
+| Uçları checklist şekline uyup `TaskController`'a bağlamak                                | Yayınlanan beş uçtan üçü bir görev üzerinden adreslenmiyor ve modül bir depolama portu, bir multer interceptor'ı ve API'nin bayt akıtan tek handler'ını taşıyor                                                           |
+| `file-type`'ı `@nestjs/common`'ın transitive bağımlılığı olarak bırakmak                 | Orada tam sürümle sabitlenmiş, dolayısıyla sürümü değiştirmek Nest'in elinde; rutin bir yama, doğrulama yolumuzun isimle import ettiği paketi kendi `package.json`'ımızda karşılaştıracak bir kayıt olmadan oynatabilir   |
