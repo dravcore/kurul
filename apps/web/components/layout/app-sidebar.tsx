@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { LayoutDashboard, LogOut, PanelLeftClose, PanelLeft, Settings } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -16,6 +16,31 @@ import { useWorkspaceContext } from './workspace-provider';
 import { WorkspaceSwitcher } from './workspace-switcher';
 
 const COLLAPSE_MQ = '(max-width: 1279px)';
+const COLLAPSE_STORAGE_KEY = 'kurultay:sidebar-collapsed';
+
+/**
+ * `localStorage` throws in private-browsing/quota-exceeded states and does not exist during
+ * SSR at all, so every access is wrapped rather than trusted — a missing preference should
+ * fall back to the breakpoint default, not crash the shell.
+ */
+function readStoredCollapsed(): boolean | null {
+  try {
+    const raw = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
+    return raw === null ? null : raw === 'true';
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredCollapsed(value: boolean): void {
+  try {
+    window.localStorage.setItem(COLLAPSE_STORAGE_KEY, String(value));
+  } catch {
+    // Best-effort persistence — a full or blocked store just means the preference does not
+    // survive reload, which is the pre-existing behavior this change is improving on, not a
+    // new failure mode to surface.
+  }
+}
 
 export function AppSidebar(): React.ReactElement {
   const t = useTranslations('app');
@@ -27,10 +52,28 @@ export function AppSidebar(): React.ReactElement {
 
   useEffect(() => {
     const media = window.matchMedia(COLLAPSE_MQ);
-    const sync = (): void => setCollapsed(media.matches);
+    // A stored preference always wins over the breakpoint — re-read on every sync rather than
+    // caching an "is overridden" flag, so a manual toggle (which writes storage immediately,
+    // see `toggleCollapsed`) is picked up the next time this same function runs, whether that
+    // is the call below or the next `change` event. One function serving both roles, invoked
+    // directly once and then registered as the listener, mirrors the exact shape the media
+    // sync used before this fix and is what keeps this the sidebar's single source of truth
+    // for `collapsed` instead of splitting it across a ref and the effect body.
+    const sync = (): void => {
+      const stored = readStoredCollapsed();
+      setCollapsed(stored ?? media.matches);
+    };
     sync();
     media.addEventListener('change', sync);
     return () => media.removeEventListener('change', sync);
+  }, []);
+
+  const toggleCollapsed = useCallback((): void => {
+    setCollapsed((value) => {
+      const next = !value;
+      writeStoredCollapsed(next);
+      return next;
+    });
   }, []);
 
   const dashboardActive = pathname.startsWith('/dashboard');
@@ -71,7 +114,7 @@ export function AppSidebar(): React.ReactElement {
             variant="ghost"
             size="icon-sm"
             aria-label={collapsed ? t('shell.expandSidebar') : t('shell.collapseSidebar')}
-            onClick={() => setCollapsed((value) => !value)}
+            onClick={toggleCollapsed}
           >
             {collapsed ? <PanelLeft /> : <PanelLeftClose />}
           </Button>

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import type { MemberRole, WorkspaceDto } from '@kurultay/shared-types';
@@ -119,16 +119,26 @@ export function WorkspaceProvider({
     }
   }, [bootstrapped, loadError, workspaces.length, pathname, router]);
 
+  // A second `onSwitch` fired before the first's `fetchOwnMembership` resolves must not let
+  // the first request's late reply land on the second's workspace. Each call stamps its own
+  // generation before awaiting anything; only the call that is still the latest one when its
+  // response arrives is allowed to write `activeRole`, mirroring the `moveGenerationRef`
+  // pattern `use-board-mutations.ts` uses to drop overtaken drag responses.
+  const switchGenerationRef = useRef(0);
+
   const onSwitch = useCallback(
     async (workspaceId: string): Promise<void> => {
+      const generation = ++switchGenerationRef.current;
       // Applied before the role is known so the rest of the shell re-scopes immediately; the
       // role follows a moment later rather than holding the whole switch behind one request.
       setBootstrap((current) => ({ ...current, activeId: workspaceId }));
       await authClient.organization.setActive({ organizationId: workspaceId });
       try {
         const membership = await fetchOwnMembership(workspaceId);
+        if (generation !== switchGenerationRef.current) return;
         setBootstrap((current) => ({ ...current, activeRole: membership.role }));
       } catch {
+        if (generation !== switchGenerationRef.current) return;
         setBootstrap((current) => ({ ...current, activeRole: null }));
       }
       router.refresh();
