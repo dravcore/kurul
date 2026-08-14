@@ -801,8 +801,8 @@ docker compose exec -T postgres \
 **Hedef: restore kararından itibaren iki saatin altında ayakta olmak (RTO ≤ 2 sa).**
 Aşağıdaki prosedür küçük bir kurulumda saniyeler sürer; bütçe karar vermek, doğru arşivi
 bulmak ve doğrulamak içindir. Uçtan uca prova edilmiştir — `scripts/backup.sh` ile
-dump'lanan seed'li bir veritabanı boş bir sunucuya restore edildiğinde 17 tablonun tamamını,
-her satır sayısını, 59 indeksin hepsini, `pg_trgm`'i ve `_prisma_migrations` tablosunu
+dump'lanan seed'li bir veritabanı boş bir sunucuya restore edildiğinde 19 tablonun tamamını,
+her satır sayısını, 68 indeksin hepsini, `pg_trgm`'i ve `_prisma_migrations` tablosunu
 eksiksiz üretti.
 
 Restore `pg_restore` iledir (arşivler SQL metni değil `--format=custom`) ve **boş** bir

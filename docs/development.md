@@ -794,8 +794,8 @@ docker compose exec -T postgres \
 **Target: back up in under two hours (RTO ≤ 2 h) from the decision to restore.** The
 procedure below runs in seconds on a small instance; the budget is for the deciding, the
 finding of the right archive, and the verifying. It has been rehearsed end to end — a seeded
-database dumped by `scripts/backup.sh` and restored into an empty server reproduced all 17
-tables, every row count, all 59 indexes, `pg_trgm`, and the `_prisma_migrations` table intact.
+database dumped by `scripts/backup.sh` and restored into an empty server reproduced all 19
+tables, every row count, all 68 indexes, `pg_trgm`, and the `_prisma_migrations` table intact.
 
 Restore is `pg_restore` (the archives are `--format=custom`, not SQL text), and it wants an
 **empty** database — restoring over a populated one produces duplicate-key errors, not a
