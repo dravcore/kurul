@@ -121,4 +121,101 @@ describe('RegisterView', () => {
     expect(mocks.replace).not.toHaveBeenCalledWith(hostile);
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login');
   });
+
+  describe('field-level error messages', () => {
+    it('shows password field error under password input when PASSWORD_TOO_SHORT is returned', async () => {
+      mocks.signUpEmail.mockResolvedValue({
+        error: { code: 'PASSWORD_TOO_SHORT', message: 'Password too short' },
+      });
+      renderView();
+      fillForm();
+
+      submit();
+
+      // Wait for the error message to appear
+      await screen.findByText('Password must be at least 8 characters long.');
+
+      // Verify password input has aria-invalid="true"
+      const passwordInput = screen.getByLabelText('Password');
+      expect(passwordInput.getAttribute('aria-invalid')).toBe('true');
+      expect(passwordInput.getAttribute('aria-describedby')).toBeTruthy();
+
+      // Verify email input is not marked invalid
+      const emailInput = screen.getByLabelText('Email');
+      expect(emailInput.getAttribute('aria-invalid')).toBe('false');
+
+      expect(mocks.replace).not.toHaveBeenCalled();
+    });
+
+    it('shows email field error under email input when USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL is returned', async () => {
+      mocks.signUpEmail.mockResolvedValue({
+        error: {
+          code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL',
+          message: 'User already exists',
+        },
+      });
+      renderView();
+      fillForm();
+
+      submit();
+
+      // Wait for the error message to appear
+      await screen.findByText(
+        'This email address is already in use. Sign in instead, or use a different address.',
+      );
+
+      // Verify email input has aria-invalid="true"
+      const emailInput = screen.getByLabelText('Email');
+      expect(emailInput.getAttribute('aria-invalid')).toBe('true');
+      expect(emailInput.getAttribute('aria-describedby')).toBeTruthy();
+
+      // Verify password input is not marked invalid
+      const passwordInput = screen.getByLabelText('Password');
+      expect(passwordInput.getAttribute('aria-invalid')).toBe('false');
+
+      expect(mocks.replace).not.toHaveBeenCalled();
+    });
+
+    it('falls back to generic error with no field marked invalid when UNKNOWN_ERROR is returned', async () => {
+      mocks.signUpEmail.mockResolvedValue({
+        error: { code: 'UNKNOWN_ERROR', message: 'Unknown error' },
+      });
+      renderView();
+      fillForm();
+
+      submit();
+
+      // Wait for the generic error message to appear
+      await screen.findByText(messages.auth.register.error);
+
+      // Verify no input is marked with aria-invalid="true"
+      const emailInput = screen.getByLabelText('Email');
+      const passwordInput = screen.getByLabelText('Password');
+      expect(emailInput.getAttribute('aria-invalid')).toBe('false');
+      expect(passwordInput.getAttribute('aria-invalid')).toBe('false');
+
+      expect(mocks.replace).not.toHaveBeenCalled();
+    });
+
+    it('falls back to generic error with no field marked invalid when error has no code', async () => {
+      mocks.signUpEmail.mockResolvedValue({
+        error: { message: 'Some error without code' },
+      });
+      renderView();
+      fillForm();
+
+      submit();
+
+      // Wait for the generic error message to appear
+      await screen.findByText(messages.auth.register.error);
+
+      // Verify no input is marked with aria-invalid="true"
+      const emailInput = screen.getByLabelText('Email');
+      const passwordInput = screen.getByLabelText('Password');
+      expect(emailInput.getAttribute('aria-invalid')).toBe('false');
+      expect(passwordInput.getAttribute('aria-invalid')).toBe('false');
+
+      expect(mocks.replace).not.toHaveBeenCalled();
+    });
+  });
 });
