@@ -4,9 +4,10 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { ActivityType, MemberRole } from '@kurultay/shared-types';
 import { APIError } from 'better-auth/api';
 import type { Request } from 'express';
+import { ActivityService } from '../activity/activity.service';
 import { auth } from '../auth/auth';
 import type { WorkspaceMembership } from '../common/types/request-context';
 import { PrismaService } from '../prisma/prisma.service';
@@ -60,6 +61,7 @@ interface PrismaStub {
 function buildService(roster: MemberSeed[]): {
   service: WorkspaceMemberService;
   prisma: PrismaStub;
+  activityService: { record: jest.Mock };
 } {
   const rows = roster.map((seed, index) => ({
     id: `0198e2c0-9a1b-7f04-8c3d-1000000000${String(index).padStart(2, '0')}`,
@@ -91,9 +93,15 @@ function buildService(roster: MemberSeed[]): {
     },
   };
 
+  const activityService = { record: jest.fn().mockResolvedValue({ id: 'activity' }) };
+
   return {
-    service: new WorkspaceMemberService(prisma as unknown as PrismaService),
+    service: new WorkspaceMemberService(
+      prisma as unknown as PrismaService,
+      activityService as unknown as ActivityService,
+    ),
     prisma,
+    activityService,
   };
 }
 
@@ -495,5 +503,133 @@ describe('WorkspaceMemberService.leave', () => {
         request,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+/**
+ * The rows an incident responder reads after an account is compromised. Membership writes go
+ * through Better Auth, so these assert what the service records *around* the plugin call —
+ * including every case where it must record nothing, because an audit trail that logs refusals
+ * as if they were changes is worse than one that misses them.
+ */
+describe('WorkspaceMemberService audit trail', () => {
+  it('records a removal with the role the target was holding', async () => {
+    const { service, activityService } = buildService(OWNER_AND_ADMIN);
+
+    await service.removeMember(
+      WORKSPACE_ID,
+      ADMIN_USER,
+      actorOf(OWNER_USER, MemberRole.OWNER),
+      request,
+    );
+
+    expect(activityService.record).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        workspaceId: WORKSPACE_ID,
+        userId: OWNER_USER,
+        type: ActivityType.MemberRemoved,
+        payload: expect.objectContaining({
+          targetUserId: ADMIN_USER,
+          previousRole: MemberRole.ADMIN,
+          actorRole: MemberRole.OWNER,
+        }),
+      }),
+    );
+  });
+
+  it('records a role change with both roles named', async () => {
+    const { service, activityService } = buildService(OWNER_AND_ADMIN);
+
+    await service.updateMemberRole(
+      WORKSPACE_ID,
+      MEMBER_USER,
+      { role: MemberRole.ADMIN },
+      actorOf(OWNER_USER, MemberRole.OWNER),
+      request,
+    );
+
+    // Privilege escalation is the event the trail exists for: without `previousRole` the row
+    // cannot say whether anything was actually granted.
+    expect(activityService.record).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: ActivityType.MemberRoleChanged,
+        payload: expect.objectContaining({
+          targetUserId: MEMBER_USER,
+          previousRole: MemberRole.MEMBER,
+          newRole: MemberRole.ADMIN,
+          actorRole: MemberRole.OWNER,
+        }),
+      }),
+    );
+  });
+
+  it('records nothing when the requested role is the one already held', async () => {
+    const { service, activityService } = buildService(OWNER_AND_ADMIN);
+
+    await service.updateMemberRole(
+      WORKSPACE_ID,
+      ADMIN_USER,
+      { role: MemberRole.ADMIN },
+      actorOf(OWNER_USER, MemberRole.OWNER),
+      request,
+    );
+
+    expect(api.updateMemberRole).not.toHaveBeenCalled();
+    expect(activityService.record).not.toHaveBeenCalled();
+  });
+
+  it('records nothing when an ADMIN is refused an ownership change', async () => {
+    const { service, activityService } = buildService(OWNER_AND_ADMIN);
+
+    await expect(
+      service.updateMemberRole(
+        WORKSPACE_ID,
+        MEMBER_USER,
+        { role: MemberRole.OWNER },
+        actorOf(ADMIN_USER, MemberRole.ADMIN),
+        request,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(activityService.record).not.toHaveBeenCalled();
+  });
+
+  it('separates walking out from being removed', async () => {
+    const { service, activityService } = buildService(OWNER_AND_ADMIN);
+
+    await service.leave(WORKSPACE_ID, actorOf(ADMIN_USER, MemberRole.ADMIN), request);
+
+    expect(activityService.record).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: ADMIN_USER,
+        type: ActivityType.MemberLeft,
+        payload: expect.objectContaining({
+          targetUserId: ADMIN_USER,
+          previousRole: MemberRole.ADMIN,
+        }),
+      }),
+    );
+  });
+
+  it('records nothing when the plugin refuses the removal', async () => {
+    const { service, activityService } = buildService(OWNER_AND_ADMIN);
+    api.removeMember.mockRejectedValue(
+      new APIError('BAD_REQUEST', {
+        message: 'You are not allowed to delete this member',
+        code: 'YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_MEMBER',
+      }),
+    );
+
+    await expect(
+      service.removeMember(
+        WORKSPACE_ID,
+        ADMIN_USER,
+        actorOf(OWNER_USER, MemberRole.OWNER),
+        request,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(activityService.record).not.toHaveBeenCalled();
   });
 });

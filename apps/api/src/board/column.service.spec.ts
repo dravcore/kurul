@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { ColumnCategory, SocketEvents, type Locale } from '@kurultay/shared-types';
+import { ActivityType, ColumnCategory, SocketEvents, type Locale } from '@kurultay/shared-types';
+import type { ActivityService } from '../activity/activity.service';
 import type { LocaleService } from '../locale/locale.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RealtimeService } from '../realtime/realtime.service';
@@ -36,15 +37,18 @@ describe('ColumnService', () => {
     );
     const realtime = { emitToBoard: jest.fn() };
     const localeService = { resolve: jest.fn().mockResolvedValue(locale) };
+    const activityService = { record: jest.fn().mockResolvedValue({ id: 'activity' }) };
     return {
       service: new ColumnService(
         prisma as unknown as PrismaService,
         realtime as unknown as RealtimeService,
         localeService as unknown as LocaleService,
+        activityService as unknown as ActivityService,
       ),
       prisma,
       realtime,
       localeService,
+      activityService,
     };
   }
 
@@ -433,6 +437,135 @@ describe('ColumnService', () => {
       where: { id: COLUMN_ID, board: { workspaceId: WORKSPACE_ID } },
     });
     expect(tx.task.count).toHaveBeenCalledWith({ where: { columnId: COLUMN_ID } });
+  });
+
+  describe('audit trail', () => {
+    it('records a created column against the actor', async () => {
+      const { service, prisma, activityService } = buildService();
+      prisma.column.findMany.mockResolvedValue([]);
+      prisma.column.create.mockResolvedValue({
+        id: COLUMN_ID,
+        boardId: BOARD_ID,
+        name: 'Review',
+        position: 1000,
+        color: null,
+        category: ColumnCategory.STARTED,
+        _count: { tasks: 0 },
+      });
+
+      await service.create(WORKSPACE_ID, BOARD_ID, ACTOR_ID, { name: 'Review' });
+
+      expect(activityService.record).toHaveBeenCalledWith(prisma, {
+        workspaceId: WORKSPACE_ID,
+        userId: ACTOR_ID,
+        type: ActivityType.ColumnCreated,
+        payload: {
+          columnId: COLUMN_ID,
+          boardId: BOARD_ID,
+          name: 'Review',
+          category: ColumnCategory.STARTED,
+        },
+      });
+    });
+
+    it('records one entry per seeded column, marked as a seed', async () => {
+      const { service, prisma, activityService } = buildService();
+      prisma.column.findMany.mockResolvedValue(seededRows());
+
+      await service.createDefaults(WORKSPACE_ID, BOARD_ID, ACTOR_ID);
+
+      expect(activityService.record).toHaveBeenCalledTimes(3);
+      expect(activityService.record).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({
+          type: ActivityType.ColumnCreated,
+          payload: expect.objectContaining({ name: 'Done', seeded: true }),
+        }),
+      );
+    });
+
+    it('records a category change with both sides of it', async () => {
+      const { service, prisma, activityService } = buildService();
+      prisma.column.findFirst.mockResolvedValue({
+        id: COLUMN_ID,
+        name: 'Shipped',
+        color: null,
+        category: ColumnCategory.STARTED,
+      });
+      prisma.column.update.mockResolvedValue({
+        id: COLUMN_ID,
+        boardId: BOARD_ID,
+        name: 'Shipped',
+        position: 1000,
+        color: null,
+        category: ColumnCategory.COMPLETED,
+        _count: { tasks: 0 },
+      });
+
+      await service.update(WORKSPACE_ID, COLUMN_ID, ACTOR_ID, {
+        category: ColumnCategory.COMPLETED,
+      });
+
+      // The field that silently moves a stage across the Done boundary the dashboard measures.
+      expect(activityService.record).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({
+          type: ActivityType.ColumnUpdated,
+          payload: expect.objectContaining({
+            changes: {
+              category: { from: ColumnCategory.STARTED, to: ColumnCategory.COMPLETED },
+            },
+          }),
+        }),
+      );
+    });
+
+    it('records a deleted column before the delete, inside the same transaction', async () => {
+      const { service, prisma, activityService } = buildService();
+      prisma.column.findFirst.mockResolvedValue({
+        id: COLUMN_ID,
+        boardId: BOARD_ID,
+        name: 'Blocked',
+        position: 1000,
+        color: null,
+        category: ColumnCategory.STARTED,
+      });
+
+      await service.remove(WORKSPACE_ID, COLUMN_ID, ACTOR_ID);
+
+      expect(activityService.record).toHaveBeenCalledWith(prisma, {
+        workspaceId: WORKSPACE_ID,
+        userId: ACTOR_ID,
+        type: ActivityType.ColumnDeleted,
+        payload: {
+          columnId: COLUMN_ID,
+          boardId: BOARD_ID,
+          name: 'Blocked',
+          category: ColumnCategory.STARTED,
+        },
+      });
+      expect(activityService.record.mock.invocationCallOrder[0]!).toBeLessThan(
+        prisma.column.deleteMany.mock.invocationCallOrder[0]!,
+      );
+    });
+
+    it('writes nothing when the column is refused for holding tasks', async () => {
+      const { service, prisma, activityService } = buildService();
+      prisma.column.findFirst.mockResolvedValue({
+        id: COLUMN_ID,
+        boardId: BOARD_ID,
+        name: 'Blocked',
+        position: 1000,
+        color: null,
+        category: ColumnCategory.STARTED,
+      });
+      prisma.task.count.mockResolvedValue(4);
+
+      await expect(service.remove(WORKSPACE_ID, COLUMN_ID, ACTOR_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(activityService.record).not.toHaveBeenCalled();
+    });
   });
 
   describe('update', () => {

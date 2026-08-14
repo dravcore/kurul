@@ -5,10 +5,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { ActivityType, MemberRole } from '@kurultay/shared-types';
 import type { WorkspaceMemberDto } from '@kurultay/shared-types';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
+import { ActivityService } from '../activity/activity.service';
 import { auth } from '../auth/auth';
 import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth-error';
 import type { WorkspaceMembership } from '../common/types/request-context';
@@ -63,10 +64,30 @@ const MEMBER_NOT_FOUND_MESSAGE = 'Workspace member not found';
  * `docs/api-conventions.md` wants `409`/`403`. Deciding here means the refusal a client sees
  * is stated in product terms and carries the status the convention promises; the plugin's own
  * answer only surfaces for the residual race between the read and the write.
+ *
+ * ## Why the audit rows are written here and not in `afterRemoveMember`
+ *
+ * The organization hook (`src/auth/organization-options.ts`) sees the membership that was
+ * deleted and the workspace it belonged to, and that is all — it does not know who ordered the
+ * removal, which is the single most important field on an access-revocation record. It also
+ * does not fire at all for `/organization/leave`, so half the membership departures would be
+ * missing. These three methods know the actor, the target and the role on both sides, which is
+ * exactly the payload the audit trail is for, so they are where it is written.
+ *
+ * All three write it *after* the `auth.api.*` call, with no transaction spanning the two, and
+ * the resulting window is a deliberate choice rather than an oversight: a crash in between
+ * loses the record of a change that happened, but recording first would invent records of
+ * changes the plugin went on to refuse. A trail that under-reports is recoverable from the
+ * membership rows themselves; one that reports revocations and promotions which never occurred
+ * is actively misleading. Closing the window means taking the write out from under the plugin's
+ * hooks, which the section above rules out.
  */
 @Injectable()
 export class WorkspaceMemberService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+  ) {}
 
   private headersFrom(request: Request): Headers {
     return fromNodeHeaders(request.headers);
@@ -187,6 +208,25 @@ export class WorkspaceMemberService {
       );
     }
 
+    // After the plugin call, never before: Better Auth owns the membership row and there is no
+    // transaction spanning the two, so an entry written first would outlive a removal the
+    // plugin refused. The reverse gap — a crash between the two writes — loses the record of a
+    // removal that happened, which is the worse of the two failures but the only one available
+    // without moving the delete out from under the plugin's hooks.
+    await this.activityService.record(this.prisma, {
+      workspaceId,
+      userId: actor.userId,
+      type: ActivityType.MemberRemoved,
+      payload: {
+        targetUserId,
+        targetName: target.user.name,
+        // The role the removed member held. Without it the entry cannot distinguish an
+        // ordinary member being let go from an administrator being locked out.
+        previousRole: target.role,
+        actorRole: actor.role,
+      },
+    });
+
     // `afterRemoveMember` (organization-options.ts) already evicted the user's sockets.
   }
 
@@ -253,6 +293,22 @@ export class WorkspaceMemberService {
       );
     }
 
+    // The entry an escalation investigation actually reads: both roles, named, plus who
+    // ordered it. `target.role === nextRole` returned above without writing, so every row here
+    // is a real change and the two fields are never equal.
+    await this.activityService.record(this.prisma, {
+      workspaceId,
+      userId: actor.userId,
+      type: ActivityType.MemberRoleChanged,
+      payload: {
+        targetUserId,
+        targetName: target.user.name,
+        previousRole: target.role,
+        newRole: nextRole,
+        actorRole: actor.role,
+      },
+    });
+
     return toMemberDto({ ...target, role: nextRole });
   }
 
@@ -284,6 +340,21 @@ export class WorkspaceMemberService {
         'The last OWNER cannot leave the workspace; transfer ownership or delete the workspace',
       );
     }
+
+    // Its own type, not `member.removed`: a departure and a revocation are the same row write
+    // and completely different facts, and an investigation that cannot tell "they walked out"
+    // from "they were locked out" has learned nothing. `userId` is the actor *and* the subject
+    // here, which is what makes the distinction readable without joining anything.
+    await this.activityService.record(this.prisma, {
+      workspaceId,
+      userId: actor.userId,
+      type: ActivityType.MemberLeft,
+      payload: {
+        targetUserId: actor.userId,
+        targetName: membership.user.name,
+        previousRole: membership.role,
+      },
+    });
 
     // `/organization/leave` deletes the membership without running `afterRemoveMember` — the
     // hook is wired to `remove-member` only (better-auth 1.6 `routes/crud-members.ts`). So the

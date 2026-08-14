@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
-import { ColumnCategory, type Locale } from '@kurultay/shared-types';
+import { ActivityType, ColumnCategory, type Locale } from '@kurultay/shared-types';
+import { ActivityService } from '../activity/activity.service';
 import { LocaleService } from '../locale/locale.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BoardService } from './board.service';
@@ -18,6 +19,7 @@ describe('BoardService', () => {
         delete: jest.fn(),
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      task: { count: jest.fn().mockResolvedValue(0) },
       $transaction: jest.fn(),
     };
     // The default transaction hands the same mock back as `tx`, so assertions on
@@ -26,13 +28,16 @@ describe('BoardService', () => {
       callback(prisma),
     );
     const localeService = { resolve: jest.fn().mockResolvedValue(locale) };
+    const activityService = { record: jest.fn().mockResolvedValue({ id: 'activity' }) };
     return {
       service: new BoardService(
         prisma as unknown as PrismaService,
         localeService as unknown as LocaleService,
+        activityService as unknown as ActivityService,
       ),
       prisma,
       localeService,
+      activityService,
     };
   }
 
@@ -82,6 +87,26 @@ describe('BoardService', () => {
     );
   });
 
+  it('records the creation with the seeded stage names, in the same transaction', async () => {
+    const { service, prisma, activityService } = buildService();
+    const create = jest.fn().mockResolvedValue(boardRow());
+    const tx = { board: { create } };
+    prisma.$transaction.mockImplementation((callback) => callback(tx));
+
+    await service.create(WORKSPACE_ID, ACTOR_ID, { name: 'Roadmap' });
+
+    expect(activityService.record).toHaveBeenCalledWith(tx, {
+      workspaceId: WORKSPACE_ID,
+      userId: ACTOR_ID,
+      type: ActivityType.BoardCreated,
+      payload: {
+        boardId: BOARD_ID,
+        name: 'Roadmap',
+        seededColumns: ['To Do', 'In Progress', 'Done'],
+      },
+    });
+  });
+
   it('seeds the columns in the language the creator reads', async () => {
     const { service, prisma, localeService } = buildService();
     const create = jest.fn().mockResolvedValue({
@@ -109,10 +134,14 @@ describe('BoardService', () => {
   describe('update', () => {
     it('carries the tenant scope on the write predicate, not just the check', async () => {
       const { service, prisma } = buildService();
-      prisma.board.findFirst.mockResolvedValue({ id: BOARD_ID });
+      prisma.board.findFirst.mockResolvedValue({
+        id: BOARD_ID,
+        name: 'Roadmap',
+        description: null,
+      });
       prisma.board.update.mockResolvedValue(boardRow());
 
-      await service.update(WORKSPACE_ID, BOARD_ID, { name: 'Renamed' });
+      await service.update(WORKSPACE_ID, BOARD_ID, ACTOR_ID, { name: 'Renamed' });
 
       expect(prisma.board.update).toHaveBeenCalledWith({
         where: { id: BOARD_ID, workspaceId: WORKSPACE_ID },
@@ -121,22 +150,48 @@ describe('BoardService', () => {
     });
 
     it('returns 404 and writes nothing for a board in another workspace', async () => {
-      const { service, prisma } = buildService();
+      const { service, prisma, activityService } = buildService();
       prisma.board.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.update(WORKSPACE_ID, BOARD_ID, { name: 'Hijacked' }),
+        service.update(WORKSPACE_ID, BOARD_ID, ACTOR_ID, { name: 'Hijacked' }),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.board.update).not.toHaveBeenCalled();
+      expect(activityService.record).not.toHaveBeenCalled();
+    });
+
+    it('records the previous value, not only the new one', async () => {
+      const { service, prisma, activityService } = buildService();
+      prisma.board.findFirst.mockResolvedValue({
+        id: BOARD_ID,
+        name: 'Q3 Launch',
+        description: null,
+      });
+      prisma.board.update.mockResolvedValue({ ...boardRow(), name: 'Archive' });
+
+      await service.update(WORKSPACE_ID, BOARD_ID, ACTOR_ID, { name: 'Archive' });
+
+      expect(activityService.record).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          workspaceId: WORKSPACE_ID,
+          userId: ACTOR_ID,
+          type: ActivityType.BoardUpdated,
+          payload: expect.objectContaining({
+            boardId: BOARD_ID,
+            changes: { name: { from: 'Q3 Launch', to: 'Archive' } },
+          }),
+        }),
+      );
     });
   });
 
   describe('remove', () => {
     it('deletes with the tenant predicate rather than the bare id', async () => {
       const { service, prisma } = buildService();
-      prisma.board.findFirst.mockResolvedValue({ id: BOARD_ID });
+      prisma.board.findFirst.mockResolvedValue({ id: BOARD_ID, name: 'Roadmap' });
 
-      await expect(service.remove(WORKSPACE_ID, BOARD_ID)).resolves.toBeUndefined();
+      await expect(service.remove(WORKSPACE_ID, BOARD_ID, ACTOR_ID)).resolves.toBeUndefined();
       expect(prisma.board.deleteMany).toHaveBeenCalledWith({
         where: { id: BOARD_ID, workspaceId: WORKSPACE_ID },
       });
@@ -144,25 +199,48 @@ describe('BoardService', () => {
     });
 
     it('returns 404 and writes nothing for a board in another workspace', async () => {
-      const { service, prisma } = buildService();
+      const { service, prisma, activityService } = buildService();
       prisma.board.findFirst.mockResolvedValue(null);
 
-      await expect(service.remove(WORKSPACE_ID, BOARD_ID)).rejects.toBeInstanceOf(
+      await expect(service.remove(WORKSPACE_ID, BOARD_ID, ACTOR_ID)).rejects.toBeInstanceOf(
         NotFoundException,
       );
       expect(prisma.board.deleteMany).not.toHaveBeenCalled();
+      expect(activityService.record).not.toHaveBeenCalled();
     });
 
     it('returns 404 when the scoped delete matches no row', async () => {
       const { service, prisma } = buildService();
       // The row passed the in-transaction check but left the workspace before the write —
       // the scoped predicate is what catches it, and 404 is the cross-tenant answer.
-      prisma.board.findFirst.mockResolvedValue({ id: BOARD_ID });
+      prisma.board.findFirst.mockResolvedValue({ id: BOARD_ID, name: 'Roadmap' });
       prisma.board.deleteMany.mockResolvedValue({ count: 0 });
 
-      await expect(service.remove(WORKSPACE_ID, BOARD_ID)).rejects.toBeInstanceOf(
+      await expect(service.remove(WORKSPACE_ID, BOARD_ID, ACTOR_ID)).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+
+    it('records the name and task count before the row that holds them is gone', async () => {
+      const { service, prisma, activityService } = buildService();
+      prisma.board.findFirst.mockResolvedValue({ id: BOARD_ID, name: 'Q3 Launch' });
+      prisma.task.count.mockResolvedValue(87);
+
+      await service.remove(WORKSPACE_ID, BOARD_ID, ACTOR_ID);
+
+      expect(activityService.record).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          workspaceId: WORKSPACE_ID,
+          userId: ACTOR_ID,
+          type: ActivityType.BoardDeleted,
+          payload: { boardId: BOARD_ID, name: 'Q3 Launch', taskCount: 87 },
+        }),
+      );
+      // Ordering is the point: the entry has to be written while the board still exists.
+      const recordOrder = activityService.record.mock.invocationCallOrder[0]!;
+      const deleteOrder = prisma.board.deleteMany.mock.invocationCallOrder[0]!;
+      expect(recordOrder).toBeLessThan(deleteOrder);
     });
   });
 });
