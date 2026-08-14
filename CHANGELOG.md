@@ -9,6 +9,37 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **An activation funnel you can read about your own instance, and telemetry that is off.**
+  Kurultay measured nothing about its own use — a grep for `telemetry`, `analytics`, `posthog`,
+  `plausible` or `umami` across `apps/` and `docs/` returned zero matches in source — so where
+  onboarding broke, whether invitations converted, and whether anyone used this as a *team* were
+  all answered by intuition (audit finding PM-07). Two layers now exist, decided separately.
+  **The funnel is instance-local and nothing about it ever leaves your server:** eleven steps
+  (`user_registered`, `workspace_created`, `board_created`, `first_task_created`, `first_drag`,
+  `invite_sent`, `smtp_configured`, `invite_accepted`, `dashboard_viewed`, `task_completed`,
+  `wau_board_view`) plus a North Star — **Weekly Active Team Workspaces**, workspaces with 2+
+  members where 2+ current members were active in the last seven days — computed on demand at
+  `GET /instance/activation` and rendered at the bottom of Settings. Nine of the eleven are
+  *derived* from `Activity`, `User` and `WorkspaceMember`, so the funnel covers an instance's
+  whole history rather than starting flat at the deploy, and no new write path was added to any
+  request that creates or moves anything. Every step counts distinct people, never events;
+  `smtp_configured` is the one exception and sits between "invite sent" and "invite accepted"
+  because without a mail transport an invitee cannot accept at all (ADR 0013), so a zero there
+  explains a drop that would otherwise read as a product problem. Reading it requires the new
+  `INSTANCE_ADMIN_EMAILS`, **blank by default, which means nobody** — including the account that
+  owns every workspace on the box, because on an install with open registration "owner of a
+  workspace" is a role any visitor can grant themselves. **Outbound telemetry is opt-in and off:**
+  `TELEMETRY_ENABLED=false` is the default and sends nothing at all; switching it on *and*
+  naming a `TELEMETRY_ENDPOINT` (no default — there is deliberately no built-in collector
+  address) sends exactly one POST at process start carrying
+  `{"event":"instance_started","version":"0.1.0"}` and nothing else — no instance identifier, no
+  hostname, no IP, no counts, no part of the funnel, nothing about any person — logged in full
+  before it is sent, never retried, and unable to delay or fail a boot. `docs/development.md`
+  (EN + TR) lists the payload field by field; the reasoning, including why the ping carries no
+  instance id and therefore counts starts rather than installs, is
+  [ADR 0021](docs/decisions/0021-activation-funnel-and-opt-in-telemetry.md). Closes audit
+  finding PM-07 ([#128](https://github.com/dravcore/kurultay/issues/128)).
+
 - **Administrative actions now leave an audit trail.** `Activity` recorded only what happened to
   cards and comments, so board, column and label creation and deletion, workspace renames,
   member removals, role changes and the whole invitation lifecycle passed through the API
@@ -252,6 +283,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   healthy API restarted.
 
 ### Changed
+
+- **The nightly retention sweep now covers a fifth table.** `UsagePing` — the deduplicated
+  "somebody opened a board / the dashboard" rows the activation funnel above needed — is swept
+  under the existing `ACTIVITY_RETENTION_DAYS` rather than growing a window of its own: it is
+  the same class of row (instance history naming a user), and two settings on one class of data
+  can only ever disagree with each other. `0` still means "keep forever" for both. The job's
+  nightly JSON log line gains a `usagePings` count alongside the four it already carried; it is
+  still counts only, with nothing from the rows themselves.
 
 - **A board column now mounts 40 cards at a time instead of all of them**, revealing the next
   batch as the reader scrolls toward the end of the current one, and cards are marked

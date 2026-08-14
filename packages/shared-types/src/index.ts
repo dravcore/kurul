@@ -3,4 +3,5 @@ export * from './locales.js';
 export * from './entities.js';
 export * from './requests.js';
 export * from './activity.js';
+export * from './activation.js';
 export * from './socket.js';

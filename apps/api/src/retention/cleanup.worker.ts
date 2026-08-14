@@ -53,6 +53,8 @@ export interface CleanupCounts {
   verifications: number;
   notifications: number;
   activities: number;
+  /** Deduplicated "somebody opened a board / the dashboard" rows — see `model UsagePing`. */
+  usagePings: number;
 }
 
 export interface RetentionSettings {
@@ -216,6 +218,7 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
       verifications: 0,
       notifications: 0,
       activities: 0,
+      usagePings: 0,
     };
     if (!settings.enabled) return empty;
 
@@ -280,7 +283,35 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
             `;
           });
 
-    const counts: CleanupCounts = { sessions, verifications, notifications, activities };
+    // Usage pings share `ACTIVITY_RETENTION_DAYS` rather than growing a knob of their own.
+    // They are the same class of row — instance history naming a user — and a self-hoster who
+    // has already decided how long this instance keeps a record of what people did here should
+    // not have to make that decision twice, in two variables that can silently disagree.
+    //
+    // The window runs from `createdAt`, not from `day`: the two are the same date for every row
+    // this code writes, but `createdAt` is the column that cannot be affected by a future
+    // backfill, and it is what "kept for N days after it was written" literally means. No
+    // referential action to worry about — nothing references `UsagePing`.
+    const usagePings =
+      settings.activityDays === 0
+        ? 0
+        : await this.deleteInBatches(() => {
+            const cutoff = cutoffFor(now, settings.activityDays);
+            return this.prisma.$executeRaw`
+              DELETE FROM "UsagePing"
+              WHERE "id" IN (
+                SELECT "id" FROM "UsagePing" WHERE "createdAt" < ${cutoff} LIMIT ${CLEANUP_BATCH_SIZE}
+              )
+            `;
+          });
+
+    const counts: CleanupCounts = {
+      sessions,
+      verifications,
+      notifications,
+      activities,
+      usagePings,
+    };
     const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
 
     // Emitted even when every count is zero. One line a night is a rounding error in log

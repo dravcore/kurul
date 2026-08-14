@@ -30,6 +30,14 @@ vi.mock('@/components/settings/workspace-settings', () => ({
   WorkspaceSettings: (): React.ReactElement => <div data-testid="workspace-settings" />,
 }));
 
+// Stubbed as the case that matters for this page: on any instance where the reader is not the
+// operator the funnel renders `null`, and the page's own layout has to be correct in that
+// state — it is the state almost every reader is in. The component's own visible branch is
+// covered in `components/settings/activation-funnel.test.tsx`.
+vi.mock('@/components/settings/activation-funnel', () => ({
+  ActivationFunnel: (): React.ReactElement | null => null,
+}));
+
 import SettingsPage from './page';
 
 afterEach(() => {

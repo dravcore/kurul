@@ -18,6 +18,7 @@ How to set up a Kurultay development environment and work in it day to day.
 - [pnpm scripts](#pnpm-scripts)
 - [Database workflow](#database-workflow)
 - [Data retention](#data-retention)
+- [Activation funnel and telemetry](#activation-funnel-and-telemetry)
 - [Upgrading and backups](#upgrading-and-backups)
 - [Rollback](#rollback)
 - [Observability](#observability)
@@ -119,6 +120,10 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(blank)_ / `production`                                            | `SENTRY_ENVIRONMENT`'s web counterpart, also build-time                                                                                                                                                                  |
 | `NEXT_PUBLIC_SENTRY_RELEASE`          | _(blank)_ / `v0.2.0`                                                | `SENTRY_RELEASE`'s web counterpart, also build-time                                                                                                                                                                      |
 | `SEED_LARGE_BOARD_TASKS`              | _(blank)_ / `1000`                                                  | Read only by `pnpm db:seed`. Adds a synthetic board of this many tasks next to the demo one. Blank or `0` skips it — see [Seeding a large board](#seeding-a-large-board)                                                 |
+| `INSTANCE_ADMIN_EMAILS`               | _(blank)_                                                           | Comma-separated addresses allowed to read the instance-wide [activation funnel](#activation-funnel-and-telemetry). **Blank means nobody**, including the account that owns every workspace                               |
+| `TELEMETRY_ENABLED`                   | `false`                                                             | Outbound telemetry. **Off by default; nothing is sent while this is `false`** — see [Activation funnel and telemetry](#activation-funnel-and-telemetry)                                                                  |
+| `TELEMETRY_ENDPOINT`                  | _(blank)_                                                           | Where the opt-in ping is POSTed. **No default**; `TELEMETRY_ENABLED=true` with this blank logs an error and sends nothing                                                                                                |
+| `TELEMETRY_TIMEOUT_MS`                | `5000`                                                              | How long the single boot-time ping may take before it is abandoned. Failure is a warning line and nothing else                                                                                                           |
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` are read only by `next build` when
 uploading source maps, and only when they are set; they are absent from `.env.example`
@@ -519,7 +524,7 @@ was measured against.
 ## Data retention
 
 Kurultay deletes rows it is no longer entitled to keep. A BullMQ job runs **once a day** on
-`REDIS_URL` — the same mechanism as the due-soon scan — and sweeps four tables:
+`REDIS_URL` — the same mechanism as the due-soon scan — and sweeps five tables:
 
 | Table          | Deleted when                        | Setting                                      |
 | -------------- | ----------------------------------- | -------------------------------------------- |
@@ -527,6 +532,13 @@ Kurultay deletes rows it is no longer entitled to keep. A BullMQ job runs **once
 | `Verification` | `expiresAt` has passed              | none — not configurable                      |
 | `Notification` | read, and read more than N days ago | `NOTIFICATION_RETENTION_DAYS` (default `90`) |
 | `Activity`     | written more than N days ago        | `ACTIVITY_RETENTION_DAYS` (default `365`)    |
+| `UsagePing`    | written more than N days ago        | `ACTIVITY_RETENTION_DAYS` (default `365`)    |
+
+`UsagePing` deliberately shares `ACTIVITY_RETENTION_DAYS` rather than carrying a window of its
+own: it is the same class of row — instance history naming a user — and two settings on one
+class of data can only ever disagree with each other. See
+[ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md) for what that table stores
+(one deduplicated row per person, workspace, kind and UTC day) and what it deliberately does not.
 
 The reasoning behind each window — and why `Activity` is deleted at a year rather than
 archived or kept — is [ADR 0020](decisions/0020-data-retention.md).
@@ -551,7 +563,8 @@ else — no identifiers, no payloads:
   "sessions": 132,
   "verifications": 9,
   "notifications": 2140,
-  "activities": 0
+  "activities": 0,
+  "usagePings": 0
 }
 ```
 
@@ -566,6 +579,112 @@ background of a suite whose fixtures are backdated rows.
 
 Deleting is batched (1000 rows per statement) so a first run against a long-lived instance
 never becomes one long transaction holding locks and blocking autovacuum.
+
+## Activation funnel and telemetry
+
+Two separate things, decided separately, and the difference between them matters more than
+either one. The full reasoning is
+[ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md).
+
+### 1. The activation funnel — computed here, shown to you, sent nowhere
+
+Kurultay derives an eleven-step activation funnel from rows your instance already holds, plus a
+North Star metric: **Weekly Active Team Workspaces** — workspaces with two or more members where
+two or more current members did something in the last seven days.
+
+| #   | Step                 | Where the number comes from                                         |
+| --- | -------------------- | ------------------------------------------------------------------- |
+| 1   | `user_registered`    | `COUNT(User)`                                                       |
+| 2   | `workspace_created`  | distinct `WorkspaceMember.userId` with `role = OWNER`               |
+| 3   | `board_created`      | distinct actors on the `board.created` activity                     |
+| 4   | `first_task_created` | distinct actors on `task.created`                                   |
+| 5   | `first_drag`         | distinct actors on `task.moved`                                     |
+| 6   | `invite_sent`        | distinct actors on `invitation.created`                             |
+| 7   | `smtp_configured`    | whether this deployment has an SMTP transport (not a headcount)     |
+| 8   | `invite_accepted`    | distinct actors on `invitation.accepted` — the actor is the invitee |
+| 9   | `dashboard_viewed`   | distinct users with a `dashboard_view` row in `UsagePing`           |
+| 10  | `task_completed`     | distinct actors moving a card into a `COMPLETED` column             |
+| 11  | `wau_board_view`     | distinct users with a `board_view` row in the last 7 days           |
+
+Nine of the eleven are read from `Activity`, `User` and `WorkspaceMember` — tables the product
+already writes for its own reasons — so the funnel covers your instance's whole history, not
+just the period since you upgraded. Only steps 9 and 11 needed storage of their own, because
+`Activity` records changes and _reading a board is not a change_: without them, a team that
+opens the board every morning and edits nothing would be reported as dead.
+
+Every step counts **distinct people**, never events, except step 7 which is a property of the
+deployment. `smtp_configured` sits between "invite sent" and "invite accepted" on purpose: with
+no mail transport an invitee cannot confirm their address and therefore cannot accept at all
+(see [SMTP and Mailpit](#smtp-and-mailpit) and
+[ADR 0013](decisions/0013-invitation-email-verification.md)), so a zero there explains a drop
+that would otherwise look like a product problem.
+
+**Nothing here leaves your server.** It is computed on demand and returned to one signed-in
+caller over the same API as everything else.
+
+#### Who can see it
+
+Nobody, until you say so:
+
+```dotenv
+INSTANCE_ADMIN_EMAILS=you@example.com,ops@example.com
+```
+
+Blank — the default — means the endpoint answers `403` to everyone, including the account that
+owns every workspace on the box. It has to: on an install with open registration, "owner of a
+workspace" is a role any visitor can grant themselves by creating one, so no workspace role
+could be the boundary. Addresses are matched case-insensitively and a restart is needed to
+change the list.
+
+Once set, the funnel appears at the bottom of **Settings** for those accounts, and for nobody
+else. There is no in-app way to grant it.
+
+### 2. Outbound telemetry — off, and it stays off unless you switch it on
+
+```dotenv
+TELEMETRY_ENABLED=false          # the default
+TELEMETRY_ENDPOINT=              # no default; required in addition to the switch above
+```
+
+With `TELEMETRY_ENABLED=false` — which is what an untouched `.env` means — **no outbound request
+is made at all**. Setting it to `true` without also setting `TELEMETRY_ENDPOINT` logs an error
+and still sends nothing; there is deliberately no built-in collector address.
+
+When you do switch it on, exactly one `POST` is made when the API process starts, carrying this
+body and **nothing else**:
+
+```json
+{
+  "event": "instance_started",
+  "version": "0.1.0"
+}
+```
+
+Field by field, that is the whole list:
+
+| Field     | Value                | Notes                                                    |
+| --------- | -------------------- | -------------------------------------------------------- |
+| `event`   | `"instance_started"` | Always this literal string. There is only one event      |
+| `version` | e.g. `"0.1.0"`       | The `@kurultay/api` package version this build came from |
+
+What is **not** sent, and has no code path to be sent: any instance or installation identifier,
+your hostname, your IP address, your URL, your database, any count of users, workspaces, boards
+or tasks, any part of the activation funnel above, and anything at all about any person. There
+is no session, no cookie, no fingerprint, and no second request — no retry, no queue, no
+schedule. The payload is logged in full before it is sent, so you can read what left your server
+in your own API log:
+
+```text
+LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.1.0"} to https://…
+```
+
+A refused connection, a DNS failure, an error from the collector or a timeout
+(`TELEMETRY_TIMEOUT_MS`, default 5s) all produce one warning line and nothing else — telemetry
+can never delay or fail a boot.
+
+Because there is no instance identifier, a collector can count _starts_ and not installs. That
+is a deliberate loss of precision in exchange for a promise with nothing to take on trust; the
+trade is argued out in [ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md).
 
 ## Upgrading and backups
 

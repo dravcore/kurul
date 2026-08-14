@@ -18,6 +18,7 @@ Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl ça
 - [pnpm script'leri](#pnpm-scriptleri)
 - [Veritabanı iş akışı](#veritabanı-iş-akışı)
 - [Veri saklama](#veri-saklama)
+- [Aktivasyon hunisi ve telemetri](#aktivasyon-hunisi-ve-telemetri)
 - [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme)
 - [Geri alma (rollback)](#geri-alma-rollback)
 - [Gözlemlenebilirlik](#gözlemlenebilirlik)
@@ -118,6 +119,10 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(boş)_ / `production`                                              | `SENTRY_ENVIRONMENT`'ın web karşılığı, o da build zamanlı                                                                                                                                                                                          |
 | `NEXT_PUBLIC_SENTRY_RELEASE`          | _(boş)_ / `v0.2.0`                                                  | `SENTRY_RELEASE`'in web karşılığı, o da build zamanlı                                                                                                                                                                                              |
 | `SEED_LARGE_BOARD_TASKS`              | _(boş)_ / `1000`                                                    | Yalnızca `pnpm db:seed` okur. Demo board'un yanına bu kadar task taşıyan sentetik bir board ekler. Boş ya da `0` atlar — bkz. [Büyük board seed'lemek](#büyük-board-seedlemek)                                                                     |
+| `INSTANCE_ADMIN_EMAILS`               | _(boş)_                                                             | Kurulum genelindeki [aktivasyon hunisini](#aktivasyon-hunisi-ve-telemetri) okumasına izin verilen, virgülle ayrılmış adresler. **Boş, hiç kimse demektir** — makinedeki her workspace'in sahibi olan hesap dahil                                   |
+| `TELEMETRY_ENABLED`                   | `false`                                                             | Dışa telemetri. **Varsayılan kapalı; bu `false` iken hiçbir şey gönderilmez** — bkz. [Aktivasyon hunisi ve telemetri](#aktivasyon-hunisi-ve-telemetri)                                                                                             |
+| `TELEMETRY_ENDPOINT`                  | _(boş)_                                                             | Opt-in ping'in POST edileceği adres. **Varsayılanı yok**; `TELEMETRY_ENABLED=true` iken bu boşsa hata loglanır ve hiçbir şey gönderilmez                                                                                                           |
+| `TELEMETRY_TIMEOUT_MS`                | `5000`                                                              | Açılıştaki tek ping'in terk edilmeden önce sürebileceği süre. Başarısızlık tek bir uyarı satırıdır, başka hiçbir şey değil                                                                                                                         |
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` ve `SENTRY_PROJECT` yalnızca `next build` tarafından, source
 map yüklenirken ve yalnızca ayarlanmışlarsa okunur; bunlar olmadan build sessizce başarılı
@@ -522,7 +527,7 @@ içindeki column başına render bütçesi bu board'a karşı ölçüldü.
 ## Veri saklama
 
 Kurultay artık saklamaya hakkı olmayan satırları siler. Bir BullMQ işi `REDIS_URL` üzerinde
-**günde bir kez** koşar — due-soon taramasıyla aynı mekanizma — ve dört tabloyu süpürür:
+**günde bir kez** koşar — due-soon taramasıyla aynı mekanizma — ve beş tabloyu süpürür:
 
 | Tablo          | Ne zaman silinir                     | Ayar                                            |
 | -------------- | ------------------------------------ | ----------------------------------------------- |
@@ -530,6 +535,13 @@ Kurultay artık saklamaya hakkı olmayan satırları siler. Bir BullMQ işi `RED
 | `Verification` | `expiresAt` geçtiğinde               | yok — yapılandırılabilir değil                  |
 | `Notification` | okunmuşsa ve N günden önce okunmuşsa | `NOTIFICATION_RETENTION_DAYS` (varsayılan `90`) |
 | `Activity`     | N günden önce yazılmışsa             | `ACTIVITY_RETENTION_DAYS` (varsayılan `365`)    |
+| `UsagePing`    | N günden önce yazılmışsa             | `ACTIVITY_RETENTION_DAYS` (varsayılan `365`)    |
+
+`UsagePing` bilerek kendi penceresini taşımak yerine `ACTIVITY_RETENTION_DAYS`'i paylaşır: aynı
+sınıf satırdır — bir kullanıcıyı adlandıran kurulum geçmişi — ve tek bir veri sınıfı üzerindeki
+iki ayar ancak birbiriyle çelişebilir. O tablonun ne sakladığı (kişi, workspace, tür ve UTC gün
+başına tekilleştirilmiş tek satır) ve bilerek neyi saklamadığı için bkz.
+[ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md).
 
 Her pencerenin ardındaki gerekçe — ve `Activity`'nin neden arşivlenmek ya da süresiz
 saklanmak yerine bir yıl sonra silindiği — [ADR 0020](decisions/0020-data-retention.md)'de.
@@ -554,7 +566,8 @@ başka hiçbir şey yok: kimlik yok, payload yok:
   "sessions": 132,
   "verifications": 9,
   "notifications": 2140,
-  "activities": 0
+  "activities": 0,
+  "usagePings": 0
 }
 ```
 
@@ -569,6 +582,111 @@ tarihlenmiş bir suite'in arka planında koşmasını isteyeceğiniz bir şey de
 
 Silme batch'lidir (statement başına 1000 satır); böylece uzun süredir çalışan bir instance'ta
 ilk koşu, kilitleri tutan ve autovacuum'u engelleyen tek bir uzun transaction'a dönüşmez.
+
+## Aktivasyon hunisi ve telemetri
+
+Ayrı ayrı kararlaştırılmış iki ayrı şey ve aralarındaki fark, her ikisinden de önemli. Tam
+gerekçe: [ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md).
+
+### 1. Aktivasyon hunisi — burada hesaplanır, size gösterilir, hiçbir yere gönderilmez
+
+Kurultay, kurulumunuzun zaten tuttuğu satırlardan on bir adımlık bir aktivasyon hunisi türetir;
+yanında bir de Kuzey Yıldızı metriği: **Haftalık Aktif Takım Workspace'i** — iki veya daha fazla
+üyesi olan ve son yedi günde iki veya daha fazla mevcut üyesi bir şey yapmış workspace'ler.
+
+| #   | Adım                 | Sayı nereden geliyor                                              |
+| --- | -------------------- | ----------------------------------------------------------------- |
+| 1   | `user_registered`    | `COUNT(User)`                                                     |
+| 2   | `workspace_created`  | `role = OWNER` olan distinct `WorkspaceMember.userId`             |
+| 3   | `board_created`      | `board.created` aktivitesindeki distinct aktörler                 |
+| 4   | `first_task_created` | `task.created` üzerindeki distinct aktörler                       |
+| 5   | `first_drag`         | `task.moved` üzerindeki distinct aktörler                         |
+| 6   | `invite_sent`        | `invitation.created` üzerindeki distinct aktörler                 |
+| 7   | `smtp_configured`    | bu dağıtımın SMTP aktarımı var mı (kişi sayısı değil)             |
+| 8   | `invite_accepted`    | `invitation.accepted` distinct aktörleri — aktör davet edilendir  |
+| 9   | `dashboard_viewed`   | `UsagePing`'de `dashboard_view` satırı olan distinct kullanıcılar |
+| 10  | `task_completed`     | Bir kartı `COMPLETED` kolona taşıyan distinct aktörler            |
+| 11  | `wau_board_view`     | Son 7 günde `board_view` satırı olan distinct kullanıcılar        |
+
+On birin dokuzu `Activity`, `User` ve `WorkspaceMember`'dan okunur — ürünün kendi nedenleriyle
+zaten yazdığı tablolar — dolayısıyla huni yükseltmeden bu yana geçen süreyi değil, kurulumunuzun
+tüm geçmişini kapsar. Yalnızca 9. ve 11. adımlar kendi depolamasını gerektirdi, çünkü `Activity`
+değişiklikleri kaydeder ve _bir board'u okumak bir değişiklik değildir_: onlar olmadan, her sabah
+board'unu açıp hiçbir şeyi düzenlemeyen bir takım ölü olarak raporlanırdı.
+
+Her adım **distinct kişi** sayar, asla olay değil; tek istisna dağıtımın bir özelliği olan 7.
+adımdır. `smtp_configured` bilerek "davet gönderildi" ile "davet kabul edildi" arasında durur:
+mail aktarımı olmadan davetli adresini doğrulayamaz ve dolayısıyla hiç kabul edemez (bkz.
+[SMTP ve Mailpit](#smtp-ve-mailpit) ve
+[ADR 0013](decisions/0013-invitation-email-verification.md)); oradaki bir sıfır, aksi hâlde ürün
+sorunu gibi görünecek bir düşüşü açıklar.
+
+**Buradaki hiçbir şey sunucunuzdan çıkmaz.** İstek anında hesaplanır ve diğer her şeyle aynı API
+üzerinden oturum açmış tek bir çağırana döner.
+
+#### Kimler görebilir
+
+Siz söyleyene kadar hiç kimse:
+
+```dotenv
+INSTANCE_ADMIN_EMAILS=siz@example.com,ops@example.com
+```
+
+Varsayılan olan boş değer, uç noktanın herkese — makinedeki her workspace'in sahibi olan hesap
+dahil — `403` yanıtı vermesi demektir. Vermek zorunda: kaydın açık olduğu bir kurulumda
+"workspace sahibi" her ziyaretçinin bir workspace oluşturarak kendine verebileceği bir roldür,
+yani hiçbir workspace rolü sınır olamazdı. Adresler büyük/küçük harf duyarsız eşleşir; listeyi
+değiştirmek için yeniden başlatma gerekir.
+
+Ayarlandıktan sonra huni, o hesaplar için **Ayarlar** ekranının altında görünür; başka kimse için
+görünmez. Uygulama içinden yetki vermenin bir yolu yoktur.
+
+### 2. Dışa telemetri — kapalı ve siz açmadıkça kapalı kalır
+
+```dotenv
+TELEMETRY_ENABLED=false          # varsayılan
+TELEMETRY_ENDPOINT=              # varsayılanı yok; yukarıdaki anahtara ek olarak gerekli
+```
+
+`TELEMETRY_ENABLED=false` ile — ki dokunulmamış bir `.env` bu demektir — **hiçbir dışa istek
+yapılmaz**. `true` yapıp `TELEMETRY_ENDPOINT` ayarlamamak hata loglar ve yine hiçbir şey
+göndermez; yerleşik bir toplayıcı adresi bilerek yoktur.
+
+Açtığınızda, API süreci başlarken tam olarak bir `POST` yapılır; gövdesi şudur ve **başka hiçbir
+şey içermez**:
+
+```json
+{
+  "event": "instance_started",
+  "version": "0.1.0"
+}
+```
+
+Alan alan, listenin tamamı budur:
+
+| Alan      | Değer                | Not                                                |
+| --------- | -------------------- | -------------------------------------------------- |
+| `event`   | `"instance_started"` | Her zaman bu düz metin. Tek bir olay vardır        |
+| `version` | örn. `"0.1.0"`       | Bu derlemenin geldiği `@kurultay/api` paket sürümü |
+
+Gönderil**mey**en ve gönderilmesi için kod yolu bulunmayanlar: herhangi bir kurulum kimliği,
+hostname'iniz, IP adresiniz, URL'iniz, veritabanınız, kullanıcı/workspace/board/task sayıları,
+yukarıdaki aktivasyon hunisinin herhangi bir parçası ve herhangi bir kişiye dair herhangi bir
+şey. Oturum yok, çerez yok, parmak izi yok ve ikinci bir istek yok — yeniden deneme yok, kuyruk
+yok, zamanlama yok. Yük gönderilmeden önce tamamen loglanır, böylece sunucunuzdan neyin çıktığını
+kendi API log'unuzda okuyabilirsiniz:
+
+```text
+LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.1.0"} to https://…
+```
+
+Reddedilen bağlantı, DNS hatası, toplayıcıdan gelen hata ya da zaman aşımı
+(`TELEMETRY_TIMEOUT_MS`, varsayılan 5sn) — hepsi tek bir uyarı satırı üretir, başka hiçbir şey;
+telemetri açılışı asla geciktiremez ya da düşüremez.
+
+Kurulum kimliği olmadığı için bir toplayıcı kurulumları değil _başlangıçları_ sayabilir. Bu,
+güvene dayalı hiçbir şey içermeyen bir söz karşılığında bilerek verilen bir hassasiyet kaybıdır;
+takas [ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md)'de tartışılıyor.
 
 ## Yükseltme ve yedekleme
 
