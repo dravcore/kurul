@@ -226,17 +226,17 @@ commented — is what a board member reads. The administrative events are what a
 after an account is compromised or someone leaves badly: they record every act that changes
 **who can reach a workspace**, or that **destroys work**.
 
-| Event                                                               | Written by                   | Payload beyond the actor                                          |
-| ------------------------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------- |
-| `board.created` · `board.updated` · `board.deleted`                 | `BoardService`               | board id, name, `changes`, deleted board's `taskCount`            |
-| `column.created` · `column.updated` · `column.deleted`              | `ColumnService`              | column id, board id, name, `category`, `changes`                  |
-| `label.created` · `label.updated` · `label.deleted`                 | `LabelService`               | label id, board id, name, colour slot, `changes`                  |
-| `workspace.updated`                                                 | `WorkspaceService`           | name, slug, `changes`                                             |
-| `member.removed` · `member.left` · `member.role_changed`            | `WorkspaceMemberService`     | target user, target name, `previousRole`, `newRole`, actor's role |
-| `invitation.created` · `invitation.revoked` · `invitation.accepted` | `WorkspaceInvitationService` | invitation id, invited address, granted role, `emailDelivery`     |
-| `task.deleted`                                                      | `TaskService`                | task id, title, board and column                                  |
+| Event                                                               | Written by                   | Payload beyond the actor                                                     |
+| ------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------- |
+| `board.created` · `board.updated` · `board.deleted`                 | `BoardService`               | board id, name, `changes`, deleted board's `taskCount`                       |
+| `column.created` · `column.updated` · `column.deleted`              | `ColumnService`              | column id, board id, name, `category`, `changes`                             |
+| `label.created` · `label.updated` · `label.deleted`                 | `LabelService`               | label id, board id, name, colour slot, `changes`                             |
+| `workspace.updated`                                                 | `WorkspaceService`           | name, slug, `changes`                                                        |
+| `member.removed` · `member.left` · `member.role_changed`            | `WorkspaceMemberService`     | target user, target name, `previousRole`, `newRole`, actor's role            |
+| `invitation.created` · `invitation.revoked` · `invitation.accepted` | `WorkspaceInvitationService` | invitation id, granted role, `emailDelivery` — **never the invited address** |
+| `task.deleted`                                                      | `TaskService`                | task id, title, board and column                                             |
 
-Three properties are deliberate:
+Four properties are deliberate:
 
 - **`changes` records both sides.** Administrative events store `{ field: { from, to } }`, not
   the `{ field: newValue }` shape the task feed uses. An audit entry is read backwards by
@@ -246,6 +246,12 @@ Three properties are deliberate:
   name of a deleted board or label exists nowhere else afterwards. Creations may be recorded
   immediately after the insert instead, because a lost creation entry still leaves the created
   row standing as evidence.
+- **A payload never widens who can read something.** `GET /workspaces/:workspaceId/activities`
+  is `@WorkspaceScoped()` and returns `payload` verbatim, so anything written there is readable
+  by every member down to GUEST. The pending-invitation list is `@WorkspaceRoles(...ADMIN_ROLES)`
+  precisely because an invited address belongs to someone who has agreed to nothing yet, so
+  `invitation.*` payloads carry the **invitation id and role only** — an admin joins
+  `WorkspaceInvitation` for the address. Forensic value is kept; the audience is not enlarged.
 - **`AUDIT_ACTIVITY_TYPES`** (`@kurultay/shared-types`) is the exported list of these types, so
   "who removed, granted or destroyed something here?" is one statement —
   `WHERE "workspaceId" = $1 AND type = ANY($2) ORDER BY id DESC`, served by the existing

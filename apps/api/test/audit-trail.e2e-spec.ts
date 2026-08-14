@@ -227,6 +227,45 @@ describe('Administrative audit trail (e2e)', () => {
     expect(accepted?.payload).toMatchObject({ role: MemberRole.MEMBER });
   });
 
+  /**
+   * Driven over HTTP as the least-privileged reader, because the unit-level guard in
+   * `workspace-invitation.service.spec.ts` can only prove what the service *writes*. This proves
+   * what a GUEST can *read*, which is the thing that actually matters: the activities feed is
+   * `@WorkspaceScoped()` and hands back `payload` verbatim, while the pending-invitation list is
+   * `@WorkspaceRoles(...ADMIN_ROLES)`. If an invited address ever lands on an activity payload,
+   * the audit trail has quietly reopened the door `listInvitations` closed.
+   */
+  it('does not leak invited addresses to a GUEST through the activities feed', async () => {
+    const owner = await signUp(app, { name: 'Owner' });
+    const guest = await signUp(app, { name: 'Guest' });
+    const workspace = await createWorkspace(owner.agent, 'Leak', `leak-${Date.now()}`);
+    await addMember(prisma, workspace.id, await userIdOf(guest), MemberRole.GUEST);
+
+    const invitedAddress = `contractor-${Date.now()}@test.example.com`;
+    const invitation = await owner.agent
+      .post(`/workspaces/${workspace.id}/invitations`)
+      .send({ email: invitedAddress, role: MemberRole.GUEST })
+      .expect(201);
+    await owner.agent
+      .delete(`/workspaces/${workspace.id}/invitations/${invitation.body.id as string}`)
+      .expect(204);
+
+    // The gate the address is supposed to sit behind still holds…
+    await guest.agent.get(`/workspaces/${workspace.id}/invitations`).expect(403);
+
+    // …and the feed the GUEST *can* read does not carry it in any form.
+    const feed = await guest.agent.get(`/workspaces/${workspace.id}/activities`).expect(200);
+    expect(JSON.stringify(feed.body)).not.toContain(invitedAddress);
+
+    // The id is on the row, so an admin still recovers the address by joining
+    // `WorkspaceInvitation` — forensic value kept, exposure not widened.
+    const trail = await auditTrail(workspace.id);
+    for (const row of trail) {
+      expect(row.payload).toMatchObject({ invitationId: invitation.body.id as string });
+    }
+    expect(trail).toHaveLength(2);
+  });
+
   it('keeps one workspace’s trail out of another’s', async () => {
     const ownerA = await signUp(app, { name: 'Owner A' });
     const ownerB = await signUp(app, { name: 'Owner B' });

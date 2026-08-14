@@ -492,7 +492,7 @@ describe('WorkspaceInvitationService invitation error mapping', () => {
  * importantly, that a refused call leaves none.
  */
 describe('WorkspaceInvitationService audit trail', () => {
-  it('records the invited address and the role it grants', async () => {
+  it('records the invitation by id and the role it grants', async () => {
     const { service, activityService } = buildService();
     api.createInvitation.mockResolvedValue(invitationRow('inv_1', MemberRole.ADMIN));
 
@@ -511,7 +511,6 @@ describe('WorkspaceInvitationService audit trail', () => {
         type: ActivityType.InvitationCreated,
         payload: expect.objectContaining({
           invitationId: 'inv_1',
-          email: EMAIL,
           role: MemberRole.ADMIN,
         }),
       }),
@@ -561,7 +560,7 @@ describe('WorkspaceInvitationService audit trail', () => {
     expect(activityService.record).not.toHaveBeenCalled();
   });
 
-  it('records a revocation with the address the offer was aimed at', async () => {
+  it('records a revocation by invitation id', async () => {
     const { service, prisma, activityService } = buildService();
     prisma.workspaceInvitation.findFirst.mockResolvedValue({
       id: 'inv_1',
@@ -578,7 +577,7 @@ describe('WorkspaceInvitationService audit trail', () => {
       expect.objectContaining({
         userId: ACTOR_ID,
         type: ActivityType.InvitationRevoked,
-        payload: { invitationId: 'inv_1', email: EMAIL, role: MemberRole.ADMIN },
+        payload: { invitationId: 'inv_1', role: MemberRole.ADMIN },
       }),
     );
   });
@@ -610,9 +609,64 @@ describe('WorkspaceInvitationService audit trail', () => {
         workspaceId: WORKSPACE_ID,
         userId: 'usr_invitee',
         type: ActivityType.InvitationAccepted,
-        payload: { invitationId: 'inv_1', email: EMAIL, role: MemberRole.MEMBER },
+        payload: { invitationId: 'inv_1', role: MemberRole.MEMBER },
       }),
     );
+  });
+
+  /**
+   * The regression guard for the whole section above.
+   *
+   * `GET /workspaces/:workspaceId/activities` is `@WorkspaceScoped()` and returns `payload`
+   * verbatim, while the pending-invitation list is `@WorkspaceRoles(...ADMIN_ROLES)`. An address
+   * on any of these payloads would republish the invitation queue to every MEMBER and GUEST —
+   * the exact exposure `WorkspaceController.listInvitations` refuses. Asserted over all three
+   * events at once, and by value rather than by key, so a future payload cannot smuggle it back
+   * under a different name.
+   */
+  it('never puts an invited address on any invitation payload', async () => {
+    const { service, prisma, activityService } = buildService();
+    api.createInvitation.mockResolvedValue(invitationRow('inv_1', MemberRole.MEMBER));
+    prisma.workspaceInvitation.findFirst.mockResolvedValue({
+      id: 'inv_1',
+      workspaceId: WORKSPACE_ID,
+      email: EMAIL,
+      role: MemberRole.MEMBER,
+    });
+    prisma.workspaceInvitation.findUnique.mockResolvedValue({
+      id: 'inv_1',
+      workspaceId: WORKSPACE_ID,
+      email: EMAIL,
+      status: 'pending',
+    });
+    api.cancelInvitation.mockResolvedValue({ id: 'inv_1' });
+    api.acceptInvitation.mockResolvedValue({
+      member: {
+        id: 'member-1',
+        userId: 'usr_invitee',
+        role: MemberRole.MEMBER,
+        organizationId: WORKSPACE_ID,
+      },
+    });
+
+    await service.createInvitation(
+      WORKSPACE_ID,
+      ACTOR_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+    await service.revokeInvitation(WORKSPACE_ID, ACTOR_ID, 'inv_1', request);
+    await service.acceptInvitation(WORKSPACE_ID, 'inv_1', request);
+
+    const payloads = activityService.record.mock.calls.map(
+      ([, input]: [unknown, { payload: Record<string, unknown> }]) => input.payload,
+    );
+    expect(payloads).toHaveLength(3);
+    for (const payload of payloads) {
+      expect(JSON.stringify(payload)).not.toContain(EMAIL);
+      // The id is what makes the address recoverable by a reader who is allowed to see it.
+      expect(payload).toHaveProperty('invitationId', 'inv_1');
+    }
   });
 });
 

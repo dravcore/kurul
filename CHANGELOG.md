@@ -20,8 +20,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   sides of every changed field, so a role change records the role that was held as well as the
   one that was granted, and a deleted board records the name and task count that stop existing
   with it. Deletions are written inside the transaction that performs them, before the delete,
-  so a refused delete leaves no entry and a successful one cannot lose its record.
-  `AUDIT_ACTIVITY_TYPES` in `@kurultay/shared-types` makes the whole question a single
+  so a refused delete leaves no entry and a successful one cannot lose its record. No payload
+  widens who can read something: the activity feed is readable by every member down to GUEST,
+  while the pending-invitation list is admin-only, so `invitation.*` entries record the
+  invitation id and role and never the invited address — an admin joins `WorkspaceInvitation`
+  for that. `AUDIT_ACTIVITY_TYPES` in `@kurultay/shared-types` makes the whole question a single
   tenant-scoped query. Workspace *deletion* is the one act that cannot be stored this way —
   `Activity` cascades on `workspaceId`, so the row would delete itself — and is emitted on the
   JSON-line log instead, as a `workspace.deleted` event carrying the name, slug, member count

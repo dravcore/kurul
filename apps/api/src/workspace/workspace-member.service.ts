@@ -73,6 +73,14 @@ const MEMBER_NOT_FOUND_MESSAGE = 'Workspace member not found';
  * does not fire at all for `/organization/leave`, so half the membership departures would be
  * missing. These three methods know the actor, the target and the role on both sides, which is
  * exactly the payload the audit trail is for, so they are where it is written.
+ *
+ * All three write it *after* the `auth.api.*` call, with no transaction spanning the two, and
+ * the resulting window is a deliberate choice rather than an oversight: a crash in between
+ * loses the record of a change that happened, but recording first would invent records of
+ * changes the plugin went on to refuse. A trail that under-reports is recoverable from the
+ * membership rows themselves; one that reports revocations and promotions which never occurred
+ * is actively misleading. Closing the window means taking the write out from under the plugin's
+ * hooks, which the section above rules out.
  */
 @Injectable()
 export class WorkspaceMemberService {
