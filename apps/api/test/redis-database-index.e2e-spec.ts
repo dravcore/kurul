@@ -223,7 +223,12 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
 
       const databases = await databasesOfClientsAfter(onDbZero, since);
       expect(adapters).toHaveLength(1);
-      expect(databases).toHaveLength(2);
+      // At least two, not exactly two: the assertion that carries the weight is the set below —
+      // *every* connection opened during this test is on the requested index — and that one is
+      // not weakened by an extra socket appearing (a reconnect, a client this suite does not
+      // own). Pinning the count instead would fail on a stray connection that is on database 3,
+      // which is the outcome this test exists to see.
+      expect(databases.length).toBeGreaterThanOrEqual(2);
       expect(new Set(databases)).toEqual(new Set([TEST_DB]));
     } finally {
       if (savedWorkerId !== undefined) process.env.JEST_WORKER_ID = savedWorkerId;
