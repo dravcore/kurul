@@ -76,6 +76,12 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  /// Backs the nightly expiry sweep in `retention/cleanup.worker.ts` — the only query that
+  /// reads this column at all. Measured at 50k sessions: without it the sweep is a `Seq Scan`
+  /// touching 516 buffers, and it pays that every night forever rather than once. The batch
+  /// `LIMIT` bounds how long a row lock is held, not how much of the table is read: each batch
+  /// is its own scan.
+  @@index([expiresAt])
 }
 
 model Account {
@@ -105,6 +111,12 @@ model Verification {
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  /// The table's only index, and the only query that reads it: the nightly expiry sweep in
+  /// `retention/cleanup.worker.ts`. Verification rows are written once and read by token, so
+  /// nothing else needs an index — but the sweep was a `Seq Scan` over the whole table every
+  /// night (206 buffers at 20k rows, measured), which is the one cost this table had.
+  @@index([expiresAt])
 }
 
 model Workspace {
@@ -442,13 +454,22 @@ model UsagePing {
   /// The dedupe. Also the index the `ON CONFLICT` insert probes, so the write costs one index
   /// lookup and nothing else.
   @@unique([userId, workspaceId, kind, day])
-  /// Deliberately one index and deliberately not `(kind, day)`. Both readers of this table are
-  /// day-range scans: the funnel reads the last seven days across both kinds at once, and the
-  /// retention sweep deletes everything older than its cutoff across both kinds at once.
-  /// `kind` has two values, so leading with it would halve a scan that a date range has already
-  /// cut to a fraction of a percent — see DB-07 in the audit for what happens when index
-  /// columns are added on the theory that a predicate mentions them.
+  /// Deliberately not `(kind, day)`. `kind` has two values, so leading with it would halve a
+  /// scan that a date range has already cut to a fraction of a percent — see DB-07 in the audit
+  /// for what happens when index columns are added on the theory that a predicate mentions them.
+  ///
+  /// This serves the funnel, which reads the last seven days. It does *not* serve the retention
+  /// sweep, though this comment used to claim it did: the sweep filters `createdAt`, not `day`,
+  /// so it could never use this index and was measured as a `Seq Scan` (416 buffers at 50k rows,
+  /// the slowest of the five sweeps).
   @@index([day])
+  /// The retention sweep's index. Filtering on `day` instead would have reused the index above
+  /// and cost nothing — and would have been wrong: `day` is the day being *recorded* and
+  /// `createdAt` is when the row was *written*. They match for every row this code writes today,
+  /// but "kept for N days after it was written" is what the policy means, and only `createdAt`
+  /// survives a backfill saying so. The second index is the price of the window meaning what
+  /// [ADR 0020](../../../docs/decisions/0020-data-retention.md) says it means.
+  @@index([createdAt])
   /// Cascade support. A deleted workspace runs `DELETE FROM "UsagePing" WHERE "workspaceId" =
   /// $1`, which no other index here leads with (`@@unique` leads with `userId`). Without it,
   /// deleting one workspace scans the whole table. `userId` needs no twin: the unique index
