@@ -12,6 +12,14 @@ name: Release images
 # (docs/git-strategy.md#release-process step 5: `git tag -a vX.Y.Z && git push origin vX.Y.Z`)
 # — a release/* branch or its PR can still be abandoned or force-fixed before that point, so
 # building images any earlier would risk publishing a version nobody actually released.
+#
+# Every `uses:` below is pinned to a mutable major tag (`@v7`, `@v3`, `@v5`, `@v6`), matching
+# ci.yml/codeql.yml/cla.yml's existing convention rather than pinning to a commit SHA — pinning
+# just this file to SHAs while every other workflow stays on major tags would be an
+# inconsistency, not a hardening. Actions-pinning is audit finding SEC-06's job
+# (audit/findings/security.md, issue #157: "Actions mutable tag'e pinli") and its roadmap item
+# P3-5, and belongs as one repo-wide pass across all four workflow files at once, not a
+# one-off in the workflow this finding's own dependency chain adds.
 on:
   push:
     tags:
@@ -112,12 +120,16 @@ jobs:
           # API URL work tracked as this finding's own follow-up lands.
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,scope=${{ matrix.image }},mode=max
-          # Keeps the published manifest list to exactly the two platforms this job built.
-          # Buildx's newer default (provenance/SBOM attestations as extra manifest entries)
-          # is useful supply-chain metadata, but it also means `docker manifest inspect`
-          # returns more than the two platform entries a self-hoster or this workflow's own
-          # arm64 verification is looking for — off for now so that check stays a straight
-          # read, revisit if/when attestations become part of this project's supply-chain
-          # story.
-          provenance: false
-          sbom: false
+          # provenance/sbom left at build-push-action's default (both on) rather than turned
+          # off for a simpler manifest read: audit finding SEC-06 (audit/findings/security.md,
+          # issue #157) already tracks "no signed image / no SBOM" as its own gap, and its
+          # roadmap item P3-5 depends on this workflow existing — build-push-action's default
+          # attestations are the free half of that work, so switching them off here would
+          # hand P3-5 more to build, not less. Verifying a release image's platforms now needs
+          # `docker buildx imagetools inspect ghcr.io/dravcore/<image>:<tag>`, not `docker
+          # manifest inspect` — imagetools understands the attestation manifests as attached
+          # metadata and lists platforms and attestations separately instead of interleaving
+          # them the way a plain manifest list read would. cosign signing and a published SBOM
+          # release asset stay P3-5's job, not this workflow's — provenance/sbom attestations
+          # are supply-chain metadata *inside* the registry, not the signed/verifiable
+          # artifact SEC-06 asks for.
