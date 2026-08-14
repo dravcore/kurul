@@ -8,10 +8,17 @@ const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
 const TASK_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d55';
 const ACTOR_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d54';
 const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
+const CHECKLIST_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d56';
 
 function build() {
   const prisma = {
-    checklist: { findMany: jest.fn(), create: jest.fn() },
+    checklist: {
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
   } as unknown as PrismaService;
   const taskRead = {
     findTaskBasic: jest.fn().mockResolvedValue({ id: TASK_ID, boardId: BOARD_ID }),
@@ -61,5 +68,92 @@ describe('ChecklistService.create', () => {
       NotFoundException,
     );
     expect(prisma.checklist.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChecklistService.update', () => {
+  it('scopes the rename through the task relation', async () => {
+    const { service, prisma, taskEvents } = build();
+
+    await service.update(WORKSPACE_ID, TASK_ID, ACTOR_ID, CHECKLIST_ID, { title: 'Yeni ad' });
+
+    expect(prisma.checklist.updateMany).toHaveBeenCalledWith({
+      where: { id: CHECKLIST_ID, taskId: TASK_ID, task: { board: { workspaceId: WORKSPACE_ID } } },
+      data: { title: 'Yeni ad' },
+    });
+    expect(taskEvents.emitUpdated).toHaveBeenCalledWith(WORKSPACE_ID, TASK_ID, ACTOR_ID);
+  });
+
+  it('raises not found when the rename matches no row in this tenant', async () => {
+    const { service, prisma } = build();
+    (prisma.checklist.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.update(WORKSPACE_ID, TASK_ID, ACTOR_ID, CHECKLIST_ID, { title: 'x' }),
+    ).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('ChecklistService.remove', () => {
+  it('scopes the delete through the task relation, not the id alone', async () => {
+    const { service, prisma } = build();
+
+    await service.remove(WORKSPACE_ID, TASK_ID, ACTOR_ID, CHECKLIST_ID);
+
+    expect(prisma.checklist.deleteMany).toHaveBeenCalledWith({
+      where: { id: CHECKLIST_ID, taskId: TASK_ID, task: { board: { workspaceId: WORKSPACE_ID } } },
+    });
+  });
+
+  it('raises not found when the checklist belongs to another task', async () => {
+    const { service, prisma } = build();
+    (prisma.checklist.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+    await expect(service.remove(WORKSPACE_ID, TASK_ID, ACTOR_ID, CHECKLIST_ID)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});
+
+describe('ChecklistService.move', () => {
+  it('places the checklist at the midpoint of its new neighbors', async () => {
+    const { service, prisma } = build();
+    (prisma.checklist.findMany as jest.Mock).mockResolvedValue([
+      { id: 'a', position: 1000 },
+      { id: CHECKLIST_ID, position: 2000 },
+      { id: 'c', position: 3000 },
+    ]);
+
+    await service.move(WORKSPACE_ID, TASK_ID, ACTOR_ID, CHECKLIST_ID, { afterId: 'c' });
+
+    expect(prisma.checklist.update).toHaveBeenCalledWith({
+      where: { id: CHECKLIST_ID },
+      data: { position: 4000 },
+    });
+  });
+
+  it('moves to the front when no afterId is given', async () => {
+    const { service, prisma } = build();
+    (prisma.checklist.findMany as jest.Mock).mockResolvedValue([
+      { id: 'a', position: 1000 },
+      { id: CHECKLIST_ID, position: 2000 },
+    ]);
+
+    await service.move(WORKSPACE_ID, TASK_ID, ACTOR_ID, CHECKLIST_ID, {});
+
+    expect(prisma.checklist.update).toHaveBeenCalledWith({
+      where: { id: CHECKLIST_ID },
+      data: { position: 0 },
+    });
+  });
+
+  it('raises not found when the checklist is not on this task', async () => {
+    const { service, prisma } = build();
+    (prisma.checklist.findMany as jest.Mock).mockResolvedValue([{ id: 'a', position: 1000 }]);
+
+    await expect(service.move(WORKSPACE_ID, TASK_ID, ACTOR_ID, CHECKLIST_ID, {})).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(prisma.checklist.update).not.toHaveBeenCalled();
   });
 });

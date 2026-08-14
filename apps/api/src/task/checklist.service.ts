@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { TaskDto } from '@kurultay/shared-types';
-import { POSITION_GAP } from '../common/position/fractional-index';
+import { POSITION_GAP, midpoint } from '../common/position/fractional-index';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateChecklistDto } from './dto/create-checklist.dto';
+import type { MoveChecklistDto } from './dto/move-checklist.dto';
+import type { UpdateChecklistDto } from './dto/update-checklist.dto';
 import { TaskEventsService } from './task-events.service';
 import { TaskReadService } from './task-read.service';
 
@@ -41,6 +43,70 @@ export class ChecklistService {
       data: { taskId: task.id, title: dto.title, position },
     });
 
+    return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
+  }
+
+  async update(
+    workspaceId: string,
+    taskId: string,
+    actorId: string,
+    checklistId: string,
+    dto: UpdateChecklistDto,
+  ): Promise<TaskDto> {
+    await this.taskRead.findTaskBasic(workspaceId, taskId);
+    const result = await this.prisma.checklist.updateMany({
+      where: { id: checklistId, taskId, task: { board: { workspaceId } } },
+      data: { title: dto.title },
+    });
+    if (result.count === 0) throw new NotFoundException('Checklist not found');
+    return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
+  }
+
+  async remove(
+    workspaceId: string,
+    taskId: string,
+    actorId: string,
+    checklistId: string,
+  ): Promise<TaskDto> {
+    await this.taskRead.findTaskBasic(workspaceId, taskId);
+    // Reachable only through its task, so the tenant scope rides the relation rather than
+    // resting on the read above — the same shape `TaskLabelService.removeLabel` uses.
+    const result = await this.prisma.checklist.deleteMany({
+      where: { id: checklistId, taskId, task: { board: { workspaceId } } },
+    });
+    if (result.count === 0) throw new NotFoundException('Checklist not found');
+    return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
+  }
+
+  async move(
+    workspaceId: string,
+    taskId: string,
+    actorId: string,
+    checklistId: string,
+    dto: MoveChecklistDto,
+  ): Promise<TaskDto> {
+    await this.taskRead.findTaskBasic(workspaceId, taskId);
+    const siblings = await this.prisma.checklist.findMany({
+      where: { taskId },
+      orderBy: { position: 'asc' },
+      select: { id: true, position: true },
+    });
+    if (!siblings.some((row) => row.id === checklistId)) {
+      throw new NotFoundException('Checklist not found');
+    }
+
+    const others = siblings.filter((row) => row.id !== checklistId);
+    const afterIndex = dto.afterId ? others.findIndex((row) => row.id === dto.afterId) : -1;
+    if (dto.afterId && afterIndex === -1) {
+      throw new NotFoundException('Checklist not found');
+    }
+    const prev = afterIndex >= 0 ? (others[afterIndex]?.position ?? null) : null;
+    const next = others[afterIndex + 1]?.position ?? null;
+
+    await this.prisma.checklist.update({
+      where: { id: checklistId },
+      data: { position: midpoint(prev, next) },
+    });
     return this.taskEvents.emitUpdated(workspaceId, taskId, actorId);
   }
 }
