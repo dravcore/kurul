@@ -23,7 +23,7 @@ merge sonrası silinir.
 | Branch      | Ömür        | Şuradan dallanır | Şuraya merge olur  | Amaç                                                                        |
 | ----------- | ----------- | ---------------- | ------------------ | --------------------------------------------------------------------------- |
 | `main`      | kalıcı      | —                | —                  | Yalnızca release edilmiş kod. Her commit etiketli (tagged) bir release'tir. |
-| `develop`   | kalıcı      | `main`           | —                  | Entegrasyon branch'i. Her zaman staging'e deploy edilebilir.                |
+| `develop`   | kalıcı      | `main`           | —                  | Entegrasyon branch'i. Her zaman ayağa kalkar (aşağıya bakın).               |
 | `feature/*` | kısa ömürlü | `develop`        | `develop`          | Yeni işlevsellik                                                            |
 | `fix/*`     | kısa ömürlü | `develop`        | `develop`          | Acil olmayan bug fix'leri                                                   |
 | `docs/*`    | kısa ömürlü | `develop`        | `develop`          | Yalnızca dokümantasyon değişiklikleri                                       |
@@ -41,6 +41,25 @@ develop  ──────●──●──●────●─────�
 feature          ●          └─ geri-merge
 
 ```
+
+**Staging ortamı yok.** Bu tablo eskiden `develop`'ın "her zaman staging'e deploy
+edilebilir" olduğunu söylüyordu; böyle bir dağıtım hiç var olmadı — bu depoda onu gösteren bir
+host, bir workflow veya bir secret yok (denetim bulgusu OPS-08). Hiçbir şeyin zorlamadığı
+duran bir iddia, iddiasızlıktan kötüdür; işte gerçekten kontrol edilen iddia: `develop`
+**ayağa kalkmalı** ve kontrolü herkesin kendi makinesinde çalıştırabileceği bir komut.
+
+```bash
+docker compose up -d --build
+docker compose ps -a                              # her servis ayakta; migrate Exited (0)
+curl -s http://localhost/api/health/ready         # {"status":"ok","checks":{…}}
+```
+
+Bu, `SITE_URL` varsayılan `http://localhost` değerinde bırakılmış haliyle bir self-host
+kullanıcısının çalıştırdığı stack'in ta kendisidir ([Self-hosting](self-hosting.md)); yani
+"ayağa kalkıyor", staging'e özgü bir yaklaşıklık üzerinde değil gerçek dağıtım biçimi üzerinde
+doğrulanır. CI bunu çalıştırmaz — pipeline build, lint, tip ve test yapar ve her pull request'te
+tam bir compose açılışı, yakaladığından fazlasına mal olur — bu da onu release zamanına ait bir
+adım yapar; [release sürecinin 4. adımıdır](#release-süreci).
 
 **`main` veya `develop`'a doğrudan commit yok.** Tüm iş onlara bir branch ve bir pull
 request üzerinden ulaşır. Bu maintainer'lar için de geçerlidir.
@@ -220,9 +239,22 @@ git commit -am "chore(release): 0.2.0"
 # 3. Bu branch'e yalnızca release'i engelleyen fix'ler girebilir.
 #    Geri kalan her şey her zamanki gibi develop'a gitmeye devam eder.
 
-# 4. Bir PR aç: release/0.2.0 -> main. Bir merge commit ile (--no-ff) merge et.
+# 4. Bu branch'ten stack'i bir kez ayağa kaldır, sonra bir PR aç:
+#    release/0.2.0 -> main. Bir merge commit ile (--no-ff) merge et.
+#
+#    CI hiçbir şeyi ayağa kaldırmaz: kodu build eder, lint'ler, tiplerini ve
+#    testlerini kontrol eder — bunların hiçbiri artık başlamayan bir
+#    docker-compose.yml veya Caddyfile'ı fark etmez. Branch tablosundaki
+#    "her zaman ayağa kalkar" iddiasının arkasındaki kontrol budur ve bozuk
+#    olanı düzeltmenin hâlâ ucuz olduğu son nokta burasıdır.
+docker compose up -d --build
+docker compose ps -a                       # -a olmazsa tek seferlik migrate satırı gizlenir
+curl -s http://localhost/api/health/ready  # {"status":"ok","checks":{…}}
+docker compose down -v                     # -v: sonraki koşuya volume bırakma
 
-# 5. main üzerindeki merge commit'ini tag'le
+# 5. main üzerindeki merge commit'ini tag'le. Container imajlarını yayınlayan şey
+#    de budur (.github/workflows/release-images.yml) — tag yoksa imaj da yok ve
+#    docs/self-hosting.md'yi izleyen herkes için `docker compose pull` başarısız olur.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0

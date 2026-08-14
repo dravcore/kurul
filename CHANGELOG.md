@@ -308,6 +308,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **"`develop` is always deployable to staging" is gone, replaced by a claim something checks.**
+  `docs/git-strategy.md` had promised that since the branch table was written, and no staging
+  environment has ever existed — no host, no workflow, no secret in this repository points at
+  one (audit finding OPS-08). A standing promise nothing enforces is worse than no promise,
+  because it is quoted as though it were a safety net. The table now says `develop` must
+  **start**, which is verifiable, and the release process gained the verification as part of
+  step 4: `docker compose up -d --build`, `docker compose ps -a`, `curl` the readiness endpoint,
+  `docker compose down -v`. It is deliberately a release-time step rather than a CI job — a full
+  compose boot on every pull request costs more than it catches — and it runs the same stack a
+  self-hoster runs, `SITE_URL` at its `http://localhost` default, so what is checked is the real
+  deployment shape and not a staging-only approximation. Step numbering is unchanged; the boot
+  and the release PR share step 4.
+- **`docs/self-hosting.md` now covers the host, not just the stack.** The guide arrived with
+  automatic HTTPS but said nothing about what the machine around it should allow: it now states
+  the inbound firewall rule (SSH, 80, 443 and nothing else), why the rest of the stack is
+  already private without one (`proxy` is the only service in `docker-compose.yml` with a
+  `ports:` entry — everything else is on Docker's internal network, checkable with
+  `docker compose ps`), and the trap that makes a firewall alone insufficient on Linux: Docker
+  publishes ports through its own iptables rules, which are consulted before ufw's, so a port
+  published in an override is internet-facing despite a `ufw deny` covering it. Verifying the
+  deployment also no longer stops at "the page loads" — step 4 checks the thing HTTPS was for,
+  by reading the session cookie back. `SITE_URL=https://…` yields
+  `__Secure-better-auth.session_token=…; HttpOnly; Secure; SameSite=Lax`; the same request under
+  `SITE_URL=http://…` yields `better-auth.session_token=…; HttpOnly; SameSite=Lax`, no prefix
+  and no `Secure`, with the session token crossing the network in clear text. Both measured on a
+  running stack. Better Auth derives both properties from the scheme of the URL it is configured
+  with, which makes the scheme in `SITE_URL` the single switch behind them — now stated where an
+  operator will read it, along with what the wrong answer looks like.
 - **The nightly retention sweep now covers a fifth table.** `UsagePing` — the deduplicated
   "somebody opened a board / the dashboard" rows the activation funnel above needed — is swept
   under the existing `ACTIVITY_RETENTION_DAYS` rather than growing a window of its own: it is
@@ -427,6 +455,35 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The uptime monitor the docs tell you to build was pointed at a URL that is not the API.**
+  `docs/development.md` said to monitor `https://<your-host>/health/ready`, which predates the
+  reverse proxy: behind `proxy` that path matches the catch-all rule, reaches the web app and
+  answers `307` with a redirect to `/login`. Followed together with the same section's "expected
+  status: 200", it produces a monitor that is red on a perfectly healthy instance — and the
+  obvious way to quiet it, widening the accepted statuses, produces one that is green during an
+  outage instead. Measured on a running stack: `/health/ready` → `307`, `/api/health/ready` →
+  `200 {"status":"ok","checks":{"database":"up","redis":"up"}}`. The path is corrected, the
+  reason it is easy to get wrong is written down next to it, and the push-model cron beside it —
+  which probed `localhost:4000`, a port no Docker deployment publishes any more — now goes
+  through `docker compose exec` instead. `docs/self-hosting.md` gained the monitoring step
+  itself, as step 5 of the deployment rather than a footnote, including the deliberate outage
+  drill (`docker compose stop postgres` → `503` naming `"database":"down"`, `start` → `200`,
+  both verified) that turns an alerting setup from a hypothesis into a safeguard.
+- `docs/self-hosting.md` now explains the failure every reader hits before the first release
+  that publishes images. `docker compose pull` exits non-zero with `denied` for `api` and `web`
+  — the workflow that pushes them runs on a release tag, and `v0.1.0` predates it — after
+  succeeding for `postgres`, `redis` and `caddy`, so the three that worked scroll the two that
+  did not off the screen. The same is true of the files step 2 downloads: they come from `main`,
+  which carries only what the newest release carried, so a reader can end up with a
+  `docker-compose.yml` that has no `proxy:` service and no `docker/Caddyfile` to fetch beside
+  it — at which point none of the guide's HTTPS applies to what they just downloaded. Both are
+  named in Troubleshooting, with the build-from-source path that works in the meantime.
+- `docs/self-hosting.md` told operators to look for `migrate` in `docker compose ps` output and
+  expect it to say "exited". A plain `ps` lists running containers only, so the one-shot
+  `migrate` row it names is the one row that is never there. Corrected to `ps -a`, with the
+  expected output printed in full so "healthy" is recognizable rather than guessed at —
+  including why `backup` and `proxy` show no `(healthy)` marker (neither declares a
+  healthcheck), which otherwise reads as two broken services.
 - The dashboard no longer greets a first visit with "Your boards couldn't load." in
   development. The board list and the dashboard summary share one boards `GET` so a single
   screen does not ask twice, but the shared request was created with the abort signal of

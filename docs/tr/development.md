@@ -1132,8 +1132,16 @@ Kurulum — örnek olarak [UptimeRobot](https://uptimerobot.com) veya
 [healthchecks.io](https://healthchecks.io); bir URL'yi yoklayıp e-posta gönderebilen her
 monitör olur:
 
-1. `https://<host-unuz>/health/ready` için bir **HTTP(s) monitörü** oluşturun (API henüz bir
-   reverse proxy arkasında değilse `:4000/health/ready`).
+1. `https://<host-unuz>/api/health/ready` için bir **HTTP(s) monitörü** oluşturun.
+
+   Dağıtılmış bir stack'te `/api` ön eki isteğe bağlı değildir ve onu atlamak, fark edilmesi en
+   zor biçimde başarısız olur. Pakete dahil `proxy`, `/api/*`'ı API'ye, geri kalan her şeyi web
+   uygulamasına yönlendirir (`docker/Caddyfile`); dolayısıyla `https://<host-unuz>/health/ready`
+   catch-all kuralına düşer, Next.js'e varır ve `307` ile `/login`'e yönlendirir. Aşağıdaki 4. kural karşısında bu monitör, sapasağlam bir örnekte kırmızıdır — ve doğal çözüm, yani
+   kabul edilen durum kodlarını susana kadar genişletmek, onu gerçek bir kesinti sırasında da
+   yeşil yapar. Yalnızca kendi portunda, önünde proxy olmadan çalışan dev döngüsü API'sine
+   `http://localhost:4000/health/ready` adresinden erişilir.
+
 2. **Aralık: 5 dakika.** Gece yaşanan bir kesintiyi sabaha kalmadan yakalayacak kadar hızlı,
    her ücretsiz katmanın içinde kalacak kadar yavaş.
 3. Alarm öncesi **eşik: art arda 2 başarısız yoklama** — bir deploy veya
@@ -1152,9 +1160,13 @@ monitör olur:
    alarm kurulumu bir güvence değil, bir varsayımdır.
 
 API henüz internetten erişilebilir değilse healthchecks.io'nun _push_ modeli alternatiftir:
-sizden ses **kesildiğinde** alarm verir; host tarafında bir cron
-(`*/5 * * * * curl -fsS localhost:4000/health/ready && curl -fsS <ping-url>`) hiçbir şeyi dışa
-açmadan özel bir dağıtımı kapsar.
+sizden ses **kesildiğinde** alarm verir; host tarafında bir cron, hiçbir şeyi dışa açmadan özel
+bir dağıtımı kapsar. Yoklamayı, container'ın kendi healthcheck'i gibi, yayınlanmış bir port
+üzerinden değil ağın içinden yapın — Docker dağıtımında API'nin yayınlanmış portu yoktur:
+
+```cron
+*/5 * * * * cd /opt/kurultay && docker compose exec -T api wget -qO- http://127.0.0.1:4000/health/ready >/dev/null && curl -fsS <ping-url>
+```
 
 ## Günlük döngü
 
