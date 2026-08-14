@@ -34,6 +34,7 @@ Kurultay, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğun
 | [0020](0020-data-retention.md)                         | Veri Saklama: Tablo Başına Pencereler, Gecelik Bir Süpürme ile               | Kabul edildi                                          | 2026-08-14 |
 | [0021](0021-activation-funnel-and-opt-in-telemetry.md) | Aktivasyon Hunisi Instance İçinde, Telemetri Opt-In ve Varsayılan Kapalı     | Kabul edildi                                          | 2026-08-14 |
 | [0022](0022-attachment-storage.md)                     | Dosya Eki Depolaması: Bir Port Arkasında Yerel Disk, API Origin'inden Servis | Kabul edildi                                          | 2026-08-14 |
+| [0023](0023-checklist-data-model.md)                   | Checklist Veri Modeli: Kart Başına Çoklu Liste, Türetilmiş İlerleme, Yeni Realtime Event Yok | Kabul edildi                                          | 2026-08-14 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 

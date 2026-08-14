@@ -40,6 +40,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0020](0020-data-retention.md)                         | Data Retention: Per-Table Windows Enforced by a Nightly Sweep            | Accepted                                         | 2026-08-14 |
 | [0021](0021-activation-funnel-and-opt-in-telemetry.md) | Activation Funnel In-Instance, Telemetry Opt-In and Off by Default       | Accepted                                         | 2026-08-14 |
 | [0022](0022-attachment-storage.md)                     | Attachment Storage: Local Disk Behind a Port, Served From the API Origin | Accepted                                         | 2026-08-14 |
+| [0023](0023-checklist-data-model.md)                   | Checklist Data Model: Multi-List Per Card, Derived Progress, No New Realtime Event | Accepted                                         | 2026-08-14 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).
