@@ -1,0 +1,123 @@
+name: Release images
+
+# audit/findings/devops.md OPS-04: a self-host product with no published artifact means every
+# install *and every upgrade* rebuilds from source (measured: api 52s + web 22s, real OOM risk
+# on a small VPS). This workflow is the fix — it publishes the two long-running services to
+# GHCR so `docker compose pull && up -d` (docs/development.md#full-stack-in-docker) replaces
+# `docker compose up --build` as the normal path; the `migrate` one-shot service is left
+# building from source (see the comment beside it in docker-compose.yml) — it is not on OPS-04's
+# critical path and OPS-04's own text scopes the fix to "api+web imajlarını yayınla".
+#
+# Triggered by the tag push, not by the release/* -> main PR that precedes it
+# (docs/git-strategy.md#release-process step 5: `git tag -a vX.Y.Z && git push origin vX.Y.Z`)
+# — a release/* branch or its PR can still be abandoned or force-fixed before that point, so
+# building images any earlier would risk publishing a version nobody actually released.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+# `contents: read` is the default-safe floor for a checkout; `packages: write` is the one
+# elevated grant this workflow needs, scoped to the ephemeral, workflow-run-only
+# GITHUB_TOKEN — no PAT, no repo secret, nothing that outlives this run or could leak into a
+# log. See docker/login-action below for where it's spent.
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  # A release tag names one immutable version, so two runs racing to publish the same tag
+  # would still converge on the same content (GHCR layers are content-addressed) — this group
+  # exists to avoid burning the ~75s build twice, not to prevent a correctness problem.
+  # cancel-in-progress stays false (unlike ci.yml's group): cancelling a run mid-push can leave
+  # a multi-arch manifest list pointing at a platform manifest that never finished uploading,
+  # which is a worse failure mode than a queued duplicate run finishing a few minutes later.
+  group: release-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      # api and web have independent Dockerfiles and share no build cache, so there is nothing
+      # to serialize for — and fail-fast: false means a broken `web` build still lets a working
+      # `api` image reach GHCR (and vice versa) instead of the matrix aborting both on one
+      # image's failure.
+      fail-fast: false
+      matrix:
+        include:
+          - image: kurultay-api
+            dockerfile: apps/api/Dockerfile
+          - image: kurultay-web
+            dockerfile: apps/web/Dockerfile
+    steps:
+      - uses: actions/checkout@v7
+
+      # QEMU is what lets this amd64 runner execute arm64 instructions during the build itself
+      # (pnpm install, tsc, next build all run *as* arm64 under emulation) — Buildx alone only
+      # handles the multi-arch manifest/layer plumbing around a build, not running foreign-arch
+      # RUN steps. This is exactly what OPS-04's "ARM için önceden derlenmiş imaj yok, kaynaktan
+      # build teorik ama doğrulanmamış" gap asks for: a real, tested arm64 artifact instead of
+      # an unverified claim that source-building on ARM hardware works.
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Turns the git ref alone into every tag this push should carry, so nothing in this
+      # workflow hardcodes a version number. For a `refs/tags/v0.2.0` push that's `0.2.0`,
+      # `0.2` (float onto patch releases without opting into the next minor — a middle ground
+      # between a full `:0.2.0` pin and unpinned `:latest`), and `latest` itself, which
+      # `docker-compose.yml`'s `image: ghcr.io/dravcore/${{ matrix.image }}:${TAG:-latest}`
+      # relies on as the default a self-hoster gets without setting TAG at all.
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          # Both Dockerfiles end on `runner` (the migrate stage is a mid-file detour that ends
+          # at `migrate`, not the last stage) — pinned explicitly rather than relying on "last
+          # stage wins" so a future stage added after `runner` for some other purpose can't
+          # silently retarget what gets published here.
+          target: runner
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Neither Dockerfile's build ARGs are set here. apps/api/Dockerfile's DATABASE_URL
+          # only needs to be well-formed for `prisma generate`, never reachable, so its
+          # Dockerfile default is fine unmodified. apps/web/Dockerfile's NEXT_PUBLIC_API_URL
+          # and NEXT_PUBLIC_SENTRY_* are baked in at build time (Next.js inlines
+          # NEXT_PUBLIC_* into the client bundle, they cannot be swapped at container start —
+          # see docs/development.md#full-stack-in-docker) — this published web image therefore
+          # only serves the common case where the browser reaches the API at
+          # http://localhost:4000, its Dockerfile default. A deployment needing a different
+          # API origin still builds locally (`docker compose build web`, which is what the
+          # `build:` fallback beside `image:` in docker-compose.yml is for) until the runtime
+          # API URL work tracked as this finding's own follow-up lands.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+          # Keeps the published manifest list to exactly the two platforms this job built.
+          # Buildx's newer default (provenance/SBOM attestations as extra manifest entries)
+          # is useful supply-chain metadata, but it also means `docker manifest inspect`
+          # returns more than the two platform entries a self-hoster or this workflow's own
+          # arm64 verification is looking for — off for now so that check stays a straight
+          # read, revisit if/when attestations become part of this project's supply-chain
+          # story.
+          provenance: false
+          sbom: false

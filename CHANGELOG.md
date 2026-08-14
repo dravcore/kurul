@@ -14,6 +14,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   like `PASSWORD_TOO_SHORT` and `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` now map to their
   relevant field (password, email) with a message that tells the user exactly what to fix.
   Unknown errors fall back to the generic message to avoid leaking unnecessary details.
+- **GHCR image publishing** — `.github/workflows/release-images.yml` builds and pushes
+  `ghcr.io/dravcore/kurultay-api` and `ghcr.io/dravcore/kurultay-web` (`linux/amd64` +
+  `linux/arm64`, tagged with the release's SemVer, its `major.minor`, and `latest`) on every
+  `vX.Y.Z` tag push. `docker-compose.yml`'s `api`/`web` services now declare `image:
+  ghcr.io/dravcore/kurultay-{api,web}:${TAG:-latest}` alongside their existing `build:`, so
+  `docker compose pull && docker compose up -d` installs and upgrades from a published image
+  with no local build — falling back to `build:` automatically (same source build as before)
+  when no image exists for the configured `TAG` or the registry is unreachable. `TAG` is a new
+  compose-only `.env` variable (see `.env.example`) for pinning a specific release instead of
+  tracking `latest`. `migrate` (the one-shot migration runner) still always builds from source
+  — see the comment beside it in `docker-compose.yml` for why that's scoped out of this change
+  — and the published `web` image only has its `NEXT_PUBLIC_API_URL` set to the Dockerfile's
+  `http://localhost:4000` default, since Next.js bakes `NEXT_PUBLIC_*` into the client bundle
+  at build time; a deployment needing a different API origin still runs `docker compose build
+  web` until the runtime-configurable API URL that follows this change lands. Closes audit
+  finding OPS-04 ([#126](https://github.com/dravcore/kurultay/issues/126)); README (EN + TR)
+  and `docs/development.md` (EN + TR) now document the pull-based flow as the default, with
+  `docker compose up --build` kept as the explicit build-on-purpose path.
 - A **Workspace** section in Settings — renaming and deleting a workspace no longer require
   `curl`. `PATCH /workspaces/:workspaceId` and `DELETE /workspaces/:workspaceId` existed from
   the start, but nothing in the product called either. Rename (OWNER/ADMIN, matching the
