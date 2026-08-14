@@ -168,6 +168,69 @@ describe('WorkspaceProvider bootstrap', () => {
   });
 
   /**
+   * FE-07: `onSwitch` used to write whichever `fetchOwnMembership` reply landed last in wall
+   * time, not whichever switch was last *requested*. Two rapid switches with the first's
+   * reply arriving after the second's must leave the second switch's role standing — a stale
+   * ADMIN reply must not overwrite a just-applied VIEWER role (or vice versa).
+   */
+  it('drops a stale membership reply from an overtaken switch', async () => {
+    const WORKSPACE_B = 'workspace-b';
+    const WORKSPACE_C = 'workspace-c';
+    let resolveB: ((value: WorkspaceMemberDto) => void) | undefined;
+    const bMembership: WorkspaceMemberDto = {
+      ...membership,
+      workspaceId: WORKSPACE_B,
+      role: MemberRole.ADMIN,
+    };
+    const cMembership: WorkspaceMemberDto = {
+      ...membership,
+      workspaceId: WORKSPACE_C,
+      role: MemberRole.MEMBER,
+    };
+
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/workspaces') return Promise.resolve([workspace]) as never;
+      if (path === `/workspaces/${WORKSPACE_ID}/members/me`) {
+        return Promise.resolve(membership) as never;
+      }
+      // B is the switch that is overtaken: its reply is held open here and only released
+      // once C — the switch that actually wins — has already landed.
+      if (path === `/workspaces/${WORKSPACE_B}/members/me`) {
+        return new Promise<WorkspaceMemberDto>((resolve) => {
+          resolveB = resolve;
+        }) as never;
+      }
+      if (path === `/workspaces/${WORKSPACE_C}/members/me`) {
+        return Promise.resolve(cMembership) as never;
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { result } = renderProvider();
+    await waitFor(() => expect(result.current.bootstrapped).toBe(true));
+
+    // Fired back-to-back without awaiting the first, exactly the race FE-07 describes: B's
+    // `fetchOwnMembership` is still in flight when the switch to C starts, then finishes.
+    const switchB = result.current.onSwitch(WORKSPACE_B);
+    await act(async () => {
+      await result.current.onSwitch(WORKSPACE_C);
+    });
+
+    expect(result.current.activeId).toBe(WORKSPACE_C);
+    expect(result.current.activeRole).toBe(MemberRole.MEMBER);
+
+    // B's reply lands last in wall time. Without the generation guard this would overwrite
+    // `activeRole` with B's ADMIN role even though the shell has already moved on to C.
+    await act(async () => {
+      resolveB?.(bMembership);
+      await switchB;
+    });
+
+    expect(result.current.activeId).toBe(WORKSPACE_C);
+    expect(result.current.activeRole).toBe(MemberRole.MEMBER);
+  });
+
+  /**
    * `RenameWorkspaceDialog` hands the `PATCH` response straight to this — no second fetch — so
    * `WorkspaceSwitcher` (which reads the same `workspaces` array) shows the new name without a
    * full bootstrap. The other workspace stays untouched, matched by id rather than position.
