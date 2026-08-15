@@ -93,3 +93,27 @@ describe('TaskCard checklist badge', () => {
     expect(screen.queryByText(/^\d+\/\d+$/)).toBeNull();
   });
 });
+
+describe('TaskCard attachment badge', () => {
+  it('carries the attachment count on a card that has nothing else in its meta row', () => {
+    // The guard on the meta row is the whole test. A card whose only metadata is an attachment
+    // renders no row at all unless `attachmentCount` is one of the terms in that condition —
+    // and the badge, correct on its own, is then never mounted.
+    renderCard({ attachmentCount: 2 });
+
+    expect(screen.getByLabelText('2 attachments')).toBeDefined();
+  });
+
+  it('still shows the badge beside other metadata', () => {
+    renderCard({ attachmentCount: 1, estimatedMinutes: 45 });
+
+    expect(screen.getByLabelText('1 attachment')).toBeDefined();
+    expect(screen.getByText('45m')).toBeDefined();
+  });
+
+  it('adds nothing to a card whose task has no attachment', () => {
+    renderCard({ attachmentCount: 0 });
+
+    expect(screen.queryByLabelText(/attachment/)).toBeNull();
+  });
+});
