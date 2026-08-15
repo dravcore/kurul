@@ -194,9 +194,22 @@ services:
       PGDATABASE: ${POSTGRES_DB:-kurultay}
       BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
+      # Where the read-only attachments mount lands. Blank would skip the file archive
+      # entirely; it is set unconditionally because the volume exists on every deployment and
+      # an instance with attachments off simply archives an empty directory. ADR 0020 rejected
+      # cold-storage archiving as "a file on the same disk that nobody reads and nobody
+      # restores" — the answer here is not that the files are visible to users, but that this
+      # copy is read and restored on the same rehearsed schedule as the dump beside it.
+      ATTACHMENT_DIR: /attachments
     volumes:
       - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
       - backup_data:/backups
+      # Read-only on purpose: this container's whole job is to copy, and a backup process that
+      # can write to the thing it is backing up is one bug away from being the outage. The
+      # restore direction therefore needs its own `docker compose run` with a writable mount —
+      # docs/development.md#restoring-from-a-backup spells that out rather than leaving an
+      # operator to discover it mid-restore.
+      - attachment_data:/attachments:ro
     entrypoint: ['/bin/sh', '/usr/local/bin/backup.sh']
     # The one service that must come back by itself: a backup sidecar that stays down after
     # a reboot silently stops producing recovery points.

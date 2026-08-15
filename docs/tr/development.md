@@ -742,8 +742,21 @@ eşleşir — ve döngüye girer:
 1. `pg_dump --format=custom` ile `backup_data` volume'üne
    `/backups/kurultay-<UTC timestamp>.dump` yazar (önce `.part` olarak yazılır, başarıda
    yeniden adlandırılır; yarıda kesilen bir dump asla tamamlanmış bir arşiv gibi görünmez),
-2. en yeni `BACKUP_KEEP` arşivinden eskisini siler,
-3. `BACKUP_INTERVAL` saniye uyur, tekrarlar.
+2. `/attachments` altında salt-okunur bağlanmış attachment volume'ünü `tar -czf` ile
+   `/backups/kurultay-<AYNI UTC timestamp>-files.tar.gz` olarak arşivler. Ortak damga, bir
+   restore'un hangi tar'ın hangi dump'a ait olduğunu bilme yoludur,
+3. **her iki seride de** en yeni `BACKUP_KEEP` arşivinden eskisini siler,
+4. `BACKUP_INTERVAL` saniye uyur, tekrarlar.
+
+**Dosya arşivi bir snapshot değildir ve bu sınır varsayılmaz, ölçülür.** `pg_dump`
+veritabanının tutarlı bir görüntüsünü alır; `tar` dizini gezerken ne görürse onu alır, yani
+arşiv koşarken yüklenen bir dosya arşivin içinde yarım kalabilir. `.part`+yeniden adlandırma
+disiplini yarım kalmış bir _arşivi_ gizler, yarım kalmış bir _dosyayı_ değil. Pencere,
+`BACKUP_INTERVAL` başına attachment dizininin bir `tar`'ıdır ve aşağıdaki restore tatbikatı bu
+durumu, geri yüklenen her dosyanın boyutunu satırındaki `size` ile karşılaştırarak yakalar —
+tek başına bir sayım yakalayamaz, çünkü kesilmiş bir dosya da bir dosyadır. Pencereyi gerçekten
+kapatmak LVM/ZFS snapshot'ı ya da arşiv boyunca yüklemeleri durdurmak demektir; tek makinelik
+bir Compose kurulumu ikisini de taşımaz.
 
 Varsayılanlar — günde bir dump, yedi tanesi saklanır — **en fazla 24 saatlik bir kurtarma
 noktası (RPO ≤ 24 sa) ve bir haftalık geçmiş** demektir; host'ta cron yok, hatırlanacak bir
@@ -752,21 +765,31 @@ yedekleme sidecar'ı sessizce kurtarma noktası üretmeyi bırakır ki bu bölü
 tam olarak bu hatadır. `docker-compose.dev.yml`'de bilinçli olarak **yok** — `pnpm db:seed`'in
 istendiğinde sildiği yerel bir veritabanında saklanmaya değer bir şey yoktur.
 
-İki ayar, ikisi de compose tarafından `.env`'den okunur (yalnızca compose'a aittir — hiçbir
-uygulama kodu okumaz, dolayısıyla API'nin yüklediği [ortam
-değişkenlerinin](#ortam-değişkenleri) parçası değildirler):
+İki ayar, ikisi de compose tarafından `.env`'den okunur:
 
-| Değişken          | Varsayılan | Amaç                                                                      |
-| ----------------- | ---------- | ------------------------------------------------------------------------- |
-| `BACKUP_INTERVAL` | `86400`    | Dump'lar arası saniye. `86400` = günlük; bu **doğrudan** sizin RPO'nuzdur |
-| `BACKUP_KEEP`     | `7`        | Saklanan arşiv sayısı; her yeni dump'tan sonra daha eskileri silinir      |
+| Değişken          | Varsayılan | Amaç                                                                       |
+| ----------------- | ---------- | -------------------------------------------------------------------------- |
+| `BACKUP_INTERVAL` | `86400`    | Döngüler arası saniye. `86400` = günlük; bu **doğrudan** sizin RPO'nuzdur  |
+| `BACKUP_KEEP`     | `7`        | Her seride saklanan arşiv sayısı; her döngüden sonra daha eskileri silinir |
+
+Compose bu ikisini `api` servisine de geçirir — yedekleme ayarı gibi okunduğu için gözden
+kaçması kolaydır: gece koşan yetim dosya süpürmesi, bir dosyayı sahiplenmeyi bırakacak kadar
+eski bir dump hâlâ restore edilebilirken o dosyayı silmeyi reddeder ve bu grace period tam
+olarak `BACKUP_KEEP × BACKUP_INTERVAL`'dır. "Diskte var, veritabanında yok" ancak veritabanı
+otorite olduğu sürece doğru bir yargıdır; bir restore satırları geri sarar, disk olduğu yerde
+kalır. Yani iki değişkenden birini kısaltmak, bir restore'un o süpürmeden güvende olduğu
+pencereyi de kısaltır. Bkz. [ADR 0022](decisions/0022-attachment-storage.md).
 
 Kontrol edin — test edilmemiş bir yedek yedek değildir, okunmamış bir log da öyle:
 
 ```bash
-docker compose logs backup | tail            # "wrote /backups/kurultay-….dump (… bytes)"
-docker compose exec backup ls -lh /backups   # en yeni arşiv ve kaç tanesi saklanıyor
+docker compose logs backup | tail            # döngü başına iki "wrote /backups/kurultay-…" satırı
+docker compose exec backup ls -lh /backups   # en yeni çift ve kaç tanesi saklanıyor
 ```
+
+Döngü başına bir değil iki satır: yalnızca dump'ı loglayan bir döngü, dosya arşivinin
+başarısız olduğu (ya da `ATTACHMENT_DIR`'in boş olduğu) anlamına gelir; üstündeki `ERROR`
+satırı hangisi olduğunu söyler.
 
 **Arşivleri host dışına kopyalayın.** `backup_data`, `postgres_data` ile aynı diskte durur;
 yani "yanlış tabloyu düşürdüm"ü kapsar, ölen bir diski veya kaybolan bir sunucuyu hiç
@@ -777,19 +800,27 @@ yolundan `rsync`/`rclone`), yoksa felaket senaryosu yine her şeyi kaybettirir.
 ### Elle dump almak
 
 Bir yükseltmeden önce ya da kurtarma noktasını `BACKUP_INTERVAL` sonra değil şimdi istediğiniz
-her an, aynı script'i bir kez çalıştırın — aynı volume'e yazar ve aynı kurala göre budar:
+her an, aynı script'i bir kez çalıştırın — her iki arşivi de aynı volume'e, tek bir damga
+altında yazar ve aynı kurala göre budar:
 
 ```bash
 docker compose exec backup /bin/sh /usr/local/bin/backup.sh once
 ```
 
 Volume dışında bir kopya tutmak için (yükseltme öncesi önerilir, çünkü
-`docker compose down -v`'den sağ çıkar):
+`docker compose down -v`'den sağ çıkar) — dump ve yanında dosyalar:
 
 ```bash
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
 docker compose exec -T postgres \
-  pg_dump -U kurultay --format=custom kurultay > kurultay-$(date -u +%Y%m%dT%H%M%SZ).dump
+  pg_dump -U kurultay --format=custom kurultay > "kurultay-$stamp.dump"
+docker compose run --rm -T --entrypoint tar backup -czf - -C /attachments . \
+  > "kurultay-$stamp-files.tar.gz"
 ```
+
+İkisi için tek bir `stamp`, sidecar'ın tek damga paylaşmasıyla aynı sebeple: çift yalnız
+birlikte işe yarar ve hangi dump'a ait olduğunu söyleyemediğiniz bir tar, satırı olmayan bir
+dosya dizinidir.
 
 - Önce hedef sürümün `CHANGELOG.md` girdisini okuyun — her kırıcı değişiklik orada bir
   migration notu taşır.
@@ -800,10 +831,12 @@ docker compose exec -T postgres \
 
 **Hedef: restore kararından itibaren iki saatin altında ayakta olmak (RTO ≤ 2 sa).**
 Aşağıdaki prosedür küçük bir kurulumda saniyeler sürer; bütçe karar vermek, doğru arşivi
-bulmak ve doğrulamak içindir. Uçtan uca prova edilmiştir — `scripts/backup.sh` ile
-dump'lanan seed'li bir veritabanı boş bir sunucuya restore edildiğinde 19 tablonun tamamını,
-her satır sayısını, 68 indeksin hepsini, `pg_trgm`'i ve `_prisma_migrations` tablosunu
-eksiksiz üretti.
+bulmak ve doğrulamak içindir. Uçtan uca prova edilmiştir — `scripts/backup.sh` ile dump'lanıp
+arşivlenen bir veritabanı, eşleşen dosya arşiviyle birlikte boş bir sunucuya restore
+edildiğinde 20 tablonun tamamını, her satır sayısını, 71 indeksin hepsini, `pg_trgm`'i,
+`_prisma_migrations` tablosunu ve **her attachment dosyasını satırındaki bayt boyutuyla**
+eksiksiz üretti. Son cümlecik bu tatbikatın büyüdüğü yerdir: satırları geri getirip dosyaları
+geride bırakan bir restore, attachment'lardan önce yazılmış her kontrolden geçer.
 
 Restore `pg_restore` iledir (arşivler SQL metni değil `--format=custom`) ve **boş** bir
 veritabanı ister — dolu bir veritabanının üzerine restore etmek temiz bir üzerine yazma
@@ -814,8 +847,9 @@ değil, duplicate-key hataları üretir.
 #    rotasyonla düşürmesin diye yedekleme sidecar'ı dahil. Postgres'in kendisi ayakta kalır.
 docker compose stop web api backup
 
-# 2. Restore edilecek arşivi seçin. Sidecar durduğu için `run --rm`; tek kullanımlık
-#    container aynı backup_data volume'ünü mount eder.
+# 2. Restore edilecek ÇİFTİ seçin — bir `.dump` ve AYNI damgayı taşıyan `-files.tar.gz`.
+#    Sidecar durduğu için `run --rm`; tek kullanımlık container aynı backup_data volume'ünü
+#    mount eder.
 docker compose run --rm --entrypoint ls backup -1 /backups
 
 # 3. Veritabanını boş olarak yeniden oluşturun. Yıkıcı adım budur — arşiv alındıktan sonra
@@ -830,21 +864,63 @@ docker compose run --rm --entrypoint pg_restore backup \
   --host=postgres --username=kurultay --dbname=kurultay \
   --no-owner --exit-on-error /backups/kurultay-<timestamp>.dump
 
+# 4b. AYNI damgaya ait attachment dosyalarını geri yükleyin. `backup` servisi volume'ü
+#     salt-okunur mount ettiği için bu adımın kendi yazılabilir mount'u gerekir — ve
+#     `--user 1000:1000`, çünkü dosyalar api'nin `node` kullanıcısına aittir ve bu stack
+#     `cap_drop: [ALL]` ile koşar, bu da root'tan CAP_DAC_OVERRIDE'ı alır. Bayrak olmadan
+#     `rm`, adı root olan bir container'da "Permission denied" ile düşer. Tahmin değil, ölçüm.
+docker compose run --rm --user 1000:1000 -v kurultay_attachment_data:/restore \
+  --entrypoint sh backup -c \
+  'rm -rf /restore/* && tar -xzf /backups/kurultay-<timestamp>-files.tar.gz -C /restore'
+
 # 5. Migration durumunu kontrol edin. Arşiv _prisma_migrations'ı taşıdığı için kayıtlı durum
 #    restore edilen şemayla eşleşir ve bunun yapacak bir şey bulmaması beklenir.
 docker compose run --rm migrate
 
-# 6. Trafiği geri almadan önce doğrulayın.
+# 6. Trafiği geri almadan önce doğrulayın: şema, satır sayıları ve dosyaların geri geldiği.
 docker compose exec -T postgres psql -U kurultay -d kurultay \
   -c '\dt' \
   -c 'SELECT count(*) FROM "User";' \
   -c 'SELECT count(*) FROM "Workspace";' \
   -c 'SELECT count(*) FROM "Task";' \
+  -c 'SELECT count(*) FROM "Attachment" WHERE kind = '"'"'FILE'"'"';' \
   -c 'SELECT count(*) FROM "_prisma_migrations";'
+docker compose run --rm --entrypoint sh backup -c 'find /attachments -type f | wc -l'
+
+# 6b. Ve geri gelen her dosyanın satırındaki boyutta olduğu. `tar`'ın hâlâ yazılırken
+#     kopyaladığı bir dosyayı yakalayan şey budur — tek başına bir sayım yakalayamaz: kesilmiş
+#     bir dosya da bir dosyadır.
+#
+#     Bilinçli olarak düz POSIX: `diff <(…) <(…)` değil, geçici dosyalar ve `diff a b`. Process
+#     substitution bir bash/zsh özelliğidir ve bu blok kimsenin itiraf ettiğinden daha sık
+#     `sh` içine yapıştırılır; orada yedeğin bozulduğu izlenimi veren bir sözdizimi hatasıyla
+#     düşer.
+#
+#     `find -printf` değil, `find -exec stat -c`: backup container'ı postgres:18-alpine'dir ve
+#     BusyBox `find`'ın `-printf`'i yoktur. Tek komut, seçenek değil — bir operatör restore'un
+#     ortasında taşınabilirlik kararı vermek zorunda kalmamalı.
+docker compose exec -T postgres psql -U kurultay -d kurultay -At \
+  -c 'SELECT "storageKey" || '"'"' '"'"' || "size" FROM "Attachment" WHERE kind = '"'"'FILE'"'"';' \
+  | sort > /tmp/expected.txt
+docker compose run --rm --entrypoint sh backup -c \
+  'cd /attachments && find . -type f -exec stat -c "%n %s" {} + | sed "s|^\./||"' \
+  | sort > /tmp/actual.txt
+diff /tmp/expected.txt /tmp/actual.txt && echo "her dosya kayıtlı boyutuyla geri geldi"
 
 # 7. Stack'i geri getirin.
 docker compose up -d
 ```
+
+Tatbikat iki değil **üç** şey üzerinden geçer:
+
+1. `FILE` attachment satır sayısı diskteki dosya sayısına eşit,
+2. 6b'deki `diff` boş — her dosya satırındaki boyutta,
+3. arşiv alınırken bir yükleme yapıldıysa fark **yalnızca** o penceredeki dosyalarda çıkabilir
+   ve `diff` onları isimleriyle raporlar. Sessiz bir fark asla kabul edilmez: raporlanırsa
+   yukarıdaki "`tar` snapshot değildir" sınırı ölçülmüş olur, raporlanmazsa yalnızca yazılmış.
+
+4b'deki `kurultay_attachment_data`, volume'ün Compose'un proje adıyla öneklediği tam adıdır —
+dizininizin adı `kurultay` değilse `docker volume ls`.
 
 Checkout edilmiş kod arşivin şemasından yeniyse, 5. adım eksik migration'ları ileri doğru
 uygular; bu doğrudur. **Eskiyse**, 5. adımdan önce arşive karşılık gelen release tag'ine
@@ -856,6 +932,12 @@ Volume'dekinin yerine host tarafındaki bir dosyadan restore (4. adımın varyan
 docker compose run --rm -T --entrypoint pg_restore backup \
   --host=postgres --username=kurultay --dbname=kurultay --no-owner \
   --exit-on-error < kurultay-20260813T194856Z.dump
+
+# Dosya yarısı, aynı fikir (4b'nin varyantı) — yazılabilir mount ve aynı CAP_DAC_OVERRIDE
+# sebebiyle uid 1000.
+docker compose run --rm -T --user 1000:1000 -v kurultay_attachment_data:/restore \
+  --entrypoint sh backup -c 'rm -rf /restore/* && tar -xzf - -C /restore' \
+  < kurultay-20260813T194856Z-files.tar.gz
 ```
 
 **PostgreSQL major sürüm yükseltmeleri bir dump ve restore gerektirir.** Resmi `postgres`
@@ -870,6 +952,14 @@ fan-out'u ve bildirim kuyruğunu tutar — hepsi yeniden inşa edilebilir. Onu k
 herkesin oturumunu kapatır ve henüz teslim edilmemiş kuyruklanmış bildirimleri düşürür;
 hiçbir board verisini kaybetmez. Redis yükseltmeleri bir major içinde, ve 7 → 8, yerinde
 ve RDB/AOF uyumludur.
+
+**Attachment dosyaları ise tam tersi sebeple yedeklenir.** `attachment_data`, bu stack'te ne
+Postgres'te duran ne de ondan yeniden üretilebilen tek bayt yığınıdır: kaybolan bir volume'den
+satır sağ çıkar, indirme çıkmaz. Sidecar'ın onu dump'ın yanında arşivlemesinin ve yukarıdaki
+tatbikatın satırlar kadar dosyaları da kontrol etmesinin sebebi budur — ADR 0020 soğuk-depolama
+arşivlemesini "aynı diskte duran, kimsenin okumadığı ve kimsenin geri yüklemediği bir dosya"
+diye reddetmişti; cevap bu dosyaların kullanıcıya görünür olması değil, bu kopyanın yanındaki
+dump ile aynı prova edilmiş takvimde okunup geri yüklenmesidir.
 
 ### İndeks migration'ları yazma kilidi alır
 
