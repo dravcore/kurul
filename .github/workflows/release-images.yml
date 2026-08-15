@@ -277,6 +277,12 @@ jobs:
       - name: Attach the SBOMs to the GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This job deliberately has no `actions/checkout` — it needs four JSON files from the
+          # previous job, not the source tree. But `gh` normally works out which repository it
+          # is talking about from the git remote in the working directory, and there is no git
+          # repository here for it to read. `GH_REPO` is what replaces that, and without it
+          # every `gh release` call below fails with "not a git repository".
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
