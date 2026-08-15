@@ -141,6 +141,21 @@ jobs:
         run: pnpm db:generate
       - name: Build
         run: pnpm build
+      # In this job and not in `lint`, because the generator reads the *built* API: the Swagger
+      # CLI plugin registered in `apps/api/nest-cli.json` is what turns a DTO's TypeScript types
+      # and doc comments into a schema, and it runs during `nest build` and nowhere else. It
+      # needs no database — `NestFactory.create(..., { preview: true })` registers every
+      # controller's metadata without instantiating a single provider — which is why it can sit
+      # in the one job that has no Postgres service.
+      #
+      # This is the gate that makes the committed specification mean something. Adding an
+      # endpoint, renaming a field, widening a validation rule or changing a role gate all move
+      # the generated document; if `apps/api/openapi.json` did not move with them, the
+      # specification is describing an API that no longer exists and this step is the only thing
+      # that would say so. `--check` exits non-zero on a difference and names the first line
+      # that differs, so the gate is the command's own answer rather than a grep over its prose.
+      - name: Check for OpenAPI specification drift
+        run: pnpm openapi:check
 
   ci-ok:
     # Gate job: the single required status check. `if: always()` is the whole point —

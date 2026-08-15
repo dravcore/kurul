@@ -118,6 +118,19 @@ module.exports = {
   // without a single one of the cold zones the floor watches getting warmer. Branch margin is now
   // 3.54 points. If a later item wants to raise the floor, the number to raise it against is a
   // measurement taken *after* the cold zones are covered, not this one.
+  //
+  //   2026-08-15  78.06 / 69.15 / 79.57 / 79.09  after P3-11 (OpenAPI specification and `/docs`)
+  //                                              — three consecutive runs, identical to four
+  //                                              digits
+  //
+  // **Down, and recorded rather than accommodated**, per the asymmetry above. The cause is
+  // `src/openapi/`: 35 response-schema classes with no runtime behaviour to exercise, plus
+  // `openapi.document.ts` and `generate-openapi.ts`, which run under `nest build` and the CI
+  // drift gate rather than under Jest. Only `serve-openapi.ts`'s exposure decision is unit
+  // tested, because it is the only part of the directory where being wrong changes what a
+  // deployment publishes. The floor does not move: 0.59 points of the P3-3 margin are gone and
+  // that is the signal, not something to erase — but nothing the floor watches got colder, and
+  // the branch margin is still 3.15 points.
   coverageThreshold: {
     global: {
       statements: 75,

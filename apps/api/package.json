@@ -13,7 +13,9 @@
     "test:watch": "jest --config jest.config.cjs --watch",
     "test:cov": "jest --config jest.config.cjs --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.config.cjs --runInBand",
-    "prisma": "prisma"
+    "prisma": "prisma",
+    "openapi": "node dist/openapi/generate-openapi.js",
+    "openapi:check": "node dist/openapi/generate-openapi.js --check"
   },
   "dependencies": {
     "@kurultay/auth-access": "workspace:*",
@@ -22,6 +24,7 @@
     "@nestjs/core": "^11.0.12",
     "@nestjs/platform-express": "^11.0.12",
     "@nestjs/platform-socket.io": "^11.1.28",
+    "@nestjs/swagger": "^11.4.6",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.1.28",
     "@prisma/adapter-pg": "^7.0.0",
@@ -56,6 +59,7 @@
     "@types/pg": "^8.11.11",
     "@types/supertest": "^7.2.1",
     "jest": "^30.4.2",
+    "prettier": "^3.5.3",
     "prisma": "^7.0.0",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.6",

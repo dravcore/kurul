@@ -5,6 +5,7 @@ import { configureApp, resolveRequestBodyMaxBytes } from './common/configure-app
 import { loadRootEnv, envPort, envString } from './common/env';
 import { captureServerError, flushSentry, initSentry } from './common/observability/sentry';
 import { resolveTrustProxySetting } from './common/trust-proxy';
+import { serveOpenApi } from './openapi/serve-openapi';
 
 loadRootEnv();
 
@@ -28,6 +29,11 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create(AppModule);
   configureApp(app, { corsOrigin: webUrl, trustProxy, bodyLimitBytes });
+  // After `configureApp` and not inside it: `configureApp` is shared with the e2e harness, and
+  // scanning the whole container for an OpenAPI document in every integration test would be
+  // paid for on every run. Off under NODE_ENV=production unless API_DOCS_ENABLED says otherwise
+  // — the reasoning is on `openApiDocsEnabled`.
+  serveOpenApi(app);
   // Lets OnModuleDestroy hooks (PrismaService, DueSoonWorker) run on SIGTERM/SIGINT
   // instead of the process being killed mid-connection.
   app.enableShutdownHooks();

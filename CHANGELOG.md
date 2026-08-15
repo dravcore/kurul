@@ -9,6 +9,52 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **An OpenAPI specification, generated from the running API, with a CI gate that fails when it
+  drifts.** The document is served at `/openapi.json`, the interactive console at `/docs`, and a
+  byte-identical copy is committed at `apps/api/openapi.json`. It covers all 49 paths and 69
+  operations the NestJS router registers, with request bodies and response shapes rather than
+  paths alone. `docs/api-conventions.md` remains the prose contract and gains a section pointing
+  at the spec; where the two disagree, one of them is wrong and neither wins by default.
+
+  **`/docs` is off under `NODE_ENV=production` unless `API_DOCS_ENABLED=true`, and on
+  otherwise.** This API is self-hosted by people who did not choose it, so a surprise public
+  surface is a decision rather than a default. The document itself leaks little — the project is
+  AGPL and the routes are on GitHub — but `/docs` is an unauthenticated HTML page on a service
+  that renders no documents and pins itself to `default-src 'none'`, so serving it means carving
+  a Content-Security-Policy exception for one path; and its "Try it out" console issues real
+  same-origin requests carrying the reader's own session cookie. Nothing is lost by defaulting
+  it off: the identical document is in the repository, so the contract is readable without a
+  running server.
+
+  **The gate is what makes the committed file mean anything.** CI regenerates the document in
+  the `build` job and compares it to the committed copy, returning the generator's own exit code
+  rather than grepping its output — the same shape as the migration-drift check. It fires on
+  more than new endpoints: because the Swagger CLI plugin derives schemas from the DTOs'
+  TypeScript types and `class-validator` decorators, narrowing a `@MaxLength` or making a field
+  nullable moves the document too. Both cases were measured red before the check was declared
+  done.
+
+  Response schemas are classes that `implements` the interfaces in `@kurultay/shared-types`, so
+  a field added to a DTO and forgotten here fails `pnpm typecheck` rather than quietly producing
+  a spec that describes a shape the API no longer returns. Three facts that belong to global
+  providers — the `401` from the session guard, the `429` and rate-limit headers from the
+  throttler, the `500` envelope from the exception filter — are applied to every operation in
+  one pass instead of being restated 69 times, and the `403`/`404` pair is attached to the
+  `@WorkspaceScoped()`/`@WorkspaceRoles()` decorators themselves, so a route acquires its
+  documented failures by being gated rather than by being remembered.
+
+  The endpoints that are not plain CRUD are described as what they are: the attachment upload's
+  two body shapes (`multipart/form-data` with a `file` part, or JSON for a link) and the `413`
+  from `ATTACHMENT_MAX_BYTES`; the Trello import's separate `413` from `TRELLO_IMPORT_MAX_BYTES`,
+  which is a heap ceiling rather than a disk one; and the byte-stream download, the one response
+  in this API that is not JSON, with the five headers it writes. `/auth/*` and the Socket.io
+  contract are absent and say so — neither is a Nest route.
+
+  `docs/roadmap.md` gains an **API 1.0** heading declaring the scope a compatibility promise
+  would cover: a `/v1` prefix, personal access tokens, and three webhook events
+  (`task.created`, `task.moved`, `task.completed`). All three are explicitly post-1.0 and none
+  is implemented here.
+
 - **Account deletion, as an erasure request rather than a `DELETE` statement.** A user can now
   delete their own account from Settings, and an instance operator named in
   `INSTANCE_ADMIN_EMAILS` can execute a request on somebody's behalf — the case that actually

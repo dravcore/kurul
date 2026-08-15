@@ -20,6 +20,8 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
+    "openapi": "pnpm --filter @kurultay/api build && pnpm --filter @kurultay/api openapi",
+    "openapi:check": "pnpm --filter @kurultay/api openapi:check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"

@@ -1,6 +1,9 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
+import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { ActivationFunnelDto } from '@kurultay/shared-types';
 import { InstanceAdminGuard } from '../common/guards/instance-admin.guard';
+import { ErrorEnvelopeSchema } from '../openapi/schemas/error.schema';
+import { ActivationFunnelSchema } from '../openapi/schemas/instance.schema';
 import { ActivationService } from './activation.service';
 
 /**
@@ -22,6 +25,7 @@ import { ActivationService } from './activation.service';
  * Rate limiting is the global default. There is no probe here whose verdict a `429` would
  * corrupt (unlike `/health`), and a screen an operator opens by hand cannot come close to it.
  */
+@ApiTags('Instance')
 @Controller('instance')
 @UseGuards(InstanceAdminGuard)
 export class ActivationController {
@@ -35,6 +39,20 @@ export class ActivationController {
    * saving nobody can measure. If this ever becomes slow the fix is an index, not a stale copy.
    */
   @Get('activation')
+  @ApiOperation({
+    summary: "Read this instance's activation funnel",
+    description:
+      'The only route outside `/workspaces/{workspaceId}` that reads product data, and the only ' +
+      'one gated on `INSTANCE_ADMIN_EMAILS` rather than on a workspace role: it answers "how is ' +
+      'this deployment doing", a question no tenant owns. **Nothing it returns leaves the ' +
+      'instance** \u2014 these are aggregates over local rows, and the one outbound path in this ' +
+      'codebase is off by default and carries none of them.',
+  })
+  @ApiOkResponse({ type: ActivationFunnelSchema })
+  @ApiForbiddenResponse({
+    description: 'Signed in, but the account is not listed in `INSTANCE_ADMIN_EMAILS`.',
+    type: ErrorEnvelopeSchema,
+  })
   funnel(): Promise<ActivationFunnelDto> {
     return this.activation.funnel();
   }

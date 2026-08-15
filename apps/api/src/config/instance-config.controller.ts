@@ -1,5 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { InstanceConfigDto } from '@kurultay/shared-types';
+import { InstanceConfigSchema } from '../openapi/schemas/instance.schema';
 import { MailService } from '../mail/mail.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -44,6 +46,7 @@ import { StorageService } from '../storage/storage.service';
  * Rate limiting is the global default on purpose: this is an ordinary client endpoint, and
  * unlike `/health` there is no probe whose verdict a `429` would corrupt.
  */
+@ApiTags('Instance')
 @Controller('config')
 export class InstanceConfigController {
   constructor(
@@ -57,6 +60,15 @@ export class InstanceConfigController {
    * reads the capability bit off a storage backend built the same way — and a cache would only
    * add a second copy of the truth that can disagree with the transport actually in use.
    */
+  @ApiOperation({
+    summary: 'Read what this deployment is configured to do',
+    description:
+      'Capability, never tenant state \u2014 nothing here varies by workspace, role or caller, ' +
+      'which is why it carries no `{workspaceId}` and no role gate. It does require a session: ' +
+      'the leak is small, but an unauthenticated version would hand a scanner a per-instance ' +
+      'list of what a self-hosted install has left unconfigured, and nothing needs it public.',
+  })
+  @ApiOkResponse({ type: InstanceConfigSchema })
   @Get()
   config(): InstanceConfigDto {
     return {

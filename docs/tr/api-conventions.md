@@ -18,6 +18,7 @@ pagination ve DTO'lar.
 - [Filtreleme, sıralama, alan seçimi](#filtreleme-sıralama-alan-seçimi)
 - [DTO adlandırma](#dto-adlandırma)
 - [Veri tipleri](#veri-tipleri)
+- [OpenAPI belgesi](#openapi-belgesi)
 - [Versiyonlama](#versiyonlama)
 
 ## Kapsam
@@ -867,6 +868,48 @@ içinden bir oluşturulma zamanı okuyan bir client, gelecekteki bir id strateji
 kırabileceği bir implementasyon detayına bağımlı olmuş olur. Bu belgedeki URL örnekleri
 okunabilirlik için id'leri kısaltır (`w_1`, `b_1`, `t_1`); gerçek olanlar 36 karakterlik
 UUIDv7 string'leridir.
+
+## OpenAPI belgesi
+
+Bu sayfa düz metin. Makine tarafından okunabilir olanı
+**[`apps/api/openapi.json`](../../apps/api/openapi.json)** — çalışan uygulamadan üretiliyor;
+içindeki her path, parametre, request body ve response, NestJS router'ının ve DTO sınıflarının
+gerçekten beyan ettiği şey.
+
+**İkisi arasında bir sıralama yok.** Spec ile bu sayfa çeliştiğinde ikisinden biri yanlıştır ve
+hiçbiri varsayılan olarak kazanmaz: gerekçeler bu sayfada, şekiller spec'te duruyor, çelişki de
+birinin bir şekli değiştirirken gerekçesine dönmediği anlamına gelir. Yanlış olanı düzeltin.
+
+|                    |                                                                           |
+| ------------------ | ------------------------------------------------------------------------- |
+| Etkileşimli konsol | `GET /docs`                                                               |
+| Belge              | `GET /openapi.json` — versiyon kontrolündeki dosyayla byte-byte aynı      |
+| Kayıtlı snapshot   | `apps/api/openapi.json`                                                   |
+| Yeniden üret       | `pnpm openapi` (önce API'yi build eder)                                   |
+| Doğrula            | `pnpm openapi:check` — herhangi bir fark varsa sıfırdan farklı çıkış kodu |
+
+**`API_DOCS_ENABLED=true` denmedikçe `/docs` production'da kapalı.** Development'ta varsayılan
+olarak açık. Bu asimetri, self-host edilen bir servis hakkında verilmiş bir karar ve üç parçası
+var: belgenin kendisi neredeyse hiçbir şey sızdırmıyor (bu AGPL bir proje, route'lar zaten açık),
+ama `/docs` hiç doküman render etmeyen ve kendini `default-src 'none'` ile kilitleyen bir servisin
+üzerinde **kimlik doğrulaması olmayan bir HTML sayfası** — yani onu yayınlamak tek bir path için
+Content-Security-Policy istisnası açmak demek — ve içindeki "Try it out" konsolu okuyucunun kendi
+oturum çerezini taşıyan gerçek same-origin istekler atıyor. Bu API'yi hiç seçmemiş bir operatör
+bunu miras olarak değil, bilerek almalı. Kapatmak keşfedilebilirlikten bir şey götürmüyor: aynı
+belge deponun içinde duruyor.
+
+**Spec kaydığında CI kırmızıya dönüyor.** `build` job'ı belgeyi yeniden üretip kayıtlı dosyayla
+karşılaştırıyor; yani bir endpoint eklemek, bir alanı yeniden adlandırmak, bir `@MaxLength`
+genişletmek ya da bir rol kapısını değiştirmek, `apps/api/openapi.json` aynı değişiklik içinde
+yeniden üretilene kadar CI'yı kırıyor. Kapının kendisi üreticinin çıkış kodu; çıktısında grep
+değil.
+
+Spec'te bilinçli olarak **bulunmayan** iki şey var ve ikisi de Nest route'u olmadıkları için yok:
+
+- **`/auth/*`.** Better Auth, Nest router'ının altında ham Express üzerine mount ediliyor
+  ([ADR 0004](decisions/0004-auth-better-auth.md)), dolayısıyla taranacak bir controller yok.
+- **Socket.io kontratı.** HTTP değil. `@kurultay/shared-types` içinde ve
+  [architecture.md](architecture.md)'de yaşıyor.
 
 ## Versiyonlama
 
