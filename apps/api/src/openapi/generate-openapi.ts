@@ -51,12 +51,19 @@ function firstDifference(expected: string, actual: string): string {
 }
 
 /**
- * Builds the document without starting a server or touching a dependency.
+ * Builds the document without starting a server or dialling a dependency.
  *
  * `preview: true` is what makes that true: Nest loads every module and registers every
  * controller's metadata — which is all `SwaggerModule` reads — but instantiates no providers,
- * so `PrismaService.onModuleInit` never opens a pool and nothing connects to Redis. That is
- * why this can run in a CI job with no database, next to `pnpm build`.
+ * so `PrismaService.onModuleInit` never opens a pool and nothing connects to Redis. That is why
+ * this can run next to `pnpm build` in a CI job with no Postgres and no Redis.
+ *
+ * **It does still need the environment the application validates at import.** Preview mode
+ * skips provider *instantiation*, not module *evaluation*: `auth/auth.ts` throws
+ * `BETTER_AUTH_SECRET is required` while its module body runs, and `prisma/database.ts` builds
+ * a pool object from `DATABASE_URL` (lazily — it opens no socket). Both are therefore set in
+ * the `build` job, to placeholders, and CI failing on that once is how it was found rather than
+ * reasoned about.
  */
 async function generate(): Promise<string> {
   const app = await NestFactory.create(AppModule, { preview: true, logger: false });
