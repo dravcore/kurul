@@ -383,10 +383,14 @@ describe('Trello import (e2e)', () => {
       const report = await importFixture(admin, 'synthetic-full-board');
 
       const tasks = await prisma.task.findMany({ where: { boardId: report.boardId } });
-      expect(tasks.every((task) => task.createdById === actorId)).toBe(true);
       const attachments = await prisma.attachment.findMany({
         where: { task: { boardId: report.boardId } },
       });
+      // The lengths come first because `[].every(...)` is `true`: without these two lines the
+      // assertions below would hold just as well for an import that wrote nothing at all.
+      expect(tasks).toHaveLength(4);
+      expect(attachments).toHaveLength(2);
+      expect(tasks.every((task) => task.createdById === actorId)).toBe(true);
       expect(attachments.every((row) => row.uploadedById === actorId)).toBe(true);
       // K5: a Trello member is not a Kurultay user, so nothing was assigned to anybody.
       expect(await prisma.taskAssignee.count()).toBe(0);
