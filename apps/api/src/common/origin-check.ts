@@ -7,9 +7,14 @@ import { getRequestId } from './logging/request-id';
  * Deliberately the *unsafe* half of the method table, not all of it. A `GET` that arrives
  * with a foreign `Origin` is a cross-origin **read**, and the browser already governs that:
  * it will refuse to hand the response to the calling script unless the CORS allowlist named
- * that origin. Rejecting those server-side would add nothing and would break the one
- * cross-origin read the product actually performs — the Socket.io handshake, which is a `GET`
- * carrying the web app's `Origin` (see `realtime.gateway.ts`, which has its own CORS config).
+ * that origin. Rejecting those server-side would add nothing and would break the two
+ * cross-origin reads the product actually performs — the Socket.io handshake, which is a `GET`
+ * carrying the web app's `Origin` (see `realtime.gateway.ts`, which has its own CORS config),
+ * and the attachment byte stream, which is a `GET` a browser issues from an `<img src>` or an
+ * `<a download>` on the page itself. Neither is unprotected by being outside this list: the
+ * attachment stream is behind the session cookie and the workspace guard's tenant scope, and it
+ * answers `Cross-Origin-Resource-Policy: same-origin` so no other site can embed the bytes it
+ * returns. The exemption is a boundary that was drawn, not a gap that was left.
  *
  * `OPTIONS` is absent for a different reason: it *is* the preflight. The CORS middleware
  * registered ahead of this one answers and ends preflight requests itself, so one never

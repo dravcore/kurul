@@ -95,6 +95,14 @@ module.exports = {
   // For reference, the attachment work (P3-1 tasks 1-4) measured 77.08 / 67.33 / 79.66 / 78.39,
   // i.e. it pulled the baseline back up rather than down. That is the expected shape for a new
   // module and not a reason to re-cut the floor either.
+  //
+  //   2026-08-15  77.56 / 67.96 / 79.61 / 78.85  after P3-1 tasks 5-8 (attachment service,
+  //                                              controller, download path) — measured on three
+  //                                              consecutive runs, identical to four digits
+  //
+  // The branch margin over the floor is back to 1.96 points from the 0.64 recorded above. The
+  // floor is left where it is, for the same reason tasks 1-4 left it: a new module arriving with
+  // its own tests raises the average without saying anything about the zones the floor watches.
   coverageThreshold: {
     global: {
       statements: 75,

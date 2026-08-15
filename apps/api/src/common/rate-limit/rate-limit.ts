@@ -34,6 +34,32 @@ export const INVITATION_RATE_LIMIT = 10;
  */
 export const TASK_SEARCH_RATE_LIMIT = 30;
 
+/**
+ * Uploading spends disk rather than someone else's SMTP quota, so it sits above
+ * `INVITATION_RATE_LIMIT` — but it is still the one endpoint where a single request can cost
+ * `ATTACHMENT_MAX_BYTES`, so it sits well below the default.
+ *
+ * No ADR carries this number; this constant is its source. ADR 0022 asks for a decorator
+ * "modelled on `ThrottleInvitations()`" and stops there. Left off, the global 100/min applies
+ * and one IP can spend 25 MiB × 100 = 2.5 GiB of disk a minute.
+ *
+ * This ceiling is named as insufficient rather than pretended to be enough (ADR 0022): the
+ * throttler counts requests per IP per route, which is the wrong unit twice here — twenty
+ * 25 MiB uploads and twenty 10 kB uploads spend the same budget, and an office behind one NAT
+ * shares a bucket. The real ceiling is `limits.fileSize` plus a per-workspace quota that does
+ * not exist yet. Overriding `ThrottlerGuard.getTracker` is deliberately not attempted.
+ */
+export const ATTACHMENT_UPLOAD_RATE_LIMIT = 20;
+
+/**
+ * Downloads sit *above* the default, not below it.
+ *
+ * A task panel with ten image attachments issues ten requests on open, so a user stepping
+ * through a few cards would exhaust the 100/min default on a completely ordinary interaction.
+ * ADR 0022 asks for this explicitly: the download endpoint gets a limit higher than the default.
+ */
+export const ATTACHMENT_DOWNLOAD_RATE_LIMIT = 300;
+
 /** Message returned in the `AllExceptionsFilter` envelope when a limit is hit. */
 export const RATE_LIMIT_ERROR_MESSAGE = 'Too many requests. Please try again later.';
 
@@ -96,6 +122,18 @@ export function taskListRateLimit(context: ExecutionContext): number {
 export const ThrottleInvitations = (): MethodDecorator & ClassDecorator =>
   Throttle({
     default: { limit: INVITATION_RATE_LIMIT, ttl: seconds(RATE_LIMIT_WINDOW_SECONDS) },
+  });
+
+/** Stricter ceiling for `POST /workspaces/:workspaceId/tasks/:taskId/attachments`. */
+export const ThrottleAttachmentUpload = (): MethodDecorator & ClassDecorator =>
+  Throttle({
+    default: { limit: ATTACHMENT_UPLOAD_RATE_LIMIT, ttl: seconds(RATE_LIMIT_WINDOW_SECONDS) },
+  });
+
+/** Looser ceiling for the attachment byte stream. */
+export const ThrottleAttachmentDownload = (): MethodDecorator & ClassDecorator =>
+  Throttle({
+    default: { limit: ATTACHMENT_DOWNLOAD_RATE_LIMIT, ttl: seconds(RATE_LIMIT_WINDOW_SECONDS) },
   });
 
 /** Stricter ceiling for the task list, but only when it is used as a search. */

@@ -37,6 +37,7 @@
     "file-type": "21.3.4",
     "helmet": "^8.3.0",
     "ioredis": "^6.0.0",
+    "multer": "2.2.0",
     "nodemailer": "^9.0.5",
     "pg": "^8.14.1",
     "reflect-metadata": "^0.2.2",
