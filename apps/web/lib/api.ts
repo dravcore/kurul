@@ -118,7 +118,12 @@ async function parseError(response: Response): Promise<ApiError> {
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
-  if (init?.body !== undefined && !headers.has('Content-Type')) {
+  // `FormData` is the one body shape whose Content-Type the browser has to write itself: the
+  // header carries a boundary token generated with the body, and setting the bare media type
+  // here produces a request no multipart parser can read. Everything else keeps the JSON
+  // default it has always had.
+  const writesOwnContentType = init?.body instanceof FormData;
+  if (init?.body !== undefined && !writesOwnContentType && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -183,5 +188,31 @@ export const api = {
   },
   delete<TResponse = void>(path: string, init?: RequestInit): Promise<TResponse> {
     return request<TResponse>(path, { ...init, method: 'DELETE' });
+  },
+
+  /**
+   * A multipart write, for the one endpoint that takes a file.
+   *
+   * Separate from `post` rather than a branch inside it: `post`'s body is typed `NoInfer<TBody>`
+   * against the shared request DTOs precisely so an untyped object cannot slip through, and a
+   * `FormData` has no such contract to check. Two members keep that guarantee intact for every
+   * other call site.
+   */
+  postForm<TResponse>(path: string, body: FormData, init?: RequestInit): Promise<TResponse> {
+    return request<TResponse>(path, { ...init, method: 'POST', body });
+  },
+
+  /**
+   * Reads a response as bytes.
+   *
+   * `request` cannot serve this: it ends in `response.json()`, which is right for every endpoint
+   * that existed before attachments and wrong for the one that does not answer with JSON. The
+   * failure path stays shared — a non-2xx is still parsed by `parseError`, so an attachment that
+   * 404s raises the same `ApiError` every other call does.
+   */
+  async getBlob(path: string, init?: RequestInit): Promise<Blob> {
+    const response = await apiFetch(path, { ...init, method: 'GET' });
+    if (!response.ok) throw await parseError(response);
+    return response.blob();
   },
 };
