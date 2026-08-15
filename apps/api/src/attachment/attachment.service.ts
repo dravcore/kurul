@@ -1,11 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { uuidv7 } from 'uuidv7';
 import { ActivityType, AttachmentKind, SocketEvents } from '@kurultay/shared-types';
 import type { AttachmentDto } from '@kurultay/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { StorageService } from '../storage/storage.service';
+import { assertAllowedMimeType } from './attachment-mime';
+import { storageKeyFor } from './attachment-storage-key';
 import { toAttachmentDto, type AttachmentRow } from './attachment.mapper';
 import type { CreateAttachmentDto } from './dto/create-attachment.dto';
+import type { UploadedFile } from './multer-file';
 
 /** The only two schemes a stored URL may carry. See K7 / ADR 0024. */
 const ALLOWED_URL_SCHEMES: ReadonlySet<string> = new Set(['http:', 'https:']);
@@ -36,6 +41,7 @@ export class AttachmentService {
     private readonly prisma: PrismaService,
     private readonly activity: ActivityService,
     private readonly realtime: RealtimeService,
+    private readonly storage: StorageService,
   ) {}
 
   /** One place builds the broadcast, so the four fields cannot drift between call sites. */
@@ -98,6 +104,71 @@ export class AttachmentService {
 
     this.announce(workspaceId, task.boardId, task.id, actorId);
     return toAttachmentDto(created);
+  }
+
+  async createFile(
+    workspaceId: string,
+    taskId: string,
+    actorId: string,
+    file: UploadedFile,
+  ): Promise<AttachmentDto> {
+    const task = await this.findTask(workspaceId, taskId);
+
+    // Sniff before anything is written anywhere. The declared `mimetype` and the extension both
+    // come from the caller and neither is evidence (K3); this throws a 415 that
+    // `transformException` passes through untouched.
+    const mimeType = await assertAllowedMimeType(file.buffer, file.mimetype);
+
+    // The id is generated here rather than left to `@default(uuid(7))` because the storage key
+    // is derived from it and the bytes are written first (plan decision D6). `uuidv7` is already
+    // a dependency (`auth/auth.ts`, `common/logging/request-id.ts`).
+    const id = uuidv7();
+    const storageKey = storageKeyFor(id);
+
+    // Bytes first, row second. The worst outcome of this order is a file with no row, which the
+    // nightly sweep removes after the grace period. The worst outcome of the other order is a
+    // row with no bytes — a broken download that no sweep can repair. The cheap direction of
+    // being wrong is the one that gets chosen (D6).
+    await this.storage.write(storageKey, file.buffer);
+
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.attachment.create({
+          data: {
+            id,
+            taskId: task.id,
+            uploadedById: actorId,
+            kind: AttachmentKind.File,
+            filename: displayFilename(file.originalname),
+            storageKey,
+            mimeType,
+            // `buffer.length`, not `file.size`. They agree under `memoryStorage()`, but only one
+            // of them is the number of bytes that reached the disk, and this value becomes
+            // `Content-Length` on the download — where disagreeing with the stream is a hung or
+            // truncated transfer rather than an error anyone sees.
+            size: file.buffer.length,
+            url: null,
+          },
+        });
+        await this.activity.record(tx, {
+          workspaceId,
+          taskId: task.id,
+          userId: actorId,
+          type: ActivityType.AttachmentCreated,
+          payload: { attachmentId: row.id, kind: AttachmentKind.File, filename: row.filename },
+        });
+        return row as AttachmentRow;
+      });
+
+      this.announce(workspaceId, task.boardId, task.id, actorId);
+      return toAttachmentDto(created);
+    } catch (error) {
+      // Best effort. If this also fails the file is an orphan, which is a state the sweep
+      // already exists to handle — so the rethrow below is never delayed by a cleanup that
+      // cannot succeed.
+      await this.storage.remove(storageKey).catch(() => undefined);
+      throw error;
+    }
   }
 
   async remove(workspaceId: string, attachmentId: string, actorId: string): Promise<void> {
@@ -178,4 +249,18 @@ export class AttachmentService {
     if (!task) throw new NotFoundException('Task not found');
     return task;
   }
+}
+
+/**
+ * The name shown next to the attachment.
+ *
+ * Path separators are stripped and the basename kept — not because the value could reach a path
+ * (it cannot: the key comes from the id, K9) but because `../../../../etc/passwd` rendered as a
+ * filename in the UI is a phishing surface, and a name is a name. CR and LF go too: this string
+ * is later written into a `Content-Disposition` header (D8).
+ */
+function displayFilename(original: string): string {
+  const base = original.split(/[/\\]/).pop() ?? '';
+  const cleaned = base.replace(/[\r\n"\\]/g, '').trim();
+  return cleaned === '' ? 'attachment' : cleaned.slice(0, 255);
 }

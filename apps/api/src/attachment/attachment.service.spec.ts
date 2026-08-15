@@ -1,8 +1,13 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  UnsupportedMediaTypeException,
+} from '@nestjs/common';
 import { ActivityType, AttachmentKind, SocketEvents } from '@kurultay/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { StorageService } from '../storage/storage.service';
 import { AttachmentService } from './attachment.service';
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
@@ -28,11 +33,41 @@ function build() {
     record: jest.fn().mockResolvedValue({ id: 'a' }),
   } as unknown as ActivityService;
   const realtime = { emitToBoard: jest.fn() } as unknown as RealtimeService;
+  const storage = {
+    persistsFiles: true,
+    maxBytes: 26_214_400,
+    write: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined),
+  } as unknown as StorageService;
   return {
-    service: new AttachmentService(prisma, activity, realtime),
+    service: new AttachmentService(prisma, activity, realtime, storage),
     prisma,
     activity,
     realtime,
+    storage,
+  };
+}
+
+/** A one-pixel PNG — real magic bytes, so `file-type` names it without a stub. */
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+/** The row a successful `createFile` resolves to; the shape, not the values, is what matters. */
+function fileRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: ATTACHMENT_ID,
+    taskId: TASK_ID,
+    kind: AttachmentKind.File,
+    filename: 'shot.png',
+    storageKey: '01/98/' + ATTACHMENT_ID,
+    mimeType: 'image/png',
+    size: PNG.length,
+    url: null,
+    uploadedById: ACTOR_ID,
+    createdAt: new Date(0),
+    ...overrides,
   };
 }
 
@@ -238,10 +273,24 @@ describe('AttachmentService.remove', () => {
     });
   });
 
-  // Görev 6 writes the body: the claim needs a real `StorageService` double, and the service
-  // does not take one until the FILE path exists. A skipped todo is visible; a test that was
-  // never written is not.
-  it.todo('does not delete the bytes inline — the sweep owns that');
+  it('does not delete the bytes inline — the sweep owns that', async () => {
+    const { service, prisma, storage } = build();
+    (prisma.attachment.findFirst as jest.Mock).mockResolvedValue({
+      id: ATTACHMENT_ID,
+      taskId: TASK_ID,
+      filename: 'contract.pdf',
+      kind: AttachmentKind.File,
+      storageKey: '01/98/' + ATTACHMENT_ID,
+      task: { boardId: BOARD_ID },
+    });
+
+    await service.remove(WORKSPACE_ID, ATTACHMENT_ID, ACTOR_ID);
+
+    // Cascades from `Workspace → Board → Task` never call application code, so an inline unlink
+    // would miss every bulk delete and give the codebase two deletion paths, one of which is
+    // wrong most of the time. The sweep is the single one (ADR 0022).
+    expect(storage.remove).not.toHaveBeenCalled();
+  });
 
   it('raises not found when the attachment belongs to another workspace', async () => {
     const { service, prisma } = build();
@@ -269,5 +318,179 @@ describe('AttachmentService.remove', () => {
     );
     expect(activity.record).not.toHaveBeenCalled();
     expect(realtime.emitToBoard).not.toHaveBeenCalled();
+  });
+});
+
+describe('AttachmentService.createFile', () => {
+  const file = (overrides: Record<string, unknown> = {}) => ({
+    originalname: 'shot.png',
+    mimetype: 'application/octet-stream',
+    size: PNG.length,
+    buffer: PNG,
+    ...overrides,
+  });
+
+  it('writes the bytes before the row, and keys the file on the id it generated', async () => {
+    const { service, prisma, storage } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
+
+    await service.createFile(WORKSPACE_ID, TASK_ID, ACTOR_ID, file());
+
+    const [key] = (storage.write as jest.Mock).mock.calls[0];
+    const { data } = (prisma.attachment.create as jest.Mock).mock.calls[0][0];
+    expect(key).toBe(data.storageKey);
+    expect(key).toContain(data.id);
+    expect((storage.write as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
+      (prisma.attachment.create as jest.Mock).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('stores the sniffed type, not the declared one', async () => {
+    const { service, prisma } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
+
+    // The client claimed something else entirely; the row must not carry it.
+    await service.createFile(WORKSPACE_ID, TASK_ID, ACTOR_ID, file());
+
+    expect((prisma.attachment.create as jest.Mock).mock.calls[0][0].data.mimeType).toBe(
+      'image/png',
+    );
+  });
+
+  it('stores the length of the bytes it wrote, not the size the caller declared', async () => {
+    const { service, prisma } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
+
+    // `size` is what `Content-Length` is built from on the download. A row that trusts the
+    // caller's number can therefore promise a length the stream never produces, which a browser
+    // sees as a hung or truncated download rather than as an error.
+    await service.createFile(WORKSPACE_ID, TASK_ID, ACTOR_ID, file({ size: 999_999 }));
+
+    expect((prisma.attachment.create as jest.Mock).mock.calls[0][0].data.size).toBe(PNG.length);
+  });
+
+  it('records the upload as an activity and announces the task change', async () => {
+    const { service, prisma, activity, realtime } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
+
+    await service.createFile(WORKSPACE_ID, TASK_ID, ACTOR_ID, file());
+
+    expect((activity.record as jest.Mock).mock.calls[0][1]).toMatchObject({
+      type: ActivityType.AttachmentCreated,
+    });
+    expect(realtime.emitToBoard).toHaveBeenCalledWith(BOARD_ID, SocketEvents.TASK_UPDATED, {
+      workspaceId: WORKSPACE_ID,
+      boardId: BOARD_ID,
+      actorId: ACTOR_ID,
+      taskId: TASK_ID,
+    });
+  });
+
+  it('never writes a row when the bytes are not an accepted type', async () => {
+    const { service, prisma, storage } = build();
+
+    await expect(
+      service.createFile(
+        WORKSPACE_ID,
+        TASK_ID,
+        ACTOR_ID,
+        file({
+          mimetype: 'image/png',
+          size: 40,
+          buffer: Buffer.from('<!doctype html><script>alert(1)</script>'),
+        }),
+      ),
+    ).rejects.toBeInstanceOf(UnsupportedMediaTypeException);
+
+    expect(storage.write).not.toHaveBeenCalled();
+    expect(prisma.attachment.create).not.toHaveBeenCalled();
+  });
+
+  it('404s for a task in another workspace before a byte is written', async () => {
+    const { service, prisma, storage } = build();
+    (prisma.task.findFirst as jest.Mock).mockResolvedValue(null);
+
+    await expect(service.createFile(WORKSPACE_ID, TASK_ID, ACTOR_ID, file())).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(storage.write).not.toHaveBeenCalled();
+  });
+
+  it('removes the bytes it just wrote when the row cannot be written', async () => {
+    const { service, prisma, storage } = build();
+    (prisma.$transaction as jest.Mock).mockRejectedValue(new Error('db is down'));
+
+    await expect(service.createFile(WORKSPACE_ID, TASK_ID, ACTOR_ID, file())).rejects.toThrow(
+      'db is down',
+    );
+
+    expect(storage.remove).toHaveBeenCalledWith((storage.write as jest.Mock).mock.calls[0][0]);
+  });
+
+  it('still reports the original failure when the cleanup unlink also fails', async () => {
+    const { service, prisma, storage } = build();
+    (prisma.$transaction as jest.Mock).mockRejectedValue(new Error('db is down'));
+    (storage.remove as jest.Mock).mockRejectedValue(new Error('disk gone'));
+
+    // A cleanup that cannot succeed must not replace the diagnosis; the file is then an orphan,
+    // which is a state the sweep already exists to handle.
+    await expect(service.createFile(WORKSPACE_ID, TASK_ID, ACTOR_ID, file())).rejects.toThrow(
+      'db is down',
+    );
+  });
+
+  it('keeps the caller-supplied filename out of the storage key entirely', async () => {
+    const { service, storage, prisma } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
+
+    await service.createFile(
+      WORKSPACE_ID,
+      TASK_ID,
+      ACTOR_ID,
+      file({ originalname: '../../../../etc/passwd', mimetype: 'image/png' }),
+    );
+
+    expect((storage.write as jest.Mock).mock.calls[0][0]).not.toContain('..');
+    expect((storage.write as jest.Mock).mock.calls[0][0]).not.toContain('passwd');
+  });
+
+  it('shows the basename and drops the directory part of a traversal-shaped name', async () => {
+    const { service, prisma } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
+
+    await service.createFile(
+      WORKSPACE_ID,
+      TASK_ID,
+      ACTOR_ID,
+      file({ originalname: '../../../../etc/passwd' }),
+    );
+
+    expect((prisma.attachment.create as jest.Mock).mock.calls[0][0].data.filename).toBe('passwd');
+  });
+
+  it('strips the characters that would break out of a Content-Disposition header', async () => {
+    const { service, prisma } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
+
+    await service.createFile(
+      WORKSPACE_ID,
+      TASK_ID,
+      ACTOR_ID,
+      file({ originalname: 'a"b\\c\r\nX-Evil: 1.png' }),
+    );
+
+    const stored = (prisma.attachment.create as jest.Mock).mock.calls[0][0].data.filename;
+    expect(stored).not.toMatch(/["\\\r\n]/);
+  });
+
+  it('falls back to a name when the caller sent one made only of stripped characters', async () => {
+    const { service, prisma } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
+
+    await service.createFile(WORKSPACE_ID, TASK_ID, ACTOR_ID, file({ originalname: '"""' }));
+
+    expect((prisma.attachment.create as jest.Mock).mock.calls[0][0].data.filename).toBe(
+      'attachment',
+    );
   });
 });
