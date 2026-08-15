@@ -27,7 +27,7 @@ Kurultay’s MVP feature set is complete; the testing strategy stays deliberatel
   catching at this stage live in the query, not in the TypeScript.
 - Do **not** chase a coverage number. Do not write tests that only restate the
   implementation.
-- Browser e2e covers **six flows, and deliberately no more** — the ones where the stack
+- Browser e2e covers **seven flows, and deliberately no more** — the ones where the stack
   either holds together or does not. See [Browser end-to-end](#browser-end-to-end).
 
 The cost of a test is not writing it — it is maintaining it through every refactor. Tests
@@ -35,14 +35,14 @@ are written where that cost buys real confidence.
 
 ## The pyramid
 
-| Layer           | Tool                                   | Scope                                                                                     | Status                                                    |
-| --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Services, guards, pure functions, board/permission logic, DnD hooks. Dependencies mocked. | Required from day one                                     |
-| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`)    | Required for every endpoint                               |
-| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | Six scenarios (`e2e/`) — nightly and before every release |
+| Layer           | Tool                                   | Scope                                                                                     | Status                                                      |
+| --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Services, guards, pure functions, board/permission logic, DnD hooks. Dependencies mocked. | Required from day one                                       |
+| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`)    | Required for every endpoint                                 |
+| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | Seven scenarios (`e2e/`) — nightly and before every release |
 
 ```
-        /\        e2e — six critical flows (Playwright, real Chromium)
+        /\        e2e — seven critical flows (Playwright, real Chromium)
        /  \
       /────\      integration — every endpoint (Supertest + real Postgres)
      /      \
@@ -53,7 +53,7 @@ Full component-tree rendering tests are not part of the MVP. Web unit tests cove
 (`lib/*.test.ts` — permissions, position math, mentions, query params) and the board
 drag-and-drop hook in isolation; type safety plus integration coverage of the API is the
 trade-off for everything else, and the board's own behaviour is covered end to end by the
-six browser scenarios below rather than by component tests covering it in pieces.
+seven browser scenarios below rather than by component tests covering it in pieces.
 
 ## What must be tested
 
@@ -112,34 +112,36 @@ endpoint, and **not once in a real browser**. Both of those suites pass against 
 never renders.
 
 The suite lives in [`e2e/`](../e2e), runs a real Chromium against a compiled API and a
-production web build, and is exactly six scenarios. It started at four and has grown only with
-features whose stack-level wiring nothing else could reach — a real multipart upload from a real
-browser, and a real file picker feeding the importer.
+production web build, and is exactly seven scenarios. It started at four and has grown only
+with features whose stack-level wiring nothing else could reach — a real multipart upload from a
+real browser, a real file picker feeding the importer, and a viewport, a touchscreen and a
+laid-out document, none of which exist in jsdom.
 
-### The six scenarios
+### The seven scenarios
 
-| Scenario                                                                   | File                                   | What it is the only coverage of                                                                                                                                                                                                 |
-| -------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sign in → open a board → drag a card → **reload and find it still moved**  | `tests/board-drag-persistence.spec.ts` | That a pointer gesture in a browser produces the move request at all, and that the board reads back what it wrote                                                                                                               |
-| A move in one browser appears **in a second browser**, with no reload      | `tests/board-realtime.spec.ts`         | Socket.io handshake auth, board-room membership, and the client applying an id-only payload                                                                                                                                     |
-| Invite from settings → **read the mail in Mailpit** → accept from the link | `tests/invitation.spec.ts`             | That the invitation mail is sent and carries a link that works — `acceptUrl` is built from `WEB_URL`, and the API's own tests assert on the DTO, not the message                                                                |
-| Click a notification → **the right task opens**                            | `tests/notification.spec.ts`           | A notification carries `taskId` but no `boardId`; the web resolves the board with a second request, in the browser, with the recipient's session                                                                                |
-| Upload a file to a card → **download it back and compare the bytes**       | `tests/task-attachment.spec.ts`        | A multipart body Chromium wrote rather than the API suite; a non-ASCII filename surviving both the upload encoding and `Content-Disposition`; the board card's count badge, which comes from a different query than the panel's |
-| Import a Trello export from a file picker → **read the report on screen**  | `tests/board-import.spec.ts`           | A real `<input type="file">` producing the boundary the API never composes itself, and the import report reaching the screen — it exists only in the body of the `201`, so a panel that drops it drops the only copy            |
+| Scenario                                                                                    | File                                   | What it is the only coverage of                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign in → open a board → drag a card → **reload and find it still moved**                   | `tests/board-drag-persistence.spec.ts` | That a pointer gesture in a browser produces the move request at all, and that the board reads back what it wrote                                                                                                               |
+| A move in one browser appears **in a second browser**, with no reload                       | `tests/board-realtime.spec.ts`         | Socket.io handshake auth, board-room membership, and the client applying an id-only payload                                                                                                                                     |
+| Invite from settings → **read the mail in Mailpit** → accept from the link                  | `tests/invitation.spec.ts`             | That the invitation mail is sent and carries a link that works — `acceptUrl` is built from `WEB_URL`, and the API's own tests assert on the DTO, not the message                                                                |
+| Click a notification → **the right task opens**                                             | `tests/notification.spec.ts`           | A notification carries `taskId` but no `boardId`; the web resolves the board with a second request, in the browser, with the recipient's session                                                                                |
+| Upload a file to a card → **download it back and compare the bytes**                        | `tests/task-attachment.spec.ts`        | A multipart body Chromium wrote rather than the API suite; a non-ASCII filename surviving both the upload encoding and `Content-Disposition`; the board card's count badge, which comes from a different query than the panel's |
+| Import a Trello export from a file picker → **read the report on screen**                   | `tests/board-import.spec.ts`           | A real `<input type="file">` producing the boundary the API never composes itself, and the import report reaching the screen — it exists only in the body of the `201`, so a panel that drops it drops the only copy            |
+| The board at **360px with a touchscreen** — drawer, 44px targets, column scroll, touch drag | `tests/mobile-navigation.spec.ts`      | Layout at a width, and input from a finger. jsdom lays nothing out, so every box measurement in a Vitest test is zeros; `hasTouch` / `isMobile` are context options a unit test has no equivalent of                            |
 
-Anything outside those six belongs in a unit or integration test. Every test added here is
+Anything outside those seven belongs in a unit or integration test. Every test added here is
 one more thing to keep green through a UI refactor, and this suite exists to notice when the
 **stack** comes apart — not to re-check what the layers below already cover.
 
 ### Running it
 
 Postgres **and Mailpit** must be up (`docker compose -f docker-compose.dev.yml up -d`);
-without Mailpit three of the six scenarios cannot confirm an address or read an invitation.
+without Mailpit three of the seven scenarios cannot confirm an address or read an invitation.
 Redis is not needed — see [Isolation](#isolation) for why the suite runs without it.
 
 ```bash
 pnpm --filter @kurultay/e2e browsers   # once: downloads Chromium
-pnpm test:browser                      # builds the stack, then runs all six
+pnpm test:browser                      # builds the stack, then runs all seven
 ```
 
 `pnpm test:browser` runs `e2e/build-stack.mjs` first — it builds `shared-types`,

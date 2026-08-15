@@ -145,14 +145,20 @@ export const BoardColumn = memo(function BoardColumn({
    * thing standing between the reader and rows the board says are there. Scrolling is what
    * they were already doing.
    *
-   * The root is the **viewport**, deliberately not the column's own scroll container. Whether
-   * the column scrolls at all depends on the page's height chain resolving to a bounded box,
-   * and today it does not on a tall board — `min-h-screen` on the shell lets the whole
-   * document grow instead, so the column's `overflow-y-auto` never clips and a container root
-   * would see the sentinel as permanently in view, revealing every batch back-to-back the
-   * moment the board loaded (measured: 1 000 of 1 000 cards mounted, ~0 ms after the drain).
-   * The viewport root is correct under both layouts: an intersection is computed against every
-   * clipping ancestor, so once the column does clip, the sentinel is hidden by it.
+   * The root is the **viewport**, deliberately not the column's own scroll container, and it
+   * stays that way now that the column has one.
+   *
+   * When this was written the column did not scroll at all: `min-h-screen` on the shell left
+   * the page's height chain unbounded, so a column's `overflow-y-auto` never clipped and the
+   * document grew instead. A container root would have seen the sentinel as permanently in
+   * view and revealed every batch back-to-back the moment the board loaded (measured: 1 000 of
+   * 1 000 cards mounted, ~0 ms after the drain). Issue #184 has since bounded the chain
+   * (`components/layout/app-shell.tsx`), so a container root would now work — but the viewport
+   * root was never a workaround for that. An intersection is computed against every clipping
+   * ancestor, so once the column clips, the sentinel is hidden by it and the two roots agree;
+   * what the viewport root additionally survives is the chain being unbounded again, which is
+   * exactly the class of regression a layout change makes. It is correct under both, and only
+   * one of them is correct under both.
    *
    * The observer is re-created after each reveal because the sentinel moves with it;
    * re-observing is what lets a fast scroll pull in several batches in a row instead of
@@ -188,7 +194,13 @@ export const BoardColumn = memo(function BoardColumn({
       style={style}
       aria-label={column.name}
     >
-      <header className="sticky top-0 z-10 flex h-10 items-center gap-2 border-b border-border bg-muted/90 px-3 backdrop-blur-sm">
+      {/* 40px per `docs/design.md` §4, 48px below `md` so the 44px overflow button fits inside
+          it rather than spilling over the first card.
+
+          `sticky` here only started meaning anything with the height-chain fix (#184): until
+          the column had a scroll container of its own, this header was stuck to a box that
+          never moved, and the reader scrolled the whole document past it. */}
+      <header className="sticky top-0 z-10 flex h-10 items-center gap-2 border-b border-border bg-muted/90 px-3 backdrop-blur-sm max-md:h-12">
         <h2 className="min-w-0 flex-1 truncate text-body font-medium">{column.name}</h2>
         <span className="font-mono text-small text-muted-foreground tabular-nums">
           {tasks.length}

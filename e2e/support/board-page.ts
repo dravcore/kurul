@@ -109,12 +109,66 @@ export async function dragCardOnto(
   await page.mouse.up();
 }
 
-async function centreOf(locator: Locator): Promise<{ x: number; y: number }> {
-  // `scrollIntoViewIfNeeded` before measuring: issue #184 means the board's height chain does
-  // not constrain its columns, so a tall column grows the *document* and its own
-  // `overflow-y-auto` never clips. A card below the fold is therefore reached by scrolling
-  // the page, not the column — and a bounding box measured before that scroll would name a
-  // point the mouse can never be at.
+/**
+ * Drags one card onto another with a **finger**, and waits for the drop to be applied.
+ *
+ * Everything `dragCardOnto` says about coordinates and the activation distance holds here
+ * too. Two things are different, and both are the point of having a second helper:
+ *
+ * 1. **Real touch events, dispatched over CDP.** `page.mouse` in a `hasTouch` context still
+ *    produces *mouse* events, and a mouse event is exactly what a phone does not send.
+ *    `Input.dispatchTouchEvent` is what makes Chromium synthesise `pointerdown` with
+ *    `pointerType: 'touch'` — which is the input dnd-kit's `PointerSensor` has to cope with,
+ *    and the one where `touch-action` decides whether the gesture becomes a drag or a scroll.
+ * 2. **The grip, and only the grip.** On touch the card body belongs to the column's
+ *    scroller: the wrapper carrying dnd-kit's listeners has no `touch-action` of its own, so
+ *    the browser claims a vertical drag there and cancels the pointer. The grip declares
+ *    `touch-action: none` (`components/task/sortable-task-card.tsx`) and is the one place the
+ *    gesture reaches dnd-kit. That is a deliberate division and it is asserted from both
+ *    sides in `tests/mobile-navigation.spec.ts`.
+ */
+export async function touchDragCardOnto(
+  page: Page,
+  sourceTitle: string,
+  targetTitle: string,
+): Promise<void> {
+  const from = await centreOf(cardHandle(page, sourceTitle));
+  const to = await centreOf(cardHandle(page, targetTitle));
+  const cdp = await page.context().newCDPSession(page);
+
+  const touch = async (
+    type: 'touchStart' | 'touchMove' | 'touchEnd',
+    point?: { x: number; y: number },
+  ): Promise<void> => {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: point ? [{ x: point.x, y: point.y }] : [],
+    });
+  };
+
+  await touch('touchStart', from);
+  // Past the 6px activation distance first, in small steps, exactly as the mouse helper does.
+  await touch('touchMove', { x: from.x, y: from.y + 12 });
+  const steps = 16;
+  for (let step = 1; step <= steps; step += 1) {
+    await touch('touchMove', {
+      x: from.x + ((to.x - from.x) * step) / steps,
+      y: from.y + 12 + ((to.y - (from.y + 12)) * step) / steps,
+    });
+  }
+  await touch('touchMove', { x: to.x, y: to.y + 1 });
+  await touch('touchEnd');
+  await cdp.detach();
+}
+
+export async function centreOf(locator: Locator): Promise<{ x: number; y: number }> {
+  // `scrollIntoViewIfNeeded` before measuring: a card below the fold is reached by scrolling,
+  // and a bounding box measured before that scroll would name a point the pointer can never be
+  // at. Which box actually scrolls changed with the fix for issue #184 — it used to be the
+  // document, because the board's height chain did not constrain its columns and a tall column
+  // grew the page instead; it is now the column's own `overflow-y-auto`. This call is correct
+  // under both, which is why the fix did not move it: `scrollIntoViewIfNeeded` scrolls whatever
+  // ancestor is scrollable, and the measurement happens after.
   await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
   if (!box) {

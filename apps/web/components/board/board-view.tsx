@@ -234,17 +234,6 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
         }
         actions={
           <div className="flex items-center gap-2">
-            {!socketConnected ? (
-              <span className="text-micro text-muted-foreground" aria-live="polite">
-                {t('realtime.reconnecting')}
-              </span>
-            ) : null}
-            {/* The board paints on the first page; later pages stream in behind it. */}
-            {tasksSyncing ? (
-              <span className="text-micro text-muted-foreground" aria-live="polite">
-                {t('loadingMore')}
-              </span>
-            ) : null}
             {canMutateColumnsFlag ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -264,8 +253,31 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
         }
       />
 
-      <div className="border-b border-border px-3 py-2">
+      {/*
+        The filter bar, and with it the board's two status lines.
+
+        `Reconnecting…` and `Loading the rest of the tasks…` used to sit in the topbar's action
+        slot. At 360px that bar is a hamburger, a back arrow, a title and an overflow menu —
+        three 44px targets and whatever is left — and a sentence dropped in beside them either
+        wrapped inside a fixed-height bar or squeezed the board's name to nothing. Here they
+        wrap onto their own line when the row runs out of width and cost the title nothing.
+
+        It is also where `docs/design.md` §5 says they belong: "a quiet inline 'Reconnecting…'
+        bar, never a blocking overlay". Same live regions, same wording, one row lower.
+      */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-3 py-2">
         <BoardFilters filters={filters} members={members} labels={labels} onChange={applyFilters} />
+        {!socketConnected ? (
+          <span className="text-micro text-muted-foreground max-md:w-full" aria-live="polite">
+            {t('realtime.reconnecting')}
+          </span>
+        ) : null}
+        {/* The board paints on the first page; later pages stream in behind it. */}
+        {tasksSyncing ? (
+          <span className="text-micro text-muted-foreground max-md:w-full" aria-live="polite">
+            {t('loadingMore')}
+          </span>
+        ) : null}
       </div>
 
       <div className="flex min-h-0 flex-1">

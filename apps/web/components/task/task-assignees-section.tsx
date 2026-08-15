@@ -27,7 +27,7 @@ export function TaskAssigneesSection({
           const assigned = assignedUserIds.has(member.userId);
           return (
             <li key={member.id}>
-              <label className="flex cursor-pointer items-center gap-2 text-body">
+              <label className="flex cursor-pointer items-center gap-2 text-body max-md:min-h-11">
                 <input
                   type="checkbox"
                   checked={assigned}

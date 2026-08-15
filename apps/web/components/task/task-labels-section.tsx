@@ -75,7 +75,7 @@ export function TaskLabelsSection({
             const assigned = taskLabelIds.has(label.id);
             return (
               <li key={label.id} className="flex items-center gap-2">
-                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-body">
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-body max-md:min-h-11">
                   <input
                     type="checkbox"
                     checked={assigned}

@@ -153,7 +153,7 @@ export function NotificationsList(): React.ReactElement {
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="flex items-center gap-2 text-small">
+          <label className="flex items-center gap-2 text-small max-md:min-h-11">
             <input
               type="checkbox"
               className="size-4 rounded border-input"

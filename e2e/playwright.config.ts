@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { apiEnv, API_URL, webEnv, WEB_URL } from './stack-env';
 
 /**
- * Browser end-to-end suite — six scenarios, deliberately.
+ * Browser end-to-end suite — seven scenarios, deliberately.
  *
  * `docs/testing.md` deferred browser tests while the board UI was still changing shape every
  * week, and that judgement was right: a full suite written then would have been rewritten
@@ -50,9 +50,28 @@ import { apiEnv, API_URL, webEnv, WEB_URL } from './stack-env';
  * 24.18), 8 consecutive runs each with the servers warm: the five at 4.2–5.1s (median 4.4s), the
  * six at 4.3–5.6s (median 4.75s) — about 0.3s of median. The sixth is the *fastest* single test
  * of the six at ~1.5s, because it drives one form and two page loads and does its setup over
- * HTTP. Against the five-minute ceiling the whole suite is now 1.6% of the budget. That margin is
- * still headroom for a cold CI runner and still not an argument for a seventh: the paragraph at
- * the top of this file is the admission test, and "there is time" has never been it.
+ * HTTP. Against the five-minute ceiling the whole suite is now 1.6% of the budget.
+ *
+ * **Why the number went from six to seven.** `tests/mobile-navigation.spec.ts` was added for
+ * P3-8, and it is the clearest case yet for the admission criterion — because what it measures
+ * is not reachable from an in-process suite by construction, not merely inconvenient there.
+ * Its subject is *layout at a width*: an off-canvas drawer below 768px, a 44px floor under
+ * every touch target, and a document that no longer grows past the viewport (issue #184). jsdom
+ * lays nothing out, so every `getBoundingClientRect` in a Vitest test is zeros and every one of
+ * those assertions would pass whatever the CSS said — the exact vacuous-assertion failure
+ * `docs/testing.md` names. The input is out of reach too: `hasTouch` and `isMobile` are context
+ * options, so the touch drag it exercises cannot be driven from anywhere but a browser context
+ * created with them.
+ *
+ * It is one file with four tests rather than four files, and it costs the suite about 1.4s of
+ * median — measured the same way, 8 consecutive warm runs on the same machine: the six at
+ * 4.6–5.2s (median 4.8s), the seven at 5.9–7.1s (median 6.15s). The slowest of the four is the
+ * scroll-and-drag scenario at ~2.1s, which seeds 25 cards over HTTP and dispatches a real touch
+ * sequence over CDP. Against the five-minute ceiling the whole suite is 2.1% of the budget.
+ *
+ * That margin is headroom for a cold CI runner and still not an argument for an eighth: the
+ * paragraph at the top of this file is the admission test, and "there is time" has never been
+ * it.
  */
 export default defineConfig({
   testDir: './tests',
@@ -95,14 +114,14 @@ export default defineConfig({
   /**
    * Five minutes for the whole suite, enforced rather than aspired to.
    *
-   * The budget is the reason this suite is six scenarios and not forty: a nightly that takes
+   * The budget is the reason this suite is seven scenarios and not forty: a nightly that takes
    * twenty minutes is a nightly people stop reading. Putting the ceiling here instead of in
    * the workflow's `timeout-minutes` means it also applies locally, so the run that first
    * exceeds it is the one on the author's machine. Measured on a laptop (Apple M3 Max, 14
-   * cores, 36 GB, Node 24.18) the five took 4.0–4.5s over 24 runs and the six take 4.3–5.6s
-   * over 8; the margin is for a cold CI runner, not for growth.
+   * cores, 36 GB, Node 24.18) the five took 4.0–4.5s over 24 runs, the six 4.3–5.6s over 8,
+   * and the seven 5.9–7.1s over 8; the margin is for a cold CI runner, not for growth.
    *
-   * Read that margin as headroom for the runner, not as room for a seventh scenario: the
+   * Read that margin as headroom for the runner, not as room for an eighth scenario: the
    * paragraph at the top of this file is the admission test, and "there is time" has never
    * been it.
    */
