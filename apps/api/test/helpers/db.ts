@@ -6,6 +6,7 @@ export async function resetDatabase(prisma: PrismaService): Promise<void> {
   await prisma.notification.deleteMany();
   await prisma.activity.deleteMany();
   await prisma.comment.deleteMany();
+  await prisma.attachment.deleteMany();
   await prisma.checklistItem.deleteMany();
   await prisma.checklist.deleteMany();
   await prisma.taskLabel.deleteMany();

@@ -52,6 +52,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     labels: [],
     checklistSummary: { total: 2, done: 1 },
     checklists: CHECKLISTS,
+    attachmentCount: 0,
     ...overrides,
   };
 }

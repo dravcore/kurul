@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { HealthModule } from './health/health.module';
+import { StorageModule } from './storage/storage.module';
 import { InstanceConfigModule } from './config/instance-config.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -26,6 +27,9 @@ import { throttlerOptions } from './common/rate-limit/rate-limit';
     ThrottlerModule.forRoot(throttlerOptions()),
     PrismaModule,
     HealthModule,
+    // Ahead of `InstanceConfigModule` so the reading order follows the dependency: the config
+    // document asks `StorageService` whether this deployment stores attachments at all.
+    StorageModule,
     InstanceConfigModule,
     AuthModule,
     MailModule,

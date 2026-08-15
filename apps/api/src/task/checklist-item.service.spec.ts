@@ -50,6 +50,7 @@ function build() {
       assignees: [],
       labels: [],
       checklists: [],
+      _count: { attachments: 0 },
     }),
   } as unknown as TaskReadService;
   const taskEvents = {

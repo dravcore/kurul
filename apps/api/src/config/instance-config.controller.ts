@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import type { InstanceConfigDto } from '@kurultay/shared-types';
 import { MailService } from '../mail/mail.service';
+import { StorageService } from '../storage/storage.service';
 
 /**
  * What this deployment is configured to do, for a client that cannot read its environment.
@@ -45,15 +46,22 @@ import { MailService } from '../mail/mail.service';
  */
 @Controller('config')
 export class InstanceConfigController {
-  constructor(private readonly mail: MailService) {}
+  constructor(
+    private readonly mail: MailService,
+    private readonly storage: StorageService,
+  ) {}
 
   /**
    * Not cached and not memoized. The document is two booleans' worth of work — `mailEnabled`
-   * reads a field off a transport that is built once per process — and a cache would only add
-   * a second copy of the truth that can disagree with the transport actually in use.
+   * reads a field off a transport that is built once per process, and `attachmentsEnabled`
+   * reads the capability bit off a storage backend built the same way — and a cache would only
+   * add a second copy of the truth that can disagree with the transport actually in use.
    */
   @Get()
   config(): InstanceConfigDto {
-    return { mailEnabled: this.mail.isEnabled() };
+    return {
+      mailEnabled: this.mail.isEnabled(),
+      attachmentsEnabled: this.storage.persistsFiles,
+    };
   }
 }

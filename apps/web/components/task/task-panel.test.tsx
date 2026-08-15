@@ -42,6 +42,7 @@ const task: TaskDto = {
   labels: [],
   checklistSummary: { total: 0, done: 0 },
   checklists: null,
+  attachmentCount: 0,
 };
 
 /**

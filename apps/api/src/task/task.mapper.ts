@@ -40,6 +40,7 @@ function toTaskCore(row: TaskRowBase): Omit<TaskDto, 'checklistSummary' | 'check
     updatedAt: row.updatedAt.toISOString(),
     assignees,
     labels,
+    attachmentCount: row._count.attachments,
   };
 }
 
@@ -99,12 +100,18 @@ export function toTaskDetailDto(row: TaskDetailRow): TaskDto {
 /**
  * A task that was just created, mapped without a second read.
  *
- * A fresh task has no assignees, no labels and no checklists, so the relations are supplied
- * rather than fetched — but they are supplied as the *detail* shape, because the caller of a
- * create wants the same DTO a single-task read would give them.
+ * A fresh task has no assignees, no labels, no checklists and no attachments, so the relations
+ * and the count are supplied rather than fetched — but they are supplied as the *detail* shape,
+ * because the caller of a create wants the same DTO a single-task read would give them.
  */
 export function emptyTaskRelations<
-  T extends Omit<TaskDetailRow, 'assignees' | 'labels' | 'checklists'>,
+  T extends Omit<TaskDetailRow, 'assignees' | 'labels' | 'checklists' | '_count'>,
 >(row: T): TaskDetailRow {
-  return { ...row, assignees: [], labels: [], checklists: [] };
+  return {
+    ...row,
+    assignees: [],
+    labels: [],
+    checklists: [],
+    _count: { attachments: 0 },
+  };
 }
