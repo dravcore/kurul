@@ -529,6 +529,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **An oversized JSON body answered `500` and was filed in Sentry as a server fault.** Express's
+  body parsers signal every rejection by throwing an
+  [`http-errors`](https://github.com/jshttp/http-errors) instance — a plain `Error` subclass
+  carrying `status: 413`, not a Nest `HttpException` — so it matched only the
+  `AllExceptionsFilter` fallback for an unrecognised error, and every request that sent too much
+  data became an "unexpected server failure" in the error envelope *and* an event on a
+  self-hoster's error-tracking quota. It is now `413 Payload Too Large` in the same envelope,
+  with wording this project chose rather than the library's, and it is not reported: a client
+  sending too much data is the API working as designed, exactly like a `404` or a `403`. The
+  branch is deliberately narrow — it requires the full shape `http-errors` uses to identify its
+  own errors (a real `Error`, a boolean `expose`, and `status === statusCode`) and it stops at
+  4xx, so a library that merely records an upstream's status code cannot have its failure
+  relabelled as a client error and disappear from error tracking. A malformed JSON body was
+  never part of this: Nest converts any `SyntaxError` to a `400` before a filter sees it, and it
+  is now pinned by a test that says so.
+
+- **The request body limit was Express's unconfigured default, not a decision.** Nothing in this
+  repository set one, so the API's real ceiling was body-parser's built-in **100 kB** — a value
+  nobody chose and no file recorded, discoverable only by sending a large body and watching what
+  came back. The limit is now explicit and named: `REQUEST_BODY_MAX_BYTES`, default `1048576`
+  (1 MiB), documented in `.env.example` and
+  [api-conventions.md](docs/api-conventions.md#request-body-size), applied to the JSON *and* the
+  form-encoded parser. 1 MiB is about two orders of magnitude above the largest body any endpoint
+  legitimately receives today (no array bodies; the longest single field any DTO accepts is 2048
+  characters), and it is a memory ceiling as much as a size one — the body is parsed into heap
+  before anything validates it. It has nothing to do with `ATTACHMENT_MAX_BYTES`: an upload is
+  `multipart/form-data`, which these parsers never see.
+
 - **`REDIS_URL`'s database index was accepted and then quietly ignored.** Every ioredis and
   BullMQ connection in the API is built by one function, `parseRedisUrl`, and it returned only
   `{ host, port, password }` — the URL's path segment (`redis://redis:6379/3`) and any `?db=`

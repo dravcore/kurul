@@ -317,21 +317,27 @@ koymaz — pakete dahil `docker/Caddyfile`'ın limiti açıkça yazmasının seb
 `client_max_body_size` için **1 MB** varsayar; yani satırı atlayan bir yedek proxy, bir
 megabayttan büyük her eki reddeder.
 
-### İki 413'ü birbirinden ayırmak
+### 413'leri birbirinden ayırmak
 
-Her iki katman da boyutu aşan bir yüklemeye `413` ile cevap verir ve **hangisinin reddettiğini
-cevap gövdesi söyler**:
+Her iki katman da boyutu aşan bir yüklemeye `413` ile cevap verir — ve yüklemelerle hiç ilgisi
+olmayan üçüncü bir limit de öyle. **Hangisinin reddettiğini cevap gövdesi söyler**:
 
-| Aldığınız cevap                             | Reddeden | Anlamı                                                    |
-| ------------------------------------------- | -------- | --------------------------------------------------------- |
-| `statusCode` taşıyan **JSON** gövdeli `413` | API      | tasarlandığı gibi — dosya `ATTACHMENT_MAX_BYTES`'ı aşıyor |
-| **Boş** gövdeli `413` (`Content-Length: 0`) | proxy    | gövde proxy'nin tavanını aştı; bu kaba kesim              |
+| Aldığınız cevap                              | Reddeden | Anlamı                                                          |
+| -------------------------------------------- | -------- | --------------------------------------------------------------- |
+| `statusCode` taşıyan **JSON** gövdeli `413`  | API      | tasarlandığı gibi — dosya `ATTACHMENT_MAX_BYTES`'ı aşıyor       |
+| **Boş** gövdeli `413` (`Content-Length: 0`)  | proxy    | gövde proxy'nin tavanını aştı; bu kaba kesim                    |
+| `Request body is too large` yazan JSON `413` | API      | yükleme bile değil — `REQUEST_BODY_MAX_BYTES`'ı aşan JSON gövde |
 
 Birinci satır, boyutu aşan bir ek için normal cevaptır ve kullanıcının bir şey yapabileceği
 cevaptır: limiti adlandırır. İkincisi, proxy'nin gövdeyi API hiç görmeden reddetmesidir —
 absürt bir şey için doğrudur, ama kullanıcı bunu `ATTACHMENT_MAX_BYTES`'ın **altındaki** bir
 dosyada alıyorsa proxy tavanınız çok düşüktür (yukarıdaki "Proxy'nin sayısı neden 26 MiB,
 API'ninki neden 25" bölümüne bakın).
+
+Üçüncü satır, aynı status kodunu paylaşan başka bir limittir: `REQUEST_BODY_MAX_BYTES`
+(varsayılan `1048576`, 1 MiB) diğer bütün uçların aldığı **JSON ve form-encoded** gövdeleri
+sınırlar ve hiçbir attachment oradan geçmez. Bunu görüyorsanız ne storage'ınızda ne proxy'nizde
+yanlış bir şey var; bir istek yalnızca API'nin kabul ettiğinden fazla JSON göndermiştir.
 
 Header'lar yardımcı olmaz — Caddy'nin `413`'ü `Server` header'ı taşımaz; ikisini yalnız gövde
 ayırır. API'nin kendi reddettiği her şey
