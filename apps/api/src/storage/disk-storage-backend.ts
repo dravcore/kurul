@@ -14,7 +14,26 @@ export class DiskStorageBackend implements StorageBackend {
   readonly backend = 'disk' as const;
   readonly persistsFiles = true;
 
-  constructor(private readonly root: string) {}
+  /**
+   * @param root Absolute path of the directory attachments live under.
+   *
+   * The absoluteness is checked here rather than assumed, because a relative root defeats
+   * `resolve()` below without tripping it: `resolve('', key)` is `join(cwd, key)` and
+   * `relative('', that)` is just the key again, so the traversal check sees a clean relative
+   * path and the backend quietly writes into the process's working directory. That is not a
+   * hypothetical — it happened during a mutation run and left real files in `apps/api/`.
+   *
+   * `readStorageConfig` already refuses an unset `STORAGE_PATH`, so today nothing reaches this
+   * with a bad value. That is exactly the argument that stops being true when a second caller
+   * appears (an importer, a sweep, a test constructing the backend directly), which is why the
+   * port checks its own precondition instead of trusting the one caller it has.
+   */
+  constructor(private readonly root: string) {
+    if (!isAbsolute(root.trim()) || root.trim() === '') {
+      // Deliberately none of multer's message constants — see storage-backend.ts.
+      throw new Error(`Storage root must be an absolute path, received "${root}"`);
+    }
+  }
 
   /**
    * Absolute path for `key`, refusing anything that lands outside the root.

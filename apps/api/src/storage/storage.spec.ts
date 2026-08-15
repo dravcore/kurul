@@ -74,6 +74,20 @@ describe('storage configuration', () => {
     expect(() => getStorageConfig()).toThrow(/ATTACHMENT_MAX_BYTES/);
   });
 
+  /**
+   * The error an operator actually sees, and it names the variable they set.
+   *
+   * `DiskStorageBackend`'s constructor refuses a relative root too, but its message is about a
+   * "storage root" — a phrase that appears nowhere in `.env.example`. A relative `STORAGE_PATH`
+   * would resolve against the API process's working directory, which is a different directory
+   * under `pnpm dev`, under Docker and under a `cron`-invoked script, so "it worked on my
+   * machine and the files vanished in production" is the failure being refused here.
+   */
+  it('refuses a relative STORAGE_PATH, naming the variable', () => {
+    process.env.STORAGE_PATH = 'attachments';
+    expect(() => getStorageConfig()).toThrow(/STORAGE_PATH/);
+  });
+
   it('builds the same backend the singleton would, from a config alone', async () => {
     const dir = await createTempStorageDir();
     dirs.push(dir);

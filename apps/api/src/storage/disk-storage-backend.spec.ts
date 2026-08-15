@@ -38,6 +38,24 @@ describe('DiskStorageBackend', () => {
     await expect(new DiskStorageBackend(root).remove('01/98/missing')).resolves.toBeUndefined();
   });
 
+  /**
+   * A root that is not an absolute path is refused at construction.
+   *
+   * This is not theoretical. `resolve('', key)` is `join(cwd, key)`, and `relative('', that)` is
+   * just the key — so the traversal check in `resolve()` sees nothing wrong and the backend
+   * writes into whatever directory the process happens to be running from. It was observed:
+   * a mutation run that made `readStorageConfig` return a `disk` config unconditionally left a
+   * real `apps/api/01/98/k` on disk. `readStorageConfig` is what keeps an empty `STORAGE_PATH`
+   * from getting here, but a port whose only defence is its caller is a port with no defence, so
+   * the constructor refuses instead of trusting.
+   */
+  it.each(['', '   ', 'relative/path', './attachments'])(
+    'refuses a root that is not an absolute path: %p',
+    (root) => {
+      expect(() => new DiskStorageBackend(root)).toThrow(/absolute path/);
+    },
+  );
+
   it('lists what it wrote, with the key it was given', async () => {
     const backend = new DiskStorageBackend(root);
     await backend.write(KEY, Buffer.from('hello'));

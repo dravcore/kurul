@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import { envInt, envString } from '../common/env';
 
 /** 25 MiB. One number, quoted in `docker/Caddyfile` and `docs/self-hosting.md` (ADR 0024). */
@@ -27,6 +28,14 @@ export interface StorageConfig {
  */
 export function readStorageConfig(): StorageConfig {
   const root = envString('STORAGE_PATH', '');
+  // Refused here as well as in `DiskStorageBackend`'s constructor, and the duplication is the
+  // point: the constructor protects the port from any caller, this protects the operator from a
+  // message that never names the variable they set. A relative path would resolve against the
+  // API process's working directory, which differs between `pnpm dev`, the container and any
+  // script that starts the process from somewhere else.
+  if (root !== '' && !isAbsolute(root)) {
+    throw new Error(`Invalid STORAGE_PATH: expected an absolute path, received "${root}"`);
+  }
   const maxBytes = envInt('ATTACHMENT_MAX_BYTES', DEFAULT_ATTACHMENT_MAX_BYTES);
   if (maxBytes <= 0) {
     throw new Error(
