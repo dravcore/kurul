@@ -383,27 +383,22 @@ describe('Attachments (e2e)', () => {
       await expect(prisma.attachment.count({ where: { taskId: where.taskId } })).resolves.toBe(1);
     });
 
-    it('rejects a file of exactly ATTACHMENT_MAX_BYTES — the ceiling is exclusive', async () => {
-      // Measured, not assumed, and it disagrees with how the number reads. busboy raises the
-      // limit on equality, not on excess: `multipart.js:476` is `if (fileSize === fileSizeLimit)`
-      // … `emit('limit')`. So the largest file this API accepts is `ATTACHMENT_MAX_BYTES - 1`
-      // bytes, and a file of exactly the configured number is refused with a 413.
+    it('accepts a file of exactly ATTACHMENT_MAX_BYTES — the published ceiling is inclusive', async () => {
+      // The boundary nail for K2, and the reason `attachment.module.ts` configures
+      // `storage.maxBytes + 1`. busboy raises its limit on *equality*
+      // (`busboy/lib/types/multipart.js:476`), so passing `maxBytes` straight through would
+      // refuse a file of exactly the number both layers publish — while the proxy half passes
+      // that same body (#215). That gap is a 413 nobody configured and nobody can trace, which
+      // is the failure ADR 0022:170-176 exists to prevent.
       //
-      // The proxy half of the two-layer limit does not share the off-by-one — Caddy's
-      // `request_body max_size` rejects a body that *exceeds* the value, and it measures the
-      // whole multipart envelope rather than the file part. The two layers therefore stop
-      // agreeing at exactly the boundary the docs quote (K2). Left as a finding rather than
-      // changed here: this is a spec question, not a test one.
+      // Remove the `+ 1` from the module and this is the one test that turns red.
       const where = await seed('exact');
 
-      await where.user.agent
-        .post(`/workspaces/${where.workspaceId}/tasks/${where.taskId}/attachments`)
-        .field('kind', AttachmentKind.File)
-        .attach('file', pngOfSize(MAX_BYTES), { filename: 'exact.png', contentType: 'image/png' })
-        .expect(413);
+      const created = await upload(where, pngOfSize(MAX_BYTES), 'exact.png', 'image/png');
 
-      await expect(prisma.attachment.count()).resolves.toBe(0);
-      await expect(listStorageFiles()).resolves.toEqual([]);
+      expect(created.size).toBe(MAX_BYTES);
+      await expect(prisma.attachment.count()).resolves.toBe(1);
+      await expect(listStorageFiles()).resolves.toHaveLength(1);
     });
 
     it('refuses a second file part rather than storing either', async () => {
@@ -582,8 +577,7 @@ describe('Attachments (e2e)', () => {
 
       const disposition = response.headers['content-disposition'];
       expect(disposition).toBe(
-        `inline; filename="${created.filename.replace(/[^\x20-\x7e]/g, '_')}"; ` +
-          `filename*=UTF-8''${encodeURIComponent(created.filename)}`,
+        `inline; filename="_l__m raporu.png"; filename*=UTF-8''${encodeURIComponent('ölçüm raporu.png')}`,
       );
       // The ASCII parameter really is ASCII, so a client that ignores the second one is not
       // handed bytes it cannot spell.
@@ -592,21 +586,23 @@ describe('Attachments (e2e)', () => {
       expect(disposition).not.toMatch(/[\r\n]/);
     });
 
-    it('MEASURED DEFECT: stores a non-ASCII filename decoded as latin1, not as UTF-8', async () => {
-      // Not the behaviour anyone wants, and pinned here so the day it is fixed this test turns
-      // red and says so. `multer@2.2.0/index.js:22` defaults `defParamCharset` to `'latin1'`, and
-      // `attachment.module.ts` does not override it; a browser sends the multipart `filename`
-      // parameter as UTF-8 bytes (RFC 7578), so every non-ASCII name is stored mojibake'd —
-      // `ölçüm` becomes `Ã¶lÃ§Ã¼m` in the database, in the panel and in `Content-Disposition`.
-      //
-      // The fix is one key (`defParamCharset: 'utf8'`) in the MulterModule factory, and it is
-      // deliberately not made in this PR: this is a test package, and rows already written under
-      // the old decoding are a data question rather than a test one. Reported instead.
-      const where = await seed('latin1');
+    it('stores a non-ASCII filename as the UTF-8 the browser actually sent', async () => {
+      // The nail on `defParamCharset: 'utf8'`. multer defaults that option to `'latin1'`
+      // (`multer@2.2.0/index.js:22`) while a browser writes the multipart `filename` parameter
+      // as UTF-8 (RFC 7578 §5.1), so under the default this same upload was measured landing in
+      // the row — and in the panel, and in `Content-Disposition` — as `Ã¶lÃ§Ã¼m raporu.png`.
+      // Remove the option from `attachment.module.ts` and this test goes red with exactly that
+      // string, which is what makes it a nail rather than a restatement of the code.
+      const where = await seed('utf8-row');
       const created = await upload(where, PNG, 'ölçüm raporu.png', 'image/png');
 
-      expect(created.filename).toBe(Buffer.from('ölçüm raporu.png', 'utf8').toString('latin1'));
-      expect(created.filename).not.toBe('ölçüm raporu.png');
+      expect(created.filename).toBe('ölçüm raporu.png');
+      // Named explicitly, so the failure message says *which* decoding produced the wrong value
+      // rather than only that two strings differ.
+      expect(created.filename).not.toBe(Buffer.from('ölçüm raporu.png', 'utf8').toString('latin1'));
+
+      const row = await prisma.attachment.findUniqueOrThrow({ where: { id: created.id } });
+      expect(row.filename).toBe('ölçüm raporu.png');
     });
 
     it('keeps only the basename of a Windows-style path', async () => {
