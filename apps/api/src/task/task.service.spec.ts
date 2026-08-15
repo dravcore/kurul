@@ -58,6 +58,9 @@ function taskRow(
       position: number;
       items: Array<{ id: string; content: string; isDone: boolean; position: number }>;
     }>,
+    // `_count` rides both includes, so the fixture carries it for the same reason it carries
+    // the wider `checklists` shape.
+    _count: { attachments: 0 },
   };
 }
 

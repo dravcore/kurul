@@ -140,7 +140,9 @@ type TextDeclaration = (typeof TEXT_DECLARATIONS)[number];
  * a PDF and so does not exercise this branch.
  */
 function plainTextType(bytes: Buffer, declared: string): TextDeclaration | null {
-  const label = declared.split(';')[0].trim().toLowerCase();
+  // `?? ''` is unreachable — `split` always yields at least one element — but this project
+  // typechecks with `noUncheckedIndexedAccess`, which does not know that.
+  const label = (declared.split(';')[0] ?? '').trim().toLowerCase();
   // A membership test against two literals, never a copy of the caller's string: whatever this
   // returns is written to the row and later to a response header.
   const match = TEXT_DECLARATIONS.find((candidate) => candidate === label);
