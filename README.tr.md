@@ -54,7 +54,9 @@ Kurultay'ın cevabı bilinçli olarak dar:
   scope'lanmış sorgular sonradan eklenmedi, baştan tasarlandı.
 
 Ve `v0.1.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, public API token'ları ve
-webhook'lar yok, UI yalnız İngilizce. API token'ları, webhook'lar ve ek dil paketleri
+webhook'lar yok. UI hem İngilizce hem Türkçe konuşuyor — her arayüz metni, yeni bir board'un
+başladığı column adları ve size gönderdiğimiz e-posta dahil — ve üçüncü bir dil bir katalog
+uzakta. API token'ları, webhook'lar ve ek dil paketleri
 [MVP ötesi](docs/tr/roadmap.md#mvp-ötesi) altında, her biri kendisini bekleten açık soruyla
 listeli; subtask ve zaman takibi ise o listede hiç yok. Bunlara bugün ihtiyacınız varsa
 yukarıdaki daha olgun projelerden biri daha iyi bir seçim.
@@ -94,6 +96,11 @@ MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadma
 - **Dashboard** — agregasyon görünümleri ve grafikler (created vs completed dahil)
 - **Aktivite log'u ve bildirimler** — uygulama içi atama, mention, due-soon; `/notifications`
 - **Realtime senkronizasyon** — board değişiklikleri Socket.io üzerinden canlı yayılır
+- **İngilizce ve Türkçe** — workspace başına değil, kullanıcı başına bir tercih; böylece tek bir
+  workspace farklı diller okuyan insanları bir arada tutabilir. Giriş yaptığınız her cihaza
+  gelir, oluşturduğunuz board'un başladığı column adlarını belirler ve size gönderilen e-postanın
+  dilini seçer. Bir katalogda olup diğerinde olmayan bir key build'i düşürür
+  ([ADR 0018](docs/tr/decisions/0018-localization-strategy.md))
 
 ## Hızlı başlangıç
 

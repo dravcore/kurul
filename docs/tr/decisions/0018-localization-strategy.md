@@ -112,14 +112,45 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
   `SUPPORTED_LOCALES`'tir; o gerçekten sınırı geçer: web seçiciyi ondan üretir, API `PATCH /me`'yi
   ona karşı doğrular. Tohum listesinin yapısal yarısı (position, `ColumnCategory`) adlardan ayrı
   tutulur, böylece bir çeviri bir kolonu yerinden oynatamaz veya anlamını değiştiremez.
-- Bir dil eklemek `SUPPORTED_LOCALES`'e yapılan bir değişiklik, artı ardından derlenmeyi
-  reddeden iki yerdir: API'nin tohum adları `Record<Locale, …>`'ı ve eksik
-  `messages/<tag>.json`. Veri migration'ı yok, `User.locale` backfill'i yok — sütun nullable
-  kalır ve null "tarayıcıyı izle" demeye devam eder.
+- Bir dil eklemek `SUPPORTED_LOCALES`'e yapılan bir değişiklik, artı ardından kendiliğinden
+  patlayan üç yerdir: API'nin tohum adları `Record<Locale, …>`'ı ve mail metinleri
+  `Record<Locale, …>`'ı derlenmeyi bırakır, `messages/<tag>.json` ise var olup İngilizce ile
+  key key eşleşene kadar katalog parity testini düşürür. Veri migration'ı yok, `User.locale`
+  backfill'i yok — sütun nullable kalır ve null "tarayıcıyı izle" demeye devam eder.
 - `GET /me`, `User.locale`'i session'dan değil veritabanından okur. Better Auth session
   kullanıcısını beş dakika boyunca bir çerezde önbelleğe alır ve web'in zinciri `/me`'ye
   başvurur; session'da taşınan bir locale, kullanıcı dili değiştirdikten sonra arayüzü beş
   dakikaya kadar eski dilde bırakırdı.
+- **§4'ün koşulu karşılandı: Türkçe geldi.** İngilizce arayüz tamamlandığı için
+  `messages/tr.json` onun karşısına yazıldı — 486 key, aynı key kümesi, aynı ICU argümanları.
+  Tohum kolon adları bir `tr` satırı kazandı (`Yapılacak / Devam Ediyor / Bitti`) ve iki
+  transactional e-posta da artık alıcının dilinde yazılıyor. İngilizce kanonik kalır: yeni bir
+  metnin eklendiği dosya hâlâ `en.json`'dır ve Türkçe katalog ona göre ölçülür.
+- **"%100 çevrildi" bir iddia değil, bir kapıdır.** `apps/web/messages/catalog.test.ts`,
+  `en.json`'da olup başka bir katalogda olmayan bir key'de, başka bir katalogda olup
+  İngilizce'de olmayan bir key'de ve ICU argümanları iki dosya arasında farklılaşan bir mesajda
+  build'i düşürür. Sabit bir `['tr']` yerine `SUPPORTED_LOCALES`'i okur; böylece üçüncü dil,
+  ilan edildiği gün kapının arkasına girer. Bunu başka hiçbir şey yakalayamaz: next-intl eksik
+  bir mesajı çalışma zamanında ham key yoluna çözer, dolayısıyla yarım çevrilmiş bir locale
+  derlenir, tip kontrolünden geçer ve kullanıcıya `app.board.column.deleteAction` gösterir.
+- **Giden e-posta, ortada bir request yokken bir dil çözer ve zinciri arayüzünkinden bir halka
+  uzundur.** §2 yalnızca "ve giden e-posta için" dediği için bu, uygulama sırasında karara
+  bağlandı. Zincir şu: `alıcının User.locale'i → gönderenin User.locale'i → tetikleyen
+request'in Accept-Language'i → 'en'` (`apps/api/src/mail/recipient-locale.ts`). Karar olan
+  halka ortadaki: bir davet, bu instance'ta hiç hesabı olmayan bir adrese gidebilir, dolayısıyla
+  okunacak bir tercihi yoktur. Bu kişileri İngilizce'ye düşürmek yerine davet, onu gönderen
+  kişinin dilinde yazılır — bu alışverişte dili bilinen tek insan odur, o adrese yazmayı o
+  seçmiştir ve davet zaten onun adını vererek dilini ele verir. Doğrulama e-postasında ise
+  eyleyen ile alıcı aynı yeni hesaptır, yani zincir kayıt oldukları tarayıcıya iner. Başarısız
+  bir okuma bir sonraki halkaya düşer ve loglanır; kendisini tetikleyen kaydı ya da daveti asla
+  düşürmez.
+- **Mail metinleri, tohum adlarıyla aynı gerekçeyle API'de bir `Record<Locale, …>`'dır.** Arayüz
+  metni değildir — hiçbir şey onu bir izleyicinin dilinde yeniden render etmez — ve
+  `SUPPORTED_LOCALES`'e eklenen bir dil, e-posta metinleri var olana kadar derlenmez; böylece
+  bir locale, arayüzü çevrilmiş ama e-postası İngilizce halde gelemez. Bunu format string'leri
+  değil fonksiyonlar tablosu yapan şey kelime sırasıdır: Türkçe workspace adını fiilden önce,
+  fiili en sona koyar; ortak bir `{inviter} invited you to {workspace}` şablonu dillerden birini
+  diğerinin gramerine zorlardı.
 
 ## Değerlendirilen alternatifler
 

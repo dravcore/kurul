@@ -59,6 +59,11 @@ type SeedColumnKey = (typeof SEED_COLUMNS)[number]['key'];
  */
 const SEED_COLUMN_NAMES: Record<Locale, Record<SeedColumnKey, string>> = {
   en: { todo: 'To Do', inProgress: 'In Progress', done: 'Done' },
+  // `Bitti` is the case ADR 0019 was written around: it never matches `'done'`, and nothing
+  // here tries to — the category on the row above carries the meaning, so a board seeded in
+  // Turkish reports throughput exactly like one seeded in English. Short forms on purpose;
+  // these render as column headers, the tightest slot in the product.
+  tr: { todo: 'Yapılacak', inProgress: 'Devam Ediyor', done: 'Bitti' },
 };
 
 /**

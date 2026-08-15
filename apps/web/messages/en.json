@@ -123,7 +123,8 @@
         "followBrowser": "Match my browser",
         "help": "New boards start with columns named in this language. Columns you already have keep their names.",
         "options": {
-          "en": "English"
+          "en": "English",
+          "tr": "Türkçe"
         },
         "saved": "Language updated",
         "loadError": "Your language setting couldn't load.",
