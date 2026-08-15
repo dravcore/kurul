@@ -1,11 +1,18 @@
 import { MemberRole } from '@kurultay/shared-types';
 import type { MailMessage } from '../mail/mail-sender';
 import { sendMail } from '../mail/send-mail';
+import { readStoredLocale } from '../mail/stored-locale';
 import { evictUserFromWorkspaceSockets } from '../realtime/workspace-socket-eviction';
 import { organizationOptions } from './organization-options';
 
 jest.mock('../mail/send-mail', () => ({
   sendMail: jest.fn<Promise<void>, [unknown]>().mockResolvedValue(undefined),
+}));
+
+// Mocked rather than left to fail through: the real reader opens a Prisma client, and the
+// point of these cases is which address the hook *asks* about, not what a database answers.
+jest.mock('../mail/stored-locale', () => ({
+  readStoredLocale: jest.fn<Promise<string | null>, [string]>().mockResolvedValue(null),
 }));
 
 jest.mock('../realtime/workspace-socket-eviction', () => ({
@@ -16,6 +23,7 @@ jest.mock('../realtime/workspace-socket-eviction', () => ({
 
 const sendMailMock = jest.mocked(sendMail);
 const evictMock = jest.mocked(evictUserFromWorkspaceSockets);
+const storedLocaleMock = jest.mocked(readStoredLocale);
 
 /** The shape Better Auth hands to `sendInvitationEmail`, trimmed to what the hook reads. */
 function invitationEmailData(overrides?: { id?: string; email?: string }) {
@@ -25,8 +33,14 @@ function invitationEmailData(overrides?: { id?: string; email?: string }) {
     email: overrides?.email ?? 'invitee@example.test',
     organization: { name: 'Analytical Engine' },
     invitation: {},
-    inviter: { user: { name: 'Ada Lovelace' } },
+    inviter: { user: { name: 'Ada Lovelace', email: 'inviter@example.test' } },
   };
+}
+
+/** Casts the trimmed fixture to the plugin's own payload type, as the hook receives it. */
+type InvitationArgs = Parameters<typeof organizationOptions.sendInvitationEmail>;
+function asInvitation(data: ReturnType<typeof invitationEmailData>): InvitationArgs[0] {
+  return data as InvitationArgs[0];
 }
 
 describe('organizationOptions', () => {
@@ -35,6 +49,8 @@ describe('organizationOptions', () => {
   beforeEach(() => {
     sendMailMock.mockClear();
     evictMock.mockClear();
+    storedLocaleMock.mockReset();
+    storedLocaleMock.mockResolvedValue(null);
     process.env.WEB_URL = 'https://app.example.test';
   });
 
@@ -65,19 +81,20 @@ describe('organizationOptions', () => {
 
   describe('sendInvitationEmail', () => {
     it('is wired to real delivery, not a no-op', async () => {
-      await organizationOptions.sendInvitationEmail(
-        invitationEmailData() as Parameters<typeof organizationOptions.sendInvitationEmail>[0],
-      );
+      await organizationOptions.sendInvitationEmail(asInvitation(invitationEmailData()), undefined);
 
       expect(sendMailMock).toHaveBeenCalledTimes(1);
     });
 
     it('mails the invited address a link to that invitation on the web app', async () => {
       await organizationOptions.sendInvitationEmail(
-        invitationEmailData({
-          id: '0199f0d2-0000-7000-8000-0000000000ff',
-          email: 'someone@example.test',
-        }) as Parameters<typeof organizationOptions.sendInvitationEmail>[0],
+        asInvitation(
+          invitationEmailData({
+            id: '0199f0d2-0000-7000-8000-0000000000ff',
+            email: 'someone@example.test',
+          }),
+        ),
+        undefined,
       );
 
       const message = sendMailMock.mock.calls[0]?.[0] as MailMessage;
@@ -86,6 +103,62 @@ describe('organizationOptions', () => {
       expect(message.text).toContain(
         'https://app.example.test/invite/0199f0d2-0000-7000-8000-0000000000ff',
       );
+    });
+
+    /**
+     * The locale rule, at the one call site where it is not a formality: an invited address
+     * may belong to nobody yet, so "the recipient's stored preference" is frequently absent
+     * and something has to be decided in its place — see `mail/recipient-locale.ts`.
+     */
+    describe('recipient language', () => {
+      it("writes in the invitee's own language when they already have an account", async () => {
+        storedLocaleMock.mockImplementation((email) =>
+          Promise.resolve(email === 'invitee@example.test' ? 'tr' : 'en'),
+        );
+
+        await organizationOptions.sendInvitationEmail(
+          asInvitation(invitationEmailData()),
+          undefined,
+        );
+
+        const message = sendMailMock.mock.calls[0]?.[0] as MailMessage;
+        expect(message.subject).toContain('davet edildiniz');
+      });
+
+      it("writes in the inviter's language when the address has no account yet", async () => {
+        storedLocaleMock.mockImplementation((email) =>
+          Promise.resolve(email === 'inviter@example.test' ? 'tr' : null),
+        );
+
+        await organizationOptions.sendInvitationEmail(
+          asInvitation(invitationEmailData()),
+          undefined,
+        );
+
+        const message = sendMailMock.mock.calls[0]?.[0] as MailMessage;
+        expect(message.subject).toContain('davet edildiniz');
+      });
+
+      it("falls back to the inviter's Accept-Language when nobody stored a preference", async () => {
+        const request = new Request('https://api.example.test/organization/invite-member', {
+          headers: { 'accept-language': 'tr-TR,tr;q=0.9,en;q=0.8' },
+        });
+
+        await organizationOptions.sendInvitationEmail(asInvitation(invitationEmailData()), request);
+
+        const message = sendMailMock.mock.calls[0]?.[0] as MailMessage;
+        expect(message.subject).toContain('davet edildiniz');
+      });
+
+      it('sends English when nothing at all is known about either party', async () => {
+        await organizationOptions.sendInvitationEmail(
+          asInvitation(invitationEmailData()),
+          undefined,
+        );
+
+        const message = sendMailMock.mock.calls[0]?.[0] as MailMessage;
+        expect(message.subject).toContain('You have been invited');
+      });
     });
   });
 

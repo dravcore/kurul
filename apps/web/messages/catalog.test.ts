@@ -1,7 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@kurultay/shared-types';
 import messages from './en.json';
 
 /**
@@ -189,5 +190,109 @@ describe('en.json', () => {
       .map(([key]) => key);
 
     expect(blank).toEqual([]);
+  });
+});
+
+/**
+ * The gate behind "the Turkish interface is 100% complete".
+ *
+ * Everything above measures `en.json` against the code. Nothing above notices that a second
+ * catalogue is missing a key, and next-intl will not either: an absent message resolves to its
+ * raw key path at runtime, so a half-translated locale renders `app.board.column.deleteAction`
+ * to the user and fails no build. The mirror image is a key `tr.json` has and English does not
+ * — a leftover from a rename, translated work that renders nowhere, and the first thing to
+ * quietly rot.
+ *
+ * Driven off `SUPPORTED_LOCALES` rather than off a hardcoded `['tr']`, so the third language
+ * is gated the day it is declared rather than the day someone remembers this file.
+ */
+const messagesDir = here;
+
+function catalogueFor(locale: string): Record<string, string> {
+  return flatten(JSON.parse(readFileSync(path.join(messagesDir, `${locale}.json`), 'utf8')));
+}
+
+/**
+ * The ICU argument names a message interpolates.
+ *
+ * An identifier is only counted when the next thing after it is `,` or `}` — the two shapes a
+ * real argument takes (`{name}`, `{count, plural, …}`). That is what keeps the free text
+ * inside a plural branch (`=0 {no one}`, `other {# task}`) from being read as an argument,
+ * which a plain `\{(\w+)` would do in every language differently.
+ *
+ * The remaining blind spot is a plural branch whose whole text is a single word — it would
+ * read as an argument. No message in either catalogue has one, and the failure mode is a false
+ * alarm on a new message rather than a missed mismatch, which is the right way round.
+ */
+function icuArguments(message: string): Set<string> {
+  return new Set(Array.from(message.matchAll(/\{\s*([A-Za-z_]\w*)\s*(?=[,}])/g), (m) => m[1]!));
+}
+
+describe.each(SUPPORTED_LOCALES.filter((locale) => locale !== DEFAULT_LOCALE))(
+  '%s.json',
+  (locale) => {
+    it('has a catalogue file at all', () => {
+      expect(existsSync(path.join(messagesDir, `${locale}.json`))).toBe(true);
+    });
+
+    it('translates every key English defines', () => {
+      const missing = Object.keys(catalogue).filter((key) => !(key in catalogueFor(locale)));
+
+      expect(missing).toEqual([]);
+    });
+
+    it('defines no key English does not have', () => {
+      const extra = Object.keys(catalogueFor(locale)).filter((key) => !(key in catalogue));
+
+      expect(extra).toEqual([]);
+    });
+
+    it('interpolates the same arguments English does', () => {
+      const translated = catalogueFor(locale);
+      const mismatched: string[] = [];
+
+      for (const [key, english] of Object.entries(catalogue)) {
+        const other = translated[key];
+        if (other === undefined) continue;
+
+        const expected = [...icuArguments(english)].sort();
+        const actual = [...icuArguments(other)].sort();
+        // A dropped `{name}` is not a typo the reader can work around: the sentence loses the
+        // thing it was about. A renamed one renders as literal braces.
+        if (expected.join(',') !== actual.join(',')) {
+          mismatched.push(`${key}: expected [${expected.join(', ')}], got [${actual.join(', ')}]`);
+        }
+      }
+
+      expect(mismatched).toEqual([]);
+    });
+
+    it('has no empty string as a message', () => {
+      const blank = Object.entries(catalogueFor(locale))
+        .filter(([, value]) => value.trim() === '')
+        .map(([key]) => key);
+
+      expect(blank).toEqual([]);
+    });
+  },
+);
+
+describe('every supported locale', () => {
+  it('is named in the language picker of every catalogue', () => {
+    // `language-settings.tsx` renders one option per supported locale through
+    // `t(\`options.${locale}\`)`. The liveness scan above matches that by prefix, so a locale
+    // added without its option key passes every other test in this file and shows the user a
+    // raw key path where a language name should be.
+    const missing: string[] = [];
+
+    for (const catalogueLocale of SUPPORTED_LOCALES) {
+      const entries = catalogueFor(catalogueLocale);
+      for (const named of SUPPORTED_LOCALES) {
+        const key = `app.settings.language.options.${named}`;
+        if (!(key in entries)) missing.push(`${catalogueLocale}.json is missing ${key}`);
+      }
+    }
+
+    expect(missing).toEqual([]);
   });
 });

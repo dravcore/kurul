@@ -9,6 +9,50 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A Turkish interface.** `SUPPORTED_LOCALES` is now `['en', 'tr']`, and everything keyed to
+  it grew with it: `apps/web/messages/tr.json` carries all 486 keys, a new board created by a
+  Turkish-speaking user seeds `Yapılacak / Devam Ediyor / Bitti`, and the two transactional
+  emails — address verification and workspace invitation — are written in the recipient's
+  language rather than always in English. The resolution chain, the settings picker and the
+  `User.locale` column all shipped earlier with
+  [ADR 0018](docs/decisions/0018-localization-strategy.md); this is the second language they
+  were built for.
+
+  **The seeded columns prove ADR 0019 rather than test it.** `Bitti` matches nothing that
+  looks like `done`, and it does not need to: a column's category is stored when the column is
+  written, so a Turkish board reports throughput exactly like an English one. The seed list's
+  structural half — position and `ColumnCategory` — is asserted to be identical across every
+  locale, so a translation can change a label and nothing else.
+
+  **Email picks a language with no request in flight, and the interesting case is an address
+  with no account.** The chain is the recipient's stored preference, then the *sender's*, then
+  the `Accept-Language` of the request that triggered the send, then English. The middle link
+  is a decision, not a fallback: an invitation to a new address has no preference to read, and
+  the inviter is the only person in the exchange whose language is known — so a Turkish team
+  invites a colleague in Turkish instead of in the server's default. A failed lookup degrades
+  to the next link and is logged; it never fails the signup or the invitation behind it.
+
+  **"100% translated" is enforced, not asserted.** `apps/web/messages/catalog.test.ts` fails
+  the build on a key English has and a translation does not, on a key a translation has and
+  English does not, and on a message whose ICU arguments differ between the two — driven off
+  `SUPPORTED_LOCALES`, so a third language is gated the day it is declared. next-intl resolves
+  a missing message to its raw key path at runtime, which is why nothing else would catch it.
+  A separate test renders real screens against `tr.json`: Turkish takes one plural form where
+  English takes two (`124 task`, never `124 task'lar`) and groups thousands with a dot
+  (`2.000 kart`), and both come out of the running catalogue rather than out of a review.
+
+  **For translators.** The Turkish keeps the domain nouns this project's own Turkish
+  documentation keeps — `board`, `task`, `column`, `label`, `workspace`, `checklist` — and
+  inflects them with an apostrophe (`board'a dön`), while translating everything with a settled
+  Turkish word (`kart`, `yorum`, `davet`, `bildirim`). The four workspace roles are translated
+  too — `Sahip / Yönetici / Üye / Misafir` — in the badge and in all 17 sentences that name a
+  role inline, where they take Turkish case suffixes rather than the apostrophe form
+  (`Bir workspace sahibinden isteyin`). The `OWNER`/`ADMIN`/`MEMBER`/`GUEST` enum values, the
+  `@kurultay/auth-access` identifiers and the API contract are untouched; only what a person
+  reads changed. Adding a third language needs no new mechanism: a catalogue file, one row in
+  `SEED_COLUMN_NAMES` and one in `MAIL_COPY`, both `Record<Locale, …>` and both compile errors
+  until they exist.
+
 - **Task attachments — files and links on a card.** A task now carries attachments of two
   kinds, and the schema says which: a `FILE` has stored bytes, a sniffed media type and a size;
   a `LINK` has only a URL. Both are first-class user features, not one plus an import artifact

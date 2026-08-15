@@ -6,7 +6,9 @@ import { PrismaClient } from '../generated/prisma';
 import { loadRootEnv, envString } from '../common/env';
 import { RESOLVED_CLIENT_IP_HEADER } from '../common/trust-proxy';
 import { buildVerificationEmail } from '../mail/mail-templates';
+import { acceptLanguageOf, resolveRecipientLocale } from '../mail/recipient-locale';
 import { sendMail } from '../mail/send-mail';
+import { readStoredLocale } from '../mail/stored-locale';
 import { createSharedPrismaAdapter, registerPoolConsumer } from '../prisma/database';
 import { authRateLimitOptions } from './auth-rate-limit';
 import { organizationOptions } from './organization-options';
@@ -117,13 +119,23 @@ export const auth = betterAuth({
     // here, which fixes the staleness, and signs the user in when they opened the link in a
     // browser that had no session.
     autoSignInAfterVerification: true,
-    async sendVerificationEmail({ user, url }) {
+    // Recipient and actor are the same person here, and on sign-up that person has had no
+    // opportunity to store a language yet — so in practice this resolves from the
+    // `Accept-Language` of the browser they signed up in, and from `User.locale` only on a
+    // resend after they picked one.
+    async sendVerificationEmail({ user, url }, request) {
+      const locale = await resolveRecipientLocale(readStoredLocale, {
+        to: user.email,
+        acceptLanguage: acceptLanguageOf(request),
+      });
+
       await sendMail(
         buildVerificationEmail({
           to: user.email,
           name: user.name,
           // Better Auth's link would send the user back to the API origin after verifying.
           verificationUrl: resolveVerificationUrl(url),
+          locale,
         }),
       );
     },

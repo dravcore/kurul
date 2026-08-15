@@ -7,8 +7,9 @@
  * same `Accept-Language` header when it seeds a board's columns. Two copies of "which languages
  * exist" is how a value the picker offers becomes a value the API rejects.
  *
- * What is *not* here: the message catalog (`apps/web/messages/en.json`, web-only) and the
- * seed column names (`apps/api/src/common/board-defaults.ts`, API-only). See
+ * What is *not* here: the message catalogs (`apps/web/messages/<tag>.json`, web-only), the
+ * seed column names and the mail copy (`apps/api/src/common/board-defaults.ts` and
+ * `apps/api/src/mail/mail-templates.ts`, API-only). See
  * [ADR 0018](../../../docs/decisions/0018-localization-strategy.md).
  */
 
@@ -16,11 +17,12 @@
  * Every locale with a message catalog, in the order the picker lists them.
  *
  * Adding a language is a change to this list — nothing else in the resolution chain is
- * keyed to a specific tag. The two places that must grow with it fail to compile until they
- * do: `SEED_COLUMN_NAMES` in the API is a `Record<Locale, …>`, and `apps/web/messages/<tag>.json`
- * has to exist for the catalog import to resolve.
+ * keyed to a specific tag. The places that must grow with it fail to compile or fail a test
+ * until they do: `SEED_COLUMN_NAMES` and `MAIL_COPY` in the API are both `Record<Locale, …>`,
+ * and `apps/web/messages/<tag>.json` has to exist for the catalog import to resolve — and to
+ * carry exactly the keys `en.json` carries, which `messages/catalog.test.ts` gates.
  */
-export const SUPPORTED_LOCALES = ['en'] as const;
+export const SUPPORTED_LOCALES = ['en', 'tr'] as const;
 
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 

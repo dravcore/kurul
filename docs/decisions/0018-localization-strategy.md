@@ -113,14 +113,51 @@ There is no `[locale]` path segment and no i18n middleware. Alongside that:
   genuinely crosses the boundary: the web renders the picker from it, the API validates
   `PATCH /me` against it. The structural half of the seed list (position, `ColumnCategory`) is
   held apart from the names so a translation cannot move a column or change what it means.
-- Adding a language is a change to `SUPPORTED_LOCALES` plus the two things that then fail to
-  compile: the API's `Record<Locale, …>` of seed names, and the missing `messages/<tag>.json`.
-  No data migration, and no `User.locale` backfill — the column stays nullable, and null keeps
-  meaning "follow the browser".
+- Adding a language is a change to `SUPPORTED_LOCALES` plus the three things that then fail on
+  their own: the API's `Record<Locale, …>` of seed names and its `Record<Locale, …>` of mail
+  copy both stop compiling, and `messages/<tag>.json` fails the catalogue parity test until it
+  exists and matches English key for key. No data migration, and no `User.locale` backfill —
+  the column stays nullable, and null keeps meaning "follow the browser".
 - `GET /me` reads `User.locale` from the database rather than from the session. Better Auth
   caches the session user in a cookie for five minutes, and `/me` is what the web's chain
   consults, so a session-carried locale would leave the interface in the old language for up to
   five minutes after the user changed it.
+- **§4's condition is met: Turkish ships.** The English interface was complete, so
+  `messages/tr.json` was written against it — 486 keys, the same key set, the same ICU
+  arguments. Seed column names gained a `tr` row (`Yapılacak / Devam Ediyor / Bitti`) and both
+  transactional emails are now written in the recipient's language. English stays canonical:
+  `en.json` is still the file a new string is added to, and the one the Turkish catalogue is
+  measured against.
+- **Role names are translated in the interface (`Sahip / Yönetici / Üye / Misafir`) and left in
+  English in `docs/tr/**` (`owner'ından`, `admin'e`) — a deliberate split, not drift.** The docs
+  are talking about the `OWNER`/`ADMIN` enum values and the `@kurultay/auth-access` role
+  identifiers, which are never translated; the badge is a word a person reads.
+- **"100% translated" is a gate, not a claim.** `apps/web/messages/catalog.test.ts` fails the
+  build on a key `en.json` has and another catalogue does not, on a key another catalogue has
+  and English does not, and on a message whose ICU arguments differ between the two. It reads
+  `SUPPORTED_LOCALES` rather than a hardcoded `['tr']`, so a third language is gated the day it
+  is declared. Nothing else could catch this: next-intl resolves a missing message to its raw
+  key path at runtime, so a half-translated locale compiles, passes type-checking and shows the
+  user `app.board.column.deleteAction`.
+- **Outbound mail resolves a language with no request in flight, and the chain has one more
+  link than the interface's.** Settled during implementation, because §2 says only "and for
+  outbound email". It is `recipient's User.locale → sender's User.locale → Accept-Language of
+the triggering request → 'en'` (`apps/api/src/mail/recipient-locale.ts`). The middle link is
+  the decision: an invitation may be addressed to someone who has no account on this instance
+  at all, so there is no preference of theirs to read. Rather than defaulting those people to
+  English, the invitation is written in the language of the person who sent it — the only human
+  in the exchange whose language is known, who chose to write to that address, and whose
+  language the invitation already discloses by naming them. For a verification email, actor and
+  recipient are the same brand-new account, so the chain collapses to the browser they signed
+  up in. A failed lookup degrades to the next link and is logged; it never fails the signup or
+  the invitation that triggered it.
+- **The mail copy is a `Record<Locale, …>` in the API, for the same reason the seed names are.**
+  It is not interface text — nothing re-renders it in a viewer's language — and a language
+  added to `SUPPORTED_LOCALES` fails to compile until its email copy exists, so a locale cannot
+  ship with a translated interface and English email. Word order is what makes it a table of
+  functions rather than of format strings: Turkish puts the workspace name before the verb and
+  the verb last, and a shared `{inviter} invited you to {workspace}` template would force one
+  language into the other's grammar.
 
 ## Alternatives considered
 

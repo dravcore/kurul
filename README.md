@@ -51,10 +51,12 @@ Kurultay's answer is deliberately narrow:
   were designed in, not added on top.
 
 And what it is not, at `v0.1.0`: no subtasks, no time tracking, no public API tokens or
-webhooks, and an English-only UI. API tokens, webhooks and further language packs are listed
-under [Beyond MVP](docs/roadmap.md#beyond-mvp), each with the open question holding it up;
-subtasks and time tracking are not on that list at all. If you need them today, one of the more
-mature projects above is the better choice.
+webhooks. The UI speaks English and Turkish — every interface string, the columns a new board
+is seeded with, and the email we send you — and a third language is a catalog away. API tokens,
+webhooks and further language packs are listed under
+[Beyond MVP](docs/roadmap.md#beyond-mvp), each with the open question holding it up; subtasks
+and time tracking are not on that list at all. If you need them today, one of the more mature
+projects above is the better choice.
 
 ## Features
 
@@ -90,6 +92,11 @@ Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
 - **Dashboard** — aggregation views and charts (including created vs completed)
 - **Activity log and notifications** — in-app assignment, mention, due-soon; `/notifications`
 - **Realtime sync** — board changes propagate live via Socket.io
+- **English and Turkish** — a per-user preference, not a per-workspace one, so one workspace
+  can hold people who read different languages. It follows you to every device you sign in on,
+  names the columns a board you create starts with, and picks the language of the email we
+  send you. A build fails on a key one catalog has and the other does not
+  ([ADR 0018](docs/decisions/0018-localization-strategy.md))
 
 ## Quick start
 
