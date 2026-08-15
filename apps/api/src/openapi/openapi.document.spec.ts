@@ -34,22 +34,31 @@ class StubHealthController {
   }
 }
 
+/**
+ * Every handler below returns a constant and none of them reads the parameter it declares.
+ *
+ * The declarations are the whole point — they are what `SwaggerModule` scans to produce the
+ * parameter list this file makes assertions about — but echoing one back into the response is
+ * reflected XSS, which CodeQL flagged on the first version of this file and was right to. A stub
+ * that reflects user input is a bad pattern to leave lying around as an example even where
+ * nothing serves it, and none of these applications is ever `init()`ed, let alone listening.
+ */
 @Controller('workspaces/:workspaceId')
 class StubWorkspaceController {
   @Get('tasks/:taskId')
-  get(@Param('workspaceId') workspaceId: string, @Param('taskId') taskId: string): string {
-    return `${workspaceId}/${taskId}`;
+  get(@Param('workspaceId') _workspaceId: string, @Param('taskId') _taskId: string): string {
+    return 'ok';
   }
 
   @Post('tasks')
-  create(@Param('workspaceId') workspaceId: string): string {
-    return workspaceId;
+  create(@Param('workspaceId') _workspaceId: string): string {
+    return 'ok';
   }
 
   /** Carries a query parameter, which the UUID pass must leave alone. */
   @Get('tasks')
-  list(@Param('workspaceId') workspaceId: string, @Query('cursor') cursor: string): string {
-    return `${workspaceId}?${cursor}`;
+  list(@Param('workspaceId') _workspaceId: string, @Query('cursor') _cursor: string): string {
+    return 'ok';
   }
 }
 
@@ -57,8 +66,8 @@ class StubWorkspaceController {
 @Controller('workspaces/:workspaceId')
 class StubSlugController {
   @Get('boards/by-slug/:slug')
-  bySlug(@Param('slug') slug: string): string {
-    return slug;
+  bySlug(@Param('slug') _slug: string): string {
+    return 'ok';
   }
 }
 
