@@ -1,5 +1,14 @@
-import { Controller, Get, INestApplication } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  INestApplication,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor, MulterModule } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
+import { memoryStorage } from 'multer';
 import request from 'supertest';
 import { App } from 'supertest/types';
 
@@ -36,6 +45,36 @@ import { UUID_V7_REGEX } from './uuid';
 class ProbeController {
   @Get()
   read(): { ok: true } {
+    return { ok: true };
+  }
+}
+
+/**
+ * The size ceiling the multipart probe below is configured with.
+ *
+ * Deliberately tiny. The property under test is an *ordering* one, and a 25 MiB body would make
+ * the suite slow for no extra evidence — what matters is that a body over the configured limit
+ * exists, not how large the limit is.
+ */
+const PROBE_MAX_BYTES = 1024;
+
+/** Records whether the multipart handler ran at all, so "rejected earlier" is observable. */
+const uploadHandler = jest.fn();
+
+@Controller('probe')
+class UploadProbeController {
+  /**
+   * Stands in for `POST .../attachments`: a multipart route behind a size-limited multer.
+   *
+   * A stand-in rather than the real controller because the property is `configureApp`'s
+   * middleware order, which is the same for every route the Nest router owns. Using a probe
+   * keeps this suite free of the database, the session and the storage backend, none of which
+   * participate in the ordering being pinned.
+   */
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  upload(@UploadedFile() file?: { size: number }): { ok: true } {
+    uploadHandler(file);
     return { ok: true };
   }
 }
@@ -209,5 +248,98 @@ describe('configureApp security headers', () => {
       expect(line).not.toContain('salary');
       expect(accessLog().path).toBe('/probe');
     });
+  });
+});
+
+/**
+ * The origin check runs before the body is read — stated as behaviour, not as a middleware index.
+ *
+ * `multipart/form-data` is a CORS **simple request**: a cross-site `<form>` can POST one with no
+ * preflight, so no CORS decision is ever made and the write would land before the browser
+ * discarded a response the attacker never needed. The only layer that stops it is
+ * `origin-check.ts`, and the only reason it stops it *before* megabytes have been buffered is
+ * that `configureApp` runs between `create` and `listen`. Nothing declared that until this
+ * block: it was a correct default nobody had written down.
+ *
+ * Express's internals are deliberately untouched. Express 5 removed `app._router`, and a test
+ * that walks the layer array pins a name rather than a consequence. The consequence here is the
+ * *absence* of `413`.
+ */
+describe('configureApp middleware order', () => {
+  let app: INestApplication<App>;
+  let stdout: jest.SpyInstance;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        MulterModule.register({
+          storage: memoryStorage(),
+          limits: { fileSize: PROBE_MAX_BYTES, files: 1, fields: 8 },
+        }),
+      ],
+      controllers: [UploadProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    uploadHandler.mockClear();
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  // The control. Without it the assertion below would pass on a build where multer has no limit
+  // at all — "never answers 413" is only evidence if a 413 is reachable in the first place.
+  it('answers 413 for an oversized upload that the origin check lets through', async () => {
+    await request(app.getHttpServer())
+      .post('/probe/upload')
+      .attach('file', Buffer.alloc(PROBE_MAX_BYTES * 4), 'big.png')
+      .expect(413);
+  });
+
+  it('rejects a cross-origin multipart POST with the origin check, not a body error', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/upload')
+      .set('Origin', 'https://evil.example')
+      .field('kind', 'FILE')
+      .attach('file', Buffer.alloc(64), 'small.png')
+      .expect(403);
+
+    // The hand-written envelope from `origin-check.ts`, not `AllExceptionsFilter`'s — which is
+    // itself evidence about *which* layer answered.
+    expect(response.body.message).toBe('Cross-origin state-changing request rejected');
+    expect(uploadHandler).not.toHaveBeenCalled();
+  });
+
+  it('never answers 413 for an oversized cross-origin upload', async () => {
+    // Multer turns an over-limit body into `LIMIT_FILE_SIZE` → 413. If the body were read before
+    // the origin was judged, this request would be a 413. What the ordering guarantees is
+    // therefore the *absence* of 413 — and that is what this asserts, rather than the presence
+    // of 403: the server answers and closes while supertest is still writing, so the client can
+    // legitimately observe a connection reset instead of ever reading the 403 body. Requiring
+    // 403 here would make the test flaky for a reason unrelated to the property.
+    const result = await request(app.getHttpServer())
+      .post('/probe/upload')
+      .set('Origin', 'https://evil.example')
+      .field('kind', 'FILE')
+      .attach('file', Buffer.alloc(PROBE_MAX_BYTES * 4), 'big.png')
+      .then((response) => ({ status: response.status as number | null }))
+      .catch(() => ({ status: null }));
+
+    // 403, or the connection closed under us. Never 413, and never a created attachment.
+    expect(result.status).not.toBe(413);
+    expect(result.status).not.toBe(201);
+    expect(result.status).not.toBe(200);
+    expect(uploadHandler).not.toHaveBeenCalled();
   });
 });
