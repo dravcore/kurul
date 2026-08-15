@@ -258,32 +258,57 @@ web app is built against it. Three rules, in this order, all on one hostname:
 | Path       | Goes to  | Prefix              | Max request body              |
 | ---------- | -------- | ------------------- | ----------------------------- |
 | `/auth/*`  | api:4000 | kept as-is          | proxy default is fine         |
-| `/api/*`   | api:4000 | `/api` **stripped** | **25 MiB** (`26214400` bytes) |
+| `/api/*`   | api:4000 | `/api` **stripped** | **26 MiB** (`27262976` bytes) |
 | everything | web:3000 | kept as-is          | proxy default is fine         |
 
 `/api/*` must also pass WebSocket upgrades through — that is the realtime board feed.
 
-The body size on `/api/*` is part of the contract, not a tuning knob. It is the same number as
-the API's `ATTACHMENT_MAX_BYTES` (`.env.example`), and the two are **not independently
-tunable**: raise the API's without raising the proxy's and every upload over the proxy's limit
-fails with a `413` the API never sees and never logs; raise the proxy's without raising the
-API's and the proxy logs a successful request the API then rejects. Caddy imposes no body limit
-of its own, which is why the bundled `docker/Caddyfile` has to set one explicitly — and nginx
-defaults `client_max_body_size` to **1 MB**, so a replacement proxy that omits the row rejects
-every attachment larger than a megabyte.
+#### Why the proxy's number is 26 MiB and the API's is 25
+
+**This is not a typo and the two must not be made equal.** The largest _attachment_ this
+instance accepts is `ATTACHMENT_MAX_BYTES`, 25 MiB — that is the number to quote to users and
+the only one to change when you want a different limit. The proxy's 26 MiB is a ceiling above
+it, not a second copy of it.
+
+They differ because they count different things. `client_max_body_size` (and Caddy's
+`request_body max_size`) counts the **whole request body**; `ATTACHMENT_MAX_BYTES` counts the
+**file** inside it. An upload wraps the file in a multipart envelope — a boundary line and a
+`Content-Disposition` header per part, plus the closing boundary — which adds to the body on top
+of the file's own bytes. Measured against the real request this API receives, that envelope is
+309 bytes for a short filename and 563 bytes for a 255-character one.
+
+So a proxy set to exactly 25 MiB rejects a 25 MiB attachment: the file is within the documented
+limit, the body is not. The user gets a `413` on a file the documentation says is allowed, and
+the number they are pointed at is the one that is not the problem.
+
+The rule the two layers actually follow is an ordering, not an equality:
+
+> **The proxy must never reject something the API would accept.** The proxy's job is to cut
+> absurd bodies before anything buffers them. The exact file limit belongs to the API — the only
+> layer that can answer with _which_ file was too big.
+
+So: raise `ATTACHMENT_MAX_BYTES` and you must raise the proxy's number to stay above it (1 MiB
+of headroom is what the bundled config ships and is ~1860x the largest envelope measured).
+Lower the proxy's below the API's and every upload near the limit fails with a `413` the API
+never sees and never logs. Caddy imposes no body limit of its own, which is why the bundled
+`docker/Caddyfile` has to set one explicitly — and nginx defaults `client_max_body_size` to
+**1 MB**, so a replacement proxy that omits the row rejects every attachment larger than a
+megabyte.
 
 ### Telling the two 413s apart
 
 Both layers answer an oversized upload with `413`, and **the response body is what says which
 one did it**:
 
-| What you get back                                  | Who rejected it | What it means                                                            |
-| -------------------------------------------------- | --------------- | ------------------------------------------------------------------------ |
-| `413` with an **empty** body (`Content-Length: 0`) | the proxy       | working as designed — the request never reached the API                  |
-| `413` with a **JSON** body carrying `statusCode`   | the API         | your proxy's limit is higher than `ATTACHMENT_MAX_BYTES`, or it has none |
+| What you get back                                  | Who rejected it | What it means                                                  |
+| -------------------------------------------------- | --------------- | -------------------------------------------------------------- |
+| `413` with a **JSON** body carrying `statusCode`   | the API         | working as designed — the file is over `ATTACHMENT_MAX_BYTES`  |
+| `413` with an **empty** body (`Content-Length: 0`) | the proxy       | the body was over the proxy's ceiling, which is the coarse cut |
 
-The second row is the misconfiguration: the proxy carried a body the API then refused, which is
-the wasted-upload half of the two-layer rule. The first row is the correct behaviour.
+The first row is the normal answer for an oversized attachment, and the one a user can act on:
+it names the limit. The second is the proxy refusing a body before the API ever saw it — correct
+for something absurd, but if a user hits it on a file **under** `ATTACHMENT_MAX_BYTES` then your
+proxy's ceiling is too low (see "Why the proxy's number is 26 MiB and the API's is 25" above).
 
 The headers do not help — Caddy's `413` carries no `Server` header, so only the body
 distinguishes them. Everything the API itself rejects comes back as
@@ -296,9 +321,13 @@ deployment's log volume for one size check — so a body rejected by the proxy a
 `docker compose logs proxy` **not at all**. An empty `413` with nothing in the proxy log is the
 expected result, not evidence that the limit is broken.
 
-Measured on the shipped `docker/Caddyfile` against `caddy:2-alpine`: exactly `26214400` bytes →
-`200`, one byte more → `413`, with `curl` exiting `0` on a well-formed status line — the
-connection is closed properly rather than cut mid-upload.
+Measured on `docker/Caddyfile` against `caddy:2-alpine`, with the limit it carried at the time
+(`25MiB`): exactly `26214400` bytes of body → `200`, one byte more → `413`, with `curl` exiting
+`0` on a well-formed status line — the connection is closed properly rather than cut mid-upload.
+That is what established the threshold is `> max_size` rather than `>=`, and it is also what
+showed the limit had to move: a 26214400-byte _file_ produces a body a few hundred bytes larger
+than that, so the shipped config now sets `26MiB` and the same measurement's boundary moves with
+it.
 
 If you reproduce this yourself, **aim it at a real upload endpoint**. Pointing it at an
 arbitrary path measures nothing: the API answers `404` as soon as it has the headers, without
@@ -314,7 +343,9 @@ mounted at its own root and gets the prefix removed on the way in. In nginx:
 location /auth/ { proxy_pass http://api:4000;  }   # no trailing slash → path preserved
 location /api/  {
   proxy_pass http://api:4000/;                     # trailing slash    → /api stripped
-  client_max_body_size 25m;                        # = ATTACHMENT_MAX_BYTES (26214400)
+  client_max_body_size 26m;                        # ABOVE ATTACHMENT_MAX_BYTES (25 MiB), not
+                                                   # equal to it — the multipart envelope rides
+                                                   # on top of the file. See the section above.
 }
 location /      { proxy_pass http://web:3000;  }
 ```

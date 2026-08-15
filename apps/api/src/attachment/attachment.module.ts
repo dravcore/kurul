@@ -49,7 +49,31 @@ import { AttachmentService } from './attachment.service';
         // `Buffer.concat` then producing a second copy of the whole file. Anyone raising
         // ATTACHMENT_MAX_BYTES should budget against the measured factor.
         storage: memoryStorage(),
-        limits: { fileSize: storage.maxBytes, files: 1, fields: 8 },
+        // ## `utf8`, because multer's default corrupts every non-ASCII filename
+        //
+        // `multer@2.2.0/index.js:22` is `this.defParamCharset = options.defParamCharset ||
+        // 'latin1'`, while a browser writes the multipart `filename` parameter as UTF-8 bytes
+        // (RFC 7578 §5.1). Under the default those bytes are decoded one-per-character, so
+        // `ölçüm raporu.png` is stored, listed and served back as `Ã¶lÃ§Ã¼m raporu.png` —
+        // measured through the real upload path, not reasoned about. Nothing about that is a
+        // deployment's choice: it is a library default nobody in this repo ever set, and it is
+        // wrong for every client this API has (phase plan §5 — "an unconfigured default is a
+        // decision too, just one nobody made").
+        defParamCharset: 'utf8',
+        // ## `maxBytes + 1`, because busboy's limit fires on equality
+        //
+        // Not an off-by-one and not slack: `busboy/lib/types/multipart.js:476` is
+        // `if (fileSize === fileSizeLimit) … emit('limit')`, so a file of exactly
+        // `limits.fileSize` bytes is rejected. Passing `maxBytes` therefore makes the largest
+        // accepted file `maxBytes - 1`, one byte tighter than the number K2 publishes.
+        //
+        // That single byte is the failure ADR 0022:170-176 added the proxy line to prevent. The
+        // proxy half rejects a body that *exceeds* 26214400 and passes one that equals it
+        // (measured in #215), so an upload of exactly ATTACHMENT_MAX_BYTES would clear Caddy and
+        // die at Nest — an untraceable 413 produced by library semantics rather than by anything
+        // an operator configured. `+ 1` is the translation of busboy's threshold into the
+        // inclusive ceiling the two layers both publish; deleting it re-opens the gap.
+        limits: { fileSize: storage.maxBytes + 1, files: 1, fields: 8 },
       }),
     }),
   ],

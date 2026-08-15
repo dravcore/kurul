@@ -78,16 +78,35 @@
 	# this file in place the board's realtime feed connects on the `websocket` transport
 	# (HTTP 101 on `/api/socket.io/?…&transport=websocket`), not the polling fallback.
 	handle_path /api/* {
-		# The proxy half of the two-layer size limit, and the same number as the API's
-		# ATTACHMENT_MAX_BYTES. The two are not independently tunable: a deployment that raises
-		# one without the other is misconfigured, and the failure it produces is a 413 the
-		# operator cannot trace — logged as a successful proxied request in one direction and
-		# logged nowhere at all in the other (ADR 0022, ADR 0024). Caddy sets no body limit of
-		# its own, which is why this line has to exist at all, and why the published contract in
-		# docs/self-hosting.md now carries an nginx `client_max_body_size` row beside it (nginx
-		# defaults to 1 MB, so an operator who replaced this proxy gets the broken install).
+		# The proxy half of the two-layer size limit, and deliberately ONE MEBIBYTE HIGHER than
+		# the API's ATTACHMENT_MAX_BYTES (25 MiB). Do not "fix" the two into agreeing.
+		#
+		# The two layers do not measure the same thing. `max_size` counts the whole request body;
+		# ATTACHMENT_MAX_BYTES counts the file part. An upload wraps the file in a multipart
+		# envelope — a boundary line and a `Content-Disposition` header per part, plus the closing
+		# boundary — which rides on top of the file's own bytes. Measured on the real request this
+		# API receives (one `kind` field, one file part, a 26214400-byte file): 309 bytes of
+		# envelope for a 5-character filename, 318 for a typical one, 563 for a 255-character one.
+		#
+		# So setting both layers to 25 MiB makes a file of exactly the published limit
+		# unuploadable: the file clears the API's check and the envelope pushes the body past the
+		# proxy's. The user sees a 413 on a file the documentation says is allowed, and the number
+		# they are told to look at is the one that is not the problem — the untraceable 413 of
+		# ADR 0022:170-176 in its quietest form.
+		#
+		# The invariant is therefore not equality but ordering: **the proxy must never reject
+		# something the API would accept.** Its job is to cut absurd bodies before anything
+		# buffers them; the exact file limit belongs to the API, which is the layer that can tell
+		# a user which file was too big. 1 MiB of headroom is ~1860x the worst envelope measured
+		# above and still ~4% of the limit. `two-layer-limit.spec.ts` fails the build if this drops
+		# to or below ATTACHMENT_MAX_BYTES.
+		#
+		# Caddy sets no body limit of its own, which is why this line has to exist at all, and why
+		# the published contract in docs/self-hosting.md carries an nginx `client_max_body_size`
+		# row beside it (nginx defaults to 1 MB, so an operator who replaced this proxy gets the
+		# broken install).
 		request_body {
-			max_size 25MiB
+			max_size 26MiB
 		}
 		reverse_proxy api:4000
 	}
