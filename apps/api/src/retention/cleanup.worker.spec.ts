@@ -7,6 +7,7 @@ import {
   CLEANUP_BATCH_SIZE,
   CleanupWorker,
   MAX_BATCHES_PER_TABLE,
+  MIN_ORPHAN_GRACE_MS,
   cutoffFor,
   orphanGraceMs,
   retentionSettings,
@@ -481,10 +482,10 @@ describe('CleanupWorker', () => {
     });
 
     it('multiplies the two backup variables the compose file passes in', () => {
-      process.env.BACKUP_INTERVAL = '3600';
+      process.env.BACKUP_INTERVAL = '86400';
       process.env.BACKUP_KEEP = '3';
 
-      expect(orphanGraceMs()).toBe(3 * 3600 * 1000);
+      expect(orphanGraceMs()).toBe(3 * DAY_MS);
     });
 
     it('treats BACKUP_KEEP=0 as one archive rather than as no grace at all', () => {
@@ -495,6 +496,36 @@ describe('CleanupWorker', () => {
       process.env.BACKUP_INTERVAL = '86400';
 
       expect(orphanGraceMs()).toBe(DAY_MS);
+    });
+
+    /**
+     * The floor exists because the grace period does two jobs and only one of them is about
+     * backups. See {@link orphanGraceMs} — the in-flight upload race is there whether or not
+     * this deployment takes a dump at all, so the window can never bottom out at zero.
+     */
+    it('never returns less than a day, however the backup pair is configured', () => {
+      process.env.BACKUP_INTERVAL = '3600';
+      process.env.BACKUP_KEEP = '3';
+
+      // Three hours by multiplication; a day by floor.
+      expect(orphanGraceMs()).toBe(MIN_ORPHAN_GRACE_MS);
+      expect(MIN_ORPHAN_GRACE_MS).toBe(DAY_MS);
+    });
+
+    it('refuses to collapse the window when BACKUP_INTERVAL is 0', () => {
+      // The data-loss path this floor closes: a zero-length window hands the sweep every file
+      // whose row has not committed yet — bytes written, row still in flight, gone.
+      process.env.BACKUP_INTERVAL = '0';
+      process.env.BACKUP_KEEP = '7';
+
+      expect(orphanGraceMs()).toBe(MIN_ORPHAN_GRACE_MS);
+    });
+
+    it('still honours a window longer than the floor', () => {
+      process.env.BACKUP_INTERVAL = '86400';
+      process.env.BACKUP_KEEP = '7';
+
+      expect(orphanGraceMs()).toBe(7 * DAY_MS);
     });
   });
 

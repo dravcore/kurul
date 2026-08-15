@@ -770,7 +770,10 @@ enough to disown it is still restorable, and that grace period is exactly
 `BACKUP_KEEP × BACKUP_INTERVAL`. "On disk with no row pointing at it" is a correct predicate
 only while the database is authoritative, and a restore rewinds the rows while the disk stays
 where it is — so shortening either variable shortens the window in which a restore is safe from
-that sweep. See [ADR 0022](decisions/0022-attachment-storage.md).
+that sweep. **Never below 24 hours**, though: the API clamps the window to a day whatever these
+two say, because the grace period also covers an upload whose bytes are on disk while its row is
+still being written, and that has nothing to do with backups — it is there on an instance that
+has never taken a dump. See [ADR 0022](decisions/0022-attachment-storage.md).
 
 Check on it — an untested backup is not a backup, and neither is an unread log:
 

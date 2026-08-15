@@ -778,7 +778,10 @@ eski bir dump hâlâ restore edilebilirken o dosyayı silmeyi reddeder ve bu gra
 olarak `BACKUP_KEEP × BACKUP_INTERVAL`'dır. "Diskte var, veritabanında yok" ancak veritabanı
 otorite olduğu sürece doğru bir yargıdır; bir restore satırları geri sarar, disk olduğu yerde
 kalır. Yani iki değişkenden birini kısaltmak, bir restore'un o süpürmeden güvende olduğu
-pencereyi de kısaltır. Bkz. [ADR 0022](decisions/0022-attachment-storage.md).
+pencereyi de kısaltır. **Ama asla 24 saatin altına inmez**: bu ikisi ne derse desin API pencereyi
+bir güne sabitler, çünkü grace period aynı zamanda byte'ları diske yazılmış ama satırı henüz
+yazılmakta olan bir yüklemeyi de korur — ve bunun yedeklemeyle ilgisi yoktur, hiç dump almamış
+bir kurulumda da vardır. Bkz. [ADR 0022](decisions/0022-attachment-storage.md).
 
 Kontrol edin — test edilmemiş bir yedek yedek değildir, okunmamış bir log da öyle:
 

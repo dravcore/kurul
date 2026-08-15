@@ -72,6 +72,14 @@ export const DEFAULT_ACTIVITY_RETENTION_DAYS = 365;
 export const DEFAULT_BACKUP_INTERVAL_SECONDS = 86_400;
 export const DEFAULT_BACKUP_KEEP = 7;
 
+/**
+ * The shortest orphan grace period this job will use, whatever the backup pair says.
+ *
+ * A day, and deliberately not derived from `BACKUP_*` — see {@link orphanGraceMs} for why the
+ * floor has to be independent of the backup schedule to mean anything.
+ */
+export const MIN_ORPHAN_GRACE_MS = MS_PER_DAY;
+
 /** Rows deleted in one run, per table. */
 export interface CleanupCounts {
   sessions: number;
@@ -94,29 +102,37 @@ export interface CleanupCounts {
 /**
  * How old a file has to be before "no row points at it" is allowed to mean "delete it".
  *
- * "On disk and not in the database" is a correct predicate only while the database is
- * authoritative. After a restore it is not: `DROP DATABASE` and `pg_restore` rewind the rows
- * while the disk stays where it was, so every file uploaded after the dump exists with no row
- * to match — and a sweep that night would delete them permanently. The restore and the sweep
- * are each safe alone and destructive together (ADR 0022).
+ * The window does **two** jobs, and only the first one is about backups:
  *
- * Tying the window to `BACKUP_KEEP × BACKUP_INTERVAL` means no file can be swept while a dump
- * old enough to disown it is still restorable. The constant is borrowed rather than invented,
- * which is the point: that rotation is a rehearsed behaviour, not a documented intention. The
- * same window also covers the smaller race with an in-flight upload whose row has not committed.
+ * 1. **The restore window.** "On disk and not in the database" is a correct predicate only
+ *    while the database is authoritative. After a restore it is not: `DROP DATABASE` and
+ *    `pg_restore` rewind the rows while the disk stays where it was, so every file uploaded
+ *    after the dump exists with no row to match — and a sweep that night would delete them
+ *    permanently. The restore and the sweep are each safe alone and destructive together
+ *    (ADR 0022). Tying this to `BACKUP_KEEP × BACKUP_INTERVAL` means no file can be swept while
+ *    a dump old enough to disown it is still restorable. The constant is borrowed rather than
+ *    invented, which is the point: that rotation is a rehearsed behaviour, not a documented
+ *    intention.
+ * 2. **The in-flight upload race.** Bytes are written before the row is (`D6`: the cheap
+ *    direction of being wrong), so between the write and the commit there is always a file no
+ *    row claims. This job has nothing to do with backups: it is there on an instance that has
+ *    never taken a dump and it does not go away if the sidecar is switched off.
  *
- * `BACKUP_KEEP` is floored at 1 rather than trusted: `backup.sh`'s prune reads `0` as "keep
- * nothing", and a zero-length grace period would let the sweep delete a file the instant its
- * row is missing — including in the middle of a restore. `BACKUP_INTERVAL` is only floored at
- * `0`, so `BACKUP_INTERVAL=0` (a value that means nothing to the sidecar either, which would
- * then dump in a tight loop) still collapses the window. That is a known sharp edge rather than
- * a defended one: the pair is documented as one setting, and a value that breaks the backup
- * schedule breaks the grace period with it.
+ * Which is why {@link MIN_ORPHAN_GRACE_MS} is a floor and not a default. Both variables come
+ * from a file an operator edits, and the product of the two can be made arbitrarily small —
+ * `BACKUP_KEEP=0` (which `backup.sh`'s prune reads as "keep nothing") or `BACKUP_INTERVAL=0`
+ * each collapse it to zero, which would hand the sweep every upload whose row has not committed
+ * yet. A backup setting must not be able to reach through and disable the second job, so the
+ * result is clamped by a window that owes the backup schedule nothing.
+ *
+ * The floor is only ever a floor: a longer configured window is used as configured, which is
+ * what keeps the default (seven days) meaningful.
  */
 export function orphanGraceMs(): number {
   const interval = envInt('BACKUP_INTERVAL', DEFAULT_BACKUP_INTERVAL_SECONDS);
   const keep = envInt('BACKUP_KEEP', DEFAULT_BACKUP_KEEP);
-  return Math.max(interval, 0) * Math.max(keep, 1) * 1000;
+  const configured = Math.max(interval, 0) * Math.max(keep, 1) * 1000;
+  return Math.max(configured, MIN_ORPHAN_GRACE_MS);
 }
 
 export interface RetentionSettings {

@@ -352,9 +352,11 @@ services:
       # nowhere at all in the other (ADR 0022, ADR 0024).
       ATTACHMENT_MAX_BYTES: ${ATTACHMENT_MAX_BYTES:-26214400}
       # Read by the orphan sweep, which refuses to delete a file while a dump old enough to
-      # disown it is still restorable — its grace period is BACKUP_KEEP × BACKUP_INTERVAL. The
-      # same two values the `backup` service below reads: one setting, not two that can
-      # silently disagree, which is why they are passed here rather than defaulted in code.
+      # disown it is still restorable — its grace period is BACKUP_KEEP × BACKUP_INTERVAL, with
+      # a 24h floor the API applies whatever these say (the window also covers an upload whose
+      # row has not committed, which is not a backup concern). The same two values the `backup`
+      # service below reads: one setting, not two that can silently disagree, which is why they
+      # are passed here rather than defaulted in code.
       BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
     # The first `volumes:` this service has ever had, and with it the first deployment
