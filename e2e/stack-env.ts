@@ -15,7 +15,14 @@
  */
 
 import './load-env.mjs';
-import { API_PORT, API_URL, e2eDatabaseUrl, WEB_PORT, WEB_URL } from './stack-shared.mjs';
+import {
+  API_PORT,
+  API_URL,
+  E2E_STORAGE_PATH,
+  e2eDatabaseUrl,
+  WEB_PORT,
+  WEB_URL,
+} from './stack-shared.mjs';
 
 export { API_URL, WEB_URL };
 
@@ -95,6 +102,15 @@ export function apiEnv(): Record<string, string> {
     BETTER_AUTH_SECRET: 'kurultay-playwright-e2e-secret-not-a-real-secret',
     RATE_LIMIT_ENABLED: 'false',
     CLEANUP_ENABLED: 'false',
+    // Attachments on. Stated here rather than inherited for the same reason as everything else
+    // in this object: `webServer` spawns with `{ ...process.env, ...env }`, so a developer whose
+    // `.env` happens to carry a `STORAGE_PATH` would otherwise have the suite writing into their
+    // real attachment store — and one whose `.env` does not would get a scenario that fails on a
+    // missing file input rather than on anything about the product. See `E2E_STORAGE_PATH`.
+    //
+    // `ATTACHMENT_MAX_BYTES` is deliberately *not* pinned: the browser scenario never approaches
+    // it, and the upload measurement is only honest if it runs against the shipped default.
+    STORAGE_PATH: E2E_STORAGE_PATH,
     // See the long note above: an index would now separate the queues (#190 is fixed) but not
     // the Socket.io channel, and switching this suite onto a Redis is its own change. Blanking
     // it is still what makes the isolation real.

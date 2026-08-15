@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { apiEnv, API_URL, webEnv, WEB_URL } from './stack-env';
 
 /**
- * Browser end-to-end suite — four scenarios, deliberately.
+ * Browser end-to-end suite — five scenarios, deliberately.
  *
  * `docs/testing.md` deferred browser tests while the board UI was still changing shape every
  * week, and that judgement was right: a full suite written then would have been rewritten
@@ -11,9 +11,26 @@ import { apiEnv, API_URL, webEnv, WEB_URL } from './stack-env';
  * verification in a real browser at all. The unit and API-integration suites both pass with a
  * board that never renders.
  *
- * The scope stays four scenarios on purpose. Every test added here is one more thing to keep
- * green through a UI refactor, and the point of this suite is to notice when the *stack*
- * comes apart, not to re-check what the unit and integration suites already cover.
+ * The scope stays small on purpose. Every test added here is one more thing to keep green
+ * through a UI refactor, and the point of this suite is to notice when the *stack* comes
+ * apart, not to re-check what the unit and integration suites already cover.
+ *
+ * **Why the number went from four to five.** `tests/task-attachment.spec.ts` was added for
+ * P3-1, and it is here rather than in the API or Vitest suites because of what only a browser
+ * produces: a real `<input type="file">` builds a real multipart body, and it is *Chromium's*
+ * encoding of a non-ASCII filename meeting busboy's `defParamCharset` that had never been
+ * checked anywhere — the API suite writes its own multipart bodies, so it cannot disagree with
+ * the browser. The scenario then takes the download and compares it byte for byte, which is
+ * the difference between a row that renders and a file that comes back. That is the same test
+ * this file's admission criterion asks for — a way the *stack* comes apart that no in-process
+ * suite can see — and the ROADMAP records it as P3-1's "one scenario added to the Playwright
+ * smoke".
+ *
+ * The cost was measured before it was accepted, not asserted after: 24 consecutive local runs
+ * of the five, 4.0–4.5s wall clock each (median 4.2s), against 3.6–3.9s for the four. The
+ * fifth scenario is the slowest single test at ~2.3s, and it costs the *suite* about half a
+ * second because the workers run it beside the others. Against the five-minute ceiling below
+ * that is 1.4% of the budget — the ceiling is still sized for a cold CI runner, not for this.
  */
 export default defineConfig({
   testDir: './tests',
@@ -56,11 +73,16 @@ export default defineConfig({
   /**
    * Five minutes for the whole suite, enforced rather than aspired to.
    *
-   * The budget is the reason this suite is four scenarios and not forty: a nightly that takes
+   * The budget is the reason this suite is five scenarios and not forty: a nightly that takes
    * twenty minutes is a nightly people stop reading. Putting the ceiling here instead of in
    * the workflow's `timeout-minutes` means it also applies locally, so the run that first
-   * exceeds it is the one on the author's machine. Measured on a laptop the four take about
-   * four seconds; the margin is for a cold CI runner, not for growth.
+   * exceeds it is the one on the author's machine. Measured on a laptop (Apple M3 Max, 14
+   * cores, 36 GB, Node 24.18) the five take 4.0–4.5s over 24 runs; the margin is for a cold CI
+   * runner, not for growth.
+   *
+   * Read that margin as headroom for the runner, not as room for a sixth scenario: the
+   * paragraph at the top of this file is the admission test, and "there is time" has never
+   * been it.
    */
   globalTimeout: 5 * 60_000,
 

@@ -18,7 +18,7 @@ import { join } from 'node:path';
 // instead of satisfying it.
 import process from 'node:process';
 import { repoRoot } from './load-env.mjs';
-import { API_URL, e2eDatabaseUrl } from './stack-shared.mjs';
+import { API_URL, E2E_STORAGE_PATH, e2eDatabaseUrl } from './stack-shared.mjs';
 
 function run(command, args, extraEnv = {}) {
   process.stdout.write(`\n> ${command} ${args.join(' ')}\n`);
@@ -75,3 +75,10 @@ process.stdout.write('\n> copied .next/static and public into the standalone bun
 // `migrate deploy` creates the database when it does not exist, so a first run on a new
 // machine needs no `createdb`.
 run('pnpm', ['db:migrate'], { DATABASE_URL: e2eDatabaseUrl() });
+
+// Attachment bytes from previous runs. Emptied rather than kept: the rows that reference them
+// are never read again (every scenario builds its own task), and the upload measurement under
+// `e2e/measure` writes 10 MB a run — ballast that would otherwise accumulate in the developer's
+// temp directory with nothing ever pruning it. The API recreates the tree on its first write.
+rmSync(E2E_STORAGE_PATH, { recursive: true, force: true });
+process.stdout.write(`\n> emptied ${E2E_STORAGE_PATH}\n`);

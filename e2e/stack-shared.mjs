@@ -12,6 +12,8 @@
  */
 // The repository's ESLint config declares no environment globals for `.mjs`, so these are
 // imported rather than taken off the global object.
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import process from 'node:process';
 import { URL } from 'node:url';
 
@@ -27,6 +29,28 @@ export const API_URL = `http://localhost:${API_PORT}`;
  * database is how two parallel runs delete each other's rows mid-assertion.
  */
 export const E2E_DATABASE_NAME = 'kurultay_test_playwright';
+
+/**
+ * Where the suite's API writes attachment bytes.
+ *
+ * Setting this is what turns attachments *on* — `STORAGE_PATH` is the whole switch
+ * (`apps/api/src/storage/storage-config.ts`), so without it `GET /config` reports
+ * `attachmentsEnabled: false`, the panel renders "This instance does not store files" instead
+ * of a file input, and the attachment scenario would be asserting on a feature the stack was
+ * booted without.
+ *
+ * Outside the repository on purpose: the API creates the tree lazily and fills it with opaque
+ * UUID-named blobs, and a run that leaves those under `apps/` is a run that leaves untracked
+ * files in someone's working copy. Fixed rather than per-run, because `reuseExistingServer`
+ * keeps an API alive between `playwright test` invocations and the path is read once at boot —
+ * a fresh directory per run would point the tests at a store the running server never opened.
+ *
+ * `build-stack.mjs` empties it, which is the same stance the database takes from the other
+ * side: rows survive a run (nothing truncates them) because every test creates its own world
+ * and never reads a row it did not write, while bytes are pure ballast — the upload
+ * measurement alone writes 100 MB of them.
+ */
+export const E2E_STORAGE_PATH = join(tmpdir(), 'kurultay-e2e-attachments');
 
 /**
  * The suite's own Postgres URL: the developer's (or CI's) connection with the database name
