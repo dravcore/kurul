@@ -41,7 +41,16 @@ describe('AUDIT_ACTIVITY_TYPES', () => {
     // prefix rather than by a copy of the list, which would just be the same array twice.
     const subjects = new Set(AUDIT_ACTIVITY_TYPES.map((type) => type.split('.')[0]));
     expect(subjects).toEqual(
-      new Set(['task', 'board', 'column', 'label', 'workspace', 'member', 'invitation']),
+      new Set([
+        'task',
+        'attachment',
+        'board',
+        'column',
+        'label',
+        'workspace',
+        'member',
+        'invitation',
+      ]),
     );
   });
 
@@ -61,5 +70,23 @@ describe('AUDIT_ACTIVITY_TYPES', () => {
       expect(AUDIT_ACTIVITY_TYPES).not.toContain(type);
     }
     expect(AUDIT_ACTIVITY_TYPES).toContain(ActivityType.TaskDeleted);
+  });
+
+  /**
+   * The attachment pair, asserted by name rather than by subject.
+   *
+   * The subject test above cannot see this: `attachment.created` and `attachment.deleted` share
+   * a prefix, so swapping one for the other leaves the set of subjects identical and that test
+   * green. Which of the two is in the subset is the whole of ADR 0024's narrowing — it takes the
+   * delete and declines the add, against `audit/phase-3-plan.md` §4.1b's proposal of both — and
+   * it is the kind of decision a later reader is most likely to "fix" by symmetry.
+   *
+   * Out: an upload is content creation, and P3-3's importer writes one row per imported URL, in
+   * bulk, through a path no rate limit governs. In: a deleted attachment's bytes leave the disk
+   * on the next orphan sweep, so the row becomes the only evidence the file existed.
+   */
+  it('audits the attachment delete and not the attachment upload', () => {
+    expect(AUDIT_ACTIVITY_TYPES).toContain(ActivityType.AttachmentDeleted);
+    expect(AUDIT_ACTIVITY_TYPES).not.toContain(ActivityType.AttachmentCreated);
   });
 });
