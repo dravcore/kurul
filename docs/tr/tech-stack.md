@@ -36,6 +36,8 @@ Mimari şekil: [architecture.md](architecture.md).
 | Grafik                 | Recharts                               | Chart.js, Apache ECharts                |
 | Auth                   | Better Auth (organization plugin)      | Auth.js / NextAuth (bakım modunda)      |
 | E-posta                | SMTP üzerinden `nodemailer`            | Sağlayıcı API'si (Resend, SendGrid, …)  |
+| Dosya yükleme          | `multer` + `file-type` magic byte'ları | Beyan edilen `Content-Type`'a güvenmek  |
+| Reverse proxy          | Caddy (tek origin, otomatik HTTPS)     | nginx, Traefik                          |
 | Deployment             | Docker Compose                         | Kubernetes (ölçek gerektirdiğinde)      |
 
 Mimari (monorepo + modüler monolit) ayrı olarak [architecture.md](architecture.md)'de ele
@@ -167,10 +169,24 @@ asla gerçek mail göndermemesi için lokal bir SMTP catch-all olarak
 “Tarayıcımı izle” seçebilir. Katalog hâlâ yalnızca İngilizce — ek UI dil paketleri
 [MVP ötesi](roadmap.md#mvp-ötesi).
 
+### Dosya yükleme — `multer` + `file-type`
+
+`multipart/form-data` alan iki uç var: ek yükleme ve Trello import'u. İkisini de `multer`
+okuyor; global değil modül başına kayıtlı, çünkü her biri kendi byte tavanını taşıyor — ek
+tavanı bir disk tavanı, import tavanı bir heap tavanı, ve import ek'leri kapalı bir instance'ta
+da çalışmak zorunda. `file-type` yüklenen dosyanın **magic byte**'larını okur: beyan edilen
+`Content-Type` de dosya uzantısı da çağırandan gelir ve ikisi de kanıt değildir; satıra ve
+sonra indirme header'ına yazılan tip, sniff edilmiş olandır
+([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Düz metnin magic number'ı
+yoktur ve bilinçli olarak dar tutulmuş tek istisnadır; ayrıntısı
+[api-conventions.md](api-conventions.md#dosya-yükleme-ve-indirme) içinde.
+
 ### Deployment — Docker Compose
 
-Dört servis — `api`, `web`, `postgres`, `redis` — mevcut self-managed Linux sunucu
-kurulumuyla eşleşiyor. Ölçek gerektirdiğinde Kubernetes'e giden yol açık kalıyor (hem
+Yedi servis: ürünü taşıyan dördü — `api`, `web`, `postgres`, `redis` — artı `proxy` (Caddy;
+port yayınlayan tek servis, TLS'i sonlandırır ve tüm stack'i tek origin'den sunar), `migrate`
+(tek seferlik `prisma migrate deploy`) ve `backup` (`pg_dump` sidecar'ı; ek volume'ünü de
+arşivler). Bu, mevcut self-managed Linux sunucu kurulumuyla eşleşiyor. Ölçek gerektirdiğinde Kubernetes'e giden yol açık kalıyor (hem
 ClickUp hem Linear sonunda oraya vardı), ama şimdilik tek bir host'ta Compose doğru
 büyüklük.
 

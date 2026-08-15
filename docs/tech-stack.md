@@ -35,6 +35,8 @@ today. Architecture shape: [architecture.md](architecture.md).
 | Charts                 | Recharts                               | Chart.js, Apache ECharts              |
 | Auth                   | Better Auth (organization plugin)      | Auth.js / NextAuth (maintenance mode) |
 | Email                  | `nodemailer` over SMTP                 | Provider API (Resend, SendGrid, …)    |
+| File uploads           | `multer` + `file-type` magic bytes     | Trusting the declared `Content-Type`  |
+| Reverse proxy          | Caddy (one origin, automatic HTTPS)    | nginx, Traefik                        |
 | Deployment             | Docker Compose                         | Kubernetes (once scale demands it)    |
 
 Architecture (monorepo + modular monolith) is covered separately in [architecture.md](architecture.md).
@@ -89,9 +91,13 @@ Kurultay sends one class of transactional email so far: the verification link an
 **Settings → Language** can set a preference or “Match my browser”. English is still the only
 catalog on offer — additional UI language packs remain [Beyond MVP](roadmap.md#beyond-mvp).
 
+### File uploads — `multer` + `file-type`
+
+Two endpoints take `multipart/form-data`: an attachment upload and a Trello import. `multer` reads both, registered per module rather than globally so each carries its own byte ceiling — an attachment ceiling is a disk one, an import ceiling is a heap one, and an import must keep working on an instance with attachments switched off. `file-type` reads the **magic bytes** of an uploaded file, because the declared `Content-Type` and the filename extension both come from the caller and neither is evidence; the type written to the row and later to the download header is the sniffed one ([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Plain text has no magic number and is the one deliberately narrow exception, spelled out in [api-conventions.md](api-conventions.md#file-uploads-and-downloads).
+
 ### Deployment — Docker Compose
 
-Four services — `api`, `web`, `postgres`, `redis` — matching the existing self-managed Linux server setup. The path to Kubernetes stays open for when scale demands it (both ClickUp and Linear ended up there), but Compose on a single host is the right size for now.
+Seven services: the four that carry the product — `api`, `web`, `postgres`, `redis` — plus `proxy` (Caddy, the only one publishing a port, terminating TLS and serving the whole stack from one origin), `migrate` (a one-shot `prisma migrate deploy`) and `backup` (a `pg_dump` sidecar that also archives the attachment volume). This matches the existing self-managed Linux server setup. The path to Kubernetes stays open for when scale demands it (both ClickUp and Linear ended up there), but Compose on a single host is the right size for now.
 
 ---
 
