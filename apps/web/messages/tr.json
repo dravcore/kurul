@@ -1,6 +1,7 @@
 {
   "common": {
-    "close": "Kapat"
+    "close": "Kapat",
+    "deletedUser": "Silinmiş kullanıcı"
   },
   "auth": {
     "login": {
@@ -221,6 +222,29 @@
         "deleteError": "Bu workspace silinemedi.",
         "deleteErrorForbidden": "Bu workspace'i yalnızca bir sahip silebilir. Bir workspace sahibinden isteyin.",
         "deleteErrorGone": "Bu workspace artık yok."
+      },
+      "account": {
+        "title": "Hesap",
+        "description": "Giriş yaptığınız hesap ve onu nasıl kapatabileceğiniz.",
+        "cancel": "Vazgeç",
+        "loadError": "Hesap bilgileriniz yüklenemedi.",
+        "deleteSectionTitle": "Hesabınızı silin",
+        "deleteSectionBody": "Sizi bu sunucudaki her workspace'ten çıkarır ve yazdığınız her şeyden adınızı kaldırır. Bu geri alınamaz.",
+        "deleteAction": "Hesabı sil",
+        "deleteTitle": "Hesabınızı sil?",
+        "deleteBody": "Oturumunuz kapatılacak ve buradaki her workspace'ten çıkarılacaksınız. Adınız ve e-posta adresiniz silinir. Bu geri alınamaz.",
+        "retained": "Yazdığınız {comments, plural, =0 {yorum yok} other {# yorum}} ve {tasks, plural, =0 {task yok} other {# task}} olduğu yerde kalır; “Deleted user” adına yazılır.",
+        "ownedTitle": "Bunların tek sahibi sizsiniz. Her biri için ne olacağına karar verin.",
+        "ownedWorkspace": "{name} — {members, plural, other {# üye}}, {boards, plural, other {# board}}",
+        "ownedChoose": "Seçin…",
+        "ownedTransferTo": "Sahipliği {name} kişisine ver",
+        "ownedDelete": "Bu workspace'i ve içindeki her şeyi sil",
+        "ownedNobodyLeft": "Bu workspace'te başka kimse yok, dolayısıyla yalnızca silinebilir.",
+        "confirmLabel": "Onaylamak için {email} yazın",
+        "deleteError": "Hesabınız silinemedi.",
+        "deleteErrorConfirm": "Bu, bu hesabın adresi değil. Kontrol edip tekrar deneyin.",
+        "deleteErrorTransferGone": "Seçtiğiniz kişi artık o workspace'te değil. Bunu yeniden açıp tekrar seçin.",
+        "deleteErrorUndecided": "Siz karar verirken bir şeyler değişti. Neyin kaldığını görmek için bunu yeniden açın."
       },
       "activation": {
         "title": "Instance aktivasyonu",

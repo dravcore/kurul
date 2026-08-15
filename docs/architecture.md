@@ -87,27 +87,28 @@ Every module has the same skeleton: `*.module.ts`, `*.controller.ts`, `*.service
 **Current vs planned:** after Phase 9, feature modules including `realtime` are implemented.
 Treat the table below as the module map.
 
-| Module         | Responsibility                                                                                                                                                                                          |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth`         | Better Auth integration, session handling, request user resolution                                                                                                                                      |
-| `workspace`    | Workspace CRUD, membership, invitations, roles                                                                                                                                                          |
-| `board`        | Board and column management, column ordering                                                                                                                                                            |
-| `task`         | Task CRUD, moving between columns, fractional-index reordering                                                                                                                                          |
-| `label`        | Board-scoped labels and task-label assignment                                                                                                                                                           |
-| `comment`      | Task comments                                                                                                                                                                                           |
-| `attachment`   | Files and links on a task: upload, list, download stream, detach                                                                                                                                        |
-| `import`       | One-way Trello board import: read an export, plan the rows, write them once                                                                                                                             |
-| `activity`     | Append-only activity log (`payload` is Json)                                                                                                                                                            |
-| `dashboard`    | Aggregation queries feeding the charts                                                                                                                                                                  |
-| `notification` | Notification fan-out, Redis-backed queue                                                                                                                                                                |
-| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                                                                                                                                          |
-| `retention`    | Nightly data-retention sweep; no controller, no exported provider                                                                                                                                       |
-| `mail`         | SMTP delivery (`nodemailer`); logs instead of sending when unconfigured                                                                                                                                 |
-| `locale`       | Stored interface language: reads/writes `User.locale`, resolves it for a request                                                                                                                        |
-| `config`       | `GET /config` — the two capability flags the UI branches on (`mailEnabled`, `attachmentsEnabled`), unauthenticated                                                                                      |
-| `activation`   | Instance-local activation funnel and North Star, computed on demand from existing rows; readable only by `INSTANCE_ADMIN_EMAILS` ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md)) |
-| `telemetry`    | Opt-in, default-off outbound ping at boot; sends nothing unless `TELEMETRY_ENABLED` and `TELEMETRY_ENDPOINT` are both set ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))        |
-| `health`       | Liveness probe (`GET /health`) and readiness probe (`GET /health/ready`, which probes DB and Redis and answers `503` with a diagnostic body), both unauthenticated                                      |
+| Module         | Responsibility                                                                                                                                                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth`         | Better Auth integration, session handling, request user resolution                                                                                                                                                                |
+| `account`      | Account erasure: `DELETE /me` and the instance operator's `DELETE /instance/users/:userId`, over one engine that anonymises the `User` row rather than deleting it ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)) |
+| `workspace`    | Workspace CRUD, membership, invitations, roles                                                                                                                                                                                    |
+| `board`        | Board and column management, column ordering                                                                                                                                                                                      |
+| `task`         | Task CRUD, moving between columns, fractional-index reordering                                                                                                                                                                    |
+| `label`        | Board-scoped labels and task-label assignment                                                                                                                                                                                     |
+| `comment`      | Task comments                                                                                                                                                                                                                     |
+| `attachment`   | Files and links on a task: upload, list, download stream, detach                                                                                                                                                                  |
+| `import`       | One-way Trello board import: read an export, plan the rows, write them once                                                                                                                                                       |
+| `activity`     | Append-only activity log (`payload` is Json)                                                                                                                                                                                      |
+| `dashboard`    | Aggregation queries feeding the charts                                                                                                                                                                                            |
+| `notification` | Notification fan-out, Redis-backed queue                                                                                                                                                                                          |
+| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                                                                                                                                                                    |
+| `retention`    | Nightly data-retention sweep; no controller, no exported provider                                                                                                                                                                 |
+| `mail`         | SMTP delivery (`nodemailer`); logs instead of sending when unconfigured                                                                                                                                                           |
+| `locale`       | Stored interface language: reads/writes `User.locale`, resolves it for a request                                                                                                                                                  |
+| `config`       | `GET /config` — the two capability flags the UI branches on (`mailEnabled`, `attachmentsEnabled`), unauthenticated                                                                                                                |
+| `activation`   | Instance-local activation funnel and North Star, computed on demand from existing rows; readable only by `INSTANCE_ADMIN_EMAILS` ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                           |
+| `telemetry`    | Opt-in, default-off outbound ping at boot; sends nothing unless `TELEMETRY_ENABLED` and `TELEMETRY_ENDPOINT` are both set ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                                  |
+| `health`       | Liveness probe (`GET /health`) and readiness probe (`GET /health/ready`, which probes DB and Redis and answers `503` with a diagnostic body), both unauthenticated                                                                |
 
 Cross-cutting infrastructure:
 
@@ -286,6 +287,18 @@ Four properties are deliberate:
 gathered before the delete because none of it can be looked up afterwards. Read it with
 `docker logs … | jq 'select(.event == "workspace.deleted")'`. On a deployment that must retain
 deletion records, ship the application log.
+
+**One event lives in both places: `account.deleted`.** Deleting an account writes an
+`account.deleted` activity row into every workspace the person was a member of — carrying
+`targetUserId`, `previousRole` and `initiatedBy`, and deliberately **no name**, since a row
+written to stop naming somebody must not name them. Its actor is the departing user and never
+the instance operator who may have ordered it, so an operator's identity cannot appear in a
+tenant's feed. The operator's half goes to the JSON log instead:
+`{ ts, level: 'warn', event: 'account.deleted', userId, initiatedBy, actorId, …counts }`, with
+no address and no name for the same reason the retention sweep logs counts only. A workspace a
+disposition deleted gets no activity row at all — the same cascade problem `workspace.deleted`
+has — and produces a `workspace.deleted` line carrying `deletedWithAccount`.
+[ADR 0026](decisions/0026-account-deletion-anonymisation.md).
 
 Audit rows are swept by the same retention window as any other activity
 (`ACTIVITY_RETENTION_DAYS`, default 365; `0` keeps them forever —

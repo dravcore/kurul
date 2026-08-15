@@ -208,3 +208,31 @@ export interface CreateInvitationRequest {
 export interface UpdateMemberRoleRequest {
   role: MemberRole;
 }
+
+/**
+ * What is to become of one workspace the departing user is the only OWNER of.
+ *
+ * A discriminated union rather than an optional `newOwnerUserId`, because the two shapes are
+ * two different decisions and a body that carries both — or neither — is not a decision at all.
+ * See `docs/decisions/0026-account-deletion-anonymisation.md`.
+ */
+export type WorkspaceDispositionRequest =
+  | { workspaceId: string; action: 'transfer'; newOwnerUserId: string }
+  | { workspaceId: string; action: 'delete' };
+
+/**
+ * `DELETE /me` and `DELETE /instance/users/:userId`
+ *
+ * `confirmEmail` must equal the address of the account being deleted, and it is a misclick
+ * gate rather than a security control — the session sending this request can already delete
+ * every workspace the user owns, so a stronger check here alone would imply a guarantee it
+ * does not give (ADR 0026 §4).
+ *
+ * `dispositions` must name every workspace `GET …/deletion-preview` returned under
+ * `soleOwnedWorkspaces`, exactly once. Missing, unknown or duplicated entries are `409`, and
+ * there is deliberately no default for either direction.
+ */
+export interface DeleteAccountRequest {
+  confirmEmail: string;
+  dispositions?: WorkspaceDispositionRequest[];
+}

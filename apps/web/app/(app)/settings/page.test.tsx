@@ -30,6 +30,10 @@ vi.mock('@/components/settings/workspace-settings', () => ({
   WorkspaceSettings: (): React.ReactElement => <div data-testid="workspace-settings" />,
 }));
 
+vi.mock('@/components/settings/account-settings', () => ({
+  AccountSettings: (): React.ReactElement => <div data-testid="account-settings" />,
+}));
+
 // Stubbed as the case that matters for this page: on any instance where the reader is not the
 // operator the funnel renders `null`, and the page's own layout has to be correct in that
 // state — it is the state almost every reader is in. The component's own visible branch is
@@ -55,16 +59,20 @@ describe('SettingsPage', () => {
     render(await SettingsPage());
 
     const headings = screen.getAllByRole('heading', { level: 2 }).map((node) => node.textContent);
-    // Members before Language before Workspace: the section a new owner comes here to find
-    // leads, and the one irreversible control (delete) trails everything read routinely.
+    // Members, Language, Workspace, Account: the section a new owner comes here to find leads,
+    // and the ordering rule below it is "the further down, the harder to undo" — deleting the
+    // workspace, then deleting the account, which is the only control here whose consequences
+    // reach past this tenant (ADR 0026).
     expect(headings).toEqual([
       messages.app.settings.members.title,
       messages.app.settings.language.title,
       messages.app.settings.workspace.title,
+      messages.app.settings.account.title,
     ]);
     expect(screen.getByText(messages.app.settings.members.description)).toBeTruthy();
     expect(screen.getByText(messages.app.settings.language.description)).toBeTruthy();
     expect(screen.getByText(messages.app.settings.workspace.description)).toBeTruthy();
+    expect(screen.getByText(messages.app.settings.account.description)).toBeTruthy();
   });
 
   it('mounts every section body', async () => {
@@ -73,6 +81,7 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('members-settings')).toBeTruthy();
     expect(screen.getByTestId('language-settings')).toBeTruthy();
     expect(screen.getByTestId('workspace-settings')).toBeTruthy();
+    expect(screen.getByTestId('account-settings')).toBeTruthy();
   });
 
   it('holds no hardcoded copy of its own', async () => {
@@ -89,6 +98,8 @@ describe('SettingsPage', () => {
       messages.app.settings.language.description,
       messages.app.settings.workspace.title,
       messages.app.settings.workspace.description,
+      messages.app.settings.account.title,
+      messages.app.settings.account.description,
     ];
     for (const text of catalogued) {
       expect(rendered).toContain(text);

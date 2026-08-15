@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { Topbar } from '@/components/layout/topbar';
+import { AccountSettings } from '@/components/settings/account-settings';
 import { ActivationFunnel } from '@/components/settings/activation-funnel';
 import { LanguageSettings } from '@/components/settings/language-settings';
 import { MembersSettings } from '@/components/settings/members-settings';
@@ -50,12 +51,20 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
           <SettingsSection title={t('language.title')} description={t('language.description')}>
             <LanguageSettings />
           </SettingsSection>
-          {/* Last: it holds the one control on this screen with no undo (delete), and every
-              other section is either read constantly (members) or set once and forgotten
+          {/* Near the end: it holds a control with no undo (delete the workspace), and every
+              section above it is either read constantly (members) or set once and forgotten
               (language). Nothing about "workspace" being alphabetically first should put a
               delete button above sections people open every day. */}
           <SettingsSection title={t('workspace.title')} description={t('workspace.description')}>
             <WorkspaceSettings />
+          </SettingsSection>
+          {/* Last of the tenant sections, and below "delete this workspace" on purpose: this is
+              the only control on the screen whose consequences reach past the workspace being
+              looked at — it removes the person from every workspace they are in, everywhere on
+              this instance (ADR 0026). The ordering rule for this page is "the further down,
+              the harder to undo", and nothing is further down than this. */}
+          <SettingsSection title={t('account.title')} description={t('account.description')}>
+            <AccountSettings />
           </SettingsSection>
           {/* Below the delete button and outside `SettingsSection`, both on purpose. It is the
               only block here that is about the *server* rather than about this workspace, and

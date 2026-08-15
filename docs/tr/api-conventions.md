@@ -167,6 +167,11 @@ GET   /config                # instance yetenekleri; oturum açmış her çağı
 POST  /auth/*                # Better Auth handler'ları
 GET   /me                    # mevcut kullanıcı profili
 PATCH /me                    # kendi profili; bugün yalnızca arayüz dili
+GET   /me/deletion-preview   # bu hesabı silmek neye yol açar
+DELETE /me                   # bu hesabı sil (anonimleştirir)
+GET   /instance/activation                     # aktivasyon hunisi; yalnız INSTANCE_ADMIN_EMAILS
+GET   /instance/users/:userId/deletion-preview # aynı önizleme, operatör için
+DELETE /instance/users/:userId                 # bir başkası adına silme talebini uygula
 ```
 
 İki health route'u farklı sorulara cevap verir, birbirinin yerine kullanılamaz. `/health`
@@ -182,6 +187,23 @@ healthcheck'tir, bir istemci değil.
 dolayısıyla yetkilendirmenin tamamı session guard'ıdır. `User.locale`'in yazıldığı tek yer de
 burasıdır — bkz.
 [decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md).
+
+`DELETE /me` çağıranın hesabını siler ve bu API'de eksik bir isteğe varsayılan seçerek değil,
+reddederek karşılık veren tek route'tur. Gövde `confirmEmail` (hesabın kendi adresi) ve
+çağıranın **tek** OWNER olduğu her workspace için bir `disposition` taşır — adı verilen bir üyeye
+`transfer` ya da workspace'i doğrudan `delete`. Eksik, tanınmayan veya tekrarlanan bir karar
+`409`'dur ve hâlâ karara bağlanmamış workspace'leri adıyla sayar; eşleşmeyen bir onay adresi
+`403`'tür; o workspace'te olmayan bir devir hedefi `404`'tür — her workspace route'unun verdiği
+aynı opaklık. `GET /me/deletion-preview`, istemcinin o gövdeyi kurmak için okuduğu şeydir.
+`DELETE /instance/users/:userId` aynı işlemin bir instance operatörü tarafından yapılan hâlidir —
+`INSTANCE_ADMIN_EMAILS` çağıranı adıyla saymıyorsa `403`, ki taze bir kurulumda varsayılan budur.
+Hesap satırı silinmez, anonimleştirilir; bkz.
+[decisions/0026-account-deletion-anonymisation.md](decisions/0026-account-deletion-anonymisation.md).
+
+`/instance/*` route'ları, API'de ne workspace'e scope'lu olan ne de çağıranın kendisiyle ilgili
+olan tek route'lardır. `404` değil `403` dönerler: bir workspace route'unun verdiği `404`,
+tenant'lar arası bir yoklamanın "yasak" ile "yok"u ayırt etmesini engellemek için vardır ve
+burada gizlenecek bir şey yok — route, AGPL bir projenin kaynak kodunda duruyor.
 
 ### Instance yapılandırması
 

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { CommentDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import { authorLabel } from '@/lib/author-label';
 import { getActiveMentionQuery, insertMentionMarkup } from '@/lib/mentions';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -53,6 +54,7 @@ export function TaskCommentsSection({
 }: TaskCommentsSectionProps): React.ReactElement {
   const t = useTranslations('app.board.task');
   const tErrors = useTranslations('app.errors');
+  const tCommon = useTranslations('common');
   const locale = useLocale();
   const commentId = useId();
   const mentionListId = useId();
@@ -156,7 +158,9 @@ export function TaskCommentsSection({
           <li key={comment.id} className="rounded-md border border-border px-3 py-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-small font-medium text-foreground">{comment.author.name}</p>
+                <p className="text-small font-medium text-foreground">
+                  {authorLabel(comment.author, tCommon('deletedUser'))}
+                </p>
                 <p className="text-micro text-muted-foreground">
                   {new Date(comment.createdAt).toLocaleString(locale)}
                 </p>

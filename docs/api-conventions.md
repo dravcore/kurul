@@ -165,6 +165,11 @@ GET   /config                # instance capabilities; any signed-in caller
 POST  /auth/*                # Better Auth handlers
 GET   /me                    # current user profile
 PATCH /me                    # own profile; interface language today
+GET   /me/deletion-preview   # what deleting this account would do
+DELETE /me                   # delete this account (anonymises it)
+GET   /instance/activation                     # activation funnel; INSTANCE_ADMIN_EMAILS only
+GET   /instance/users/:userId/deletion-preview # same preview, for an operator
+DELETE /instance/users/:userId                 # execute an erasure request for somebody else
 ```
 
 The two health routes answer different questions and are not interchangeable. `/health` is
@@ -178,6 +183,23 @@ document rather than the error envelope below — the caller is a healthcheck, n
 `PATCH /me` is not workspace-scoped and not role-gated: the subject is the caller, so the
 session guard is the whole authorization story. It is also the only place `User.locale` is
 written — see [decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md).
+
+`DELETE /me` deletes the caller's account, and it is the one route in this API that refuses to
+act on an incomplete request rather than picking a default. The body carries `confirmEmail` (the
+account's own address) and one `disposition` per workspace the caller is the **only** OWNER of —
+`transfer` to a named member, or `delete` the workspace outright. A missing, unknown or
+duplicated disposition is `409` and names the workspaces still undecided; a confirmation address
+that does not match is `403`; a transfer target who is not in that workspace is `404`, the same
+opacity every workspace route gives. `GET /me/deletion-preview` is what a client reads to build
+that body. `DELETE /instance/users/:userId` is the same operation performed by an instance
+operator — `403` when `INSTANCE_ADMIN_EMAILS` does not name the caller, which is the default on
+a fresh install. The account row is anonymised rather than deleted; see
+[decisions/0026-account-deletion-anonymisation.md](decisions/0026-account-deletion-anonymisation.md).
+
+The `/instance/*` routes are the only ones in the API that are neither workspace-scoped nor
+about the caller themselves. They answer `403` and never `404`: the `404` a workspace route
+gives exists to stop a cross-tenant probe distinguishing "forbidden" from "does not exist", and
+here there is nothing to hide — the route is in the source of an AGPL project.
 
 ### Instance configuration
 

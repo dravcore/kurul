@@ -67,7 +67,7 @@ describe('CommentService', () => {
         userId: AUTHOR_ID,
         body: 'hello',
         createdAt,
-        user: { id: AUTHOR_ID, name: 'Ada', avatarUrl: null },
+        user: { id: AUTHOR_ID, name: 'Ada', avatarUrl: null, deletedAt: null },
       },
     ]);
 
@@ -79,12 +79,49 @@ describe('CommentService', () => {
           userId: AUTHOR_ID,
           body: 'hello',
           createdAt: createdAt.toISOString(),
-          author: { id: AUTHOR_ID, name: 'Ada', avatarUrl: null },
+          author: { id: AUTHOR_ID, name: 'Ada', avatarUrl: null, deleted: false },
         },
       ],
       nextCursor: null,
       hasMore: false,
     });
+  });
+
+  /**
+   * The other surface that can name an anonymised account, and the one where the name is also
+   * inside the text — the mention rewrite handles the body, this handles the byline.
+   *
+   * `deleted` is a boolean and not the `deletedAt` timestamp on purpose: this route is
+   * `@WorkspaceScoped()`, so a GUEST reads the result, and publishing the date a named person
+   * asked to be erased would widen who can see a fact nothing on the screen needs
+   * (`common/author.ts`).
+   */
+  it('reports an anonymised author as deleted, without publishing when it happened', async () => {
+    const { service, prisma } = buildService();
+    prisma.comment.findMany.mockResolvedValue([
+      {
+        id: COMMENT_ID,
+        taskId: TASK_ID,
+        userId: AUTHOR_ID,
+        body: 'hello',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        user: {
+          id: AUTHOR_ID,
+          name: 'Deleted user',
+          avatarUrl: null,
+          deletedAt: new Date('2026-08-15'),
+        },
+      },
+    ]);
+
+    const page = await service.list(WORKSPACE_ID, TASK_ID);
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]!.author.deleted).toBe(true);
+    expect(page.items[0]!.author).not.toHaveProperty('deletedAt');
+    // The comment itself is untouched — that is the half that makes this anonymisation rather
+    // than deletion of somebody else's conversation.
+    expect(page.items[0]!.body).toBe('hello');
   });
 
   it('paginates comments by cursor with a bounded page size', async () => {

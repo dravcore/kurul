@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { ActivityDto, CursorPage } from '@kurultay/shared-types';
 import type { Prisma } from '../generated/prisma';
+import { AUTHOR_SELECT, toAuthorDto, type AuthorRow } from '../common/author';
 import { toCursorPage } from '../common/pagination/cursor-page';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -19,11 +20,9 @@ export type ActivityCursorQuery = {
   limit?: number;
 };
 
-const authorSelect = {
-  id: true,
-  name: true,
-  avatarUrl: true,
-} as const;
+// One selector, shared with `CommentService`, so the two feeds cannot disagree about whether a
+// person still exists — see `common/author.ts`.
+const authorSelect = AUTHOR_SELECT;
 
 type ActivityRow = {
   id: string;
@@ -33,7 +32,7 @@ type ActivityRow = {
   type: string;
   payload: Prisma.JsonValue;
   createdAt: Date;
-  user: { id: string; name: string; avatarUrl: string | null };
+  user: AuthorRow;
 };
 
 @Injectable()
@@ -49,11 +48,7 @@ export class ActivityService {
       type: row.type,
       payload: (row.payload ?? {}) as Record<string, unknown>,
       createdAt: row.createdAt.toISOString(),
-      author: {
-        id: row.user.id,
-        name: row.user.name,
-        avatarUrl: row.user.avatarUrl,
-      },
+      author: toAuthorDto(row.user),
     };
   }
 

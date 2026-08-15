@@ -11,6 +11,8 @@ import messages from '@/messages/tr.json';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { BoardList } from '@/components/board/board-list';
 import { ImportReportPanel } from '@/components/board/import-report-panel';
+import { DeleteAccountDialog } from '@/components/settings/delete-account-dialog';
+import { TaskCommentsSection } from '@/components/task/task-comments-section';
 
 /**
  * Renders real screens against `tr.json`.
@@ -44,8 +46,12 @@ vi.mock('@/components/layout/workspace-provider', () => ({
 }));
 vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
-  return { ...actual, api: { ...actual.api, postForm: vi.fn() } };
+  return { ...actual, api: { ...actual.api, postForm: vi.fn(), get: vi.fn(), delete: vi.fn() } };
 });
+vi.mock('@/lib/socket', () => ({ disconnectSocket: vi.fn() }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
+}));
 
 const fetchBoards = vi.mocked(fetchWorkspaceBoards);
 
@@ -102,6 +108,89 @@ describe('the Turkish interface', () => {
 
     // `#` is formatted by the active locale: 2000 groups with a dot in Turkish, not a comma.
     expect(within(region).getByText(/2\.000 kart/)).toBeDefined();
+  });
+
+  /**
+   * The account-deletion dialog, and it is here rather than only in its own spec because both
+   * of its sentences are ICU plurals over a count — `retained` and `ownedWorkspace` — which is
+   * exactly the shape `catalog.test.ts` can prove complete and cannot prove renders.
+   */
+  it('renders the account-deletion dialog in Turkish, with Turkish plural forms', async () => {
+    const { api } = await import('@/lib/api');
+    vi.mocked(api.get).mockResolvedValue({
+      userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d20',
+      soleOwnedWorkspaces: [
+        {
+          workspaceId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d21',
+          name: 'Kurultay',
+          slug: 'kurultay',
+          memberCount: 4,
+          boardCount: 2,
+          transferCandidates: [],
+        },
+      ],
+      otherWorkspaces: [],
+      retainedContent: { comments: 3, tasksCreated: 2, attachments: 0, activities: 9 },
+    } as never);
+
+    render(tr(<DeleteAccountDialog open onOpenChange={vi.fn()} email="ada@example.com" />));
+
+    await waitFor(() => {
+      expect(screen.getByText(messages.app.settings.account.ownedTitle)).toBeDefined();
+    });
+
+    // One plural form, not two: Turkish does not inflect a noun after a numeral, so `4 üye`
+    // is correct and `4 üyeler` is not.
+    expect(screen.getByText(/4 üye, 2 board/)).toBeDefined();
+    expect(screen.getByText(/3 yorum/)).toBeDefined();
+    // The "there is nobody to hand this to" line, which is the branch that decides whether
+    // deletion is the only option this dialog can offer.
+    expect(screen.getByText(messages.app.settings.account.ownedNobodyLeft)).toBeDefined();
+  });
+
+  /**
+   * The hole this test exists to keep closed, and it is a different door into the one the rest
+   * of this file guards.
+   *
+   * A deleted account's `User.name` holds the English string `Deleted user`, because the
+   * database is what an API consumer that is not this app reads. Rendering it verbatim would put
+   * two English words in the middle of a Turkish comment thread — and it would only ever be
+   * found by a user, because it appears exclusively after somebody has actually left.
+   */
+  it('calls a deleted comment author by a Turkish name, not by the stored English one', () => {
+    render(
+      tr(
+        <TaskCommentsSection
+          comments={[
+            {
+              id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d30',
+              taskId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d31',
+              userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d32',
+              body: 'Bu karta bakmıştım',
+              createdAt: '2026-01-01T00:00:00.000Z',
+              author: {
+                id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d32',
+                name: 'Deleted user',
+                avatarUrl: null,
+                deleted: true,
+              },
+            },
+          ]}
+          members={[]}
+          canMutate={false}
+          pending={false}
+          loading={false}
+          onSubmit={vi.fn().mockResolvedValue(true)}
+          onDelete={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(screen.getByText(messages.common.deletedUser)).toBeDefined();
+    expect(screen.queryByText('Deleted user')).toBeNull();
+    // The comment itself survives, which is the half that makes this anonymisation rather than
+    // deleting somebody else's conversation.
+    expect(screen.getByText('Bu karta bakmıştım')).toBeDefined();
   });
 
   it('renders the not-found page in Turkish', async () => {

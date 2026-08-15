@@ -11,6 +11,7 @@ import type { Request } from 'express';
 import { ActivityService } from '../activity/activity.service';
 import { auth } from '../auth/auth';
 import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth-error';
+import { assertAccountNotDeleted } from '../common/deleted-account';
 import { fieldChanges } from '../common/field-changes';
 import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
 import { toCursorPage } from '../common/pagination/cursor-page';
@@ -115,7 +116,20 @@ export class WorkspaceService {
     return memberships.map((m) => this.toWorkspaceDto(m.workspace));
   }
 
-  async create(_userId: string, dto: CreateWorkspaceDto, request: Request): Promise<WorkspaceDto> {
+  /**
+   * Creates a workspace, with the caller as its OWNER.
+   *
+   * The deleted-account check is the reason `userId` is no longer unused. This is one of the
+   * two writes in the API that are not workspace-scoped, and it is the dangerous one: an
+   * account deleted by an instance administrator keeps a working session cookie for up to five
+   * minutes (Better Auth's `session.cookieCache` answers without a database read), and creating
+   * a workspace is the one thing in that window that would give the tombstone a membership
+   * again — an anonymised row with no credentials, sitting as the sole owner of a live tenant.
+   * See `common/deleted-account.ts` for why the check is here rather than in `SessionAuthGuard`.
+   */
+  async create(userId: string, dto: CreateWorkspaceDto, request: Request): Promise<WorkspaceDto> {
+    await assertAccountNotDeleted(this.prisma, userId);
+
     const existing = await this.prisma.workspace.findUnique({
       where: { slug: dto.slug },
     });

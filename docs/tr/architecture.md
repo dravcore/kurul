@@ -98,27 +98,28 @@ buna bağlıdır.
 **Mevcut vs planlanan:** Faz 9 sonrası `realtime` dahil özellik modülleri uygulanmıştır.
 Aşağıdaki tabloyu modül haritası olarak okuyun.
 
-| Modül          | Sorumluluk                                                                                                                                                                                                    |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth`         | Better Auth entegrasyonu, session yönetimi, request user çözümlemesi                                                                                                                                          |
-| `workspace`    | Workspace CRUD, üyelik, davetler, rol'ler                                                                                                                                                                     |
-| `board`        | Board ve column yönetimi, column sıralaması                                                                                                                                                                   |
-| `task`         | Task CRUD, column'lar arası taşıma, fractional-index ile yeniden sıralama                                                                                                                                     |
-| `label`        | Board-scoped label'lar ve task-label ataması                                                                                                                                                                  |
-| `comment`      | Task yorumları                                                                                                                                                                                                |
-| `attachment`   | Task'taki dosya ve bağlantılar: yükleme, listeleme, indirme akışı, silme                                                                                                                                      |
-| `import`       | Tek yönlü Trello board import'u: export'u oku, satırları planla, bir kez yaz                                                                                                                                  |
-| `activity`     | Yalnızca-ekleme (append-only) aktivite log'u (`payload` Json)                                                                                                                                                 |
-| `dashboard`    | Grafikleri besleyen agregasyon sorguları                                                                                                                                                                      |
-| `notification` | Bildirim dağıtımı, Redis destekli kuyruk                                                                                                                                                                      |
-| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                                                                                                                                                |
-| `retention`    | Gecelik veri saklama süpürmesi; controller yok, dışa açılan provider yok                                                                                                                                      |
-| `mail`         | SMTP gönderimi (`nodemailer`); yapılandırılmamışsa gönderim yerine loglar                                                                                                                                     |
-| `locale`       | Saklanan arayüz dili: `User.locale` okur/yazar, istek için çözümler                                                                                                                                           |
-| `config`       | `GET /config` — UI'ın dallandığı iki yetenek bayrağı (`mailEnabled`, `attachmentsEnabled`), kimlik doğrulamasız                                                                                               |
-| `activation`   | Instance'a özel aktivasyon hunisi ve North Star; mevcut satırlardan istek anında hesaplanır, yalnız `INSTANCE_ADMIN_EMAILS` okuyabilir ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md)) |
-| `telemetry`    | Opt-in, varsayılan kapalı açılış ping'i; `TELEMETRY_ENABLED` ve `TELEMETRY_ENDPOINT` birlikte tanımlı değilse hiçbir şey göndermez ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))     |
-| `health`       | Canlılık probe'u (`GET /health`) ve hazırlık probe'u (`GET /health/ready` — DB ve Redis'i yoklar, teşhis gövdesiyle `503` döner); ikisi de kimlik doğrulamasız                                                |
+| Modül          | Sorumluluk                                                                                                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `auth`         | Better Auth entegrasyonu, session yönetimi, request user çözümlemesi                                                                                                                                                                 |
+| `account`      | Hesap silme: `DELETE /me` ve instance operatörünün `DELETE /instance/users/:userId`'i; ikisi de `User` satırını silmek yerine anonimleştiren tek bir motorun üzerinde ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)) |
+| `workspace`    | Workspace CRUD, üyelik, davetler, rol'ler                                                                                                                                                                                            |
+| `board`        | Board ve column yönetimi, column sıralaması                                                                                                                                                                                          |
+| `task`         | Task CRUD, column'lar arası taşıma, fractional-index ile yeniden sıralama                                                                                                                                                            |
+| `label`        | Board-scoped label'lar ve task-label ataması                                                                                                                                                                                         |
+| `comment`      | Task yorumları                                                                                                                                                                                                                       |
+| `attachment`   | Task'taki dosya ve bağlantılar: yükleme, listeleme, indirme akışı, silme                                                                                                                                                             |
+| `import`       | Tek yönlü Trello board import'u: export'u oku, satırları planla, bir kez yaz                                                                                                                                                         |
+| `activity`     | Yalnızca-ekleme (append-only) aktivite log'u (`payload` Json)                                                                                                                                                                        |
+| `dashboard`    | Grafikleri besleyen agregasyon sorguları                                                                                                                                                                                             |
+| `notification` | Bildirim dağıtımı, Redis destekli kuyruk                                                                                                                                                                                             |
+| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                                                                                                                                                                       |
+| `retention`    | Gecelik veri saklama süpürmesi; controller yok, dışa açılan provider yok                                                                                                                                                             |
+| `mail`         | SMTP gönderimi (`nodemailer`); yapılandırılmamışsa gönderim yerine loglar                                                                                                                                                            |
+| `locale`       | Saklanan arayüz dili: `User.locale` okur/yazar, istek için çözümler                                                                                                                                                                  |
+| `config`       | `GET /config` — UI'ın dallandığı iki yetenek bayrağı (`mailEnabled`, `attachmentsEnabled`), kimlik doğrulamasız                                                                                                                      |
+| `activation`   | Instance'a özel aktivasyon hunisi ve North Star; mevcut satırlardan istek anında hesaplanır, yalnız `INSTANCE_ADMIN_EMAILS` okuyabilir ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                        |
+| `telemetry`    | Opt-in, varsayılan kapalı açılış ping'i; `TELEMETRY_ENABLED` ve `TELEMETRY_ENDPOINT` birlikte tanımlı değilse hiçbir şey göndermez ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                            |
+| `health`       | Canlılık probe'u (`GET /health`) ve hazırlık probe'u (`GET /health/ready` — DB ve Redis'i yoklar, teşhis gövdesiyle `503` döner); ikisi de kimlik doğrulamasız                                                                       |
 
 Cross-cutting altyapı:
 
@@ -316,6 +317,18 @@ edilir; yani satır, kendisini tarif eden ifadenin ta kendisi tarafından silini
 Bunlar silmeden **önce** toplanır, çünkü sonrasında hiçbiri sorgulanamaz.
 `docker logs … | jq 'select(.event == "workspace.deleted")'` ile okunur. Silme kayıtlarını
 saklaması gereken bir kurulumda uygulama log'unu bir toplayıcıya yönlendirin.
+
+**Bir olay iki yerde birden yaşar: `account.deleted`.** Bir hesabı silmek, kişinin üyesi olduğu
+her workspace'e bir `account.deleted` aktivite satırı yazar — `targetUserId`, `previousRole` ve
+`initiatedBy` taşır, **ad taşımaz**; birini adıyla anmayı bitirmek için yazılan bir satır onu
+adıyla anmamalı. Aktörü, silmeyi emretmiş olabilecek instance operatörü değil, ayrılan
+kullanıcıdır; böylece bir operatörün kimliği bir tenant'ın feed'inde belirmez. Operatöre düşen
+yarı JSON log'a gider:
+`{ ts, level: 'warn', event: 'account.deleted', userId, initiatedBy, actorId, …sayılar }` —
+saklama süpürmesinin yalnızca sayı log'lamasıyla aynı sebeple adres ve ad taşımaz. Bir kararın
+sildiği workspace hiç aktivite satırı almaz (`workspace.deleted`'ın aynı cascade problemi) ve
+`deletedWithAccount` taşıyan bir `workspace.deleted` satırı üretir.
+[ADR 0026](decisions/0026-account-deletion-anonymisation.md).
 
 Denetim satırları da diğer aktiviteler gibi aynı saklama penceresiyle temizlenir
 (`ACTIVITY_RETENTION_DAYS`, varsayılan 365; `0` sonsuza kadar saklar —
