@@ -2,11 +2,13 @@ import { Logger } from '@nestjs/common';
 import { Queue, Worker, type Job } from 'bullmq';
 import { initSentry, resetSentryForTesting } from '../common/observability/sentry';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import {
   CLEANUP_BATCH_SIZE,
   CleanupWorker,
   MAX_BATCHES_PER_TABLE,
   cutoffFor,
+  orphanGraceMs,
   retentionSettings,
 } from './cleanup.worker';
 
@@ -26,7 +28,14 @@ const RETENTION_ENV = [
   'NOTIFICATION_RETENTION_DAYS',
   'ACTIVITY_RETENTION_DAYS',
   'REDIS_URL',
+  // The orphan sweep's grace period is BACKUP_KEEP × BACKUP_INTERVAL, so these two are as much
+  // retention configuration as the windows above are.
+  'BACKUP_INTERVAL',
+  'BACKUP_KEEP',
 ] as const;
+
+/** A storage key shaped like the real thing: it carries an attachment's id, so it identifies. */
+const ORPHAN_KEY = '0198f0c2/0198f0c2-3c1a-7a3f-9b6e-2f0a1d4c5e60';
 
 /** A frozen "now" so every cutoff in these tests is arithmetic, not a race with the clock. */
 const NOW = new Date('2026-08-14T00:00:00.000Z');
@@ -54,20 +63,59 @@ describe('CleanupWorker', () => {
     jest.clearAllMocks();
   });
 
+  /**
+   * A `StorageService` stub whose `persistsFiles` is a plain writable property.
+   *
+   * The real one is a getter over the process-wide backend; a test that wants "this deployment
+   * stores nothing" would otherwise have to reach into module state that other specs share.
+   */
+  interface StorageStub {
+    persistsFiles: boolean;
+    listKeys: jest.Mock;
+    remove: jest.Mock;
+  }
+
+  /** Turns a plain array into the `AsyncIterable` `StorageBackend.listKeys` hands back. */
+  function keyStream(entries: { key: string; modifiedAt: Date }[]): AsyncIterable<{
+    key: string;
+    modifiedAt: Date;
+  }> {
+    return {
+      async *[Symbol.asyncIterator]() {
+        for (const entry of entries) yield entry;
+      },
+    };
+  }
+
   function buildWorker(deleted: number[] = []): {
     worker: CleanupWorker;
     executeRaw: jest.Mock;
+    findMany: jest.Mock;
+    storage: StorageStub;
     lines: string[];
   } {
     const executeRaw = jest.fn().mockResolvedValue(0);
     for (const count of deleted) executeRaw.mockResolvedValueOnce(count);
 
-    const prisma = { $executeRaw: executeRaw } as unknown as PrismaService;
-    const worker = new CleanupWorker(prisma);
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = {
+      $executeRaw: executeRaw,
+      attachment: { findMany },
+    } as unknown as PrismaService;
+
+    // Nothing on disk by default, so every existing test in this file keeps describing a run
+    // that only deletes rows.
+    const storage: StorageStub = {
+      persistsFiles: true,
+      listKeys: jest.fn(() => keyStream([])),
+      remove: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const worker = new CleanupWorker(prisma, storage as unknown as StorageService);
     const lines: string[] = [];
     worker.setLogWriter((line) => lines.push(line));
 
-    return { worker, executeRaw, lines };
+    return { worker, executeRaw, findMany, storage, lines };
   }
 
   function callsFor(executeRaw: jest.Mock, table: string): ExecuteRawCall[] {
@@ -87,6 +135,7 @@ describe('CleanupWorker', () => {
         notifications: 7,
         activities: 5,
         usagePings: 4,
+        orphanedFiles: 0,
       });
 
       // One statement per table: each batch came back short, so no table looped.
@@ -240,7 +289,7 @@ describe('CleanupWorker', () => {
   describe('CLEANUP_ENABLED=false', () => {
     it('deletes nothing and issues no statement', async () => {
       process.env.CLEANUP_ENABLED = 'false';
-      const { worker, executeRaw, lines } = buildWorker([10, 10, 10, 10]);
+      const { worker, executeRaw, storage, lines } = buildWorker([10, 10, 10, 10]);
 
       await expect(worker.runCleanup(NOW)).resolves.toEqual({
         sessions: 0,
@@ -248,8 +297,12 @@ describe('CleanupWorker', () => {
         notifications: 0,
         activities: 0,
         usagePings: 0,
+        orphanedFiles: 0,
       });
       expect(executeRaw).not.toHaveBeenCalled();
+      // The off switch covers the file sweep too: it is the same run, and a switch that stops
+      // deleting rows while still deleting files would be the worst possible reading of it.
+      expect(storage.listKeys).not.toHaveBeenCalled();
       expect(lines).toEqual([]);
     });
 
@@ -283,12 +336,165 @@ describe('CleanupWorker', () => {
       process.env.CLEANUP_ENABLED = 'true';
       // Always a full batch — the shape a broken predicate would produce.
       const executeRaw = jest.fn().mockResolvedValue(CLEANUP_BATCH_SIZE);
-      const worker = new CleanupWorker({ $executeRaw: executeRaw } as unknown as PrismaService);
+      const worker = new CleanupWorker(
+        { $executeRaw: executeRaw } as unknown as PrismaService,
+        { persistsFiles: false } as unknown as StorageService,
+      );
       worker.setLogWriter(() => {});
 
       await worker.runCleanup(NOW);
 
       expect(callsFor(executeRaw, 'Session')).toHaveLength(MAX_BATCHES_PER_TABLE);
+    });
+  });
+
+  /**
+   * The one sweep in this worker that is not a batched `DELETE`, and the one count that is not
+   * a row count. Its grace period is `BACKUP_KEEP × BACKUP_INTERVAL`, so a file can never be
+   * deleted while a dump old enough to disown it is still restorable (ADR 0022).
+   */
+  describe('orphan attachment sweep', () => {
+    beforeEach(() => {
+      process.env.CLEANUP_ENABLED = 'true';
+      delete process.env.BACKUP_INTERVAL;
+      delete process.env.BACKUP_KEEP;
+    });
+
+    /** One key, aged relative to the cutoff by `offsetMs` (negative = older than the cutoff). */
+    function withOrphan(offsetMs: number): ReturnType<typeof buildWorker> {
+      const built = buildWorker();
+      const modifiedAt = new Date(NOW.getTime() - orphanGraceMs() + offsetMs);
+      built.storage.listKeys.mockReturnValue(keyStream([{ key: ORPHAN_KEY, modifiedAt }]));
+      return built;
+    }
+
+    it('removes a file with no row once it is older than the grace period', async () => {
+      const { worker, storage } = withOrphan(-1000);
+
+      const counts = await worker.runCleanup(NOW);
+
+      expect(storage.remove).toHaveBeenCalledWith(ORPHAN_KEY);
+      expect(counts.orphanedFiles).toBe(1);
+    });
+
+    it('leaves a file alone while a dump old enough to disown it is still restorable', async () => {
+      const { worker, storage, findMany } = withOrphan(1000);
+
+      const counts = await worker.runCleanup(NOW);
+
+      expect(storage.remove).not.toHaveBeenCalled();
+      expect(counts.orphanedFiles).toBe(0);
+      // Not even asked about: a file inside the window is skipped before the database is
+      // consulted, so a directory of fresh uploads costs no queries at all.
+      expect(findMany).not.toHaveBeenCalled();
+    });
+
+    it('leaves a file alone when a row still points at it', async () => {
+      const { worker, storage, findMany } = withOrphan(-1000);
+      findMany.mockResolvedValue([{ storageKey: ORPHAN_KEY }]);
+
+      const counts = await worker.runCleanup(NOW);
+
+      expect(storage.remove).not.toHaveBeenCalled();
+      expect(counts.orphanedFiles).toBe(0);
+    });
+
+    it('asks the database only about the keys it is holding, and only for the key column', async () => {
+      const { worker, findMany } = withOrphan(-1000);
+
+      await worker.runCleanup(NOW);
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: { storageKey: { in: [ORPHAN_KEY] } },
+        select: { storageKey: true },
+      });
+    });
+
+    it('honours a shortened BACKUP_KEEP instead of assuming the default week', async () => {
+      process.env.BACKUP_KEEP = '2';
+      process.env.BACKUP_INTERVAL = '86400';
+      // Three days old: outside a two-day window, well inside the seven-day default.
+      const { worker, storage } = buildWorker();
+      storage.listKeys.mockReturnValue(
+        keyStream([{ key: ORPHAN_KEY, modifiedAt: new Date(NOW.getTime() - 3 * DAY_MS) }]),
+      );
+
+      const counts = await worker.runCleanup(NOW);
+
+      expect(storage.remove).toHaveBeenCalledWith(ORPHAN_KEY);
+      expect(counts.orphanedFiles).toBe(1);
+    });
+
+    it('does nothing at all when this deployment stores no files', async () => {
+      const { worker, storage } = withOrphan(-1000);
+      storage.persistsFiles = false;
+
+      const counts = await worker.runCleanup(NOW);
+
+      expect(storage.listKeys).not.toHaveBeenCalled();
+      expect(counts.orphanedFiles).toBe(0);
+    });
+
+    it('never writes a path into the log line', async () => {
+      const { worker, lines } = withOrphan(-1000);
+
+      await worker.runCleanup(NOW);
+
+      // A storage key is an attachment's identity. Copying it into a log aggregator is exactly
+      // what this job exists to prevent (ADR 0020, `CleanupLogLine`).
+      expect(lines[0]).not.toContain(ORPHAN_KEY);
+      expect(JSON.parse(lines[0]!)).toMatchObject({ orphanedFiles: expect.any(Number) });
+    });
+
+    it('checks a directory in batches rather than one round trip per file', async () => {
+      const { worker, findMany, storage } = buildWorker();
+      const old = new Date(NOW.getTime() - 30 * DAY_MS);
+      storage.listKeys.mockReturnValue(
+        keyStream(
+          Array.from({ length: CLEANUP_BATCH_SIZE + 1 }, (_, index) => ({
+            key: `${ORPHAN_KEY}-${index}`,
+            modifiedAt: old,
+          })),
+        ),
+      );
+
+      const counts = await worker.runCleanup(NOW);
+
+      // 1001 files, two queries: one full batch plus the flush of the remainder.
+      expect(findMany).toHaveBeenCalledTimes(2);
+      expect(
+        (findMany.mock.calls[0]![0] as { where: { storageKey: { in: string[] } } }).where.storageKey
+          .in,
+      ).toHaveLength(CLEANUP_BATCH_SIZE);
+      expect(counts.orphanedFiles).toBe(CLEANUP_BATCH_SIZE + 1);
+    });
+  });
+
+  describe('orphanGraceMs', () => {
+    beforeEach(() => {
+      delete process.env.BACKUP_INTERVAL;
+      delete process.env.BACKUP_KEEP;
+    });
+
+    it('defaults to a week — the same rotation the backup sidecar actually performs', () => {
+      expect(orphanGraceMs()).toBe(7 * DAY_MS);
+    });
+
+    it('multiplies the two backup variables the compose file passes in', () => {
+      process.env.BACKUP_INTERVAL = '3600';
+      process.env.BACKUP_KEEP = '3';
+
+      expect(orphanGraceMs()).toBe(3 * 3600 * 1000);
+    });
+
+    it('treats BACKUP_KEEP=0 as one archive rather than as no grace at all', () => {
+      // `ls | tail -n +1` in backup.sh's prune keeps nothing, but a zero-length window would
+      // let the sweep delete a file the instant its row is missing — including during a
+      // restore. Clamping to one interval is the conservative reading.
+      process.env.BACKUP_KEEP = '0';
+      process.env.BACKUP_INTERVAL = '86400';
+
+      expect(orphanGraceMs()).toBe(DAY_MS);
     });
   });
 
@@ -321,6 +527,7 @@ describe('CleanupWorker', () => {
         'event',
         'level',
         'notifications',
+        'orphanedFiles',
         'sessions',
         'ts',
         'usagePings',
@@ -417,7 +624,9 @@ describe('CleanupWorker', () => {
     > {
       process.env.REDIS_URL = 'redis://localhost:6379';
       const prisma = { $executeRaw: jest.fn() } as unknown as PrismaService;
-      const worker = new CleanupWorker(prisma);
+      const worker = new CleanupWorker(prisma, {
+        persistsFiles: false,
+      } as unknown as StorageService);
 
       await worker.onModuleInit();
 

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { StorageModule } from '../storage/storage.module';
 import { CleanupWorker } from './cleanup.worker';
 
 /**
@@ -14,8 +15,15 @@ import { CleanupWorker } from './cleanup.worker';
  *
  * No controller and no exported provider: nothing in the API calls into retention, and there
  * is deliberately no route that triggers a sweep on demand.
+ *
+ * `StorageModule` is imported for the same reason the sweep list above names four tables that
+ * belong to three modules: the orphan-file pass is the one part of retention that deletes
+ * something Postgres has never heard of, and it still belongs to the nightly run rather than to
+ * any delete path — `Workspace → Board → Task` cascades remove attachment rows inside Postgres
+ * with no application code running at all (ADR 0022).
  */
 @Module({
+  imports: [StorageModule],
   providers: [CleanupWorker],
 })
 export class RetentionModule {}
