@@ -1,4 +1,12 @@
-import { openApiDocsEnabled } from './serve-openapi';
+import { Controller, Get, type INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import request from 'supertest';
+import {
+  OPENAPI_JSON_PATH,
+  OPENAPI_UI_PATH,
+  openApiDocsEnabled,
+  serveOpenApi,
+} from './serve-openapi';
 
 /**
  * These assertions pin a **decision**, not an implementation.
@@ -66,5 +74,140 @@ describe('openApiDocsEnabled', () => {
     // does: `Boolean('false')` is `true`, and a lenient reading here would publish a console on
     // an instance whose operator wrote something they believed meant "no".
     expect(() => openApiDocsEnabled()).toThrow(/API_DOCS_ENABLED/);
+  });
+});
+
+/** Stands in for `HealthController`, whose two paths the document's own guard requires. */
+@Controller('health')
+class StubHealthController {
+  @Get()
+  check(): string {
+    return 'ok';
+  }
+
+  @Get('ready')
+  ready(): string {
+    return 'ok';
+  }
+}
+
+/**
+ * The decision above is only worth pinning if the switch it describes actually moves something,
+ * so these exercise the mount itself rather than the predicate.
+ *
+ * Two things here are checked nowhere else in the suite. The **Content-Security-Policy
+ * exception** is the one hole this feature opens in a service that is otherwise
+ * `default-src 'none'`, and it is per-path — a regression that widened it, or that dropped it
+ * and left the console blank, would break nothing else. And the **disabled** case has to be
+ * genuinely unmounted rather than merely unreachable: a route that exists and answers 403 is a
+ * different promise from one that was never registered.
+ */
+describe('serveOpenApi', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalDocsEnabled = process.env.API_DOCS_ENABLED;
+
+  async function bootWith(docsEnabled: string): Promise<INestApplication> {
+    process.env.API_DOCS_ENABLED = docsEnabled;
+    const moduleRef = await Test.createTestingModule({
+      controllers: [StubHealthController],
+    }).compile();
+    const app = moduleRef.createNestApplication();
+    // `serveOpenApi` before `init`, exactly as `main.ts` orders it.
+    serveOpenApi(app);
+    await app.init();
+
+    return app;
+  }
+
+  afterEach(() => {
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+    if (originalDocsEnabled === undefined) {
+      delete process.env.API_DOCS_ENABLED;
+    } else {
+      process.env.API_DOCS_ENABLED = originalDocsEnabled;
+    }
+  });
+
+  describe('when enabled', () => {
+    let app: INestApplication;
+
+    beforeAll(async () => {
+      app = await bootWith('true');
+    });
+
+    afterAll(async () => {
+      await app.close();
+      delete process.env.API_DOCS_ENABLED;
+    });
+
+    it('serves the console as HTML', async () => {
+      const response = await request(app.getHttpServer()).get(`/${OPENAPI_UI_PATH}`);
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/text\/html/);
+    });
+
+    it('relaxes the content-security-policy on the console, and only so far', async () => {
+      const response = await request(app.getHttpServer()).get(`/${OPENAPI_UI_PATH}`);
+      const policy = response.headers['content-security-policy'];
+
+      // Swagger UI is a document with an inline style block and its own bundles. Under the
+      // API-wide `default-src 'none'` every one of them is refused and the page renders blank.
+      expect(policy).toContain("script-src 'self' 'unsafe-inline'");
+      expect(policy).toContain("style-src 'self' 'unsafe-inline'");
+      // What the exception does **not** buy: nothing off-origin loads, nothing may frame the
+      // console, and no `<base>` or form target can be smuggled into it.
+      expect(policy).toContain("default-src 'none'");
+      expect(policy).toContain("frame-ancestors 'none'");
+      expect(policy).toContain("base-uri 'none'");
+      expect(policy).toContain("form-action 'none'");
+    });
+
+    it('serves the document as JSON, with the paths the guard demanded', async () => {
+      const response = await request(app.getHttpServer()).get(`/${OPENAPI_JSON_PATH}`);
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/application\/json/);
+      expect(Object.keys(response.body.paths)).toEqual(
+        expect.arrayContaining(['/health', '/health/ready']),
+      );
+    });
+
+    it('needs no session for either — that is the point of the decision above', async () => {
+      // No cookie is sent by any request in this describe block. Both answered 200, which is
+      // what makes the production default worth having.
+      const ui = await request(app.getHttpServer()).get(`/${OPENAPI_UI_PATH}`);
+      const json = await request(app.getHttpServer()).get(`/${OPENAPI_JSON_PATH}`);
+
+      expect([ui.status, json.status]).toEqual([200, 200]);
+    });
+  });
+
+  describe('when disabled', () => {
+    let app: INestApplication;
+
+    beforeAll(async () => {
+      process.env.NODE_ENV = 'production';
+      app = await bootWith('false');
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    it('registers nothing at all, rather than registering something that refuses', async () => {
+      const ui = await request(app.getHttpServer()).get(`/${OPENAPI_UI_PATH}`);
+      const json = await request(app.getHttpServer()).get(`/${OPENAPI_JSON_PATH}`);
+
+      expect([ui.status, json.status]).toEqual([404, 404]);
+    });
+
+    it('leaves the rest of the application untouched', async () => {
+      await request(app.getHttpServer()).get('/health').expect(200);
+    });
   });
 });

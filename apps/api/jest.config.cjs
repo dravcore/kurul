@@ -131,6 +131,52 @@ module.exports = {
   // deployment publishes. The floor does not move: 0.59 points of the P3-3 margin are gone and
   // that is the signal, not something to erase — but nothing the floor watches got colder, and
   // the branch margin is still 3.15 points.
+  //
+  //   2026-08-16  74.70 / 66.44 / 76.54 / 75.66  P3-11 rebased onto a `develop` carrying P3-4
+  //                                              through P3-9. **Below the floor on three of
+  //                                              four.** Measured in CI, reproduced locally.
+  //
+  // The entry above said the margin shrinking was the signal. This is what the signal was for.
+  // Nothing about `src/openapi/` changed; the denominator did, when six other items landed and
+  // the 3.15-point cushion that was absorbing an untested module stopped existing. A drop that
+  // only shows up when someone else's work lands is still this module's drop.
+  //
+  //   2026-08-16  76.11 / 67.89 / 78.11 / 77.13  after testing `src/openapi/` — three
+  //                                              consecutive runs, identical to four digits
+  //
+  // **Recovered by covering the cause, and no file is excluded from the denominator.** Three
+  // options were measured rather than argued:
+  //
+  //   - excluding `generate-openapi.ts` alone        75.46 / 66.87 / 77.25 / 76.46
+  //   - excluding it and `openapi.document.ts`       76.40 / 67.97 / 78.32 / 77.45
+  //   - testing the module, excluding nothing        76.11 / 67.89 / 78.11 / 77.13
+  //
+  // The last one is within a rounding error of the second and beats the first outright, so the
+  // exclusion buys about three tenths of a point. That is not worth what it costs:
+  // `apps/web/vitest.config.ts` already states the rule in this repository's own words — *an
+  // excluded file is an invisible one* — and excluding a file to restore a margin is the same
+  // move as lowering the floor with one indirection in front of it.
+  //
+  // The tempting argument for exclusion was that `pnpm openapi:check` regenerates the whole
+  // document on every CI build and byte-compares it, which is a stronger instrument than a unit
+  // test. It is — for the paths a *green* run walks. It is blind exactly where the risk is:
+  // `openapi.document.ts`'s two guards (`assertPathsExist`, the `UUID_PATH_PARAMS` membership
+  // test) throw, so a passing gate never executes them, and they are the code that makes it safe
+  // to restate a routing fact as a hard-coded list. The gate proves the lists are right today;
+  // only a test proves the thing that is supposed to notice when they stop being right does.
+  // `openapi.document.ts` is now 96.49% statements / 82.35% branches / 100% functions, and
+  // `serve-openapi.ts` — the file that decides whether an unauthenticated console is published
+  // in production — is 100% across the board, mount and all.
+  //
+  // `generate-openapi.ts` stays counted at 0% and stays in. It is the one file with a real
+  // exclusion argument (argv, two `fs` calls, and a container boot, all of which `openapi:check`
+  // runs on every build), and the floor clears with a 1.11-point margin without making it. An
+  // argument you do not need to make is one you should not make. Its only untested logic — the
+  // sentence printed when the gate fires, which a green run can never reach — was moved to
+  // `openapi/snapshot.ts` and tested there.
+  //
+  // The floor still does not move. Margins are 1.11 / 1.89 / 1.11 / 1.13, and they are now
+  // margins over a measurement that includes every file, which is the only kind worth having.
   coverageThreshold: {
     global: {
       statements: 75,
