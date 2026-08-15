@@ -221,6 +221,7 @@ assertion, which is the point: that final assertion is the whole test.
 | Unit                   | Colocated with the source file | `apps/api/src/task/task.service.spec.ts`             |
 | Integration            | Separate test root             | `apps/api/test/task.e2e-spec.ts`                     |
 | Test helpers/factories | Shared under the test root     | `apps/api/test/helpers/`, `apps/api/test/factories/` |
+| Temporary storage root | Beside the database helper     | `apps/api/test/helpers/storage.ts`                   |
 | Browser e2e            | Repository-level package       | `e2e/tests/board-realtime.spec.ts`                   |
 | Browser e2e helpers    | Beside them                    | `e2e/support/`, `e2e/stack-env.ts`                   |
 
@@ -258,7 +259,17 @@ uses a third one — see [Isolation](#isolation).
   twenty tests.
 - **Each integration test cleans up after itself** — truncate the affected tables in
   `afterEach` or wrap the test in a transaction that is rolled back. Order-dependent test
-  suites are a bug.
+  suites are a bug. **The temporary directory counts as state too**: a spec that exercises
+  storage creates its own root with `createTempStorageDir()` and removes it in `afterEach` with
+  `removeTempStorageDir()` (`test/helpers/storage.ts`), the same way `helpers/db.ts` answers the
+  same question about rows.
+- **Storage is tested against a real directory, never a memory backend.** ADR 0022 rejected an
+  in-memory `StorageBackend` for the same reason this file forbids mocking Prisma in
+  integration tests: it would be a class that exists only for tests, and the codebase has no
+  precedent for one — `LogMailSender`, the closest thing to it, is also a production fallback.
+  Writing to a real filesystem is what makes path handling, permissions and the read-stream
+  path testable at all, and those are exactly the three things a fake would have gotten right
+  by construction.
 - Mock only what crosses a process boundary you do not control (email, third-party HTTP).
   Do not mock Prisma in integration tests — that is the point of them. The browser suite
   mocks nothing at all, including mail: it reads what was sent out of Mailpit.

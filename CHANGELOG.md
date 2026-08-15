@@ -9,6 +9,63 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Task attachments — files and links on a card.** A task now carries attachments of two
+  kinds, and the schema says which: a `FILE` has stored bytes, a sniffed media type and a size;
+  a `LINK` has only a URL. Both are first-class user features, not one plus an import artifact
+  ([ADR 0022](docs/decisions/0022-attachment-storage.md),
+  [ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md)). The task panel
+  uploads a file, attaches a link, lists what is there newest-first, previews the four image
+  types inline and removes an attachment; the board card gains a count badge and renders
+  nothing at all on a task with no attachments. Five endpoints were added under the workspace
+  root, one of which — the byte stream — is the first response in this API that is not JSON.
+  No new socket event: an attachment change emits the same `task:updated` every other task
+  sub-resource uses, and the client re-reads over REST.
+
+  **The server never requests a `LINK`'s URL.** No preview, no favicon, no `<title>` scrape,
+  no unfurl, no health check — the URL is opaque text that is stored, returned and rendered by
+  the client. Only `http:` and `https:` are accepted at write time. A server-side fetch of a
+  user-supplied URL is an SSRF primitive, and a Compose network where `postgres` and `redis`
+  resolve by name is the worst place to have one; link previews are cosmetic, the capability
+  they require is not.
+
+  **Files are accepted on their magic bytes, not their extension or their declared type.** The
+  allowlist is broad — PNG/JPEG/GIF/WebP, PDF, the OpenXML and OpenDocument office formats,
+  ZIP, `text/plain` and `text/csv` — and excludes `text/html` and `image/svg+xml` by name,
+  because images are the one family served `inline` and both of those are markup. Plain text
+  has no magic number, so `.txt` and `.csv` come in through a deliberately narrow fallback:
+  the declared type must be exactly one of those two, the bytes must decode as UTF-8, contain
+  no `NUL`, and not begin with `<`. Anything else is a `415`. Downloads always carry the
+  sniffed type, `nosniff`, `Cross-Origin-Resource-Policy: same-origin` and a `private,
+  must-revalidate` cache policy; everything except the four image types is served
+  `Content-Disposition: attachment`, PDFs included.
+
+  **Operators: three things change.** First, **the API becomes stateful** — a new
+  `attachment_data` volume holds the uploaded files, the `backup` sidecar now writes **two**
+  archives per cycle (the `pg_dump` and a `-files.tar.gz` sharing its timestamp), and the
+  restore procedure grew a step: restoring the dump without the matching file archive brings
+  the rows back and leaves every file behind, which passes every check written before
+  attachments existed. The rehearsed drill in
+  [development.md](docs/development.md#restoring-from-a-backup) now compares file count **and**
+  per-file size against the rows. Second, **the reverse-proxy contract gains a body-size row,
+  and its number is deliberately not the same as the user-facing limit**:
+  `ATTACHMENT_MAX_BYTES` is `26214400` (25 MiB) and is the size of the _file_, while the proxy
+  caps the _whole request body_ at 26 MiB, because a multipart envelope adds a few hundred
+  bytes on top — set both to 25 MiB and a file of exactly the documented limit becomes
+  unuploadable. The rule between them is an ordering, not an equality: the proxy must never
+  reject what the API would accept. A replacement proxy that omits the row rejects everything
+  over nginx's 1 MB default. Third, **the nightly retention sweep now also unlinks stored files
+  no attachment row claims**, after a grace period of `BACKUP_KEEP × BACKUP_INTERVAL` (floored
+  at 24 hours) — which is why those two variables are now passed to the `api` service as well
+  as to `backup`. Attachments are off entirely unless `STORAGE_PATH` is set; links work either
+  way, and `GET /config` reports `attachmentsEnabled` so the UI can say so.
+
+  **One audit-query note.** `AUDIT_ACTIVITY_TYPES` grew by one entry, `attachment.deleted`, so
+  the administrative activity query returns a type it did not before — on the singular path
+  only, one person detaching one file. `attachment.created` was deliberately left **out** of
+  that subset: the Trello importer will write one attachment row per imported URL, which is
+  the bulk-volume behaviour the audit list excludes `comment.created` for. The upload is still
+  on the task's own activity feed either way.
+
 - **Task checklists.** A task can now carry multiple named checklists, each with its own items
   — the shape Trello uses, chosen because Trello import (P3-3, the next roadmap item) targets a
   source that is itself multi-list, and because a single flat list would need re-modelling the

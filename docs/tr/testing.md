@@ -223,6 +223,7 @@ mesele de bu: o son assertion testin kendisidir.
 | Unit                         | Kaynak dosyayla yerinde (colocated) | `apps/api/src/task/task.service.spec.ts`             |
 | Integration                  | Ayrı bir test kökü                  | `apps/api/test/task.e2e-spec.ts`                     |
 | Test helper'ları/factory'ler | Test kökü altında paylaşılır        | `apps/api/test/helpers/`, `apps/api/test/factories/` |
+| Geçici depolama kökü         | Veritabanı helper'ının yanında      | `apps/api/test/helpers/storage.ts`                   |
 | Browser e2e                  | Repository seviyesinde paket        | `e2e/tests/board-realtime.spec.ts`                   |
 | Browser e2e helper'ları      | Onların yanında                     | `e2e/support/`, `e2e/stack-env.ts`                   |
 
@@ -262,7 +263,17 @@ Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#izol
   elle yazmayın.
 - **Her integration testi kendinden sonra temizlik yapar** — etkilenen tabloları
   `afterEach`'te truncate edin ya da testi geri alınan (rolled back) bir transaction
-  içine sarın. Sıraya bağımlı test suite'leri bir bug'dır.
+  içine sarın. Sıraya bağımlı test suite'leri bir bug'dır. **Geçici dizin de state sayılır**:
+  depolamaya dokunan bir spec kendi kökünü `createTempStorageDir()` ile açar ve `afterEach`'te
+  `removeTempStorageDir()` ile siler (`test/helpers/storage.ts`) — `helpers/db.ts`'in satırlar
+  için cevapladığı aynı sorunun cevabı.
+- **Depolama gerçek bir dizine karşı test edilir, asla memory backend'e karşı değil.** ADR 0022
+  bellek içi bir `StorageBackend`'i, bu dosyanın integration testlerinde Prisma mock'lamayı
+  yasaklamasıyla aynı gerekçeyle reddetti: yalnız testler için var olan bir sınıf olurdu ve kod
+  tabanında bunun emsali yok — ona en yakın şey olan `LogMailSender` aynı zamanda bir üretim
+  geri düşüşü. Yol işleme, izinler ve okuma akışı yolunu test edilebilir kılan şey gerçek bir
+  dosya sistemine yazmaktır; sahte bir backend'in yapısı gereği zaten doğru yapacağı üç şey de
+  tam olarak bunlardı.
 - Yalnızca kontrol etmediğiniz bir process sınırını geçen şeyleri mock'layın (email,
   üçüncü parti HTTP). Integration testlerinde Prisma'yı mock'lamayın — onların amacı tam
   olarak bu. Browser suite'i hiçbir şeyi mock'lamaz, postayı da: gönderileni Mailpit'ten okur.

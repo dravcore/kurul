@@ -556,7 +556,8 @@ was measured against.
 ## Data retention
 
 Kurultay deletes rows it is no longer entitled to keep. A BullMQ job runs **once a day** on
-`REDIS_URL` — the same mechanism as the due-soon scan — and sweeps five tables:
+`REDIS_URL` — the same mechanism as the due-soon scan — and sweeps five tables, plus the
+attachment directory:
 
 | Table          | Deleted when                        | Setting                                      |
 | -------------- | ----------------------------------- | -------------------------------------------- |
@@ -565,6 +566,16 @@ Kurultay deletes rows it is no longer entitled to keep. A BullMQ job runs **once
 | `Notification` | read, and read more than N days ago | `NOTIFICATION_RETENTION_DAYS` (default `90`) |
 | `Activity`     | written more than N days ago        | `ACTIVITY_RETENTION_DAYS` (default `365`)    |
 | `UsagePing`    | written more than N days ago        | `ACTIVITY_RETENTION_DAYS` (default `365`)    |
+
+The sixth sweep has no table. **Stored attachment files that no row claims are unlinked**, and
+they exist because `Workspace → Board → Task → Attachment` cascades entirely inside Postgres:
+deleting a board can remove thousands of attachment rows without a line of application code
+running, so nothing is there to delete the bytes. The sweep is skipped outright when
+`STORAGE_PATH` is unset, and it only considers files older than a **grace period** of
+`BACKUP_KEEP × BACKUP_INTERVAL` — never less than 24 hours whatever those two say, because a
+file whose row has not committed yet is also a file no row claims. The count it reports is
+`orphanedFiles`; it is a number and never a list of keys, because a storage key is an
+attachment's identity.
 
 `UsagePing` deliberately shares `ACTIVITY_RETENTION_DAYS` rather than carrying a window of its
 own: it is the same class of row — instance history naming a user — and two settings on one

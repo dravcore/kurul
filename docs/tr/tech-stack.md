@@ -178,14 +178,14 @@ büyüklük.
 
 ## 3. Bilinçli olarak dahil edilmeyenler
 
-| Teknoloji               | Neden şimdi değil                                                                                                 |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Kafka                   | ClickUp kullanıyor, ama 20M+ kullanıcı ölçeğinde. Redis pub/sub MVP için fazlasıyla yeterli; sonradan eklenebilir |
-| GraphQL                 | Linear kullanıyor. REST'le başlamak daha hızlı; API tüketicileri çeşitlendiğinde yeniden değerlendirilir          |
-| Elasticsearch           | Tam metin arama PostgreSQL'in yerleşik FTS'iyle başlayabilir                                                      |
-| Kubernetes              | Tek bir host'ta Docker Compose yeterli. Trafik gerektirdiğinde geçiş yapılır                                      |
-| MinIO / S3              | Dosya ekleri MVP kapsamı dışında. Eklendiğinde S3-uyumlu bir store seçilir                                        |
-| Local-first sync engine | Linear'ın en büyük teknik yatırımı. Çok yüksek karmaşıklık — server-first ile başla                               |
+| Teknoloji               | Neden şimdi değil                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kafka                   | ClickUp kullanıyor, ama 20M+ kullanıcı ölçeğinde. Redis pub/sub MVP için fazlasıyla yeterli; sonradan eklenebilir                                                                                                                                                                                                                                                     |
+| GraphQL                 | Linear kullanıyor. REST'le başlamak daha hızlı; API tüketicileri çeşitlendiğinde yeniden değerlendirilir                                                                                                                                                                                                                                                              |
+| Elasticsearch           | Tam metin arama PostgreSQL'in yerleşik FTS'iyle başlayabilir                                                                                                                                                                                                                                                                                                          |
+| Kubernetes              | Tek bir host'ta Docker Compose yeterli. Trafik gerektirdiğinde geçiş yapılır                                                                                                                                                                                                                                                                                          |
+| MinIO / S3              | Ekler **yerel diskte, bir `StorageBackend` port'unun arkasında** geliyor; object storage üzerinde değil ([ADR 0022](decisions/0022-attachment-storage.md)). `S3StorageBackend` bir takvime değil, bir tetikleyiciye ertelendi: yerel diskin dayanıklı olmadığı bir dağıtımın ilk operatör raporu — kalıcı olmayan bir container host, ya da çok replikalı bir kurulum |
+| Local-first sync engine | Linear'ın en büyük teknik yatırımı. Çok yüksek karmaşıklık — server-first ile başla                                                                                                                                                                                                                                                                                   |
 
 ---
 
