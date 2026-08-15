@@ -255,13 +255,22 @@ If you already run nginx, Traefik or another proxy and would rather not stack a 
 you can replace the `proxy` service — but the routing contract is not negotiable, because the
 web app is built against it. Three rules, in this order, all on one hostname:
 
-| Path       | Goes to  | Prefix              |
-| ---------- | -------- | ------------------- |
-| `/auth/*`  | api:4000 | kept as-is          |
-| `/api/*`   | api:4000 | `/api` **stripped** |
-| everything | web:3000 | kept as-is          |
+| Path       | Goes to  | Prefix              | Max request body              |
+| ---------- | -------- | ------------------- | ----------------------------- |
+| `/auth/*`  | api:4000 | kept as-is          | proxy default is fine         |
+| `/api/*`   | api:4000 | `/api` **stripped** | **25 MiB** (`26214400` bytes) |
+| everything | web:3000 | kept as-is          | proxy default is fine         |
 
 `/api/*` must also pass WebSocket upgrades through — that is the realtime board feed.
+
+The body size on `/api/*` is part of the contract, not a tuning knob. It is the same number as
+the API's `ATTACHMENT_MAX_BYTES` (`.env.example`), and the two are **not independently
+tunable**: raise the API's without raising the proxy's and every upload over the proxy's limit
+fails with a `413` the API never sees and never logs; raise the proxy's without raising the
+API's and the proxy logs a successful request the API then rejects. Caddy imposes no body limit
+of its own, which is why the bundled `docker/Caddyfile` has to set one explicitly — and nginx
+defaults `client_max_body_size` to **1 MB**, so a replacement proxy that omits the row rejects
+every attachment larger than a megabyte.
 
 The two API rules differ on purpose. Better Auth derives its mount path from the URL it is
 configured with and matches incoming requests against it, so `/auth` has to be the same string
@@ -270,7 +279,10 @@ mounted at its own root and gets the prefix removed on the way in. In nginx:
 
 ```nginx
 location /auth/ { proxy_pass http://api:4000;  }   # no trailing slash → path preserved
-location /api/  { proxy_pass http://api:4000/; }   # trailing slash    → /api stripped
+location /api/  {
+  proxy_pass http://api:4000/;                     # trailing slash    → /api stripped
+  client_max_body_size 25m;                        # = ATTACHMENT_MAX_BYTES (26214400)
+}
 location /      { proxy_pass http://web:3000;  }
 ```
 

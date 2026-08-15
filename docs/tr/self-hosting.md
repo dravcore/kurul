@@ -259,13 +259,22 @@ istemiyorsanız `proxy` servisini değiştirebilirsiniz — ancak yönlendirme s
 açık değildir, çünkü web uygulaması ona göre build edilir. Tek hostname altında, bu sırayla üç
 kural:
 
-| Yol            | Nereye   | Prefix                |
-| -------------- | -------- | --------------------- |
-| `/auth/*`      | api:4000 | olduğu gibi korunur   |
-| `/api/*`       | api:4000 | `/api` **kaldırılır** |
-| geri kalan her | web:3000 | olduğu gibi korunur   |
+| Yol            | Nereye   | Prefix                | Azami istek gövdesi          |
+| -------------- | -------- | --------------------- | ---------------------------- |
+| `/auth/*`      | api:4000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
+| `/api/*`       | api:4000 | `/api` **kaldırılır** | **25 MiB** (`26214400` bayt) |
+| geri kalan her | web:3000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
 
 `/api/*` ayrıca WebSocket upgrade'lerini de geçirmelidir — realtime pano akışı odur.
+
+`/api/*` üzerindeki gövde boyutu sözleşmenin parçasıdır, ayar düğmesi değil. Bu sayı API'nin
+`ATTACHMENT_MAX_BYTES` değeriyle **aynıdır** (`.env.example`) ve ikisi **bağımsız
+ayarlanamaz**: API'ninkini yükseltip proxy'ninkini yükseltmezseniz proxy limitini aşan her
+yükleme, API'nin hiç görmediği ve hiç loglamadığı bir `413` ile düşer; proxy'ninkini yükseltip
+API'ninkini yükseltmezseniz proxy başarılı bir istek loglar, API onu reddeder. Caddy kendi
+başına gövde limiti koymaz — pakete dahil `docker/Caddyfile`'ın limiti açıkça yazmasının sebebi
+budur — ve nginx `client_max_body_size` için **1 MB** varsayar; yani satırı atlayan bir yedek
+proxy, bir megabayttan büyük her eki reddeder.
 
 İki API kuralı bilinçli olarak farklıdır. Better Auth, mount yolunu kendisine verilen URL'den
 türetir ve gelen istekleri ona göre eşleştirir; dolayısıyla `/auth` sunucuda, tarayıcıda ve
@@ -274,7 +283,10 @@ mount edilmiştir ve prefix girişte kaldırılır. nginx'te:
 
 ```nginx
 location /auth/ { proxy_pass http://api:4000;  }   # sondaki slash yok → yol korunur
-location /api/  { proxy_pass http://api:4000/; }   # sondaki slash var → /api kaldırılır
+location /api/  {
+  proxy_pass http://api:4000/;                     # sondaki slash var → /api kaldırılır
+  client_max_body_size 25m;                        # = ATTACHMENT_MAX_BYTES (26214400)
+}
 location /      { proxy_pass http://web:3000;  }
 ```
 

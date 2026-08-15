@@ -21,8 +21,12 @@
 #   2. `/api/*`   → the API, `/api` prefix REMOVED (nginx: `proxy_pass http://api:4000/;`)
 #   3. everything else → the web app
 #
-# plus WebSocket upgrades passed through on rule 2. Rules 1 and 2 differ on purpose; the
-# comments on each below say why.
+# plus WebSocket upgrades passed through on rule 2, and a request body limit on rule 2 that
+# matches the API's ATTACHMENT_MAX_BYTES (nginx: `client_max_body_size 25m;`). The body limit
+# is part of the contract, not a tuning knob: Caddy imposes none by default and nginx defaults
+# to 1 MB, so a replacement proxy that omits it fails every upload over a megabyte with a 413
+# that appears in no documentation. Rules 1 and 2 differ on purpose; the comments on each below
+# say why.
 {
 	# Nothing here is administered over Caddy's HTTP admin API — the config is this file, and a
 	# change is a container restart. Leaving the endpoint listening (localhost:2019 inside the
@@ -74,6 +78,17 @@
 	# this file in place the board's realtime feed connects on the `websocket` transport
 	# (HTTP 101 on `/api/socket.io/?…&transport=websocket`), not the polling fallback.
 	handle_path /api/* {
+		# The proxy half of the two-layer size limit, and the same number as the API's
+		# ATTACHMENT_MAX_BYTES. The two are not independently tunable: a deployment that raises
+		# one without the other is misconfigured, and the failure it produces is a 413 the
+		# operator cannot trace — logged as a successful proxied request in one direction and
+		# logged nowhere at all in the other (ADR 0022, ADR 0024). Caddy sets no body limit of
+		# its own, which is why this line has to exist at all, and why the published contract in
+		# docs/self-hosting.md now carries an nginx `client_max_body_size` row beside it (nginx
+		# defaults to 1 MB, so an operator who replaced this proxy gets the broken install).
+		request_body {
+			max_size 25MiB
+		}
 		reverse_proxy api:4000
 	}
 
