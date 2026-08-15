@@ -33,8 +33,17 @@ ENV NODE_ENV=production
 COPY --from=build --chown=node:node /app/deploy/dist ./dist
 COPY --from=build --chown=node:node /app/deploy/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/deploy/package.json ./package.json
+# Attachments are written here at runtime (STORAGE_PATH, docker-compose.yml) — the first
+# writable path this image has ever needed. It must exist and be owned by the unprivileged
+# `node` user (uid 1000) *before* root is dropped, because an empty named volume mounted over
+# a path takes the ownership of the mount point it finds in the image: create it here and the
+# volume comes up `node:node`, leave it out and Docker creates it `root:root` and every upload
+# fails with EACCES. Creating it in the image rather than chowning at boot is also what keeps
+# docker-compose.yml's "never chowns" claim — and with it `cap_drop: [ALL]` — true. Same shape
+# as apps/web/Dockerfile's .next/cache.
+RUN mkdir -p /data/attachments && chown -R node:node /data
 # Run as the unprivileged `node` user (uid 1000) shipped with node:24-alpine.
-# dist + node_modules are read-only at runtime, so no writable paths are needed.
+# dist + node_modules are read-only at runtime; /data above is the one writable path.
 USER node
 EXPOSE 4000
 CMD ["node", "dist/main.js"]

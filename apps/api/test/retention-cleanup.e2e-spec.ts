@@ -420,6 +420,7 @@ describe('Retention cleanup (e2e)', () => {
         notifications: 0,
         activities: 0,
         usagePings: 0,
+        orphanedFiles: 0,
       });
 
       expect(await prisma.session.findUnique({ where: { id: session } })).not.toBeNull();

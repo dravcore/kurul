@@ -5,6 +5,7 @@ import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
 import { captureServerError } from '../common/observability/sentry';
 import { parseRedisUrl, type RedisConnectionOptions } from '../common/redis-url';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 const QUEUE_NAME = 'cleanup';
 const JOB_NAME = 'purge-expired';
@@ -67,6 +68,18 @@ export const MAX_BATCHES_PER_TABLE = 1000;
 export const DEFAULT_NOTIFICATION_RETENTION_DAYS = 90;
 export const DEFAULT_ACTIVITY_RETENTION_DAYS = 365;
 
+/** The `backup` sidecar's own defaults, mirrored so the two cannot silently disagree. */
+export const DEFAULT_BACKUP_INTERVAL_SECONDS = 86_400;
+export const DEFAULT_BACKUP_KEEP = 7;
+
+/**
+ * The shortest orphan grace period this job will use, whatever the backup pair says.
+ *
+ * A day, and deliberately not derived from `BACKUP_*` — see {@link orphanGraceMs} for why the
+ * floor has to be independent of the backup schedule to mean anything.
+ */
+export const MIN_ORPHAN_GRACE_MS = MS_PER_DAY;
+
 /** Rows deleted in one run, per table. */
 export interface CleanupCounts {
   sessions: number;
@@ -75,6 +88,51 @@ export interface CleanupCounts {
   activities: number;
   /** Deduplicated "somebody opened a board / the dashboard" rows — see `model UsagePing`. */
   usagePings: number;
+  /**
+   * Files on disk with no row pointing at them, removed this run.
+   *
+   * The one count in this interface that is not a row count, and the one sweep that is not a
+   * batched `DELETE`. It reports here anyway because the question an operator asks is "what did
+   * last night's cleanup remove", and answering it from two places is how one of them stops
+   * being read (ADR 0022).
+   */
+  orphanedFiles: number;
+}
+
+/**
+ * How old a file has to be before "no row points at it" is allowed to mean "delete it".
+ *
+ * The window does **two** jobs, and only the first one is about backups:
+ *
+ * 1. **The restore window.** "On disk and not in the database" is a correct predicate only
+ *    while the database is authoritative. After a restore it is not: `DROP DATABASE` and
+ *    `pg_restore` rewind the rows while the disk stays where it was, so every file uploaded
+ *    after the dump exists with no row to match — and a sweep that night would delete them
+ *    permanently. The restore and the sweep are each safe alone and destructive together
+ *    (ADR 0022). Tying this to `BACKUP_KEEP × BACKUP_INTERVAL` means no file can be swept while
+ *    a dump old enough to disown it is still restorable. The constant is borrowed rather than
+ *    invented, which is the point: that rotation is a rehearsed behaviour, not a documented
+ *    intention.
+ * 2. **The in-flight upload race.** Bytes are written before the row is (`D6`: the cheap
+ *    direction of being wrong), so between the write and the commit there is always a file no
+ *    row claims. This job has nothing to do with backups: it is there on an instance that has
+ *    never taken a dump and it does not go away if the sidecar is switched off.
+ *
+ * Which is why {@link MIN_ORPHAN_GRACE_MS} is a floor and not a default. Both variables come
+ * from a file an operator edits, and the product of the two can be made arbitrarily small —
+ * `BACKUP_KEEP=0` (which `backup.sh`'s prune reads as "keep nothing") or `BACKUP_INTERVAL=0`
+ * each collapse it to zero, which would hand the sweep every upload whose row has not committed
+ * yet. A backup setting must not be able to reach through and disable the second job, so the
+ * result is clamped by a window that owes the backup schedule nothing.
+ *
+ * The floor is only ever a floor: a longer configured window is used as configured, which is
+ * what keeps the default (seven days) meaningful.
+ */
+export function orphanGraceMs(): number {
+  const interval = envInt('BACKUP_INTERVAL', DEFAULT_BACKUP_INTERVAL_SECONDS);
+  const keep = envInt('BACKUP_KEEP', DEFAULT_BACKUP_KEEP);
+  const configured = Math.max(interval, 0) * Math.max(keep, 1) * 1000;
+  return Math.max(configured, MIN_ORPHAN_GRACE_MS);
 }
 
 export interface RetentionSettings {
@@ -128,6 +186,9 @@ export function cutoffFor(now: Date, days: number): Date {
  * `Verification.identifier` and notification payloads carrying task titles — precisely the
  * data the policy exists to remove from the database, so copying any of it into a log
  * aggregator on the way out would defeat the whole job. `docs/decisions/0020-data-retention.md`.
+ *
+ * The rule extends to the orphan sweep without an exception: a storage key is an attachment's
+ * identity, so `orphanedFiles` is a number and never a list of paths.
  */
 export interface CleanupLogLine extends CleanupCounts {
   ts: string;
@@ -163,7 +224,10 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
    */
   private write: LogWriter = stdoutWriter;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   /** @internal — for tests. */
   setLogWriter(write: LogWriter): void {
@@ -265,6 +329,7 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
       notifications: 0,
       activities: 0,
       usagePings: 0,
+      orphanedFiles: 0,
     };
     if (!settings.enabled) return empty;
 
@@ -351,12 +416,18 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
             `;
           });
 
+    // Last, and after the row sweeps on purpose: a row deleted above may be the last claim on a
+    // file, so running the file pass afterwards makes that file a candidate tonight rather than
+    // tomorrow night. It is also the only pass that touches something outside Postgres.
+    const orphanedFiles = await this.sweepOrphanFiles(now);
+
     const counts: CleanupCounts = {
       sessions,
       verifications,
       notifications,
       activities,
       usagePings,
+      orphanedFiles,
     };
     const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
 
@@ -404,6 +475,56 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
       `retention cleanup stopped at the ${MAX_BATCHES_PER_TABLE}-batch ceiling; the remainder is deleted on the next run`,
     );
     return total;
+  }
+
+  /**
+   * Deletes stored files that no attachment row claims.
+   *
+   * Not `deleteInBatches`: that helper's contract is a `() => Promise<number>` running one
+   * idempotent SQL statement per call, and an `unlink` is neither transactional nor reversible.
+   * The sweep lives here and reports into the same counts, but it is its own loop — the shape
+   * break is deliberate and ADR 0022 records it.
+   *
+   * Keys are checked against the database in batches so a directory of a million files is one
+   * `IN (…)` per thousand rather than a million round trips, and the whole pass is capped the
+   * same way every other sweep is: a bug that matches files the delete does not remove ends the
+   * run, it does not spin.
+   *
+   * The age check runs before the database is consulted at all, so a directory of fresh uploads
+   * on a deployment that has never orphaned anything costs zero queries.
+   */
+  private async sweepOrphanFiles(now: Date): Promise<number> {
+    if (!this.storage.persistsFiles) return 0;
+
+    const cutoff = new Date(now.getTime() - orphanGraceMs());
+    const ceiling = CLEANUP_BATCH_SIZE * MAX_BATCHES_PER_TABLE;
+    let removed = 0;
+    let batch: string[] = [];
+
+    const flush = async (): Promise<void> => {
+      if (batch.length === 0) return;
+      const claimed = await this.prisma.attachment.findMany({
+        where: { storageKey: { in: batch } },
+        select: { storageKey: true },
+      });
+      const keep = new Set(claimed.map((row) => row.storageKey));
+      for (const key of batch) {
+        if (keep.has(key)) continue;
+        await this.storage.remove(key);
+        removed += 1;
+      }
+      batch = [];
+    };
+
+    for await (const entry of this.storage.listKeys()) {
+      if (entry.modifiedAt >= cutoff) continue;
+      batch.push(entry.key);
+      if (batch.length >= CLEANUP_BATCH_SIZE) await flush();
+      if (removed >= ceiling) break;
+    }
+    await flush();
+
+    return removed;
   }
 
   /**

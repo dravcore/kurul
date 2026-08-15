@@ -255,13 +255,55 @@ If you already run nginx, Traefik or another proxy and would rather not stack a 
 you can replace the `proxy` service — but the routing contract is not negotiable, because the
 web app is built against it. Three rules, in this order, all on one hostname:
 
-| Path       | Goes to  | Prefix              |
-| ---------- | -------- | ------------------- |
-| `/auth/*`  | api:4000 | kept as-is          |
-| `/api/*`   | api:4000 | `/api` **stripped** |
-| everything | web:3000 | kept as-is          |
+| Path       | Goes to  | Prefix              | Max request body              |
+| ---------- | -------- | ------------------- | ----------------------------- |
+| `/auth/*`  | api:4000 | kept as-is          | proxy default is fine         |
+| `/api/*`   | api:4000 | `/api` **stripped** | **25 MiB** (`26214400` bytes) |
+| everything | web:3000 | kept as-is          | proxy default is fine         |
 
 `/api/*` must also pass WebSocket upgrades through — that is the realtime board feed.
+
+The body size on `/api/*` is part of the contract, not a tuning knob. It is the same number as
+the API's `ATTACHMENT_MAX_BYTES` (`.env.example`), and the two are **not independently
+tunable**: raise the API's without raising the proxy's and every upload over the proxy's limit
+fails with a `413` the API never sees and never logs; raise the proxy's without raising the
+API's and the proxy logs a successful request the API then rejects. Caddy imposes no body limit
+of its own, which is why the bundled `docker/Caddyfile` has to set one explicitly — and nginx
+defaults `client_max_body_size` to **1 MB**, so a replacement proxy that omits the row rejects
+every attachment larger than a megabyte.
+
+### Telling the two 413s apart
+
+Both layers answer an oversized upload with `413`, and **the response body is what says which
+one did it**:
+
+| What you get back                                  | Who rejected it | What it means                                                            |
+| -------------------------------------------------- | --------------- | ------------------------------------------------------------------------ |
+| `413` with an **empty** body (`Content-Length: 0`) | the proxy       | working as designed — the request never reached the API                  |
+| `413` with a **JSON** body carrying `statusCode`   | the API         | your proxy's limit is higher than `ATTACHMENT_MAX_BYTES`, or it has none |
+
+The second row is the misconfiguration: the proxy carried a body the API then refused, which is
+the wasted-upload half of the two-layer rule. The first row is the correct behaviour.
+
+The headers do not help — Caddy's `413` carries no `Server` header, so only the body
+distinguishes them. Everything the API itself rejects comes back as
+`Content-Type: application/json; charset=utf-8` with a `{"statusCode":…,"error":…,"path":…,
+"requestId":…}` envelope; the proxy's rejection carries no body at all.
+
+**The proxy does not log this rejection.** `docker/Caddyfile` has no `log` directive — the API
+already logs every request that reaches it, and access logs on both layers would double every
+deployment's log volume for one size check — so a body rejected by the proxy appears in
+`docker compose logs proxy` **not at all**. An empty `413` with nothing in the proxy log is the
+expected result, not evidence that the limit is broken.
+
+Measured on the shipped `docker/Caddyfile` against `caddy:2-alpine`: exactly `26214400` bytes →
+`200`, one byte more → `413`, with `curl` exiting `0` on a well-formed status line — the
+connection is closed properly rather than cut mid-upload.
+
+If you reproduce this yourself, **aim it at a real upload endpoint**. Pointing it at an
+arbitrary path measures nothing: the API answers `404` as soon as it has the headers, without
+ever reading the body, so the request finishes before the proxy's limit is reached and you get a
+`404` that looks like the limit is missing.
 
 The two API rules differ on purpose. Better Auth derives its mount path from the URL it is
 configured with and matches incoming requests against it, so `/auth` has to be the same string
@@ -270,7 +312,10 @@ mounted at its own root and gets the prefix removed on the way in. In nginx:
 
 ```nginx
 location /auth/ { proxy_pass http://api:4000;  }   # no trailing slash → path preserved
-location /api/  { proxy_pass http://api:4000/; }   # trailing slash    → /api stripped
+location /api/  {
+  proxy_pass http://api:4000/;                     # trailing slash    → /api stripped
+  client_max_body_size 25m;                        # = ATTACHMENT_MAX_BYTES (26214400)
+}
 location /      { proxy_pass http://web:3000;  }
 ```
 

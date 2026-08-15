@@ -734,8 +734,21 @@ image as the server, so `pg_dump`/`pg_restore` always match the server major —
 1. `pg_dump --format=custom` into the `backup_data` volume as
    `/backups/kurultay-<UTC timestamp>.dump` (written as `.part` and renamed on success, so an
    interrupted dump never looks like a finished archive),
-2. delete everything past the newest `BACKUP_KEEP` archives,
-3. sleep `BACKUP_INTERVAL` seconds, repeat.
+2. `tar -czf` the attachments volume — mounted read-only at `/attachments` — into
+   `/backups/kurultay-<the same UTC timestamp>-files.tar.gz`. The shared timestamp is how a
+   restore knows which tar belongs to which dump,
+3. delete everything past the newest `BACKUP_KEEP` archives **of each series**,
+4. sleep `BACKUP_INTERVAL` seconds, repeat.
+
+**The file archive is not a snapshot, and that limit is measured rather than assumed.**
+`pg_dump` takes a consistent view of the database; `tar` takes whatever the directory looks like
+as it walks it, so a file uploaded while the archive runs can end up truncated inside it. The
+`.part`-then-rename discipline hides a half-written _archive_, not a half-written _file_. The
+window is one `tar` of the attachments directory per `BACKUP_INTERVAL`, and the restore drill
+below catches the case by comparing every restored file's size against the size its row records
+— a count alone cannot, because a truncated file is still one file. Closing the window properly
+means an LVM/ZFS snapshot or pausing uploads for the duration, neither of which a single-host
+Compose install carries.
 
 The defaults — one dump a day, seven kept — mean **a recovery point at most 24 hours old
 (RPO ≤ 24 h) and a week of history**, with no cron on the host and nothing to remember. The
@@ -744,21 +757,33 @@ silently stops producing recovery points, which is the failure this whole sectio
 prevent. It is deliberately **not** in `docker-compose.dev.yml` — a local database that
 `pnpm db:seed` wipes on demand has nothing worth keeping.
 
-Two settings, both read from `.env` by compose (they are compose-only — no application code
-reads them, so they are not part of the [environment variables](#environment-variables) the
-API loads):
+Two settings, both read from `.env` by compose:
 
-| Variable          | Default | Purpose                                                       |
-| ----------------- | ------- | ------------------------------------------------------------- |
-| `BACKUP_INTERVAL` | `86400` | Seconds between dumps. `86400` = daily; this **is** your RPO  |
-| `BACKUP_KEEP`     | `7`     | Archives retained; older ones are deleted after each new dump |
+| Variable          | Default | Purpose                                                                   |
+| ----------------- | ------- | ------------------------------------------------------------------------- |
+| `BACKUP_INTERVAL` | `86400` | Seconds between cycles. `86400` = daily; this **is** your RPO             |
+| `BACKUP_KEEP`     | `7`     | Archives of each series retained; older ones are deleted after each cycle |
+
+Compose passes both to the `api` service as well, which is easy to miss because they read as
+backup settings: the nightly orphan-file sweep refuses to delete a stored file while a dump old
+enough to disown it is still restorable, and that grace period is exactly
+`BACKUP_KEEP × BACKUP_INTERVAL`. "On disk with no row pointing at it" is a correct predicate
+only while the database is authoritative, and a restore rewinds the rows while the disk stays
+where it is — so shortening either variable shortens the window in which a restore is safe from
+that sweep. **Never below 24 hours**, though: the API clamps the window to a day whatever these
+two say, because the grace period also covers an upload whose bytes are on disk while its row is
+still being written, and that has nothing to do with backups — it is there on an instance that
+has never taken a dump. See [ADR 0022](decisions/0022-attachment-storage.md).
 
 Check on it — an untested backup is not a backup, and neither is an unread log:
 
 ```bash
-docker compose logs backup | tail            # "wrote /backups/kurultay-….dump (… bytes)"
-docker compose exec backup ls -lh /backups   # newest archive, and how many are kept
+docker compose logs backup | tail            # two "wrote /backups/kurultay-…" lines per cycle
+docker compose exec backup ls -lh /backups   # newest pair, and how many are kept
 ```
+
+Two lines per cycle, not one: a cycle that logged only the dump means the file archive failed
+(or `ATTACHMENT_DIR` is unset), and the `ERROR` line above it says which.
 
 **Copy the archives off-host.** `backup_data` sits on the same disk as `postgres_data`, so it
 covers "I dropped the wrong table" and covers nothing about a dead disk or a lost server —
@@ -769,20 +794,26 @@ path) or the disaster case still loses everything.
 ### Taking a dump by hand
 
 Before an upgrade, or any time you want a recovery point now rather than up to
-`BACKUP_INTERVAL` from now, run the same script once — it writes into the same volume and
-prunes by the same rule:
+`BACKUP_INTERVAL` from now, run the same script once — it writes both archives into the same
+volume, under one timestamp, and prunes by the same rule:
 
 ```bash
 docker compose exec backup /bin/sh /usr/local/bin/backup.sh once
 ```
 
 To hold a copy outside the volume (recommended before an upgrade, since it survives a
-`docker compose down -v`):
+`docker compose down -v`) — the dump, and the files beside it:
 
 ```bash
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
 docker compose exec -T postgres \
-  pg_dump -U kurultay --format=custom kurultay > kurultay-$(date -u +%Y%m%dT%H%M%SZ).dump
+  pg_dump -U kurultay --format=custom kurultay > "kurultay-$stamp.dump"
+docker compose run --rm -T --entrypoint tar backup -czf - -C /attachments . \
+  > "kurultay-$stamp-files.tar.gz"
 ```
+
+One `stamp` for both, for the same reason the sidecar shares one: the pair is only useful
+together, and a tar whose dump you cannot identify is a directory of files with no rows.
 
 - Read the `CHANGELOG.md` entry for the target version first — every breaking change carries
   a migration note there.
@@ -793,9 +824,12 @@ docker compose exec -T postgres \
 
 **Target: back up in under two hours (RTO ≤ 2 h) from the decision to restore.** The
 procedure below runs in seconds on a small instance; the budget is for the deciding, the
-finding of the right archive, and the verifying. It has been rehearsed end to end — a seeded
-database dumped by `scripts/backup.sh` and restored into an empty server reproduced all 19
-tables, every row count, all 68 indexes, `pg_trgm`, and the `_prisma_migrations` table intact.
+finding of the right archive, and the verifying. It has been rehearsed end to end — a database
+dumped and archived by `scripts/backup.sh`, restored into an empty server with the matching file
+archive, reproduced all 20 tables, every row count, all 71 indexes, `pg_trgm`, the
+`_prisma_migrations` table, and **every attachment file at the byte size its row records**. The
+last clause is the one this drill grew: a restore that brings the rows back and leaves the files
+behind passes every check written before attachments existed.
 
 Restore is `pg_restore` (the archives are `--format=custom`, not SQL text), and it wants an
 **empty** database — restoring over a populated one produces duplicate-key errors, not a
@@ -806,8 +840,9 @@ clean overwrite.
 #    half-restored database and rotate a good archive out. Postgres itself stays up.
 docker compose stop web api backup
 
-# 2. Pick the archive to restore. `run --rm` because the sidecar is stopped now; the
-#    throwaway container mounts the same backup_data volume.
+# 2. Pick the pair to restore — a `.dump` and the `-files.tar.gz` with the SAME timestamp.
+#    `run --rm` because the sidecar is stopped now; the throwaway container mounts the same
+#    backup_data volume.
 docker compose run --rm --entrypoint ls backup -1 /backups
 
 # 3. Recreate the database empty. This is the destructive step — everything written after
@@ -822,21 +857,63 @@ docker compose run --rm --entrypoint pg_restore backup \
   --host=postgres --username=kurultay --dbname=kurultay \
   --no-owner --exit-on-error /backups/kurultay-<timestamp>.dump
 
+# 4b. Restore the attachment files that belong to the SAME timestamp. The `backup` service
+#     mounts the volume read-only, so this needs its own writable mount — and `--user 1000:1000`,
+#     because the files belong to the api's `node` user and this stack runs `cap_drop: [ALL]`,
+#     which takes CAP_DAC_OVERRIDE away from root. Without the flag, `rm` fails with
+#     "Permission denied" on a container that is nominally root. Measured, not predicted.
+docker compose run --rm --user 1000:1000 -v kurultay_attachment_data:/restore \
+  --entrypoint sh backup -c \
+  'rm -rf /restore/* && tar -xzf /backups/kurultay-<timestamp>-files.tar.gz -C /restore'
+
 # 5. Check the migration state. The archive carries _prisma_migrations, so the recorded
 #    state matches the restored schema and this should report nothing to do.
 docker compose run --rm migrate
 
-# 6. Verify before letting traffic back in.
+# 6. Verify before letting traffic back in: schema, row counts, and that the files came back.
 docker compose exec -T postgres psql -U kurultay -d kurultay \
   -c '\dt' \
   -c 'SELECT count(*) FROM "User";' \
   -c 'SELECT count(*) FROM "Workspace";' \
   -c 'SELECT count(*) FROM "Task";' \
+  -c 'SELECT count(*) FROM "Attachment" WHERE kind = '"'"'FILE'"'"';' \
   -c 'SELECT count(*) FROM "_prisma_migrations";'
+docker compose run --rm --entrypoint sh backup -c 'find /attachments -type f | wc -l'
+
+# 6b. And that every restored file is the size its row says it is. This is what catches a file
+#     `tar` copied while it was still being written — a count alone cannot: a truncated file is
+#     still one file.
+#
+#     Plain POSIX on purpose: temp files and `diff a b`, not `diff <(…) <(…)`. Process
+#     substitution is a bash/zsh feature, and this block gets pasted into `sh` more often than
+#     anyone admits, where it fails with a syntax error that reads like a broken backup.
+#
+#     `find -exec stat -c`, not `find -printf`: the backup container is postgres:18-alpine and
+#     BusyBox `find` has no `-printf`. One command, not a choice — an operator should not have
+#     to make a portability decision in the middle of a restore.
+docker compose exec -T postgres psql -U kurultay -d kurultay -At \
+  -c 'SELECT "storageKey" || '"'"' '"'"' || "size" FROM "Attachment" WHERE kind = '"'"'FILE'"'"';' \
+  | sort > /tmp/expected.txt
+docker compose run --rm --entrypoint sh backup -c \
+  'cd /attachments && find . -type f -exec stat -c "%n %s" {} + | sed "s|^\./||"' \
+  | sort > /tmp/actual.txt
+diff /tmp/expected.txt /tmp/actual.txt && echo "every file restored at its recorded size"
 
 # 7. Bring the stack back.
 docker compose up -d
 ```
+
+The drill passes on **three** things, not two:
+
+1. the `FILE` attachment row count equals the number of files on disk,
+2. `diff` in 6b is empty — every file is the size its row records,
+3. if anything was uploaded while the archive was being taken, a difference may appear **only**
+   for files in that window, and `diff` names them. A silent difference is never acceptable:
+   reported, the `tar`-is-not-a-snapshot limit above has been measured; unreported, it has only
+   been written down.
+
+`kurultay_attachment_data` in step 4b is the volume's full name, which Compose prefixes with the
+project name — `docker volume ls` if your directory is not called `kurultay`.
 
 If the checked-out code is newer than the archive's schema, step 5 applies the missing
 migrations forward, which is correct. If it is **older**, check out the release tag that
@@ -848,6 +925,12 @@ Restoring from a host-side file instead of one in the volume (step 4 variant):
 docker compose run --rm -T --entrypoint pg_restore backup \
   --host=postgres --username=kurultay --dbname=kurultay --no-owner \
   --exit-on-error < kurultay-20260813T194856Z.dump
+
+# The file half, same idea (step 4b variant) — writable mount, and uid 1000 for the same
+# CAP_DAC_OVERRIDE reason.
+docker compose run --rm -T --user 1000:1000 -v kurultay_attachment_data:/restore \
+  --entrypoint sh backup -c 'rm -rf /restore/* && tar -xzf - -C /restore' \
+  < kurultay-20260813T194856Z-files.tar.gz
 ```
 
 **PostgreSQL major-version upgrades need a dump and restore.** The official `postgres` image
@@ -861,6 +944,14 @@ dump — the pre-upgrade backup above is still the sane habit.
 pub/sub fan-out, and the notification queue — all rebuildable. Losing it logs everyone out
 and drops queued notifications that had not been delivered yet; it loses no board data.
 Redis upgrades within a major, and 7 → 8, are in-place and RDB/AOF compatible.
+
+**Attachment files are backed up, for the opposite reason.** `attachment_data` holds the only
+bytes in this stack that are neither in Postgres nor rebuildable from it: the row survives a
+lost volume and the download does not. That is why the sidecar archives it beside the dump and
+why the drill above checks the files as well as the rows — ADR 0020 rejected cold-storage
+archiving as "a file on the same disk that nobody reads and nobody restores", and the answer is
+not that users can see these files, but that this copy is read and restored on the same
+rehearsed schedule as the dump.
 
 ### Index migrations take a write lock
 
