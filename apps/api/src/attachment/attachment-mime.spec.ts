@@ -1,4 +1,5 @@
 import { UnsupportedMediaTypeException } from '@nestjs/common';
+import { buildDocx, buildDocxWithUnreadableContentTypes } from '../../test/helpers/ooxml';
 import { assertAllowedMimeType, sniffMimeType } from './attachment-mime';
 
 /** 1×1 transparent PNG. */
@@ -70,6 +71,48 @@ describe('the allowlist', () => {
   it('refuses a named type even when the caller declares one the fallback would take', async () => {
     await expect(assertAllowedMimeType(ELF, 'text/plain')).rejects.toBeInstanceOf(
       UnsupportedMediaTypeException,
+    );
+  });
+});
+
+/**
+ * Office documents, against a real OOXML container this file builds itself.
+ *
+ * The most fragile entry on the allowlist, and until this describe existed, the only entirely
+ * untested one. Every office format is a ZIP, so `PK\x03\x04` proves nothing: `file-type` opens
+ * the archive and *parses* `[Content_Types].xml` to reach the media type. That parse is what
+ * `@tokenizer/inflate` is in `transformIgnorePatterns` for, and dropping that package from the
+ * list turns every `.docx` upload into a 415 that reads like the MIME rule being wrong. Nothing
+ * else in this suite touches that path, so nothing else would go red.
+ */
+describe('office documents', () => {
+  it('reads the OOXML type out of the archive, not out of the ZIP signature', async () => {
+    const docx = buildDocx();
+
+    expect(docx.subarray(0, 4).toString('hex')).toBe('504b0304');
+    expect(await sniffMimeType(docx)).toBe(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+  });
+
+  it('accepts a .docx, whatever the browser declared it as', async () => {
+    await expect(assertAllowedMimeType(buildDocx(), 'application/octet-stream')).resolves.toBe(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+  });
+
+  /**
+   * The degradation ADR 0024 records, reproduced rather than assumed: when the content-types
+   * part cannot be parsed, `file-type` declines to guess and answers `application/zip`. This is
+   * what makes `application/zip` on the allowlist load-bearing — an office document from an
+   * unusual producer lands on an accepted type instead of a 415 the user cannot act on.
+   */
+  it('falls back to application/zip when the content-types part is unreadable, and still accepts it', async () => {
+    const broken = buildDocxWithUnreadableContentTypes();
+
+    expect(await sniffMimeType(broken)).toBe('application/zip');
+    await expect(assertAllowedMimeType(broken, 'application/octet-stream')).resolves.toBe(
+      'application/zip',
     );
   });
 });
