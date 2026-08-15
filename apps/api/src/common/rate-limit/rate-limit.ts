@@ -60,6 +60,19 @@ export const ATTACHMENT_UPLOAD_RATE_LIMIT = 20;
  */
 export const ATTACHMENT_DOWNLOAD_RATE_LIMIT = 300;
 
+/**
+ * A board import is one request that reads up to `TRELLO_IMPORT_MAX_BYTES`, parses it into an
+ * object graph several times that size, and then writes thousands of rows inside a single
+ * transaction. It costs more than an attachment upload, so it sits *below*
+ * `ATTACHMENT_UPLOAD_RATE_LIMIT` rather than beside it.
+ *
+ * Three per minute is not a security boundary and this constant does not pretend otherwise — the
+ * honesty note at :45-50 applies here twice over, because the throttler counts requests and the
+ * cost here is measured in rows. What actually bounds it is `TRELLO_IMPORT_MAX_BYTES` plus the
+ * admin-only role.
+ */
+export const IMPORT_RATE_LIMIT = 3;
+
 /** Message returned in the `AllExceptionsFilter` envelope when a limit is hit. */
 export const RATE_LIMIT_ERROR_MESSAGE = 'Too many requests. Please try again later.';
 
@@ -128,6 +141,12 @@ export const ThrottleInvitations = (): MethodDecorator & ClassDecorator =>
 export const ThrottleAttachmentUpload = (): MethodDecorator & ClassDecorator =>
   Throttle({
     default: { limit: ATTACHMENT_UPLOAD_RATE_LIMIT, ttl: seconds(RATE_LIMIT_WINDOW_SECONDS) },
+  });
+
+/** Stricter ceiling for `POST /workspaces/:workspaceId/imports/trello`. */
+export const ThrottleImport = (): MethodDecorator & ClassDecorator =>
+  Throttle({
+    default: { limit: IMPORT_RATE_LIMIT, ttl: seconds(RATE_LIMIT_WINDOW_SECONDS) },
   });
 
 /** Looser ceiling for the attachment byte stream. */
