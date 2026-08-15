@@ -34,6 +34,18 @@ export function formatActivitySummary(activity: ActivityDto, t: Translate): stri
       return t('types.taskUnassigned', { title });
     case ActivityType.CommentCreated:
       return t('types.commentCreated', { title });
+    case ActivityType.BoardImported: {
+      // The only row an import writes, and the only one whose subject is not in `title`: the
+      // payload names the board under `name` (ADR 0025). Without this case the row fell through
+      // to `types.unknown` and the audit trail read `board.imported` — the wire value, in a list
+      // of sentences.
+      const name = asString(activity.payload.name) ?? '';
+      const skipped = activity.payload.skippedTotal;
+      return t('types.boardImported', {
+        title: name,
+        count: typeof skipped === 'number' ? skipped : 0,
+      });
+    }
     default:
       return t('types.unknown', { type: activity.type });
   }
