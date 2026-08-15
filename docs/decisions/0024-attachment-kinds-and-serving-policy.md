@@ -150,6 +150,21 @@ computed from the row's UUIDv7 and nothing else. The user's filename is stored a
 only and never reaches a path segment, so path traversal is not a validation problem that has to be
 solved correctly on every code path — it is structurally unavailable.
 
+**A stored display name may not contain a character that makes it render as something else.**
+Being "only a display field" is exactly why this rule exists: the name is drawn in the task panel
+and in the browser's own save prompt, and both of those are places a user makes a trust decision.
+One character class is removed at write time and again when the name is written into
+`Content-Disposition` — `"` and `\`, the C0/C1 controls, and the Unicode bidi overrides
+(U+200E/U+200F, U+061C, U+202A–U+202E, U+2066–U+2069). The first two groups protect the header;
+the third protects the reader, because U+202E reverses the rendering of everything after it and
+`invoice<RLO>gnp.exe` is drawn as `invoiceexe.png`. It was measured surviving the whole path
+before this rule existed — the RFC 5987 parameter percent-encodes it and the browser decodes it
+again, so neither half of the header caught it. **The rule applies to a `LINK`'s label as well as
+to an uploaded filename**, which is where it was originally missing: `LINK` labels never reach a
+header, but they reach the same panel. Note what is _not_ removed: ordinary non-ASCII text. A rule
+that dropped every non-ASCII character would satisfy the same tests and would undo the
+`defParamCharset: 'utf8'` decision below, so both halves carry a control test.
+
 **`uploadedById` is a real foreign key to `User`, with `onDelete: Restrict`.** The precedent is
 `Comment.user`, which is `Restrict` at `apps/api/prisma/schema.prisma:311`. The cost is stated
 rather than discovered later: this enlarges the surface P3-4 (account deletion and anonymization,

@@ -71,6 +71,17 @@ function fileRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** A LINK row, for the two label tests below. */
+function linkRowFixture() {
+  return fileRow({
+    kind: AttachmentKind.Link,
+    storageKey: null,
+    mimeType: null,
+    size: null,
+    url: 'https://example.com/a',
+  });
+}
+
 describe('AttachmentService.list', () => {
   it('carries the tenant scope through the task relation and orders newest first', async () => {
     const { service, prisma } = build();
@@ -483,6 +494,77 @@ describe('AttachmentService.createFile', () => {
     expect(stored).not.toMatch(/["\\\r\n]/);
   });
 
+  /**
+   * The phishing surface `displayFilename` was already written to close, in the shape it did
+   * not close: `invoice<RLO>gnp.exe` renders as `invoiceexe.png` wherever the name is shown.
+   * Measured through the real upload path before the fix — the character reached the row, the
+   * DTO and the download header untouched.
+   */
+  it.each(['\u202e', '\u202a', '\u2069', '\u200e', '\u061c'])(
+    'strips the bidi control %j out of an uploaded filename',
+    async (control) => {
+      const { service, prisma } = build();
+      (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
+
+      await service.createFile(
+        WORKSPACE_ID,
+        TASK_ID,
+        ACTOR_ID,
+        file({ originalname: `invoice${control}gnp.exe` }),
+      );
+
+      expect((prisma.attachment.create as jest.Mock).mock.calls[0][0].data.filename).toBe(
+        'invoicegnp.exe',
+      );
+    },
+  );
+
+  // The control. A rule that dropped every non-ASCII character would satisfy the assertions
+  // above and would also undo the `defParamCharset: utf8` fix #216 measured into place.
+  it('leaves an ordinary non-ASCII filename intact', async () => {
+    const { service, prisma } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
+
+    await service.createFile(WORKSPACE_ID, TASK_ID, ACTOR_ID, file({ originalname: 'ölçüm.png' }));
+
+    expect((prisma.attachment.create as jest.Mock).mock.calls[0][0].data.filename).toBe(
+      'ölçüm.png',
+    );
+  });
+
+  /**
+   * The LINK branch went through no cleaning at all until this test. Its label never reaches a
+   * `Content-Disposition` — the byte stream answers 404 for a LINK — but it reaches the same
+   * panel, where the override reads the same way.
+   */
+  it('strips the same characters from a LINK label, which had no cleaning at all', async () => {
+    const { service, prisma } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(linkRowFixture());
+
+    await service.createLink(WORKSPACE_ID, TASK_ID, ACTOR_ID, {
+      kind: AttachmentKind.Link,
+      url: 'https://example.com/a',
+      filename: 'inv\u202egnp.exe\r\nX-Injected: 1',
+    });
+
+    const stored = (prisma.attachment.create as jest.Mock).mock.calls[0][0].data.filename;
+    expect(stored).toBe('invgnp.exeX-Injected: 1');
+  });
+
+  it('falls back to the url when the LINK label was made only of stripped characters', async () => {
+    const { service, prisma } = build();
+    (prisma.attachment.create as jest.Mock).mockResolvedValue(linkRowFixture());
+
+    await service.createLink(WORKSPACE_ID, TASK_ID, ACTOR_ID, {
+      kind: AttachmentKind.Link,
+      url: 'https://example.com/a',
+      filename: '\u202e\u202a\u0000',
+    });
+
+    expect((prisma.attachment.create as jest.Mock).mock.calls[0][0].data.filename).toBe(
+      'https://example.com/a',
+    );
+  });
   it('falls back to a name when the caller sent one made only of stripped characters', async () => {
     const { service, prisma } = build();
     (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());

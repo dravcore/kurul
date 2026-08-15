@@ -8,7 +8,10 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor, MulterModule } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
-import { memoryStorage } from 'multer';
+import { diskStorage, memoryStorage } from 'multer';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import request from 'supertest';
 import { App } from 'supertest/types';
 
@@ -184,6 +187,28 @@ describe('configureApp security headers', () => {
     expect(response.headers['cross-origin-resource-policy']).toBe('cross-origin');
   });
 
+  /**
+   * The half of `origin-check.ts`'s `GET` exemption that lives here rather than there.
+   *
+   * A `GET` is outside `UNSAFE_METHODS`, so a foreign origin is answered `200` — and that is
+   * only safe because the response never names the caller. `enableCors` is given a single
+   * origin *string*, so the header is a constant rather than a reflection of `Origin`; the
+   * browser compares the two, finds them different, and refuses to hand the body to the calling
+   * script. Reflecting the requester (or emitting `*`) would keep this test's status code and
+   * quietly turn every authenticated `GET` — the attachment byte stream included — into a
+   * cross-origin read.
+   */
+  it('never echoes a foreign origin back on a GET it lets through', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/probe')
+      .set('Origin', 'https://evil.example')
+      .expect(200);
+
+    expect(response.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+    expect(response.headers['access-control-allow-origin']).not.toBe('https://evil.example');
+    expect(response.headers['access-control-allow-origin']).not.toBe('*');
+  });
+
   describe('request correlation', () => {
     it('mints a UUIDv7 request id and returns it in the response header', async () => {
       const response = await request(app.getHttpServer()).get('/probe').expect(200);
@@ -341,5 +366,91 @@ describe('configureApp middleware order', () => {
     expect(result.status).not.toBe(201);
     expect(result.status).not.toBe(200);
     expect(uploadHandler).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The same ordering, asked of the filesystem instead of the status code.
+ *
+ * The block above proves the *handler* never ran; that is one step short of what the upload path
+ * needs, because multer buffers the whole part before the handler is called either way. What has
+ * to be true is that no byte of a rejected body is ever buffered at all — the reason the origin
+ * check being registered ahead of the body parser is load-bearing rather than tidy.
+ *
+ * `memoryStorage()` cannot answer that question: its buffer leaves no trace to look for.
+ * `diskStorage()` can, and it is the same multer with a different sink — it writes its temp file
+ * as soon as it starts reading the file part, well before the handler. So "the destination
+ * directory is empty" is direct evidence that the reject happened before any buffering, and the
+ * control below shows the same request from an allowed origin really does leave a file there.
+ * Without that control this suite would pass on a build where multer was never wired up.
+ */
+describe('configureApp rejects a cross-origin upload before multer buffers it', () => {
+  const BODY_BYTES = 4 * 1024 * 1024;
+  let app: INestApplication<App>;
+  let destination: string;
+  let stdout: jest.SpyInstance;
+
+  beforeAll(async () => {
+    destination = await mkdtemp(join(tmpdir(), 'kurultay-origin-buffer-'));
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        // No `limits` on purpose: a 413 would end the request for a reason other than the one
+        // under test, and the allowed-origin control has to be able to write the whole body.
+        MulterModule.register({ storage: diskStorage({ destination }) }),
+      ],
+      controllers: [UploadProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
+    await app.init();
+  });
+
+  beforeEach(async () => {
+    uploadHandler.mockClear();
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    for (const entry of await readdir(destination)) {
+      await rm(join(destination, entry), { force: true });
+    }
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await rm(destination, { recursive: true, force: true });
+  });
+
+  // The control. "Nothing was written" is only evidence if writing was reachable.
+  it('writes the body to multer’s destination when the origin is allowed', async () => {
+    await request(app.getHttpServer())
+      .post('/probe/upload')
+      .set('Origin', 'http://localhost:3000')
+      .field('kind', 'FILE')
+      .attach('file', Buffer.alloc(BODY_BYTES), 'big.png')
+      .expect(201);
+
+    expect(uploadHandler).toHaveBeenCalled();
+    await expect(readdir(destination)).resolves.toHaveLength(1);
+  });
+
+  it('leaves the destination empty when the origin is not', async () => {
+    // As above, the server answers and closes while supertest is still writing, so a connection
+    // reset is a legitimate observation and only the *absence* of a stored file is asserted.
+    const result = await request(app.getHttpServer())
+      .post('/probe/upload')
+      .set('Origin', 'https://evil.example')
+      .field('kind', 'FILE')
+      .attach('file', Buffer.alloc(BODY_BYTES), 'big.png')
+      .then((response) => ({ status: response.status as number | null }))
+      .catch(() => ({ status: null }));
+
+    expect(result.status).not.toBe(201);
+    expect(uploadHandler).not.toHaveBeenCalled();
+    // Read after the socket has settled, so a file created late would still be seen.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await expect(readdir(destination)).resolves.toEqual([]);
   });
 });

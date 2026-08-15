@@ -11,10 +11,40 @@ import { getRequestId } from './logging/request-id';
  * cross-origin reads the product actually performs — the Socket.io handshake, which is a `GET`
  * carrying the web app's `Origin` (see `realtime.gateway.ts`, which has its own CORS config),
  * and the attachment byte stream, which is a `GET` a browser issues from an `<img src>` or an
- * `<a download>` on the page itself. Neither is unprotected by being outside this list: the
- * attachment stream is behind the session cookie and the workspace guard's tenant scope, and it
- * answers `Cross-Origin-Resource-Policy: same-origin` so no other site can embed the bytes it
- * returns. The exemption is a boundary that was drawn, not a gap that was left.
+ * `<a download>` on the page itself.
+ *
+ * ## What holds the attachment stream up instead, since it is the larger of the two
+ *
+ * Four separate things, and they answer four separate questions. Naming only one of them is
+ * how a reader ends up mistaking a drawn boundary for a gap:
+ *
+ *   1. **The session cookie.** No session, no route. Nothing about being outside this list
+ *      changes that, because this check was never an authentication layer.
+ *   2. **The tenant scope, in two pieces.** `@WorkspaceScoped()` puts `WorkspaceGuard` on the
+ *      route, which refuses a caller who is not a member of the workspace named in the path;
+ *      `AttachmentService.requireAttachment` refuses a row that does not belong to it. Both are
+ *      needed and neither substitutes for the other — the guard is what stops an outsider who
+ *      writes the *owning* workspace's id into the path, a case the `where` clause matches
+ *      quite happily (`test/attachment.e2e-spec.ts`, "refuses a non-member who addresses the
+ *      owning workspace directly").
+ *   3. **CORS, for reading.** `enableCors` is configured with a single origin string, so every
+ *      response carries `Access-Control-Allow-Origin: <WEB_URL>` regardless of who asked —
+ *      measured: a `GET .../content` sent with `Origin: https://evil.example` and a valid
+ *      session answers `200` with `Access-Control-Allow-Origin: http://localhost:3000`. That is
+ *      not a leak, it is the mechanism: the value is never the requester's origin, so the
+ *      browser compares the two, finds them different, and never hands the bytes to the calling
+ *      script. A wildcard here would break that, which is why the CORS origin is a value and
+ *      not a reflection.
+ *   4. **`Cross-Origin-Resource-Policy: same-origin`, for embedding.** A different question
+ *      from (3): CORS governs whether a script may *read* a response, CORP governs whether a
+ *      page may *embed* it at all. The four raster types are served `inline`, so without CORP
+ *      any site could point an `<img>` at an attachment URL and let the victim's cookie fetch
+ *      it — a read the attacker never has to see the bytes of to profit from.
+ *
+ * So the exemption is a boundary that was drawn, not a gap that was left — and the reason it
+ * can be drawn is (1) and (2), not (3) and (4). CORS and CORP are browser-side policies that a
+ * non-browser caller simply ignores; the session and the tenant scope are the two that hold
+ * against `curl`.
  *
  * `OPTIONS` is absent for a different reason: it *is* the preflight. The CORS middleware
  * registered ahead of this one answers and ends preflight requests itself, so one never
