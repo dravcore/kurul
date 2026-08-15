@@ -303,6 +303,61 @@
       "name": "Name",
       "description": "Description",
       "boardMenu": "Board actions",
+      "import": {
+        "action": "Import from Trello",
+        "title": "Import from Trello",
+        "description": "Pick the JSON export of a single Trello board. Lists become columns, cards become tasks, and attachments come across as links.",
+        "file": "Trello board export (.json)",
+        "duplicateWarning": "Importing the same export again creates a second board. This importer never updates an existing one, so run it twice and you will have two.",
+        "slowWarning": "A large board can take a couple of minutes. Once the import starts it cannot be cancelled — leave this tab open.",
+        "pending": "Importing… this cannot be cancelled.",
+        "submit": "Import board",
+        "cancel": "Cancel",
+        "error": "The import failed and nothing was created.",
+        "forbidden": "You need admin access to import a board. Ask a workspace owner.",
+        "tooLarge": "That export is larger than this instance accepts.",
+        "badFile": "That file isn't a Trello board export.",
+        "tooMany": "Too many imports in a row. Wait a minute and try again.",
+        "reportRegion": "Import report",
+        "reportTitle": "Imported “{name}”",
+        "notSaved": "This report is not saved anywhere. Dismissing it is permanent — it cannot be shown again. The board itself is unaffected.",
+        "dismiss": "Dismiss report",
+        "goToBoard": "Go to board",
+        "importedTitle": "Written to the board",
+        "imported": {
+          "columns": "{count, plural, one {# column} other {# columns}}",
+          "tasks": "{count, plural, one {# task} other {# tasks}}",
+          "labels": "{count, plural, one {# label} other {# labels}}",
+          "checklists": "{count, plural, one {# checklist} other {# checklists}}",
+          "checklistItems": "{count, plural, one {# checklist item} other {# checklist items}}",
+          "attachments": "{count, plural, one {# attachment link} other {# attachment links}}"
+        },
+        "skippedTitle": "What did not come across as-is",
+        "nothingSkipped": "Everything in the export came across.",
+        "samples": "Showing {shown} of {count, plural, one {# example} other {# examples}}",
+        "setColumnCategories": "Set what each column means",
+        "skip": {
+          "scope": {
+            "list": "{count, plural, one {# list} other {# lists}}",
+            "column": "{count, plural, one {# column} other {# columns}}",
+            "card": "{count, plural, one {# card} other {# cards}}",
+            "label": "{count, plural, one {# label} other {# labels}}",
+            "checklist": "{count, plural, one {# checklist} other {# checklists}}",
+            "checklistItem": "{count, plural, one {# checklist item} other {# checklist items}}",
+            "attachment": "{count, plural, one {# attachment} other {# attachments}}",
+            "member": "{count, plural, one {# member} other {# members}}",
+            "comment": "{count, plural, one {# comment} other {# comments}}"
+          },
+          "reason": {
+            "outOfScope": "{count, plural, one {{items} was not imported: Kurultay has no equivalent for it.} other {{items} were not imported: Kurultay has no equivalent for them.}}",
+            "archived": "{count, plural, one {{items} was not imported: it was archived in Trello, and Kurultay has no archive.} other {{items} were not imported: they were archived in Trello, and Kurultay has no archive.}}",
+            "unmappable": "{count, plural, one {{items} was not imported: a Trello account is not a Kurultay account, so the assignment was dropped.} other {{items} were not imported: a Trello account is not a Kurultay account, so the assignments were dropped.}}",
+            "unsupportedScheme": "{count, plural, one {{items} was not imported: its address was neither http nor https.} other {{items} were not imported: their addresses were neither http nor https.}}",
+            "malformed": "{count, plural, one {{items} was not imported: the export did not carry the fields the importer needs.} other {{items} were not imported: the export did not carry the fields the importer needs.}}",
+            "defaulted": "{count, plural, one {{items} came across changed: Kurultay had no matching value, so the default was used.} other {{items} came across changed: Kurultay had no matching value, so the default was used.}}"
+          }
+        }
+      },
       "realtime": {
         "reconnecting": "Reconnecting…",
         "dragCancelled": "Someone else moved this task"
@@ -479,6 +534,7 @@
             "taskAssigned": "Assigned someone to “{title}”",
             "taskUnassigned": "Unassigned someone from “{title}”",
             "commentCreated": "Commented on “{title}”",
+            "boardImported": "Imported “{title}” from Trello — {count, plural, =0 {everything came across} one {# item did not come across} other {# items did not come across}}",
             "unknown": "{type}"
           }
         },
