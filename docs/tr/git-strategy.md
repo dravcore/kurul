@@ -255,11 +255,20 @@ docker compose down -v                     # -v: sonraki koşuya volume bırakma
 # 5. main üzerindeki merge commit'ini tag'le. Container imajlarını yayınlayan şey
 #    de budur (.github/workflows/release-images.yml) — tag yoksa imaj da yok ve
 #    docs/self-hosting.md'yi izleyen herkes için `docker compose pull` başarısız olur.
+#    Aynı koşu iki imajı cosign ile imzalar ve SBOM'larını üretir.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
 
-# 6. v0.2.0 tag'i için bir GitHub Release yayınla, body = 0.2.0 için CHANGELOG bölümü.
+# 6. Release images workflow'unun bitmesini bekle, sonra v0.2.0 tag'i için GitHub
+#    Release'i yayınla, body = 0.2.0 için CHANGELOG bölümü.
+#
+#    Workflow oraya önce varır ve dört SBOM asset'i çoktan eklenmiş bir TASLAK
+#    release bırakır — yani 6. adım normalde "release oluştur" değil, "body'yi
+#    doldur ve Publish'e bas" olur. Workflow bitmeden elle yayınlamak da hata
+#    değildir: o durumda asset'ler bulduğu release'e yüklenir, body'ye, başlığa
+#    ve taslak bayrağına hiç dokunulmaz. Yine de beklemek daha doğru sıradır —
+#    asset'ler bir release'in parçasıdır.
 
 # 7. Versiyon bump'ının ve herhangi bir release-branch fix'inin kaybolmaması için
 #    main'i develop'a geri-merge et.

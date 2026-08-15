@@ -13,25 +13,28 @@ name: Release images
 # — a release/* branch or its PR can still be abandoned or force-fixed before that point, so
 # building images any earlier would risk publishing a version nobody actually released.
 #
-# Every `uses:` below is pinned to a mutable major tag (`@v7`, `@v3`, `@v5`, `@v6`), matching
-# ci.yml/codeql.yml/cla.yml's existing convention rather than pinning to a commit SHA — pinning
-# just this file to SHAs while every other workflow stays on major tags would be an
-# inconsistency, not a hardening. Actions-pinning is audit finding SEC-06's job
-# (audit/findings/security.md, issue #157: "Actions mutable tag'e pinli") and its roadmap item
-# P3-5, and belongs as one repo-wide pass across all four workflow files at once, not a
-# one-off in the workflow this finding's own dependency chain adds.
+# Every `uses:` below is pinned to a full commit SHA with the release tag in a trailing
+# same-line comment — audit finding SEC-06 (issue #157), roadmap P3-5, applied as one repo-wide
+# pass across all five workflow files rather than a one-off here. The comment is not decoration:
+# Dependabot only rewrites the version documentation of an action "when the comment is on the
+# same line", and it is what tells Dependabot which release the SHA stands for. Every SHA below
+# is the head commit of a real release tag, which matters because a SHA that belongs to no tag
+# makes Dependabot track the upstream default branch's latest commit instead of its latest
+# release.
 on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
-# `contents: read` is the default-safe floor for a checkout; `packages: write` is the one
-# elevated grant this workflow needs, scoped to the ephemeral, workflow-run-only
-# GITHUB_TOKEN — no PAT, no repo secret, nothing that outlives this run or could leak into a
-# log. See docker/login-action below for where it's spent.
+# `contents: read` is the default-safe floor for a checkout. The two elevated grants this
+# workflow needs are declared per job instead of here, because they are needed by different
+# jobs and nothing is gained by handing both to both: `build-and-push` gets `packages: write`
+# (push images and their cosign signatures) plus `id-token: write` (mint the OIDC token cosign
+# exchanges for a Fulcio certificate), and `publish-sbom` gets `contents: write` (attach release
+# assets) and neither of the other two. Everything is spent through the ephemeral,
+# workflow-run-only GITHUB_TOKEN — no PAT, no repo secret, nothing that outlives this run.
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   # A release tag names one immutable version, so two runs racing to publish the same tag
@@ -46,6 +49,16 @@ concurrency:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Pushes the image, and the cosign signature that GHCR stores beside it as a second tag
+      # on the same repository (`sha256-<digest>.sig`).
+      packages: write
+      # Keyless signing, and the only reason this grant exists. Without it
+      # `ACTIONS_ID_TOKEN_REQUEST_URL` is unset and `cosign sign` cannot get the OIDC token it
+      # trades for a short-lived Fulcio certificate — it does not fall back to anything, it
+      # fails.
+      id-token: write
     strategy:
       # api and web have independent Dockerfiles and share no build cache, so there is nothing
       # to serialize for — and fail-fast: false means a broken `web` build still lets a working
@@ -59,7 +72,7 @@ jobs:
           - image: kurultay-web
             dockerfile: apps/web/Dockerfile
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # QEMU is what lets this amd64 runner execute arm64 instructions during the build itself
       # (pnpm install, tsc, next build all run *as* arm64 under emulation) — Buildx alone only
@@ -67,13 +80,13 @@ jobs:
       # RUN steps. This is exactly what OPS-04's "ARM için önceden derlenmiş imaj yok, kaynaktan
       # build teorik ama doğrulanmamış" gap asks for: a real, tested arm64 artifact instead of
       # an unverified claim that source-building on ARM hardware works.
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
         with:
           platforms: arm64
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -81,20 +94,37 @@ jobs:
 
       # Turns the git ref alone into every tag this push should carry, so nothing in this
       # workflow hardcodes a version number. For a `refs/tags/v0.2.0` push that's `0.2.0`,
-      # `0.2` (float onto patch releases without opting into the next minor — a middle ground
-      # between a full `:0.2.0` pin and unpinned `:latest`), and `latest` itself, which
+      # `v0.2.0`, `0.2` (float onto patch releases without opting into the next minor — a middle
+      # ground between a full `:0.2.0` pin and unpinned `:latest`), and `latest` itself, which
       # `docker-compose.yml`'s `image: ghcr.io/dravcore/${{ matrix.image }}:${TAG:-latest}`
       # relies on as the default a self-hoster gets without setting TAG at all.
-      - uses: docker/metadata-action@v5
+      #
+      # `v{{version}}` is the odd one out and it is a bug fix, not a preference. `{{version}}`
+      # strips the `v` — upstream's own table has git tag `v1.2.3` producing `1.2.3` — while
+      # every place in this repository that tells an operator how to pin a release says
+      # `TAG=vX.Y.Z`: README.md, README.tr.md, docs/self-hosting.md, docs/development.md (three
+      # times), their Turkish mirrors, and the comment beside `image:` in docker-compose.yml.
+      # Nine documented instructions against three published tags, none of which was `v0.2.0`,
+      # so `TAG=v0.2.0` + `docker compose pull` could only ever have failed. Publishing the tag
+      # the documentation already promises is a one-line fix; rewriting nine documented
+      # instructions in two languages is not.
+      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         id: meta
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           tags: |
             type=semver,pattern={{version}}
+            type=semver,pattern=v{{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        # `id:` so the steps below can address the image by `outputs.digest` — the digest of
+        # the multi-arch index this push created — rather than by one of the tags above. A tag
+        # is a mutable pointer even seconds after it is written, so signing or scanning "the
+        # thing tagged 0.2.0" would leave a race between the push and the signature. The digest
+        # cannot move.
+        id: build
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -120,16 +150,163 @@ jobs:
           # API URL work tracked as this finding's own follow-up lands.
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,scope=${{ matrix.image }},mode=max
-          # provenance/sbom left at build-push-action's default (both on) rather than turned
-          # off for a simpler manifest read: audit finding SEC-06 (audit/findings/security.md,
-          # issue #157) already tracks "no signed image / no SBOM" as its own gap, and its
-          # roadmap item P3-5 depends on this workflow existing — build-push-action's default
-          # attestations are the free half of that work, so switching them off here would
-          # hand P3-5 more to build, not less. Verifying a release image's platforms now needs
-          # `docker buildx imagetools inspect ghcr.io/dravcore/<image>:<tag>`, not `docker
+          # provenance/sbom left at build-push-action's default (both on). These are BuildKit
+          # attestations living inside the index as extra manifests — useful, but unsigned, so
+          # they answer "what did the build say it did" and not "who says so". That is why the
+          # cosign step below exists rather than being considered already covered. Reading them
+          # needs `docker buildx imagetools inspect ghcr.io/dravcore/<image>:<tag>`, not `docker
           # manifest inspect` — imagetools understands the attestation manifests as attached
           # metadata and lists platforms and attestations separately instead of interleaving
-          # them the way a plain manifest list read would. cosign signing and a published SBOM
-          # release asset stay P3-5's job, not this workflow's — provenance/sbom attestations
-          # are supply-chain metadata *inside* the registry, not the signed/verifiable
-          # artifact SEC-06 asks for.
+          # them the way a plain manifest list read would.
+
+      # ---------------------------------------------------------------------------------
+      # SEC-06 / P3-5, part 1: sign the image.
+      #
+      # Keyless (Fulcio + Rekor via the runner's OIDC token), not a cosign key pair. A key pair
+      # would mean a long-lived private key in repository secrets: it has to be generated,
+      # stored, rotated, and revoked by hand, and anyone who ever reads that secret can sign a
+      # release forever without leaving a trace. Keyless has no secret to leak — the certificate
+      # is minted per run, is valid for ten minutes, and binds the signature to *this workflow
+      # file at this ref* rather than to "somebody who holds the key". The identity a verifier
+      # checks is therefore a URL anybody can read in this repository, which is the property
+      # that makes verification meaningful for a self-hoster who has never met the maintainer.
+      # The trade is a dependency on the public Sigstore instances (Fulcio, Rekor) at both sign
+      # and verify time; for a public repository publishing public images that is the right side
+      # of the trade.
+      # ---------------------------------------------------------------------------------
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign the image with cosign
+        env:
+          # By digest, from the step above — see the note on `id: build`.
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+        # `--yes` skips the confirmation prompt for writing to the public transparency log.
+        # There is no interactive terminal here to answer it, and the entry being public is the
+        # point: Rekor is what lets a verifier check the signature years later, after the
+        # ten-minute certificate has long expired.
+        #
+        # The digest signed is the index's, which is what every tag written above resolves to,
+        # so `cosign verify ghcr.io/dravcore/kurultay-api:v0.2.0` works for amd64 and arm64
+        # users alike — one signature, not one per architecture. `--recursive` (additionally
+        # signing each per-platform manifest) is deliberately not used: it would also walk the
+        # BuildKit attestation manifests in the same index and produce a set of signatures
+        # nobody in docs/self-hosting.md is told to check.
+        run: cosign sign --yes "$IMAGE"
+
+      # ---------------------------------------------------------------------------------
+      # SEC-06 / P3-5, part 2: generate the SBOM.
+      #
+      # Format is SPDX 2.3 JSON. It is the ISO standard (ISO/IEC 5962:2021), it is what GitHub's
+      # own dependency-graph SBOM export emits, and it is what syft's own action defaults to —
+      # so an operator feeding it to grype, trivy, Dependency-Track or a corporate intake form
+      # does not have to convert anything first. CycloneDX would have been the other defensible
+      # answer; it was passed over only because nothing in this project or its documented
+      # tooling asks for it, and publishing both would double the assets to explain for no
+      # reader we can name.
+      #
+      # One SBOM per platform, not one per image. The two platform images do not contain the
+      # same packages — apps/web alone pulls @next/swc-linux-x64-gnu on one and
+      # @next/swc-linux-arm64-gnu on the other — so a single file labelled "kurultay-web" would
+      # be accurate for amd64 and quietly wrong for every arm64 operator, which is worse than
+      # publishing nothing.
+      #
+      # syft is pinned transitively: the version this action installs is baked into the action
+      # release, so the SHA above pins the scanner too (v0.24.0 installs syft v1.42.3), and
+      # Dependabot bumping the action bumps the scanner with it. Naming it again here as a
+      # `syft-version:` input would create a second number to remember to update.
+      # ---------------------------------------------------------------------------------
+      - uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
+      - name: Generate an SBOM per published platform
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          IMAGE_NAME: ${{ matrix.image }}
+          # `v0.2.0` — the git ref this run was triggered by. The asset ends up on the GitHub
+          # Release for that same ref, so naming the file after it is what makes the pairing
+          # obvious in the release's file list.
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p sbom
+          for platform in amd64 arm64; do
+            # `registry:` reads the image straight out of GHCR instead of pulling it into a
+            # local daemon — no `docker pull` of two multi-hundred-MB images for a file listing.
+            # Credentials come from the docker/login-action step above via ~/.docker/config.json.
+            syft scan "registry:${IMAGE}" \
+              --platform "linux/${platform}" \
+              -o "spdx-json=sbom/${IMAGE_NAME}-${TAG}-linux-${platform}.spdx.json"
+          done
+          ls -l sbom/
+
+      # Handed to the next job rather than attached to the release from here: this job is a
+      # matrix, and two legs racing to create the same GitHub Release is a real race with a
+      # real loser. One job, one writer.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom-${{ matrix.image }}
+          path: sbom/
+          if-no-files-found: error
+
+  # -----------------------------------------------------------------------------------
+  # SEC-06 / P3-5, part 3: publish the SBOM as a release asset.
+  #
+  # Separate job because it is the only place that needs `contents: write`, and because the
+  # matrix above must finish before there is anything to attach.
+  # -----------------------------------------------------------------------------------
+  publish-sbom:
+    needs: build-and-push
+    # `!cancelled()` rather than the default `success()`: build-and-push runs `fail-fast: false`
+    # precisely so a broken `web` build still lets a working `api` image reach GHCR. Gating on
+    # success would then throw away the SBOM of the image that did publish, which contradicts
+    # the reason fail-fast was turned off. If neither leg produced anything the step below fails
+    # loudly instead of quietly attaching nothing.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      # Creating or updating the GitHub Release for this tag, and nothing else. No
+      # `packages: write` and no `id-token: write` here — this job neither pushes nor signs.
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: sbom-*
+          merge-multiple: true
+          path: sbom
+        continue-on-error: true
+
+      - name: Attach the SBOMs to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This job deliberately has no `actions/checkout` — it needs four JSON files from the
+          # previous job, not the source tree. But `gh` normally works out which repository it
+          # is talking about from the git remote in the working directory, and there is no git
+          # repository here for it to read. `GH_REPO` is what replaces that, and without it
+          # every `gh release` call below fails with "not a git repository".
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(sbom/*.spdx.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No SBOM was produced — every image build must have failed. Nothing to attach."
+            exit 1
+          fi
+          printf 'Attaching %d file(s) to %s:\n' "${#files[@]}" "$TAG"
+          printf '  %s\n' "${files[@]}"
+
+          # docs/git-strategy.md#release-process pushes the tag (step 5) *before* a human writes
+          # the release notes (step 6), so this workflow normally arrives at a tag with no
+          # release behind it. Creating a draft is the only shape that stays correct in both
+          # orders: if the release does not exist yet, the maintainer finds a draft waiting with
+          # the assets already on it and fills in the body; if a human got there first, this
+          # only uploads files and never touches the body, the title, or the draft flag — which
+          # `gh release create` would, and which would un-publish a live release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber
+          else
+            gh release create "$TAG" "${files[@]}" \
+              --draft \
+              --title "$TAG" \
+              --notes 'Release notes pending — replace this with the CHANGELOG.md section for this version (docs/git-strategy.md#release-process, step 6).'
+          fi

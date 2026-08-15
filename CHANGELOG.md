@@ -719,6 +719,30 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- **Release images are signed, ship an SBOM, and are built by workflows whose every action is
+  pinned to a commit.** Three parts of audit finding SEC-06
+  ([#157](https://github.com/dravcore/kurultay/issues/157)), all of them things a self-hoster
+  can now check rather than take on trust. Every `uses:` across the five workflow files moved
+  from a mutable major tag (`@v7`, `@v3`) to a full commit SHA with the release in a same-line
+  comment — a major tag is a pointer its owner can move, so an action compromised upstream
+  reached this repository's runners on the next push with no diff for anyone to review. Each
+  published image is then signed with cosign, keylessly: no long-lived key exists to be
+  leaked, and the certificate binds the signature to this repository's release workflow at the
+  release's git ref, which is what makes `cosign verify` say something a stranger can rely on.
+  An SBOM (SPDX 2.3 JSON, from syft) is generated per image **per architecture** — amd64 and
+  arm64 do not contain the same packages, so one file for both would have been quietly wrong
+  for every ARM operator — and attached to the GitHub Release as an asset. The verification
+  commands, with this repository's exact identity and issuer, are in
+  [docs/self-hosting.md](docs/self-hosting.md#verifying-what-you-pulled); an unchecked
+  signature protects nobody.
+- **`TAG=vX.Y.Z` now resolves to a published image.** Every place in this repository that tells
+  an operator how to pin a release — both READMEs, both self-hosting guides, `docs/development.md`
+  three times, and the comment beside `image:` in `docker-compose.yml` — says `TAG=vX.Y.Z`, but
+  the release workflow published `0.2.0`, `0.2` and `latest` and never `v0.2.0`, because
+  `docker/metadata-action`'s `{{version}}` strips the `v`. Following the documented instruction
+  could only ever end in a failed `docker compose pull`. The workflow now publishes the
+  `v`-prefixed tag as well. Found while writing the `cosign verify` command, which needs an
+  image reference that exists.
 - **An attachment's display name can no longer be made to render as a different name.** The
   Unicode bidi overrides (U+200E/U+200F, U+061C, U+202A–U+202E, U+2066–U+2069) and the C0/C1
   control characters are now stripped from a stored filename at write time, and again when that

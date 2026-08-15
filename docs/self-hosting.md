@@ -278,6 +278,96 @@ Migrations run automatically: the one-shot `migrate` service applies them before
 Pin a release with `TAG=v0.2.0` in `.env` if you would rather upgrade deliberately than track
 `latest`.
 
+## Verifying what you pulled
+
+`docker compose pull` trusts whatever ghcr.io hands it. Two things published with every release
+let you stop doing that: a **signature** that says this image came out of this repository's
+release workflow, and an **SBOM** that says what is inside it. Both are optional to use and
+neither protects anyone who never runs the commands below.
+
+### Checking the signature
+
+You need [cosign](https://github.com/sigstore/cosign) **3.0 or newer** — the signatures are
+written in the Sigstore bundle format that cosign 3 uses by default, and cosign 2 cannot read
+them.
+
+```bash
+cosign verify \
+  --certificate-identity "https://github.com/dravcore/kurultay/.github/workflows/release-images.yml@refs/tags/v0.2.0" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  ghcr.io/dravcore/kurultay-api:v0.2.0
+```
+
+Repeat it for `kurultay-web`, and replace `v0.2.0` in both places when you verify another
+release. The version appears twice for two different reasons: once as the git ref the signing
+workflow ran on, and once as the image tag you are asking about.
+
+**The two `--certificate-*` flags are the entire check; do not drop them.** There is no signing
+key to guard here. The images are signed keylessly: the release workflow trades a GitHub OIDC
+token for a certificate valid for a few minutes, signs, and the certificate expires. What makes
+the result meaningful is not that a secret was kept, it is that the certificate records _which
+workflow, in which repository, at which git ref_ asked for it. Without `--certificate-identity`
+cosign will happily accept a validly-signed image from anybody at all — including someone who
+pushed a tag to their own fork of this repository.
+
+A successful run prints the checks it performed and a JSON claim naming the digest it verified:
+
+```
+Verification for ghcr.io/dravcore/kurultay-api:v0.2.0 --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - Existence of the claims in the transparency log was verified offline
+  - The code-signing certificate was verified using trusted certificate authority certificates
+```
+
+Anything else is a failure, and the two failures worth telling apart are `no signatures found`
+(this image was never signed — it predates this feature, or it is not the image you think it is)
+and `no matching CertificateIdentity found` (it _was_ signed, by someone or something other than
+the identity you asked for; the error prints the identity it actually found).
+
+Verification reaches out to Sigstore's public infrastructure for the trust root and the
+transparency log, so it wants outbound HTTPS. Run it from your laptop before you deploy if the
+server has none.
+
+Both the tag and the digest work as the last argument, and on a host that has already pulled,
+the digest is the stricter question — it asks about the exact bytes on disk rather than about
+whatever the tag points at now:
+
+```bash
+docker image inspect ghcr.io/dravcore/kurultay-api:v0.2.0 --format '{{index .RepoDigests 0}}'
+```
+
+### Where the SBOM lives
+
+On the [GitHub Release](https://github.com/dravcore/kurultay/releases) for the version, as
+downloadable assets — one per image per architecture, because the two architectures genuinely
+do not contain the same packages:
+
+```
+kurultay-api-v0.2.0-linux-amd64.spdx.json
+kurultay-api-v0.2.0-linux-arm64.spdx.json
+kurultay-web-v0.2.0-linux-amd64.spdx.json
+kurultay-web-v0.2.0-linux-arm64.spdx.json
+```
+
+The format is SPDX 2.3 JSON, which is what `grype`, `trivy` and Dependency-Track all read
+without conversion:
+
+```bash
+gh release download v0.2.0 --repo dravcore/kurultay --pattern '*.spdx.json'
+grype sbom:./kurultay-api-v0.2.0-linux-amd64.spdx.json
+```
+
+**The SBOM file itself is not signed** — the signature above covers the image, and the SBOM is a
+description of it produced by the same workflow run. For most people that is enough, because a
+tampered SBOM cannot make a tampered image verify. If you need the stronger property, do not
+trust the file: regenerate it yourself from the image you have already verified, with
+[syft](https://github.com/anchore/syft), and compare.
+
+```bash
+syft scan registry:ghcr.io/dravcore/kurultay-api:v0.2.0 --platform linux/amd64 -o spdx-json
+```
+
 ## Bringing your own reverse proxy
 
 If you already run nginx, Traefik or another proxy and would rather not stack a second one,
