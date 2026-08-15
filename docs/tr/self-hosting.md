@@ -262,33 +262,58 @@ kural:
 | Yol            | Nereye   | Prefix                | Azami istek gövdesi          |
 | -------------- | -------- | --------------------- | ---------------------------- |
 | `/auth/*`      | api:4000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
-| `/api/*`       | api:4000 | `/api` **kaldırılır** | **25 MiB** (`26214400` bayt) |
+| `/api/*`       | api:4000 | `/api` **kaldırılır** | **26 MiB** (`27262976` bayt) |
 | geri kalan her | web:3000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
 
 `/api/*` ayrıca WebSocket upgrade'lerini de geçirmelidir — realtime pano akışı odur.
 
-`/api/*` üzerindeki gövde boyutu sözleşmenin parçasıdır, ayar düğmesi değil. Bu sayı API'nin
-`ATTACHMENT_MAX_BYTES` değeriyle **aynıdır** (`.env.example`) ve ikisi **bağımsız
-ayarlanamaz**: API'ninkini yükseltip proxy'ninkini yükseltmezseniz proxy limitini aşan her
-yükleme, API'nin hiç görmediği ve hiç loglamadığı bir `413` ile düşer; proxy'ninkini yükseltip
-API'ninkini yükseltmezseniz proxy başarılı bir istek loglar, API onu reddeder. Caddy kendi
-başına gövde limiti koymaz — pakete dahil `docker/Caddyfile`'ın limiti açıkça yazmasının sebebi
-budur — ve nginx `client_max_body_size` için **1 MB** varsayar; yani satırı atlayan bir yedek
-proxy, bir megabayttan büyük her eki reddeder.
+#### Proxy'nin sayısı neden 26 MiB, API'ninki neden 25
+
+**Bu bir yazım hatası değil ve ikisi eşitlenmemeli.** Bu instance'ın kabul ettiği en büyük _ek_
+`ATTACHMENT_MAX_BYTES`, yani 25 MiB — kullanıcıya söylenecek sayı budur ve limiti değiştirmek
+istediğinizde değiştireceğiniz tek sayı da budur. Proxy'nin 26 MiB'ı onun **üstünde** bir
+tavandır, ikinci bir kopyası değil.
+
+Farklı olmalarının sebebi farklı şeyleri saymaları. `client_max_body_size` (ve Caddy'nin
+`request_body max_size`'ı) **istek gövdesinin tamamını** sayar; `ATTACHMENT_MAX_BYTES` ise
+içindeki **dosyayı** sayar. Bir yükleme dosyayı multipart bir zarfa sarar — her parça için bir
+boundary satırı ve bir `Content-Disposition` header'ı, artı kapanış boundary'si — ve bu zarf
+dosyanın kendi baytlarının **üstüne** biner. Bu API'nin aldığı gerçek istek üzerinde ölçüldü:
+kısa bir dosya adı için 309 bayt, 255 karakterlik bir ad için 563 bayt.
+
+Yani proxy tam 25 MiB'a ayarlanırsa 25 MiB'lık bir ek yüklenemez: dosya belgelenen limitin
+içindedir, gövde değildir. Kullanıcı, belgelerin izinli dediği bir dosyada `413` alır ve
+bakması söylenen sayı, sorun olmayan sayıdır.
+
+İki katmanın gerçekte izlediği kural eşitlik değil, bir sıralamadır:
+
+> **Proxy, API'nin kabul edeceği bir şeyi asla reddetmemeli.** Proxy'nin işi absürt gövdeleri
+> herhangi bir yerde tamponlanmadan önce kesmektir. Kesin dosya limiti API'ye aittir — hangi
+> dosyanın büyük olduğunu cevabında söyleyebilen tek katman odur.
+
+Dolayısıyla: `ATTACHMENT_MAX_BYTES`'ı yükseltirseniz proxy'nin sayısını da onun üstünde kalacak
+şekilde yükseltmelisiniz (pakete dahil yapılandırma 1 MiB pay bırakıyor; bu, ölçülen en büyük
+zarfın ~1860 katı). Proxy'ninkini API'ninkinin altına indirirseniz limite yakın her yükleme,
+API'nin hiç görmediği ve hiç loglamadığı bir `413` ile düşer. Caddy kendi başına gövde limiti
+koymaz — pakete dahil `docker/Caddyfile`'ın limiti açıkça yazmasının sebebi budur — ve nginx
+`client_max_body_size` için **1 MB** varsayar; yani satırı atlayan bir yedek proxy, bir
+megabayttan büyük her eki reddeder.
 
 ### İki 413'ü birbirinden ayırmak
 
 Her iki katman da boyutu aşan bir yüklemeye `413` ile cevap verir ve **hangisinin reddettiğini
 cevap gövdesi söyler**:
 
-| Aldığınız cevap                             | Reddeden | Anlamı                                                          |
-| ------------------------------------------- | -------- | --------------------------------------------------------------- |
-| **Boş** gövdeli `413` (`Content-Length: 0`) | proxy    | tasarlandığı gibi — istek API'ye hiç ulaşmadı                   |
-| `statusCode` taşıyan **JSON** gövdeli `413` | API      | proxy limitiniz `ATTACHMENT_MAX_BYTES`'tan yüksek ya da hiç yok |
+| Aldığınız cevap                             | Reddeden | Anlamı                                                    |
+| ------------------------------------------- | -------- | --------------------------------------------------------- |
+| `statusCode` taşıyan **JSON** gövdeli `413` | API      | tasarlandığı gibi — dosya `ATTACHMENT_MAX_BYTES`'ı aşıyor |
+| **Boş** gövdeli `413` (`Content-Length: 0`) | proxy    | gövde proxy'nin tavanını aştı; bu kaba kesim              |
 
-İkinci satır yanlış yapılandırmadır: proxy, API'nin sonradan reddettiği bir gövdeyi taşımıştır —
-iki katmanlı kuralın önlemeye çalıştığı boşa yükleme yarısı budur. Birinci satır doğru
-davranıştır.
+Birinci satır, boyutu aşan bir ek için normal cevaptır ve kullanıcının bir şey yapabileceği
+cevaptır: limiti adlandırır. İkincisi, proxy'nin gövdeyi API hiç görmeden reddetmesidir —
+absürt bir şey için doğrudur, ama kullanıcı bunu `ATTACHMENT_MAX_BYTES`'ın **altındaki** bir
+dosyada alıyorsa proxy tavanınız çok düşüktür (yukarıdaki "Proxy'nin sayısı neden 26 MiB,
+API'ninki neden 25" bölümüne bakın).
 
 Header'lar yardımcı olmaz — Caddy'nin `413`'ü `Server` header'ı taşımaz; ikisini yalnız gövde
 ayırır. API'nin kendi reddettiği her şey
@@ -302,9 +327,12 @@ her deployment'ın log hacmini ikiye katlardı — dolayısıyla proxy'nin redde
 `docker compose logs proxy` çıktısında **hiç görünmez**. Proxy logunda hiçbir şey yokken gelen
 boş gövdeli bir `413`, limitin bozuk olduğunun değil, beklenen sonucun kendisidir.
 
-Pakete dahil `docker/Caddyfile` üzerinde `caddy:2-alpine` ile ölçüldü: tam `26214400` bayt →
-`200`, bir bayt fazlası → `413`, ve `curl` düzgün bir durum satırıyla `0` koduyla çıkıyor —
-bağlantı yükleme ortasında kesilmiyor, usulünce kapanıyor.
+`docker/Caddyfile` üzerinde `caddy:2-alpine` ile, o zamanki limitiyle (`25MiB`) ölçüldü: tam
+`26214400` bayt gövde → `200`, bir bayt fazlası → `413`, ve `curl` düzgün bir durum satırıyla
+`0` koduyla çıkıyor — bağlantı yükleme ortasında kesilmiyor, usulünce kapanıyor. Eşiğin `>=`
+değil `> max_size` olduğunu kuran ölçüm budur; limitin taşınması gerektiğini gösteren de aynı
+ölçüm: 26214400 baytlık bir _dosya_ bundan birkaç yüz bayt büyük bir gövde üretiyor. Pakete
+dahil yapılandırma artık `26MiB` diyor ve bu ölçümün sınırı da onunla birlikte kayıyor.
 
 Bunu kendiniz denerseniz **gerçek bir yükleme ucuna** yöneltin. Rastgele bir yola atmak hiçbir
 şey ölçmez: API, header'ları alır almaz gövdeyi hiç okumadan `404` cevaplar, istek proxy'nin
@@ -319,7 +347,9 @@ mount edilmiştir ve prefix girişte kaldırılır. nginx'te:
 location /auth/ { proxy_pass http://api:4000;  }   # sondaki slash yok → yol korunur
 location /api/  {
   proxy_pass http://api:4000/;                     # sondaki slash var → /api kaldırılır
-  client_max_body_size 25m;                        # = ATTACHMENT_MAX_BYTES (26214400)
+  client_max_body_size 26m;                        # ATTACHMENT_MAX_BYTES'ın (25 MiB) ÜSTÜNDE,
+                                                   # eşiti değil — multipart zarfı dosyanın
+                                                   # üstüne biner. Yukarıdaki bölüme bakın.
 }
 location /      { proxy_pass http://web:3000;  }
 ```

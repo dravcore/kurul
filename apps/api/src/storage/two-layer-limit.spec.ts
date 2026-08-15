@@ -14,8 +14,37 @@ import { DEFAULT_ATTACHMENT_MAX_BYTES } from './storage-config';
  * It reads the shipped files rather than a copy of them. A test that asserted against its own
  * duplicate of the number would pass on the day somebody edits the Caddyfile, which is the only
  * day it needed to fail.
+ *
+ * ## "Not independently tunable" is an ordering, not an equality
+ *
+ * The first version of this spec asserted the two numbers were *equal*, and that was wrong — it
+ * pinned a bug rather than a contract. The layers do not measure the same thing: `max_size`
+ * counts the whole request body, `ATTACHMENT_MAX_BYTES` counts the file part, and the multipart
+ * envelope sits between them. With both at 25 MiB, a file of exactly the published limit passes
+ * the API's check and fails the proxy's, so the documented maximum was not actually uploadable
+ * through the shipped stack.
+ *
+ * The invariant that survives measurement is: **the proxy must never reject something the API
+ * would accept.** It exists to cut absurd bodies before anything buffers them; the exact file
+ * limit belongs to the API, the only layer that can name the file in its answer.
  */
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
+
+/**
+ * The worst multipart envelope measured for this endpoint's request shape — one `kind` text
+ * field and one file part — against a 26214400-byte file:
+ *
+ *   filename `a.png`                       309 bytes
+ *   filename `screenshot.png`              318 bytes
+ *   filename with 32 UTF-8 characters      340 bytes
+ *   filename with 259 characters           563 bytes
+ *
+ * Measured by reading `Content-Length` off the request superagent produces, not estimated. The
+ * number scales with the filename, which is the only variable-length part of the envelope, so
+ * the 259-character case is the ceiling any real client can reach (255 is the usual filesystem
+ * limit).
+ */
+const MEASURED_MULTIPART_ENVELOPE_BYTES = 563;
 
 function read(relativePath: string): string {
   return readFileSync(join(REPO_ROOT, relativePath), 'utf8');
@@ -48,30 +77,61 @@ describe('the two-layer upload limit', () => {
     expect(DEFAULT_ATTACHMENT_MAX_BYTES).toBe(26_214_400);
   });
 
-  it('is the same number in docker/Caddyfile', () => {
+  it('leaves docker/Caddyfile room for the multipart envelope, above the file limit', () => {
     const caddyfile = read('docker/Caddyfile');
     const match = /max_size\s+(\S+)/.exec(caddyfile);
 
     expect(match).not.toBeNull();
-    expect(parseSize(match![1]!)).toBe(DEFAULT_ATTACHMENT_MAX_BYTES);
+    const proxyLimit = parseSize(match![1]!);
+
+    // Strictly greater, so a file of exactly the published maximum can still be uploaded once
+    // its envelope is counted. Equality here is the bug this assertion replaced.
+    expect(proxyLimit).toBeGreaterThan(DEFAULT_ATTACHMENT_MAX_BYTES);
+    expect(proxyLimit - DEFAULT_ATTACHMENT_MAX_BYTES).toBeGreaterThan(
+      MEASURED_MULTIPART_ENVELOPE_BYTES,
+    );
   });
 
-  it('is the same number in docs/self-hosting.md, where an operator replacing Caddy reads it', () => {
+  it('leaves the same room in docs/self-hosting.md, where an operator replacing Caddy reads it', () => {
     // nginx defaults `client_max_body_size` to 1 MB, so an operator who followed the published
     // contract and omitted this row is the one who gets the broken install (ADR 0022).
     const doc = read('docs/self-hosting.md');
     const match = /client_max_body_size\s+([^;]+);/.exec(doc);
 
     expect(match).not.toBeNull();
-    expect(parseSize(match![1]!)).toBe(DEFAULT_ATTACHMENT_MAX_BYTES);
+    const proxyLimit = parseSize(match![1]!);
+    expect(proxyLimit).toBeGreaterThan(DEFAULT_ATTACHMENT_MAX_BYTES);
+    expect(proxyLimit - DEFAULT_ATTACHMENT_MAX_BYTES).toBeGreaterThan(
+      MEASURED_MULTIPART_ENVELOPE_BYTES,
+    );
   });
 
-  it('is the same number in the Turkish mirror', () => {
+  it('leaves the same room in the Turkish mirror', () => {
     const doc = read('docs/tr/self-hosting.md');
     const match = /client_max_body_size\s+([^;]+);/.exec(doc);
 
     expect(match).not.toBeNull();
-    expect(parseSize(match![1]!)).toBe(DEFAULT_ATTACHMENT_MAX_BYTES);
+    const proxyLimit = parseSize(match![1]!);
+    expect(proxyLimit).toBeGreaterThan(DEFAULT_ATTACHMENT_MAX_BYTES);
+    expect(proxyLimit - DEFAULT_ATTACHMENT_MAX_BYTES).toBeGreaterThan(
+      MEASURED_MULTIPART_ENVELOPE_BYTES,
+    );
+  });
+
+  it('keeps the two proxy numbers equal to each other, so replacing Caddy changes nothing', () => {
+    // The bundled proxy and the published nginx row are the *same* layer described twice. They
+    // have to agree with each other even though neither agrees with the API's number, and
+    // nothing above would notice one of them drifting — each is only compared to the API.
+    const caddy = parseSize(/max_size\s+(\S+)/.exec(read('docker/Caddyfile'))![1]!);
+    const nginx = parseSize(
+      /client_max_body_size\s+([^;]+);/.exec(read('docs/self-hosting.md'))![1]!,
+    );
+    const nginxTr = parseSize(
+      /client_max_body_size\s+([^;]+);/.exec(read('docs/tr/self-hosting.md'))![1]!,
+    );
+
+    expect(nginx).toBe(caddy);
+    expect(nginxTr).toBe(caddy);
   });
 
   it('is the same number in .env.example and in the compose default', () => {
