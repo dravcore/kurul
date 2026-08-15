@@ -401,7 +401,11 @@ Neither shrank by changing what the application depends on. The `runner` image s
 optional peer dependencies `pnpm deploy --prod` leaves in a deploy directory — Next.js's SWC
 binaries, the Prisma CLI and Studio, sharp, Playwright, the TypeScript compiler, none of them
 reachable from `dist/main.js` — which `scripts/prune-deployed-modules.mjs` now removes; read
-its header for how "reachable" is defined and why the removals are provably safe. The
+its header for how "reachable" is defined, and for the one class of breakage a manifest-only
+walk cannot see — a package that requires something it never declared, which used to resolve
+through pnpm's flat hoist. There is no static check for that; there is a boot with `SENTRY_DSN`,
+`SMTP_HOST` and `REDIS_URL` set, which is what exercises the code no default-configuration
+start-up touches. The
 `migrate` image stopped being the entire build stage (workspace, every dev dependency, pnpm
 itself) and became a clean base with the Prisma CLI, the schema and the migrations. Reproduce
 any of these with `docker build -f apps/api/Dockerfile --target runner .` followed by

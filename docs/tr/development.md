@@ -406,8 +406,12 @@ Hiçbiri uygulamanın bağımlılıklarını değiştirerek küçülmedi. `runne
 --prod`'un deploy dizininde bıraktığı isteğe bağlı peer bağımlılıklarından kurtuldu — Next.js'in
 SWC binary'leri, Prisma CLI ve Studio, sharp, Playwright, TypeScript derleyicisi; hiçbirine
 `dist/main.js` üzerinden erişilemiyor — bunları artık `scripts/prune-deployed-modules.mjs`
-kaldırıyor. "Erişilebilir"in nasıl tanımlandığı ve silmelerin neden kanıtlanabilir biçimde
-güvenli olduğu o dosyanın başlığında yazıyor. `migrate` imajı ise build stage'inin tamamı
+kaldırıyor. "Erişilebilir"in nasıl tanımlandığı o dosyanın başlığında yazıyor — yalnızca
+manifest okuyan bir taramanın göremeyeceği tek kırılma sınıfıyla birlikte: hiç bildirmediği bir
+modülü `require` eden bir paket, eskiden pnpm'in düz hoist'i üzerinden çözülüyordu, artık
+çözülmeyecek. Bunun statik bir kontrolü yok; olan şey `SENTRY_DSN`, `SMTP_HOST` ve `REDIS_URL`
+ayarlıyken bir boot — varsayılan yapılandırmayla açılışın hiç dokunmadığı kodu çalıştıran şey
+bu. `migrate` imajı ise build stage'inin tamamı
 olmaktan (workspace, her paketin tüm dev bağımlılıkları, pnpm'in kendisi) çıkıp Prisma CLI,
 şema ve migration'ları taşıyan temiz bir tabana dönüştü. Sayıların hepsini `docker build -f
 apps/api/Dockerfile --target runner .` ardından sonucun `docker history` ve

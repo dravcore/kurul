@@ -41,12 +41,34 @@
  * `pg` is an optional peer of `better-auth` and a direct dependency of `@kurultay/api`, so it
  * stays, as it must.
  *
+ * ## The risk this cannot see, stated plainly
+ *
+ * "No resolution path" is true of the isolated layout's *primary* path, and it is not the only
+ * path. Node resolves a bare specifier by walking parent directories, so a file at
+ * `.pnpm/<id>/node_modules/x/index.js` tries `.pnpm/<id>/node_modules` first — the scope this
+ * script follows — and then falls through to `.pnpm/node_modules`, pnpm's flat hoist of
+ * everything the install resolved. That hoist is a real last-resort path, and it is deliberately
+ * there to rescue packages that `require` something they never declared.
+ *
+ * So the class of breakage this closure cannot detect is exactly that: **a kept package that
+ * requires a module absent from its own manifest**, which used to resolve through the hoist and
+ * now will not. It is a bug in the requiring package rather than in this script, and it is
+ * narrow, but it is real, it is invisible to a manifest-only walk, and it fails at runtime
+ * rather than at build — the worst of the three properties.
+ *
+ * There is no static mitigation, only an empirical one: start the thing and use it. What stands
+ * between this script and a broken deploy is `docker-compose.yml`'s healthcheck (`/health/ready`
+ * probes Postgres and Redis, so "healthy" means the process got that far), the API's own e2e
+ * suite, and — because the paths most likely to reach for something lazily are the ones that are
+ * off by default — a boot with `SENTRY_DSN`, `SMTP_HOST` and `REDIS_URL` actually set. All three
+ * of those are opt-in, all three load code no default-configuration boot ever touches, and a
+ * prune verified only against the defaults would have tested the wrong half of the image.
+ *
  * ## What this does not do
  *
  * It does not touch file *contents* — no stripping of `.d.ts`, sourcemaps or docs from packages
  * that stay. It does not read the application's source to decide anything; it reads manifests
- * only. And it is not a substitute for the deploy being correct: run it after `pnpm deploy`, and
- * verify the result by starting the thing, which `docker-compose.yml`'s healthcheck does.
+ * only, which is both why it is cheap and why it has the blind spot above.
  *
  * ## Usage
  *

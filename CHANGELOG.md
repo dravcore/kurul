@@ -464,8 +464,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `scripts/prune-deployed-modules.mjs` now removes them: it walks `dependencies`,
   `optionalDependencies` and non-optional `peerDependencies` from the deploy's top level and
   deletes every virtual-store entry the closure does not contain. In pnpm's isolated layout
-  those entries have no resolution path at all, so this is not a judgement about which code
+  those entries are off the primary resolution path, so this is not a judgement about which code
   "probably" runs — 269 of 493 store entries went, and 212 MB of `node_modules` remained.
+
+  The residual risk, named in the script's header rather than left for someone to discover: a
+  package that `require`s something it never declared used to resolve through pnpm's flat
+  `.pnpm/node_modules` hoist, and no longer will. A manifest-only walk cannot see that, and it
+  fails at runtime rather than at build. The mitigation is empirical — the healthcheck, the e2e
+  suite, and a boot with the three opt-in paths that load code no default boot touches:
+  `SENTRY_DSN` set (SDK initialises with 44 integrations, `flush()` returns), `SMTP_HOST` set
+  (a real invitation arrives in Mailpit over SMTP), and `REDIS_URL` set (BullMQ schedulers and
+  the Socket.io Redis adapter both register). All three were exercised against the pruned image.
 
   `migrate` was the bigger number and the simpler fix: the stage was `FROM build`, so the
   image was the entire assembled workspace — every dev dependency of every package, the
