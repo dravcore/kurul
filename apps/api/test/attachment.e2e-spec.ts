@@ -307,6 +307,59 @@ describe('Attachments (e2e)', () => {
         .expect(204);
     });
 
+    /**
+     * The other half of the tenant scope, and the half nothing covered until this review.
+     *
+     * Every test above puts the *requester’s own* workspace id in the path, so what they
+     * nail is `requireAttachment`'s `where` clause — the predicate that refuses a row
+     * belonging to somebody else. That clause cannot help here: an outsider who writes the
+     * *owning* workspace's id into the path is asking for a row that really does live there,
+     * and the `where` matches. The only thing standing between them and the bytes is
+     * `@WorkspaceScoped()`, whose `WorkspaceGuard` answers 404 for a non-member.
+     *
+     * Measured: deleting `@WorkspaceScoped()` from the byte-stream route left all 34 tests in
+     * this file green, and the endpoint served any attachment on the instance to any signed-in
+     * user who knew two ids. That is what this test now costs.
+     */
+    it('refuses a non-member who addresses the owning workspace directly', async () => {
+      const theirs = await seed('outsider-owner');
+      const created = await upload(theirs, PNG, 'theirs.png', 'image/png');
+      const outsider = await signUp(app, { name: 'Outsider' });
+
+      // The outsider is a member of no workspace at all — the plainest form of the question.
+      await outsider.agent
+        .get(`/workspaces/${theirs.workspaceId}/tasks/${theirs.taskId}/attachments`)
+        .expect(404);
+      await outsider.agent
+        .get(`/workspaces/${theirs.workspaceId}/attachments/${created.id}`)
+        .expect(404);
+      await outsider.agent
+        .get(`/workspaces/${theirs.workspaceId}/attachments/${created.id}/content`)
+        .expect(404);
+      await outsider.agent
+        .delete(`/workspaces/${theirs.workspaceId}/attachments/${created.id}`)
+        .expect(404);
+
+      // Nothing was removed on the way past.
+      await expect(
+        prisma.attachment.findUnique({ where: { id: created.id } }),
+      ).resolves.not.toBeNull();
+    });
+
+    /**
+     * The same question asked by somebody who *is* a member somewhere, because "member of no
+     * workspace" is a state a real attacker never has to be in — and because a guard that
+     * looked up membership without comparing the workspace would pass the test above.
+     */
+    it('refuses a member of another workspace who addresses the owning one directly', async () => {
+      const theirs = await seed('outsider-scoped-owner');
+      const mine = await seed('outsider-scoped-mine');
+      const created = await upload(theirs, PNG, 'theirs.png', 'image/png');
+
+      await mine.user.agent
+        .get(`/workspaces/${theirs.workspaceId}/attachments/${created.id}/content`)
+        .expect(404);
+    });
     it("hides an attachment on another workspace's task from the list endpoint too", async () => {
       const mine = await seed('list-mine');
       const theirs = await seed('list-theirs');
@@ -605,6 +658,58 @@ describe('Attachments (e2e)', () => {
       expect(row.filename).toBe('ölçüm raporu.png');
     });
 
+    /**
+     * The bidi override, end to end, because the unit specs on both halves can each be true
+     * while the assembled path is not.
+     *
+     * U+202E reverses the rendering of everything after it, so `invoice<RLO>gnp.exe` is drawn
+     * as `invoiceexe.png` — in the panel, and in the prompt the browser shows when it asks
+     * where to save the file. Unlike the `"`/CR/LF group, this one is fully reachable from a
+     * real client: it is legal UTF-8, so superagent sends it and busboy decodes it. Measured
+     * reaching the row, the DTO and the RFC 5987 parameter intact before the strip existed.
+     */
+    it('strips a bidi override from the row and from both header parameters', async () => {
+      const where = await seed('bidi');
+
+      const created = await upload(where, PNG, 'invoice\u202egnp.exe.png', 'image/png');
+
+      expect(created.filename).toBe('invoicegnp.exe.png');
+      const row = await prisma.attachment.findUniqueOrThrow({ where: { id: created.id } });
+      expect(row.filename).toBe('invoicegnp.exe.png');
+
+      const response = await where.user.agent
+        .get(`/workspaces/${where.workspaceId}/attachments/${created.id}/content`)
+        .buffer(true)
+        .parse(binaryParser)
+        .expect(200);
+
+      const disposition = response.headers['content-disposition'];
+      // The percent-encoded half is the one that carried it: the browser decodes this back
+      // into the raw character before it draws the save prompt.
+      const encoded = /filename\*=UTF-8''(.*)$/.exec(disposition)?.[1] ?? '';
+      expect(decodeURIComponent(encoded)).toBe('invoicegnp.exe.png');
+      expect(disposition).not.toContain('%E2%80%AE');
+    });
+
+    /**
+     * The LINK label, which went through no cleaning at all until this review: `createLink`
+     * wrote `dto.filename?.trim()` straight to the row. It never reaches a header — the byte
+     * stream answers 404 for a LINK — but it reaches the same panel.
+     */
+    it('strips a bidi override from a LINK label too', async () => {
+      const where = await seed('bidi-link');
+
+      const created = await where.user.agent
+        .post(`/workspaces/${where.workspaceId}/tasks/${where.taskId}/attachments`)
+        .send({
+          kind: AttachmentKind.Link,
+          url: 'https://example.com/a',
+          filename: 'invoice\u202egnp.exe',
+        })
+        .expect(201);
+
+      expect(created.body.filename).toBe('invoicegnp.exe');
+    });
     it('keeps only the basename of a Windows-style path', async () => {
       const where = await seed('windows');
 

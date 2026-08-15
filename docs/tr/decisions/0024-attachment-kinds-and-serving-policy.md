@@ -150,6 +150,21 @@ ve başka hiçbir şeyden hesaplanır. Kullanıcının dosya adı yalnızca gör
 saklanır ve hiçbir zaman bir yol parçasına dönüşmez; böylece path traversal, her kod yolunda doğru
 çözülmesi gereken bir doğrulama sorunu olmaktan çıkar — yapısal olarak ifade edilemez hâle gelir.
 
+**Saklanan görünen ad, kendisini başka bir şeymiş gibi gösteren bir karakter taşıyamaz.** Bu
+kuralın var olma sebebi tam da adın "yalnızca görüntülenen bir alan" olması: ad, görev panelinde ve
+tarayıcının kendi kaydetme kutusunda çiziliyor ve ikisi de kullanıcının bir güven kararı verdiği
+yerler. Tek bir karakter sınıfı hem yazma anında hem de ad `Content-Disposition`'a yazılırken
+kaldırılır — `"` ve `\`, C0/C1 kontrol karakterleri ve Unicode yön değiştirme karakterleri
+(U+200E/U+200F, U+061C, U+202A–U+202E, U+2066–U+2069). İlk iki grup başlığı korur; üçüncüsü okuyanı
+korur, çünkü U+202E kendisinden sonraki her şeyin gösterimini ters çevirir ve `fatura<RLO>gnp.exe`
+ekranda `faturaexe.png` diye çizilir. Bu kural yokken karakterin tüm yolu sağ salim geçtiği
+ölçüldü: RFC 5987 parametresi onu yüzdelik kodluyor, tarayıcı da geri çözüyor — yani başlığın iki
+yarısı da yakalamıyordu. **Kural yalnız yüklenen dosya adına değil, bir `LINK`'in etiketine de
+uygulanır**; eksik olduğu yer de burasıydı: `LINK` etiketleri hiçbir başlığa ulaşmaz ama aynı
+panele ulaşır. Kaldırılmayanın da altı çizilmeli: sıradan ASCII-dışı metin. ASCII olmayan her
+karakteri atan bir kural aynı testleri geçer ve aşağıdaki `defParamCharset: 'utf8'` kararını geri
+alırdı; bu yüzden iki yarının da bir kontrol testi var.
+
 **`uploadedById`, `onDelete: Restrict` ile `User`'a giden gerçek bir yabancı anahtardır.** Emsal,
 `apps/api/prisma/schema.prisma:311`'de `Restrict` olan `Comment.user`. Maliyet sonradan
 keşfedilmek yerine burada yazılır: bu, P3-4'ün (hesap silme ve anonimleştirme, bulgu DB-05) üzerinde

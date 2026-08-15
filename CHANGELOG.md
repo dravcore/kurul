@@ -629,6 +629,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- **An attachment's display name can no longer be made to render as a different name.** The
+  Unicode bidi overrides (U+200E/U+200F, U+061C, U+202A–U+202E, U+2066–U+2069) and the C0/C1
+  control characters are now stripped from a stored filename at write time, and again when that
+  name is written into `Content-Disposition`. U+202E reverses the rendering of everything after
+  it, so a file uploaded as `invoice<RLO>gnp.exe` was shown — in the task panel and in the
+  browser's own save prompt — as `invoiceexe.png`. Measured surviving the whole path before the
+  fix: the RFC 5987 `filename*` parameter percent-encodes the character and the browser decodes
+  it again, so neither half of the header caught it, and the ASCII `filename=` half looked clean
+  either way. The same cleaning now also applies to a `LINK`’s label, which went through none
+  at all — it never reaches a header, but it reaches the same panel. Ordinary non-ASCII names are
+  unaffected and a control test says so.
+- **The byte-stream endpoint’s tenant guard is now covered by a test.** `@WorkspaceScoped()` on
+  `GET /workspaces/:workspaceId/attachments/:id/content` could be deleted with the entire API
+  suite — 1064 unit tests and 34 integration tests — still green: every tenant-scope test put the
+  requester's *own* workspace id in the path, which exercises the service's `where` clause and
+  not the guard. The uncovered case is the one that matters more: a signed-in non-member writing
+  the *owning* workspace's id into the path is asking for a row that really does live there, so
+  the `where` clause matches and only the guard stands in the way. Two integration tests now
+  cover it — a user who belongs to no workspace, and a user who belongs to a different one.
+- **A cross-origin upload is now proven not to buffer the body before it is rejected.** The
+  origin allowlist covers `POST` and therefore covers uploads, and an existing test showed the
+  handler never runs — but multer buffers the whole part before the handler either way, so that
+  was one step short of the property the megabyte-sized limits depend on. A test with a
+  disk-backed multer now measures the destination directory staying empty, with an allowed-origin
+  control that shows the same request really does write a file there.
 - **State-changing requests are now checked against an origin allowlist, server-side.** Until
   now every CSRF defence the API had lived in the browser: a `SameSite=Lax` session cookie and
   a single-origin CORS allowlist. Server-side there was nothing, and that was measurable — a
