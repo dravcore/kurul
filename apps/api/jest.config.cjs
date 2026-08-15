@@ -35,9 +35,34 @@ module.exports = {
   // better-auth >=1.6 is ESM-only, and so is the dependency chain it pulls in
   // (better-call -> rou3, nanostores). Jest runs CommonJS, so every one of these has to be
   // handed to ts-jest instead of being skipped as a plain `node_modules` require.
+  //
+  // `file-type` v21 is ESM-only for the same reason and reaches us through
+  // `attachment-mime.ts`'s `await import('file-type')`. Its own chain is listed too:
+  // `@tokenizer/inflate`, `strtok3`, `token-types`, `uint8array-extras`, plus `peek-readable`
+  // underneath `strtok3` and `@borewit/text-codec` underneath `token-types`.
+  // `@tokenizer/inflate` in particular is not optional — it carries the OOXML sniffing that
+  // gives a `.docx`/`.xlsx`/`.pptx` its own media type, so leaving it out makes office uploads
+  // fail as a 415 that reads like a wrong MIME rule rather than a transform gap. `@borewit` is
+  // on this list because the suite named it, not because the chain was guessed: the run that
+  // followed adding the rest failed with `Unexpected token 'export'` in
+  // `@borewit/text-codec/lib/index.js`. Extend the list the same way — run it, read the package
+  // the error names, add that one. Keep in sync with `apps/api/test/jest-e2e.config.cjs`.
   transformIgnorePatterns: [
-    'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch|rou3|nanostores)/)',
+    'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch|rou3|nanostores|file-type|@tokenizer|strtok3|token-types|peek-readable|uint8array-extras|@borewit)/)',
   ],
+  // `file-type@21`'s `exports` map offers `import` and `module-sync` and no `require`
+  // condition at all, so Jest's CommonJS resolver — which asks for `require`/`default` —
+  // answers `Cannot find module 'file-type'` even though the package is installed and
+  // `transformIgnorePatterns` above is ready to transform it. Pointing the specifier at the
+  // file that map would have chosen is the narrow fix.
+  //
+  // The broad fix, `testEnvironmentOptions.customExportConditions: ['node', 'import']`, was
+  // tried first and rejected on measurement: it flips *every* dual-published dependency to its
+  // ESM entry, and the suite immediately failed on `synckit`'s untransformed `import` — a
+  // package nothing in this API imports on purpose. One mapped specifier changes one package.
+  moduleNameMapper: {
+    '^file-type$': require.resolve('file-type/node'),
+  },
   collectCoverageFrom: ['**/*.(t|j)s', '!**/generated/**'],
   coveragePathIgnorePatterns: ['/generated/'],
   coverageDirectory: '../coverage',
