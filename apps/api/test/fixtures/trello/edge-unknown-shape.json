@@ -25,6 +25,13 @@
       "closed": "no",
       "idBoard": "6512b0aac3d4e5f602030005",
       "pos": 32768
+    },
+    {
+      "id": "6512b0abc3d4e5f602030072",
+      "name": "Archived, but said so with a string",
+      "closed": "true",
+      "idBoard": "6512b0aac3d4e5f602030005",
+      "pos": 49152
     }
   ],
   "labels": {
@@ -39,9 +46,35 @@
       "due": null,
       "idBoard": "6512b0aac3d4e5f602030005",
       "idList": "6512b0abc3d4e5f602030070",
-      "idLabels": "6512b0adc3d4e5f602030090",
+      "idLabels": [],
       "idMembers": [],
       "pos": 16384,
+      "attachments": []
+    },
+    {
+      "id": "6512b0acc3d4e5f602030081",
+      "name": "Card whose idLabels is a string",
+      "desc": "",
+      "closed": false,
+      "due": null,
+      "idBoard": "6512b0aac3d4e5f602030005",
+      "idList": "6512b0abc3d4e5f602030070",
+      "idLabels": "6512b0adc3d4e5f602030090",
+      "idMembers": [],
+      "pos": 32768,
+      "attachments": []
+    },
+    {
+      "id": "6512b0acc3d4e5f602030082",
+      "name": "Card with an attachment that has no url",
+      "desc": "",
+      "closed": false,
+      "due": null,
+      "idBoard": "6512b0aac3d4e5f602030005",
+      "idList": "6512b0abc3d4e5f602030070",
+      "idLabels": [],
+      "idMembers": [],
+      "pos": 49152,
       "attachments": [
         {
           "id": "6512b0aec3d4e5f6020300a0",
@@ -55,6 +88,19 @@
           "pos": 32768
         }
       ]
+    },
+    {
+      "id": "6512b0acc3d4e5f602030083",
+      "name": "Card whose due date is an epoch number",
+      "desc": "",
+      "closed": false,
+      "due": 1755000000000,
+      "idBoard": "6512b0aac3d4e5f602030005",
+      "idList": "6512b0abc3d4e5f602030070",
+      "idLabels": [],
+      "idMembers": [],
+      "pos": 65535,
+      "attachments": []
     },
     "a card that is just a string"
   ],

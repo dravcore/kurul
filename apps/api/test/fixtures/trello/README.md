@@ -38,7 +38,7 @@ _and_ the unreadable ones are reported rather than thrown.
 | `edge-empty-board.json`     | 2026-08-15 | A board with no lists and no cards                                                                                                                                                                                                                                  | no    |
 | `edge-empty-list.json`      | 2026-08-15 | One list, no cards in it                                                                                                                                                                                                                                            | no    |
 | `edge-unknown-color.json`   | 2026-08-15 | Labels coloured `tangerine`, `null` and `sky_light`                                                                                                                                                                                                                 | no    |
-| `edge-unknown-shape.json`   | 2026-08-15 | Right root, wrong everything else: a number inside `lists`, `labels` as an object, a card that is a string, `pos: "bottom"`, `idLabels` as a string, an attachment with no `url`, `checkItems` as a string, `members` as a string, `actions` as an object           | no    |
+| `edge-unknown-shape.json`   | 2026-08-15 | Right root, wrong everything else — see the list below                                                                                                                                                                                                              | no    |
 | `edge-card-export.json`     | 2026-08-15 | Trello's _card_ export — valid JSON, has a `name`, is not a board                                                                                                                                                                                                   | no    |
 | `edge-truncated.json`       | 2026-08-15 | A valid export cut off mid-object; **deliberately not valid JSON**                                                                                                                                                                                                  | no    |
 
@@ -60,6 +60,30 @@ A few things in it are deliberate rather than incidental, because a test depends
   count of actions.
 - **One label has an empty name and one has no colour**, which are the two cases ADR 0025 has to
   invent a name and a colour for.
+
+## What is wrong inside `edge-unknown-shape.json`
+
+Every entry in it exists because a mutation of the reader survived without it — that is, because
+the reader could be broken in that specific way and every test stayed green. The fixture grew
+during that exercise rather than being designed up front, and it is worth keeping in that order:
+each row below is a bug the suite could not previously see.
+
+- A bare number where a list should be, and a list with no `id` at all.
+- A list whose `name` is an array **and** whose `closed` is a string — the entry that proves the
+  reader counts unreadable _entries_ and not unreadable _fields_.
+- A list whose only problem is `closed: "true"`. Without it, a `closed` check that silently
+  coerced went unnoticed, and an archived list arriving as a live column is a wrong import rather
+  than an incomplete one.
+- `pos: "bottom"` on a list that is otherwise fine, which must **not** be reported: ADR 0025
+  already decided that a non-numeric `pos` falls back to id order.
+- `labels` as an object, `members` as a string, `actions` as an object — three whole sections
+  disappearing, one report row each.
+- A card whose `idLabels` is a string, a card carrying an attachment with no usable `url`, a card
+  whose `due` is an epoch number rather than an ISO string, and an entry that is a bare string.
+  The `due` one is there because a nullable field that swallows a wrong type is the quietest
+  failure in the reader: the user loses a due date and hears nothing.
+- A checklist with one unreadable item (reported as an item, so the readable items survive) and a
+  checklist whose `checkItems` is a string (reported as a checklist).
 
 `edge-truncated.json` is listed in the repository's `.prettierignore`, because it is invalid JSON
 on purpose and `prettier --check` would otherwise fail on it. That entry is load-bearing: if
