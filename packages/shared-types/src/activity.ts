@@ -39,6 +39,13 @@ export const ActivityType = {
   BoardCreated: 'board.created',
   BoardUpdated: 'board.updated',
   BoardDeleted: 'board.deleted',
+  // One row for an entire imported board, not one per created card. A 500-card import writing
+  // 500 `task.created` rows would be the same volume problem `comment.created` is kept out of
+  // the audit subset for (ADR 0024) — except here the rows would have no reader at all: the
+  // board did not exist a second earlier, so there is no "what changed" question to answer.
+  // The counts ride in the payload instead, which is also what lets this type join the audit
+  // subset below without reopening that volume argument (ADR 0025).
+  BoardImported: 'board.imported',
   ColumnCreated: 'column.created',
   ColumnUpdated: 'column.updated',
   ColumnDeleted: 'column.deleted',
@@ -128,6 +135,15 @@ export const AUDIT_ACTIVITY_TYPES = [
   ActivityType.TaskDeleted,
   ActivityType.AttachmentDeleted,
   ActivityType.BoardCreated,
+  // In, and the reasoning ran the other way round from the first guess. ADR 0024 names P3-3's
+  // bulk import as a volume risk, so "the import event stays out" looked right — until the code
+  // said otherwise: `board.created` is already in, because the third branch of the rule above is
+  // structural administration and creating a board is exactly that. An import is another way of
+  // creating a board, so keeping it out would make the same event auditable or not depending on
+  // which button produced it. The volume objection does not apply because ADR 0025 writes one
+  // row per import, which is the decision this membership depends on: if the importer ever
+  // starts writing a row per card, this line has to be revisited before that lands.
+  ActivityType.BoardImported,
   ActivityType.BoardUpdated,
   ActivityType.BoardDeleted,
   ActivityType.ColumnCreated,

@@ -42,6 +42,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0022](0022-attachment-storage.md)                     | Attachment Storage: Local Disk Behind a Port, Served From the API Origin                                 | Accepted (attachment kinds and limits settled in 0024) | 2026-08-14 |
 | [0023](0023-checklist-data-model.md)                   | Checklist Data Model: Multi-List Per Card, Derived Progress, No New Realtime Event                       | Accepted                                               | 2026-08-14 |
 | [0024](0024-attachment-kinds-and-serving-policy.md)    | Attachment Kinds and Serving Policy: FILE or LINK, One Size Number in Two Layers, Inline Only for Images | Accepted                                               | 2026-08-15 |
+| [0025](0025-trello-import-mapping.md)                  | Trello Import Mapping: Nothing Is Guessed, Everything Missing Is Counted                                 | Accepted                                               | 2026-08-15 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).

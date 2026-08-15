@@ -89,4 +89,21 @@ describe('AUDIT_ACTIVITY_TYPES', () => {
     expect(AUDIT_ACTIVITY_TYPES).toContain(ActivityType.AttachmentDeleted);
     expect(AUDIT_ACTIVITY_TYPES).not.toContain(ActivityType.AttachmentCreated);
   });
+
+  /**
+   * A subset membership claim needs both directions, or "someone added it for symmetry" passes —
+   * and here the negative half is the one carrying ADR 0024's volume rule.
+   */
+  it('audits an imported board the same way it audits a created one', () => {
+    expect(AUDIT_ACTIVITY_TYPES).toContain(ActivityType.BoardImported);
+    expect(AUDIT_ACTIVITY_TYPES).toContain(ActivityType.BoardCreated);
+  });
+
+  it('does not let the importer widen the subset to high-volume content events', () => {
+    // The reason `board.imported` is one row per import and not one per card. If either of these
+    // ever joins the subset, one board import writes hundreds of audit rows (ADR 0024, ADR 0025).
+    expect(AUDIT_ACTIVITY_TYPES).not.toContain(ActivityType.AttachmentCreated);
+    expect(AUDIT_ACTIVITY_TYPES).not.toContain(ActivityType.CommentCreated);
+    expect(AUDIT_ACTIVITY_TYPES).not.toContain(ActivityType.TaskCreated);
+  });
 });

@@ -269,6 +269,107 @@ export interface NotificationUnreadCountDto {
   count: number;
 }
 
+/**
+ * Which part of a Trello export a skipped item came from.
+ *
+ * `list` and `column` are both here and they are not the same thing: `list` names something the
+ * reader found in the export and did not carry across, `column` names something that *was*
+ * carried across and arrived changed — the default category every imported column takes
+ * (docs/decisions/0025-trello-import-mapping.md). A report that used one word for both would
+ * have to make the user work out which of the two happened.
+ */
+export const TrelloImportScope = {
+  List: 'list',
+  Column: 'column',
+  Card: 'card',
+  Label: 'label',
+  Checklist: 'checklist',
+  ChecklistItem: 'checklistItem',
+  Attachment: 'attachment',
+  Member: 'member',
+  Comment: 'comment',
+} as const;
+
+export type TrelloImportScope = (typeof TrelloImportScope)[keyof typeof TrelloImportScope];
+
+/**
+ * Why an item did not make it across.
+ *
+ * A closed vocabulary rather than free text, because the web renders one sentence per reason
+ * (`app.board.import.skip.*` in `messages/en.json`) and a free-text reason would either ship
+ * English into a Turkish UI or force the API to know the reader's language — the line ADR 0018
+ * draws. Adding a reason costs a translation key, which is the cost that keeps the list honest.
+ */
+export const TrelloImportSkipReason = {
+  /** Kurultay has no equivalent for this at all — comments today (ADR 0025). */
+  OutOfScope: 'outOfScope',
+  /** Trello had it archived (`closed: true`) and Kurultay has no archive (ADR 0025). */
+  Archived: 'archived',
+  /** A Trello member; nothing in Kurultay to map them onto (ADR 0025). */
+  Unmappable: 'unmappable',
+  /** An attachment URL that is neither `http:` nor `https:` (ADR 0024, ADR 0025). */
+  UnsupportedScheme: 'unsupportedScheme',
+  /**
+   * Present but unusable: a card with no name, a checklist with no items — and, because no field
+   * name in the importer was ever verified against a real Trello export, anything whose shape the
+   * reader did not recognise. That second case is the reason the reader answers with a report
+   * instead of an error: a schema drift should cost the user the drifted rows, not the import.
+   */
+  Malformed: 'malformed',
+  /**
+   * Not a skip at all — a *substitution*, reported in the same list because the user needs to
+   * know it happened. An unknown Trello colour fell back to `slot-1`, and every imported column
+   * took the default category.
+   *
+   * Putting a substitution in a list called "skipped" is deliberate. A separate `substitutions`
+   * array was considered and rejected: the question a user asks after an import is not "what did
+   * I lose", it is "why does my board look different", and two lists would force them to read
+   * both to answer it.
+   */
+  Defaulted: 'defaulted',
+} as const;
+
+export type TrelloImportSkipReason =
+  (typeof TrelloImportSkipReason)[keyof typeof TrelloImportSkipReason];
+
+/** One `(scope, reason)` pair of a Trello import report, with a count and a few examples. */
+export interface TrelloImportSkipGroupDto {
+  scope: TrelloImportScope;
+  reason: TrelloImportSkipReason;
+  /** The real number. Never capped. */
+  count: number;
+  /**
+   * Up to 20 names, for a user trying to recognise what is missing.
+   *
+   * Capped where the report is built, not here: a 500-card import can produce 500 skipped cards,
+   * and an uncapped list would make the response scale with the export instead of with the
+   * number of *kinds* of problem — which is the only thing a person can act on.
+   */
+  samples: string[];
+}
+
+/**
+ * The body of a successful Trello import — `201 Created`.
+ *
+ * This is the whole report and it is not stored anywhere. A user who closes it has lost the list
+ * of what did not come across; the board is unaffected (ADR 0025).
+ */
+export interface TrelloImportReportDto {
+  boardId: string;
+  boardName: string;
+  /** Rows actually written. */
+  imported: {
+    columns: number;
+    tasks: number;
+    labels: number;
+    checklists: number;
+    checklistItems: number;
+    attachments: number;
+  };
+  /** Everything not written, grouped by `(scope, reason)`. */
+  skipped: TrelloImportSkipGroupDto[];
+}
+
 /** Default list pagination shape (keyed on `id`, never `position`). */
 export interface CursorPage<T> {
   items: T[];

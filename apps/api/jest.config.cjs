@@ -103,6 +103,21 @@ module.exports = {
   // The branch margin over the floor is back to 1.96 points from the 0.64 recorded above. The
   // floor is left where it is, for the same reason tasks 1-4 left it: a new module arriving with
   // its own tests raises the average without saying anything about the zones the floor watches.
+  //
+  //   2026-08-15  78.03 / 68.46 / 80.00 / 79.29  `develop` at b13fbf5, i.e. after #221 landed.
+  //                                              Measured on this branch with `src/import`
+  //                                              temporarily moved aside, which reproduces
+  //                                              `develop` exactly: the importer is this
+  //                                              branch's only addition under `src`.
+  //   2026-08-15  78.65 / 69.54 / 80.66 / 79.99  after P3-3 tasks 1/3/4/5/6 (the Trello export
+  //                                              reader and the label-colour mapping) — three
+  //                                              consecutive runs, identical to four digits
+  //
+  // Up again, and the floor is left alone again, for the third time and for the same reason: the
+  // two files this added are pure functions with 100% function coverage, so the average moved
+  // without a single one of the cold zones the floor watches getting warmer. Branch margin is now
+  // 3.54 points. If a later item wants to raise the floor, the number to raise it against is a
+  // measurement taken *after* the cold zones are covered, not this one.
   coverageThreshold: {
     global: {
       statements: 75,
