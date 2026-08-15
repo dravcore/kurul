@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, request as playwrightRequest, type APIRequestContext } from '@playwright/test';
 import type {
+  AttachmentDto,
   BoardDto,
   ColumnDto,
   InvitationDto,
@@ -247,6 +248,31 @@ export class Stack {
     expect(response.ok(), `assignment failed: ${response.status()} ${await response.text()}`).toBe(
       true,
     );
+  }
+
+  /**
+   * What the *server* thinks is attached to a task.
+   *
+   * The attachment scenario does everything through the browser, so every one of its
+   * assertions is on the DOM — and a DOM assertion cannot tell "the row was deleted" from
+   * "the row was removed from a list in React state and the request never happened". This
+   * read is the second opinion: it goes over HTTP with the user's own session, so it also
+   * proves the endpoint answers the same thing a reload would.
+   *
+   * `GET .../attachments` returns a plain array and not a cursor page (decision D11), so
+   * there is nothing to unwrap here — if that ever changes, this is where it breaks.
+   */
+  async listAttachments(
+    user: TestUser,
+    workspaceId: string,
+    taskId: string,
+  ): Promise<AttachmentDto[]> {
+    const response = await user.api.get(`/workspaces/${workspaceId}/tasks/${taskId}/attachments`);
+    expect(
+      response.ok(),
+      `attachment list failed: ${response.status()} ${await response.text()}`,
+    ).toBe(true);
+    return (await response.json()) as AttachmentDto[];
   }
 
   /** Reads a task back from the API — used to verify what the *server* stored, not the DOM. */
