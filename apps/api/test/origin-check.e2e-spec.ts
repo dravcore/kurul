@@ -75,6 +75,35 @@ describe('Origin allowlist (e2e)', () => {
       await expect(prisma.workspace.findUnique({ where: { slug } })).resolves.toBeNull();
     });
 
+    it('is refused as multipart/form-data — the upload shape that skips the preflight too', async () => {
+      // `multipart/form-data` is the third simple-request content type, so a cross-site
+      // `<form enctype="multipart/form-data">` reaches the upload endpoint with no preflight
+      // and with the session cookie attached. `src/common/configure-app.spec.ts` pins the
+      // *ordering* against a probe controller; this pins that the real endpoint is covered,
+      // with a real session, and that nothing was written.
+      const workspace = await createWorkspace(user.agent, 'Files', 'files');
+      const board = await user.agent
+        .post(`/workspaces/${workspace.id}/boards`)
+        .send({ name: 'Board' })
+        .expect(201);
+      const columns = await user.agent
+        .get(`/workspaces/${workspace.id}/boards/${board.body.id}/columns`)
+        .expect(200);
+      const task = await user.agent
+        .post(`/workspaces/${workspace.id}/boards/${board.body.id}/tasks`)
+        .send({ title: 'Card', columnId: columns.body[0].id })
+        .expect(201);
+
+      await user.agent
+        .post(`/workspaces/${workspace.id}/tasks/${task.body.id}/attachments`)
+        .set('Origin', EVIL_ORIGIN)
+        .field('kind', 'FILE')
+        .attach('file', Buffer.alloc(64), 'shot.png')
+        .expect(403);
+
+      await expect(prisma.attachment.count()).resolves.toBe(0);
+    });
+
     it('is refused for a destructive method, and the workspace survives', async () => {
       const workspace = await createWorkspace(user.agent, 'Keep me', 'keep');
 
