@@ -229,14 +229,15 @@ makes that impossible rather than unlikely.
 
 ## File conventions
 
-| Kind                   | Location                       | Pattern                                              |
-| ---------------------- | ------------------------------ | ---------------------------------------------------- |
-| Unit                   | Colocated with the source file | `apps/api/src/task/task.service.spec.ts`             |
-| Integration            | Separate test root             | `apps/api/test/task.e2e-spec.ts`                     |
-| Test helpers/factories | Shared under the test root     | `apps/api/test/helpers/`, `apps/api/test/factories/` |
-| Temporary storage root | Beside the database helper     | `apps/api/test/helpers/storage.ts`                   |
-| Browser e2e            | Repository-level package       | `e2e/tests/board-realtime.spec.ts`                   |
-| Browser e2e helpers    | Beside them                    | `e2e/support/`, `e2e/stack-env.ts`                   |
+| Kind                   | Location                       | Pattern                                                                                                                                                                                                                             |
+| ---------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit                   | Colocated with the source file | `apps/api/src/task/task.service.spec.ts`                                                                                                                                                                                            |
+| Integration            | Separate test root             | `apps/api/test/task.e2e-spec.ts`                                                                                                                                                                                                    |
+| Test helpers/factories | Shared under the test root     | `apps/api/test/helpers/`, `apps/api/test/factories/`                                                                                                                                                                                |
+| Temporary storage root | Beside the database helper     | `apps/api/test/helpers/storage.ts`                                                                                                                                                                                                  |
+| Input fixtures         | Under the test root, by source | `apps/api/test/fixtures/trello/` — hand-written Trello exports read by both unit and integration tests; the directory's own README records that none of them is a real export ([ADR 0025](decisions/0025-trello-import-mapping.md)) |
+| Browser e2e            | Repository-level package       | `e2e/tests/board-realtime.spec.ts`                                                                                                                                                                                                  |
+| Browser e2e helpers    | Beside them                    | `e2e/support/`, `e2e/stack-env.ts`                                                                                                                                                                                                  |
 
 Nest's generator calls integration tests `*.e2e-spec.ts`; that name is kept for tooling
 compatibility even though these are API integration tests, not browser e2e.

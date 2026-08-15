@@ -231,14 +231,15 @@ yokluğu assert etmek de bunu olası değil, imkânsız kılar.
 
 ## Dosya konvansiyonları
 
-| Tür                          | Konum                               | Desen                                                |
-| ---------------------------- | ----------------------------------- | ---------------------------------------------------- |
-| Unit                         | Kaynak dosyayla yerinde (colocated) | `apps/api/src/task/task.service.spec.ts`             |
-| Integration                  | Ayrı bir test kökü                  | `apps/api/test/task.e2e-spec.ts`                     |
-| Test helper'ları/factory'ler | Test kökü altında paylaşılır        | `apps/api/test/helpers/`, `apps/api/test/factories/` |
-| Geçici depolama kökü         | Veritabanı helper'ının yanında      | `apps/api/test/helpers/storage.ts`                   |
-| Browser e2e                  | Repository seviyesinde paket        | `e2e/tests/board-realtime.spec.ts`                   |
-| Browser e2e helper'ları      | Onların yanında                     | `e2e/support/`, `e2e/stack-env.ts`                   |
+| Tür                          | Konum                               | Desen                                                                                                                                                                                                                                            |
+| ---------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit                         | Kaynak dosyayla yerinde (colocated) | `apps/api/src/task/task.service.spec.ts`                                                                                                                                                                                                         |
+| Integration                  | Ayrı bir test kökü                  | `apps/api/test/task.e2e-spec.ts`                                                                                                                                                                                                                 |
+| Test helper'ları/factory'ler | Test kökü altında paylaşılır        | `apps/api/test/helpers/`, `apps/api/test/factories/`                                                                                                                                                                                             |
+| Geçici depolama kökü         | Veritabanı helper'ının yanında      | `apps/api/test/helpers/storage.ts`                                                                                                                                                                                                               |
+| Girdi fixture'ları           | Test kökünde, kaynağına göre        | `apps/api/test/fixtures/trello/` — elle yazılmış Trello export'ları; hem unit hem entegrasyon testleri okur, dizinin kendi README'si hiçbirinin gerçek bir export olmadığını kayda geçirir ([ADR 0025](decisions/0025-trello-import-mapping.md)) |
+| Browser e2e                  | Repository seviyesinde paket        | `e2e/tests/board-realtime.spec.ts`                                                                                                                                                                                                               |
+| Browser e2e helper'ları      | Onların yanında                     | `e2e/support/`, `e2e/stack-env.ts`                                                                                                                                                                                                               |
 
 Nest'in generator'ı integration testlerini `*.e2e-spec.ts` olarak adlandırıyor; bunlar
 browser e2e değil API integration testleri olsa da bu isim tooling uyumluluğu için
