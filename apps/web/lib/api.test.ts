@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CreateColumnRequest, UpdateBoardRequest } from '@kurultay/shared-types';
-import { api, ApiError, apiStatus, resolveApiMessage } from './api';
+import { api, apiFetch, ApiError, apiStatus, resolveApiMessage } from './api';
 
 const t = (key: string): string => `t:${key}`;
 
@@ -108,6 +108,67 @@ describe('api writes', () => {
     const init = lastInit(fetchMock);
     expect(init.method).toBe('PATCH');
     expect(init.body).toBe('{"description":null}');
+  });
+});
+
+describe('apiFetch content type', () => {
+  it('lets the browser write the multipart boundary instead of overwriting it', async () => {
+    const fetchMock = mockFetch({});
+    const body = new FormData();
+    body.append('kind', 'FILE');
+
+    await apiFetch('/x', { method: 'POST', body });
+
+    const init = lastInit(fetchMock);
+    expect(new Headers(init.headers).get('Content-Type')).toBeNull();
+  });
+
+  it('still sets JSON on an ordinary write', async () => {
+    const fetchMock = mockFetch({});
+
+    await api.post<unknown, { a: number }>('/x', { a: 1 });
+
+    const init = lastInit(fetchMock);
+    expect(new Headers(init.headers).get('Content-Type')).toBe('application/json');
+  });
+});
+
+describe('api.postForm', () => {
+  it('sends the FormData body untouched, with no Content-Type set', async () => {
+    const fetchMock = mockFetch({ id: 'a1' });
+    const body = new FormData();
+    body.append('kind', 'FILE');
+
+    await api.postForm('/x', body);
+
+    const init = lastInit(fetchMock);
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(body);
+    expect(new Headers(init.headers).has('Content-Type')).toBe(false);
+  });
+});
+
+describe('api.getBlob', () => {
+  it('reads a blob without trying to parse it as JSON', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(new Blob([new Uint8Array([1, 2, 3])]), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const blob = await api.getBlob('/x');
+
+    expect(blob).toBeInstanceOf(Blob);
+  });
+
+  it('still raises ApiError from the JSON envelope when a blob read fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ statusCode: 404, error: 'Not Found', message: 'x' }), {
+        status: 404,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(api.getBlob('/x')).rejects.toBeInstanceOf(ApiError);
   });
 });
 
