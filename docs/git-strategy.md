@@ -248,11 +248,20 @@ docker compose down -v                     # -v: leave no volume behind for the 
 # 5. Tag the merge commit on main. This is also what publishes the container
 #    images (.github/workflows/release-images.yml) — no tag, no images, and
 #    `docker compose pull` fails for everyone following docs/self-hosting.md.
+#    The same run signs both images with cosign and generates their SBOMs.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
 
-# 6. Publish a GitHub Release for tag v0.2.0, body = the CHANGELOG section for 0.2.0.
+# 6. Wait for the Release images workflow to finish, then publish the GitHub
+#    Release for tag v0.2.0, body = the CHANGELOG section for 0.2.0.
+#
+#    The workflow gets there first and leaves a DRAFT release with the four SBOM
+#    assets already attached — so step 6 is normally "fill in the body and hit
+#    Publish", not "create a release". Publishing by hand before the workflow
+#    finishes is not an error either: it only uploads the assets onto whatever
+#    release it finds and never rewrites the body, the title or the draft flag.
+#    Waiting is still the better order — the assets are part of what a release is.
 
 # 7. Back-merge main into develop so the version bump and any
 #    release-branch fixes are not lost.
