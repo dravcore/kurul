@@ -55,6 +55,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`task.created`, `task.moved`, `task.completed`). All three are explicitly post-1.0 and none
   is implemented here.
 
+  **One dependency override, and the reason it exists.** `@nestjs/swagger@11.4.6` pins
+  `js-yaml` to exactly `5.2.1`, which carries a high-severity denial-of-service advisory
+  ([GHSA-pm4m-ph32-ghv5](https://github.com/advisories/GHSA-pm4m-ph32-ghv5)) patched in
+  `5.2.2` — so installing the package turned CI's own `pnpm audit --audit-level high` red before
+  a line of it was used. `pnpm.overrides` lifts it to `^5.2.2`. An exact pin in a transitive
+  dependency is not something a consumer can wait out, and the alternative — lowering the audit
+  threshold — would have traded one library's stale pin for the whole tree's guarantee. The
+  override is dropped as soon as upstream moves; `js-yaml` is what serves the YAML rendering of
+  this document at `/docs-yaml`, which was exercised against the running server to check the
+  substitution rather than assumed.
+
 - **Account deletion, as an erasure request rather than a `DELETE` statement.** A user can now
   delete their own account from Settings, and an instance operator named in
   `INSTANCE_ADMIN_EMAILS` can execute a request on somebody's behalf — the case that actually

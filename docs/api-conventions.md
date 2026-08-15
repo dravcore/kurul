@@ -857,13 +857,14 @@ is what the NestJS router and the DTO classes actually declare.
 neither wins by default: this page carries the reasons, the spec carries the shapes, and a
 disagreement means somebody changed a shape without revisiting the reason. Fix the wrong one.
 
-|                     |                                                            |
-| ------------------- | ---------------------------------------------------------- |
-| Interactive console | `GET /docs`                                                |
-| Document            | `GET /openapi.json` — byte-identical to the committed file |
-| Committed snapshot  | `apps/api/openapi.json`                                    |
-| Regenerate          | `pnpm openapi` (builds the API first)                      |
-| Verify              | `pnpm openapi:check` — exits non-zero on any difference    |
+|                       |                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------- |
+| Interactive console   | `GET /docs`                                                                                       |
+| Document              | `GET /openapi.json` — byte-identical to the committed file                                        |
+| Same document as YAML | `GET /docs-yaml` — `@nestjs/swagger` serves it alongside; the JSON is the one this project checks |
+| Committed snapshot    | `apps/api/openapi.json`                                                                           |
+| Regenerate            | `pnpm openapi` (builds the API first)                                                             |
+| Verify                | `pnpm openapi:check` — exits non-zero on any difference                                           |
 
 **`/docs` is off in production unless `API_DOCS_ENABLED=true`.** Development gets it by
 default. That asymmetry is a decision about a self-hosted service, and it has three parts: the

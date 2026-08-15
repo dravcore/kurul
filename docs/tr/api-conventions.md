@@ -880,13 +880,14 @@ gerçekten beyan ettiği şey.
 hiçbiri varsayılan olarak kazanmaz: gerekçeler bu sayfada, şekiller spec'te duruyor, çelişki de
 birinin bir şekli değiştirirken gerekçesine dönmediği anlamına gelir. Yanlış olanı düzeltin.
 
-|                    |                                                                           |
-| ------------------ | ------------------------------------------------------------------------- |
-| Etkileşimli konsol | `GET /docs`                                                               |
-| Belge              | `GET /openapi.json` — versiyon kontrolündeki dosyayla byte-byte aynı      |
-| Kayıtlı snapshot   | `apps/api/openapi.json`                                                   |
-| Yeniden üret       | `pnpm openapi` (önce API'yi build eder)                                   |
-| Doğrula            | `pnpm openapi:check` — herhangi bir fark varsa sıfırdan farklı çıkış kodu |
+|                      |                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------- |
+| Etkileşimli konsol   | `GET /docs`                                                                                        |
+| Belge                | `GET /openapi.json` — versiyon kontrolündeki dosyayla byte-byte aynı                               |
+| Aynı belgenin YAML'ı | `GET /docs-yaml` — `@nestjs/swagger` onu da yanında sunuyor; bu projenin kontrol ettiği JSON olanı |
+| Kayıtlı snapshot     | `apps/api/openapi.json`                                                                            |
+| Yeniden üret         | `pnpm openapi` (önce API'yi build eder)                                                            |
+| Doğrula              | `pnpm openapi:check` — herhangi bir fark varsa sıfırdan farklı çıkış kodu                          |
 
 **`API_DOCS_ENABLED=true` denmedikçe `/docs` production'da kapalı.** Development'ta varsayılan
 olarak açık. Bu asimetri, self-host edilen bir servis hakkında verilmiş bir karar ve üç parçası
