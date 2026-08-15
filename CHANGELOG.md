@@ -41,6 +41,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   workspace with no other member can only be deleted, and the preview says so rather than
   leaving the client to discover it from a `404`.
 
+  **An author DTO now says whether the person still exists.** `CommentDto.author` and
+  `ActivityDto.author` carry `deleted: boolean` — the complete set of surfaces that can name an
+  anonymised account, since memberships, assignments and rosters are all removed by the flow.
+  The web renders a catalogue label from it (`Silinmiş kullanıcı` in Turkish) instead of the
+  English `Deleted user` the database stores for API consumers. It is a boolean and not the
+  `deletedAt` timestamp on purpose: both routes are readable by every member down to GUEST, and
+  *when* a named person asked to be erased is a fact nothing on either screen needs. The
+  display name inside a comment's mention markup stays English — that one is stored text with no
+  reader's locale in scope, and it is the single place the two cannot agree.
+
   **The deletion leaves a record of itself.** One `account.deleted` activity row per surviving
   workspace, carrying the previous role and who initiated it and deliberately **no name** — its
   actor is the departing user, so an operator's identity never reaches a tenant's feed — plus

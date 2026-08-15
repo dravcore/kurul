@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { ActivityType, MemberRole, SocketEvents } from '@kurultay/shared-types';
 import type { CommentDto, CursorPage } from '@kurultay/shared-types';
 import { ActivityService } from '../activity/activity.service';
+import { AUTHOR_SELECT, toAuthorDto, type AuthorRow } from '../common/author';
 import { parseMentions } from '../common/mentions/parse-mentions';
 import { toCursorPage } from '../common/pagination/cursor-page';
 import { NotificationService } from '../notification/notification.service';
@@ -20,7 +21,7 @@ type CommentRow = {
   userId: string;
   body: string;
   createdAt: Date;
-  user: { id: string; name: string; avatarUrl: string | null };
+  user: AuthorRow;
 };
 
 @Injectable()
@@ -39,11 +40,7 @@ export class CommentService {
       userId: row.userId,
       body: row.body,
       createdAt: row.createdAt.toISOString(),
-      author: {
-        id: row.user.id,
-        name: row.user.name,
-        avatarUrl: row.user.avatarUrl,
-      },
+      author: toAuthorDto(row.user),
     };
   }
 
@@ -61,7 +58,7 @@ export class CommentService {
         taskId,
         ...(query.cursor ? { id: { gt: query.cursor } } : {}),
       },
-      include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+      include: { user: { select: AUTHOR_SELECT } },
       orderBy: { id: 'asc' },
       take: limit + 1,
     });
@@ -89,7 +86,7 @@ export class CommentService {
           userId,
           body: dto.body,
         },
-        include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+        include: { user: { select: AUTHOR_SELECT } },
       });
 
       let memberIds: string[] = [];

@@ -7,7 +7,7 @@ const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d50';
 const TASK_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60';
 const USER_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d53';
 
-function activityRow(id: string) {
+function activityRow(id: string, deletedAt: Date | null = null) {
   return {
     id,
     workspaceId: WORKSPACE_ID,
@@ -16,7 +16,7 @@ function activityRow(id: string) {
     type: ActivityType.TaskCreated,
     payload: { title: 'Card' },
     createdAt: new Date('2026-01-01'),
-    user: { id: USER_ID, name: 'Owner', avatarUrl: null },
+    user: { id: USER_ID, name: 'Owner', avatarUrl: null, deletedAt },
   };
 }
 
@@ -67,7 +67,12 @@ describe('ActivityService', () => {
     const page = await service.listWorkspace(WORKSPACE_ID, { limit: 2 });
 
     expect(page.items).toHaveLength(2);
-    expect(page.items[0]!.author).toEqual({ id: USER_ID, name: 'Owner', avatarUrl: null });
+    expect(page.items[0]!.author).toEqual({
+      id: USER_ID,
+      name: 'Owner',
+      avatarUrl: null,
+      deleted: false,
+    });
     expect(page.nextCursor).toBe(b.id);
     expect(page.hasMore).toBe(true);
     expect(prisma.activity.findMany).toHaveBeenCalledWith(
@@ -77,6 +82,30 @@ describe('ActivityService', () => {
         take: 3,
       }),
     );
+  });
+
+  /**
+   * The feed is one of the two surfaces that can name an anonymised account — the memberships,
+   * assignments and rosters are all gone by then, so an activity row and a comment are the only
+   * places a tombstone still appears.
+   *
+   * The DTO reports the state and **not** the timestamp: this route is `@WorkspaceScoped()`, so
+   * every member down to GUEST reads it, and when a named person asked to be erased is a fact
+   * about them that nothing here needs (`common/author.ts`).
+   */
+  it('reports an anonymised author as deleted, without publishing when it happened', async () => {
+    const { service, prisma } = buildService();
+    prisma.activity.findMany.mockResolvedValue([
+      activityRow('0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d71', new Date('2026-08-15')),
+    ]);
+
+    const page = await service.listWorkspace(WORKSPACE_ID, { limit: 10 });
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]!.author.deleted).toBe(true);
+    // The stored tombstone still travels, for an API consumer that is not the web app.
+    expect(page.items[0]!.author.name).toBe('Owner');
+    expect(page.items[0]!.author).not.toHaveProperty('deletedAt');
   });
 
   it('returns 404 when listing activities for a missing task', async () => {

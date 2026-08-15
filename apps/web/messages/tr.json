@@ -1,6 +1,7 @@
 {
   "common": {
-    "close": "Kapat"
+    "close": "Kapat",
+    "deletedUser": "Silinmiş kullanıcı"
   },
   "auth": {
     "login": {

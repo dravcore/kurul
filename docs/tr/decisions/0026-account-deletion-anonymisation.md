@@ -271,12 +271,29 @@ gereken iki şey var:
   taşını kendi giriş noktalarında açıkça reddeder. `SessionAuthGuard` içindeki bir kontrol
   pencereyi tamamen kapatırdı ve reddedildi: nadir bir yönetim eyleminin beş dakikalık penceresini
   kısaltmak için üründeki her kimlikli isteğe bir veritabanı gidiş-dönüşü eklerdi.
-- **Mezar taşının görünen adı İngilizce saklanır ve çevrilmez.** `User.name`'e `Deleted user`
-  yazılır ve web onu başka bir üyenin adını render ettiği gibi render eder. Türkçe arayüz
-  İngilizce kelimeleri gösterir. Alternatif, web'in çevrilmiş bir etiket koyabilmesi için
-  `deletedAt`'i `CommentDto.author` ve `ActivityDto.author` üzerinden geçirmek; doğru çözüm bu ve
-  bu PR'da yok. **Tetikleyici:** Türkçe konuşan bir instance'tan gelen ilk şikâyet ya da her iki
-  author DTO'suna zaten dokunan bir sonraki değişiklik.
+- **Saklanan ad bir mezar taşıdır; render edilen ad çevrilir.** `User.name` İngilizce
+  `Deleted user`'ı tutar, çünkü bu web uygulaması olmayan bir API tüketicisinin o alanda hâlâ
+  okunabilir bir şeye ihtiyacı var. Bir _insanın_ okuduğu şey oradan gelmiyor: `CommentDto.author`
+  ve `ActivityDto.author` `deleted: boolean` taşıyor ve web bir katalog etiketi koyuyor
+  (`common.deletedUser` — Türkçede `Silinmiş kullanıcı`). Bu iki DTO tam kümedir; varsayılmadı,
+  kontrol edildi: üyelikler, atamalar ve roster'ların hepsi bu akış tarafından siliniyor, yani
+  anonimleştirilmiş bir hesap `WorkspaceMemberDto` ya da `TaskAssigneeDto` içinde hiç
+  beliremiyor; `AttachmentDto` ise ad taşımadan `uploadedById` taşıyor.
+
+  **`deletedAt` zaman damgası değil, bir boolean.** İki route da `@WorkspaceScoped()`; yani GUEST
+  dahil her üye sonucu okuyor ve `docs/architecture.md`'nin kuralı, bir payload'ın hiçbir zaman
+  bir şeyi kimin görebileceğini genişletmemesi — adı konmuş bir bireyin _ne zaman_ silinmek
+  istediği, o kişi hakkında iki ekranın da ihtiyaç duymadığı bir olgudur. Boolean ayrıca bir
+  istemcinin meşru olarak eyleme döktüğü şeyin tamamı ve dilden bağımsız bir kontrat eksiğini de
+  kapatıyor: mezar taşı bir yazar profil bağlantısı ya da mention seçicide bir satır olmamalı ve
+  bundan önce web, mezar taşını adını `Deleted user` yazmış canlı bir üyeden ayırt edemiyordu.
+
+  **Zorunlu tek istisna.** Bir yorumun mention markup'ındaki görünen ad (`@[Deleted user](<id>)`)
+  İngilizce kalıyor. O, `Comment.body` içinde saklanan metin; anonimleştirme anında, okuyucunun
+  locale'i kapsamda değilken bir kez yeniden yazılıyor ve sonrasında ona bir locale'in ulaştığı
+  bir an yok. Yani Türkçe bir thread, çevrilmiş bir imzayı İngilizce bir mention token'ının
+  yanında gösterebilir. Bu, keşfedilmeye bırakılmak yerine burada yazılıdır.
+
 - **Bir hesabı silmek, başkalarının workspace'lerine yazmaktır.** Üyeler roster'ın küçüldüğünü ve
   feed'lerinde bir `account.deleted` kaydını görür. Bu kasıtlı — alternatifi, kimseye atanmamış
   bir kart ve artık hiçbir yerde görünmeyen bir addan gelen bir yorum.
@@ -314,4 +331,6 @@ gereken iki şey var:
 | Yalnızca self-servis, yönetici yolu yok                                        | Gerçekten gelen talepler için — hesabına çalışan erişimi kalmamış insanlardan — operatörü `psql`'e geri gönderir                                                                                                                |
 | Yalnızca yönetici, self-servis yol yok                                         | Operatörü, kullanıcıya ait bir karar için bilet kuyruğuna çevirir ve her self-hoster'ı bir veri koruma yardım masası yapar                                                                                                      |
 | `SessionAuthGuard` içinde `deletedAt` kontrol et                               | Nadir bir eylemin beş dakikalık penceresini kapatmak için üründeki her kimlikli isteğe bir veritabanı gidiş-dönüşü ekler. Bunun yerine ulaşılabilen iki yazma kendi giriş noktalarında kapatıldı                                |
+| Author DTO'larında `deleted` yerine `deletedAt` yayınla                        | Bir karakter daha ucuz ve workspace'in GUEST'e kadar her üyesine kişi başına bir silinme tarihi yayınlıyor. İstemci _ne zaman_'a değil, her zaman _olup olmadığına_ göre davranıyor                                             |
+| Web, mezar taşını `name`'i `Deleted user` ile karşılaştırarak tespit etsin     | `Deleted user`, canlı herhangi bir hesabın yazmakta özgür olduğu bir görünen ad; yani kontrol o kişi için yanlış ve sabitin ileride yeniden adlandırılmasında sessizce yanlış olur                                              |
 | Bunun yerine her tabloda `deletedAt` soft-delete katmanı                       | O, DB-06 bulgusu; farklı bir problem (yanlışlıkla silmeden dönmek) ve satırları hâlâ tabloda olan bir saklama ya da silme tasarımı hiçbir şeyi silmemiştir                                                                      |

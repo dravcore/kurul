@@ -231,10 +231,28 @@ export interface CommentDto {
   userId: string;
   body: string;
   createdAt: string;
+  /**
+   * Who wrote it, resolved so the client never has to join a roster it may not be able to read.
+   *
+   * `deleted` is the whole of what an anonymised account exposes here, and the field is a
+   * **boolean rather than the `deletedAt` timestamp on purpose**. This object is returned by a
+   * `@WorkspaceScoped()` route, so every member down to GUEST reads it, and
+   * `docs/architecture.md`'s rule is that a payload must never widen who can see something —
+   * *when* a named individual asked to be erased is a fact about that person which nothing on
+   * this screen needs. The boolean is enough for everything a client legitimately does with it:
+   * render a localised "deleted user" label instead of the stored English one, and decline to
+   * offer affordances that only make sense for a live member (a profile link, a mention entry).
+   *
+   * `name` still carries `Deleted user` for a tombstone, because an API consumer that is not
+   * this web app still needs something readable in the field
+   * (docs/decisions/0026-account-deletion-anonymisation.md).
+   */
   author: {
     id: string;
     name: string;
     avatarUrl: string | null;
+    /** True when this account has been anonymised — see the note above. */
+    deleted: boolean;
   };
 }
 
@@ -246,10 +264,12 @@ export interface ActivityDto {
   type: string;
   payload: Record<string, unknown>;
   createdAt: string;
+  /** Who did it. Same shape and same `deleted` contract as {@link CommentDto.author}. */
   author: {
     id: string;
     name: string;
     avatarUrl: string | null;
+    deleted: boolean;
   };
 }
 

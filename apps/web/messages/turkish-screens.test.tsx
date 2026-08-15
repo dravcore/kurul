@@ -12,6 +12,7 @@ import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { BoardList } from '@/components/board/board-list';
 import { ImportReportPanel } from '@/components/board/import-report-panel';
 import { DeleteAccountDialog } from '@/components/settings/delete-account-dialog';
+import { TaskCommentsSection } from '@/components/task/task-comments-section';
 
 /**
  * Renders real screens against `tr.json`.
@@ -145,6 +146,51 @@ describe('the Turkish interface', () => {
     // The "there is nobody to hand this to" line, which is the branch that decides whether
     // deletion is the only option this dialog can offer.
     expect(screen.getByText(messages.app.settings.account.ownedNobodyLeft)).toBeDefined();
+  });
+
+  /**
+   * The hole this test exists to keep closed, and it is a different door into the one the rest
+   * of this file guards.
+   *
+   * A deleted account's `User.name` holds the English string `Deleted user`, because the
+   * database is what an API consumer that is not this app reads. Rendering it verbatim would put
+   * two English words in the middle of a Turkish comment thread — and it would only ever be
+   * found by a user, because it appears exclusively after somebody has actually left.
+   */
+  it('calls a deleted comment author by a Turkish name, not by the stored English one', () => {
+    render(
+      tr(
+        <TaskCommentsSection
+          comments={[
+            {
+              id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d30',
+              taskId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d31',
+              userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d32',
+              body: 'Bu karta bakmıştım',
+              createdAt: '2026-01-01T00:00:00.000Z',
+              author: {
+                id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d32',
+                name: 'Deleted user',
+                avatarUrl: null,
+                deleted: true,
+              },
+            },
+          ]}
+          members={[]}
+          canMutate={false}
+          pending={false}
+          loading={false}
+          onSubmit={vi.fn().mockResolvedValue(true)}
+          onDelete={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(screen.getByText(messages.common.deletedUser)).toBeDefined();
+    expect(screen.queryByText('Deleted user')).toBeNull();
+    // The comment itself survives, which is the half that makes this anonymisation rather than
+    // deleting somebody else's conversation.
+    expect(screen.getByText('Bu karta bakmıştım')).toBeDefined();
   });
 
   it('renders the not-found page in Turkish', async () => {

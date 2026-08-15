@@ -274,12 +274,29 @@ narrower than it sounds and are worth stating rather than discovering:
   A check in `SessionAuthGuard` would close the window fully and was rejected: it would add a
   database round trip to every authenticated request in the product to shorten a five-minute
   window on a rare administrative action.
-- **The tombstone's display name is stored English text and is not translated.** `Deleted user`
-  is written into `User.name`, and the web renders it the way it renders any other member's
-  name. A Turkish interface shows the English words. The alternative is threading `deletedAt`
-  through `CommentDto.author` and `ActivityDto.author` so the web can substitute a translated
-  label; that is the right fix and it is not in this PR. **Trigger:** the first report of it
-  from a Turkish-speaking instance, or the next change that touches both author DTOs anyway.
+- **The stored name is a tombstone; the rendered name is translated.** `User.name` holds the
+  English `Deleted user`, because an API consumer that is not this web app still needs something
+  readable in the field. What a _person_ reads does not come from there: `CommentDto.author` and
+  `ActivityDto.author` carry `deleted: boolean`, and the web substitutes a catalogue label
+  (`common.deletedUser` — `Silinmiş kullanıcı` in Turkish). Those two DTOs are the complete set,
+  checked rather than assumed: memberships, assignments and rosters are all deleted by this
+  flow, so an anonymised account cannot appear in `WorkspaceMemberDto` or `TaskAssigneeDto` at
+  all, and `AttachmentDto` carries `uploadedById` with no name.
+
+  **A boolean, not the `deletedAt` timestamp.** Both routes are `@WorkspaceScoped()`, so every
+  member down to GUEST reads the result, and `docs/architecture.md`'s rule is that a payload
+  must never widen who can see something — _when_ a named individual asked to be erased is a
+  fact about that person which nothing on either screen needs. The boolean is also the whole of
+  what a client legitimately acts on, and it is a contract gap independent of language: a
+  tombstoned author should not be a profile link or a mention-picker entry, and before this the
+  web could not tell a tombstone from a live member who had typed `Deleted user` as their name.
+
+  **One exception, by necessity.** The display name inside a comment's mention markup
+  (`@[Deleted user](<id>)`) stays English. It is stored text in `Comment.body`, rewritten once at
+  anonymisation time with no reader's locale in scope, and there is no later moment at which a
+  locale is available to it. So a Turkish thread can show the translated byline beside an English
+  mention token. That is stated here rather than left to be discovered.
+
 - **Deleting an account is a write to other people's workspaces.** Members see a roster shrink
   and an `account.deleted` entry in their feed. That is intended — the alternative is a card
   assigned to nobody and a comment from a name that no longer appears anywhere.
@@ -316,4 +333,6 @@ narrower than it sounds and are worth stating rather than discovering:
 | Self-service only, no administrator path                                         | Leaves the operator back at `psql` for the requests that actually arrive — from people who no longer have working access to the account                                                                                      |
 | Administrator only, no self-service path                                         | Makes the operator a ticket queue for a decision that is the user's to make, and every self-hoster becomes a data-protection helpdesk                                                                                        |
 | Check `deletedAt` in `SessionAuthGuard`                                          | Closes a five-minute window on a rare action by adding a database round trip to every authenticated request in the product. The two reachable writes are closed at their own entry points instead                            |
+| Expose `deletedAt` on the author DTOs instead of `deleted`                       | One character cheaper and publishes a per-person erasure date to every member of the workspace, down to GUEST. The client acts on _whether_, never on _when_                                                                 |
+| Let the web detect a tombstone by comparing `name` to `Deleted user`             | `Deleted user` is a display name any live account is free to type, so the check is wrong for that person and silently wrong for a future rename of the constant                                                              |
 | A soft-delete `deletedAt` tier on every table instead                            | That is finding DB-06, a different problem (recovering from an accidental delete), and a retention or erasure design whose rows are still in the table has erased nothing                                                    |

@@ -1,6 +1,7 @@
 {
   "common": {
-    "close": "Close"
+    "close": "Close",
+    "deletedUser": "Deleted user"
   },
   "auth": {
     "login": {

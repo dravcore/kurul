@@ -388,6 +388,65 @@ describe('Account deletion and anonymisation (e2e)', () => {
     });
   });
 
+  describe('what a client can tell afterwards', () => {
+    it('marks the author of a surviving comment and activity as deleted, over HTTP', async () => {
+      const seed = await seedContentfulUser();
+
+      // Before: a live author, so the assertions after the delete are about a change rather
+      // than about a field that was always true.
+      const before = await seed.keeper.agent
+        .get(`/workspaces/${seed.workspaceId}/tasks/${seed.taskId}/comments`)
+        .expect(200);
+      const beforeItems = (before.body as { items: { author: { deleted: boolean } }[] }).items;
+      expect(beforeItems).toHaveLength(1);
+      expect(beforeItems[0]!.author.deleted).toBe(false);
+
+      await seed.departing.agent
+        .delete('/me')
+        .send({ confirmEmail: seed.departing.email })
+        .expect(204);
+
+      const comments = await seed.keeper.agent
+        .get(`/workspaces/${seed.workspaceId}/tasks/${seed.taskId}/comments`)
+        .expect(200);
+      const items = (
+        comments.body as { items: { body: string; author: { name: string; deleted: boolean } }[] }
+      ).items;
+      expect(items).toHaveLength(1);
+      expect(items[0]!.author.deleted).toBe(true);
+      // The stored tombstone still travels — an API consumer that is not the web app needs
+      // something readable in the field — and the comment itself is untouched.
+      expect(items[0]!.author.name).toBe(ANONYMOUS_USER_NAME);
+      expect(items[0]!.body).toBe('I looked at this and it is fine');
+
+      const activities = await seed.keeper.agent
+        .get(`/workspaces/${seed.workspaceId}/tasks/${seed.taskId}/activities`)
+        .expect(200);
+      const rows = (
+        activities.body as { items: { userId: string; author: { deleted: boolean } }[] }
+      ).items;
+      const theirs = rows.filter((row) => row.userId === seed.departingId);
+      expect(theirs.length).toBeGreaterThan(0);
+      expect(theirs.every((row) => row.author.deleted)).toBe(true);
+    });
+
+    it('never publishes when the account was deleted', async () => {
+      const seed = await seedContentfulUser();
+      await seed.departing.agent
+        .delete('/me')
+        .send({ confirmEmail: seed.departing.email })
+        .expect(204);
+
+      const comments = await seed.keeper.agent
+        .get(`/workspaces/${seed.workspaceId}/tasks/${seed.taskId}/comments`)
+        .expect(200);
+
+      // `deletedAt` is a date about a named individual, and this route is readable by every
+      // member down to GUEST. The flag says whether; nothing says when (ADR 0026).
+      expect(JSON.stringify(comments.body)).not.toContain('deletedAt');
+    });
+  });
+
   describe('what is removed outright', () => {
     it('deletes credentials, sessions, notifications, pings and open assignments', async () => {
       const seed = await seedContentfulUser();
