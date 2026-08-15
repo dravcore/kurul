@@ -20,6 +20,7 @@ import type { CreateTaskDto } from './dto/create-task.dto';
 import type { MoveTaskDto } from './dto/move-task.dto';
 import type { TaskQueryDto } from './dto/task-query.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
+import { countAttachments, countAttachmentsByTask } from './attachment-count';
 import { createTaskAttributes, planTaskUpdate } from './task-fields';
 import { TaskAssigneeService } from './task-assignee.service';
 import {
@@ -54,7 +55,7 @@ export class TaskService {
     const where = buildListWhere(boardId, query);
     const limit = query.limit ?? 50;
 
-    const rows: TaskListRow[] = await this.prisma.task.findMany({
+    const found = await this.prisma.task.findMany({
       where,
       // The list include, not the detail one: a board page reads up to `limit` tasks at once,
       // and the card only needs `done/total` from their checklists.
@@ -63,6 +64,19 @@ export class TaskService {
       orderBy: { id: 'asc' },
       take: limit + 1,
     });
+
+    // Second statement, scoped to the ids this page returned — never an `include`. The full
+    // measurement is in `attachment-count.ts`; the short version is that Prisma's `_count`
+    // aggregates the entire `Attachment` table on every board read, and at 100 000 rows that
+    // is 19.878 ms against 0.168 ms for this.
+    const counts = await countAttachmentsByTask(
+      this.prisma,
+      found.map((task) => task.id),
+    );
+    const rows: TaskListRow[] = found.map((task) => ({
+      ...task,
+      attachmentCount: counts.get(task.id) ?? 0,
+    }));
 
     return toCursorPage(rows, limit, (task) => toTaskListDto(task));
   }
@@ -117,16 +131,18 @@ export class TaskService {
         position = midpoint(prevPos, nextPos);
       }
 
-      const created: Omit<TaskDetailRow, 'assignees' | 'labels' | 'checklists' | '_count'> =
-        await tx.task.create({
-          data: {
-            boardId,
-            columnId: column.id,
-            ...attributes,
-            position,
-            createdById: userId,
-          },
-        });
+      const created: Omit<
+        TaskDetailRow,
+        'assignees' | 'labels' | 'checklists' | 'attachmentCount'
+      > = await tx.task.create({
+        data: {
+          boardId,
+          columnId: column.id,
+          ...attributes,
+          position,
+          createdById: userId,
+        },
+      });
 
       await this.activityService.record(tx, {
         workspaceId,
@@ -203,7 +219,10 @@ export class TaskService {
         },
       });
 
-      return toTaskDetailDto(updated);
+      return toTaskDetailDto({
+        ...updated,
+        attachmentCount: await countAttachments(tx, taskId),
+      });
     });
 
     this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_UPDATED, {
@@ -313,6 +332,10 @@ export class TaskService {
         dto.afterTaskId,
       );
 
+      // Counted once, after the checks that can still reject the move and before either branch
+      // builds a DTO. A move never touches attachments, so both branches share this number
+      // rather than asking the same question twice.
+      const attachmentCount = await countAttachments(tx, taskId);
       let result: TaskDto;
 
       if (needsRebalance(prev?.position ?? null, next?.position ?? null)) {
@@ -343,6 +366,7 @@ export class TaskService {
         await batchUpdateTaskPositions(tx, targetColumn.id, otherUpdates);
         result = toTaskDetailDto({
           ...task,
+          attachmentCount,
           columnId: targetColumn.id,
           position: positions[insertionIndex]!,
           updatedAt: new Date(),
@@ -356,7 +380,7 @@ export class TaskService {
           },
           include: taskDetailInclude,
         });
-        result = toTaskDetailDto(updated);
+        result = toTaskDetailDto({ ...updated, attachmentCount });
       }
 
       await this.activityService.record(tx, {

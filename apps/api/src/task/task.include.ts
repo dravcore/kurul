@@ -10,48 +10,21 @@ export const taskInclude = {
     include: { label: true },
     orderBy: { id: 'asc' },
   },
-  /**
-   * The card's attachment badge: a number, never the rows.
-   *
-   * It sits in the shared include rather than in either branch because both reads need it: the
-   * card renders the badge and the panel renders it beside the list it loads from its own
-   * endpoint (ADR 0024). Carrying attachment rows into a board list instead is what P2-8 spent
-   * a task undoing, and that part of decision D2 holds.
-   *
-   * **What does not hold is how this compiles, and it was measured rather than assumed.** The
-   * plan and an earlier version of this comment said `_count` becomes a correlated subquery.
-   * Prisma 7 emits this instead:
-   *
-   *     LEFT JOIN (SELECT "taskId", COUNT(*) FROM "Attachment" WHERE 1=1 GROUP BY "taskId")
-   *
-   * — an aggregate over the **whole table**, filtered by nothing. It is not scoped to the
-   * board, to the workspace, or to the 51 rows the page returns.
-   *
-   * Measured on the seeded 1 000-task board (`SEED_LARGE_BOARD_TASKS=1000`), Postgres 18,
-   * `EXPLAIN (ANALYZE, BUFFERS)` of the first page:
-   *
-   * | `Attachment` rows | without `_count`     | with `_count`             |
-   * | ----------------- | -------------------- | ------------------------- |
-   * | 592               | 0.148 ms, 13 buffers | 0.380 ms, 21 buffers      |
-   * | 100 592           | 0.070 ms, 13 buffers | 19.878 ms, 2 509 buffers  |
-   *
-   * The 100 000 extra rows are on tasks the first page never shows, so the payload is
-   * identical — only the table behind the aggregate grew. At that size the planner switches
-   * from `GroupAggregate` to `HashAggregate` over a full `Seq Scan`, and a `HashAggregate`
-   * cannot stop early for the `LIMIT`.
-   *
-   * A plan that does not have that shape exists and is 100× cheaper: with `enable_seqscan=off`
-   * the same SQL runs in **0.192 ms with 8 buffers**, streaming `Attachment_taskId_id_idx`
-   * (decision D4's index) through a `GroupAggregate` that the merge join stops early. The
-   * planner does not choose it because it costs the aggregate as if it had to complete.
-   *
-   * So this is a cost-model outcome, not an inherent one, and the remedies are a question for
-   * whoever owns the read: a scoped `groupBy` over the ids the page returned (measured
-   * 0.168 ms, 158 buffers), a raw `LATERAL`, or taking the count out of the list read as the
-   * P3-1 plan's fallback says. None of them is done here — this comment exists so the next
-   * reader does not re-derive the measurement from a sentence that was wrong.
-   */
-  _count: { select: { attachments: true } },
+  /*
+    There is deliberately no `_count: { select: { attachments: true } }` here, and it is not an
+    omission — it was here, it was measured, and it came out.
+
+    Prisma 7 compiles that include into an aggregate over the **whole** `Attachment` table
+    (`... WHERE 1=1 GROUP BY "taskId"`, joined afterwards), scoped to no board, no workspace and
+    no page. On the seeded 1 000-task board the first page went from 0.070 ms / 13 buffers to
+    19.878 ms / 2 509 once the table held 100 000 rows — rows belonging to tasks that page never
+    returns. The card's badge is a number either way; what grew was a scan nobody asked for.
+
+    The badge now reads `attachmentCount`, filled by `countAttachmentsByTask` from the ids the
+    page actually returned. The full numbers, the plan the planner declines to pick, and why an
+    index alone does not fix it are in `attachment-count.ts` — read that before putting `_count`
+    back, because it reads like the simpler option and is not.
+  */
 } satisfies Prisma.TaskInclude;
 
 /**
@@ -86,6 +59,12 @@ export const taskDetailInclude = { ...taskInclude, ...checklistDetailInclude };
  * Spelled out rather than derived from `Prisma.TaskGetPayload` so unit tests can build a
  * row without the client's generated payload types. `label.color` stays `string` here —
  * this is the database shape, and narrowing it to a slot is the mapper's job.
+ *
+ * `attachmentCount` is the one field on this type that no include produces: it is attached by
+ * the caller from `countAttachmentsByTask`, for the reason written above and in
+ * `attachment-count.ts`. Keeping it on the row rather than threading it through the mapper's
+ * signature means the read that knows the page is the read that scopes the count, and every
+ * `toTaskDetailDto` call site stays as it was.
  */
 export type TaskRowBase = {
   id: string;
@@ -106,7 +85,7 @@ export type TaskRowBase = {
   labels: Array<{
     label: { id: string; boardId: string; name: string; color: string };
   }>;
-  _count: { attachments: number };
+  attachmentCount: number;
 };
 
 /** A task row as read with `taskListInclude`: checklist items reduced to their state. */

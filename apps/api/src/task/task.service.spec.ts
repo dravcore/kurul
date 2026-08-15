@@ -58,9 +58,6 @@ function taskRow(
       position: number;
       items: Array<{ id: string; content: string; isDone: boolean; position: number }>;
     }>,
-    // `_count` rides both includes, so the fixture carries it for the same reason it carries
-    // the wider `checklists` shape.
-    _count: { attachments: 0 },
   };
 }
 
@@ -104,6 +101,13 @@ describe('TaskService', () => {
       },
       label: {
         findFirst: jest.fn(),
+      },
+      // The attachment count is its own scoped statement rather than an `include`
+      // (`attachment-count.ts`), so it is its own delegate here. Defaults say "no attachments",
+      // which is what every fixture in this file describes; the tests that care override them.
+      attachment: {
+        groupBy: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
       },
       workspaceMember: {
         findFirst: jest.fn(),
@@ -225,6 +229,7 @@ describe('TaskService', () => {
           }),
         },
         $executeRaw: jest.fn().mockResolvedValue(0),
+        attachment: { count: jest.fn().mockResolvedValue(0) },
       }),
     );
 
@@ -247,6 +252,7 @@ describe('TaskService', () => {
           findFirst: jest.fn().mockResolvedValue({ id: COLUMN_ID, boardId: BOARD_ID }),
         },
         $executeRaw: jest.fn().mockResolvedValue(0),
+        attachment: { count: jest.fn().mockResolvedValue(0) },
       }),
     );
 
@@ -301,6 +307,7 @@ describe('TaskService', () => {
           findFirst: jest.fn().mockResolvedValue({ id: COLUMN_ID, boardId: BOARD_ID }),
         },
         $executeRaw: executeRaw,
+        attachment: { count: jest.fn().mockResolvedValue(0) },
       }),
     );
 
@@ -363,6 +370,7 @@ describe('TaskService', () => {
             ),
         },
         $executeRaw: jest.fn().mockResolvedValue(0),
+        attachment: { count: jest.fn().mockResolvedValue(0) },
       }),
     );
     return { updates, siblingQuery };
@@ -377,6 +385,7 @@ describe('TaskService', () => {
           create: jest.fn(),
         },
         $executeRaw: jest.fn().mockResolvedValue(0),
+        attachment: { count: jest.fn().mockResolvedValue(0) },
       }),
     );
 
@@ -413,6 +422,7 @@ describe('TaskService', () => {
           }),
         },
         $executeRaw: executeRaw,
+        attachment: { count: jest.fn().mockResolvedValue(0) },
       }),
     );
 
@@ -847,6 +857,107 @@ describe('TaskService', () => {
       expect(prisma.task.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: buildListWhere(BOARD_ID, query) }),
       );
+    });
+  });
+
+  /**
+   * The attachment badge's number, and the one thing about it that is not obvious.
+   *
+   * This count used to ride the include as `_count: { select: { attachments: true } }`, which
+   * reads like the cheap option and is not: Prisma compiles it to an aggregate over the whole
+   * `Attachment` table, scoped to no board, no workspace and no page. Measured on the seeded
+   * 1 000-task board, the first page went from 0.070 ms / 13 buffers to 19.878 ms / 2 509 once
+   * the table held 100 000 rows belonging to tasks that page never returns — the regression
+   * P2-8 exists to prevent. `attachment-count.ts` carries the full numbers.
+   *
+   * So the assertion worth having is not "the number is right" (it would be right either way)
+   * but **what the read is scoped to**. Asserted against the delegate rather than by parsing
+   * emitted SQL: the shape of Prisma's SQL is Prisma's to change, while "the aggregate names
+   * the ids this page returned" is the property that has to survive.
+   */
+  describe('attachment counts', () => {
+    const A = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d61';
+    const B = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d62';
+
+    it('aggregates only over the tasks the page returned, never the whole table', async () => {
+      const { service, prisma } = buildService();
+      prisma.task.findMany.mockResolvedValue([taskRow({ id: A }), taskRow({ id: B })]);
+
+      await service.list(WORKSPACE_ID, BOARD_ID, { limit: 50 });
+
+      expect(prisma.attachment.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ['taskId'],
+          where: { taskId: { in: [A, B] } },
+        }),
+      );
+    });
+
+    it('carries a per-task count, and 0 for a task with none', async () => {
+      const { service, prisma } = buildService();
+      prisma.task.findMany.mockResolvedValue([taskRow({ id: A }), taskRow({ id: B })]);
+      prisma.attachment.groupBy.mockResolvedValue([{ taskId: A, _count: { _all: 3 } }]);
+
+      const page = await service.list(WORKSPACE_ID, BOARD_ID, { limit: 50 });
+
+      expect(page.items.map((task) => [task.id, task.attachmentCount])).toEqual([
+        [A, 3],
+        [B, 0],
+      ]);
+    });
+
+    it('does not let another board’s task bleed into a count', async () => {
+      // The aggregate answers for whatever ids it is given, so an id the page never returned
+      // must not appear in the answer either. A grouping row for a foreign task is dropped
+      // because the map is read by the page's own ids, not merged into it.
+      const { service, prisma } = buildService();
+      const foreign = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1dff';
+      prisma.task.findMany.mockResolvedValue([taskRow({ id: A })]);
+      prisma.attachment.groupBy.mockResolvedValue([
+        { taskId: foreign, _count: { _all: 9 } },
+        { taskId: A, _count: { _all: 1 } },
+      ]);
+
+      const page = await service.list(WORKSPACE_ID, BOARD_ID, { limit: 50 });
+
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]?.attachmentCount).toBe(1);
+    });
+
+    it('spends no query at all on an empty page', async () => {
+      const { service, prisma } = buildService();
+      prisma.task.findMany.mockResolvedValue([]);
+
+      await service.list(WORKSPACE_ID, BOARD_ID, { limit: 50 });
+
+      // `IN ()` is a round trip whose answer is already known.
+      expect(prisma.attachment.groupBy).not.toHaveBeenCalled();
+    });
+
+    it('counts a single task by its own id on a detail read', async () => {
+      const { service, prisma } = buildService();
+      prisma.task.findFirst.mockResolvedValue(taskRow({ id: A }));
+      prisma.attachment.count.mockResolvedValue(2);
+
+      const task = await service.get(WORKSPACE_ID, A);
+
+      expect(prisma.attachment.count).toHaveBeenCalledWith({ where: { taskId: A } });
+      expect(task.attachmentCount).toBe(2);
+    });
+
+    it('gives a freshly created task 0 without asking the database', async () => {
+      const { service, prisma } = buildService();
+      prisma.task.findMany.mockResolvedValue([]);
+      prisma.task.create.mockResolvedValue(taskRow({ id: A }));
+
+      const created = await service.create(WORKSPACE_ID, BOARD_ID, USER_ID, {
+        title: 'New',
+        columnId: COLUMN_ID,
+      });
+
+      expect(created.attachmentCount).toBe(0);
+      expect(prisma.attachment.count).not.toHaveBeenCalled();
+      expect(prisma.attachment.groupBy).not.toHaveBeenCalled();
     });
   });
 });
