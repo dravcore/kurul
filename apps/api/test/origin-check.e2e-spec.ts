@@ -102,6 +102,17 @@ describe('Origin allowlist (e2e)', () => {
         .expect(403);
 
       await expect(prisma.attachment.count()).resolves.toBe(0);
+
+      // The control, and the reason the assertion above is evidence: the very same multipart
+      // request without the foreign origin reaches the handler and writes a row. Without this,
+      // a 403 from a route that was broken for some unrelated reason would read as a pass.
+      await user.agent
+        .post(`/workspaces/${workspace.id}/tasks/${task.body.id}/attachments`)
+        .field('kind', 'LINK')
+        .field('url', 'https://example.com/spec')
+        .expect(201);
+
+      await expect(prisma.attachment.count()).resolves.toBe(1);
     });
 
     it('is refused for a destructive method, and the workspace survives', async () => {

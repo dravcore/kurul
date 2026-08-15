@@ -32,6 +32,22 @@ import { AttachmentService } from './attachment.service';
       useFactory: (storage: StorageService) => ({
         // memoryStorage, not disk: a disk-backed multer creates a file before validation runs,
         // and the sniffer needs `file.buffer` anyway (D5, K12).
+        //
+        // ## The accepted cost, measured rather than estimated
+        //
+        // The plan's estimate was "N concurrent uploads <= N x ATTACHMENT_MAX_BYTES of heap".
+        // Driving this exact multer configuration in an isolated process (client in a separate
+        // process, so no request-side buffer is counted), with a 24 MiB body and the 25 MiB
+        // default limit, peak RSS above baseline came out at:
+        //
+        //   N=1   54 MiB   2.17x  (N x MAX)
+        //   N=4  172 MiB   1.72x
+        //   N=8  302 MiB   1.51x
+        //
+        // So the real factor is roughly **1.5-2.2x the estimate**, not 1x. The single-upload
+        // case is the worst of the three, which is the shape of busboy accumulating chunks and
+        // `Buffer.concat` then producing a second copy of the whole file. Anyone raising
+        // ATTACHMENT_MAX_BYTES should budget against the measured factor.
         storage: memoryStorage(),
         limits: { fileSize: storage.maxBytes, files: 1, fields: 8 },
       }),
