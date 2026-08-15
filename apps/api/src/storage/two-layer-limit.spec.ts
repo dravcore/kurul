@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { DEFAULT_TRELLO_IMPORT_MAX_BYTES } from '../import/import-config';
 import { DEFAULT_ATTACHMENT_MAX_BYTES } from './storage-config';
 
 /**
@@ -132,6 +133,44 @@ describe('the two-layer upload limit', () => {
 
     expect(nginx).toBe(caddy);
     expect(nginxTr).toBe(caddy);
+  });
+
+  /**
+   * The importer is a second body that crosses the same proxy, under a limit of its own.
+   *
+   * It is checked here rather than in `src/import` because the fact being pinned is not about
+   * importing — it is that *every* multipart ceiling in this API stays under the one layer in
+   * front of it. A second file would let the two drift into two different rules.
+   */
+  it('keeps the Trello import limit under the proxy limit, envelope included', () => {
+    const proxyLimit = parseSize(/max_size\s+(\S+)/.exec(read('docker/Caddyfile'))![1]!);
+
+    expect(DEFAULT_TRELLO_IMPORT_MAX_BYTES).toBe(20_971_520);
+    // Not "smaller than" — smaller *with room for the multipart envelope*, the same margin the
+    // attachment rows above check. Without this, raising TRELLO_IMPORT_MAX_BYTES to 30 MiB would
+    // produce an import Caddy kills with an empty-bodied 413 the API never sees, which is exactly
+    // the untraceable failure ADR 0022 added the proxy row to prevent.
+    //
+    // MEASURED_MULTIPART_ENVELOPE_BYTES is reused rather than re-measured: it is the worst case
+    // for a *wider* request shape (an extra `kind` text field), and an import request carries one
+    // part fewer, so it is already a valid upper bound here.
+    expect(proxyLimit).toBeGreaterThan(DEFAULT_TRELLO_IMPORT_MAX_BYTES);
+    expect(proxyLimit - DEFAULT_TRELLO_IMPORT_MAX_BYTES).toBeGreaterThan(
+      MEASURED_MULTIPART_ENVELOPE_BYTES,
+    );
+  });
+
+  it('is the same Trello import number in .env.example and in the compose default', () => {
+    // A limit an operator can set in .env but the container never receives is the same class of
+    // defect as an unconfigured default: the variable exists and does nothing.
+    expect(/^TRELLO_IMPORT_MAX_BYTES=(\d+)$/m.exec(read('.env.example'))?.[1]).toBe(
+      String(DEFAULT_TRELLO_IMPORT_MAX_BYTES),
+    );
+    expect(
+      /TRELLO_IMPORT_MAX_BYTES:\s*\$\{TRELLO_IMPORT_MAX_BYTES:-(\d+)\}/.exec(
+        read('docker-compose.yml'),
+      )?.[1],
+    ).toBe(String(DEFAULT_TRELLO_IMPORT_MAX_BYTES));
   });
 
   it('is the same number in .env.example and in the compose default', () => {

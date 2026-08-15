@@ -13,6 +13,7 @@ import { BoardModule } from './board/board.module';
 import { TaskModule } from './task/task.module';
 import { LabelModule } from './label/label.module';
 import { CommentModule } from './comment/comment.module';
+import { ImportModule } from './import/import.module';
 import { ActivityModule } from './activity/activity.module';
 import { ActivationModule } from './activation/activation.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -40,6 +41,9 @@ import { throttlerOptions } from './common/rate-limit/rate-limit';
     TaskModule,
     LabelModule,
     CommentModule,
+    // After `BoardModule`, whose rows it writes; it carries its own MulterModule rather than
+    // sharing `AttachmentModule`'s, because an import needs no file storage at all.
+    ImportModule,
     ActivityModule,
     ActivationModule,
     DashboardModule,

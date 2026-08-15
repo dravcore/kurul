@@ -357,6 +357,12 @@ services:
       # produces a 413 logged as a successful proxied request in one direction and logged
       # nowhere at all in the other (ADR 0022, ADR 0024).
       ATTACHMENT_MAX_BYTES: ${ATTACHMENT_MAX_BYTES:-26214400}
+      # The Trello importer's own ceiling, passed through for the same reason
+      # REQUEST_BODY_MAX_BYTES above is: a limit that silently ignores its own variable is worse
+      # than one nobody can change. It measures heap rather than disk and is unrelated to
+      # ATTACHMENT_MAX_BYTES, which is why it is a separate number rather than a derived one, and
+      # it needs no STORAGE_PATH — an import writes link rows and stores no bytes.
+      TRELLO_IMPORT_MAX_BYTES: ${TRELLO_IMPORT_MAX_BYTES:-20971520}
       # Read by the orphan sweep, which refuses to delete a file while a dump old enough to
       # disown it is still restorable — its grace period is BACKUP_KEEP × BACKUP_INTERVAL, with
       # a 24h floor the API applies whatever these say (the window also covers an upload whose
