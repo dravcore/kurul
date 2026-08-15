@@ -31,6 +31,18 @@ export class StorageService implements OnModuleDestroy {
     return getStorageConfig().maxBytes;
   }
 
+  /**
+   * The configured backend, or the 503 that says this deployment stores nothing.
+   *
+   * **This throws synchronously, from methods whose signature says `Promise`.** The four
+   * pass-throughs below are not `async`, so the guard runs before any promise is constructed:
+   * `await storage.write(...)` behaves exactly as the signature suggests, but
+   * `storage.write(...).catch(handle)` never reaches `handle` — the exception escapes at the
+   * call site instead. Every caller in this API awaits, and `storage.service.spec.ts` pins the
+   * behaviour with `toThrow` rather than `rejects` so the next reader sees it stated. There is
+   * no hook that could catch a future caller getting this wrong, so this paragraph is the only
+   * thing protecting it.
+   */
   private require(): StorageBackend {
     const backend = getStorageBackend();
     if (backend === undefined) {

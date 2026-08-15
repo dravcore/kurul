@@ -1,6 +1,27 @@
 import { UnsupportedMediaTypeException } from '@nestjs/common';
 
 /**
+ * ## How an ESM-only package works inside this CommonJS build
+ *
+ * `file-type@21` is ESM-only and `apps/api` ships as CommonJS, which normally means a build-time
+ * problem. It is not one here, and the reason was measured on the compiled output rather than
+ * reasoned about:
+ *
+ *   - `tsconfig.base.json` sets `module: NodeNext`, so `tsc` leaves the `await import(...)`
+ *     below **as a real dynamic import** in `dist/attachment/attachment-mime.js` instead of
+ *     downleveling it to `require`. A CommonJS module is allowed to `import()` an ESM one.
+ *   - Loading `dist/attachment/attachment-mime.js` through `require` and calling `sniffMimeType`
+ *     returns `image/png` for a PNG and `null` for HTML — the production path works.
+ *   - This runtime is Node 24 (`engines: >=24`), which also supports plain `require(esm)`, so
+ *     even the downleveled form would have resolved.
+ *
+ * What does *not* work is Jest: it runs CommonJS and asks the resolver for a `require`
+ * condition, and `file-type`'s `exports` map offers only `import`/`module-sync`. That is why
+ * `jest.config.cjs` carries a `moduleNameMapper` entry for this one specifier. The mapping is a
+ * test-harness detail with no production counterpart — do not "fix" this import to match it.
+ */
+
+/**
  * What this instance accepts, read from the magic bytes and nothing else.
  *
  * Broad on purpose: a tool that refuses `.xlsx` because a strict reading of "safe types"
