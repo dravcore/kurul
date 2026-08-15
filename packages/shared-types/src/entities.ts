@@ -430,3 +430,77 @@ export interface DashboardSummaryDto {
   /** Last 14 UTC days: `task.created` vs moves into a `COMPLETED` column. */
   throughput: DashboardThroughputDay[];
 }
+
+/**
+ * What deleting this account is about to do, answered before anything is destroyed.
+ *
+ * The preview exists because one of the questions an erasure request raises has no safe
+ * default. A workspace the user is the only OWNER of cannot be left behind, and it cannot be
+ * guessed at either — transferring hands a tenant to someone who never asked for it, deleting
+ * takes other people's boards with it. So the client is handed the facts and the API refuses to
+ * proceed until it is handed a decision back
+ * (docs/decisions/0026-account-deletion-anonymisation.md).
+ */
+export interface AccountDeletionPreviewDto {
+  /** The account this preview describes — the caller, or an administrator's target. */
+  userId: string;
+  /**
+   * Workspaces the user is the **only** OWNER of. Each one needs a disposition in the delete
+   * request, or it is refused with `409`.
+   */
+  soleOwnedWorkspaces: SoleOwnedWorkspaceDto[];
+  /**
+   * Workspaces the user is in that need no decision — another OWNER is present, or the user
+   * holds a lesser role. Their membership is simply removed.
+   *
+   * Listed rather than counted because "you will be removed from these five workspaces" is the
+   * other half of what the person is agreeing to, and a number does not say which.
+   */
+  otherWorkspaces: DepartingMembershipDto[];
+  /**
+   * What stays behind, re-attributed to a row that no longer names anybody.
+   *
+   * Counts and not contents: the point of showing them is that the user learns their comments
+   * do not disappear, not that they re-read them here.
+   */
+  retainedContent: RetainedContentDto;
+}
+
+/** A workspace whose only OWNER is the departing user. */
+export interface SoleOwnedWorkspaceDto {
+  workspaceId: string;
+  name: string;
+  slug: string;
+  memberCount: number;
+  boardCount: number;
+  /**
+   * Members who could be promoted to OWNER in the departing user's place.
+   *
+   * **Empty means transfer is impossible**, not that the client should offer it and let the
+   * server refuse: a workspace whose only member is the person leaving has nobody to hand it
+   * to, and deleting is the only disposition the endpoint will accept for it.
+   */
+  transferCandidates: TransferCandidateDto[];
+}
+
+/** A member who may be promoted to OWNER when the current sole owner leaves. */
+export interface TransferCandidateDto {
+  userId: string;
+  name: string;
+  role: MemberRole;
+}
+
+/** A membership that will be removed without a decision being needed. */
+export interface DepartingMembershipDto {
+  workspaceId: string;
+  name: string;
+  role: MemberRole;
+}
+
+/** Rows that survive the deletion, re-attributed to an anonymised `User` row. */
+export interface RetainedContentDto {
+  comments: number;
+  tasksCreated: number;
+  attachments: number;
+  activities: number;
+}

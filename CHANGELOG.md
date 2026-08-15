@@ -9,6 +9,51 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Account deletion, as an erasure request rather than a `DELETE` statement.** A user can now
+  delete their own account from Settings, and an instance operator named in
+  `INSTANCE_ADMIN_EMAILS` can execute a request on somebody's behalf — the case that actually
+  arrives, from a person who has already lost access to the account. Until now neither was
+  possible even by hand: `DELETE FROM "User"` fails on the first of **seven** `Restrict` foreign
+  keys, which is the whole of audit finding DB-05
+  ([ADR 0026](docs/decisions/0026-account-deletion-anonymisation.md)).
+
+  **The `User` row is anonymised, never deleted, and no foreign key was relaxed to make that
+  work.** Each of those seven `Restrict` relations is a decision that the content outlives its
+  author, so the erasure rewrites the columns that identify a person — `email` to
+  `deleted-<id>@deleted.invalid`, `name` to `Deleted user`, `avatarUrl` and `locale` to null —
+  and everything that is also somebody else's keeps resolving. A comment thread survives with
+  its structure intact and its author unnamed; the activity feed still says a change happened.
+  The replacement address is derived from `User.id` and **not** from a hash of the old one: a
+  hash of a known address is checkable, which makes it pseudonymisation rather than
+  anonymisation. The old address is freed, so the person can sign up again as somebody new.
+
+  **The name is copied out of the `User` row in two places, and both are rewritten.** Mention
+  markup stores the display name in the comment body (`@[Ada](<id>)`), so anonymising the row
+  touches none of it — every mention of the departing user becomes `@[Deleted user](<id>)`, id
+  preserved so the sentence still reads. `Activity.payload` carries a person's name in exactly
+  one field, `targetName`, written by the three `member.*` events; it is replaced where the
+  payload is about the departing user and left alone everywhere else.
+
+  **A workspace the user solely owns is a question the flow asks, never a default it picks.**
+  `GET /me/deletion-preview` returns each such workspace with its member and board counts and
+  the people who could take it over; `DELETE /me` refuses with `409` until every one of them
+  carries a decision — transfer to a named member, or delete the workspace outright. A
+  workspace with no other member can only be deleted, and the preview says so rather than
+  leaving the client to discover it from a `404`.
+
+  **The deletion leaves a record of itself.** One `account.deleted` activity row per surviving
+  workspace, carrying the previous role and who initiated it and deliberately **no name** — its
+  actor is the departing user, so an operator's identity never reaches a tenant's feed — plus
+  one `warn` JSON log line carrying the user id and counts, and no address. Recovery, if a
+  deletion was executed in error, is a restore from the nightly dump into a scratch database:
+  the procedure is in
+  [Undoing an account deletion](docs/development.md#undoing-an-account-deletion), including the
+  clock that runs on attachment bytes once the orphan sweep's grace window passes.
+
+  Better Auth's own `user.deleteUser` stays disabled, on purpose: it hard-deletes the `user`
+  row after its hooks run, which is the exact statement those seven foreign keys exist to
+  refuse. Data portability (Article 20) is explicitly not in this change.
+
 - **Mobile navigation — the sidebar becomes a drawer below 768px.** Under the `md` breakpoint
   the app shell had one breakpoint and it was 1280px: at 360px the 56px icon rail kept its
   width, took 15% of the viewport, and could not show a workspace name in it. There was no

@@ -50,8 +50,26 @@ describe('AUDIT_ACTIVITY_TYPES', () => {
         'workspace',
         'member',
         'invitation',
+        // `account.deleted`, and its own subject rather than a `member.*` name on purpose: a
+        // member leaving and an account ceasing to exist are different facts, and only the
+        // second one is permanent (ADR 0026).
+        'account',
       ]),
     );
+  });
+
+  /**
+   * The account-deletion row, asserted by name for the same reason the attachment pair is: the
+   * subject test above would stay green if `account.deleted` were swapped for some other
+   * `account.*` event, and this is the one that has to be in the subset.
+   *
+   * It is also the event most likely to be argued out of the list later, on the grounds that a
+   * deleted account writes it about itself. That argument is backwards — it is the last record
+   * of somebody's access being removed, and unlike `member.left` the subject can never come back
+   * to explain it.
+   */
+  it('audits the account deletion', () => {
+    expect(AUDIT_ACTIVITY_TYPES).toContain(ActivityType.AccountDeleted);
   });
 
   it('excludes the high-volume content events', () => {

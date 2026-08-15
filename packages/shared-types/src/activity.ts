@@ -64,6 +64,18 @@ export const ActivityType = {
   InvitationCreated: 'invitation.created',
   InvitationRevoked: 'invitation.revoked',
   InvitationAccepted: 'invitation.accepted',
+  // Written into every workspace the departing account was a member of, at the moment their
+  // membership is removed and their `User` row is anonymised. `userId` is the departing user,
+  // never the instance administrator who may have ordered it: an operator's identity must not
+  // appear in a tenant's feed, and the administrator half of the record goes to the JSON log
+  // instead. The payload carries `targetUserId`, `previousRole` and `initiatedBy` and
+  // deliberately no name — a row written to stop naming somebody must not name them
+  // (docs/decisions/0026-account-deletion-anonymisation.md).
+  //
+  // Not written for a workspace the same request deletes: `Activity` cascades on `workspaceId`,
+  // so that row would be removed by the statement it describes — the same reason there is no
+  // `workspace.deleted` type.
+  AccountDeleted: 'account.deleted',
 } as const;
 
 export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
@@ -159,6 +171,10 @@ export const AUDIT_ACTIVITY_TYPES = [
   ActivityType.InvitationCreated,
   ActivityType.InvitationRevoked,
   ActivityType.InvitationAccepted,
+  // Kind 2, access-changing: it is the last thing that ever removes this person's access, and
+  // unlike `member.left` it is permanent — the account behind it can never come back. Volume is
+  // one row per workspace per deleted account, which is the lowest of anything in this list.
+  ActivityType.AccountDeleted,
 ] as const;
 
 export type AuditActivityType = (typeof AUDIT_ACTIVITY_TYPES)[number];

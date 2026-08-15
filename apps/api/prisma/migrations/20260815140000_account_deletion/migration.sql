@@ -1,0 +1,19 @@
+-- Account deletion becomes anonymisation of the User row
+-- (docs/decisions/0026-account-deletion-anonymisation.md).
+--
+-- One nullable column, and deliberately nothing else. Seven foreign keys reference "User" with
+-- ON DELETE RESTRICT — WorkspaceMember, WorkspaceInvitation, Task, TaskAssignee, Comment,
+-- Activity, Attachment — and this migration relaxes none of them. That is the decision, not an
+-- omission: each of those seven says the content outlives its author, so an erasure request
+-- rewrites the identifying columns of the row instead of deleting it, and every authorship
+-- reference in the schema stays valid. `DELETE FROM "User"` remains impossible, on purpose.
+--
+-- Nullable with no backfill and no default: every existing account is live, and NULL is what
+-- "live" means here. Backfilling anything would claim a deletion date for accounts nobody
+-- asked to delete.
+--
+-- No index. The only query that reads this column is `WHERE id = $1` (does this session belong
+-- to a tombstone), which the primary key already serves. An index on a nullable timestamp that
+-- is true for a handful of rows would be maintained on every user write to serve nothing — the
+-- same reasoning migration 20260814150000_drop_unused_indexes applied to five other candidates.
+ALTER TABLE "User" ADD COLUMN "deletedAt" TIMESTAMP(3);

@@ -36,6 +36,8 @@ const ACTOR_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d5a';
 interface PrismaStub {
   workspace: { findUnique: jest.Mock; findFirst: jest.Mock };
   workspaceMember: { findMany: jest.Mock; findUnique: jest.Mock };
+  /** `create` refuses a session belonging to a deleted account — see `common/deleted-account.ts`. */
+  user: { findUnique: jest.Mock };
 }
 
 interface ActivityStub {
@@ -56,6 +58,8 @@ function buildService(): {
       findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn().mockResolvedValue(null),
     },
+    // A live account by default; the deleted case has its own test below.
+    user: { findUnique: jest.fn().mockResolvedValue({ deletedAt: null }) },
   };
   const activityService: ActivityStub = {
     record: jest.fn().mockResolvedValue({ id: 'activity' }),
@@ -241,6 +245,28 @@ describe('WorkspaceService.create', () => {
     await expect(
       service.create(ACTOR_ID, { name: 'Acme', slug: 'acme' }, request),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  /**
+   * The one window ADR 0026 leaves open, closed at the one place it matters.
+   *
+   * An account deleted by an instance administrator keeps a working session cookie for up to
+   * five minutes, because Better Auth's `session.cookieCache` answers without a database read.
+   * Every workspace-scoped route already answers `404` in that window — the memberships are
+   * gone — and this is the write that would hand the tombstone a fresh one, as the sole OWNER
+   * of a live tenant.
+   */
+  it('refuses to create a workspace for an account that has been deleted', async () => {
+    const { service, prisma } = buildService();
+    prisma.user.findUnique.mockResolvedValue({ deletedAt: new Date('2026-08-15') });
+
+    await expect(
+      service.create(ACTOR_ID, { name: 'Acme', slug: 'acme' }, request),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    // Refused before Better Auth is asked to create anything, so there is no organization to
+    // clean up after: the check is a gate, not a compensating action.
+    expect(api.createOrganization).not.toHaveBeenCalled();
   });
 });
 

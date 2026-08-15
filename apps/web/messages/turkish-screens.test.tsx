@@ -11,6 +11,7 @@ import messages from '@/messages/tr.json';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { BoardList } from '@/components/board/board-list';
 import { ImportReportPanel } from '@/components/board/import-report-panel';
+import { DeleteAccountDialog } from '@/components/settings/delete-account-dialog';
 
 /**
  * Renders real screens against `tr.json`.
@@ -44,8 +45,12 @@ vi.mock('@/components/layout/workspace-provider', () => ({
 }));
 vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
-  return { ...actual, api: { ...actual.api, postForm: vi.fn() } };
+  return { ...actual, api: { ...actual.api, postForm: vi.fn(), get: vi.fn(), delete: vi.fn() } };
 });
+vi.mock('@/lib/socket', () => ({ disconnectSocket: vi.fn() }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
+}));
 
 const fetchBoards = vi.mocked(fetchWorkspaceBoards);
 
@@ -102,6 +107,44 @@ describe('the Turkish interface', () => {
 
     // `#` is formatted by the active locale: 2000 groups with a dot in Turkish, not a comma.
     expect(within(region).getByText(/2\.000 kart/)).toBeDefined();
+  });
+
+  /**
+   * The account-deletion dialog, and it is here rather than only in its own spec because both
+   * of its sentences are ICU plurals over a count — `retained` and `ownedWorkspace` — which is
+   * exactly the shape `catalog.test.ts` can prove complete and cannot prove renders.
+   */
+  it('renders the account-deletion dialog in Turkish, with Turkish plural forms', async () => {
+    const { api } = await import('@/lib/api');
+    vi.mocked(api.get).mockResolvedValue({
+      userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d20',
+      soleOwnedWorkspaces: [
+        {
+          workspaceId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d21',
+          name: 'Kurultay',
+          slug: 'kurultay',
+          memberCount: 4,
+          boardCount: 2,
+          transferCandidates: [],
+        },
+      ],
+      otherWorkspaces: [],
+      retainedContent: { comments: 3, tasksCreated: 2, attachments: 0, activities: 9 },
+    } as never);
+
+    render(tr(<DeleteAccountDialog open onOpenChange={vi.fn()} email="ada@example.com" />));
+
+    await waitFor(() => {
+      expect(screen.getByText(messages.app.settings.account.ownedTitle)).toBeDefined();
+    });
+
+    // One plural form, not two: Turkish does not inflect a noun after a numeral, so `4 üye`
+    // is correct and `4 üyeler` is not.
+    expect(screen.getByText(/4 üye, 2 board/)).toBeDefined();
+    expect(screen.getByText(/3 yorum/)).toBeDefined();
+    // The "there is nobody to hand this to" line, which is the branch that decides whether
+    // deletion is the only option this dialog can offer.
+    expect(screen.getByText(messages.app.settings.account.ownedNobodyLeft)).toBeDefined();
   });
 
   it('renders the not-found page in Turkish', async () => {

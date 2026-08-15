@@ -59,6 +59,19 @@ model User {
   /// email has to know the recipient's language with no request in flight
   /// (docs/decisions/0018-localization-strategy.md).
   locale        String?
+  /// When this account was anonymised on request, or null for a live account.
+  ///
+  /// The row itself is the tombstone: a user who has ever created a card cannot be deleted —
+  /// seven `Restrict` foreign keys reference this table and each of them is a decision that the
+  /// content outlives its author — so an erasure request rewrites `email`, `name`, `avatarUrl`
+  /// and `locale` instead and stamps this column. Every `createdById` / `uploadedById` /
+  /// `userId` in the schema keeps resolving; it just resolves to nobody.
+  ///
+  /// A state rather than a comparison against `name`: "Deleted user" is a display name any live
+  /// account is free to choose. Read by primary key and never scanned, so it carries no index
+  /// (see migration 20260814150000_drop_unused_indexes for the discipline).
+  /// See docs/decisions/0026-account-deletion-anonymisation.md.
+  deletedAt     DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

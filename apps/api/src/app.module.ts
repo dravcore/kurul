@@ -7,6 +7,7 @@ import { StorageModule } from './storage/storage.module';
 import { InstanceConfigModule } from './config/instance-config.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { AccountModule } from './account/account.module';
 import { MailModule } from './mail/mail.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { BoardModule } from './board/board.module';
@@ -35,6 +36,9 @@ import { throttlerOptions } from './common/rate-limit/rate-limit';
     AttachmentModule,
     InstanceConfigModule,
     AuthModule,
+    // Right after `AuthModule`, whose `/me` routes it sits beside: `GET /me` and `PATCH /me`
+    // are the profile, `DELETE /me` is the end of it.
+    AccountModule,
     MailModule,
     WorkspaceModule,
     BoardModule,
