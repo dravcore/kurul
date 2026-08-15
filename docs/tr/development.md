@@ -390,6 +390,26 @@ yorumda açıklanıyor), dolayısıyla her zaman kaynaktan build eder — `api`/
 gerekçesinin tamamı için bkz.
 [denetim bulgusu OPS-04](https://github.com/dravcore/kurultay/issues/126).
 
+### İki API imajı ne kadar yer kaplıyor
+
+`linux/arm64` üzerinde, `docker history` çıktısı toplanarak ölçüldü — disk ve pull süresi
+açısından anlamlı olan sayı bu:
+
+| İmaj             | Önce    | Şimdi  |
+| ---------------- | ------- | ------ |
+| `api` (`runner`) | 955 MB  | 407 MB |
+| `migrate`        | 2663 MB | 418 MB |
+
+Hiçbiri uygulamanın bağımlılıklarını değiştirerek küçülmedi. `runner` imajı, `pnpm deploy
+--prod`'un deploy dizininde bıraktığı isteğe bağlı peer bağımlılıklarından kurtuldu — Next.js'in
+SWC binary'leri, Prisma CLI ve Studio, sharp, Playwright, TypeScript derleyicisi; hiçbirine
+`dist/main.js` üzerinden erişilemiyor — bunları artık `scripts/prune-deployed-modules.mjs`
+kaldırıyor. "Erişilebilir"in nasıl tanımlandığı ve silmelerin neden kanıtlanabilir biçimde
+güvenli olduğu o dosyanın başlığında yazıyor. `migrate` imajı ise build stage'inin tamamı
+olmaktan (workspace, her paketin tüm dev bağımlılıkları, pnpm'in kendisi) çıkıp Prisma CLI,
+şema ve migration'ları taşıyan temiz bir tabana dönüştü. Her iki sayıyı da `docker build -f
+apps/api/Dockerfile --target runner .` ve sonucun `docker history`'si ile yeniden üretebilirsin.
+
 Next.js, `NEXT_PUBLIC_*` değerlerini build zamanında client bundle'a gömer; dolayısıyla
 yayınlanmış bir imaj bunları `api`'nin `DATABASE_URL`'i gibi container başlangıcında alamaz. Bu
 framework'ün bir özelliği ve değişmedi — değişen şey, gömülen değerin artık dağıtıma özgü
@@ -442,7 +462,7 @@ kısa özeti:
 | Servis       | `cap_add`                                             | Neden                                                                                                                                                                                                                                                                                                                                                 |
 | ------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `api`, `web` | yok                                                   | Zaten `USER node` — container'ın ömrü boyunca hiçbir noktada `chown`, `setuid` veya ayrıcalıklı port bind'i yok                                                                                                                                                                                                                                       |
-| `migrate`    | yok                                                   | `migrate` build hedefinin `USER`'ı yok (runner öncesi `build` stage'inin kendisi), yani root çalışır — ama yalnızca DB'ye bağlanır ve kendi zaten inşa edilmiş `/app`'ini okur                                                                                                                                                                        |
+| `migrate`    | yok                                                   | O da `USER node`: imaj küçültme çalışması bu stage'e root sahipli `build` stage'i yerine kendi temiz tabanını verdi. Yalnızca DB'ye bağlanır ve yanına kopyalanan şema ile migration'ları okur                                                                                                                                                        |
 | `backup`     | yok                                                   | `entrypoint:`, postgres imajının kendi entrypoint'ini tamamen değiştiriyor, dolayısıyla chown/re-exec mantığı hiç çalışmıyor — sidecar root kalır ama hiçbir sahiplik değiştirmiyor                                                                                                                                                                   |
 | `postgres`   | `CHOWN`, `FOWNER`, `SETUID`, `SETGID`, `DAC_OVERRIDE` | Resmî entrypoint her zaman root olarak başlar, _her_ açılışta (yalnızca ilkinde değil) `PGDATA`'yı `postgres` kullanıcısına `chown`'lar, sonra `gosu postgres` ile kendini yeniden exec eder — `DAC_OVERRIDE` özellikle ikinci açılıştan itibaren gerekir: `PGDATA` artık `chmod 0700` olduğunda root bu izin olmadan içine `find` ile bile giremiyor |
 | `redis`      | `SETUID`, `SETGID`                                    | Entrypoint, `setpriv` ile uid 999'a ayrıcalık düşürür — ama yalnızca ilk argümanı harfiyen `redis-server` olduğunda; aşağıya bakın                                                                                                                                                                                                                    |
