@@ -143,9 +143,25 @@ describe('TaskAttachments', () => {
 
     const input = screen.getByLabelText('Attach a file') as HTMLInputElement;
     const file = new File(['x'], 'note.txt', { type: 'text/plain' });
+
+    // jsdom never gives a file input a non-empty `value`, so asserting it is `''` after the
+    // change proves nothing on its own — the clear this test is about is invisible. A real
+    // browser puts the picked path there, so it is put there by hand and the handler's own
+    // assignment is what has to take it away again.
+    let value = 'C:\\fakepath\\note.txt';
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get: () => value,
+      set: (next: string) => {
+        value = next;
+      },
+    });
+
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => expect(onUpload).toHaveBeenCalledWith(file));
+    // Without this, picking the same file twice fires no `change` at all and a failed upload
+    // cannot be retried from the same file.
     expect(input.value).toBe('');
   });
 });
