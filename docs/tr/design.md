@@ -168,17 +168,55 @@ figure veya bir stat-tile değeri üzerinde değil.
 App shell, [architecture.md §4](architecture.md#4-appsweb--yapı)'teki `(app)` route group'una
 göre.
 
-| Bölge                | Spec                                                                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Sidebar              | 240px, üstte pinlenmiş workspace switcher; 1280px altında ve talep üzerine 56px'lik bir icon rail'ine collapse olur                   |
-| Topbar               | 48px sticky — board adı, filter girişi, overflow, presence avatar'ları                                                                |
-| Board canvas         | Full-bleed, horizontal scroll; column header'ları vertical scroll'da sticky kalır                                                     |
-| Column               | 300px fixed (geniş ekranlarda 280 min / 320 max), 12px gap, isim + count + `⋯` içeren 40px sticky header                              |
-| Card                 | 10px 12px padding, 8px gap, min 56px (yalnızca title), tipik 72–92px; hiçbir şeyin ~140px'i aşmaması için title 3 satırda clamp'lenir |
-| Card içerik sırası   | priority ikonu + title · label dot'ları · meta satırı (due date, estimate, assignee'ler)                                              |
-| List / table satırı  | 36px                                                                                                                                  |
-| Settings ve form'lar | 720px max width — prose okunur, taranmaz                                                                                              |
-| Touch target         | Coarse pointer'larda 40px minimum, size'la değil padding'le sağlanır                                                                  |
+| Bölge                | Spec                                                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell yüksekliği     | Tam olarak `100dvh`, `overflow: hidden` — asla `min-height` değil. Her sayfa kendi scroller'ına sahiptir.                                     |
+| Sidebar              | 240px, üstte pinlenmiş workspace switcher; 1280px altında ve talep üzerine 56px'lik bir icon rail'ine collapse olur; 768px altında off-canvas |
+| Topbar               | 48px sticky — board adı, filter girişi, overflow, presence avatar'ları; **768px altında 56px**, ve orada gezinme trigger'ını da taşır         |
+| Board canvas         | Full-bleed, horizontal scroll; column header'ları vertical scroll'da sticky kalır                                                             |
+| Column               | 300px fixed (geniş ekranlarda 280 min / 320 max), 12px gap, isim + count + `⋯` içeren 40px sticky header (768px altında 48px)                 |
+| Card                 | 10px 12px padding, 8px gap, min 56px (yalnızca title), tipik 72–92px; hiçbir şeyin ~140px'i aşmaması için title 3 satırda clamp'lenir         |
+| Card içerik sırası   | priority ikonu + title · label dot'ları · meta satırı (due date, estimate, assignee'ler)                                                      |
+| List / table satırı  | 36px; 768px altında 44px                                                                                                                      |
+| Settings ve form'lar | 720px max width — prose okunur, taranmaz                                                                                                      |
+| Touch target         | **768px altında 44px minimum**, istisnasız her etkileşimli öğede                                                                              |
+
+**Shell tam olarak bir viewport yüksekliğindedir ve bu taşıyıcı bir karardır.**
+`min-height: 100dvh` "en az" der ve altındaki hiçbir şeyi sınırlamaz — yaptığı da buydu, ve
+bir column'un `overflow-y-auto`'sunun neden hiç kırpmadığının sebebi budur: belge büyüyordu,
+1 000 task'lık bir board'da 27 425px'e ulaşıyordu. Column başına scroll, sticky column header'ı
+ve drag autoscroll'un üçü de column'un sınırlı bir kutuya sahip olmasına bağlı; dolayısıyla
+üçü de işlevsizdi. `100vh` değil `100dvh`: telefonda `100vh`, browser chrome'u geri çekilmiş
+haldeki viewport'tur, yani `vh` ile boyutlanmış bir shell ekrandan yüksektir ve ilk paint'te
+topbar'ı adres çubuğunun altına iter. Yeni sayfa eklerken uyulacak sonuç: **uygulamanın hiçbir
+yerinde belge scroll etmez**, bu yüzden `(app)` altındaki yeni bir route kendi
+`flex-1 overflow-y-auto`'sunu bildirmek zorundadır — dashboard, settings ve notifications
+sayfalarının yaptığı gibi.
+
+**768px altında sidebar off-canvas'tır** — topbar'daki bir hamburger, aynı `SidebarBody`'yi
+bir drawer'da açar; kendi link listesi olan ikinci bir gezinme değil. Drawer, uygulamanın
+`Dialog` primitive'inin sol kenara sabitlenmiş hali (`DialogDrawerContent`), ve bu bilinçli
+bir "elle yazmayı reddetme"dir: focus trap, `Escape`, focus'u trigger'a geri verme, arkadaki
+sayfayı inert kılma ve scroll lock, bir off-canvas panelin bütün özüdür — paralel bir
+implementasyon, bunlardan birinin eksik kalabileceği ikinci bir yerdir. 220ms'de
+`--ease-drawer` ile kayar, `prefers-reduced-motion` altında ise kaymak yerine cross-fade eder.
+
+**40 değil 44, ve pointer tipine değil genişliğe bağlı.** 44px, WCAG 2.5.5 (AAA) ve roadmap'in
+bu yerleşimi tuttuğu rakam. `pointer: coarse` yerine drawer'ın kullandığı breakpoint'e —
+`max-md` — bağlıdır: birbiriyle çelişebilecek iki koşul yerine tüm mobil yerleşimi tek bir
+koşul yönetsin diye. Masaüstünde 360px genişliğinde bir pencerenin 44px hedef alması bir şeye
+mal olmaz. Zemin, çağrı yerlerinde değil `Button` ile `Input` variant'larında ve dropdown item
+sınıflarında yaşar; böylece okunacak tek bir liste vardır. Breakpoint üstündeki ölçüler
+değişmez. Ve bu **iddia edilmez, ölçülür**: `e2e/tests/mobile-navigation.spec.ts`, 360px'te
+board'daki ve drawer'daki her button, link, input ve menu item'ını tarar ve iki eksenden
+birinde 44px'in altındaki her kutuda fail eder. jsdom hiçbir şeyi layout etmediği için bir
+unit test bu iddiayı kuramaz.
+
+**Touch'ta drag grip'ten yapılır.** Kart gövdesi column'un scroller'ına aittir — dnd-kit
+listener'larını taşıyan wrapper'ın kendi `touch-action`'ı yoktur, dolayısıyla dikey bir
+hareketi browser üstlenir — grip ise `touch-action: none` bildirir, ve o 44px'lik tek bölgeyi
+dnd-kit'e veren şey budur. Bu bir kısıt değil, bir iş bölümüdür: başparmakla scroll edilemeyen
+bir column, ortasından sürüklenemeyen bir karttan daha kötüdür. İki yarı da test edilir.
 
 **Task detayı: bir modal değil, sağ tarafta bir panel.** Varsayılan 480px, drag-resizable
 420–640px, **non-modal** — board arkasında görünür ve tıklanabilir kalır. 1024px altında

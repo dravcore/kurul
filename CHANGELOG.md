@@ -9,6 +9,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Mobile navigation — the sidebar becomes a drawer below 768px.** Under the `md` breakpoint
+  the app shell had one breakpoint and it was 1280px: at 360px the 56px icon rail kept its
+  width, took 15% of the viewport, and could not show a workspace name in it. There was no
+  mobile navigation pattern at all. A hamburger now sits in the topbar and opens the same
+  sidebar in an off-canvas drawer; above 768px nothing on the desktop shell changed.
+
+  **It is the app's `Dialog`, docked to an edge — not a second overlay.** Focus trapping,
+  `Escape`, returning focus to the trigger, inerting the page behind and the scroll lock are
+  the substance of an off-canvas panel, and Radix already does all of it for every other
+  dialog here; a hand-rolled panel would be a second place for one of them to be missing.
+  `DialogDrawerContent` is the same portal, overlay and content with different geometry, and
+  the drawer and the desktop `<aside>` render one `SidebarBody`, so a nav row added to one is
+  a row in both.
+
+  **Touch targets are 44px below 768px, measured rather than asserted.** The floor lives in
+  the `Button` and `Input` size variants and the dropdown item classes rather than at the call
+  sites, so there is one list to read; the topbar grows to 56px to hold it, the column header
+  to 48px, and the card's drag grip from 24px to 44px. `e2e/tests/mobile-navigation.spec.ts`
+  sweeps every button, link, input and menu item on the board and inside the drawer at 360px
+  and fails on any box under 44px in either axis — jsdom lays nothing out, so a unit test
+  could only have restated the class names.
+
+  **Touch drag works, by the grip.** The card body belongs to the column's scroller; the grip
+  declares `touch-action: none` and is where the gesture reaches dnd-kit. Both halves are
+  driven with real touch events in the browser: a card dragged by its grip reorders the column
+  and survives a reload, and a finger dragged down the card body scrolls the column and moves
+  nothing. Keyboard drag, the announcements and the skip link are unchanged and still checked.
+
 - **A Turkish interface.** `SUPPORTED_LOCALES` is now `['en', 'tr']`, and everything keyed to
   it grew with it: `apps/web/messages/tr.json` carries all 486 keys, a new board created by a
   Turkish-speaking user seeds `Yapılacak / Devam Ediyor / Bitti`, and the two transactional
@@ -677,6 +705,25 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `apps/api/prisma/migrations/20260814150000_drop_unused_indexes` for the full methodology.
 
 ### Fixed
+
+- **Board columns never scrolled independently; the page did** ([#184](https://github.com/dravcore/kurultay/issues/184)).
+  The app shell was `min-h-screen` — a floor with no ceiling — so nothing under it was bounded,
+  a column's `overflow-y-auto` had nothing to clip against, and a long column grew the
+  *document* instead. Measured on a board seeded with 1 000 tasks, the document reached
+  27 425px: the reader scrolled the whole page past a `sticky` column header that was stuck to
+  a box it had already left. The shell is now exactly `100dvh` with `overflow: hidden`, and
+  `<main>` carries the `min-h-0` that passes the bound down.
+
+  Every link below the shell was already correct and already inert — the board is
+  `h-full min-h-0`, the canvas `min-h-0 flex-1`, the column's card list `flex-1
+  overflow-y-auto` — so one `min-h` was holding the entire chain open. Three behaviours the
+  design has always specified start working as a result: per-column scrolling, the sticky
+  column header, and drag autoscroll inside a column. `dvh` and not `vh` because on a phone
+  `100vh` is the viewport with the browser chrome retracted, which would push the topbar under
+  the address bar on first paint. The consequence to know when adding a page: the document no
+  longer scrolls anywhere under `(app)`, so a new route declares its own
+  `flex-1 overflow-y-auto` — as the dashboard, settings and notifications pages already did,
+  having been written for a bounded shell that had not been built yet.
 
 - **An oversized JSON body answered `500` and was filed in Sentry as a server fault.** Express's
   body parsers signal every rejection by throwing an

@@ -112,7 +112,11 @@
       "collapseSidebar": "Kenar çubuğunu daralt",
       "expandSidebar": "Kenar çubuğunu genişlet",
       "settings": "Ayarlar",
-      "skipToContent": "İçeriğe geç"
+      "skipToContent": "İçeriğe geç",
+      "navigation": "Gezinme",
+      "navigationDescription": "Workspace değiştirin, dashboard'u veya ayarları açın, çıkış yapın.",
+      "openNavigation": "Gezinmeyi aç",
+      "closeNavigation": "Gezinmeyi kapat"
     },
     "settings": {
       "title": "Ayarlar",

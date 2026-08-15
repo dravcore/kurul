@@ -45,7 +45,12 @@ export function ChecklistItemRow({
       <label
         htmlFor={inputId}
         className={cn(
-          'min-w-0 flex-1 cursor-pointer text-body break-words',
+          // `max-md:min-h-11` and `flex items-center`: the label is what a thumb aims at —
+          // the checkbox beside it is a 14px native control that is not going to be resized
+          // into a 44px square. The label toggles the same input (`htmlFor`), sits flush
+          // against it, and is the box the mobile sweep in `e2e/tests/mobile-navigation.spec.ts`
+          // measures for exactly that reason.
+          'min-w-0 flex-1 cursor-pointer text-body break-words max-md:flex max-md:min-h-11 max-md:items-center',
           item.isDone && 'text-muted-foreground line-through',
         )}
       >

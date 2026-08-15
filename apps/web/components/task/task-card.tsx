@@ -49,7 +49,16 @@ export function TaskCard({
       href={`/board/${boardId}/task/${task.id}`}
       data-selected={selected || undefined}
       className={cn(
-        'block rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 text-left transition-colors',
+        // `max-md:min-h-11`: a title-only card measures 36px, which is a fine density on a
+        // desktop board and not a target a thumb can hit. Below `md` it grows to 44px.
+        //
+        // Only below `md`, deliberately. `docs/design.md` §4 says a card is "min 56px (title
+        // only)" and the measured figure is 36 — the spec and the code have disagreed since
+        // the card was written, and `board-column.tsx` records the 36 as measured fact in the
+        // reasoning behind its `containIntrinsicSize`. Closing that gap changes desktop
+        // density and invalidates a performance measurement; it is a real discrepancy and it
+        // is not this change's to settle.
+        'block rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 text-left transition-colors max-md:min-h-11',
         'hover:border-border-strong hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
         selected && 'border-signature bg-signature-subtle/40',
         className,

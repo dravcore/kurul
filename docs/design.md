@@ -159,17 +159,53 @@ a stat-tile value.
 
 App shell per the `(app)` route group in [architecture.md §4](architecture.md#4-appsweb--structure).
 
-| Region             | Spec                                                                                                                  |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand                     |
-| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet)                               |
-| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                |
-| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯`                 |
-| Card               | 10px 12px padding, 8px gap, min 56px (title only), typical 72–92px; title clamps at 3 lines so nothing exceeds ~140px |
-| Card content order | Priority icon + title · label dots · meta row (due date, estimate, assignees)                                         |
-| List / table row   | 36px                                                                                                                  |
-| Settings and forms | 720px max width — prose is read, not scanned                                                                          |
-| Touch target       | 40px minimum on coarse pointers, achieved with padding, not size                                                      |
+| Region             | Spec                                                                                                                                                        |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell height       | Exactly `100dvh`, `overflow: hidden` — never `min-height`. Every page owns its own scroller.                                                                |
+| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand; off-canvas below 768px                                   |
+| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet); **56px below 768px**, where it also carries the navigation trigger |
+| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                                                      |
+| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯` (48px below 768px)                                    |
+| Card               | 10px 12px padding, 8px gap, min 56px (title only), typical 72–92px; title clamps at 3 lines so nothing exceeds ~140px                                       |
+| Card content order | Priority icon + title · label dots · meta row (due date, estimate, assignees)                                                                               |
+| List / table row   | 36px; 44px below 768px                                                                                                                                      |
+| Settings and forms | 720px max width — prose is read, not scanned                                                                                                                |
+| Touch target       | **44px minimum below 768px**, on every interactive element without exception                                                                                |
+
+**The shell is exactly one viewport tall, and this is load-bearing.** `min-height: 100dvh`
+would say "at least" and bound nothing below it — which is what it did, and why a column's
+`overflow-y-auto` never clipped: the document grew instead, reaching 27 425px on a 1 000-task
+board. Per-column scrolling, the sticky column header and drag autoscroll all depend on the
+column having a bounded box, so all three were inert. `100dvh` and not `100vh`: on a phone
+`100vh` is the viewport with the browser chrome retracted, so a `vh`-sized shell is taller than
+the screen and pushes the topbar under the address bar on first paint. The consequence to
+respect when adding a page: **the document does not scroll anywhere in the app**, so a new
+route under `(app)` must declare its own `flex-1 overflow-y-auto`, exactly as the dashboard,
+settings and notifications pages do.
+
+**Below 768px the sidebar is off-canvas** — a hamburger in the topbar opening the same
+`SidebarBody` in a drawer, not a second navigation with its own list of links. The drawer is
+the app's `Dialog` primitive docked to the left edge (`DialogDrawerContent`), which is a
+deliberate refusal to hand-roll one: the focus trap, `Escape`, returning focus to the trigger,
+inerting the page behind and the scroll lock are the whole substance of an off-canvas panel,
+and a parallel implementation is a second place for one of them to be missing. It slides at
+220ms on `--ease-drawer`, and cross-fades instead under `prefers-reduced-motion`.
+
+**44px, not 40, and keyed on width rather than on pointer type.** 44px is WCAG 2.5.5 (AAA) and
+the figure the roadmap holds this layout to. It is keyed on `max-md` — the same breakpoint the
+drawer uses — rather than on `pointer: coarse`, so one condition governs the whole mobile
+layout instead of two that can disagree; a 360px window on a desktop getting 44px targets costs
+nothing. The floor lives in the `Button` and `Input` variants and in the dropdown item classes,
+not at the call sites, so there is one list to read. Sizes above the breakpoint are untouched.
+It is **measured, not asserted**: `e2e/tests/mobile-navigation.spec.ts` sweeps every button,
+link, input and menu item on the board and in the drawer at 360px and fails on any box under
+44px in either axis. jsdom lays nothing out, so a unit test cannot make this claim.
+
+**Touch drag is by the grip.** The card body belongs to the column's scroller — the wrapper
+carrying dnd-kit's listeners has no `touch-action`, so the browser claims a vertical gesture
+there — and the grip declares `touch-action: none`, which is what hands that one 44px region to
+dnd-kit instead. This is a division, not a limitation: a column that cannot be scrolled with a
+thumb is worse than a card that cannot be dragged from its middle. Both halves are asserted.
 
 **Task detail: a right-side panel, not a modal.** ~480px wide (`min` 420px / `max` 640px via
 CSS), **non-modal** — the board stays visible and clickable behind it on desktop. Below the

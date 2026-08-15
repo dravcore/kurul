@@ -112,7 +112,11 @@
       "collapseSidebar": "Collapse sidebar",
       "expandSidebar": "Expand sidebar",
       "settings": "Settings",
-      "skipToContent": "Skip to content"
+      "skipToContent": "Skip to content",
+      "navigation": "Navigation",
+      "navigationDescription": "Switch workspace, open the dashboard or settings, and sign out.",
+      "openNavigation": "Open navigation",
+      "closeNavigation": "Close navigation"
     },
     "settings": {
       "title": "Settings",

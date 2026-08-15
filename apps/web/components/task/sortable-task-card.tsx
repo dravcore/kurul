@@ -73,14 +73,28 @@ export const SortableTaskCard = memo(function SortableTaskCard({
         task={task}
         boardId={boardId}
         selected={selected}
-        className={cn('pr-8', isDragging && 'shadow-drag')}
+        className={cn('pr-8 max-md:pr-12', isDragging && 'shadow-drag')}
       />
       {disabled ? null : (
+        /**
+         * The grip is the drag affordance, and below `md` it is the *only* one.
+         *
+         * `touch-none` on this button is what makes a touch drag possible at all: the
+         * listeners above are on the wrapper, which has no `touch-action` of its own, so a
+         * touch that starts on the card body belongs to whichever ancestor scrolls — which,
+         * since the height-chain fix (#184), is the column. That is the right outcome and not
+         * a compromise: a column that cannot be scrolled with a thumb is worse than a card
+         * that cannot be dragged from its middle. `touch-action: none` here carves the one
+         * 44px region out of that, where the browser hands the gesture to dnd-kit instead.
+         *
+         * 24px on desktop, 44px below `md`. It grows into the card's padding (`pr-12` above),
+         * not over its text.
+         */
         <button
           ref={setActivatorNodeRef}
           type="button"
           aria-label={t('dragHandle', { title: task.title })}
-          className="absolute top-1.5 right-1.5 flex size-6 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="absolute top-1.5 right-1.5 flex size-6 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none max-md:top-1 max-md:right-1 max-md:size-11"
           {...attributes}
         >
           <GripVertical className="size-3.5" aria-hidden />

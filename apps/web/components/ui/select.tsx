@@ -25,8 +25,8 @@ const selectVariants = cva(
     variants: {
       size: {
         // Right padding leaves room for the chevron; the background position matches it.
-        default: 'h-9 pr-8 pl-3 bg-[position:right_0.75rem_center]',
-        sm: 'h-8 pr-7 pl-2 bg-[position:right_0.5rem_center]',
+        default: 'h-9 pr-8 pl-3 bg-[position:right_0.75rem_center] max-md:min-h-11',
+        sm: 'h-8 pr-7 pl-2 bg-[position:right_0.5rem_center] max-md:min-h-11',
       },
     },
     defaultVariants: {
