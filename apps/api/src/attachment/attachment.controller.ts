@@ -6,10 +6,12 @@ import {
   Get,
   HttpCode,
   Post,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { AttachmentKind } from '@kurultay/shared-types';
 import type { AttachmentDto } from '@kurultay/shared-types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -19,8 +21,12 @@ import {
   WorkspaceRoles,
   WorkspaceScoped,
 } from '../common/decorators/workspace-roles.decorator';
-import { ThrottleAttachmentUpload } from '../common/rate-limit/rate-limit';
+import {
+  ThrottleAttachmentDownload,
+  ThrottleAttachmentUpload,
+} from '../common/rate-limit/rate-limit';
 import type { AuthenticatedUser } from '../common/types/request-context';
+import { AttachmentDownloadService } from './attachment-download.service';
 import { AttachmentService } from './attachment.service';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import type { UploadedFile as MulterFile } from './multer-file';
@@ -42,7 +48,10 @@ import type { UploadedFile as MulterFile } from './multer-file';
  */
 @Controller('workspaces/:workspaceId')
 export class AttachmentController {
-  constructor(private readonly attachments: AttachmentService) {}
+  constructor(
+    private readonly attachments: AttachmentService,
+    private readonly downloads: AttachmentDownloadService,
+  ) {}
 
   @Get('tasks/:taskId/attachments')
   @WorkspaceScoped()
@@ -94,6 +103,37 @@ export class AttachmentController {
     @UuidParam('attachmentId') attachmentId: string,
   ): Promise<AttachmentDto> {
     return this.attachments.findOne(workspaceId, attachmentId);
+  }
+
+  /**
+   * The byte stream.
+   *
+   * `@Res()`: this handler owns the response. Headers are written from the descriptor the
+   * service resolved, and only then does the stream start. A failure *after* that point destroys
+   * the socket instead of throwing, because a thrown error here would reach
+   * `AllExceptionsFilter` with headers already sent (ADR 0022).
+   *
+   * Authorization is the guard chain, exactly as on every other route — `@WorkspaceScoped()`, a
+   * session cookie, the 404-not-403 rule. This is a `GET`, so `origin-check.ts` does not cover
+   * it by design; what covers it is the session plus the tenant scope, and the
+   * `Cross-Origin-Resource-Policy: same-origin` the descriptor carries.
+   */
+  @Get('attachments/:attachmentId/content')
+  @WorkspaceScoped()
+  @ThrottleAttachmentDownload()
+  async content(
+    @UuidParam('workspaceId') workspaceId: string,
+    @UuidParam('attachmentId') attachmentId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { stream, headers } = await this.downloads.open(workspaceId, attachmentId);
+
+    res.set(headers);
+    stream.on('error', () => {
+      // Nothing to report to the client that it can act on, and nothing the filter can write.
+      res.destroy();
+    });
+    stream.pipe(res);
   }
 
   @Delete('attachments/:attachmentId')

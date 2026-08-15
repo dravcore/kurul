@@ -70,6 +70,17 @@ export class AttachmentService {
     return toAttachmentDto(await this.requireAttachment(workspaceId, attachmentId));
   }
 
+  /**
+   * The row rather than the DTO, for the download path.
+   *
+   * The one caller needs `storageKey`, which `AttachmentDto` deliberately does not carry (K9).
+   * Exposing the read rather than the key keeps the tenant scope on this side of the boundary:
+   * `AttachmentDownloadService` never writes a `where` clause of its own.
+   */
+  async findRow(workspaceId: string, attachmentId: string): Promise<AttachmentRow> {
+    return this.requireAttachment(workspaceId, attachmentId);
+  }
+
   async createLink(
     workspaceId: string,
     taskId: string,

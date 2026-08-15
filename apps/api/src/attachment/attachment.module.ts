@@ -6,6 +6,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { StorageModule } from '../storage/storage.module';
 import { StorageService } from '../storage/storage.service';
 import { AttachmentController } from './attachment.controller';
+import { AttachmentDownloadService } from './attachment-download.service';
 import { AttachmentService } from './attachment.service';
 
 @Module({
@@ -37,6 +38,6 @@ import { AttachmentService } from './attachment.service';
     }),
   ],
   controllers: [AttachmentController],
-  providers: [AttachmentService],
+  providers: [AttachmentService, AttachmentDownloadService],
 })
 export class AttachmentModule {}
