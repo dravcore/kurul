@@ -388,13 +388,14 @@ rationale.
 
 ### What the two API images weigh
 
-Measured on `linux/arm64` by summing `docker history`, which is the number that matters for
-disk and for pull time:
+Measured on `linux/arm64`. Docker answers "how big" three ways and they are far apart, so all
+three are here — `docker history` summed, `docker image ls --tree`'s DISK USAGE (unpacked bytes
+on the host) and its CONTENT SIZE (compressed, roughly what a `pull` moves):
 
-| Image            | Was     | Is     |
-| ---------------- | ------- | ------ |
-| `api` (`runner`) | 955 MB  | 407 MB |
-| `migrate`        | 2663 MB | 418 MB |
+| Image            | `docker history` | Unpacked disk    | Compressed   |
+| ---------------- | ---------------- | ---------------- | ------------ |
+| `api` (`runner`) | 955 → 407 MB     | 1.22 GB → 516 MB | 266 → 108 MB |
+| `migrate`        | 2663 → 418 MB    | 3.37 GB → 538 MB | 705 → 120 MB |
 
 Neither shrank by changing what the application depends on. The `runner` image shed the
 optional peer dependencies `pnpm deploy --prod` leaves in a deploy directory — Next.js's SWC
@@ -403,8 +404,13 @@ reachable from `dist/main.js` — which `scripts/prune-deployed-modules.mjs` now
 its header for how "reachable" is defined and why the removals are provably safe. The
 `migrate` image stopped being the entire build stage (workspace, every dev dependency, pnpm
 itself) and became a clean base with the Prisma CLI, the schema and the migrations. Reproduce
-either number with `docker build -f apps/api/Dockerfile --target runner .` and
-`docker history` on the result.
+any of these with `docker build -f apps/api/Dockerfile --target runner .` followed by
+`docker history` and `docker image ls --tree` on the result.
+
+What is left is mostly not ours: `node:24-alpine` is 171 MB of every one of these images
+(Alpine 9.31 MB, Node 156 MB, Yarn 5.48 MB), 42% of the API image. Cutting that means a
+different base, and the base is load-bearing — `docker-compose.yml`'s healthcheck is a busybox
+`wget` run inside the container, which a distroless image would not have.
 
 Next.js inlines `NEXT_PUBLIC_*` into the client bundle at build time, so a published image
 cannot pick those up at container start the way `api`'s `DATABASE_URL` can. That is a property

@@ -392,13 +392,15 @@ gerekçesinin tamamı için bkz.
 
 ### İki API imajı ne kadar yer kaplıyor
 
-`linux/arm64` üzerinde, `docker history` çıktısı toplanarak ölçüldü — disk ve pull süresi
-açısından anlamlı olan sayı bu:
+`linux/arm64` üzerinde ölçüldü. Docker "bu imaj ne kadar" sorusuna birbirinden hayli uzak üç
+yanıt veriyor; üçü de burada — `docker history` toplamı, `docker image ls --tree`'nin DISK
+USAGE'ı (host üzerinde açılmış bayt) ve CONTENT SIZE'ı (sıkıştırılmış, kabaca bir `pull`'un
+taşıdığı miktar):
 
-| İmaj             | Önce    | Şimdi  |
-| ---------------- | ------- | ------ |
-| `api` (`runner`) | 955 MB  | 407 MB |
-| `migrate`        | 2663 MB | 418 MB |
+| İmaj             | `docker history` | Diskte açılmış   | Sıkıştırılmış |
+| ---------------- | ---------------- | ---------------- | ------------- |
+| `api` (`runner`) | 955 → 407 MB     | 1.22 GB → 516 MB | 266 → 108 MB  |
+| `migrate`        | 2663 → 418 MB    | 3.37 GB → 538 MB | 705 → 120 MB  |
 
 Hiçbiri uygulamanın bağımlılıklarını değiştirerek küçülmedi. `runner` imajı, `pnpm deploy
 --prod`'un deploy dizininde bıraktığı isteğe bağlı peer bağımlılıklarından kurtuldu — Next.js'in
@@ -407,8 +409,14 @@ SWC binary'leri, Prisma CLI ve Studio, sharp, Playwright, TypeScript derleyicisi
 kaldırıyor. "Erişilebilir"in nasıl tanımlandığı ve silmelerin neden kanıtlanabilir biçimde
 güvenli olduğu o dosyanın başlığında yazıyor. `migrate` imajı ise build stage'inin tamamı
 olmaktan (workspace, her paketin tüm dev bağımlılıkları, pnpm'in kendisi) çıkıp Prisma CLI,
-şema ve migration'ları taşıyan temiz bir tabana dönüştü. Her iki sayıyı da `docker build -f
-apps/api/Dockerfile --target runner .` ve sonucun `docker history`'si ile yeniden üretebilirsin.
+şema ve migration'ları taşıyan temiz bir tabana dönüştü. Sayıların hepsini `docker build -f
+apps/api/Dockerfile --target runner .` ardından sonucun `docker history` ve
+`docker image ls --tree` çıktısıyla yeniden üretebilirsin.
+
+Geriye kalanın büyük kısmı bize ait değil: `node:24-alpine` bu imajların her birinde 171 MB yer
+tutuyor (Alpine 9.31 MB, Node 156 MB, Yarn 5.48 MB) — API imajının %42'si. Bunu kesmek farklı
+bir taban demek ve taban taşıyıcı bir parça: `docker-compose.yml`'deki healthcheck, container
+içinde çalışan bir busybox `wget` — distroless bir imajda bu yok.
 
 Next.js, `NEXT_PUBLIC_*` değerlerini build zamanında client bundle'a gömer; dolayısıyla
 yayınlanmış bir imaj bunları `api`'nin `DATABASE_URL`'i gibi container başlangıcında alamaz. Bu

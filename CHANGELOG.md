@@ -446,7 +446,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **The two API images lost 2.8 GB between them, without dropping a dependency the app uses.**
   Summing `docker history` on `linux/arm64`: the `api` runtime image went from 955 MB to
-  407 MB, and the one-shot `migrate` image from 2663 MB to 418 MB (audit finding OPS-07).
+  407 MB, and the one-shot `migrate` image from 2663 MB to 418 MB (audit finding OPS-07). As
+  unpacked bytes on disk, the same two images went from 1.22 GB to 516 MB and from 3.37 GB to
+  538 MB; compressed, from 266 MB to 108 MB and from 705 MB to 120 MB. All three readings are
+  in `docs/development.md`, because they are far enough apart that quoting one alone would be
+  choosing a flattering number.
 
   Most of the API image was never reachable code. `pnpm deploy --prod` prunes the deployed
   package's own `devDependencies` but keeps _optional peer dependencies_ — peers the publishing
