@@ -126,6 +126,10 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
   Tohum kolon adları bir `tr` satırı kazandı (`Yapılacak / Devam Ediyor / Bitti`) ve iki
   transactional e-posta da artık alıcının dilinde yazılıyor. İngilizce kanonik kalır: yeni bir
   metnin eklendiği dosya hâlâ `en.json`'dır ve Türkçe katalog ona göre ölçülür.
+- **Rol adları arayüzde çevrilir (`Sahip / Yönetici / Üye / Misafir`), `docs/tr/**` içinde ise
+  İngilizce kalır (`owner'ından`, `admin'e`) — bu bir drift değil, bilinçli bir ayrım.** Doküman
+  `OWNER`/`ADMIN` enum değerlerinden ve `@kurultay/auth-access` rol tanımlayıcılarından söz eder
+  ve bunlar hiç çevrilmez; arayüzdeki rozet ise bir insanın okuduğu bir kelimedir.
 - **"%100 çevrildi" bir iddia değil, bir kapıdır.** `apps/web/messages/catalog.test.ts`,
   `en.json`'da olup başka bir katalogda olmayan bir key'de, başka bir katalogda olup
   İngilizce'de olmayan bir key'de ve ICU argümanları iki dosya arasında farklılaşan bir mesajda

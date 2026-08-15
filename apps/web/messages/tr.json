@@ -139,10 +139,10 @@
         "cancel": "Vazgeç",
         "memberMenu": "{name} için işlemler",
         "roles": {
-          "OWNER": "Owner",
-          "ADMIN": "Admin",
-          "MEMBER": "Member",
-          "GUEST": "Guest"
+          "OWNER": "Sahip",
+          "ADMIN": "Yönetici",
+          "MEMBER": "Üye",
+          "GUEST": "Misafir"
         },
         "roleHints": {
           "OWNER": "Workspace'i silmek dahil her şey.",
@@ -159,7 +159,7 @@
         "inviteNotDelivered": "Davet oluşturuldu ama {email} adresine e-posta gitmedi. Bağlantıyı kopyala ile kendiniz iletin.",
         "inviteError": "Davet gönderilemedi.",
         "inviteErrorAddress": "Bu adres davet edilemez. Adresi kontrol edin ya da hâlihazırda kullandıkları adresle giriş yapmalarını isteyin.",
-        "inviteErrorForbidden": "Kişi davet etmek için admin erişimine ihtiyacınız var. Bir workspace owner'ından isteyin.",
+        "inviteErrorForbidden": "Kişi davet etmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.",
         "inviteErrorConflict": "Siz doldururken birisi bu daveti değiştirdi. Tekrar gönderin.",
         "inviteErrorTooMany": "Bir seferde çok fazla davet. Bir dakika bekleyip kalanını gönderin.",
         "pendingTitle": "Kabul edilmeyi bekleyenler",
@@ -175,27 +175,27 @@
         "revokeBody": "{email}, kendisine gönderilen bağlantıyla katılamayacak. Daha sonra tekrar davet edebilirsiniz.",
         "revokeError": "Davet geri çekilemedi.",
         "revokeErrorGone": "O davet zaten yok.",
-        "revokeErrorForbidden": "Davetleri geri çekmek için admin erişimine ihtiyacınız var. Bir workspace owner'ından isteyin.",
+        "revokeErrorForbidden": "Davetleri geri çekmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.",
         "changeRoleAction": "Rolü değiştir",
         "changeRoleTitle": "Rolü değiştir",
         "changeRoleSubmit": "Rolü değiştir",
         "changeRoleError": "Rol değiştirilemedi.",
-        "changeRoleErrorForbidden": "Sahipliği yalnızca bir owner değiştirebilir. Bir workspace owner'ından isteyin.",
-        "changeRoleErrorLastOwner": "Tek owner bu. Önce başka birini owner yapın.",
+        "changeRoleErrorForbidden": "Sahipliği yalnızca workspace sahibi değiştirebilir. Bir workspace sahibinden isteyin.",
+        "changeRoleErrorLastOwner": "Tek sahip bu. Önce başka birini sahip yapın.",
         "changeRoleErrorGone": "Bu kişi artık bu workspace'te değil.",
         "removeAction": "Workspace'ten çıkar",
         "removeTitle": "{name} çıkarılsın mı?",
         "removeBody": "Bu workspace'teki her board'a erişimini anında kaybeder. Yazdığı task ve yorumlar kalır.",
         "removeError": "Bu kişi çıkarılamadı.",
-        "removeErrorForbidden": "Bir owner'ı yalnızca başka bir owner çıkarabilir. Bir workspace owner'ından isteyin.",
-        "removeErrorLastOwner": "Tek owner bu. Önce başka birini owner yapın.",
+        "removeErrorForbidden": "Bir sahibi yalnızca başka bir sahip çıkarabilir. Bir workspace sahibinden isteyin.",
+        "removeErrorLastOwner": "Tek sahip bu. Önce başka birini sahip yapın.",
         "removeErrorGone": "Bu kişi artık bu workspace'te değil.",
         "leaveAction": "Workspace'ten ayrıl",
         "leaveTitle": "Bu workspace'ten ayrıl?",
-        "leaveBody": "İçindeki her board'u kaybedersiniz. Sizi bir owner ya da admin yeniden davet etmeli.",
+        "leaveBody": "İçindeki her board'u kaybedersiniz. Sizi bir sahip ya da yönetici yeniden davet etmeli.",
         "leaveDone": "Workspace'ten ayrıldınız",
         "leaveError": "Bu workspace'ten çıkarılamadınız.",
-        "leaveErrorLastOwner": "Tek owner sizsiniz. Önce başka birini owner yapın ya da workspace'i silin."
+        "leaveErrorLastOwner": "Tek sahip sizsiniz. Önce başka birini sahip yapın ya da workspace'i silin."
       },
       "workspace": {
         "title": "Workspace",
@@ -205,7 +205,7 @@
         "renameAction": "Yeniden adlandır",
         "renameTitle": "Workspace'i yeniden adlandır",
         "renameError": "Bu workspace yeniden adlandırılamadı.",
-        "renameErrorForbidden": "Workspace'i yeniden adlandırmak için admin erişimine ihtiyacınız var. Bir workspace owner'ından isteyin.",
+        "renameErrorForbidden": "Workspace'i yeniden adlandırmak için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.",
         "renameErrorGone": "Bu workspace artık yok.",
         "deleteSectionTitle": "Bu workspace'i sil",
         "deleteSectionBody": "İçindeki her board'u, task'ı ve yorumu siler. Bu geri alınamaz.",
@@ -215,7 +215,7 @@
         "deleteConfirmLabel": "Onaylamak için {name} yazın",
         "deleteDone": "{name} silindi",
         "deleteError": "Bu workspace silinemedi.",
-        "deleteErrorForbidden": "Bu workspace'i yalnızca bir owner silebilir. Bir workspace owner'ından isteyin.",
+        "deleteErrorForbidden": "Bu workspace'i yalnızca bir sahip silebilir. Bir workspace sahibinden isteyin.",
         "deleteErrorGone": "Bu workspace artık yok."
       },
       "activation": {
@@ -315,7 +315,7 @@
         "submit": "Board'u içe aktar",
         "cancel": "Vazgeç",
         "error": "İçe aktarma başarısız oldu, hiçbir şey oluşturulmadı.",
-        "forbidden": "Board içe aktarmak için admin erişimine ihtiyacınız var. Bir workspace owner'ından isteyin.",
+        "forbidden": "Board içe aktarmak için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.",
         "tooLarge": "Bu export, bu instance'ın kabul ettiğinden büyük.",
         "badFile": "Bu dosya bir Trello board export'u değil.",
         "tooMany": "Arka arkaya çok fazla içe aktarma. Bir dakika bekleyip tekrar deneyin.",
@@ -364,7 +364,7 @@
         "dragCancelled": "Birisi bu task'ı taşıdı"
       },
       "errors": {
-        "forbiddenDelete": "Board silmek için admin erişimine ihtiyacınız var. Bir workspace owner'ından isteyin."
+        "forbiddenDelete": "Board silmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin."
       },
       "column": {
         "name": "Ad",
@@ -402,7 +402,7 @@
         "retryAction": "Tekrar dene",
         "emptyDrop": "Bir task'ı buraya bırakın",
         "cancel": "Vazgeç",
-        "forbidden": "Column'ları değiştirmek için admin erişimine ihtiyacınız var. Bir workspace owner'ından isteyin."
+        "forbidden": "Column'ları değiştirmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin."
       },
       "filter": {
         "searchLabel": "Task ara",
@@ -456,7 +456,7 @@
         "createLabel": "Label oluştur",
         "deleteLabel": "Sil",
         "labelDeleted": "Label bu board'dan silindi",
-        "labelForbidden": "Board label'larını yönetmek için admin erişimine ihtiyacınız var. Bir workspace owner'ından isteyin.",
+        "labelForbidden": "Board label'larını yönetmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.",
         "labelSaveError": "Label'lar güncellenemedi.",
         "labelDeleteError": "Bu label silinemedi.",
         "checklist": {
@@ -473,7 +473,7 @@
           "progress": "Checklist: {total} item'ın {done} tanesi bitti",
           "complete": "Checklist tamamlandı: {total} item'ın hepsi bitti",
           "saveError": "Bu checklist kaydedilemedi.",
-          "forbidden": "Bu task'ı değiştirme erişiminiz yok. Bir workspace admin'inden isteyin."
+          "forbidden": "Bu task'ı değiştirme erişiminiz yok. Bir workspace yöneticisinden isteyin."
         },
         "attachments": {
           "sectionLabel": "Ekler",
@@ -494,7 +494,7 @@
           "tooLarge": "Bu dosya, bu instance'ın kabul ettiğinden büyük.",
           "wrongType": "Bu dosya türü kabul edilmiyor.",
           "saveError": "Bu eklenemedi.",
-          "forbidden": "Bu task'ı değiştirme erişiminiz yok. Bir workspace admin'inden isteyin."
+          "forbidden": "Bu task'ı değiştirme erişiminiz yok. Bir workspace yöneticisinden isteyin."
         },
         "comments": "Yorumlar",
         "noComments": "Henüz yorum yok",
@@ -555,7 +555,7 @@
         "moveError": "Bu task taşınamadı.",
         "retryAction": "Tekrar dene",
         "cancel": "Vazgeç",
-        "forbidden": "Task'ları değiştirmek için workspace üyesi olmanız gerekir. Erişim için bir workspace owner'ından isteyin."
+        "forbidden": "Task'ları değiştirmek için workspace üyesi olmanız gerekir. Erişim için bir workspace sahibinden isteyin."
       }
     },
     "notifications": {

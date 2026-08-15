@@ -128,6 +128,10 @@ There is no `[locale]` path segment and no i18n middleware. Alongside that:
   transactional emails are now written in the recipient's language. English stays canonical:
   `en.json` is still the file a new string is added to, and the one the Turkish catalogue is
   measured against.
+- **Role names are translated in the interface (`Sahip / Yönetici / Üye / Misafir`) and left in
+  English in `docs/tr/**` (`owner'ından`, `admin'e`) — a deliberate split, not drift.** The docs
+  are talking about the `OWNER`/`ADMIN` enum values and the `@kurultay/auth-access` role
+  identifiers, which are never translated; the badge is a word a person reads.
 - **"100% translated" is a gate, not a claim.** `apps/web/messages/catalog.test.ts` fails the
   build on a key `en.json` has and another catalogue does not, on a key another catalogue has
   and English does not, and on a message whose ICU arguments differ between the two. It reads

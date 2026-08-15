@@ -44,9 +44,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   **For translators.** The Turkish keeps the domain nouns this project's own Turkish
   documentation keeps — `board`, `task`, `column`, `label`, `workspace`, `checklist` — and
   inflects them with an apostrophe (`board'a dön`), while translating everything with a settled
-  Turkish word (`kart`, `yorum`, `üye`, `davet`, `bildirim`). Adding a third language needs no
-  new mechanism: a catalogue file, one row in `SEED_COLUMN_NAMES` and one in `MAIL_COPY`, both
-  `Record<Locale, …>` and both compile errors until they exist.
+  Turkish word (`kart`, `yorum`, `davet`, `bildirim`). The four workspace roles are translated
+  too — `Sahip / Yönetici / Üye / Misafir` — in the badge and in all 17 sentences that name a
+  role inline, where they take Turkish case suffixes rather than the apostrophe form
+  (`Bir workspace sahibinden isteyin`). The `OWNER`/`ADMIN`/`MEMBER`/`GUEST` enum values, the
+  `@kurultay/auth-access` identifiers and the API contract are untouched; only what a person
+  reads changed. Adding a third language needs no new mechanism: a catalogue file, one row in
+  `SEED_COLUMN_NAMES` and one in `MAIL_COPY`, both `Record<Locale, …>` and both compile errors
+  until they exist.
 
 - **Task attachments — files and links on a card.** A task now carries attachments of two
   kinds, and the schema says which: a `FILE` has stored bytes, a sniffed media type and a size;
