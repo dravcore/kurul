@@ -37,6 +37,19 @@ describe('Instance config (e2e)', () => {
   });
 
   /**
+   * Same contract-shaped assertion as `mailEnabled`, for the same reason: a run whose
+   * `STORAGE_PATH` happens to be set would fail a hard `false`. What is pinned is that the
+   * capability is published at all — the web decides whether to render the upload control
+   * from this field, and a missing one reads as "attachments are off" on an instance where
+   * they work.
+   */
+  it('publishes an attachmentsEnabled boolean beside it', async () => {
+    const response = await owner.agent.get('/config').expect(200);
+
+    expect(typeof response.body.attachmentsEnabled).toBe('boolean');
+  });
+
+  /**
    * The deliberate difference from `/health`, which is `@Public()` and `@SkipRateLimit()`.
    * Deployment configuration is not probe output, and the only client that needs it is behind
    * sign-in — see the reasoning on `InstanceConfigController`.

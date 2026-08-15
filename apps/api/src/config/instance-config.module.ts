@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MailModule } from '../mail/mail.module';
+import { StorageModule } from '../storage/storage.module';
 import { InstanceConfigController } from './instance-config.controller';
 
 /**
@@ -12,7 +13,7 @@ import { InstanceConfigController } from './instance-config.controller';
  * can be read against `InstanceConfigDto`.
  */
 @Module({
-  imports: [MailModule],
+  imports: [MailModule, StorageModule],
   controllers: [InstanceConfigController],
 })
 export class InstanceConfigModule {}
