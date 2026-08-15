@@ -98,22 +98,23 @@ buna bağlıdır.
 **Mevcut vs planlanan:** Faz 9 sonrası `realtime` dahil özellik modülleri uygulanmıştır.
 Aşağıdaki tabloyu modül haritası olarak okuyun.
 
-| Modül          | Sorumluluk                                                                |
-| -------------- | ------------------------------------------------------------------------- |
-| `auth`         | Better Auth entegrasyonu, session yönetimi, request user çözümlemesi      |
-| `workspace`    | Workspace CRUD, üyelik, davetler, rol'ler                                 |
-| `board`        | Board ve column yönetimi, column sıralaması                               |
-| `task`         | Task CRUD, column'lar arası taşıma, fractional-index ile yeniden sıralama |
-| `label`        | Board-scoped label'lar ve task-label ataması                              |
-| `comment`      | Task yorumları                                                            |
-| `attachment`   | Task'taki dosya ve bağlantılar: yükleme, listeleme, indirme akışı, silme  |
-| `activity`     | Yalnızca-ekleme (append-only) aktivite log'u (`payload` Json)             |
-| `dashboard`    | Grafikleri besleyen agregasyon sorguları                                  |
-| `notification` | Bildirim dağıtımı, Redis destekli kuyruk                                  |
-| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                            |
-| `retention`    | Gecelik veri saklama süpürmesi; controller yok, dışa açılan provider yok  |
-| `mail`         | SMTP gönderimi (`nodemailer`); yapılandırılmamışsa gönderim yerine loglar |
-| `locale`       | Saklanan arayüz dili: `User.locale` okur/yazar, istek için çözümler       |
+| Modül          | Sorumluluk                                                                   |
+| -------------- | ---------------------------------------------------------------------------- |
+| `auth`         | Better Auth entegrasyonu, session yönetimi, request user çözümlemesi         |
+| `workspace`    | Workspace CRUD, üyelik, davetler, rol'ler                                    |
+| `board`        | Board ve column yönetimi, column sıralaması                                  |
+| `task`         | Task CRUD, column'lar arası taşıma, fractional-index ile yeniden sıralama    |
+| `label`        | Board-scoped label'lar ve task-label ataması                                 |
+| `comment`      | Task yorumları                                                               |
+| `attachment`   | Task'taki dosya ve bağlantılar: yükleme, listeleme, indirme akışı, silme     |
+| `import`       | Tek yönlü Trello board import'u: export'u oku, satırları planla, bir kez yaz |
+| `activity`     | Yalnızca-ekleme (append-only) aktivite log'u (`payload` Json)                |
+| `dashboard`    | Grafikleri besleyen agregasyon sorguları                                     |
+| `notification` | Bildirim dağıtımı, Redis destekli kuyruk                                     |
+| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                               |
+| `retention`    | Gecelik veri saklama süpürmesi; controller yok, dışa açılan provider yok     |
+| `mail`         | SMTP gönderimi (`nodemailer`); yapılandırılmamışsa gönderim yerine loglar    |
+| `locale`       | Saklanan arayüz dili: `User.locale` okur/yazar, istek için çözümler          |
 
 Cross-cutting altyapı:
 
@@ -135,6 +136,19 @@ siler ([ADR 0020](decisions/0020-data-retention.md)). `REDIS_URL` boşsa ikisi d
 ilki için desteklenen tek-instance yapılandırması, ikincisi için kapatılmış bir saklama
 politikasıdır. İkisi de [§8](#8-runtime-evrimi)'in 2. aşamasında ayrılan `worker` rolüdür;
 API'de bir isteğin dışında koşan başka hiçbir şey yok.
+
+**`import`, diğer bütün yazma modüllerinin tersi bir biçimde kurulmuş, bilinçli olarak.** Bütün
+karar verme işi iki saf fonksiyonda: ham JSON'u bu kodun anladığı bir şekle daraltan bir okuyucu
+(`trello-export.ts`) ve onu yazılacak tam satırlara artı reddettiklerinin raporuna çeviren bir
+planlayıcı (`trello-import-planner.ts`). İkisi de veritabanına dokunmaz. Servis sonra içinde hiç
+dal olmayan **tek** bir transaction açar: ona ulaşan her satırın yazılabilir olduğu zaten
+bilinmektedir. Board'u atomik, kapsamını kısmi yapan şey budur; bozuk bir export'un `400`'e mal
+olup hiçbir şey yazmamasının sebebi de. Modül **tek bir tablo ve tek bir kolon eklemiyor** —
+import, `Board`, `Column`, `Task`, `Label`, `Checklist`, `ChecklistItem` ve `Attachment`'ı zaten
+oldukları hâlleriyle kullanıyor — ve `attachment`'ınkini paylaşmak yerine kendi `MulterModule`'ünü
+taşıyor, çünkü iki tavan farklı kaynakları ölçüyor ve import hiç bayt saklamadığı için
+`STORAGE_PATH`'siz bir instance'ta da çalışıyor
+([ADR 0025](decisions/0025-trello-import-mapping.md)).
 
 `retention`, `notification` içinde bir provider yerine kendi modülüdür: tasarım gereği modül ve
 tenant sınırlarının ötesinde silen tek bileşen o — `Session`, `Verification`, `Notification` ve

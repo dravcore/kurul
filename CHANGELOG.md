@@ -83,6 +83,65 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   task-shaped child with its own board column, position and assignee — remain out of scope:
   ADR 0023 treats that as a different data model from a checklist item, not a deeper one.
 
+- **Trello board import, one-way.** A workspace admin uploads a Trello board's JSON export at
+  `POST /workspaces/:workspaceId/imports/trello` and gets a new board: lists become columns,
+  cards become tasks, labels fold onto the eight design-token colour slots, and Trello's
+  checklists arrive as checklists — one Kurultay list per Trello list, unflattened, which is the
+  shape [ADR 0023](docs/decisions/0023-checklist-data-model.md) chose in advance for exactly this
+  ([ADR 0025](docs/decisions/0025-trello-import-mapping.md)). The board list gains an "Import from
+  Trello" entry; the report comes back in the response and is rendered as a panel that stays until
+  it is dismissed.
+
+  **It is not idempotent, and that is a decision rather than a gap.** Importing the same export
+  twice creates **two boards** — there is no dedupe key, no update-in-place and no "already
+  imported" answer, because updating an existing board is synchronisation rather than import and
+  needs a conflict policy, a deletion policy and a direction. The dialog says so before the upload
+  and a test pins the behaviour, so anyone who adds deduplication has to read the record first.
+
+  **Four things deliberately do not come across, and the report counts every one of them rather
+  than dropping them silently.** *Files*: a Trello export carries attachment URLs, not bytes, so
+  every attachment becomes a `LINK` row — and the server never requests those URLs, the same SSRF
+  rule the attachment feature already follows. *Members*: a Trello account is not a Kurultay
+  account, so assignments are dropped and every row written — tasks and attachments alike — is
+  attributed to the person who ran the import. *Comments*: out of scope for this pass. *Archived
+  lists and cards*: Kurultay has no archive, and importing what a user deliberately filed away
+  would be the wrong default. Alongside them the report also carries what came across *changed*:
+  **every imported column arrives `UNSTARTED`**, because [ADR 0019](docs/decisions/0019-column-category.md)
+  refuses to infer completion from a column's name or its position and a Trello list carries
+  neither — so the panel says how many columns are waiting and links to where they are set. On an
+  imported board no column means "done" until someone says so, which means the dashboard's
+  completion figures read zero until then.
+
+  **The write is atomic; the coverage is partial.** Reading and mapping happen in two pure
+  functions before the transaction opens, so a malformed export costs a `400` and writes nothing —
+  there is no half-imported board, and no "skip this one and carry on" inside the transaction. The
+  report is the body of the `201` and **is not stored anywhere**: no `ImportRun` table, no status
+  endpoint, no way to ask for it again. Dismissing the panel is permanent; the board is unaffected.
+  One activity row is written per import (`board.imported`, new in `AUDIT_ACTIVITY_TYPES`), not one
+  per card, and no socket event is emitted at all — a new board's room has nobody in it yet.
+
+  **Operators: one new variable.** `TRELLO_IMPORT_MAX_BYTES` (default `20971520`, 20 MiB) is the
+  largest export the importer will accept. It is a **memory** ceiling rather than a disk one — the
+  body is buffered and `JSON.parse`d and the parsed graph is a multiple of the bytes — which is why
+  it is a separate number from `ATTACHMENT_MAX_BYTES` and not derived from it, and why raising it
+  raises peak heap by a multiple of the change. It must stay below the reverse proxy's body limit;
+  `two-layer-limit.spec.ts` fails the build if it stops doing so. Import needs no `STORAGE_PATH`:
+  it stores no bytes. The endpoint is admin-only (creating columns is, so creating a board *and*
+  its columns in one request is too) and rate-limited to **3 requests a minute**, well under the
+  upload budget because one request costs a 20 MiB parse plus the longest-lived write transaction
+  in this API.
+
+  **What was measured, and what was not.** A generated 500-card export imported in a **median of
+  572.9 ms and a p95 of 655.8 ms** over five runs on an Apple M3 Max, against a local API and
+  Postgres over loopback — no reverse proxy, no container, no network between the client and the
+  API. That is comfortably inside the two-minute budget the roadmap asked for, but it is a floor
+  rather than a prediction for a real deployment. Schema conformance is the part that was **not**
+  measured: no real Trello export was available, so every fixture is synthetic and nothing here is
+  evidence about Trello's actual export format, whose schema has no version field and no
+  changelog. The reader is written for that — an unrecognised field is counted into the report
+  instead of failing the import — but the first genuine export remains the most likely place for
+  it to break.
+
 - **An activation funnel you can read about your own instance, and telemetry that is off.**
   Kurultay measured nothing about its own use — a grep for `telemetry`, `analytics`, `posthog`,
   `plausible` or `umami` across `apps/` and `docs/` returned zero matches in source — so where
@@ -142,13 +201,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   notification opening **the task it refers to**. These four were the largest single gap in the
   project's testing: the unit suites and the API integration suite all pass against a board
   that never renders, and until now nothing exercised drag-and-drop, Socket.io, mail delivery
-  or notification navigation in a browser at all. Scope is capped at four on purpose, and the run
-  is capped at five minutes by `globalTimeout` — this suite exists to notice when the *stack*
-  comes apart, not to re-check the layers below it. Setup is done over HTTP and only the
+  or notification navigation in a browser at all. Two more scenarios arrived later in this same
+  release, each with the feature it covers — an attachment uploaded and downloaded back, and a
+  Trello export imported from a real file picker — bringing the suite to **six**. Scope is capped
+  on purpose and the run is capped at five minutes by `globalTimeout` — this suite exists to notice
+  when the *stack* comes apart, not to re-check the layers below it. Setup is done over HTTP and only the
   behaviour under test is clicked; there are no `data-testid` attributes (columns are
   `<section aria-label>`, cards carry `aria-label="Reorder <title>"` on their grip), no fixed
-  waits, and no retries — including in CI. Each scenario was verified by breaking the thing it
-  protects and confirming it goes red. It runs in its own workflow
+  waits, and no retries — including in CI. Each of the original four was verified by breaking the
+  thing it protects and confirming it goes red; the two added since carry the same guarantee in a
+  cheaper form, asserting the absence before the presence in every case. It runs in its own workflow
   (`.github/workflows/e2e.yml`) nightly and on pull requests into `main` — i.e. before every
   release and hotfix — deliberately **outside** the required `ci-ok` gate, so an infrastructure
   hiccup in a full-stack browser run can never block every merge in the repository. The suite
@@ -161,7 +223,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   documented as such. Run
   it with `pnpm test:browser`. Closes audit finding QA-01
   ([#129](https://github.com/dravcore/kurultay/issues/129)); `docs/testing.md` (EN + TR) now
-  names these four flows as the concrete definition of the "critical flows later" it had been
+  names these flows as the concrete definition of the "critical flows later" it had been
   reserving Playwright for.
 - **One image, any domain — and a one-page guide for putting it on yours.** The published
   `web` image no longer has a deployment's API URL compiled into it, so

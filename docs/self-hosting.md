@@ -87,6 +87,18 @@ may want to change is `ATTACHMENT_MAX_BYTES` (default `26214400`, 25 MiB), and i
 [the proxy contract below](#bringing-your-own-reverse-proxy) first: the reverse proxy carries a
 separate, deliberately higher ceiling that has to move with it.
 
+**Trello import needs no line here either.** `TRELLO_IMPORT_MAX_BYTES` (default `20971520`,
+20 MiB) is the largest board export the importer will accept, and the bundled Compose file
+already passes it. Three things about it are worth knowing before you touch it. It is a
+**memory** ceiling, not a disk one: the upload is buffered and then `JSON.parse`d, and the parsed
+object graph is a multiple of the bytes that produced it — so raising this raises the API's peak
+heap by a multiple of the difference, not by the difference. It is **unrelated to
+`ATTACHMENT_MAX_BYTES`**, which is why it is a second variable rather than a reuse of the first.
+And it must stay **below the proxy's body limit** (26 MiB in the bundled `docker/Caddyfile`) with
+room for the multipart envelope, for exactly the reason the attachment limit does — see
+[the proxy contract below](#bringing-your-own-reverse-proxy). Importing works on an instance with
+no `STORAGE_PATH` at all: an import creates link attachments, which store no bytes.
+
 ## 3. Start it
 
 ```bash
@@ -304,6 +316,15 @@ The rule the two layers actually follow is an ordering, not an equality:
 > absurd bodies before anything buffers them. The exact file limit belongs to the API — the only
 > layer that can answer with _which_ file was too big.
 
+**A second body crosses the same proxy: the Trello import.** `TRELLO_IMPORT_MAX_BYTES` (20 MiB)
+sits under the same ordering rule and under the same 26 MiB proxy ceiling, with more headroom
+because it is a smaller number. The relationship checked between the two is an **inequality**, not
+the equality-plus-envelope the attachment limit is held to — the import limit only has to stay
+below the proxy's, not track it — so raising `TRELLO_IMPORT_MAX_BYTES` past the proxy's number
+gives you an import the proxy kills with an empty-bodied `413` the API never sees.
+`apps/api/src/storage/two-layer-limit.spec.ts` fails the build if either relationship stops
+holding.
+
 So: raise `ATTACHMENT_MAX_BYTES` and you must raise the proxy's number to stay above it (1 MiB
 of headroom is what the bundled config ships and is ~1860x the largest envelope measured).
 Lower the proxy's below the API's and every upload near the limit fails with a `413` the API
@@ -332,6 +353,11 @@ The third row is a different limit that happens to share the status code: `REQUE
 (default `1048576`, 1 MiB) caps the **JSON and form-encoded** bodies every other endpoint takes,
 and no attachment ever passes through it. If you see it, nothing about your storage or your proxy
 is misconfigured — some request simply sent more JSON than the API accepts.
+
+There is a fourth, and only one endpoint can produce it: a `413` on
+`POST /workspaces/…/imports/trello` is `TRELLO_IMPORT_MAX_BYTES` (20 MiB), not any of the three
+above. The route in the response envelope's `path` is what tells it apart. If a user hits it on an
+export **under** 20 MiB, the proxy cut the body first and the ceiling to look at is the proxy's.
 
 The headers do not help — Caddy's `413` carries no `Server` header, so only the body
 distinguishes them. Everything the API itself rejects comes back as

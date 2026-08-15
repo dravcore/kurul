@@ -27,7 +27,7 @@ pragmatik** kalır:
   test edin. Bu aşamada yakalanmaya değer çoğu bug TypeScript'te değil, sorguda yaşıyor.
 - Bir coverage sayısının peşinden **koşmayın**. Yalnızca implementasyonu yeniden ifade eden
   testler yazmayın.
-- Browser e2e **dört akışı kapsar, bilinçli olarak daha fazlasını değil** — stack'in ya
+- Browser e2e **altı akışı kapsar, bilinçli olarak daha fazlasını değil** — stack'in ya
   tuttuğu ya da tutmadığı akışlar. Bkz. [Browser uçtan uca](#browser-uçtan-uca).
 
 Bir testin maliyeti onu yazmak değildir — her refactor boyunca onu bakımda tutmaktır.
@@ -39,10 +39,10 @@ Testler, bu maliyetin gerçek güven satın aldığı yerlerde yazılır.
 | --------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Servisler, guard'lar, saf fonksiyonlar, board/izin logic'i, DnD hook'ları. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu                              |
 | **Integration** | Jest + Supertest                       | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden)       | Her endpoint için zorunlu                            |
-| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | Dört senaryo (`e2e/`) — her gece ve her sürüm öncesi |
+| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | Altı senaryo (`e2e/`) — her gece ve her sürüm öncesi |
 
 ```
-        /\        e2e — dört kritik akış (Playwright, gerçek Chromium)
+        /\        e2e — altı kritik akış (Playwright, gerçek Chromium)
        /  \
       /────\      integration — her endpoint (Supertest + gerçek Postgres)
      /      \
@@ -53,7 +53,7 @@ Tam component-tree render testleri MVP'nin parçası değil. Web unit testleri s
 (`lib/*.test.ts` — izinler, position matematiği, mention'lar, query parametreleri) ve board
 drag-and-drop hook'unu izole şekilde kapsar; geri kalan her şey için yapılan takas tip
 güvenliği artı API'nin integration coverage'ı; board'un kendi davranışını ise parça parça
-component testleri değil, aşağıdaki dört browser senaryosu uçtan uca kapsar.
+component testleri değil, aşağıdaki altı browser senaryosu uçtan uca kapsar.
 
 ## Neler test edilmeli
 
@@ -112,18 +112,23 @@ ve **bir kez bile gerçek bir tarayıcıda değil**. İki suite de hiç render o
 ile yeşil kalır.
 
 Suite [`e2e/`](../../e2e) altında yaşar, derlenmiş bir API ve production web build'i
-üzerinde gerçek bir Chromium koşturur, ve tam olarak dört senaryodur.
+üzerinde gerçek bir Chromium koşturur, ve tam olarak altı senaryodur. Dört senaryoyla başladı ve
+yalnızca stack seviyesindeki bağlantısına başka hiçbir şeyin ulaşamadığı özelliklerle büyüdü —
+gerçek bir tarayıcıdan gelen gerçek bir multipart yükleme, ve importer'ı besleyen gerçek bir dosya
+seçici.
 
-### Dört senaryo
+### Altı senaryo
 
-| Senaryo                                                               | Dosya                                  | Tek başına neyi kapsar                                                                                                                              |
-| --------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Giriş → board aç → kart sürükle → **reload sonrası hâlâ yeni sırada** | `tests/board-drag-persistence.spec.ts` | Tarayıcıdaki pointer hareketinin move isteğini gerçekten üretmesi ve board'un yazdığını geri okuması                                                |
-| Bir tarayıcıdaki taşıma **ikinci tarayıcıda** reload olmadan görünür  | `tests/board-realtime.spec.ts`         | Socket.io handshake auth'u, board-room üyeliği, ve client'ın yalnızca id taşıyan payload'ı uygulaması                                               |
-| Ayarlar'dan davet → **Mailpit'te postayı oku** → linkten kabul et     | `tests/invitation.spec.ts`             | Davet postasının gönderildiği ve çalışan bir link taşıdığı — `acceptUrl` `WEB_URL`'den üretilir, API'nin kendi testleri DTO'ya bakar, gövdeye değil |
-| Bildirime tıkla → **doğru task açılır**                               | `tests/notification.spec.ts`           | Bildirimde `taskId` var ama `boardId` yok; board'u web ikinci bir istekle, tarayıcıda, alıcının session'ıyla çözer                                  |
+| Senaryo                                                               | Dosya                                  | Tek başına neyi kapsar                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Giriş → board aç → kart sürükle → **reload sonrası hâlâ yeni sırada** | `tests/board-drag-persistence.spec.ts` | Tarayıcıdaki pointer hareketinin move isteğini gerçekten üretmesi ve board'un yazdığını geri okuması                                                                                                                                       |
+| Bir tarayıcıdaki taşıma **ikinci tarayıcıda** reload olmadan görünür  | `tests/board-realtime.spec.ts`         | Socket.io handshake auth'u, board-room üyeliği, ve client'ın yalnızca id taşıyan payload'ı uygulaması                                                                                                                                      |
+| Ayarlar'dan davet → **Mailpit'te postayı oku** → linkten kabul et     | `tests/invitation.spec.ts`             | Davet postasının gönderildiği ve çalışan bir link taşıdığı — `acceptUrl` `WEB_URL`'den üretilir, API'nin kendi testleri DTO'ya bakar, gövdeye değil                                                                                        |
+| Bildirime tıkla → **doğru task açılır**                               | `tests/notification.spec.ts`           | Bildirimde `taskId` var ama `boardId` yok; board'u web ikinci bir istekle, tarayıcıda, alıcının session'ıyla çözer                                                                                                                         |
+| Karta dosya yükle → **geri indir ve baytları karşılaştır**            | `tests/task-attachment.spec.ts`        | API suite'inin değil, Chromium'un yazdığı bir multipart gövde; ASCII olmayan bir dosya adının hem yükleme kodlamasından hem `Content-Disposition`'dan sağ çıkması; board kartındaki sayaç rozeti — panelinkinden farklı bir sorgudan gelir |
+| Dosya seçiciden Trello export'u import et → **raporu ekranda oku**    | `tests/board-import.spec.ts`           | API'nin kendisi hiç üretmediği boundary'yi üreten gerçek bir `<input type="file">`, ve import raporunun ekrana ulaşması — rapor yalnız `201`'in gövdesinde vardır, dolayısıyla onu düşüren bir panel tek kopyayı düşürür                   |
 
-Bu dördünün dışındaki her şey unit ya da integration testine aittir. Buraya eklenen her test,
+Bu altısının dışındaki her şey unit ya da integration testine aittir. Buraya eklenen her test,
 bir UI refactor'ü boyunca yeşil tutulacak bir şey daha demektir; bu suite alt katmanların
 zaten kapsadığını tekrar kontrol etmek için değil, **stack** dağıldığında bunu fark etmek
 için vardır.
@@ -131,12 +136,12 @@ için vardır.
 ### Çalıştırma
 
 Postgres **ve Mailpit** ayakta olmalı (`docker compose -f docker-compose.dev.yml up -d`);
-Mailpit olmadan dört senaryonun üçü adresini doğrulayamaz veya daveti okuyamaz. Redis
+Mailpit olmadan altı senaryonun üçü adresini doğrulayamaz veya daveti okuyamaz. Redis
 gerekmez — suite'in onsuz koşmasının nedeni için [İzolasyon](#i̇zolasyon) bölümüne bakın.
 
 ```bash
 pnpm --filter @kurultay/e2e browsers   # bir kez: Chromium'u indirir
-pnpm test:browser                      # stack'i build eder, sonra dördünü de koşar
+pnpm test:browser                      # stack'i build eder, sonra altısını da koşar
 ```
 
 `pnpm test:browser` önce `e2e/build-stack.mjs`'i çalıştırır — `shared-types`, `auth-access`,
@@ -191,7 +196,7 @@ içinde kapsanıyor.
 - **Kurulum HTTP üzerinden, davranış UI üzerinden.** Hesaplar, workspace'ler, board'lar ve
   kartlar API çağrılarıyla yaratılır; yalnızca test edilen davranış tıklanır. Kurulumu da
   tıklayarak yapmak her senaryoyu aynı zamanda kayıt ve workspace yaratma testine çevirirdi;
-  o zaman tek bir değişiklik dördünü birden kırar ve hiçbiri doğru bir şey söylemezdi.
+  o zaman tek bir değişiklik hepsini birden kırar ve hiçbiri doğru bir şey söylemezdi.
 - **`data-testid` yok.** Bu uygulamanın production kodunda bir tane bile yok ve suite de
   eklemiyor. Kolonlar `<section aria-label>`, kartların tutamağında
   `aria-label="Reorder <title>"` var — erişilebilir yüzey üzerinden assert etmek, ekran
@@ -211,10 +216,18 @@ içinde kapsanıyor.
 Geçen bir browser testi hakkında yanılmak alışılmadık ölçüde kolaydır: `await` edilmemiş bir
 assertion her zaman yeşildir, ve bir senaryo saklanan durum yerine sessizce optimistik UI'a
 assert ediyor olabilir. Bir senaryo bitmiş sayılmadan önce **koruduğu şeyi bozun ve kırmızıya
-dönmesini izleyin.** Dördü de tam olarak böyle kontrol edildi — position PATCH'i,
+dönmesini izleyin.** İlk dördü tam olarak böyle kontrol edildi — position PATCH'i,
 `task:moved` emit'i, davet postasındaki kabul linki ve bildirimin yönlendirme hedefindeki
-task segmenti sırayla kaldırıldı. Dördünün üçü son assertion'a kadar geçmeye devam etti;
+task segmenti sırayla kaldırıldı. O dördünün üçü son assertion'a kadar geçmeye devam etti;
 mesele de bu: o son assertion testin kendisidir.
+
+Sonradan eklenen iki senaryo aynı garantiyi ikinci bir biçimde taşıyor, çünkü onu sürdürmek daha
+ucuz: **her olumlu assertion, kendisinden önce gelen olumsuzuyla eşleştirilmiş durumda.** Ek
+listesinin boş durumu yüklemeden önce assert ediliyor ve kart rozeti var olduğu assert edilmeden
+önce yok olduğu assert ediliyor; board listesinin boş durumu import'tan önce assert ediliyor ve
+rapor bölgesi görünür olduğu assert edilmeden önce gizli olduğu assert ediliyor. Özellik tamamen
+sökülse bile geçmeye devam edecek bir senaryo, bu bölümün önlemek için var olduğu şeydir; bir
+yokluğu assert etmek de bunu olası değil, imkânsız kılar.
 
 ## Dosya konvansiyonları
 

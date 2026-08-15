@@ -123,6 +123,8 @@ GET    /workspaces/:workspaceId/notifications
 GET    /workspaces/:workspaceId/notifications/unread-count
 POST   /workspaces/:workspaceId/notifications/read-all
 POST   /workspaces/:workspaceId/notifications/:notificationId/read
+
+POST   /workspaces/:workspaceId/imports/trello   # multipart, `file` adında tek parça; yalnız admin
 ```
 
 Board ve column rol kapıları:
@@ -140,6 +142,12 @@ adreslenir — yukarıdaki sığ adresleme kuralı. Okumalar (liste, tekil, byte
 cascade, dolayısıyla küçük eylemi kapatıp büyüğünü açık bırakmak bir yetki kontrolü değil, bir
 UI tuzağı olurdu. Tipler, limitler ve servis politikası:
 [ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md).
+
+`imports/trello`, koleksiyon segmenti kimsenin okuyamayacağı tek route'tur: `GET /imports` yok,
+import id'si de yok — çünkü import, kendi satırı olan bir kaynak değil, arkasında bir board bırakan
+bir eylemdir. Yalnız admin'e açıktır ve API'nin toplu yazan tek ucudur; şekli, limitleri ve bilinçli
+olarak taşımadığı her şey
+[Trello board export'u içe aktarma](#trello-board-exportu-içe-aktarma) bölümünde.
 
 Davetler public API'de workspace-scoped'dır. Persistence Better Auth organization
 plugin'ine aittir (Faz 1'de Prisma `Invitation` modeli yok). Ürün isimleri
@@ -260,21 +268,21 @@ gerçekten operasyon olduğu yerde kullanılır (örneğin bir column'un tamamı
 sıralamak). Bir alanı atlayan bir `PATCH` onu dokunulmamış bırakır; açıkça `null` göndermek
 nullable bir alanı temizler.
 
-| Status                       | Ne zaman                                                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `200 OK`                     | Başarılı okuma, güncelleme veya aksiyon                                                                            |
-| `201 Created`                | Kaynak oluşturuldu; body oluşturulan kaynaktır                                                                     |
-| `204 No Content`             | Başarılı silme; boş body                                                                                           |
-| `400 Bad Request`            | Bozuk request veya validation hatası                                                                               |
-| `401 Unauthorized`           | Eksik veya geçersiz session                                                                                        |
-| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz                                                                        |
-| `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                      |
-| `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                        |
-| `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, ya da bir yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor                       |
-| `415 Unsupported Media Type` | Dosyanın **magic byte**'ları allowlist'te değil. Beyan edilen `Content-Type` ve uzantı kanıt sayılmaz, hiç okunmaz |
-| `422 Unprocessable Entity`   | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak)      |
-| `429 Too Many Requests`      | Rate limit uygulandı                                                                                               |
-| `500 Internal Server Error`  | Ele alınmamış hata. Asla bir stack trace sızdırmaz.                                                                |
+| Status                       | Ne zaman                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `200 OK`                     | Başarılı okuma, güncelleme veya aksiyon                                                                                              |
+| `201 Created`                | Kaynak oluşturuldu; body oluşturulan kaynaktır                                                                                       |
+| `204 No Content`             | Başarılı silme; boş body                                                                                                             |
+| `400 Bad Request`            | Bozuk request veya validation hatası                                                                                                 |
+| `401 Unauthorized`           | Eksik veya geçersiz session                                                                                                          |
+| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz                                                                                          |
+| `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                                        |
+| `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                                          |
+| `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, bir yükleme `ATTACHMENT_MAX_BYTES`'ı, ya da bir import `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor |
+| `415 Unsupported Media Type` | Dosyanın **magic byte**'ları allowlist'te değil. Beyan edilen `Content-Type` ve uzantı kanıt sayılmaz, hiç okunmaz                   |
+| `422 Unprocessable Entity`   | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak)                        |
+| `429 Too Many Requests`      | Rate limit uygulandı                                                                                                                 |
+| `500 Internal Server Error`  | Ele alınmamış hata. Asla bir stack trace sızdırmaz.                                                                                  |
 
 **Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
 doğrulardı, ki bu tenant sınırının ötesine bilgi sızdırır. `403`, rolü çok düşük meşru bir
@@ -344,9 +352,11 @@ Ve bu, bir boyut tavanı olduğu kadar bir **bellek** tavanıdır: body, herhang
 doğrulamadan önce heap'e parse edilir, yani N eşzamanlı istek N × bu değere kadar maliyet
 çıkarır. 1 MiB, bugün herhangi bir ucun meşru olarak aldığı en büyük body'nin yaklaşık iki
 mertebe üstündedir (hiçbir uç array body almıyor ve herhangi bir DTO'nun kabul ettiği en uzun tek
-alan 2048 karakter). Gerçekten daha fazlasına ihtiyaç duyan bir uç — örneğin bir board export'unu
-içe aktarmak — bu değişkeni bilinçli olarak yükseltir ve onu API'nin önündeki ters proxy'nin
-izin verdiği body boyutunun altında tutar.
+alan 2048 karakter). Gerçekten daha fazlasına ihtiyaç duyan bir uç bu değişkeni **yükseltmez** —
+yükseltmek zorunda kalacak olan tek uç Trello importer'ıydı ve o, bunun yerine gövdesini kendi
+tavanı altında `multipart/form-data` olarak alıyor (bkz.
+[Trello board export'u içe aktarma](#trello-board-exportu-içe-aktarma)). Bu sayıyı tek bir uca
+sığdırmak için yükseltmek, aynı bellek maliyetini diğer bütün uçlara dağıtmak demektir.
 
 ### Dosya yükleme ve indirme
 
@@ -403,6 +413,102 @@ dışında her şeyde `attachment`'tır — "her şey"e PDF de dahil. Böyle her
 olarak verdiği `cross-origin` politikasını override eder) ve
 `Cache-Control: private, max-age=0, must-revalidate` taşır. Bir `LINK`'in içeriğini istemek
 `404`'tür: byte yoktur, ve "tip yanlış" demek satırın var olduğunu doğrulardı.
+
+### Trello board export'u içe aktarma
+
+`POST /workspaces/:workspaceId/imports/trello`, bir Trello board'unun JSON export'unu alır ve
+ondan **yeni bir board** yaratır. API'nin toplu yazma yapan tek ucudur.
+
+| Özellik      | Değer                                                                              |
+| ------------ | ---------------------------------------------------------------------------------- |
+| Gövde        | `multipart/form-data`, **`file`** adında tek bir parça — başka parça yok, JSON yok |
+| Rol          | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                               |
+| Boyut tavanı | `TRELLO_IMPORT_MAX_BYTES` (varsayılan `20971520` — 20 MiB)                         |
+| Rate limit   | **3 / dk**, client IP başına                                                       |
+| Başarı       | `201` ve gövdede bir `TrelloImportReportDto`                                       |
+
+**JSON değil multipart, ve bu bir kolaylık değil bir karar.** Bir board export'u birkaç
+megabayttır, `REQUEST_BODY_MAX_BYTES` ise 1 MiB'dır; onu tek bir uç için yükseltmek aynı maliyeti
+API'nin bütün uçlarına dağıtırdı. Dolayısıyla export, bu modülün sahibi olduğu bir limitin altında
+bir dosya parçası olarak gelir. İki sayı farklı kaynakları ölçer — `TRELLO_IMPORT_MAX_BYTES` bir
+**heap** tavanıdır (baytlar belleğe alınır, `JSON.parse` edilir ve ayrıştırılmış grafik onları
+üreten baytların katıdır), `ATTACHMENT_MAX_BYTES` ise bir **disk** tavanıdır — ayrı değişken
+olmalarının ve hiçbirinin diğerinden türetilmemesinin sebebi budur. Import limiti ters proxy'nin
+gövde limitinin altında kalmak zorundadır; bu ilişkiyi bir test kapsıyor
+(`storage/two-layer-limit.spec.ts`) ve
+[self-hosting.md](self-hosting.md#kendi-reverse-proxynizi-kullanmak) açıklıyor.
+
+**`ADMIN_ROLES`, izin aritmetiğiyle.** Board yaratmak `CONTENT_ROLES`, ama _kolon_ yaratmak
+yalnızca admin'e açık — ve bir import ikisini birden yapıyor. Bir uç, çağıranın birkaç istekte
+yapamayacağı şeyi tek istekte yapmamalı.
+
+**Hatalar:**
+
+| Durum | Ne zaman                                                                                |
+| ----- | --------------------------------------------------------------------------------------- |
+| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil |
+| `403` | Workspace üyesi, ama rolü `ADMIN`'in altında                                            |
+| `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı     |
+| `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                        |
+| `429` | Bir dakikalık pencerede üçten fazla import                                              |
+
+Ayrıştırıcıya ulaşan tek hata `400`'dür ve **ulaştığında hiçbir şey yazılmaz**: export, transaction
+açılmadan önce baştan sona okunup eşlenir, yani reddedilen bir import workspace'i baytı baytına
+olduğu gibi bırakır.
+
+**Cevabın gövdesi raporun kendisidir ve hiçbir yerde saklanmaz.**
+
+```jsonc
+// POST /workspaces/w_1/imports/trello  → 201
+{
+  "boardId": "0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f",
+  "boardName": "Product Roadmap",
+  "imported": {
+    "columns": 4,
+    "tasks": 137,
+    "labels": 6,
+    "checklists": 21,
+    "checklistItems": 88,
+    "attachments": 12,
+  },
+  "skipped": [
+    { "scope": "column", "reason": "defaulted", "count": 4, "samples": ["Backlog", "Doing"] },
+    { "scope": "member", "reason": "unmappable", "count": 9, "samples": ["ayse", "bora"] },
+    { "scope": "comment", "reason": "outOfScope", "count": 412, "samples": [] },
+    { "scope": "card", "reason": "archived", "count": 57, "samples": ["Old spike"] },
+  ],
+}
+```
+
+`imported`, gerçekten yazılan satırları sayar. `skipped` ise geri kalan her şeyi `(scope, reason)`
+çiftine göre gruplar; `count` her zaman gerçek sayıdır, `samples` ise 20 isimle sınırlıdır — böylece
+cevap export'un boyutuyla değil, sorun **türlerinin** sayısıyla büyür. Sözlükler kapalıdır —
+`@kurultay/shared-types` içindeki `TrelloImportScope` ve `TrelloImportSkipReason` — çünkü web her
+sebep için çevrilmiş tek bir cümle basıyor ve serbest metin bir sebep, Türkçe bir arayüze İngilizce
+taşırdı (ADR 0018).
+
+**`defaulted`, bir atlama olmadığı hâlde atlama listesinde**, ve bu bilinçli: içe aktarılan bir
+kolon varsayılan kategoriyi alıyor, bilinmeyen bir Trello rengi de `slot-1`'e düşüyor. İkisi de
+kullanıcının göreceği bir şeyi değiştirdi, ve import sonrası sorulan soru "ne kaybettim" değil,
+"board'um neden farklı görünüyor".
+
+**Bu ucun yapmadıkları** — her biri
+[ADR 0025](decisions/0025-trello-import-mapping.md)'te kayıtlı birer karar:
+
+- **İdempotans yok.** Aynı export'u iki kez göndermek **iki board** yaratır. Tekilleştirme
+  anahtarı, yerinde güncelleme, "zaten aktarılmıştı" cevabı yok. Var olan bir board'u güncellemek
+  import değil senkronizasyondur ve bu API'de olmayan bir çakışma politikası ister.
+- **Üye eşlemesi yok.** Bir Trello hesabı bir Kurultay hesabı değildir; atamalar düşer ve sayılır.
+  Yazılan her satır — task'lar da attachment'lar da — çağıranın üzerine yazılır.
+- **Kolon kategorisi yok.** İçe aktarılan her kolon `UNSTARTED`; kategori ne list'in adından ne de
+  konumundan çıkarılır ([ADR 0019](decisions/0019-column-category.md) ikisini de reddediyor).
+  Rapor bunun kaç kolonu etkilediğini söyler, kategorileri sonrasında kullanıcı ayarlar.
+- **Dosya yok.** Trello export'u attachment'ların baytlarını değil URL'lerini taşır, dolayısıyla
+  her attachment bir `LINK` satırı olur — ve sunucu, attachment ucunun izlediği kuralın aynısıyla,
+  o URL'lere hiç istek atmaz.
+- **Yorum yok.** Kapsam dışı, ve sessizce düşürülmek yerine sayılıyor.
+- **Socket event'i yok.** Import, odasına henüz kimsenin katılmadığı bir board yaratır. Kart başına
+  değil, toplam **tek** bir activity satırı yazar: `board.imported`.
 
 ## Hatalar
 
@@ -538,22 +644,26 @@ istekler `X-RateLimit-Limit`, `X-RateLimit-Remaining` ve `X-RateLimit-Reset` ta�
 Bütçeler **client IP'si ve route başına**, kayan bir dakikalık pencerede sayılır — yoğun
 çalışan bir endpoint asla başka bir endpoint'in payını harcamaz.
 
-| Endpoint                                    | Bütçe    | Neden                                                                       |
-| ------------------------------------------- | -------- | --------------------------------------------------------------------------- |
-| Aşağıda sayılmayan her endpoint             | 100 / dk | Bir insanın üreteceğinin çok üstünde; script'i sınırlar                     |
-| `POST /workspaces/:workspaceId/invitations` | 10 / dk  | Her çağrı, adresini çağıranın seçtiği bir mesajı SMTP relay'ine verir       |
-| `GET .../boards/:boardId/tasks?q=`          | 30 / dk  | `q=` bir trigram taramasıdır; aynı route `q=` olmadan varsayılanda kalır    |
-| `POST .../tasks/:taskId/attachments`        | 20 / dk  | Tek bir isteğin `ATTACHMENT_MAX_BYTES` kadar diske mal olabildiği tek uç    |
-| `GET .../attachments/:attachmentId/content` | 300 / dk | Varsayılanın _üstünde_: on görsel ekli bir panel açılışta on istek üretir   |
-| `/auth/sign-in*`, `/auth/sign-up*`          | 3 / 10sn | Better Auth'un kimlik endpoint'leri için yerleşik kuralı                    |
-| Diğer `/auth/*`                             | 100 / dk | Better Auth'un kendi limiter'ı — `/auth/*` Nest router'ını atlar (ADR 0004) |
-| `GET /health`, `GET /health/ready`          | muaf     | Throttle edilen bir probe, sağlıklı bir API'yi çökmüş gösterir              |
+| Endpoint                                       | Bütçe    | Neden                                                                            |
+| ---------------------------------------------- | -------- | -------------------------------------------------------------------------------- |
+| Aşağıda sayılmayan her endpoint                | 100 / dk | Bir insanın üreteceğinin çok üstünde; script'i sınırlar                          |
+| `POST /workspaces/:workspaceId/invitations`    | 10 / dk  | Her çağrı, adresini çağıranın seçtiği bir mesajı SMTP relay'ine verir            |
+| `GET .../boards/:boardId/tasks?q=`             | 30 / dk  | `q=` bir trigram taramasıdır; aynı route `q=` olmadan varsayılanda kalır         |
+| `POST .../tasks/:taskId/attachments`           | 20 / dk  | Tek bir isteğin `ATTACHMENT_MAX_BYTES` kadar diske mal olabildiği tek uç         |
+| `POST /workspaces/:workspaceId/imports/trello` | 3 / dk   | Heap'e ayrıştırılan 20 MiB'lık gövde, ardından tek transaction'da binlerce satır |
+| `GET .../attachments/:attachmentId/content`    | 300 / dk | Varsayılanın _üstünde_: on görsel ekli bir panel açılışta on istek üretir        |
+| `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10sn | Better Auth'un kimlik endpoint'leri için yerleşik kuralı                         |
+| Diğer `/auth/*`                                | 100 / dk | Better Auth'un kendi limiter'ı — `/auth/*` Nest router'ını atlar (ADR 0004)      |
+| `GET /health`, `GET /health/ready`             | muaf     | Throttle edilen bir probe, sağlıklı bir API'yi çökmüş gösterir                   |
 
 **Yükleme bütçesi yeterliymiş gibi sunulmuyor, yetersiz diye adlandırılıyor.** Throttler IP
 başına, route başına istek sayar; bu bir yükleme için iki kez yanlış birimdir: yirmi 25 MiB'lık
 istek ile yirmi 10 kB'lık istek aynı bütçeyi harcar, ve tek bir NAT arkasındaki ofis tek bir
 kovayı paylaşır. Gerçek tavan, dosya başına boyut limiti artı henüz var olmayan bir workspace
-kotasıdır (ADR 0022).
+kotasıdır (ADR 0022). **Import bütçesi de aynı dürüstlük şerhi altında ve tam da bu yüzden daha
+düşük ayarlı:** üç istek, yükleme bütçesinin epey altında, çünkü tek bir import isteği 20 MiB'lık
+bir ayrıştırma artı bu API'nin açtığı en uzun ömürlü yazma transaction'ı demek — ve istek sayan
+bir throttler dört kartlık bir board ile beş yüz kartlık bir board'u ayırt edemez.
 
 İki router olduğu için iki limiter var. `/auth/*` Nest'in altındaki ham Express tarafından
 sunulur, dolayısıyla `ThrottlerGuard` onu hiç görmez ve işi Better Auth'un kendi limiter'ı

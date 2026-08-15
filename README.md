@@ -12,7 +12,7 @@ Open-source, Kanban-focused project management tool.
 
 Kurultay’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards) — auth/workspaces, boards and
 tasks, filtering, dashboard, activity/notifications, and realtime board sync. See
-[docs/roadmap.md](docs/roadmap.md). A four-scenario Playwright smoke pack covers the critical
+[docs/roadmap.md](docs/roadmap.md). A six-scenario Playwright smoke pack covers the critical
 browser flows ([docs/testing.md](docs/testing.md#browser-end-to-end)). Beyond-MVP items (email
 notifications, presence, extra locales, …) remain listed under Beyond MVP.
 
@@ -72,6 +72,17 @@ Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
   the URL, so no preview fetch can be turned into a probe of your network
   ([ADR 0022](docs/decisions/0022-attachment-storage.md),
   [ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md))
+- **Trello import (one-way)** — upload a Trello board's JSON export and get a Kurultay board:
+  lists, cards, labels and checklists. It is one-way and not repeatable: **importing the same
+  export twice creates two boards** — there is no update-in-place and no dedupe. Three things
+  deliberately do not come across, and the import report tells you how many of each: **files**
+  (a Trello export carries attachment URLs, not bytes, so they arrive as links the server never
+  requests), **members** (a Trello account is not a Kurultay account, so assignments are dropped
+  and everything is attributed to you) and **comments**. Archived lists and cards are skipped too,
+  and every imported column arrives as "not started" — Kurultay never guesses which of your
+  columns means "done", so you set that yourself afterwards. The report exists only in the
+  response: it is shown once, it is not stored, and dismissing it is permanent
+  ([ADR 0025](docs/decisions/0025-trello-import-mapping.md))
 - **Fractional-indexed ordering** — reordering a card only touches that card's position,
   never a full-list renumber
 - **Workspaces** — multi-tenant from the ground up, every query scoped by workspace

@@ -6,7 +6,7 @@ import { Stack, type TestUser } from './stack';
  *
  * The session comes from the API context that registered them rather than from typing into
  * the login form, for the same reason the rest of the setup goes over HTTP: only one of these
- * four scenarios is about signing in, and the other three should not go red when the login
+ * six scenarios is about signing in, and the other five should not go red when the login
  * page changes. It works because the session cookie Better Auth issues is host-scoped to
  * `localhost` with no port — the API on 4110 and the web app on 3110 are the same cookie
  * origin, which is also why the suite can hand an API-issued session to a browser at all.
