@@ -46,6 +46,19 @@ export default defineConfig({
       // task 65/65/63/67, layout 80/71/90/84. These are the interactive surfaces that
       // already have meaningful unit coverage; a second glob floor catches deleting a
       // board/task/layout test without waiting for a global average to become meaningful.
+      //
+      // `components/notification/**` and `lib/**` (2026-08-15, QA-04): the bell's badge, the
+      // dropdown's click-through and the page that lists the same rows were the last
+      // interactive surface with no floor watching it, and `lib/notification-actions.ts` and
+      // `lib/notification-nav.ts` — the two modules that decide where a clicked notification
+      // takes you — were at 0% on every metric. Measured after the behaviour tests landed:
+      // notification 96.35/88.79/100/98.83, lib 96.08/88.49/98.23/96.98.
+      //
+      // `lib/**` is floored as a folder rather than as those two files because it is already
+      // the best-covered folder in the app (91.55% statements before this change): a floor
+      // there is a ratchet on code that is genuinely tested, which is the only kind this file
+      // sets. It also means a new helper landing in `lib/` with no test at all is visible,
+      // which is the regression the notification helpers themselves were.
       thresholds: {
         'app/**': {
           statements: 85,
@@ -70,6 +83,18 @@ export default defineConfig({
           branches: 65,
           functions: 85,
           lines: 78,
+        },
+        'components/notification/**': {
+          statements: 91,
+          branches: 83,
+          functions: 95,
+          lines: 93,
+        },
+        'lib/**': {
+          statements: 91,
+          branches: 83,
+          functions: 93,
+          lines: 92,
         },
       },
     },
