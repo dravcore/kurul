@@ -67,13 +67,34 @@ module.exports = {
   coveragePathIgnorePatterns: ['/generated/'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
-  // Floor set a few points below the measured baseline (2026-08-14, `pnpm --filter
-  // @kurultay/api test:cov`: stmts 77.86 / branch 69.31 / funcs 79.64 / lines 79.24 — raised
-  // from the 2026-08-09 baseline of 57.19/48.29/59.68/58.12 after closing the workspace/
-  // activity/label/common-pipes-and-decorators cold zones tracked as audit finding QA-03) so
-  // CI fails on real regressions without being so tight that routine refactors trip it. Raise
-  // this again the same way once the next baseline moves: measure, then set floor a few points
-  // under the new number rather than under the old one.
+  // Floor set a few points below the measured baseline, so CI fails on real regressions without
+  // being so tight that routine refactors trip it.
+  //
+  // Baseline history, all `pnpm --filter @kurultay/api test:cov`, stmts/branch/funcs/lines:
+  //
+  //   2026-08-09  57.19 / 48.29 / 59.68 / 58.12
+  //   2026-08-14  77.86 / 69.31 / 79.64 / 79.24  after closing the workspace/activity/label/
+  //                                              common-pipes-and-decorators cold zones tracked
+  //                                              as audit finding QA-03
+  //   2026-08-15  76.51 / 66.64 / 78.82 / 77.76  on `develop` — measured twice, independently,
+  //                                              agreeing to four digits
+  //
+  // **The 2026-08-15 baseline is lower than the one before it, and the floor did not move.**
+  // P3-2 (#206, #207) added checklist code, `collectCoverageFrom: ['**/*.(t|j)s']` counted it
+  // automatically, and nobody re-measured — so the recorded baseline claimed roughly 3 points of
+  // headroom over the branch floor while the real figure was **0.64**. That is worth stating
+  // plainly, because the instruction below reads as symmetric and is not:
+  //
+  //   - Baseline moves **up**: re-measure, then raise the floor to a few points under the *new*
+  //     number rather than under the old one.
+  //   - Baseline moves **down**: re-measure and **record it here**. Do not lower the floor to
+  //     restore the margin. The margin shrinking is the signal; lowering the floor deletes the
+  //     signal and keeps the cause. A floor is only lowered on a deliberate, argued decision,
+  //     never as bookkeeping after a drop.
+  //
+  // For reference, the attachment work (P3-1 tasks 1-4) measured 77.08 / 67.33 / 79.66 / 78.39,
+  // i.e. it pulled the baseline back up rather than down. That is the expected shape for a new
+  // module and not a reason to re-cut the floor either.
   coverageThreshold: {
     global: {
       statements: 75,

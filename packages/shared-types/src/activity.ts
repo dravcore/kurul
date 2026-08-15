@@ -89,6 +89,12 @@ export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
  *    still there after the board is gone). `board.created`, `board.updated`, `column.created`,
  *    `column.updated`, `label.created`, `label.updated`, `workspace.updated`.
  *
+ *    `workspace.updated` sits in this kind because of what it carries today — name, slug,
+ *    metadata. **Trigger for moving it to kind 2:** the first workspace setting that decides
+ *    who may join or what a member may do (open sign-up, an email-domain allowlist, a default
+ *    role). On that day it is access-changing, and this paragraph is wrong rather than merely
+ *    incomplete.
+ *
  * The third kind is stated because seven of the entries below are in neither of the first two,
  * and a rule that does not describe seventeen of seventeen members is a rule the next person
  * cannot apply. It is also what the older comment beside the board entries was reaching for
