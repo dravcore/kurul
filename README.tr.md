@@ -12,7 +12,7 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 Kurultay’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı) — auth/workspace’ler, board ve
 task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Bkz.
-[docs/roadmap.md](docs/tr/roadmap.md). Kritik tarayıcı akışlarını dört senaryoluk bir
+[docs/roadmap.md](docs/tr/roadmap.md). Kritik tarayıcı akışlarını altı senaryoluk bir
 Playwright smoke paketi kapsıyor ([docs/testing.md](docs/tr/testing.md#browser-uçtan-uca)).
 MVP ötesi maddeler (e-posta bildirimleri, presence, ek diller, …) hâlâ MVP ötesi altında
 listelenir.
@@ -75,6 +75,18 @@ MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadma
   hiç istek atmaz, yani hiçbir önizleme fetch'i ağınızı yoklayan bir araca dönüşemez
   ([ADR 0022](docs/tr/decisions/0022-attachment-storage.md),
   [ADR 0024](docs/tr/decisions/0024-attachment-kinds-and-serving-policy.md))
+- **Trello import'u (tek yönlü)** — bir Trello board'unun JSON export'unu yükleyin, karşılığında
+  bir Kurultay board'u alın: list'ler, kart'lar, label'lar ve checklist'ler. Tek yönlüdür ve
+  tekrarlanabilir değildir: **aynı export'u iki kez import etmek iki board yaratır** — yerinde
+  güncelleme de yok, tekilleştirme de. Üç şey bilinçli olarak gelmez ve import raporu her birinin
+  kaç tane olduğunu söyler: **dosyalar** (Trello export'u attachment'ların baytlarını değil
+  URL'lerini taşır, dolayısıyla bağlantı olarak gelirler ve sunucu o URL'lere hiç istek atmaz),
+  **üyeler** (bir Trello hesabı bir Kurultay hesabı değildir; atamalar düşer ve her şey sizin
+  üzerinize yazılır) ve **yorumlar**. Arşivlenmiş list ve kartlar da atlanır, ve içe aktarılan her
+  kolon "başlanmadı" olarak gelir — Kurultay hangi kolonunuzun "bitti" demek olduğunu asla tahmin
+  etmez, onu sonradan siz ayarlarsınız. Rapor yalnız cevabın içindedir: bir kez gösterilir,
+  saklanmaz, kapatmak kalıcıdır
+  ([ADR 0025](docs/tr/decisions/0025-trello-import-mapping.md))
 - **Fractional-indexed sıralama** — bir kartı yeniden sıralamak yalnızca o kartın position'ına
   dokunur, tüm listeyi yeniden numaralandırmaz
 - **Workspace'ler** — temelden itibaren multi-tenant; her sorgu workspace'e göre scope'lanır

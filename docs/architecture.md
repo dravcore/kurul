@@ -96,6 +96,7 @@ Treat the table below as the module map.
 | `label`        | Board-scoped labels and task-label assignment                                    |
 | `comment`      | Task comments                                                                    |
 | `attachment`   | Files and links on a task: upload, list, download stream, detach                 |
+| `import`       | One-way Trello board import: read an export, plan the rows, write them once      |
 | `activity`     | Append-only activity log (`payload` is Json)                                     |
 | `dashboard`    | Aggregation queries feeding the charts                                           |
 | `notification` | Notification fan-out, Redis-backed queue                                         |
@@ -123,6 +124,18 @@ scans for approaching due dates every 15 minutes and only ever inserts.
 is a supported single-instance configuration for the first and a disabled retention policy
 for the second. Both are the `worker` role that stage 2 of [§8](#8-runtime-evolution) splits
 out; nothing else in the API runs off a request.
+
+**`import` is shaped the other way round from every other write module, on purpose.** All of the
+decision-making is in two pure functions — a reader (`trello-export.ts`) that narrows raw JSON to
+a shape this code understands, and a planner (`trello-import-planner.ts`) that turns it into the
+exact rows to write plus the report of what it refused. Neither touches a database. The service
+then opens **one** transaction with no branches in it: every row that reaches it is already known
+to be writable. That is what makes a board atomic while its coverage is partial, and it is why a
+malformed export costs a `400` and writes nothing. It adds **no table and no column** — the import
+uses `Board`, `Column`, `Task`, `Label`, `Checklist`, `ChecklistItem` and `Attachment` as they
+already are — and it owns its own `MulterModule` rather than sharing `attachment`'s, because the
+two ceilings measure different resources and because an import stores no bytes and therefore works
+on an instance with no `STORAGE_PATH` ([ADR 0025](decisions/0025-trello-import-mapping.md)).
 
 `retention` is its own module rather than a provider inside `notification` because it is the
 one component that deletes across module and tenant boundaries by design — `Session`,

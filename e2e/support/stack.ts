@@ -20,7 +20,7 @@ import { extractLink, openMailbox, type Mailbox } from './mailpit';
  * confirmed address, a workspace, a board, three cards — is created through the public API
  * rather than through the UI. Driving that setup with clicks would make every scenario also a
  * test of registration, workspace creation and the task dialog, so a change to any of those
- * would turn all four scenarios red at once and none of them would be telling the truth about
+ * would turn every scenario red at once and none of them would be telling the truth about
  * what broke. It is also the difference between a suite that finishes in one minute and one
  * that finishes in six.
  *

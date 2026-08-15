@@ -121,6 +121,8 @@ GET    /workspaces/:workspaceId/notifications
 GET    /workspaces/:workspaceId/notifications/unread-count
 POST   /workspaces/:workspaceId/notifications/read-all
 POST   /workspaces/:workspaceId/notifications/:notificationId/read
+
+POST   /workspaces/:workspaceId/imports/trello   # multipart, one part named `file`; admin-only
 ```
 
 Board and column role gates:
@@ -138,6 +140,12 @@ author line, unlike comment deletion (ADR 0012): the same role can already delet
 task, and `Attachment.taskId` cascades, so gating the smaller act while leaving the larger one
 open would be a UI trap rather than an authorization check. Kinds, limits and the serving
 policy: [ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md).
+
+`imports/trello` is the one route whose collection segment is not a resource anyone can read:
+there is no `GET /imports` and no import id, because an import is an action that leaves a board
+behind rather than a row of its own. It is admin-only and it is the API's only bulk write — the
+shape, the limits and everything it deliberately does not carry across are in
+[Importing a Trello board export](#importing-a-trello-board-export).
 
 Invitations are workspace-scoped in the public API. Persistence is the
 `WorkspaceInvitation` table, mapped from Better Auth's organization plugin.
@@ -254,21 +262,21 @@ Action segments are the exception and each one needs a reason. Do not invent
 genuinely the operation (reordering an entire column, for example). A `PATCH` that omits a
 field leaves it untouched; sending `null` explicitly clears a nullable field.
 
-| Status                       | When                                                                                                                                      |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `200 OK`                     | Successful read, update, or action                                                                                                        |
-| `201 Created`                | Resource created; body is the created resource                                                                                            |
-| `204 No Content`             | Successful delete; empty body                                                                                                             |
-| `400 Bad Request`            | Malformed request or validation failure                                                                                                   |
-| `401 Unauthorized`           | Missing or invalid session                                                                                                                |
-| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient                                                                                 |
-| `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                               |
-| `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                 |
-| `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, or an upload is over `ATTACHMENT_MAX_BYTES`                                            |
-| `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted |
-| `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                 |
-| `429 Too Many Requests`      | Rate limited                                                                                                                              |
-| `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                             |
+| Status                       | When                                                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200 OK`                     | Successful read, update, or action                                                                                                          |
+| `201 Created`                | Resource created; body is the created resource                                                                                              |
+| `204 No Content`             | Successful delete; empty body                                                                                                               |
+| `400 Bad Request`            | Malformed request or validation failure                                                                                                     |
+| `401 Unauthorized`           | Missing or invalid session                                                                                                                  |
+| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient                                                                                   |
+| `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                                 |
+| `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                   |
+| `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, an upload is over `ATTACHMENT_MAX_BYTES`, or an import is over `TRELLO_IMPORT_MAX_BYTES` |
+| `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted   |
+| `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                   |
+| `429 Too Many Requests`      | Rate limited                                                                                                                                |
+| `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                               |
 
 **Cross-workspace access returns `404`, not `403`.** A `403` would confirm that the resource
 exists, which leaks information across the tenant boundary. `403` is reserved for a
@@ -336,9 +344,11 @@ ceiling — a value nobody chose and no file recorded. And it is a **memory** ce
 size one, since the body is parsed into heap before anything validates it; N concurrent requests
 cost up to N × this value. 1 MiB is roughly two orders of magnitude above the largest body any
 endpoint legitimately receives today (no endpoint takes an array body, and the longest single
-field any DTO accepts is 2048 characters). An endpoint that genuinely needs more — importing a
-board export, say — raises this variable deliberately, and keeps it under whatever body size the
-reverse proxy in front of the API allows.
+field any DTO accepts is 2048 characters). An endpoint that genuinely needs more does **not** raise
+this variable — the Trello importer is the one that would have had to, and instead takes its body
+as `multipart/form-data` under a ceiling of its own (see
+[Importing a Trello board export](#importing-a-trello-board-export)). Raising this number to fit
+one endpoint hands the same memory cost to every other one.
 
 ### File uploads and downloads
 
@@ -394,6 +404,102 @@ such response also carries `X-Content-Type-Options: nosniff`,
 `Cross-Origin-Resource-Policy: same-origin` (overriding the `cross-origin` policy the API sets
 globally) and `Cache-Control: private, max-age=0, must-revalidate`. Asking for the content of a
 `LINK` is `404`: there are no bytes, and saying "wrong kind" would confirm the row exists.
+
+### Importing a Trello board export
+
+`POST /workspaces/:workspaceId/imports/trello` takes a Trello board's JSON export and creates a
+**new board** from it. It is the API's only bulk-write endpoint.
+
+| Property     | Value                                                                           |
+| ------------ | ------------------------------------------------------------------------------- |
+| Body         | `multipart/form-data`, one part named **`file`** — no other part, no JSON shape |
+| Role         | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                            |
+| Size ceiling | `TRELLO_IMPORT_MAX_BYTES` (default `20971520` — 20 MiB)                         |
+| Rate limit   | **3 / min** per client IP                                                       |
+| Success      | `201` with a `TrelloImportReportDto`                                            |
+
+**Multipart rather than JSON, and that is a decision rather than a convenience.** A board export
+is several megabytes and `REQUEST_BODY_MAX_BYTES` is 1 MiB; raising that to fit this one endpoint
+would hand the same cost to every other endpoint the API has. So the export arrives as a file
+part under a limit this module owns. The two numbers measure different resources —
+`TRELLO_IMPORT_MAX_BYTES` is a **heap** ceiling (the bytes are buffered, `JSON.parse`d, and the
+parsed graph is a multiple of the bytes that produced it), while `ATTACHMENT_MAX_BYTES` is a
+**disk** ceiling — which is why they are separate variables and why neither is derived from the
+other. The import limit must stay below the reverse proxy's body limit; that relationship is
+covered by a test (`storage/two-layer-limit.spec.ts`) and explained in
+[self-hosting.md](self-hosting.md#bringing-your-own-reverse-proxy).
+
+**`ADMIN_ROLES`, by permission arithmetic.** Creating a board is `CONTENT_ROLES`, but creating a
+_column_ is admin-only — and an import creates both. An endpoint must not do in one request what
+its caller could not do in several.
+
+**Errors:**
+
+| Status | When                                                                                                 |
+| ------ | ---------------------------------------------------------------------------------------------------- |
+| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export              |
+| `403`  | Workspace member whose role is below `ADMIN`                                                         |
+| `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it |
+| `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                      |
+| `429`  | More than three imports in a rolling minute                                                          |
+
+A `400` is the only failure that reaches the parser, and **nothing is written when it does**: the
+export is read and mapped entirely before the transaction opens, so a rejected import leaves the
+workspace byte-for-byte as it was.
+
+**The response body is the whole report, and it is not stored anywhere.**
+
+```jsonc
+// POST /workspaces/w_1/imports/trello  → 201
+{
+  "boardId": "0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f",
+  "boardName": "Product Roadmap",
+  "imported": {
+    "columns": 4,
+    "tasks": 137,
+    "labels": 6,
+    "checklists": 21,
+    "checklistItems": 88,
+    "attachments": 12,
+  },
+  "skipped": [
+    { "scope": "column", "reason": "defaulted", "count": 4, "samples": ["Backlog", "Doing"] },
+    { "scope": "member", "reason": "unmappable", "count": 9, "samples": ["ayse", "bora"] },
+    { "scope": "comment", "reason": "outOfScope", "count": 412, "samples": [] },
+    { "scope": "card", "reason": "archived", "count": 57, "samples": ["Old spike"] },
+  ],
+}
+```
+
+`imported` counts rows actually written. `skipped` groups everything else by `(scope, reason)`;
+`count` is always the real number, while `samples` is capped at 20 names so the response scales
+with the number of _kinds_ of problem rather than with the size of the export. The vocabularies
+are closed — `TrelloImportScope` and `TrelloImportSkipReason` in `@kurultay/shared-types` — because
+the web renders one translated sentence per reason and a free-text reason would ship English into
+a Turkish UI (ADR 0018).
+
+**`defaulted` is in the skip list without being a skip**, and deliberately: an imported column
+takes the default category and an unknown Trello colour falls back to `slot-1`. Both changed
+something the user will see, and the question after an import is "why does my board look
+different", not "what did I lose".
+
+**What this endpoint does not do**, each of which is a decision recorded in
+[ADR 0025](decisions/0025-trello-import-mapping.md):
+
+- **No idempotency.** Posting the same export twice creates **two boards**. There is no dedupe
+  key, no update-in-place, no "already imported" answer. Updating an existing board is
+  synchronisation, not import, and it needs a conflict policy this API does not have.
+- **No member mapping.** A Trello account is not a Kurultay account, so assignments are dropped
+  and counted. Every row written — tasks and attachments alike — is attributed to the caller.
+- **No column categories.** Every imported column is `UNSTARTED`; the category is never inferred
+  from a list's name or its position ([ADR 0019](decisions/0019-column-category.md) refuses both).
+  The report says how many columns this affected, and the user sets them afterwards.
+- **No files.** A Trello export carries attachment URLs, not bytes, so every attachment becomes a
+  `LINK` row — and the server never requests those URLs, the same rule the attachment endpoint
+  follows.
+- **No comments.** Out of scope, and counted rather than silently dropped.
+- **No socket event.** An import creates a board whose room nobody has joined yet. It writes
+  exactly one activity row, `board.imported`, rather than one per card.
 
 ## Errors
 
@@ -525,22 +631,26 @@ with a `Retry-After` header giving the seconds to wait. Requests still under bud
 Budgets are counted **per client IP and per route** over a rolling minute — one endpoint
 running hot never spends another endpoint's allowance.
 
-| Endpoint                                    | Budget    | Why                                                                                 |
-| ------------------------------------------- | --------- | ----------------------------------------------------------------------------------- |
-| Any endpoint, unless listed below           | 100 / min | Well clear of what a person generates; caps a script                                |
-| `POST /workspaces/:workspaceId/invitations` | 10 / min  | Each call hands a message to the SMTP relay, addressed by the caller                |
-| `GET .../boards/:boardId/tasks?q=`          | 30 / min  | `q=` is a trigram scan; the same route without `q=` keeps the default               |
-| `POST .../tasks/:taskId/attachments`        | 20 / min  | The one endpoint where a single request can cost `ATTACHMENT_MAX_BYTES` of disk     |
-| `GET .../attachments/:attachmentId/content` | 300 / min | _Above_ the default: a panel with ten image attachments issues ten requests on open |
-| `/auth/sign-in*`, `/auth/sign-up*`          | 3 / 10s   | Better Auth's built-in rule for credential endpoints                                |
-| `/auth/*` otherwise                         | 100 / min | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004)           |
-| `GET /health`, `GET /health/ready`          | exempt    | A throttled probe would report a healthy API as down                                |
+| Endpoint                                       | Budget    | Why                                                                                 |
+| ---------------------------------------------- | --------- | ----------------------------------------------------------------------------------- |
+| Any endpoint, unless listed below              | 100 / min | Well clear of what a person generates; caps a script                                |
+| `POST /workspaces/:workspaceId/invitations`    | 10 / min  | Each call hands a message to the SMTP relay, addressed by the caller                |
+| `GET .../boards/:boardId/tasks?q=`             | 30 / min  | `q=` is a trigram scan; the same route without `q=` keeps the default               |
+| `POST .../tasks/:taskId/attachments`           | 20 / min  | The one endpoint where a single request can cost `ATTACHMENT_MAX_BYTES` of disk     |
+| `POST /workspaces/:workspaceId/imports/trello` | 3 / min   | A 20 MiB body parsed into heap, then thousands of rows in one transaction           |
+| `GET .../attachments/:attachmentId/content`    | 300 / min | _Above_ the default: a panel with ten image attachments issues ten requests on open |
+| `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10s   | Better Auth's built-in rule for credential endpoints                                |
+| `/auth/*` otherwise                            | 100 / min | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004)           |
+| `GET /health`, `GET /health/ready`             | exempt    | A throttled probe would report a healthy API as down                                |
 
 **The upload budget is named as insufficient rather than presented as enough.** The throttler
 counts requests per IP per route, which is the wrong unit twice for an upload: twenty 25 MiB
 requests and twenty 10 kB requests spend the same allowance, and an office behind one NAT
 shares a single bucket. The real ceiling is the per-file size limit, plus a per-workspace quota
-that does not exist yet (ADR 0022).
+that does not exist yet (ADR 0022). **The import budget is under the same honest caveat and set
+lower for it:** three requests is well below the upload budget because one import request costs a
+20 MiB parse plus the longest-lived write transaction in this API, and a throttler that counts
+requests cannot tell a four-card board from a five-hundred-card one.
 
 Two limiters cover the surface because there are two routers. `/auth/*` is served by raw
 Express below Nest, so `ThrottlerGuard` never sees it and Better Auth's own limiter handles
