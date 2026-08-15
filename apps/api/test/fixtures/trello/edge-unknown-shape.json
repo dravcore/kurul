@@ -1,0 +1,87 @@
+{
+  "id": "6512b0aac3d4e5f602030005",
+  "name": "Fields this repo guessed wrong",
+  "desc": 42,
+  "closed": false,
+  "url": "https://trello.com/b/vVvVvVvV/fields-this-repo-guessed-wrong",
+  "lists": [
+    {
+      "id": "6512b0abc3d4e5f602030070",
+      "name": "Readable list",
+      "closed": false,
+      "idBoard": "6512b0aac3d4e5f602030005",
+      "pos": "bottom",
+      "subscribed": false
+    },
+    17,
+    {
+      "name": "List with no id at all",
+      "closed": false,
+      "pos": 16384
+    },
+    {
+      "id": "6512b0abc3d4e5f602030071",
+      "name": ["Backlog"],
+      "closed": "no",
+      "idBoard": "6512b0aac3d4e5f602030005",
+      "pos": 32768
+    }
+  ],
+  "labels": {
+    "note": "Trello writes an array here. Something else wrote an object."
+  },
+  "cards": [
+    {
+      "id": "6512b0acc3d4e5f602030080",
+      "name": "Readable card",
+      "desc": "",
+      "closed": false,
+      "due": null,
+      "idBoard": "6512b0aac3d4e5f602030005",
+      "idList": "6512b0abc3d4e5f602030070",
+      "idLabels": "6512b0adc3d4e5f602030090",
+      "idMembers": [],
+      "pos": 16384,
+      "attachments": [
+        {
+          "id": "6512b0aec3d4e5f6020300a0",
+          "name": "Attachment with no url",
+          "pos": 16384
+        },
+        {
+          "id": "6512b0aec3d4e5f6020300a1",
+          "name": "Attachment with a numeric url",
+          "url": 8080,
+          "pos": 32768
+        }
+      ]
+    },
+    "a card that is just a string"
+  ],
+  "checklists": [
+    {
+      "id": "6512b0afc3d4e5f6020300b0",
+      "name": "Readable checklist",
+      "idCard": "6512b0acc3d4e5f602030080",
+      "pos": 16384,
+      "checkItems": [
+        {
+          "id": "6512b0afc3d4e5f6020300b1",
+          "name": "Readable item",
+          "pos": 16384,
+          "state": "complete"
+        },
+        { "name": "Item with no id", "pos": 32768, "state": "incomplete" }
+      ]
+    },
+    {
+      "id": "6512b0afc3d4e5f6020300b2",
+      "name": "Checklist whose items are not a list",
+      "idCard": "6512b0acc3d4e5f602030080",
+      "pos": 32768,
+      "checkItems": "one, two, three"
+    }
+  ],
+  "members": "two people",
+  "actions": { "commentCard": 3 }
+}
