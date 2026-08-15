@@ -17,6 +17,7 @@ REST conventions for the Kurultay API: URLs, verbs, payloads, errors, pagination
 - [Filtering, sorting, field selection](#filtering-sorting-field-selection)
 - [DTO naming](#dto-naming)
 - [Data types](#data-types)
+- [The OpenAPI document](#the-openapi-document)
 - [Versioning](#versioning)
 
 ## Scope
@@ -845,6 +846,48 @@ for cursor pagination — but clients must not. A client that sorts by `id` or r
 creation time out of it is depending on an implementation detail that a future id strategy
 would break. URL examples in this document abbreviate ids (`w_1`, `b_1`, `t_1`) for
 readability; real ones are 36-character UUIDv7 strings.
+
+## The OpenAPI document
+
+This document is prose. The machine-readable one is **[`apps/api/openapi.json`](../apps/api/openapi.json)**,
+generated from the running application — every path, parameter, request body and response in it
+is what the NestJS router and the DTO classes actually declare.
+
+**The two are not ranked.** Where the spec and this page disagree, one of them is wrong and
+neither wins by default: this page carries the reasons, the spec carries the shapes, and a
+disagreement means somebody changed a shape without revisiting the reason. Fix the wrong one.
+
+|                       |                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------- |
+| Interactive console   | `GET /docs`                                                                                       |
+| Document              | `GET /openapi.json` — byte-identical to the committed file                                        |
+| Same document as YAML | `GET /docs-yaml` — `@nestjs/swagger` serves it alongside; the JSON is the one this project checks |
+| Committed snapshot    | `apps/api/openapi.json`                                                                           |
+| Regenerate            | `pnpm openapi` (builds the API first)                                                             |
+| Verify                | `pnpm openapi:check` — exits non-zero on any difference                                           |
+
+**`/docs` is off in production unless `API_DOCS_ENABLED=true`.** Development gets it by
+default. That asymmetry is a decision about a self-hosted service, and it has three parts: the
+document itself leaks little (this is an AGPL project and the routes are public), but `/docs`
+is an unauthenticated **HTML page** on a service that renders no documents and locks itself to
+`default-src 'none'` — so publishing it means carving a Content-Security-Policy exception for
+one path — and its "Try it out" console issues real same-origin requests carrying the reader's
+own session cookie. An operator who never chose this API should get that on purpose, not by
+inheritance. Turning it off costs no discoverability: the identical document is in the
+repository.
+
+**CI fails when the spec drifts.** The `build` job regenerates the document and compares it to
+the committed file, so adding an endpoint, renaming a field, widening a `@MaxLength` or
+changing a role gate all turn CI red until `apps/api/openapi.json` is regenerated in the same
+change. The gate is the generator's own exit code, not a grep over its output.
+
+Two things are deliberately **absent** from the spec, and both are absent because they are not
+Nest routes:
+
+- **`/auth/*`.** Better Auth is mounted on raw Express below the Nest router
+  ([ADR 0004](decisions/0004-auth-better-auth.md)), so there is no controller to scan.
+- **The Socket.io contract.** Not HTTP. It lives in `@kurultay/shared-types` and in
+  [architecture.md](architecture.md).
 
 ## Versioning
 

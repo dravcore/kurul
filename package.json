@@ -20,6 +20,8 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
+    "openapi": "pnpm --filter @kurultay/api build && pnpm --filter @kurultay/api openapi",
+    "openapi:check": "pnpm --filter @kurultay/api openapi:check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"
@@ -51,6 +53,9 @@
     "typescript-eslint": "^8.26.1"
   },
   "pnpm": {
+    "overrides": {
+      "js-yaml": "^5.2.2"
+    },
     "peerDependencyRules": {
       "allowedVersions": {
         "eslint-plugin-jsx-a11y>eslint": "10"

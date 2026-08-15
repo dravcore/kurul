@@ -8,17 +8,18 @@ Five-minute map of Kurultay docs. English is canonical; Turkish copies live unde
 
 ## Start here
 
-| If you want…                      | Read                                                                          |
-| --------------------------------- | ----------------------------------------------------------------------------- |
-| What the product is / quick start | [../README.md](../README.md)                                                  |
-| How the system is shaped          | [architecture.md](architecture.md) · [design.md](design.md)                   |
-| Day-to-day coding                 | [development.md](development.md) · [coding-standards.md](coding-standards.md) |
-| Running it on your own domain     | [self-hosting.md](self-hosting.md)                                            |
-| REST shapes and errors            | [api-conventions.md](api-conventions.md)                                      |
-| Tests and CI gates                | [testing.md](testing.md)                                                      |
-| Branches, PRs, releases           | [git-strategy.md](git-strategy.md)                                            |
-| Why a stack or policy choice      | [tech-stack.md](tech-stack.md) · [decisions/](decisions/)                     |
-| What’s done / what’s deferred     | [roadmap.md](roadmap.md)                                                      |
+| If you want…                      | Read                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------- |
+| What the product is / quick start | [../README.md](../README.md)                                                          |
+| How the system is shaped          | [architecture.md](architecture.md) · [design.md](design.md)                           |
+| Day-to-day coding                 | [development.md](development.md) · [coding-standards.md](coding-standards.md)         |
+| Running it on your own domain     | [self-hosting.md](self-hosting.md)                                                    |
+| REST shapes and errors            | [api-conventions.md](api-conventions.md)                                              |
+| The generated API specification   | [`apps/api/openapi.json`](../apps/api/openapi.json), or `/docs` on a running instance |
+| Tests and CI gates                | [testing.md](testing.md)                                                              |
+| Branches, PRs, releases           | [git-strategy.md](git-strategy.md)                                                    |
+| Why a stack or policy choice      | [tech-stack.md](tech-stack.md) · [decisions/](decisions/)                             |
+| What’s done / what’s deferred     | [roadmap.md](roadmap.md)                                                              |
 
 Root community files (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, …)
 sit outside `docs/` because GitHub treats them specially.
@@ -41,7 +42,7 @@ sit outside `docs/` because GitHub treats them specially.
 | [design.md](design.md)                     | UI/UX language                                                                                              |
 | [git-strategy.md](git-strategy.md)         | Git Flow, Conventional Commits, releases                                                                    |
 | [testing.md](testing.md)                   | Test layers and expectations                                                                                |
-| [api-conventions.md](api-conventions.md)   | REST naming, errors, pagination                                                                             |
+| [api-conventions.md](api-conventions.md)   | REST naming, errors, pagination, and where the generated OpenAPI document lives                             |
 | [cla.md](cla.md)                           | Contributor License Agreement (**draft**, unused — [ADR 0015](decisions/0015-no-external-contributions.md)) |
 | [roadmap.md](roadmap.md)                   | MVP status and beyond-MVP backlog                                                                           |
 | [decisions/](decisions/)                   | Architecture decision records (ADRs)                                                                        |
