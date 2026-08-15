@@ -40,7 +40,7 @@ function toTaskCore(row: TaskRowBase): Omit<TaskDto, 'checklistSummary' | 'check
     updatedAt: row.updatedAt.toISOString(),
     assignees,
     labels,
-    attachmentCount: row._count.attachments,
+    attachmentCount: row.attachmentCount,
   };
 }
 
@@ -102,16 +102,18 @@ export function toTaskDetailDto(row: TaskDetailRow): TaskDto {
  *
  * A fresh task has no assignees, no labels, no checklists and no attachments, so the relations
  * and the count are supplied rather than fetched — but they are supplied as the *detail* shape,
- * because the caller of a create wants the same DTO a single-task read would give them.
+ * because the caller of a create wants the same DTO a single-task read would give them. The
+ * count is `0` rather than a query: a row that was created one statement ago has nothing
+ * pointing at it.
  */
 export function emptyTaskRelations<
-  T extends Omit<TaskDetailRow, 'assignees' | 'labels' | 'checklists' | '_count'>,
+  T extends Omit<TaskDetailRow, 'assignees' | 'labels' | 'checklists' | 'attachmentCount'>,
 >(row: T): TaskDetailRow {
   return {
     ...row,
     assignees: [],
     labels: [],
     checklists: [],
-    _count: { attachments: 0 },
+    attachmentCount: 0,
   };
 }

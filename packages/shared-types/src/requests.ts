@@ -14,6 +14,7 @@
  * added with the first caller — `PATCH /labels/:labelId` and `PATCH /workspaces/:workspaceId`
  * exist on the server but have no UI yet.
  */
+import type { AttachmentKind } from './entities.js';
 import type { ColumnCategory, LabelColorSlot, MemberRole, Priority } from './enums.js';
 import type { Locale } from './locales.js';
 
@@ -95,6 +96,24 @@ export interface CreateChecklistItemRequest {
 export interface UpdateChecklistItemRequest {
   content?: string;
   isDone?: boolean;
+}
+
+/**
+ * `POST /workspaces/:workspaceId/tasks/:taskId/attachments`, JSON shape only.
+ *
+ * The same endpoint also takes `multipart/form-data` for a FILE (plan decision D7), and that
+ * shape has no type here on purpose: a `FormData` carries no compile-time contract, which is
+ * why `api.postForm` is a separate member from `api.post`. This interface mirrors the JSON
+ * branch — `kind: 'LINK'` — where `CreateAttachmentDto` requires a non-empty `url`.
+ *
+ * The scheme allowlist (`http:`/`https:` and nothing else) lives on the server and is not
+ * expressible here; the client never treats its own check as the one that matters (K7).
+ */
+export interface CreateAttachmentLinkRequest {
+  kind: Extract<AttachmentKind, 'LINK'>;
+  url: string;
+  /** Display name. Omit and the server shows the URL itself. */
+  filename?: string;
 }
 
 /** `POST /workspaces/:workspaceId/boards` */

@@ -10,16 +10,20 @@ export const taskInclude = {
     include: { label: true },
     orderBy: { id: 'asc' },
   },
-  /**
-   * The card's attachment badge: a number, never the rows.
-   *
-   * `_count` compiles to a correlated subquery, so it costs one aggregate per task and carries
-   * no attachment rows into a board list — the same trade `checklistSummaryInclude` makes one
-   * projection down, and the reason P2-8's board read stays cheap. It sits in the shared
-   * include rather than in either branch because both reads need it: the card renders the
-   * badge and the panel renders it beside the list it loads from its own endpoint (ADR 0024).
-   */
-  _count: { select: { attachments: true } },
+  /*
+    There is deliberately no `_count: { select: { attachments: true } }` here, and it is not an
+    omission — it was here, it was measured, and it came out.
+
+    Prisma compiles that include into an aggregate over the **whole** `Attachment` table
+    (`... WHERE 1=1 GROUP BY "taskId"`, joined afterwards), scoped to no board, no workspace and
+    no page, which makes a board page's cost depend on a plan choice rather than on the page.
+    The badge now reads `attachmentCount`, filled by `countAttachmentsByTask` from the ids the
+    page actually returned.
+
+    `attachment-count.ts` carries the measurements, including the ones that argue *against* this
+    split — on realistic data the two are within noise of each other and this one pays a second
+    round trip. Read them before changing it back, and before quoting them.
+  */
 } satisfies Prisma.TaskInclude;
 
 /**
@@ -54,6 +58,12 @@ export const taskDetailInclude = { ...taskInclude, ...checklistDetailInclude };
  * Spelled out rather than derived from `Prisma.TaskGetPayload` so unit tests can build a
  * row without the client's generated payload types. `label.color` stays `string` here —
  * this is the database shape, and narrowing it to a slot is the mapper's job.
+ *
+ * `attachmentCount` is the one field on this type that no include produces: it is attached by
+ * the caller from `countAttachmentsByTask`, for the reason written above and in
+ * `attachment-count.ts`. Keeping it on the row rather than threading it through the mapper's
+ * signature means the read that knows the page is the read that scopes the count, and every
+ * `toTaskDetailDto` call site stays as it was.
  */
 export type TaskRowBase = {
   id: string;
@@ -74,7 +84,7 @@ export type TaskRowBase = {
   labels: Array<{
     label: { id: string; boardId: string; name: string; color: string };
   }>;
-  _count: { attachments: number };
+  attachmentCount: number;
 };
 
 /** A task row as read with `taskListInclude`: checklist items reduced to their state. */

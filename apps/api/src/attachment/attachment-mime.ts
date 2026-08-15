@@ -56,7 +56,17 @@ export const ALLOWED_MIME_TYPES: ReadonlySet<string> = new Set([
   'text/csv',
 ]);
 
-/** The four types served `inline`; everything else is `attachment` (ADR 0024). */
+/**
+ * The four types served `inline`; everything else is `attachment` (ADR 0024).
+ *
+ * **There is a second copy of this list**, in `apps/web/components/task/attachment-row.tsx` as
+ * `PREVIEWABLE_MIME_TYPES`, and nothing makes the two agree. They are separate on purpose —
+ * this one decides a response header on bytes the server has sniffed, that one decides whether
+ * the panel spends a request on a thumbnail — but the duplication is real and drifting is
+ * silent, so each list names the other. Adding a type here and not there costs a preview;
+ * adding it there and not here costs a failed fetch the row already degrades from. Neither
+ * breaks, which is exactly why nothing would tell you.
+ */
 export const INLINE_MIME_TYPES: ReadonlySet<string> = new Set([
   'image/png',
   'image/jpeg',

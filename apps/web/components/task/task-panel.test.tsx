@@ -23,6 +23,23 @@ vi.mock('./task-metadata-panel', () => ({
   TaskMetadataPanel: (): React.ReactElement => <div data-testid="metadata" />,
 }));
 
+// The attachment surface owns a read of its own (`GET .../attachments`) plus the instance
+// config, neither of which is part of this file's contract. The hook is stubbed rather than the
+// component, so the real section still renders and the order assertion below has something to
+// measure.
+vi.mock('./use-task-attachments', () => ({
+  useTaskAttachments: () => ({
+    attachments: [],
+    storageEnabled: true,
+    loading: false,
+    loadFailed: false,
+    pending: false,
+    upload: vi.fn(),
+    addLink: vi.fn(),
+    remove: vi.fn(),
+  }),
+}));
+
 const TASK_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d60';
 
 const task: TaskDto = {
@@ -300,5 +317,34 @@ describe('TaskPanel checklists', () => {
       screen.getByRole('region', { name: messages.app.board.task.checklist.sectionLabel }),
     ).toBeDefined();
     expect(screen.getByLabelText(messages.app.board.task.checklist.newChecklist)).toBeDefined();
+  });
+});
+
+describe('TaskPanel attachments', () => {
+  it('offers the attachment surface inside the panel rather than behind another click', () => {
+    render(<Board open />);
+
+    expect(
+      screen.getByRole('region', { name: messages.app.board.task.attachments.sectionLabel }),
+    ).toBeDefined();
+  });
+
+  it('keeps the delete footer last, with attachments above the metadata panel', () => {
+    // The footer is `mt-auto` and only reaches the bottom of the scroll column while it is the
+    // last child of it. A section appended after it looks fine in a screenshot of a long task
+    // and wrong on every short one, which is why the position is asserted rather than reviewed.
+    render(<Board open />);
+
+    const attachments = screen.getByRole('region', {
+      name: messages.app.board.task.attachments.sectionLabel,
+    });
+    const metadata = screen.getByTestId('metadata');
+    const footer = screen.getByRole('button', {
+      name: messages.app.board.task.deleteAction,
+    }).parentElement!;
+
+    expect(attachments.compareDocumentPosition(metadata)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(footer.nextElementSibling).toBeNull();
+    expect(footer.parentElement).toBe(metadata.parentElement);
   });
 });
