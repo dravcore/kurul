@@ -563,7 +563,8 @@ içindeki column başına render bütçesi bu board'a karşı ölçüldü.
 ## Veri saklama
 
 Kurultay artık saklamaya hakkı olmayan satırları siler. Bir BullMQ işi `REDIS_URL` üzerinde
-**günde bir kez** koşar — due-soon taramasıyla aynı mekanizma — ve beş tabloyu süpürür:
+**günde bir kez** koşar — due-soon taramasıyla aynı mekanizma — ve beş tabloyu, artı attachment
+dizinini süpürür:
 
 | Tablo          | Ne zaman silinir                     | Ayar                                            |
 | -------------- | ------------------------------------ | ----------------------------------------------- |
@@ -572,6 +573,16 @@ Kurultay artık saklamaya hakkı olmayan satırları siler. Bir BullMQ işi `RED
 | `Notification` | okunmuşsa ve N günden önce okunmuşsa | `NOTIFICATION_RETENTION_DAYS` (varsayılan `90`) |
 | `Activity`     | N günden önce yazılmışsa             | `ACTIVITY_RETENTION_DAYS` (varsayılan `365`)    |
 | `UsagePing`    | N günden önce yazılmışsa             | `ACTIVITY_RETENTION_DAYS` (varsayılan `365`)    |
+
+Altıncı süpürmenin tablosu yok. **Hiçbir satırın sahiplenmediği attachment dosyaları silinir**;
+bunlar `Workspace → Board → Task → Attachment` zincirinin tümüyle Postgres içinde cascade
+etmesinden doğar: bir board silindiğinde binlerce attachment satırı tek satır uygulama kodu
+koşmadan kaybolabilir, yani byte'ları silecek hiçbir şey çalışmaz. `STORAGE_PATH` tanımsızsa
+süpürme hiç koşmaz, ve yalnız `BACKUP_KEEP × BACKUP_INTERVAL` kadarlık bir **grace period**'dan
+daha eski dosyalara bakar — o iki değer ne derse desin asla 24 saatin altına inmez, çünkü satırı
+henüz commit edilmemiş bir dosya da hiçbir satırın sahiplenmediği bir dosyadır. Raporladığı
+sayı `orphanedFiles`; bir depolama anahtarı attachment'ın kimliği olduğu için bu bir sayıdır,
+asla anahtar listesi değil.
 
 `UsagePing` bilerek kendi penceresini taşımak yerine `ACTIVITY_RETENTION_DAYS`'i paylaşır: aynı
 sınıf satırdır — bir kullanıcıyı adlandıran kurulum geçmişi — ve tek bir veri sınıfı üzerindeki

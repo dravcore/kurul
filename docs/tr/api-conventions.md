@@ -99,6 +99,21 @@ GET    /workspaces/:workspaceId/tasks/:taskId/comments
 POST   /workspaces/:workspaceId/tasks/:taskId/comments
 DELETE /workspaces/:workspaceId/comments/:commentId
 
+POST   /workspaces/:workspaceId/tasks/:taskId/checklists
+PATCH  /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId
+PATCH  /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId/position
+DELETE /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId
+POST   /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId/items
+PATCH  /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId
+PATCH  /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId/position
+DELETE /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId  # GET yok: checklist'ler GET tasks/:taskId içinde döner
+
+GET    /workspaces/:workspaceId/tasks/:taskId/attachments
+POST   /workspaces/:workspaceId/tasks/:taskId/attachments   # multipart (dosya) veya JSON (bağlantı)
+GET    /workspaces/:workspaceId/attachments/:attachmentId
+GET    /workspaces/:workspaceId/attachments/:attachmentId/content  # byte'lar — JSON olmayan tek cevap
+DELETE /workspaces/:workspaceId/attachments/:attachmentId
+
 GET    /workspaces/:workspaceId/activities                 # workspace aktivite akışı
 GET    /workspaces/:workspaceId/tasks/:taskId/activities    # task aktivite akışı
 
@@ -117,6 +132,14 @@ Board ve column rol kapıları:
 [ADR 0012](decisions/0012-comment-delete-authorship.md). Activity, dashboard ve notification
 route'ları aynı veri üzerinde salt-okunur agregasyon/akışlardır ve ayrı bir rol matrisi
 yerine workspace üyelik kapısını (`WorkspaceGuard`) miras alır.
+
+Attachment'lar beş route'tur ve üçü bir task üzerinden değil, doğrudan attachment id'siyle
+adreslenir — yukarıdaki sığ adresleme kuralı. Okumalar (liste, tekil, byte'lar) her workspace
+üyesine açık; ekleme ve silme bir content rolü ister. Silme, comment silmenin aksine (ADR 0012)
+**yazar çizgisi çekmez**: aynı rol zaten task'ın tamamını silebiliyor ve `Attachment.taskId`
+cascade, dolayısıyla küçük eylemi kapatıp büyüğünü açık bırakmak bir yetki kontrolü değil, bir
+UI tuzağı olurdu. Tipler, limitler ve servis politikası:
+[ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md).
 
 Davetler public API'de workspace-scoped'dır. Persistence Better Auth organization
 plugin'ine aittir (Faz 1'de Prisma `Invitation` modeli yok). Ürün isimleri
@@ -158,12 +181,13 @@ burasıdır — bkz.
 `InstanceConfigDto` ile cevap verir:
 
 ```json
-{ "mailEnabled": true }
+{ "mailEnabled": true, "attachmentsEnabled": true }
 ```
 
-| Alan          | Anlamı                                                                                                                                                              |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mailEnabled` | SMTP host'u yapılandırılmamışsa `false` — her mesaj API log'una yazılır ve hiçbir yere teslim edilmez; kimse adresini doğrulayamaz, dolayısıyla daveti kabul edemez |
+| Alan                 | Anlamı                                                                                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mailEnabled`        | SMTP host'u yapılandırılmamışsa `false` — her mesaj API log'una yazılır ve hiçbir yere teslim edilmez; kimse adresini doğrulayamaz, dolayısıyla daveti kabul edemez                        |
+| `attachmentsEnabled` | `STORAGE_PATH` tanımsızsa `false` — bu deployment hiç dosya saklamaz ve web arayüzü yükleme kontrolünü gizler. **Bağlantı ekleri buna bağlı değildir** — bir bağlantı hiç depolama istemez |
 
 Bu ucun biçimini üç kural tutar ve her biri başka türlü de karar verilebilecek bir seçimdir:
 
@@ -236,19 +260,21 @@ gerçekten operasyon olduğu yerde kullanılır (örneğin bir column'un tamamı
 sıralamak). Bir alanı atlayan bir `PATCH` onu dokunulmamış bırakır; açıkça `null` göndermek
 nullable bir alanı temizler.
 
-| Status                      | Ne zaman                                                                                                      |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `200 OK`                    | Başarılı okuma, güncelleme veya aksiyon                                                                       |
-| `201 Created`               | Kaynak oluşturuldu; body oluşturulan kaynaktır                                                                |
-| `204 No Content`            | Başarılı silme; boş body                                                                                      |
-| `400 Bad Request`           | Bozuk request veya validation hatası                                                                          |
-| `401 Unauthorized`          | Eksik veya geçersiz session                                                                                   |
-| `403 Forbidden`             | Kimlikli, workspace üyesi, ama rol yetersiz                                                                   |
-| `404 Not Found`             | Kaynak yok **veya** başka bir workspace'e ait                                                                 |
-| `409 Conflict`              | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                   |
-| `422 Unprocessable Entity`  | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak) |
-| `429 Too Many Requests`     | Rate limit uygulandı                                                                                          |
-| `500 Internal Server Error` | Ele alınmamış hata. Asla bir stack trace sızdırmaz.                                                           |
+| Status                       | Ne zaman                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `200 OK`                     | Başarılı okuma, güncelleme veya aksiyon                                                                            |
+| `201 Created`                | Kaynak oluşturuldu; body oluşturulan kaynaktır                                                                     |
+| `204 No Content`             | Başarılı silme; boş body                                                                                           |
+| `400 Bad Request`            | Bozuk request veya validation hatası                                                                               |
+| `401 Unauthorized`           | Eksik veya geçersiz session                                                                                        |
+| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz                                                                        |
+| `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                      |
+| `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                        |
+| `413 Payload Too Large`      | Yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor. İki katman da bu cevabı verebilir — aşağıya bakın                         |
+| `415 Unsupported Media Type` | Dosyanın **magic byte**'ları allowlist'te değil. Beyan edilen `Content-Type` ve uzantı kanıt sayılmaz, hiç okunmaz |
+| `422 Unprocessable Entity`   | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak)      |
+| `429 Too Many Requests`      | Rate limit uygulandı                                                                                               |
+| `500 Internal Server Error`  | Ele alınmamış hata. Asla bir stack trace sızdırmaz.                                                                |
 
 **Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
 doğrulardı, ki bu tenant sınırının ötesine bilgi sızdırır. `403`, rolü çok düşük meşru bir
@@ -296,7 +322,66 @@ Kurallar:
   ile. Client'lar "yok"u "null"dan ayırt etmek zorunda kalmamalıdır.
 - Bir Prisma entity'sini asla doğrudan döndürmeyin. Neyin public olduğuna response DTO'su
   karar verir.
-- Body'si olan her response'ta `Content-Type: application/json; charset=utf-8`.
+- Body'si olan her response'ta `Content-Type: application/json; charset=utf-8` — belgelenmiş
+  tam olarak tek bir istisnayla: `GET /workspaces/:workspaceId/attachments/:attachmentId/content`
+  saklanan dosyanın kendi medya tipiyle ve byte'larıyla cevap verir. API'de JSON dışında bir şey
+  yazan tek handler budur; ikincisinin aynı büyüklükte bir gerekçesi olmalıdır.
+
+### Dosya yükleme ve indirme
+
+Bir attachment'ın alabileceği iki şekli de tek bir uç alır:
+`POST /workspaces/:workspaceId/tasks/:taskId/attachments` ya `multipart/form-data` (adı `file`
+olan bir part — **FILE**) ya da `application/json` (**LINK**) kabul eder. `kind` her zaman
+gövdede açıkça taşınır — `"FILE"` ya da `"LINK"` — ve bir dosya part'ının gelip gelmediğinden
+türetilmez; böylece ikisini de taşımayan bir istek tahmin değil, eksiği adıyla söyleyen bir
+doğrulama hatası alır. İki şekil de `201` ve bir `AttachmentDto` ile cevaplanır.
+
+**LINK, sunucunun sakladığı, döndürdüğü ve asla istek atmadığı bir URL'dir.** Önizleme yok,
+favicon yok, `<title>` kazıma yok, unfurl yok, sağlık kontrolü yok. Yalnız `http:` ve `https:`
+saklanır; `javascript:`, `data:` ve `file:` yazma anında `400` ile reddedilir. Kullanıcının
+verdiği bir URL'e sunucu tarafı fetch bir SSRF primitive'idir ve `postgres` ile `redis`'in
+isimle çözüldüğü bir Compose ağı bunun için olabilecek en kötü yerdir
+([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)).
+
+**FILE, magic byte'larıyla kabul edilir.** Beyan edilen `Content-Type` de dosya uzantısı da
+çağırandan gelir ve hiçbiri kanıt değildir; tip içerikten okunur ve bir allowlist'le
+eşleştirilir: PNG, JPEG, GIF, WebP; PDF; OpenXML ve OpenDocument ofis formatları; ZIP; artı
+aşağıdaki dar yoldan `text/plain` ve `text/csv`. `text/html` ve `image/svg+xml` isim isim
+dışarıdadır, her yürütülebilir ve script konteyneriyle birlikte. Başka her şey `415`.
+
+**Bir `.txt` neden geçiyor da `.txt` diye yeniden adlandırılmış bir `.html` geçmiyor.** Düz
+metnin magic number'ı yoktur, yani hiçbir şey olarak sniff edilir ve yukarıdaki kural onu
+reddederdi — bu da allowlist'teki yerini bir yalana çevirirdi. Bunun yerine **dört** koşulu
+birden isteyen bir geri düşüş kuralıyla kabul edilir:
+
+1. beyan edilen tip **tam olarak** `text/plain` ya da `text/csv` (bu kapıyı başka hiçbir şey
+   açmaz),
+2. byte'lar geçerli UTF-8 olarak çözülüyor,
+3. içlerinde `NUL` byte'ı yok, ve
+4. boşluklar atıldıktan sonraki ilk karakter `<` değil.
+
+Herhangi biri sağlanmazsa cevap `415`. Markup'ı dışarıda tutan 4. koşuldur; 1. koşul ise iki
+literale karşı bir üyelik testidir — satıra ve sonra cevap header'ına yazılan tip o iki
+literalden biridir, asla çağıranın string'inin bir kopyası değil. Beyan, zaten eşit ölçüde inert
+olan iki etiket arasında seçim yapar; yüklemenin güvenli olup olmadığına asla o karar vermez. O
+yargı 2-4. koşullarındır.
+
+**Boyut, bilinçli olarak farklı sayılar taşıyan iki katmanda sınırlanır.**
+`ATTACHMENT_MAX_BYTES` (varsayılan `26214400` — 25 MiB) **dosyanın** boyutudur ve kullanıcıya
+söylenecek sayı odur; ters proxy **isteğin tamamını** sınırlar ve daha yükseğe ayarlanır, çünkü
+multipart zarfı dosyanın üstüne birkaç yüz byte ekler. İkisi de `413` döner ve hangisinin
+döndüğünü cevabın gövdesi söyler: API'nin `413`'ü yukarıdaki hata zarfıdır, proxy'ninki hiç JSON
+değildir. Hangi sayının değiştirileceği ve aralarındaki sıralama kuralı:
+[self-hosting.md](self-hosting.md#kendi-reverse-proxynizi-kullanmak).
+
+**İndirme.** `GET .../attachments/:attachmentId/content` byte'ları **sniff edilmiş** medya tipiyle
+(asla istemcinin yüklemede beyan ettiğiyle değil), `Content-Length` ve `Content-Disposition` ile
+akıtır. Disposition, panelin önizleyebilmesi için `inline` servis edilen dört görsel tipi
+dışında her şeyde `attachment`'tır — "her şey"e PDF de dahil. Böyle her cevap ayrıca
+`X-Content-Type-Options: nosniff`, `Cross-Origin-Resource-Policy: same-origin` (API'nin global
+olarak verdiği `cross-origin` politikasını override eder) ve
+`Cache-Control: private, max-age=0, must-revalidate` taşır. Bir `LINK`'in içeriğini istemek
+`404`'tür: byte yoktur, ve "tip yanlış" demek satırın var olduğunu doğrulardı.
 
 ## Hatalar
 
@@ -433,9 +518,17 @@ Bütçeler **client IP'si ve route başına**, kayan bir dakikalık pencerede sa
 | Aşağıda sayılmayan her endpoint             | 100 / dk | Bir insanın üreteceğinin çok üstünde; script'i sınırlar                     |
 | `POST /workspaces/:workspaceId/invitations` | 10 / dk  | Her çağrı, adresini çağıranın seçtiği bir mesajı SMTP relay'ine verir       |
 | `GET .../boards/:boardId/tasks?q=`          | 30 / dk  | `q=` bir trigram taramasıdır; aynı route `q=` olmadan varsayılanda kalır    |
+| `POST .../tasks/:taskId/attachments`        | 20 / dk  | Tek bir isteğin `ATTACHMENT_MAX_BYTES` kadar diske mal olabildiği tek uç    |
+| `GET .../attachments/:attachmentId/content` | 300 / dk | Varsayılanın _üstünde_: on görsel ekli bir panel açılışta on istek üretir   |
 | `/auth/sign-in*`, `/auth/sign-up*`          | 3 / 10sn | Better Auth'un kimlik endpoint'leri için yerleşik kuralı                    |
 | Diğer `/auth/*`                             | 100 / dk | Better Auth'un kendi limiter'ı — `/auth/*` Nest router'ını atlar (ADR 0004) |
 | `GET /health`, `GET /health/ready`          | muaf     | Throttle edilen bir probe, sağlıklı bir API'yi çökmüş gösterir              |
+
+**Yükleme bütçesi yeterliymiş gibi sunulmuyor, yetersiz diye adlandırılıyor.** Throttler IP
+başına, route başına istek sayar; bu bir yükleme için iki kez yanlış birimdir: yirmi 25 MiB'lık
+istek ile yirmi 10 kB'lık istek aynı bütçeyi harcar, ve tek bir NAT arkasındaki ofis tek bir
+kovayı paylaşır. Gerçek tavan, dosya başına boyut limiti artı henüz var olmayan bir workspace
+kotasıdır (ADR 0022).
 
 İki router olduğu için iki limiter var. `/auth/*` Nest'in altındaki ham Express tarafından
 sunulur, dolayısıyla `ThrottlerGuard` onu hiç görmez ve işi Better Auth'un kendi limiter'ı

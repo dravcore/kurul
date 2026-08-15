@@ -97,14 +97,14 @@ Four services — `api`, `web`, `postgres`, `redis` — matching the existing se
 
 ## 3. Deliberately not included
 
-| Technology              | Why not now                                                                                                   |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Kafka                   | ClickUp uses it, but at 20M+ user scale. Redis pub/sub is more than enough for the MVP; it can be added later |
-| GraphQL                 | Linear uses it. REST is faster to start with; revisit when API consumers diversify                            |
-| Elasticsearch           | Full-text search can start with PostgreSQL's built-in FTS                                                     |
-| Kubernetes              | Docker Compose on one host is sufficient. Migrate when traffic requires it                                    |
-| MinIO / S3              | File attachments are out of MVP scope. When added, pick an S3-compatible store                                |
-| Local-first sync engine | Linear's largest technical investment. Very high complexity — start server-first                              |
+| Technology              | Why not now                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kafka                   | ClickUp uses it, but at 20M+ user scale. Redis pub/sub is more than enough for the MVP; it can be added later                                                                                                                                                                                                                                       |
+| GraphQL                 | Linear uses it. REST is faster to start with; revisit when API consumers diversify                                                                                                                                                                                                                                                                  |
+| Elasticsearch           | Full-text search can start with PostgreSQL's built-in FTS                                                                                                                                                                                                                                                                                           |
+| Kubernetes              | Docker Compose on one host is sufficient. Migrate when traffic requires it                                                                                                                                                                                                                                                                          |
+| MinIO / S3              | Attachments ship on **local disk behind a `StorageBackend` port**, not on object storage ([ADR 0022](decisions/0022-attachment-storage.md)). An `S3StorageBackend` is deferred to a trigger, not to a schedule: the first operator report of a deployment where local disk is not durable — an ephemeral container host, or a multi-replica install |
+| Local-first sync engine | Linear's largest technical investment. Very high complexity — start server-first                                                                                                                                                                                                                                                                    |
 
 ---
 

@@ -81,6 +81,14 @@ içerebilir ve her iki değer de bir URL'in içine giriyor — orada bir slash U
 karar veren şey odur. `https://…` otomatik HTTPS'i açar. `http://localhost` (varsayılan) ise
 domain'siz yerel kurulumdur.
 
+**Attachment'lar için burada bir satır gerekmiyor.** `docker-compose.yml` `STORAGE_PATH`'i
+kendisi, `attachment_data` volume'ünün içindeki bir dizine ayarlar; yani Compose kurulumu kutudan
+çıktığı hâliyle dosya yüklemeyi kabul eder — o değişkenin `.env`'deki kopyası yalnız geliştirme
+döngüsü içindir. Değiştirmek isteyebileceğiniz tek değer `ATTACHMENT_MAX_BYTES` (varsayılan
+`26214400`, 25 MiB) ve değiştirecekseniz önce
+[aşağıdaki proxy sözleşmesini](#kendi-reverse-proxynizi-kullanmak) okuyun: ters proxy, onunla
+birlikte hareket etmesi gereken ayrı ve bilinçli olarak daha yüksek bir tavan taşıyor.
+
 ## 3. Başlatın
 
 ```bash
@@ -230,15 +238,25 @@ docker compose logs api | grep -i mail
 ## Yedekler
 
 `backup` servisi zaten çalışıyor: her `BACKUP_INTERVAL` saniyede bir (varsayılan 24 saat)
-`backup_data` volume'üne bir `pg_dump` arşivi yazar ve bunlardan `BACKUP_KEEP` tanesini tutar.
+`backup_data` volume'üne **iki** arşiv yazar — veritabanının `pg_dump`'ı ve yüklenmiş attachment
+dosyalarının `.tar.gz`'i — ve her seriden `BACKUP_KEEP` tanesini tutar. Bir döngünün iki arşivi
+de **aynı zaman damgasını** taşır; bir restore hangi tar'ın hangi dump'a ait olduğunu böyle
+bilir.
 
 Bu, "yanlış workspace'i sildim" durumunu karşılar. Ölen bir diski karşılamaz — arşivler
-veritabanıyla aynı makinede durur. Onları makine dışına kopyalayın:
+veritabanıyla aynı makinede durur. Onları makine dışına kopyalayın — yalnız dump'ı değil, **en
+yeni döngünün iki yarısını da**:
 
 ```bash
 docker run --rm -v kurultay_backup_data:/backups -v "$PWD:/out" alpine \
-  sh -c 'cp /backups/$(ls -t /backups | head -1) /out/'
+  sh -c 'stamp=$(ls -t /backups/*.dump | head -1 | sed "s|.*/kurultay-||;s|\.dump$||"); \
+         cp /backups/kurultay-$stamp.dump /out/; \
+         cp /backups/kurultay-$stamp-files.tar.gz /out/ 2>/dev/null || true'
 ```
+
+Dosya arşivi olmadan geri yüklenen bir dump bütün satırları geri getirir ve yüklenmiş her
+dosyayı geride bırakır — üstelik attachment'lardan önce yazılmış her doğrulama adımından geçer.
+[Yedekten geri dönme](development.md#yedekten-geri-dönme) tatbikatı dosyaları da kontrol eder.
 
 Geri yükleme adımları: [Yükseltme ve yedekleme](development.md#yükseltme-ve-yedekleme).
 

@@ -106,6 +106,12 @@ PATCH  /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId
 PATCH  /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId/position
 DELETE /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId  # no GET: checklists come back inside GET tasks/:taskId
 
+GET    /workspaces/:workspaceId/tasks/:taskId/attachments
+POST   /workspaces/:workspaceId/tasks/:taskId/attachments   # multipart (a file) or JSON (a link)
+GET    /workspaces/:workspaceId/attachments/:attachmentId
+GET    /workspaces/:workspaceId/attachments/:attachmentId/content  # the bytes — the one non-JSON response
+DELETE /workspaces/:workspaceId/attachments/:attachmentId
+
 GET    /workspaces/:workspaceId/activities                 # workspace activity feed
 GET    /workspaces/:workspaceId/tasks/:taskId/activities    # task activity feed
 
@@ -124,6 +130,14 @@ Board and column role gates:
 [ADR 0012](decisions/0012-comment-delete-authorship.md). Activity, dashboard, and notification
 routes are read-only aggregations/feeds over the same data and inherit the workspace member
 gate (`WorkspaceGuard`) — no separate role matrix.
+
+Attachments are five routes, and three of them are addressed by attachment id rather than
+through a task — the shallow-addressing rule above. Reading (list, single, bytes) is open to
+any workspace member; attaching and detaching need a content role. Detaching draws **no**
+author line, unlike comment deletion (ADR 0012): the same role can already delete the whole
+task, and `Attachment.taskId` cascades, so gating the smaller act while leaving the larger one
+open would be a UI trap rather than an authorization check. Kinds, limits and the serving
+policy: [ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md).
 
 Invitations are workspace-scoped in the public API. Persistence is the
 `WorkspaceInvitation` table, mapped from Better Auth's organization plugin.
@@ -162,12 +176,13 @@ written — see [decisions/0018-localization-strategy.md](decisions/0018-localiz
 `GET /config` answers **"what is this deployment configured to do"** with an `InstanceConfigDto`:
 
 ```json
-{ "mailEnabled": true }
+{ "mailEnabled": true, "attachmentsEnabled": true }
 ```
 
-| Field         | Meaning                                                                                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mailEnabled` | `false` when no SMTP host is configured, so every message is written to the API log and delivered nowhere — nobody can confirm an address or accept an invite |
+| Field                | Meaning                                                                                                                                                                                      |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mailEnabled`        | `false` when no SMTP host is configured, so every message is written to the API log and delivered nowhere — nobody can confirm an address or accept an invite                                |
+| `attachmentsEnabled` | `false` when `STORAGE_PATH` is unset, so this deployment stores no files and the web app hides the upload control. **Link attachments do not depend on it** — a link needs no storage at all |
 
 Three rules hold this endpoint's shape, and each one is a decision that was available to make
 differently:
@@ -239,19 +254,21 @@ Action segments are the exception and each one needs a reason. Do not invent
 genuinely the operation (reordering an entire column, for example). A `PATCH` that omits a
 field leaves it untouched; sending `null` explicitly clears a nullable field.
 
-| Status                      | When                                                                                      |
-| --------------------------- | ----------------------------------------------------------------------------------------- |
-| `200 OK`                    | Successful read, update, or action                                                        |
-| `201 Created`               | Resource created; body is the created resource                                            |
-| `204 No Content`            | Successful delete; empty body                                                             |
-| `400 Bad Request`           | Malformed request or validation failure                                                   |
-| `401 Unauthorized`          | Missing or invalid session                                                                |
-| `403 Forbidden`             | Authenticated, workspace member, but role is insufficient                                 |
-| `404 Not Found`             | Resource does not exist **or** belongs to another workspace                               |
-| `409 Conflict`              | Uniqueness violation (duplicate slug), or a conflicting concurrent change                 |
-| `422 Unprocessable Entity`  | Semantically invalid though well-formed (e.g. moving a task to a column on another board) |
-| `429 Too Many Requests`     | Rate limited                                                                              |
-| `500 Internal Server Error` | Unhandled failure. Never leaks a stack trace.                                             |
+| Status                       | When                                                                                                                                      |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `200 OK`                     | Successful read, update, or action                                                                                                        |
+| `201 Created`                | Resource created; body is the created resource                                                                                            |
+| `204 No Content`             | Successful delete; empty body                                                                                                             |
+| `400 Bad Request`            | Malformed request or validation failure                                                                                                   |
+| `401 Unauthorized`           | Missing or invalid session                                                                                                                |
+| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient                                                                                 |
+| `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                               |
+| `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                 |
+| `413 Payload Too Large`      | An upload is over `ATTACHMENT_MAX_BYTES`. Two layers can answer it — see below                                                            |
+| `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted |
+| `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                 |
+| `429 Too Many Requests`      | Rate limited                                                                                                                              |
+| `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                             |
 
 **Cross-workspace access returns `404`, not `403`.** A `403` would confirm that the resource
 exists, which leaks information across the tenant boundary. `403` is reserved for a
@@ -298,7 +315,65 @@ Rules:
 - Omit nothing for the sake of size — a field that exists is always present, with `null` if
   empty. Clients should not have to distinguish "absent" from "null".
 - Never return a Prisma entity directly. The response DTO decides what is public.
-- `Content-Type: application/json; charset=utf-8` on every response with a body.
+- `Content-Type: application/json; charset=utf-8` on every response with a body — with exactly
+  one documented exception: `GET /workspaces/:workspaceId/attachments/:attachmentId/content`
+  answers with the stored file's own media type and its bytes. It is the only handler in the
+  API that writes something other than JSON, and the next one needs a reason of the same size.
+
+### File uploads and downloads
+
+One endpoint takes both shapes an attachment can have:
+`POST /workspaces/:workspaceId/tasks/:taskId/attachments` accepts `multipart/form-data` with a
+part named `file` (a **FILE**), or `application/json` (a **LINK**). `kind` is always carried
+explicitly in the body — `"FILE"` or `"LINK"` — and never inferred from whether a file part
+arrived, so a request carrying neither gets a validation error that names what is missing
+rather than a guess. Both shapes answer `201` with an `AttachmentDto`.
+
+**A LINK is a URL the server stores and returns and never requests.** No preview, no favicon,
+no `<title>` scrape, no unfurl, no health check. Only `http:` and `https:` are stored;
+`javascript:`, `data:` and `file:` are rejected with `400` at write time. Server-side fetching
+of a user-supplied URL is an SSRF primitive, and a Compose network where `postgres` and `redis`
+resolve by name is the worst possible place for one ([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)).
+
+**A FILE is accepted on its magic bytes.** The declared `Content-Type` and the filename
+extension both come from the caller and neither is evidence, so the type is read from the
+content and matched against an allowlist: PNG, JPEG, GIF and WebP; PDF; the OpenXML and
+OpenDocument office formats; ZIP; plus `text/plain` and `text/csv` through the narrow path
+below. `text/html` and `image/svg+xml` are excluded by name, along with every executable and
+script container. Anything else is `415`.
+
+**Why a `.txt` is accepted and an `.html` renamed `.txt` is not.** Plain text has no magic
+number, so it sniffs as nothing and would be refused by the rule above — which would make its
+place on the allowlist a lie. It is instead accepted by a fallback that requires **four**
+things at once:
+
+1. the declared type is **exactly** `text/plain` or `text/csv` (nothing else opens this door),
+2. the bytes decode as valid UTF-8,
+3. they contain no `NUL` byte, and
+4. the first non-whitespace character is not `<`.
+
+Fail any one and the answer is `415`. Condition 4 is what keeps markup out, and condition 1 is
+a membership test against two literals — the type written to the row and later to the response
+header is one of those two literals, never a copy of the caller's string. The declaration
+picks between two labels that are already equally inert; it never decides whether the upload is
+safe. That verdict is conditions 2-4.
+
+**Size is limited in two layers that carry deliberately different numbers.**
+`ATTACHMENT_MAX_BYTES` (default `26214400` — 25 MiB) is the size of the **file** and the number
+to quote to users; the reverse proxy caps the **whole request body** and is set higher, because
+a multipart envelope adds a few hundred bytes on top of the file. Both answer `413`, and the
+response body is what tells them apart: the API's `413` is the error envelope above, the
+proxy's is not JSON at all. Which number to change, and the ordering rule between them, are in
+[self-hosting.md](self-hosting.md#bringing-your-own-reverse-proxy).
+
+**Downloads.** `GET .../attachments/:attachmentId/content` streams the bytes with the **sniffed**
+media type (never the one the client declared at upload), `Content-Length`, and
+`Content-Disposition`. Disposition is `attachment` for everything except the four image types,
+which are served `inline` so the panel can preview them — PDFs included in "everything". Every
+such response also carries `X-Content-Type-Options: nosniff`,
+`Cross-Origin-Resource-Policy: same-origin` (overriding the `cross-origin` policy the API sets
+globally) and `Cache-Control: private, max-age=0, must-revalidate`. Asking for the content of a
+`LINK` is `404`: there are no bytes, and saying "wrong kind" would confirm the row exists.
 
 ## Errors
 
@@ -426,14 +501,22 @@ with a `Retry-After` header giving the seconds to wait. Requests still under bud
 Budgets are counted **per client IP and per route** over a rolling minute — one endpoint
 running hot never spends another endpoint's allowance.
 
-| Endpoint                                    | Budget    | Why                                                                       |
-| ------------------------------------------- | --------- | ------------------------------------------------------------------------- |
-| Any endpoint, unless listed below           | 100 / min | Well clear of what a person generates; caps a script                      |
-| `POST /workspaces/:workspaceId/invitations` | 10 / min  | Each call hands a message to the SMTP relay, addressed by the caller      |
-| `GET .../boards/:boardId/tasks?q=`          | 30 / min  | `q=` is a trigram scan; the same route without `q=` keeps the default     |
-| `/auth/sign-in*`, `/auth/sign-up*`          | 3 / 10s   | Better Auth's built-in rule for credential endpoints                      |
-| `/auth/*` otherwise                         | 100 / min | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004) |
-| `GET /health`, `GET /health/ready`          | exempt    | A throttled probe would report a healthy API as down                      |
+| Endpoint                                    | Budget    | Why                                                                                 |
+| ------------------------------------------- | --------- | ----------------------------------------------------------------------------------- |
+| Any endpoint, unless listed below           | 100 / min | Well clear of what a person generates; caps a script                                |
+| `POST /workspaces/:workspaceId/invitations` | 10 / min  | Each call hands a message to the SMTP relay, addressed by the caller                |
+| `GET .../boards/:boardId/tasks?q=`          | 30 / min  | `q=` is a trigram scan; the same route without `q=` keeps the default               |
+| `POST .../tasks/:taskId/attachments`        | 20 / min  | The one endpoint where a single request can cost `ATTACHMENT_MAX_BYTES` of disk     |
+| `GET .../attachments/:attachmentId/content` | 300 / min | _Above_ the default: a panel with ten image attachments issues ten requests on open |
+| `/auth/sign-in*`, `/auth/sign-up*`          | 3 / 10s   | Better Auth's built-in rule for credential endpoints                                |
+| `/auth/*` otherwise                         | 100 / min | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004)           |
+| `GET /health`, `GET /health/ready`          | exempt    | A throttled probe would report a healthy API as down                                |
+
+**The upload budget is named as insufficient rather than presented as enough.** The throttler
+counts requests per IP per route, which is the wrong unit twice for an upload: twenty 25 MiB
+requests and twenty 10 kB requests spend the same allowance, and an office behind one NAT
+shares a single bucket. The real ceiling is the per-file size limit, plus a per-workspace quota
+that does not exist yet (ADR 0022).
 
 Two limiters cover the surface because there are two routers. `/auth/*` is served by raw
 Express below Nest, so `ThrottlerGuard` never sees it and Better Auth's own limiter handles
