@@ -272,6 +272,39 @@ of its own, which is why the bundled `docker/Caddyfile` has to set one explicitl
 defaults `client_max_body_size` to **1 MB**, so a replacement proxy that omits the row rejects
 every attachment larger than a megabyte.
 
+### Telling the two 413s apart
+
+Both layers answer an oversized upload with `413`, and **the response body is what says which
+one did it**:
+
+| What you get back                                  | Who rejected it | What it means                                                            |
+| -------------------------------------------------- | --------------- | ------------------------------------------------------------------------ |
+| `413` with an **empty** body (`Content-Length: 0`) | the proxy       | working as designed — the request never reached the API                  |
+| `413` with a **JSON** body carrying `statusCode`   | the API         | your proxy's limit is higher than `ATTACHMENT_MAX_BYTES`, or it has none |
+
+The second row is the misconfiguration: the proxy carried a body the API then refused, which is
+the wasted-upload half of the two-layer rule. The first row is the correct behaviour.
+
+The headers do not help — Caddy's `413` carries no `Server` header, so only the body
+distinguishes them. Everything the API itself rejects comes back as
+`Content-Type: application/json; charset=utf-8` with a `{"statusCode":…,"error":…,"path":…,
+"requestId":…}` envelope; the proxy's rejection carries no body at all.
+
+**The proxy does not log this rejection.** `docker/Caddyfile` has no `log` directive — the API
+already logs every request that reaches it, and access logs on both layers would double every
+deployment's log volume for one size check — so a body rejected by the proxy appears in
+`docker compose logs proxy` **not at all**. An empty `413` with nothing in the proxy log is the
+expected result, not evidence that the limit is broken.
+
+Measured on the shipped `docker/Caddyfile` against `caddy:2-alpine`: exactly `26214400` bytes →
+`200`, one byte more → `413`, with `curl` exiting `0` on a well-formed status line — the
+connection is closed properly rather than cut mid-upload.
+
+If you reproduce this yourself, **aim it at a real upload endpoint**. Pointing it at an
+arbitrary path measures nothing: the API answers `404` as soon as it has the headers, without
+ever reading the body, so the request finishes before the proxy's limit is reached and you get a
+`404` that looks like the limit is missing.
+
 The two API rules differ on purpose. Better Auth derives its mount path from the URL it is
 configured with and matches incoming requests against it, so `/auth` has to be the same string
 on the server, in the browser and in the verification links it emails; the rest of the API is

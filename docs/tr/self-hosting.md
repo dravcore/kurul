@@ -276,6 +276,40 @@ başına gövde limiti koymaz — pakete dahil `docker/Caddyfile`'ın limiti aç
 budur — ve nginx `client_max_body_size` için **1 MB** varsayar; yani satırı atlayan bir yedek
 proxy, bir megabayttan büyük her eki reddeder.
 
+### İki 413'ü birbirinden ayırmak
+
+Her iki katman da boyutu aşan bir yüklemeye `413` ile cevap verir ve **hangisinin reddettiğini
+cevap gövdesi söyler**:
+
+| Aldığınız cevap                             | Reddeden | Anlamı                                                          |
+| ------------------------------------------- | -------- | --------------------------------------------------------------- |
+| **Boş** gövdeli `413` (`Content-Length: 0`) | proxy    | tasarlandığı gibi — istek API'ye hiç ulaşmadı                   |
+| `statusCode` taşıyan **JSON** gövdeli `413` | API      | proxy limitiniz `ATTACHMENT_MAX_BYTES`'tan yüksek ya da hiç yok |
+
+İkinci satır yanlış yapılandırmadır: proxy, API'nin sonradan reddettiği bir gövdeyi taşımıştır —
+iki katmanlı kuralın önlemeye çalıştığı boşa yükleme yarısı budur. Birinci satır doğru
+davranıştır.
+
+Header'lar yardımcı olmaz — Caddy'nin `413`'ü `Server` header'ı taşımaz; ikisini yalnız gövde
+ayırır. API'nin kendi reddettiği her şey
+`Content-Type: application/json; charset=utf-8` ile ve
+`{"statusCode":…,"error":…,"path":…,"requestId":…}` zarfıyla döner; proxy'nin reddi ise hiç gövde
+taşımaz.
+
+**Proxy bu reddi loglamaz.** `docker/Caddyfile`'da `log` direktifi yoktur — API zaten kendisine
+ulaşan her isteği logluyor ve her iki katmanda access log tutmak tek bir boyut kontrolü uğruna
+her deployment'ın log hacmini ikiye katlardı — dolayısıyla proxy'nin reddettiği bir gövde
+`docker compose logs proxy` çıktısında **hiç görünmez**. Proxy logunda hiçbir şey yokken gelen
+boş gövdeli bir `413`, limitin bozuk olduğunun değil, beklenen sonucun kendisidir.
+
+Pakete dahil `docker/Caddyfile` üzerinde `caddy:2-alpine` ile ölçüldü: tam `26214400` bayt →
+`200`, bir bayt fazlası → `413`, ve `curl` düzgün bir durum satırıyla `0` koduyla çıkıyor —
+bağlantı yükleme ortasında kesilmiyor, usulünce kapanıyor.
+
+Bunu kendiniz denerseniz **gerçek bir yükleme ucuna** yöneltin. Rastgele bir yola atmak hiçbir
+şey ölçmez: API, header'ları alır almaz gövdeyi hiç okumadan `404` cevaplar, istek proxy'nin
+limitine ulaşmadan biter ve limit yokmuş gibi görünen bir `404` alırsınız.
+
 İki API kuralı bilinçli olarak farklıdır. Better Auth, mount yolunu kendisine verilen URL'den
 türetir ve gelen istekleri ona göre eşleştirir; dolayısıyla `/auth` sunucuda, tarayıcıda ve
 gönderdiği doğrulama linklerinde aynı dize olmak zorundadır. API'nin geri kalanı kendi kökünde
