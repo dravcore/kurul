@@ -14,16 +14,15 @@ export const taskInclude = {
     There is deliberately no `_count: { select: { attachments: true } }` here, and it is not an
     omission — it was here, it was measured, and it came out.
 
-    Prisma 7 compiles that include into an aggregate over the **whole** `Attachment` table
+    Prisma compiles that include into an aggregate over the **whole** `Attachment` table
     (`... WHERE 1=1 GROUP BY "taskId"`, joined afterwards), scoped to no board, no workspace and
-    no page. On the seeded 1 000-task board the first page went from 0.070 ms / 13 buffers to
-    19.878 ms / 2 509 once the table held 100 000 rows — rows belonging to tasks that page never
-    returns. The card's badge is a number either way; what grew was a scan nobody asked for.
-
+    no page, which makes a board page's cost depend on a plan choice rather than on the page.
     The badge now reads `attachmentCount`, filled by `countAttachmentsByTask` from the ids the
-    page actually returned. The full numbers, the plan the planner declines to pick, and why an
-    index alone does not fix it are in `attachment-count.ts` — read that before putting `_count`
-    back, because it reads like the simpler option and is not.
+    page actually returned.
+
+    `attachment-count.ts` carries the measurements, including the ones that argue *against* this
+    split — on realistic data the two are within noise of each other and this one pays a second
+    round trip. Read them before changing it back, and before quoting them.
   */
 } satisfies Prisma.TaskInclude;
 

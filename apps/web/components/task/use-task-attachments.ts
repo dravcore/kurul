@@ -91,11 +91,17 @@ export function useTaskAttachments({
    * the previous task's files for one frame and never showing them: a `setState` in the effect
    * body runs after the render that already painted them, and `react-hooks/set-state-in-effect`
    * says so.
+   *
+   * **This is a deliberate difference from `use-task-checklists`, not a stylistic one.** That
+   * hook has no equivalent line because its list lives on the task prop — switching task
+   * switches the data by itself. Here the list is local state, so "whose list is this" has to
+   * be answered somewhere, and answering it by arithmetic against `loadedTaskId` is the version
+   * the lint rule permits.
+   *
+   * `useMemo` for one reason only: so the empty case is a stable array rather than a new one
+   * per render. `write` closes over this value, and a fresh `[]` each time would hand every
+   * write callback a new identity on every render of the panel.
    */
-  //
-  // `useMemo` only so the empty case is one stable array rather than a new one per render:
-  // `write` closes over this value, and a fresh `[]` each time would give every write callback
-  // a new identity on every render of the panel.
   const rows = useMemo(
     () => (loadedTaskId === taskId ? attachments : []),
     [loadedTaskId, taskId, attachments],

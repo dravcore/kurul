@@ -6,37 +6,50 @@ export type AttachmentCountDb = PrismaService | Prisma.TransactionClient;
 /**
  * How many attachments a set of tasks has, scoped to exactly those tasks.
  *
- * This exists because Prisma's `_count` in an `include` does not do what it reads like it
- * does, and the difference is a board-list regression that grows with the instance rather
- * than with the page. `include: { _count: { select: { attachments: true } } }` compiles to
+ * `TaskDto.attachmentCount` used to come from `include: { _count: { select: { attachments:
+ * true } } }`. The reason it does not any more is narrower than it first looked, and the
+ * honest version of it is worth the paragraphs, because the first version of this comment
+ * carried a number that does not reproduce.
+ *
+ * **What is a fact about the SQL, not about a plan:** Prisma compiles that include into
  *
  *     LEFT JOIN (SELECT "taskId", COUNT(*) FROM "Attachment" WHERE 1=1 GROUP BY "taskId")
  *
- * — an aggregate over the **whole table**, filtered by nothing: not by board, not by
- * workspace, not by the rows the page returns. Measured on the seeded 1 000-task board
- * (`SEED_LARGE_BOARD_TASKS=1000`, Postgres 18, `EXPLAIN (ANALYZE, BUFFERS)` of the first
- * page), with the extra attachment rows deliberately placed on tasks that page never shows:
+ * — an aggregate over the whole table, filtered by nothing: not by board, not by workspace,
+ * not by the 51 rows the page returns. It is only cheap when the planner picks a merge join
+ * whose `GroupAggregate` the `LIMIT` can stop early, so the cost of a board page depends on a
+ * plan choice rather than on the page.
  *
- * | `Attachment` rows | no count             | `_count` include          | this function        |
- * | ----------------- | -------------------- | ------------------------- | -------------------- |
- * | 592               | 0.148 ms, 13 buffers | 0.380 ms, 21 buffers      | —                    |
- * | 100 592           | 0.070 ms, 13 buffers | 19.878 ms, 2 509 buffers  | 0.168 ms, 158 buffers |
+ * **What was measured** — Postgres 18 in Docker on an Apple-silicon laptop, seeded 1 000-task
+ * board, `EXPLAIN (ANALYZE, BUFFERS)` of the first page, both statements verbatim as emitted:
  *
- * At 100 000 rows the `_count` include costs **19.878 ms and 2 509 shared buffers** against
- * **0.168 ms and 158** here, for the identical answer — because the planner switches to a
- * `HashAggregate` over a full `Seq Scan`, and a `HashAggregate` cannot stop early for the
- * `LIMIT`. That is the board read P2-8 spent a task making cheap, handed back.
+ * | dataset                                          | `_count` include        | this function          |
+ * | ------------------------------------------------ | ----------------------- | ---------------------- |
+ * | 181 710 rows over 108 320 tasks (realistic)      | 0.118 ms, 10 buffers    | 0.078 ms, 5 buffers    |
+ * | 150 601 rows over ~800 tasks (skewed)            | 0.089 ms, 8 buffers     | 0.062 ms, 4 buffers    |
+ * | 1 151 401 rows over ~800 tasks (extreme skew)    | 0.095 ms, 4 buffers     | 40.126 ms, parallel scan |
+ * | 100 592 rows, one build, not reproduced since    | 19.878 ms, 2 509 buffers | —                     |
  *
- * **The index was never the problem, and this is the part worth reading before "simplifying"
- * this back to `_count`.** A plan that streams `Attachment_taskId_id_idx` (ADR 0024 decision
- * D4's index) through a `GroupAggregate` the merge join stops early exists and runs the very
- * same SQL in 0.192 ms with 8 buffers — `SET enable_seqscan = off` produces it. The planner
- * does not pick it because it prices the unfiltered aggregate as if it had to complete. An
- * `IN` list of the page's ids removes the choice: there is nothing to scan but the matching
- * index entries.
+ * Read that table honestly. On realistic data both shapes are sub-millisecond and the
+ * difference between them is noise — and this function pays a second round trip the include
+ * does not, so end to end it is *not* the cheaper of the two there. The 19.878 ms row is one
+ * observation, on one build of the database, where the planner chose `HashAggregate` over a
+ * full `Seq Scan` and then had to `Sort` for the merge join; the identical script has not
+ * produced it since. The extreme-skew row is the mirror image, and this function is the one
+ * that loses it: 800 tasks holding a million rows makes the planner estimate ~71 000 matches
+ * for 51 ids and switch to a parallel `Seq Scan`. Neither of those distributions is what an
+ * instance looks like.
  *
- * The cost is one extra round trip. Against 19.7 ms it is noise, and `TaskDto.attachmentCount`
- * is unchanged — same number, different way of arriving at it.
+ * **So the case for this function is not "it is faster".** It is that its cost is bounded by
+ * the page (`Index Cond: taskId = ANY(...)` over `Attachment_taskId_id_idx`, ADR 0024's D4
+ * index) for every distribution a real instance has, while the include's cost is bounded by
+ * the table and depends on a plan choice that was observed to flip once. That is a smaller
+ * claim than the one this comment used to make, and it is the one the evidence supports.
+ *
+ * If someone measures the include holding its plan across the distributions that matter, going
+ * back to it is a defensible one-commit change — it is one statement instead of two, and
+ * `TaskDto.attachmentCount` never moved either way. What is not defensible is doing it
+ * because the include *reads* simpler, without measuring.
  */
 export async function countAttachmentsByTask(
   db: AttachmentCountDb,
