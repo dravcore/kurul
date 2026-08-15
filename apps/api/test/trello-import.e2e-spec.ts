@@ -571,7 +571,18 @@ describe('Trello import (e2e)', () => {
           select: { url: true },
         })
       ).map((row) => row.url ?? '');
-      expect(urls.some((url) => url.includes('trello.com'))).toBe(true);
+      // Compared on the parsed hostname rather than as a substring. `includes('trello.com')`
+      // would also accept `https://evil.example/trello.com`, so the assertion would still pass
+      // if the importer stored something quite different from what the fixture carries — and
+      // CodeQL flags exactly that shape (`js/incomplete-url-substring-sanitization`).
+      const hosts = urls.map((url) => {
+        try {
+          return new URL(url).hostname;
+        } catch {
+          return '';
+        }
+      });
+      expect(hosts).toContain('trello.com');
 
       // `fetch` is the API this repository would reach for, so it is checked as a count.
       expect(fetchSpy).not.toHaveBeenCalled();
