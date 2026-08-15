@@ -312,20 +312,26 @@ never sees and never logs. Caddy imposes no body limit of its own, which is why 
 **1 MB**, so a replacement proxy that omits the row rejects every attachment larger than a
 megabyte.
 
-### Telling the two 413s apart
+### Telling the 413s apart
 
-Both layers answer an oversized upload with `413`, and **the response body is what says which
-one did it**:
+Both layers answer an oversized upload with `413` — and so does a third limit that has nothing
+to do with uploads. **The response body is what says which one did it**:
 
-| What you get back                                  | Who rejected it | What it means                                                  |
-| -------------------------------------------------- | --------------- | -------------------------------------------------------------- |
-| `413` with a **JSON** body carrying `statusCode`   | the API         | working as designed — the file is over `ATTACHMENT_MAX_BYTES`  |
-| `413` with an **empty** body (`Content-Length: 0`) | the proxy       | the body was over the proxy's ceiling, which is the coarse cut |
+| What you get back                                  | Who rejected it | What it means                                                    |
+| -------------------------------------------------- | --------------- | ---------------------------------------------------------------- |
+| `413` with a **JSON** body carrying `statusCode`   | the API         | working as designed — the file is over `ATTACHMENT_MAX_BYTES`    |
+| `413` with an **empty** body (`Content-Length: 0`) | the proxy       | the body was over the proxy's ceiling, which is the coarse cut   |
+| `413` JSON reading `Request body is too large`     | the API         | not an upload at all — a JSON body over `REQUEST_BODY_MAX_BYTES` |
 
 The first row is the normal answer for an oversized attachment, and the one a user can act on:
 it names the limit. The second is the proxy refusing a body before the API ever saw it — correct
 for something absurd, but if a user hits it on a file **under** `ATTACHMENT_MAX_BYTES` then your
 proxy's ceiling is too low (see "Why the proxy's number is 26 MiB and the API's is 25" above).
+
+The third row is a different limit that happens to share the status code: `REQUEST_BODY_MAX_BYTES`
+(default `1048576`, 1 MiB) caps the **JSON and form-encoded** bodies every other endpoint takes,
+and no attachment ever passes through it. If you see it, nothing about your storage or your proxy
+is misconfigured — some request simply sent more JSON than the API accepts.
 
 The headers do not help — Caddy's `413` carries no `Server` header, so only the body
 distinguishes them. Everything the API itself rejects comes back as

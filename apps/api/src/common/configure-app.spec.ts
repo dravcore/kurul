@@ -1,7 +1,9 @@
 import {
+  Body,
   Controller,
   Get,
   INestApplication,
+  Logger,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -9,6 +11,7 @@ import {
 import { FileInterceptor, MulterModule } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { diskStorage, memoryStorage } from 'multer';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -40,7 +43,11 @@ interface ExpressLikeResponse {
 
 // Imported below the mock on purpose: pulling in configureApp loads ../auth/mount-better-auth,
 // so the factory above has to be registered — and `mountBetterAuth` assigned — first.
-import { configureApp } from './configure-app';
+import {
+  configureApp,
+  DEFAULT_REQUEST_BODY_MAX_BYTES,
+  resolveRequestBodyMaxBytes,
+} from './configure-app';
 import type { AccessLogLine } from './logging/access-log.middleware';
 import { UUID_V7_REGEX } from './uuid';
 
@@ -80,6 +87,29 @@ class UploadProbeController {
     uploadHandler(file);
     return { ok: true };
   }
+}
+
+/** Echoes back how many keys the parsed body had, so "the handler ran" is observable. */
+const echoHandler = jest.fn();
+
+@Controller('probe')
+class EchoProbeController {
+  @Post('echo')
+  echo(@Body() payload: Record<string, unknown>): { keys: number } {
+    echoHandler(payload);
+    return { keys: Object.keys(payload ?? {}).length };
+  }
+}
+
+/** A JSON document whose serialised form is exactly `bytes` bytes of ASCII. */
+function jsonOfBytes(bytes: number): string {
+  const overhead = JSON.stringify({ pad: '' }).length;
+  return JSON.stringify({ pad: 'x'.repeat(bytes - overhead) });
+}
+
+/** A urlencoded body of exactly `bytes` bytes. */
+function formOfBytes(bytes: number): string {
+  return `pad=${'x'.repeat(bytes - 'pad='.length)}`;
 }
 
 describe('configureApp security headers', () => {
@@ -452,5 +482,265 @@ describe('configureApp rejects a cross-origin upload before multer buffers it', 
     // Read after the socket has settled, so a file created late would still be seen.
     await new Promise((resolve) => setTimeout(resolve, 100));
     await expect(readdir(destination)).resolves.toEqual([]);
+  });
+});
+
+/**
+ * Issue #214. Nothing in this repository ever set a body-parser limit, so Express's own
+ * **100 kB** default applied — a number nobody chose, written down nowhere, and reachable only
+ * by measuring it. These two blocks make the limit a decision: the first pins the default the
+ * project now owns, the second pins that an operator can move it.
+ *
+ * Both blocks assert through the whole stack rather than against the filter directly, because
+ * the interesting claim is that a *real* `body-parser` failure has the shape
+ * `AllExceptionsFilter` now recognises. A hand-built error could agree with the filter and
+ * disagree with Express.
+ */
+describe('resolveRequestBodyMaxBytes', () => {
+  const previous = process.env.REQUEST_BODY_MAX_BYTES;
+
+  afterEach(() => {
+    if (previous === undefined) delete process.env.REQUEST_BODY_MAX_BYTES;
+    else process.env.REQUEST_BODY_MAX_BYTES = previous;
+  });
+
+  it('falls back to the documented default when unset', () => {
+    delete process.env.REQUEST_BODY_MAX_BYTES;
+
+    expect(resolveRequestBodyMaxBytes()).toBe(DEFAULT_REQUEST_BODY_MAX_BYTES);
+    // Pinned as a literal as well as by name: `.env.example`, `docs/api-conventions.md` and
+    // `docs/self-hosting.md` all quote this number, and a silent change to it would make three
+    // documents wrong at once. P3-3 is expected to raise it — deliberately, with those.
+    expect(DEFAULT_REQUEST_BODY_MAX_BYTES).toBe(1_048_576);
+  });
+
+  it('reads REQUEST_BODY_MAX_BYTES when it is set', () => {
+    process.env.REQUEST_BODY_MAX_BYTES = '5242880';
+
+    expect(resolveRequestBodyMaxBytes()).toBe(5_242_880);
+  });
+
+  // Both refusals fail the process at boot rather than answering 413 to every write.
+  it('refuses a non-integer', () => {
+    process.env.REQUEST_BODY_MAX_BYTES = '5mb';
+
+    expect(() => resolveRequestBodyMaxBytes()).toThrow(/REQUEST_BODY_MAX_BYTES/);
+  });
+
+  it.each(['0', '-1'])('refuses %s — it would reject every request body', (raw) => {
+    process.env.REQUEST_BODY_MAX_BYTES = raw;
+
+    expect(() => resolveRequestBodyMaxBytes()).toThrow(/positive byte count/);
+  });
+
+  /**
+   * The same drift check `storage/two-layer-limit.spec.ts` runs for `ATTACHMENT_MAX_BYTES`.
+   *
+   * A default that lives in three files is three chances to disagree, and the disagreement is
+   * invisible: `.env.example` teaches the operator a number, the compose default is the one a
+   * Compose install actually gets, and the constant here is what a bare `pnpm start` uses.
+   * Reading the shipped files — rather than a copy of the number — is the point: a test with its
+   * own duplicate would pass on the one day somebody edits `.env.example`.
+   *
+   * The compose row matters on its own. Without it an operator could set the variable in `.env`,
+   * see it ignored, and be back to a limit that silently is not what the file says — the exact
+   * defect class this variable was introduced to end.
+   */
+  it('is the same number in .env.example and in the compose default', () => {
+    const repoRoot = join(__dirname, '..', '..', '..', '..');
+    const read = (relative: string): string => readFileSync(join(repoRoot, relative), 'utf8');
+
+    expect(/^REQUEST_BODY_MAX_BYTES=(\d+)$/m.exec(read('.env.example'))?.[1]).toBe(
+      String(DEFAULT_REQUEST_BODY_MAX_BYTES),
+    );
+    expect(
+      /REQUEST_BODY_MAX_BYTES:\s*\$\{REQUEST_BODY_MAX_BYTES:-(\d+)\}/.exec(
+        read('docker-compose.yml'),
+      )?.[1],
+    ).toBe(String(DEFAULT_REQUEST_BODY_MAX_BYTES));
+  });
+});
+
+describe('configureApp request body limit (default)', () => {
+  /**
+   * Comfortably over Express's unconfigured 100 kB and comfortably under the default this
+   * project sets, so it is evidence about *which* of the two is in force.
+   */
+  const OVER_EXPRESS_DEFAULT = 150 * 1024;
+  let app: INestApplication<App>;
+  let stdout: jest.SpyInstance;
+  let logError: jest.SpyInstance;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [EchoProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    echoHandler.mockClear();
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+    logError.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('accepts a JSON body that an unconfigured Express would have refused', async () => {
+    await request(app.getHttpServer())
+      .post('/probe/echo')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfBytes(OVER_EXPRESS_DEFAULT))
+      .expect(201);
+
+    expect(echoHandler).toHaveBeenCalled();
+  });
+
+  it('answers 413 in the ProblemDetails envelope once the default is exceeded', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/echo')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfBytes(DEFAULT_REQUEST_BODY_MAX_BYTES + 4096))
+      .expect(413);
+
+    expect(response.body).toMatchObject({
+      statusCode: 413,
+      error: 'Payload Too Large',
+      message: 'Request body is too large',
+      path: '/probe/echo',
+    });
+    expect(response.body.requestId).toMatch(UUID_V7_REGEX);
+    expect(response.headers['content-type']).toContain('application/json');
+    expect(echoHandler).not.toHaveBeenCalled();
+  });
+
+  it('does not log the 413 as a failure, so nothing reaches error tracking', async () => {
+    // `reportFailure` is the single call site that both logs and captures (see the note on it
+    // in `all-exceptions.filter.ts`), so an absent `Logger.error` is a measurement of the
+    // Sentry claim through the real stack — not a reading of the code.
+    await request(app.getHttpServer())
+      .post('/probe/echo')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfBytes(DEFAULT_REQUEST_BODY_MAX_BYTES + 4096))
+      .expect(413);
+
+    expect(logError).not.toHaveBeenCalled();
+  });
+});
+
+describe('configureApp request body limit (configured)', () => {
+  /** Tiny on purpose: the property is that the option is honoured, not how big it is. */
+  const LIMIT = 2048;
+  let app: INestApplication<App>;
+  let stdout: jest.SpyInstance;
+  let logError: jest.SpyInstance;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [EchoProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    configureApp(app, {
+      corsOrigin: 'http://localhost:3000',
+      trustProxy: false,
+      bodyLimitBytes: LIMIT,
+    });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    echoHandler.mockClear();
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+    logError.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  // The control. "A body over the limit is refused" says nothing unless a body under it is
+  // accepted by the very same app — otherwise the assertion would still pass on a build that
+  // refused every JSON body, or on one whose limit was a hundred times smaller than asked.
+  it('accepts a JSON body just under the configured limit', async () => {
+    await request(app.getHttpServer())
+      .post('/probe/echo')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfBytes(LIMIT - 1))
+      .expect(201);
+
+    expect(echoHandler).toHaveBeenCalled();
+  });
+
+  it('answers 413 for a JSON body over the configured limit', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/echo')
+      .set('Content-Type', 'application/json')
+      .send(jsonOfBytes(LIMIT * 4))
+      .expect(413);
+
+    expect(response.body).toMatchObject({ statusCode: 413, error: 'Payload Too Large' });
+    expect(echoHandler).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  // The urlencoded parser is a second body parser with its own limit, and Nest registers it
+  // with the same unconfigured default. Configuring only `json` would leave a 100 kB hole
+  // behind a form-encoded POST.
+  it('accepts a urlencoded body just under the configured limit', async () => {
+    await request(app.getHttpServer())
+      .post('/probe/echo')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send(formOfBytes(LIMIT - 1))
+      .expect(201);
+
+    expect(echoHandler).toHaveBeenCalled();
+  });
+
+  it('answers 413 for a urlencoded body over the configured limit', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/echo')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send(formOfBytes(LIMIT * 4))
+      .expect(413);
+
+    expect(response.body).toMatchObject({ statusCode: 413, error: 'Payload Too Large' });
+    expect(echoHandler).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The neighbouring case that was *not* broken, pinned so the fix for #214 is not credited
+   * with it and cannot quietly change it.
+   *
+   * A malformed JSON body comes out of the same parser, but Nest's own
+   * `RoutesResolver.mapExternalException` converts every `SyntaxError` into a
+   * `BadRequestException` before any filter sees it. So it was already a 400 and already
+   * unreported — measured here rather than assumed, because "the parser's errors were 500s"
+   * would have been the obvious and wrong generalisation to make from the issue.
+   */
+  it('leaves a malformed JSON body as the 400 Nest already made of it', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/echo')
+      .set('Content-Type', 'application/json')
+      .send('{"pad": ')
+      .expect(400);
+
+    expect(response.body).toMatchObject({ statusCode: 400, error: 'Bad Request' });
+    expect(logError).not.toHaveBeenCalled();
   });
 });

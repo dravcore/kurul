@@ -270,7 +270,7 @@ nullable bir alanı temizler.
 | `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz                                                                        |
 | `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                      |
 | `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                        |
-| `413 Payload Too Large`      | Yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor. İki katman da bu cevabı verebilir — aşağıya bakın                         |
+| `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, ya da bir yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor                       |
 | `415 Unsupported Media Type` | Dosyanın **magic byte**'ları allowlist'te değil. Beyan edilen `Content-Type` ve uzantı kanıt sayılmaz, hiç okunmaz |
 | `422 Unprocessable Entity`   | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak)      |
 | `429 Too Many Requests`      | Rate limit uygulandı                                                                                               |
@@ -326,6 +326,27 @@ Kurallar:
   tam olarak tek bir istisnayla: `GET /workspaces/:workspaceId/attachments/:attachmentId/content`
   saklanan dosyanın kendi medya tipiyle ve byte'larıyla cevap verir. API'de JSON dışında bir şey
   yazan tek handler budur; ikincisinin aynı büyüklükte bir gerekçesi olmalıdır.
+
+### Request body boyutu
+
+**`REQUEST_BODY_MAX_BYTES` (varsayılan `1048576` — 1 MiB), API'nin okuyacağı en büyük JSON veya
+form-encoded body'dir.** Bunun üstünde cevap, yukarıdaki hata zarfı içinde `413`'tür — bir client
+hatasıdır ve tıpkı bir `404` ya da `403` gibi hata takibine **bilinçli olarak** bildirilmez.
+
+Bu, _parse edilmiş bir body'nin_ boyutudur ve `ATTACHMENT_MAX_BYTES` ile ilgisi yoktur: bir
+yükleme `multipart/form-data`'dır ve bu limit onu hiç görmez — onları multer okur, kendi
+tavanıyla (bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)).
+
+Bu sayı hakkında açıkça söylenmesi gereken iki şey var. Yazıya dökülene kadar bir kazaydı:
+hiçbir yer bir limit yapılandırmıyordu, dolayısıyla API'nin gerçek tavanı Express'in kendi
+varsayılanı olan **100 kB**'ydi — kimsenin seçmediği ve hiçbir dosyanın kaydetmediği bir değer.
+Ve bu, bir boyut tavanı olduğu kadar bir **bellek** tavanıdır: body, herhangi bir şey onu
+doğrulamadan önce heap'e parse edilir, yani N eşzamanlı istek N × bu değere kadar maliyet
+çıkarır. 1 MiB, bugün herhangi bir ucun meşru olarak aldığı en büyük body'nin yaklaşık iki
+mertebe üstündedir (hiçbir uç array body almıyor ve herhangi bir DTO'nun kabul ettiği en uzun tek
+alan 2048 karakter). Gerçekten daha fazlasına ihtiyaç duyan bir uç — örneğin bir board export'unu
+içe aktarmak — bu değişkeni bilinçli olarak yükseltir ve onu API'nin önündeki ters proxy'nin
+izin verdiği body boyutunun altında tutar.
 
 ### Dosya yükleme ve indirme
 
@@ -423,6 +444,10 @@ isimleriyle):
 - `message`, production'da asla ham bir exception string'i değildir, stack trace'ler
   döndürülmez, loglanır.
 - Client'lar `message` metnine değil, `statusCode` ve `error`'a göre dallanır.
+- Hata sözlüğü _zaten_ HTTP status kodları olan bir kütüphanenin fırlattığı bir hata —
+  Express'in body parser'larının fırlattığı `http-errors` — bu zarf içinde **kendi 4xx'i** ile
+  cevaplanır; metin kütüphanenin değil, burada seçilendir. Eşleme bilinçli olarak 4xx'te durur:
+  aynı kaynaktan gelen bir 5xx hâlâ bir sunucu hatasıdır, `500` zarfını **ve** raporunu korur.
 
 ### Request korelasyonu
 

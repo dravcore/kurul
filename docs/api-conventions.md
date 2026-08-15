@@ -264,7 +264,7 @@ field leaves it untouched; sending `null` explicitly clears a nullable field.
 | `403 Forbidden`              | Authenticated, workspace member, but role is insufficient                                                                                 |
 | `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                               |
 | `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                 |
-| `413 Payload Too Large`      | An upload is over `ATTACHMENT_MAX_BYTES`. Two layers can answer it — see below                                                            |
+| `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, or an upload is over `ATTACHMENT_MAX_BYTES`                                            |
 | `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted |
 | `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                 |
 | `429 Too Many Requests`      | Rate limited                                                                                                                              |
@@ -319,6 +319,26 @@ Rules:
   one documented exception: `GET /workspaces/:workspaceId/attachments/:attachmentId/content`
   answers with the stored file's own media type and its bytes. It is the only handler in the
   API that writes something other than JSON, and the next one needs a reason of the same size.
+
+### Request body size
+
+**`REQUEST_BODY_MAX_BYTES` (default `1048576` — 1 MiB) is the largest JSON or form-encoded body
+the API will read.** Over it, the answer is `413` in the error envelope above — a client error,
+and one that is deliberately **not** reported to error tracking, exactly like a `404` or a `403`.
+
+This is the size of a _parsed body_ and it is unrelated to `ATTACHMENT_MAX_BYTES`: an upload is
+`multipart/form-data`, which this limit never sees — multer reads those, with its own ceiling
+(see [File uploads and downloads](#file-uploads-and-downloads)).
+
+Two things about the number are worth stating plainly. It was, until it was written down, an
+accident: nothing configured a limit, so Express's own default of **100 kB** was the API's real
+ceiling — a value nobody chose and no file recorded. And it is a **memory** ceiling as much as a
+size one, since the body is parsed into heap before anything validates it; N concurrent requests
+cost up to N × this value. 1 MiB is roughly two orders of magnitude above the largest body any
+endpoint legitimately receives today (no endpoint takes an array body, and the longest single
+field any DTO accepts is 2048 characters). An endpoint that genuinely needs more — importing a
+board export, say — raises this variable deliberately, and keeps it under whatever body size the
+reverse proxy in front of the API allows.
 
 ### File uploads and downloads
 
@@ -414,6 +434,10 @@ the framework's built-in exceptions and hand-written ones look identical):
 - `message` is never a raw exception string in production, and stack traces are logged, not
   returned.
 - Clients branch on `statusCode` and `error`, never on `message` text.
+- A failure thrown by a library whose error vocabulary _is_ HTTP status codes — `http-errors`,
+  which is what Express's body parsers throw — is answered with **its own 4xx** in this envelope,
+  with wording chosen here rather than the library's. The mapping stops at 4xx on purpose: a 5xx
+  from the same source is still a server fault and keeps the `500` envelope _and_ the report.
 
 ### Request correlation
 

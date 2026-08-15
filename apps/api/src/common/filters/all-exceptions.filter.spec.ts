@@ -42,6 +42,28 @@ function body(response: CapturedResponse): Record<string, unknown> {
   return (firstCall?.[0] ?? {}) as Record<string, unknown>;
 }
 
+/**
+ * Builds the exact shape `http-errors` produces, which is what `body-parser` throws.
+ *
+ * Hand-built rather than imported: `http-errors` is a transitive dependency of Express, not a
+ * declared one of this package, and the filter deliberately matches on the *shape* rather than
+ * on a constructor (see `mapHttpClientError`). Building the shape here therefore tests the same
+ * contract the filter claims to honour. The end-to-end proof that a real `body-parser` error has
+ * this shape is in `configure-app.spec.ts`, which sends an actual oversized body through an
+ * actual Express stack.
+ *
+ * The three properties are the ones `http-errors`' own `isHttpError()` checks:
+ * `expose: boolean`, `statusCode: number`, `status === statusCode`.
+ */
+function httpError(status: number, message: string, extra: Record<string, unknown> = {}): Error {
+  return Object.assign(new Error(message), {
+    status,
+    statusCode: status,
+    expose: status < 500,
+    ...extra,
+  });
+}
+
 class AssigneeDto {
   @IsNotEmpty()
   email!: string;
@@ -172,6 +194,159 @@ describe('AllExceptionsFilter', () => {
       const problem = body(response);
       expect(problem.message).toBe('Validation failed');
       expect(problem.details).toEqual([{ field: 'title', message: 'title should not be empty' }]);
+    });
+  });
+
+  /**
+   * Issue #214. `body-parser` throws `http-errors` instances, which are plain `Error`
+   * subclasses — not `HttpException` — so before this branch existed every one of them fell
+   * through to the `instanceof Error` fallback and became a `500` that Sentry was told about.
+   *
+   * The tests below pin both halves of the branch: what it *does* convert, and — at least as
+   * important — what it refuses to convert. A branch that mapped any `status`-bearing object
+   * onto an HTTP status would turn an unrelated library's failure into a 4xx and hide a real
+   * server fault from error tracking.
+   */
+  describe('http-errors client failures', () => {
+    it('answers 413 for the PayloadTooLargeError body-parser throws', () => {
+      const { host, response } = createHost();
+
+      filter.catch(
+        httpError(413, 'request entity too large', {
+          type: 'entity.too.large',
+          length: 4_194_304,
+          limit: 1_048_576,
+        }),
+        host,
+      );
+
+      expect(response.status).toHaveBeenCalledWith(413);
+      expect(body(response)).toMatchObject({
+        statusCode: 413,
+        error: 'Payload Too Large',
+        message: 'Request body is too large',
+        path: '/workspaces/w_1/tasks',
+        requestId: REQUEST_ID,
+      });
+    });
+
+    // 413 is the one status with copy of its own; every other client status falls back to its
+    // reason phrase rather than to invented wording for a case nobody has measured. These are
+    // the other shapes `body-parser` can throw at the filter.
+    it.each<[number, string, string]>([
+      [400, 'request aborted', 'Bad Request'],
+      [415, 'unsupported content encoding "br"', 'Unsupported Media Type'],
+    ])('carries a %i through with its reason phrase', (status, message, phrase) => {
+      const { host, response } = createHost();
+
+      filter.catch(httpError(status, message), host);
+
+      expect(response.status).toHaveBeenCalledWith(status);
+      expect(body(response)).toMatchObject({ statusCode: status, error: phrase, message: phrase });
+    });
+
+    // The message is a fixed string chosen here, never the library's own: `PayloadTooLargeError`
+    // carries the configured `limit` and the received `length` on the error, and its `message`
+    // is wording this project did not write. The rule has to hold in development too, because
+    // the substitution is not conditional on the environment.
+    it.each<[string, string | undefined]>([
+      ['development', undefined],
+      ['production', 'production'],
+    ])('never echoes the library message back to the client (%s)', (_label, nodeEnv) => {
+      const previous = process.env.NODE_ENV;
+      if (nodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = nodeEnv;
+
+      try {
+        const { host, response } = createHost();
+
+        filter.catch(
+          httpError(413, 'request entity too large', {
+            type: 'entity.too.large',
+            length: 4_194_304,
+            limit: 1_048_576,
+          }),
+          host,
+        );
+
+        const serialised = JSON.stringify(body(response));
+        expect(serialised).not.toContain('request entity too large');
+        expect(serialised).not.toContain('entity.too.large');
+        expect(serialised).not.toContain('1048576');
+      } finally {
+        if (previous === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = previous;
+      }
+    });
+
+    /**
+     * Not this branch's job, and the test says so out loud.
+     *
+     * A malformed JSON body reaches the filter as a `BadRequestException`, because Nest's own
+     * `RoutesResolver.mapExternalException` converts any `SyntaxError` before the filter is
+     * called. It was therefore never part of #214 — it was already a 4xx and already unreported
+     * — and the branch added for #214 deliberately does not try to take it over.
+     */
+    it('leaves a parse failure to the HttpException branch Nest already routes it through', () => {
+      const { host, response } = createHost();
+
+      filter.catch(new HttpException('Unexpected end of JSON input', HttpStatus.BAD_REQUEST), host);
+
+      expect(response.status).toHaveBeenCalledWith(400);
+      expect(body(response)).toMatchObject({
+        statusCode: 400,
+        message: 'Unexpected end of JSON input',
+      });
+    });
+
+    it('leaves a 5xx http-error as a 500 the server owns', () => {
+      // The branch is deliberately capped at 4xx. An `http-errors` 5xx is still a server
+      // failure and must keep the old path: a 500 envelope *and* a report. Widening the branch
+      // to every `status` would silently stop reporting them.
+      const { host, response } = createHost();
+      const error = httpError(503, 'upstream gone');
+
+      filter.catch(error, host);
+
+      expect(response.status).toHaveBeenCalledWith(500);
+      expect(body(response)).toMatchObject({ statusCode: 500, error: 'Internal Server Error' });
+      expect(logError).toHaveBeenCalledWith(`upstream gone (requestId=${REQUEST_ID})`, error.stack);
+    });
+
+    it('ignores an error that merely carries a numeric status', () => {
+      // `node-fetch`, `got`, AWS SDK clients and others all attach a `status`/`statusCode` to
+      // failures that are, from this API's point of view, server-side faults. Only the full
+      // `http-errors` shape counts.
+      const { host, response } = createHost();
+      const error = Object.assign(new Error('upstream responded 404'), { status: 404 });
+
+      filter.catch(error, host);
+
+      expect(response.status).toHaveBeenCalledWith(500);
+      expect(logError).toHaveBeenCalledWith(
+        `upstream responded 404 (requestId=${REQUEST_ID})`,
+        error.stack,
+      );
+    });
+
+    it('ignores a status pair without the boolean `expose` flag', () => {
+      const { host, response } = createHost();
+      const error = Object.assign(new Error('upstream responded 404'), {
+        status: 404,
+        statusCode: 404,
+      });
+
+      filter.catch(error, host);
+
+      expect(response.status).toHaveBeenCalledWith(500);
+    });
+
+    it('ignores a plain object — a stack is what makes it an error worth mapping', () => {
+      const { host, response } = createHost();
+
+      filter.catch({ status: 413, statusCode: 413, expose: true }, host);
+
+      expect(response.status).toHaveBeenCalledWith(500);
     });
   });
 
@@ -448,6 +623,33 @@ describe('AllExceptionsFilter', () => {
         createHost().host,
       );
       expect(captureException).toHaveBeenCalledTimes(1);
+    });
+
+    // Issue #214's second half: the wrong status code was only half the defect. Every oversized
+    // body was also an event on a self-hoster's Sentry quota, filed as a server fault.
+    it('does not report an oversized body — a 413 is the client’s doing', async () => {
+      const { captureException } = await enableFakeSentry();
+
+      filter.catch(
+        httpError(413, 'request entity too large', { type: 'entity.too.large' }),
+        createHost().host,
+      );
+
+      expect(captureException).not.toHaveBeenCalled();
+      // `reportFailure` logs and captures together, on purpose, so the absent log line is a
+      // second, independent witness that the reporting call site was never reached.
+      expect(logError).not.toHaveBeenCalled();
+    });
+
+    it('still reports an http-errors 5xx', async () => {
+      // The control for the assertion above: "4xx is not reported" is only evidence if the
+      // same branchless shape *is* reported when it means the server broke.
+      const { captureException } = await enableFakeSentry();
+      const error = httpError(503, 'upstream gone');
+
+      filter.catch(error, createHost().host);
+
+      expect(captureException).toHaveBeenCalledWith(error);
     });
 
     it('reports a plain Error', async () => {

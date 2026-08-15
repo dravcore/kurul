@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { configureApp } from './common/configure-app';
+import { configureApp, resolveRequestBodyMaxBytes } from './common/configure-app';
 import { loadRootEnv, envPort, envString } from './common/env';
 import { captureServerError, flushSentry, initSentry } from './common/observability/sentry';
 import { resolveTrustProxySetting } from './common/trust-proxy';
@@ -16,6 +16,9 @@ async function bootstrap(): Promise<void> {
   // Off by default — see `resolveTrustProxySetting` for what each shape means and why a
   // directly-exposed instance must never trust an inbound X-Forwarded-For by default.
   const trustProxy = resolveTrustProxySetting(envString('TRUST_PROXY', 'false'));
+  // 1 MiB unless `REQUEST_BODY_MAX_BYTES` says otherwise. Read here, with the others, so a bad
+  // value stops the process instead of turning every write into an unexplainable 413.
+  const bodyLimitBytes = resolveRequestBodyMaxBytes();
 
   // Awaited before the container is built so no request can be served by a Nest app whose
   // exception filter would silently drop the first failures. Returns immediately without
@@ -24,7 +27,7 @@ async function bootstrap(): Promise<void> {
   await initSentry();
 
   const app = await NestFactory.create(AppModule);
-  configureApp(app, { corsOrigin: webUrl, trustProxy });
+  configureApp(app, { corsOrigin: webUrl, trustProxy, bodyLimitBytes });
   // Lets OnModuleDestroy hooks (PrismaService, DueSoonWorker) run on SIGTERM/SIGINT
   // instead of the process being killed mid-connection.
   app.enableShutdownHooks();

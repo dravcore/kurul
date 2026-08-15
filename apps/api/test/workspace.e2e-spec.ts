@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { MemberRole } from '@kurultay/shared-types';
+import request from 'supertest';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';
@@ -637,5 +638,45 @@ describe('Workspace isolation and roles (e2e)', () => {
       .post('/auth/organization/set-active')
       .send({ organizationId: workspace.id })
       .expect(200);
+  });
+
+  /**
+   * Issue #214, reproduced as it was reported: two `POST /workspaces` requests against the real
+   * application — every guard, the throttler, the Better Auth mount and the global filter all in
+   * place — differing only in how much JSON they carry.
+   *
+   * The unit suites pin the filter branch and the parser limit separately. This pins the pair as
+   * a user meets them, on the endpoint the issue measured, and it is the only test in the repo
+   * that would have caught the defect exactly as filed. The small request is the control, and
+   * its `401` is the same one the issue recorded: the body is small enough to be parsed, so the
+   * request reaches the auth guard, which is as far as an anonymous caller gets.
+   */
+  describe('an oversized JSON body (#214)', () => {
+    const bigBody = JSON.stringify({ name: 'x'.repeat(2 * 1024 * 1024), slug: 'too-big' });
+
+    it('is answered 413, not 500, and never reaches the guard', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/workspaces')
+        .set('Content-Type', 'application/json')
+        .send(bigBody)
+        .expect(413);
+
+      expect(response.body).toMatchObject({
+        statusCode: 413,
+        error: 'Payload Too Large',
+        message: 'Request body is too large',
+        path: '/workspaces',
+      });
+      // 413 rather than 401 is itself the evidence that the parser answered first: the body was
+      // refused before any guard could look at the (absent) session.
+    });
+
+    it('still reaches the guard when the same request is under the limit', async () => {
+      await request(app.getHttpServer())
+        .post('/workspaces')
+        .set('Content-Type', 'application/json')
+        .send(JSON.stringify({ name: 'Small', slug: 'small-enough' }))
+        .expect(401);
+    });
   });
 });
