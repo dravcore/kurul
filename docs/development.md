@@ -386,6 +386,36 @@ that pulls `api`/`web` from GHCR still pays that one service's build cost once. 
 [audit finding OPS-04](https://github.com/dravcore/kurultay/issues/126) for the full scoping
 rationale.
 
+### What the two API images weigh
+
+Measured on `linux/arm64`. Docker answers "how big" three ways and they are far apart, so all
+three are here — `docker history` summed, `docker image ls --tree`'s DISK USAGE (unpacked bytes
+on the host) and its CONTENT SIZE (compressed, roughly what a `pull` moves):
+
+| Image            | `docker history` | Unpacked disk    | Compressed   |
+| ---------------- | ---------------- | ---------------- | ------------ |
+| `api` (`runner`) | 955 → 407 MB     | 1.22 GB → 516 MB | 266 → 108 MB |
+| `migrate`        | 2663 → 418 MB    | 3.37 GB → 538 MB | 705 → 120 MB |
+
+Neither shrank by changing what the application depends on. The `runner` image shed the
+optional peer dependencies `pnpm deploy --prod` leaves in a deploy directory — Next.js's SWC
+binaries, the Prisma CLI and Studio, sharp, Playwright, the TypeScript compiler, none of them
+reachable from `dist/main.js` — which `scripts/prune-deployed-modules.mjs` now removes; read
+its header for how "reachable" is defined, and for the one class of breakage a manifest-only
+walk cannot see — a package that requires something it never declared, which used to resolve
+through pnpm's flat hoist. There is no static check for that; there is a boot with `SENTRY_DSN`,
+`SMTP_HOST` and `REDIS_URL` set, which is what exercises the code no default-configuration
+start-up touches. The
+`migrate` image stopped being the entire build stage (workspace, every dev dependency, pnpm
+itself) and became a clean base with the Prisma CLI, the schema and the migrations. Reproduce
+any of these with `docker build -f apps/api/Dockerfile --target runner .` followed by
+`docker history` and `docker image ls --tree` on the result.
+
+What is left is mostly not ours: `node:24-alpine` is 171 MB of every one of these images
+(Alpine 9.31 MB, Node 156 MB, Yarn 5.48 MB), 42% of the API image. Cutting that means a
+different base, and the base is load-bearing — `docker-compose.yml`'s healthcheck is a busybox
+`wget` run inside the container, which a distroless image would not have.
+
 Next.js inlines `NEXT_PUBLIC_*` into the client bundle at build time, so a published image
 cannot pick those up at container start the way `api`'s `DATABASE_URL` can. That is a property
 of the framework and has not changed — what changed is that the value being baked is no longer
@@ -434,7 +464,7 @@ observed to fail, never because it "seems like it might need it." The comments b
 | Service      | `cap_add`                                             | Why                                                                                                                                                                                                                                                                                                                            |
 | ------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `api`, `web` | none                                                  | Already `USER node` — no `chown`, `setuid`, or privileged port bind at any point in the container's life                                                                                                                                                                                                                       |
-| `migrate`    | none                                                  | The `migrate` build target has no `USER` (it's the pre-`runner` `build` stage), so it runs as root, but it only opens a DB connection and reads its own already-built `/app`                                                                                                                                                   |
+| `migrate`    | none                                                  | `USER node` as well, since the image shrink gave the stage its own base instead of reusing the root-owned `build` stage. It only opens a DB connection and reads the schema and migrations copied in beside it                                                                                                                 |
 | `backup`     | none                                                  | `entrypoint:` replaces the postgres image's own entrypoint outright, so its chown/re-exec logic never runs — the sidecar stays root but never touches ownership of anything                                                                                                                                                    |
 | `postgres`   | `CHOWN`, `FOWNER`, `SETUID`, `SETGID`, `DAC_OVERRIDE` | The official entrypoint always starts as root, `chown`s `PGDATA` to the `postgres` user on _every_ boot (not just the first), then `gosu postgres` re-execs itself — `DAC_OVERRIDE` specifically is needed from the second boot onward, once `PGDATA` is `chmod 0700` and root can no longer `find` its way in without it      |
 | `redis`      | `SETUID`, `SETGID`                                    | The entrypoint drops privilege to uid 999 via `setpriv`, but only when its first argument is literally `redis-server` — see below                                                                                                                                                                                              |

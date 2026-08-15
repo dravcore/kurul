@@ -444,6 +444,49 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The two API images lost 2.8 GB between them, without dropping a dependency the app uses.**
+  Summing `docker history` on `linux/arm64`: the `api` runtime image went from 955 MB to
+  407 MB, and the one-shot `migrate` image from 2663 MB to 418 MB (audit finding OPS-07). As
+  unpacked bytes on disk, the same two images went from 1.22 GB to 516 MB and from 3.37 GB to
+  538 MB; compressed, from 266 MB to 108 MB and from 705 MB to 120 MB. All three readings are
+  in `docs/development.md`, because they are far enough apart that quoting one alone would be
+  choosing a flattering number.
+
+  Most of the API image was never reachable code. `pnpm deploy --prod` prunes the deployed
+  package's own `devDependencies` but keeps _optional peer dependencies_ — peers the publishing
+  package itself marked `"optional": true`, which pnpm's `auto-install-peers` had resolved
+  anyway. `better-auth` declares those on `next`, `react`, `react-dom`, `svelte`, `vue`,
+  `solid-js`, `drizzle-orm`, `mongodb`, `mysql2`, `better-sqlite3` and `vitest`;
+  `@prisma/client` declares them on `prisma` and `typescript`. Following those edges shipped
+  `@next/swc-linux-arm64-{gnu,musl}` (169 MB), `@prisma/studio-core`, `@electric-sql/pglite`,
+  `@prisma/engines`, `sharp`'s libvips builds, Playwright, `vite`, `rollup`, `esbuild` and the
+  TypeScript compiler into an image whose only job is to run `node dist/main.js`.
+  `scripts/prune-deployed-modules.mjs` now removes them: it walks `dependencies`,
+  `optionalDependencies` and non-optional `peerDependencies` from the deploy's top level and
+  deletes every virtual-store entry the closure does not contain. In pnpm's isolated layout
+  those entries are off the primary resolution path, so this is not a judgement about which code
+  "probably" runs — 269 of 493 store entries went, and 212 MB of `node_modules` remained.
+
+  The residual risk, named in the script's header rather than left for someone to discover: a
+  package that `require`s something it never declared used to resolve through pnpm's flat
+  `.pnpm/node_modules` hoist, and no longer will. A manifest-only walk cannot see that, and it
+  fails at runtime rather than at build. The mitigation is empirical — the healthcheck, the e2e
+  suite, and a boot with the three opt-in paths that load code no default boot touches:
+  `SENTRY_DSN` set (SDK initialises with 44 integrations, `flush()` returns), `SMTP_HOST` set
+  (a real invitation arrives in Mailpit over SMTP), and `REDIS_URL` set (BullMQ schedulers and
+  the Socket.io Redis adapter both register). All three were exercised against the pruned image.
+
+  `migrate` was the bigger number and the simpler fix: the stage was `FROM build`, so the
+  image was the entire assembled workspace — every dev dependency of every package, the
+  sources, and pnpm — kept alive to run one command. It now starts from the same clean
+  `node:24-alpine` the API does and carries the Prisma CLI, `prisma.config.ts`, the schema and
+  the migrations. It also drops root: the old stage ran as root only because it inherited no
+  `USER` from `build`, and `prisma migrate deploy` never needed one. Both images run as
+  `USER node`, as before for `api` and newly so for `migrate`.
+
+  Nothing about the compose contract moved: `docker compose up -d` still brings the stack up
+  with `migrate` at `Exited (0)` and `api` `(healthy)`, `/health/ready` answers 200 through the
+  proxy, and the web image is untouched — no build-time API URL was reintroduced.
 - **"`develop` is always deployable to staging" is gone, replaced by a claim something checks.**
   `docs/git-strategy.md` had promised that since the branch table was written, and no staging
   environment has ever existed — no host, no workflow, no secret in this repository points at

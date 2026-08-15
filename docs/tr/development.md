@@ -390,6 +390,38 @@ yorumda açıklanıyor), dolayısıyla her zaman kaynaktan build eder — `api`/
 gerekçesinin tamamı için bkz.
 [denetim bulgusu OPS-04](https://github.com/dravcore/kurultay/issues/126).
 
+### İki API imajı ne kadar yer kaplıyor
+
+`linux/arm64` üzerinde ölçüldü. Docker "bu imaj ne kadar" sorusuna birbirinden hayli uzak üç
+yanıt veriyor; üçü de burada — `docker history` toplamı, `docker image ls --tree`'nin DISK
+USAGE'ı (host üzerinde açılmış bayt) ve CONTENT SIZE'ı (sıkıştırılmış, kabaca bir `pull`'un
+taşıdığı miktar):
+
+| İmaj             | `docker history` | Diskte açılmış   | Sıkıştırılmış |
+| ---------------- | ---------------- | ---------------- | ------------- |
+| `api` (`runner`) | 955 → 407 MB     | 1.22 GB → 516 MB | 266 → 108 MB  |
+| `migrate`        | 2663 → 418 MB    | 3.37 GB → 538 MB | 705 → 120 MB  |
+
+Hiçbiri uygulamanın bağımlılıklarını değiştirerek küçülmedi. `runner` imajı, `pnpm deploy
+--prod`'un deploy dizininde bıraktığı isteğe bağlı peer bağımlılıklarından kurtuldu — Next.js'in
+SWC binary'leri, Prisma CLI ve Studio, sharp, Playwright, TypeScript derleyicisi; hiçbirine
+`dist/main.js` üzerinden erişilemiyor — bunları artık `scripts/prune-deployed-modules.mjs`
+kaldırıyor. "Erişilebilir"in nasıl tanımlandığı o dosyanın başlığında yazıyor — yalnızca
+manifest okuyan bir taramanın göremeyeceği tek kırılma sınıfıyla birlikte: hiç bildirmediği bir
+modülü `require` eden bir paket, eskiden pnpm'in düz hoist'i üzerinden çözülüyordu, artık
+çözülmeyecek. Bunun statik bir kontrolü yok; olan şey `SENTRY_DSN`, `SMTP_HOST` ve `REDIS_URL`
+ayarlıyken bir boot — varsayılan yapılandırmayla açılışın hiç dokunmadığı kodu çalıştıran şey
+bu. `migrate` imajı ise build stage'inin tamamı
+olmaktan (workspace, her paketin tüm dev bağımlılıkları, pnpm'in kendisi) çıkıp Prisma CLI,
+şema ve migration'ları taşıyan temiz bir tabana dönüştü. Sayıların hepsini `docker build -f
+apps/api/Dockerfile --target runner .` ardından sonucun `docker history` ve
+`docker image ls --tree` çıktısıyla yeniden üretebilirsin.
+
+Geriye kalanın büyük kısmı bize ait değil: `node:24-alpine` bu imajların her birinde 171 MB yer
+tutuyor (Alpine 9.31 MB, Node 156 MB, Yarn 5.48 MB) — API imajının %42'si. Bunu kesmek farklı
+bir taban demek ve taban taşıyıcı bir parça: `docker-compose.yml`'deki healthcheck, container
+içinde çalışan bir busybox `wget` — distroless bir imajda bu yok.
+
 Next.js, `NEXT_PUBLIC_*` değerlerini build zamanında client bundle'a gömer; dolayısıyla
 yayınlanmış bir imaj bunları `api`'nin `DATABASE_URL`'i gibi container başlangıcında alamaz. Bu
 framework'ün bir özelliği ve değişmedi — değişen şey, gömülen değerin artık dağıtıma özgü
@@ -442,7 +474,7 @@ kısa özeti:
 | Servis       | `cap_add`                                             | Neden                                                                                                                                                                                                                                                                                                                                                 |
 | ------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `api`, `web` | yok                                                   | Zaten `USER node` — container'ın ömrü boyunca hiçbir noktada `chown`, `setuid` veya ayrıcalıklı port bind'i yok                                                                                                                                                                                                                                       |
-| `migrate`    | yok                                                   | `migrate` build hedefinin `USER`'ı yok (runner öncesi `build` stage'inin kendisi), yani root çalışır — ama yalnızca DB'ye bağlanır ve kendi zaten inşa edilmiş `/app`'ini okur                                                                                                                                                                        |
+| `migrate`    | yok                                                   | O da `USER node`: imaj küçültme çalışması bu stage'e root sahipli `build` stage'i yerine kendi temiz tabanını verdi. Yalnızca DB'ye bağlanır ve yanına kopyalanan şema ile migration'ları okur                                                                                                                                                        |
 | `backup`     | yok                                                   | `entrypoint:`, postgres imajının kendi entrypoint'ini tamamen değiştiriyor, dolayısıyla chown/re-exec mantığı hiç çalışmıyor — sidecar root kalır ama hiçbir sahiplik değiştirmiyor                                                                                                                                                                   |
 | `postgres`   | `CHOWN`, `FOWNER`, `SETUID`, `SETGID`, `DAC_OVERRIDE` | Resmî entrypoint her zaman root olarak başlar, _her_ açılışta (yalnızca ilkinde değil) `PGDATA`'yı `postgres` kullanıcısına `chown`'lar, sonra `gosu postgres` ile kendini yeniden exec eder — `DAC_OVERRIDE` özellikle ikinci açılıştan itibaren gerekir: `PGDATA` artık `chmod 0700` olduğunda root bu izin olmadan içine `find` ile bile giremiyor |
 | `redis`      | `SETUID`, `SETGID`                                    | Entrypoint, `setpriv` ile uid 999'a ayrıcalık düşürür — ama yalnızca ilk argümanı harfiyen `redis-server` olduğunda; aşağıya bakın                                                                                                                                                                                                                    |
