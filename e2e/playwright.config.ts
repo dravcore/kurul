@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { apiEnv, API_URL, webEnv, WEB_URL } from './stack-env';
 
 /**
- * Browser end-to-end suite — five scenarios, deliberately.
+ * Browser end-to-end suite — six scenarios, deliberately.
  *
  * `docs/testing.md` deferred browser tests while the board UI was still changing shape every
  * week, and that judgement was right: a full suite written then would have been rewritten
@@ -31,6 +31,28 @@ import { apiEnv, API_URL, webEnv, WEB_URL } from './stack-env';
  * fifth scenario is the slowest single test at ~2.3s, and it costs the *suite* about half a
  * second because the workers run it beside the others. Against the five-minute ceiling below
  * that is 1.4% of the budget — the ceiling is still sized for a cold CI runner, not for this.
+ *
+ * **Why the number went from five to six.** `tests/board-import.spec.ts` was added for P3-3, and
+ * it meets the same admission criterion for the same kind of reason. The importer's body is built
+ * by an `<input type="file">` and a `FormData` the *browser* encodes; the API suite composes its
+ * own multipart bodies, so it cannot disagree with Chromium about the field name, the boundary or
+ * the `Content-Type`. And the roadmap metric for that item is not "the endpoint answers a report"
+ * but "the partial-failure report is shown to the user" — a claim about a screen, made about a
+ * report that exists only in the body of one `201` (ADR 0025: no `ImportRun` table, no status
+ * endpoint). An API test cannot fail on a panel that renders nothing, and a Vitest test cannot
+ * fail on a report the browser never received.
+ *
+ * The scenario is also the only place the report's numbers are checked against the board they
+ * describe: it ends on the board page counting the cards the server returns, so "4 tasks" on the
+ * panel and four cards on the board have to be the same four.
+ *
+ * Measured the same way, on the same class of machine (Apple M3 Max, 14 cores, 36 GB, Node
+ * 24.18), 8 consecutive runs each with the servers warm: the five at 4.2–5.1s (median 4.4s), the
+ * six at 4.3–5.6s (median 4.75s) — about 0.3s of median. The sixth is the *fastest* single test
+ * of the six at ~1.5s, because it drives one form and two page loads and does its setup over
+ * HTTP. Against the five-minute ceiling the whole suite is now 1.6% of the budget. That margin is
+ * still headroom for a cold CI runner and still not an argument for a seventh: the paragraph at
+ * the top of this file is the admission test, and "there is time" has never been it.
  */
 export default defineConfig({
   testDir: './tests',
@@ -73,14 +95,14 @@ export default defineConfig({
   /**
    * Five minutes for the whole suite, enforced rather than aspired to.
    *
-   * The budget is the reason this suite is five scenarios and not forty: a nightly that takes
+   * The budget is the reason this suite is six scenarios and not forty: a nightly that takes
    * twenty minutes is a nightly people stop reading. Putting the ceiling here instead of in
    * the workflow's `timeout-minutes` means it also applies locally, so the run that first
    * exceeds it is the one on the author's machine. Measured on a laptop (Apple M3 Max, 14
-   * cores, 36 GB, Node 24.18) the five take 4.0–4.5s over 24 runs; the margin is for a cold CI
-   * runner, not for growth.
+   * cores, 36 GB, Node 24.18) the five took 4.0–4.5s over 24 runs and the six take 4.3–5.6s
+   * over 8; the margin is for a cold CI runner, not for growth.
    *
-   * Read that margin as headroom for the runner, not as room for a sixth scenario: the
+   * Read that margin as headroom for the runner, not as room for a seventh scenario: the
    * paragraph at the top of this file is the admission test, and "there is time" has never
    * been it.
    */
