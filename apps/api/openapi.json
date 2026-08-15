@@ -1674,6 +1674,388 @@
             "session": []
           }
         ]
+      },
+      "delete": {
+        "operationId": "AccountController_remove",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or one the server no longer recognises.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled failure. Never carries a stack trace, and never the raw exception message under `NODE_ENV=production`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Deletes the caller's account: `204`, and the session it was sent with is over.\n\nThe cookies are cleared on the way out because Better Auth's `session.cookieCache` answers\nfrom a signed cookie for up to five minutes without consulting the database, so deleting\nthe `Session` rows does not by itself stop this browser presenting a valid session. Clearing\nthem here closes that window for the browser that asked — which is every browser on this\npath (ADR 0026 §\"Consequences\" covers the administrator path, where it cannot be closed).",
+        "tags": ["Account"],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/me/deletion-preview": {
+      "get": {
+        "operationId": "AccountController_preview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or one the server no longer recognises.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled failure. Never carries a stack trace, and never the raw exception message under `NODE_ENV=production`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What deleting this account would do, before any of it happens.\n\nA separate `GET` rather than a field on `/me`: it runs six counts and a per-workspace\nroster read, and `/me` is on the web's locale-resolution path — it is polled, this is\nopened once by somebody who has decided to read it.",
+        "tags": ["Account"],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/instance/users/{userId}/deletion-preview": {
+      "get": {
+        "operationId": "InstanceAccountController_preview",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUIDv7. Opaque — never parsed, sorted or generated client-side."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or one the server no longer recognises.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled failure. Never carries a stack trace, and never the raw exception message under `NODE_ENV=production`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What deleting this account would do.\n\nThe operator reads this before deciding, exactly as the user does — and needs it more,\nbecause they cannot see the person's workspaces any other way. It is also what makes the\n≤30-minute target reachable without a database session: the sole-owned workspaces and\ntheir transfer candidates are on the screen.",
+        "tags": ["InstanceAccount"],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/instance/users/{userId}": {
+      "delete": {
+        "operationId": "InstanceAccountController_remove",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUIDv7. Opaque — never parsed, sorted or generated client-side."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or one the server no longer recognises.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled failure. Never carries a stack trace, and never the raw exception message under `NODE_ENV=production`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Deletes the named account. `204`.\n\n`confirmEmail` has to match the target's address, and on this path it is doing more work\nthan on the self-service one: a UUID in a URL is unreadable, and a mistyped one is a\ndifferent person whose data would be destroyed instead.",
+        "tags": ["InstanceAccount"],
+        "security": [
+          {
+            "session": []
+          }
+        ]
       }
     },
     "/workspaces": {
@@ -11819,9 +12201,13 @@
           "avatarUrl": {
             "type": "string",
             "nullable": true
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "True when the account has been anonymised (ADR 0026). `name` then carries the stored\ntombstone rather than a person's name, and a client is expected to render its own label\ninstead — which is why this is a flag rather than a string comparison against `name`."
           }
         },
-        "required": ["id", "name", "avatarUrl"]
+        "required": ["id", "name", "avatarUrl", "deleted"]
       },
       "ActivitySchema": {
         "type": "object",
@@ -11916,9 +12302,10 @@
             "nullable": true
           },
           "locale": {
-            "type": "string",
             "nullable": true,
-            "description": "Chosen interface language as an IETF tag, or `null` for \"never chose\".\n\n`null` is a distinct state from `\"en\"`: an unset user follows their browser's\n`Accept-Language`."
+            "description": "Chosen interface language as an IETF tag, or `null` for \"never chose\".\n\n`null` is a distinct state from `\"en\"`: an unset user follows their browser's\n`Accept-Language`.",
+            "enum": ["en", "tr"],
+            "type": "string"
           },
           "createdAt": {
             "type": "string",
@@ -11934,9 +12321,46 @@
             "type": "string",
             "nullable": true,
             "description": "Nullable on purpose: clearing the preference puts the user back on their browser's\n`Accept-Language`, which a user who set a language on someone else's machine should be\nable to undo. Omitting the key leaves the stored value alone.\n\nValidated against `SUPPORTED_LOCALES` rather than a loose IETF-tag pattern, so the column\ncan only ever hold a tag the app actually ships a catalog for.",
-            "enum": ["en"]
+            "enum": ["en", "tr"]
           }
         }
+      },
+      "WorkspaceDispositionDto": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["transfer", "delete"]
+          },
+          "newOwnerUserId": {
+            "type": "string",
+            "description": "Required for `transfer`, refused for `delete`.\n\n`ValidateIf` on the action rather than `@IsOptional()`: a body that says `delete` and also\nnames a new owner is not a `delete` request with a harmless extra field, it is a request\nwhose author believed two different things. `whitelist: true` strips unknown keys but not\ndeclared ones, so this is what makes the union actually exclusive.",
+            "format": "uuid"
+          }
+        },
+        "required": ["workspaceId", "action"]
+      },
+      "DeleteAccountDto": {
+        "type": "object",
+        "properties": {
+          "confirmEmail": {
+            "type": "string",
+            "description": "The address of the account being deleted, typed back by the caller.\n\nA misclick gate and documented as nothing more: the session sending this can already delete\nevery workspace the user owns, so a password re-prompt here and nowhere else would buy no\nsecurity while implying it had (ADR 0026 §4). On the administrator path it is the operator\nconfirming *which* account they mean, which is the failure worth guarding — an id in a URL\nis unreadable and a mistyped one is another person.",
+            "format": "email"
+          },
+          "dispositions": {
+            "description": "One entry per workspace the user is the only OWNER of. Omitted is the same as empty, and\nboth are refused with `409` when there is any such workspace.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceDispositionDto"
+            }
+          }
+        },
+        "required": ["confirmEmail"]
       },
       "WorkspaceSchema": {
         "type": "object",
@@ -12188,7 +12612,7 @@
           },
           "category": {
             "description": "Semantic state, independent of `name` and of position. Metrics key off this; a client that\nwants to know whether a column means \"finished\" reads `category`, never the typed label.",
-            "enum": ["COMPLETED", "BACKLOG", "UNSTARTED", "STARTED", "CANCELED"],
+            "enum": ["BACKLOG", "UNSTARTED", "STARTED", "COMPLETED", "CANCELED"],
             "type": "string"
           },
           "taskCount": {
@@ -12216,7 +12640,7 @@
           "category": {
             "type": "string",
             "description": "Omitted falls through to the schema default (`UNSTARTED`), not to a name-derived guess.",
-            "enum": ["COMPLETED", "BACKLOG", "UNSTARTED", "STARTED", "CANCELED"]
+            "enum": ["BACKLOG", "UNSTARTED", "STARTED", "COMPLETED", "CANCELED"]
           }
         },
         "required": ["name"]
@@ -12237,7 +12661,7 @@
           "category": {
             "type": "string",
             "description": "Non-nullable: a column always has a category. Clearing one back to \"unknown\" is not a\nstate the metrics layer has an answer for, so the client picks a value or omits the field.",
-            "enum": ["COMPLETED", "BACKLOG", "UNSTARTED", "STARTED", "CANCELED"]
+            "enum": ["BACKLOG", "UNSTARTED", "STARTED", "COMPLETED", "CANCELED"]
           }
         }
       },

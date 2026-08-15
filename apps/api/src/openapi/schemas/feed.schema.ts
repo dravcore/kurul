@@ -11,6 +11,12 @@ export class AuthorSchema {
   id!: string;
   name!: string;
   avatarUrl!: string | null;
+  /**
+   * True when the account has been anonymised (ADR 0026). `name` then carries the stored
+   * tombstone rather than a person's name, and a client is expected to render its own label
+   * instead — which is why this is a flag rather than a string comparison against `name`.
+   */
+  deleted!: boolean;
 }
 
 /** A comment on a task. */
