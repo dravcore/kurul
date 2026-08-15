@@ -22,13 +22,23 @@ export function configureApp(
   // preflights — carries the same baseline headers.
   app.use(
     helmet({
-      // This service only ever answers with JSON (see AllExceptionsFilter) — it renders no
-      // HTML, serves no static assets, and embeds no third-party resources. So instead of
-      // helmet's browser-app defaults (`default-src 'self'`, a `script-src`, an inline-friendly
-      // `style-src`), lock the policy down to the API shape: nothing is allowed to load,
-      // nothing may frame us, and no `<base>`/form target can be smuggled into a response that
-      // some browser decides to sniff as a document. CSP only governs document/worker contexts,
-      // so this cannot affect `fetch`/XHR JSON reads or the Socket.io transport.
+      // This service answers with JSON everywhere except one endpoint (see AllExceptionsFilter
+      // for the JSON half, and attachment/attachment.controller.ts for the exception, which
+      // streams stored bytes). It renders no HTML, serves no static assets, and embeds no
+      // third-party resources. So instead of helmet's browser-app defaults (`default-src
+      // 'self'`, a `script-src`, an inline-friendly `style-src`), lock the policy down to the
+      // API shape: nothing is allowed to load, nothing may frame us, and no `<base>`/form
+      // target can be smuggled into a response that some browser decides to sniff as a
+      // document. CSP only governs document/worker contexts, so this cannot affect `fetch`/XHR
+      // JSON reads or the Socket.io transport.
+      //
+      // The attachment stream does not weaken any of that, and the reason is the serving
+      // policy rather than this policy: the only family served `Content-Disposition: inline` is
+      // the four raster image types, and a raster image is not a document context — it loads
+      // nothing, so there is nothing for `default-src 'none'` to have to stop. Every other
+      // type, PDF included, is served `attachment` and never becomes a browsing context at all.
+      // `text/html` and `image/svg+xml` are refused at upload for exactly this reason
+      // (ADR 0022, ADR 0024).
       contentSecurityPolicy: {
         useDefaults: false,
         directives: {
@@ -42,7 +52,10 @@ export function configureApp(
       frameguard: { action: 'deny' },
       // The web app is a separate origin (WEB_URL) that legitimately reads this API, so the
       // default `same-origin` CORP would be wrong here. Cross-origin access stays gated by the
-      // CORS allowlist configured below.
+      // CORS allowlist configured below. One handler overrides this back to `same-origin` on
+      // its own responses — the attachment download — because the reasoning above is about the
+      // web app reading the API, and does not extend to user-uploaded bytes that nothing
+      // off-origin should be embedding (attachment-download.service.ts).
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       // HSTS keeps helmet's default (max-age 1 year, includeSubDomains). No environment
       // conditional is needed: browsers ignore Strict-Transport-Security on plain-HTTP

@@ -96,7 +96,7 @@ export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
  *    incomplete.
  *
  * The third kind is stated because seven of the entries below are in neither of the first two,
- * and a rule that does not describe seventeen of seventeen members is a rule the next person
+ * and a rule that does not describe eighteen of eighteen members is a rule the next person
  * cannot apply. It is also what the older comment beside the board entries was reaching for
  * when it said those rows "are often the only surviving evidence that the work existed at all".
  *

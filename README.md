@@ -50,11 +50,11 @@ Kurultay's answer is deliberately narrow:
 - **Realtime and multi-tenancy in the core.** Socket.io board sync and workspace-scoped queries
   were designed in, not added on top.
 
-And what it is not, at `v0.1.0`: no task attachments, no subtasks, no time tracking, no public
-API tokens or webhooks, and an English-only UI. Attachments, API tokens, webhooks and further
-language packs are listed under [Beyond MVP](docs/roadmap.md#beyond-mvp), each with the open
-question holding it up; subtasks and time tracking are not on that list at all. If you need
-them today, one of the more mature projects above is the better choice.
+And what it is not, at `v0.1.0`: no subtasks, no time tracking, no public API tokens or
+webhooks, and an English-only UI. API tokens, webhooks and further language packs are listed
+under [Beyond MVP](docs/roadmap.md#beyond-mvp), each with the open question holding it up;
+subtasks and time tracking are not on that list at all. If you need them today, one of the more
+mature projects above is the better choice.
 
 ## Features
 
@@ -66,6 +66,12 @@ Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
 - **Checklists** — multiple named checklists per task, each with its own items; a progress
   badge (`3/5`) shows on the board card and disappears when a task has none
   ([ADR 0023](docs/decisions/0023-checklist-data-model.md))
+- **Attachments** — files and links on a card. Files are stored on your own disk, accepted on
+  their magic bytes rather than their extension, and served back with a size limit you set;
+  images preview in the panel. A link is stored, shown and opened — the server never requests
+  the URL, so no preview fetch can be turned into a probe of your network
+  ([ADR 0022](docs/decisions/0022-attachment-storage.md),
+  [ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md))
 - **Fractional-indexed ordering** — reordering a card only touches that card's position,
   never a full-list renumber
 - **Workspaces** — multi-tenant from the ground up, every query scoped by workspace

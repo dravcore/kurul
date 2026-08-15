@@ -80,6 +80,13 @@ string can contain `/`, and both values end up inside a URL where a slash trunca
 obtains a certificate. `https://…` switches automatic HTTPS on. `http://localhost` (the
 default) is the local, no-domain install.
 
+**Attachments need no line here.** `docker-compose.yml` sets `STORAGE_PATH` itself, to a
+directory inside the `attachment_data` volume, so a Compose install accepts file uploads out of
+the box — the `.env` copy of that variable is for the development loop only. The one value you
+may want to change is `ATTACHMENT_MAX_BYTES` (default `26214400`, 25 MiB), and if you do, read
+[the proxy contract below](#bringing-your-own-reverse-proxy) first: the reverse proxy carries a
+separate, deliberately higher ceiling that has to move with it.
+
 ## 3. Start it
 
 ```bash
@@ -226,16 +233,26 @@ docker compose logs api | grep -i mail
 
 ## Backups
 
-The `backup` service is already running: it writes a `pg_dump` archive into the `backup_data`
-volume every `BACKUP_INTERVAL` seconds (24h by default) and keeps `BACKUP_KEEP` of them.
+The `backup` service is already running: every `BACKUP_INTERVAL` seconds (24h by default) it
+writes **two** archives into the `backup_data` volume — a `pg_dump` of the database and a
+`.tar.gz` of the uploaded attachment files — and keeps `BACKUP_KEEP` of each series. Both
+archives of one cycle carry the **same timestamp**, which is how a restore knows which tar
+belongs to which dump.
 
 That covers "I deleted the wrong workspace". It does not cover a dead disk — the archives sit
-on the same host as the database. Copy them off the machine:
+on the same host as the database. Copy them off the machine, **both halves of the newest
+cycle**, not just the dump:
 
 ```bash
 docker run --rm -v kurultay_backup_data:/backups -v "$PWD:/out" alpine \
-  sh -c 'cp /backups/$(ls -t /backups | head -1) /out/'
+  sh -c 'stamp=$(ls -t /backups/*.dump | head -1 | sed "s|.*/kurultay-||;s|\.dump$||"); \
+         cp /backups/kurultay-$stamp.dump /out/; \
+         cp /backups/kurultay-$stamp-files.tar.gz /out/ 2>/dev/null || true'
 ```
+
+A dump restored without its file archive brings every row back and leaves every uploaded file
+behind — and passes every verification step that was written before attachments existed. The
+drill in [Restoring from a backup](development.md#restoring-from-a-backup) checks the files too.
 
 Restore steps are in [Upgrading and backups](development.md#upgrading-and-backups).
 
