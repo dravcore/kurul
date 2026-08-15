@@ -1,37 +1,72 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { NotificationType, type NotificationDto } from '@kurultay/shared-types';
+import { toast } from 'sonner';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { NotificationsList } from './notifications-list';
 
-vi.mock('@/lib/api', () => ({ api: { get: vi.fn() } }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
-vi.mock('@/lib/notification-actions', () => ({
-  markAllNotificationsRead: vi.fn(),
-  openNotificationTarget: vi.fn(),
+// `@/lib/notification-actions` and `@/lib/notification-nav` are deliberately real: what this
+// screen does to a notification *is* those two modules, and stubbing them would leave the
+// click-through asserting only that a mock was called.
+vi.mock('@/lib/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+
+const push = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+
+/**
+ * The socket is stubbed, but its callbacks are kept: they are how a notification that arrives
+ * while this page is open reaches it, and a stub that dropped them would silently delete that
+ * behaviour from the suite.
+ */
+interface SocketHandlers {
+  onUnreadChanged: () => void;
+  onResync: () => void;
+}
+let socketHandlers: SocketHandlers | null = null;
+vi.mock('./use-notification-socket', () => ({
+  useNotificationSocket: (_workspaceId: unknown, _enabled: unknown, handlers: SocketHandlers) => {
+    socketHandlers = handlers;
+    return { connected: true };
+  },
 }));
-vi.mock('./use-notification-socket', () => ({ useNotificationSocket: vi.fn() }));
+
 vi.mock('@/components/layout/workspace-provider', () => ({
   useWorkspaceContext: () => ({ activeId: 'w1', activeRole: null }),
 }));
 
 const apiGet = vi.mocked(api.get);
+const apiPost = vi.mocked(api.post);
 
-function notification(id: string): NotificationDto {
+const TASK_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d10';
+const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d20';
+const READ_AT = '2026-01-02T00:00:00.000Z';
+
+function notification(id: string, overrides: Partial<NotificationDto> = {}): NotificationDto {
   return {
     id,
     workspaceId: 'w1',
     userId: 'u1',
     type: NotificationType.Mention,
-    taskId: 't1',
+    taskId: TASK_ID,
     activityId: null,
-    payload: {},
+    payload: { title: 'Ship the thing', boardId: BOARD_ID },
     readAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
   };
+}
+
+/** The page the next list request answers with, keyed by nothing — tests set it per call. */
+let listPages: { items: NotificationDto[]; nextCursor: string | null }[] = [];
+let taskLookup: () => Promise<{ boardId: string }> = () => Promise.resolve({ boardId: BOARD_ID });
+/** Every list URL the screen asked for, in order — the filters are only visible here. */
+let listUrls: string[] = [];
+
+function serveList(...pages: { items: NotificationDto[]; nextCursor: string | null }[]): void {
+  listPages = pages;
 }
 
 function renderList(): void {
@@ -42,8 +77,43 @@ function renderList(): void {
   );
 }
 
+function rows(): HTMLElement[] {
+  return screen.queryAllByRole('button').filter((button) => button.querySelector('time') !== null);
+}
+
+/**
+ * The first row, or a failure naming the empty list.
+ *
+ * `list[0]` is `T | undefined` under this repo's `noUncheckedIndexedAccess`, and the honest
+ * way through it is the rule review already asks for: prove the list is not empty before
+ * asserting anything about what is in it.
+ */
+function first<T>(list: T[]): T {
+  const [head] = list;
+  if (!head) throw new Error('expected at least one element, got an empty list');
+  return head;
+}
+
 beforeEach(() => {
   apiGet.mockReset();
+  apiPost.mockReset();
+  push.mockReset();
+  vi.mocked(toast.error).mockClear();
+  socketHandlers = null;
+  listUrls = [];
+  listPages = [{ items: [], nextCursor: null }];
+  taskLookup = () => Promise.resolve({ boardId: BOARD_ID });
+
+  apiGet.mockImplementation(((url: string) => {
+    if (url.includes('/tasks/')) return taskLookup();
+    listUrls.push(url);
+    return Promise.resolve(listPages.length > 1 ? listPages.shift() : listPages[0]);
+  }) as never);
+  apiPost.mockImplementation(((url: string) => {
+    if (url.endsWith('/read-all')) return Promise.resolve(undefined);
+    const id = url.split('/notifications/')[1]?.replace('/read', '') ?? '';
+    return Promise.resolve(notification(id, { readAt: READ_AT }));
+  }) as never);
 });
 
 afterEach(() => {
@@ -53,14 +123,14 @@ afterEach(() => {
 
 describe('NotificationsList', () => {
   it('lists the notifications it loaded', async () => {
-    apiGet.mockResolvedValue({ items: [notification('n1')], nextCursor: null } as never);
+    serveList({ items: [notification('n1')], nextCursor: null });
     renderList();
 
     expect(await screen.findByText(/mentioned/i)).toBeDefined();
   });
 
   it('says it is empty only when the load succeeded and returned nothing', async () => {
-    apiGet.mockResolvedValue({ items: [], nextCursor: null } as never);
+    serveList({ items: [], nextCursor: null });
     renderList();
 
     expect(await screen.findByText(messages.app.notifications.empty)).toBeDefined();
@@ -91,5 +161,259 @@ describe('NotificationsList', () => {
 
     await waitFor(() => expect(apiGet.mock.calls.length).toBeGreaterThan(calls));
     expect(await screen.findByText(/mentioned/i)).toBeDefined();
+  });
+
+  /** Every notification type has to read as what it is; an unknown one must not render blank. */
+  it('names what each row is about', async () => {
+    serveList({
+      items: [
+        notification('n1', { type: NotificationType.Assignment }),
+        notification('n2', { type: NotificationType.Mention }),
+        notification('n3', { type: NotificationType.DueSoon }),
+        notification('n4', { type: 'invented_later' }),
+      ],
+      nextCursor: null,
+    });
+    renderList();
+
+    await screen.findAllByText(/mentioned/i);
+    // Asserted before the four lookups below, so none of them can pass against an empty list.
+    expect(rows()).toHaveLength(4);
+    expect(screen.getByText('Assigned to “Ship the thing”')).toBeDefined();
+    expect(screen.getByText('Mentioned on “Ship the thing”')).toBeDefined();
+    expect(screen.getByText('Due soon: “Ship the thing”')).toBeDefined();
+    expect(screen.getByText('invented_later')).toBeDefined();
+  });
+});
+
+describe('NotificationsList click-through', () => {
+  it('marks a notification read and opens the task it points at', async () => {
+    serveList({ items: [notification('n1')], nextCursor: null });
+    renderList();
+    const listed = await screen.findAllByText(/mentioned/i);
+    expect(listed).toHaveLength(1);
+
+    fireEvent.click(first(listed));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/board/${BOARD_ID}/task/${TASK_ID}`));
+    expect(apiPost).toHaveBeenCalledWith('/workspaces/w1/notifications/n1/read');
+  });
+
+  /**
+   * The QA-04 case: the notification survived the task. It still marks read — the user read
+   * it — but the screen has to say the task is gone rather than look like the click missed.
+   */
+  it('says the task is gone instead of navigating nowhere', async () => {
+    serveList({ items: [notification('n1', { payload: { title: 'Deleted' } })], nextCursor: null });
+    taskLookup = () => Promise.reject(new Error('404'));
+    renderList();
+    const listed = await screen.findAllByText(/mentioned/i);
+    expect(listed).toHaveLength(1);
+
+    fireEvent.click(first(listed));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(messages.app.notifications.openTaskError),
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('reports a read the server refused, and stays put', async () => {
+    serveList({ items: [notification('n1')], nextCursor: null });
+    apiPost.mockRejectedValue(new Error('network'));
+    renderList();
+    const listed = await screen.findAllByText(/mentioned/i);
+    expect(listed).toHaveLength(1);
+
+    fireEvent.click(first(listed));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(messages.app.notifications.markReadError),
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The row is patched from the server's answer rather than refetched, so the only thing that
+   * proves the patch happened is the screen agreeing there is nothing left unread.
+   */
+  it('stops offering mark-all-read once the last unread row has been read', async () => {
+    serveList({ items: [notification('n1')], nextCursor: null });
+    renderList();
+    const markAll = await screen.findByRole('button', {
+      name: messages.app.notifications.markAllRead,
+    });
+    expect(markAll).toHaveProperty('disabled', false);
+    const listed = screen.getAllByText(/mentioned/i);
+    expect(listed).toHaveLength(1);
+
+    fireEvent.click(first(listed));
+
+    await waitFor(() => expect(markAll).toHaveProperty('disabled', true));
+    expect(
+      apiGet.mock.calls.filter((call) => String(call[0]).includes('/notifications?')),
+    ).toHaveLength(1);
+  });
+
+  /** A row the user already read is a navigation, not a second write. */
+  it('opens an already-read notification without marking it again', async () => {
+    serveList({ items: [notification('n1', { readAt: READ_AT })], nextCursor: null });
+    renderList();
+    const listed = await screen.findAllByText(/mentioned/i);
+    expect(listed).toHaveLength(1);
+
+    fireEvent.click(first(listed));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/board/${BOARD_ID}/task/${TASK_ID}`));
+    expect(apiPost).not.toHaveBeenCalled();
+  });
+
+  it('marks everything read, and then has nothing left to offer', async () => {
+    // Mixed on purpose: mark-all has to leave the row that was already read exactly as it is.
+    serveList({
+      items: [notification('n1'), notification('n2', { readAt: READ_AT })],
+      nextCursor: null,
+    });
+    renderList();
+    const markAll = await screen.findByRole('button', {
+      name: messages.app.notifications.markAllRead,
+    });
+    expect(markAll).toHaveProperty('disabled', false);
+
+    fireEvent.click(markAll);
+
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith('/workspaces/w1/notifications/read-all'),
+    );
+    // The rows are patched in place, so the button turns itself off without a refetch.
+    await waitFor(() => expect(markAll).toHaveProperty('disabled', true));
+  });
+
+  it('does not offer mark-all-read when every row is already read', async () => {
+    serveList({ items: [notification('n1', { readAt: READ_AT })], nextCursor: null });
+    renderList();
+
+    const markAll = await screen.findByRole('button', {
+      name: messages.app.notifications.markAllRead,
+    });
+    expect(markAll).toHaveProperty('disabled', true);
+  });
+
+  it('reports a failed mark-all-read and leaves the rows unread', async () => {
+    serveList({ items: [notification('n1')], nextCursor: null });
+    apiPost.mockRejectedValue(new Error('network'));
+    renderList();
+    const markAll = await screen.findByRole('button', {
+      name: messages.app.notifications.markAllRead,
+    });
+
+    fireEvent.click(markAll);
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(messages.app.notifications.markReadError),
+    );
+    expect(markAll).toHaveProperty('disabled', false);
+  });
+});
+
+describe('NotificationsList paging and filters', () => {
+  it('appends the next page instead of replacing what is on screen', async () => {
+    serveList(
+      { items: [notification('n1')], nextCursor: 'cursor-1' },
+      { items: [notification('n2', { type: NotificationType.DueSoon })], nextCursor: null },
+    );
+    renderList();
+    const loadMore = await screen.findByRole('button', {
+      name: messages.app.notifications.loadMore,
+    });
+    expect(rows()).toHaveLength(1);
+
+    fireEvent.click(loadMore);
+
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    expect(listUrls[1]).toContain('cursor=cursor-1');
+    // The first page is still there, which is the whole difference between append and replace.
+    expect(screen.getByText('Mentioned on “Ship the thing”')).toBeDefined();
+    expect(screen.getByText('Due soon: “Ship the thing”')).toBeDefined();
+    // Nothing left to page through, so the button goes away.
+    expect(screen.queryByRole('button', { name: messages.app.notifications.loadMore })).toBeNull();
+  });
+
+  it('keeps the rows it has when the next page fails', async () => {
+    serveList({ items: [notification('n1')], nextCursor: 'cursor-1' });
+    renderList();
+    const loadMore = await screen.findByRole('button', {
+      name: messages.app.notifications.loadMore,
+    });
+    expect(rows()).toHaveLength(1);
+
+    apiGet.mockRejectedValue(new Error('network'));
+    fireEvent.click(loadMore);
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(messages.app.notifications.loadError),
+    );
+    expect(rows()).toHaveLength(1);
+  });
+
+  it('asks the server for unread rows only when the user narrows to unread', async () => {
+    serveList({ items: [notification('n1')], nextCursor: null });
+    renderList();
+    await screen.findAllByText(/mentioned/i);
+    expect(listUrls[0]).not.toContain('unreadOnly');
+
+    fireEvent.click(screen.getByLabelText(messages.app.notifications.unreadOnly));
+
+    await waitFor(() => expect(listUrls.length).toBeGreaterThan(1));
+    expect(listUrls[listUrls.length - 1]).toContain('unreadOnly=true');
+  });
+
+  it('asks the server for one type when the user picks one', async () => {
+    serveList({ items: [notification('n1')], nextCursor: null });
+    renderList();
+    await screen.findAllByText(/mentioned/i);
+
+    fireEvent.change(screen.getByLabelText(messages.app.notifications.typeFilter), {
+      target: { value: NotificationType.DueSoon },
+    });
+
+    await waitFor(() => expect(listUrls.length).toBeGreaterThan(1));
+    expect(listUrls[listUrls.length - 1]).toContain(`type=${NotificationType.DueSoon}`);
+  });
+});
+
+describe('NotificationsList realtime', () => {
+  it('picks up a notification that arrives while the page is open', async () => {
+    serveList({ items: [notification('n1')], nextCursor: null });
+    renderList();
+    await screen.findAllByText(/mentioned/i);
+    expect(rows()).toHaveLength(1);
+
+    serveList({
+      items: [notification('n2', { type: NotificationType.Assignment }), notification('n1')],
+      nextCursor: null,
+    });
+    act(() => socketHandlers?.onUnreadChanged());
+
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    expect(screen.getByText('Assigned to “Ship the thing”')).toBeDefined();
+  });
+
+  /**
+   * The first join lands right after the initial load, which already returned fresh rows.
+   * Refetching on it would double every page load; refetching on the *second* one is what
+   * closes the gap a dropped connection opened.
+   */
+  it('ignores the first room join and refreshes on a later one', async () => {
+    serveList({ items: [notification('n1')], nextCursor: null });
+    renderList();
+    await screen.findAllByText(/mentioned/i);
+    const afterLoad = listUrls.length;
+
+    act(() => socketHandlers?.onResync());
+    expect(listUrls).toHaveLength(afterLoad);
+
+    act(() => socketHandlers?.onResync());
+    await waitFor(() => expect(listUrls.length).toBeGreaterThan(afterLoad));
   });
 });
