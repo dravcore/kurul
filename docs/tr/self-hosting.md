@@ -283,6 +283,93 @@ Migration'lar otomatik çalışır: tek seferlik `migrate` servisi, `api` başla
 migration'ları uygular. `latest`'i takip etmek yerine bilinçli upgrade etmeyi tercih
 ediyorsanız `.env`'de `TAG=v0.2.0` ile bir sürümü sabitleyin.
 
+## Çektiğiniz imajı doğrulamak
+
+`docker compose pull`, ghcr.io ne verirse ona güvenir. Her sürümle birlikte yayınlanan iki şey
+bunu bırakmanızı sağlar: bu imajın bu deponun release workflow'undan çıktığını söyleyen bir
+**imza** ve içinde ne olduğunu söyleyen bir **SBOM**. İkisini de kullanmak isteğe bağlıdır ve
+aşağıdaki komutları hiç çalıştırmayan kimseyi korumazlar.
+
+### İmzayı kontrol etmek
+
+[cosign](https://github.com/sigstore/cosign) **3.0 veya üstü** gerekir — imzalar cosign 3'ün
+varsayılan olarak kullandığı Sigstore bundle formatında yazılır ve cosign 2 bunları okuyamaz.
+
+```bash
+cosign verify \
+  --certificate-identity "https://github.com/dravcore/kurultay/.github/workflows/release-images.yml@refs/tags/v0.2.0" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  ghcr.io/dravcore/kurultay-api:v0.2.0
+```
+
+Aynısını `kurultay-web` için tekrarlayın; başka bir sürümü doğrularken `v0.2.0`'ı iki yerde de
+değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi anlatıyor: biri imzalayan workflow'un
+üzerinde çalıştığı git ref'i, diğeri sorduğunuz imaj tag'i.
+
+**Bütün kontrol bu iki `--certificate-*` bayrağıdır; onları atmayın.** Burada korunacak bir
+imzalama anahtarı yok. İmajlar keyless imzalanır: release workflow'u bir GitHub OIDC token'ını
+birkaç dakika geçerli bir sertifikayla takas eder, imzalar, sertifika sona erer. Sonucu anlamlı
+kılan bir sırrın saklanmış olması değil, sertifikanın _hangi depodaki hangi workflow'un hangi
+git ref'inde_ bunu istediğini kaydetmesidir. `--certificate-identity` olmadan cosign, geçerli
+imzalanmış herhangi birinin imajını seve seve kabul eder — bu deponun kendi fork'una tag atmış
+birininkini de.
+
+Başarılı bir çalıştırma yaptığı kontrolleri ve doğruladığı digest'i içeren bir JSON iddiası
+yazdırır:
+
+```
+Verification for ghcr.io/dravcore/kurultay-api:v0.2.0 --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - Existence of the claims in the transparency log was verified offline
+  - The code-signing certificate was verified using trusted certificate authority certificates
+```
+
+Bunun dışındaki her şey bir hatadır ve birbirinden ayırmaya değer iki hata şunlar: `no
+signatures found` (bu imaj hiç imzalanmamış — bu özellikten eski, ya da sandığınız imaj değil)
+ve `no matching CertificateIdentity found` (imzalanmış, ama sorduğunuz kimlikten başka biri ya
+da başka bir şey tarafından; hata mesajı bulduğu kimliği yazdırır).
+
+Doğrulama, güven kökü ve transparency log için Sigstore'un genel altyapısına çıkar, yani dışarı
+HTTPS ister. Sunucunun interneti yoksa deploy etmeden önce kendi makinenizden çalıştırın.
+
+Son argüman olarak hem tag hem digest çalışır; imajı çoktan çekmiş bir makinede digest daha
+katı soruyu sorar — tag'in şu anda neyi gösterdiğini değil, diskteki baytları sorar:
+
+```bash
+docker image inspect ghcr.io/dravcore/kurultay-api:v0.2.0 --format '{{index .RepoDigests 0}}'
+```
+
+### SBOM nerede
+
+Sürümün [GitHub Release](https://github.com/dravcore/kurultay/releases) sayfasında, indirilebilir
+asset olarak — imaj başına ve mimari başına bir tane, çünkü iki mimari gerçekten aynı paketleri
+içermiyor:
+
+```
+kurultay-api-v0.2.0-linux-amd64.spdx.json
+kurultay-api-v0.2.0-linux-arm64.spdx.json
+kurultay-web-v0.2.0-linux-amd64.spdx.json
+kurultay-web-v0.2.0-linux-arm64.spdx.json
+```
+
+Format SPDX 2.3 JSON; `grype`, `trivy` ve Dependency-Track'in üçü de dönüştürmeden okur:
+
+```bash
+gh release download v0.2.0 --repo dravcore/kurultay --pattern '*.spdx.json'
+grype sbom:./kurultay-api-v0.2.0-linux-amd64.spdx.json
+```
+
+**SBOM dosyasının kendisi imzalı değildir** — yukarıdaki imza imajı kapsar, SBOM ise aynı
+workflow çalıştırmasının ürettiği bir tarifidir. Çoğu kişi için bu yeterlidir, çünkü kurcalanmış
+bir SBOM kurcalanmış bir imajı doğrulatamaz. Daha güçlü garantiye ihtiyacınız varsa dosyaya
+güvenmeyin: zaten doğruladığınız imajdan [syft](https://github.com/anchore/syft) ile kendiniz
+yeniden üretip karşılaştırın.
+
+```bash
+syft scan registry:ghcr.io/dravcore/kurultay-api:v0.2.0 --platform linux/amd64 -o spdx-json
+```
+
 ## Kendi reverse proxy'nizi kullanmak
 
 Zaten nginx, Traefik veya başka bir proxy çalıştırıyorsanız ve üstüne ikincisini koymak

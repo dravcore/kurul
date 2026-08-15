@@ -488,6 +488,49 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The two API images lost 2.8 GB between them, without dropping a dependency the app uses.**
+  Summing `docker history` on `linux/arm64`: the `api` runtime image went from 955 MB to
+  407 MB, and the one-shot `migrate` image from 2663 MB to 418 MB (audit finding OPS-07). As
+  unpacked bytes on disk, the same two images went from 1.22 GB to 516 MB and from 3.37 GB to
+  538 MB; compressed, from 266 MB to 108 MB and from 705 MB to 120 MB. All three readings are
+  in `docs/development.md`, because they are far enough apart that quoting one alone would be
+  choosing a flattering number.
+
+  Most of the API image was never reachable code. `pnpm deploy --prod` prunes the deployed
+  package's own `devDependencies` but keeps _optional peer dependencies_ — peers the publishing
+  package itself marked `"optional": true`, which pnpm's `auto-install-peers` had resolved
+  anyway. `better-auth` declares those on `next`, `react`, `react-dom`, `svelte`, `vue`,
+  `solid-js`, `drizzle-orm`, `mongodb`, `mysql2`, `better-sqlite3` and `vitest`;
+  `@prisma/client` declares them on `prisma` and `typescript`. Following those edges shipped
+  `@next/swc-linux-arm64-{gnu,musl}` (169 MB), `@prisma/studio-core`, `@electric-sql/pglite`,
+  `@prisma/engines`, `sharp`'s libvips builds, Playwright, `vite`, `rollup`, `esbuild` and the
+  TypeScript compiler into an image whose only job is to run `node dist/main.js`.
+  `scripts/prune-deployed-modules.mjs` now removes them: it walks `dependencies`,
+  `optionalDependencies` and non-optional `peerDependencies` from the deploy's top level and
+  deletes every virtual-store entry the closure does not contain. In pnpm's isolated layout
+  those entries are off the primary resolution path, so this is not a judgement about which code
+  "probably" runs — 269 of 493 store entries went, and 212 MB of `node_modules` remained.
+
+  The residual risk, named in the script's header rather than left for someone to discover: a
+  package that `require`s something it never declared used to resolve through pnpm's flat
+  `.pnpm/node_modules` hoist, and no longer will. A manifest-only walk cannot see that, and it
+  fails at runtime rather than at build. The mitigation is empirical — the healthcheck, the e2e
+  suite, and a boot with the three opt-in paths that load code no default boot touches:
+  `SENTRY_DSN` set (SDK initialises with 44 integrations, `flush()` returns), `SMTP_HOST` set
+  (a real invitation arrives in Mailpit over SMTP), and `REDIS_URL` set (BullMQ schedulers and
+  the Socket.io Redis adapter both register). All three were exercised against the pruned image.
+
+  `migrate` was the bigger number and the simpler fix: the stage was `FROM build`, so the
+  image was the entire assembled workspace — every dev dependency of every package, the
+  sources, and pnpm — kept alive to run one command. It now starts from the same clean
+  `node:24-alpine` the API does and carries the Prisma CLI, `prisma.config.ts`, the schema and
+  the migrations. It also drops root: the old stage ran as root only because it inherited no
+  `USER` from `build`, and `prisma migrate deploy` never needed one. Both images run as
+  `USER node`, as before for `api` and newly so for `migrate`.
+
+  Nothing about the compose contract moved: `docker compose up -d` still brings the stack up
+  with `migrate` at `Exited (0)` and `api` `(healthy)`, `/health/ready` answers 200 through the
+  proxy, and the web image is untouched — no build-time API URL was reintroduced.
 - **"`develop` is always deployable to staging" is gone, replaced by a claim something checks.**
   `docs/git-strategy.md` had promised that since the branch table was written, and no staging
   environment has ever existed — no host, no workflow, no secret in this repository points at
@@ -763,6 +806,30 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- **Release images are signed, ship an SBOM, and are built by workflows whose every action is
+  pinned to a commit.** Three parts of audit finding SEC-06
+  ([#157](https://github.com/dravcore/kurultay/issues/157)), all of them things a self-hoster
+  can now check rather than take on trust. Every `uses:` across the five workflow files moved
+  from a mutable major tag (`@v7`, `@v3`) to a full commit SHA with the release in a same-line
+  comment — a major tag is a pointer its owner can move, so an action compromised upstream
+  reached this repository's runners on the next push with no diff for anyone to review. Each
+  published image is then signed with cosign, keylessly: no long-lived key exists to be
+  leaked, and the certificate binds the signature to this repository's release workflow at the
+  release's git ref, which is what makes `cosign verify` say something a stranger can rely on.
+  An SBOM (SPDX 2.3 JSON, from syft) is generated per image **per architecture** — amd64 and
+  arm64 do not contain the same packages, so one file for both would have been quietly wrong
+  for every ARM operator — and attached to the GitHub Release as an asset. The verification
+  commands, with this repository's exact identity and issuer, are in
+  [docs/self-hosting.md](docs/self-hosting.md#verifying-what-you-pulled); an unchecked
+  signature protects nobody.
+- **`TAG=vX.Y.Z` now resolves to a published image.** Every place in this repository that tells
+  an operator how to pin a release — both READMEs, both self-hosting guides, `docs/development.md`
+  three times, and the comment beside `image:` in `docker-compose.yml` — says `TAG=vX.Y.Z`, but
+  the release workflow published `0.2.0`, `0.2` and `latest` and never `v0.2.0`, because
+  `docker/metadata-action`'s `{{version}}` strips the `v`. Following the documented instruction
+  could only ever end in a failed `docker compose pull`. The workflow now publishes the
+  `v`-prefixed tag as well. Found while writing the `cosign verify` command, which needs an
+  image reference that exists.
 - **An attachment's display name can no longer be made to render as a different name.** The
   Unicode bidi overrides (U+200E/U+200F, U+061C, U+202A–U+202E, U+2066–U+2069) and the C0/C1
   control characters are now stripped from a stored filename at write time, and again when that

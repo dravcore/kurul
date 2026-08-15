@@ -44,6 +44,28 @@ updates:
           - minor
           - patch
 
+  # Every `uses:` in .github/workflows/ is pinned to a full commit SHA (audit finding SEC-06,
+  # roadmap P3-5) with the release tag in a trailing same-line comment. That changes what this
+  # block does, in three ways worth writing down rather than rediscovering:
+  #
+  #   1. It keeps working. Dependabot "only supports updates to Actions using the GitHub
+  #      repository syntax, such as `actions/checkout@v6` or `actions/checkout@<commit>`", and
+  #      it "updates the version documentation of Actions when the comment is on the same line".
+  #      So the SHA and its `# vX.Y.Z` comment are both rewritten on a bump. Trailing comments
+  #      in the workflows are load-bearing, not decoration — dropping one silently degrades the
+  #      PR titles to bare SHAs and loses Dependabot's sense of which release is installed.
+  #
+  #   2. Every SHA must be a release tag's commit. "If the commit you use is not associated with
+  #      any tag, Dependabot will update the Actions to the latest commit (which might differ
+  #      from the latest release)" — i.e. a SHA taken from a branch head silently converts this
+  #      block from release tracking to default-branch tracking.
+  #
+  #   3. Dependabot *alerts* stop covering these actions: it "only creates alerts for vulnerable
+  #      actions that use semantic versioning and will not create alerts for actions pinned to
+  #      SHA values". This is the real cost of pinning and it is accepted knowingly — the weekly
+  #      version updates below are what closes the window instead, so a patched action still
+  #      arrives, just on a schedule rather than on an advisory. An action with a live advisory
+  #      needs a manual SHA bump; nothing will page anyone about it.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -51,4 +73,18 @@ updates:
     # Same reason as above. This block is why PRs #74-#78 opened against `main`
     # and were merged straight into it, bypassing `develop` entirely.
     target-branch: develop
-    open-pull-requests-limit: 5
+    # Raised from 5 alongside SHA pinning. Under `@v7` an upstream patch release moved the
+    # major tag and produced no diff at all, so most weeks were quiet; under a SHA pin every
+    # patch release of any of the fifteen actions in use is a diff. The grouping below keeps
+    # the usual week to one PR, but a week where several actions cut majors needs the headroom.
+    open-pull-requests-limit: 10
+
+    groups:
+      # Same reasoning as the npm groups above, and the same split: minor/patch batched into
+      # one PR, majors deliberately ungrouped so each gets its own reviewed PR. Actions majors
+      # are where the breaking changes live (a runner Node bump, a renamed input), and they are
+      # exactly what should not be able to hide inside a one-line SHA diff.
+      actions:
+        update-types:
+          - minor
+          - patch

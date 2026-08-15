@@ -242,13 +242,13 @@ services:
     # Uniformity also means nobody has to re-derive which services were exempt.
     logging: *logging
     <<: *hardened
-    # The `migrate` build target (apps/api/Dockerfile) has no `USER` directive — it's the
-    # `build` stage reused as-is, one layer before `runner` adds `USER node` — so this runs
-    # as root regardless. That's fine here: `prisma migrate deploy` only opens a network
-    # connection to postgres and reads its own already-built `/app`, no chown/setuid/bind
-    # of anything. Verified by building the `migrate` target and running it standalone with
-    # `cap_drop: [ALL]` and no `cap_add` against a live postgres: all 13 migrations applied
-    # and the container exited 0.
+    # The `migrate` build target (apps/api/Dockerfile) runs as `USER node`, same as `runner`.
+    # It used to run as root — not by choice, but because the stage was `FROM build` and
+    # inherited no USER; the stage now starts from a clean base and drops root like every other
+    # service here. `prisma migrate deploy` only opens a network connection to postgres and
+    # reads files it does not own, so nothing about it ever needed root. Verified by bringing
+    # the stack up with `cap_drop: [ALL]` and no `cap_add`: all 19 migrations applied and the
+    # container exited 0.
     environment:
       # postgres:5432 (not localhost) — this is the in-network address, unrelated to
       # whatever DATABASE_URL a developer has in their host .env for the dev loop.

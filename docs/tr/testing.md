@@ -311,23 +311,34 @@ yükseltme arzusu da yoktur.
 
 Zaten kapsanmış kodun geri kaymasını mandallar engeller. Hepsi CI'ı kırar.
 
-| Kapsam                            | Taban değer                                           | Nerede tanımlı              |
-| --------------------------------- | ----------------------------------------------------- | --------------------------- |
-| `apps/api` global                 | statements 75 / branches 66 / functions 77 / lines 76 | `apps/api/jest.config.cjs`  |
-| `apps/web` `app/**`               | statements 85 / branches 90 / functions 85 / lines 85 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/board/**`  | statements 65 / branches 54 / functions 54 / lines 70 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/task/**`   | statements 60 / branches 60 / functions 58 / lines 62 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/layout/**` | statements 75 / branches 65 / functions 85 / lines 78 | `apps/web/vitest.config.ts` |
+| Kapsam                                  | Taban değer                                           | Nerede tanımlı              |
+| --------------------------------------- | ----------------------------------------------------- | --------------------------- |
+| `apps/api` global                       | statements 75 / branches 66 / functions 77 / lines 76 | `apps/api/jest.config.cjs`  |
+| `apps/web` `app/**`                     | statements 85 / branches 90 / functions 85 / lines 85 | `apps/web/vitest.config.ts` |
+| `apps/web` `components/board/**`        | statements 65 / branches 54 / functions 54 / lines 70 | `apps/web/vitest.config.ts` |
+| `apps/web` `components/task/**`         | statements 60 / branches 60 / functions 58 / lines 62 | `apps/web/vitest.config.ts` |
+| `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78 | `apps/web/vitest.config.ts` |
+| `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93 | `apps/web/vitest.config.ts` |
+| `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92 | `apps/web/vitest.config.ts` |
 
 Hepsi konuldukları anda alınan ölçümün birkaç puan altındadır — rutin bir refactor'ın
 takılmayacağı kadar pay bırakan, ama bir testin silinmesini yakalayacak kadar dar.
 
 `apps/web`'in **global bir taban değeri yoktur**, bilinçli olarak. Genel web coverage son
-koşularda instrumented satırların ~%75'i civarındadır ama bu ortalama hâlâ yoğun testli
+koşularda instrumented statement'ların ~%83'ü civarındadır ama bu ortalama hâlâ yoğun testli
 hook'ları ince sayfa kabuklarıyla karıştırır; ortalamada bir global taban az şey yakalar.
-Klasör tabanları anlamlı unit testleri olan yüzeyleri kapsar: route girişleri (`app/**`) ve
-etkileşimli board / task / layout bileşenleri. `apps/web/vitest.config.ts` tam gerekçeyi
-satır içinde taşır.
+Klasör tabanları anlamlı unit testleri olan yüzeyleri kapsar: route girişleri (`app/**`),
+etkileşimli board / task / layout / notification bileşenleri ve onların arkasındaki `lib/**`
+yardımcıları. `apps/web/vitest.config.ts` tam gerekçeyi satır içinde taşır.
+
+**Bir klasör tabanının yakalamadığı şey.** Coverage, diskteki her dosya için değil, bir testin
+_import ettiği_ dosyalar için raporlanır. Bir modülü import eden son testi silmek bu yüzden
+yüzdeyi düşürmez, modülü paydadan çıkarır ve taban yeşil kalır. Tabanlar bir testin
+zayıflatılmasını yakalar, bir modülün terk edilmesini değil; ikincisi code review'ın işidir.
+`components/notification/**` tabanında ölçüldü: `notifications-list.test.tsx` içindeki
+click-through testlerini çıkarmak tabanı dört yönden kırıyor
+(91 / 83 / 95 / 93'e karşı 75.00 / 66.35 / 71.18 / 80.11), ama o dosyanın tamamını silmek
+geçiyor.
 
 Global duruş, API'nin repo genelinde bir taban değerin anlamlı olacağı kadar kararlı olduğu
 1.0'da yeniden gözden geçirilir.
