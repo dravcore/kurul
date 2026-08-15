@@ -18,8 +18,10 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { TaskAttachments } from './task-attachments';
 import { TaskChecklists } from './task-checklists';
 import { TaskMetadataPanel } from './task-metadata-panel';
+import { useTaskAttachments } from './use-task-attachments';
 import { useTaskChecklists } from './use-task-checklists';
 
 interface TaskPanelProps {
@@ -75,6 +77,21 @@ export function TaskPanel({
   // carries `checklists: null` — the summary only — so the checklist surface owns a read as
   // well as five writes, and this file is already the widest in the folder.
   const checklists = useTaskChecklists({ workspaceId, task, canMutate, onUpdated });
+
+  // Attachments do not ride on the task DTO the way checklists do — `TaskDto` carries only
+  // `attachmentCount` (decision D2), so this hook owns a list of its own. The count is written
+  // back through the same `onUpdated` merge every other write uses, which is what keeps the
+  // board card's badge in step without waiting for this tab's own `task:updated` broadcast.
+  const onAttachmentCountChanged = useCallback(
+    (id: string, attachmentCount: number) => onUpdated({ id, attachmentCount }),
+    [onUpdated],
+  );
+  const attachments = useTaskAttachments({
+    workspaceId,
+    task,
+    canMutate,
+    onCountChanged: onAttachmentCountChanged,
+  });
 
   // Re-seed the editable fields when the panel switches task, or when the stored title or
   // description changes under it (our own PATCH coming back, or a realtime edit). Done during
@@ -353,6 +370,23 @@ export function TaskPanel({
               onRemoveChecklist={(checklistId) => void checklists.removeChecklist(checklistId)}
               onAddItem={checklists.addItem}
               onRemoveItem={(itemId) => void checklists.removeItem(itemId)}
+            />
+            {/*
+              Between the checklists and the metadata panel, not at the end: the delete footer
+              below is `mt-auto` and only reaches the bottom of the panel while it is the last
+              child of this flex column.
+            */}
+            <TaskAttachments
+              workspaceId={workspaceId}
+              attachments={attachments.attachments}
+              canMutate={canMutate}
+              storageEnabled={attachments.storageEnabled}
+              pending={attachments.pending}
+              loading={attachments.loading}
+              loadFailed={attachments.loadFailed}
+              onUpload={attachments.upload}
+              onAddLink={attachments.addLink}
+              onRemove={(attachmentId) => void attachments.remove(attachmentId)}
             />
             <TaskMetadataPanel
               workspaceId={workspaceId}

@@ -101,6 +101,25 @@ describe('buildContentSecurityPolicy', () => {
     expect(() => buildContentSecurityPolicy('/api')).not.toThrow();
   });
 
+  it('lets an image attachment be previewed from a blob, without opening img-src to a host', () => {
+    // `'self'` does not cover the `blob:` scheme, so an object URL is blocked unless the
+    // scheme is listed. The preview in `attachment-row.tsx` fetches the bytes through
+    // `lib/api.ts` and renders them from `URL.createObjectURL`; drop `blob:` here and that
+    // image is refused on every topology, same-origin API included.
+    const csp = buildContentSecurityPolicy(API_URL);
+    expect(directive(csp, 'img-src')).toEqual(["'self'", 'blob:']);
+  });
+
+  it('never widens img-src to an API host, however the API is addressed', () => {
+    // The reason the preview goes through `fetch` at all: naming the API origin here would let
+    // markup injection render any API response as an image on a split-domain deployment.
+    for (const base of [API_URL, '/api', 'http://localhost:4000']) {
+      expect(directive(buildContentSecurityPolicy(base), 'img-src')).not.toEqual(
+        expect.arrayContaining([expect.stringMatching(/^https?:\/\//)]),
+      );
+    }
+  });
+
   it('allows inline script and style, which the app measurably needs', () => {
     const csp = buildContentSecurityPolicy(API_URL);
     expect(directive(csp, 'script-src')).toEqual(["'self'", "'unsafe-inline'"]);

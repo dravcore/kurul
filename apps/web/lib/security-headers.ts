@@ -105,10 +105,21 @@ function connectSources(apiBaseUrl: string): string[] {
  *   Next inlines at build time (see `.env.example`), and the Socket.io client in
  *   `lib/socket.ts` dials the same base over `ws(s)`. What that expands to depends on which
  *   API topology the build was configured for; see {@link connectSources}.
- * - `img-src 'self'`, `font-src 'self'` — the app loads no remote images (no avatar upload,
- *   no `next/image` remote patterns configured) and self-hosts its three typefaces via
+ * - `img-src 'self' blob:`, `font-src 'self'` — the app loads no remote images (no avatar
+ *   upload, no `next/image` remote patterns configured) and self-hosts its three typefaces via
  *   `next/font/google`, which downloads them at build time and serves them from this origin —
- *   so neither directive needs to reach off-origin.
+ *   so neither directive needs to reach off-origin. `blob:` is the one addition, and it is not
+ *   an off-origin allowance: an image attachment is previewed by fetching its bytes through
+ *   `lib/api.ts` (which is what `connect-src` already governs) and handing the resulting
+ *   `Blob` to `URL.createObjectURL`. `'self'` does not cover a `blob:` URL — the scheme has to
+ *   be listed for a source expression to match it — so without this the preview is blocked on
+ *   *every* topology, not only the split-domain one. The bytes still have to pass
+ *   `connect-src` first, so nothing an attacker could not already fetch becomes displayable;
+ *   what `blob:` adds is the ability to render bytes this origin has already received.
+ *
+ *   The fetch-and-blob route is used rather than pointing `<img src>` straight at the API,
+ *   because on a split-domain deployment that URL is off-origin and widening `img-src` to the
+ *   API origin would let markup injection render arbitrary API responses as images (ADR 0022).
  * - `frame-ancestors 'none'`, `frame-src 'none'`, `object-src 'none'` — the app never embeds
  *   itself in a frame, never embeds anything else in one, and loads no plugin content
  *   (`<object>`/`<embed>`). `frame-ancestors` is the CSP-level clickjacking defense that backs
@@ -124,7 +135,7 @@ export function buildContentSecurityPolicy(apiBaseUrl: string): string {
     ['default-src', ["'self'"]],
     ['script-src', ["'self'", "'unsafe-inline'"]],
     ['style-src', ["'self'", "'unsafe-inline'"]],
-    ['img-src', ["'self'"]],
+    ['img-src', ["'self'", 'blob:']],
     ['font-src', ["'self'"]],
     ['connect-src', connectSources(apiBaseUrl)],
     ['frame-ancestors', ["'none'"]],
