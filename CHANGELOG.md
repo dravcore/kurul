@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0] - 2026-08-16
+
 ### Changed
 
 - **The project is now called Kurul.** `kurultay` was not available as a domain, so the name
@@ -1354,5 +1358,6 @@ commit; this is the point it becomes a version.
   session cookie cache, batch due-soon scans and rebalance SQL, paginate comments, and add
   `pg_trgm` search indexes.
 
-[unreleased]: https://github.com/dravcore/kurul/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/dravcore/kurul/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/dravcore/kurul/releases/tag/v0.2.0
 [0.1.0]: https://github.com/dravcore/kurul/releases/tag/v0.1.0
