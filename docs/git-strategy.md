@@ -324,6 +324,13 @@ against it. What it deliberately does **not** do is move anything anybody follow
 `{{major}}.{{minor}}` and `latest` are skipped for a pre-release, so an operator who never set
 `TAG` is unaffected, and the GitHub Release is created as a draft _and_ marked pre-release.
 
+One thing a rehearsal **cannot** cover, measured on `v0.2.0-rc.3`: `metadata-action` emits only
+the bare `{{version}}` tag for a pre-release, so `0.2.0-rc.3` is published and `v0.2.0-rc.3` is
+not. The `v`-prefixed tag — the form every pull command in this repository tells an operator to
+pin — is therefore exercised only by a real release. The merge job asserts it is present on any
+non-pre-release tag, so a regression fails the release rather than shipping a documented command
+that 404s; but the assertion itself first runs when you cut the version.
+
 A rehearsal tag is disposable. Delete it and its release when the real version ships; the
 images stay in the registry under their exact `-rc` tags and cost nothing but a line in the
 package list.

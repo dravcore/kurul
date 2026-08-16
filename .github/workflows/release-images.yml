@@ -263,21 +263,55 @@ jobs:
       # The digest of the index just written — the thing every tag above now resolves to, and
       # the thing that gets signed. Read back from the registry rather than assumed, because
       # what is signed must be what was published.
+      # Read back through a tag that was actually written, which is not the same thing as the
+      # git ref. Measured on `v0.2.0-rc.3`: `metadata-action` emitted exactly one tag,
+      # `0.2.0-rc.3`, and none of the other three patterns produced anything — for a
+      # pre-release it keeps only the bare `{{version}}`. Reading back `${{ github.ref_name }}`
+      # therefore asked the registry for `:v0.2.0-rc.3`, which nothing had published, and the
+      # step failed with `not found` *after* the index had been correctly assembled.
+      #
+      # The first entry of the metadata output is the tag this run definitely wrote, so that is
+      # what gets inspected. The tags are all pointers to one index; which of them is used to
+      # look it up does not change the digest that comes back.
       - name: Read the index digest
         id: index
         env:
           REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
-          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          digest=$(docker buildx imagetools inspect "${REGISTRY_IMAGE}:${TAG}" \
+          tag=$(jq -r '.tags[0] // empty' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          if [ -z "$tag" ]; then
+            echo "metadata-action produced no tags; nothing was published to inspect."
+            exit 1
+          fi
+
+          # The one tag every operator instruction in this repository tells them to pin is the
+          # `v`-prefixed one (`TAG=vX.Y.Z`), and #229 added `pattern=v{{version}}` precisely
+          # because `{{version}}` strips the `v`. A pre-release cannot check that — the pattern
+          # does not fire for one — so this asserts it on the runs that can: a real release that
+          # somehow stops publishing `v<version>` fails here instead of shipping a documented
+          # pull command that 404s, which is the bug #229 was fixing in the first place.
+          case "$GITHUB_REF_NAME" in
+            *-*) ;;
+            *)
+              if ! jq -e --arg t "${REGISTRY_IMAGE}:${GITHUB_REF_NAME}" \
+                   '.tags | index($t)' >/dev/null <<< "$DOCKER_METADATA_OUTPUT_JSON"; then
+                echo "A release must publish ${REGISTRY_IMAGE}:${GITHUB_REF_NAME} — every"
+                echo "documented pull command pins that form. Tags produced:"
+                jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"
+                exit 1
+              fi
+              ;;
+          esac
+
+          digest=$(docker buildx imagetools inspect "$tag" \
             --format '{{json .Manifest}}' | jq -r '.digest')
           case "$digest" in
             sha256:*) ;;
-            *) echo "imagetools returned no digest for ${REGISTRY_IMAGE}:${TAG}"; exit 1 ;;
+            *) echo "imagetools returned no digest for $tag"; exit 1 ;;
           esac
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          echo "Index digest: $digest"
+          echo "Index digest: $digest (read back through $tag)"
 
       # ---------------------------------------------------------------------------------
       # SEC-06 / P3-5, part 1: sign the image.

@@ -334,6 +334,13 @@ ona karşı çalışır. Bilinçli olarak **yapmadığı** şey, birilerinin tak
 oynatmaktır: ön-sürümde `{{major}}.{{minor}}` ve `latest` atlanır, yani `TAG` ayarlamamış bir
 operatör etkilenmez; GitHub Release'i de hem draft hem ön-sürüm olarak işaretlenir.
 
+Provanın **kapsayamadığı** bir şey var ve `v0.2.0-rc.3`'te ölçüldü: `metadata-action` ön-sürümde
+yalnız çıplak `{{version}}` tag'ini üretiyor, yani `0.2.0-rc.3` yayınlanıyor, `v0.2.0-rc.3`
+yayınlanmıyor. `v` önekli tag — bu repodaki her pull komutunun operatöre pinlemesini söylediği
+biçim — dolayısıyla ancak gerçek bir sürümle sınanıyor. Merge job'ı, ön-sürüm olmayan her tag'de
+o biçimin üretildiğini doğruluyor; yani bir gerileme, 404 veren belgelenmiş bir komut yayınlamak
+yerine sürümü kırar. Ama bu doğrulama da ilk kez sürümü kestiğinizde koşar.
+
 Prova tag'i tek kullanımlıktır. Gerçek sürüm çıkınca tag'i ve release'ini silin; imajlar kendi
 `-rc` tag'leriyle registry'de kalır ve paket listesinde bir satırdan başka maliyeti olmaz.
 
