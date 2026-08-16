@@ -303,6 +303,31 @@ The rule that resolves it:
 `git config rerere.enabled true` is worth setting once — the resolution is structurally the
 same every release, and rerere replays it automatically after the first time.
 
+### Rehearsing the publish path
+
+`release-images.yml` also fires on a pre-release tag (`vX.Y.Z-rc.N`, `-beta.N`, anything after
+a hyphen), and that exists for one reason: the workflow publishes images, signs them with
+cosign and attaches SBOMs, and none of that is exercised by CI. Cutting a version as the first
+run of an unexecuted workflow makes the release itself the test.
+
+So when the publish path has changed — a new action major, a change to the signing or SBOM
+steps, a new registry — rehearse it before step 5:
+
+```bash
+git tag -a v0.2.0-rc.1 -m "v0.2.0-rc.1"
+git push origin v0.2.0-rc.1
+```
+
+The rehearsal is a real publish: real images, a real signature, real SBOM assets, and the
+`cosign verify` command in [self-hosting.md](self-hosting.md#verifying-what-you-pulled) works
+against it. What it deliberately does **not** do is move anything anybody follows —
+`{{major}}.{{minor}}` and `latest` are skipped for a pre-release, so an operator who never set
+`TAG` is unaffected, and the GitHub Release is created as a draft _and_ marked pre-release.
+
+A rehearsal tag is disposable. Delete it and its release when the real version ships; the
+images stay in the registry under their exact `-rc` tags and cost nothing but a line in the
+package list.
+
 ## Hotfix process
 
 For a bug in a released version that cannot wait for the next release.

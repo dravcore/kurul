@@ -24,7 +24,16 @@ name: Release images
 on:
   push:
     tags:
+      # A released version, and a pre-release of one. The second pattern exists so the release
+      # path can be *rehearsed*: this workflow publishes images, signs them and attaches SBOMs,
+      # and until a tag matching it is pushed none of that has ever executed. Cutting a real
+      # version as the first run of an unexecuted workflow makes the release the test.
+      #
+      # The `-*` suffix is deliberately loose — `-rc.1`, `-beta.2`, anything SemVer calls a
+      # pre-release. What a pre-release must never do is claim a stable pointer, which is
+      # handled where the tags are computed rather than here; see the `metadata-action` step.
       - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
 
 # `contents: read` is the default-safe floor for a checkout. The two elevated grants this
 # workflow needs are declared per job instead of here, because they are needed by different
@@ -112,11 +121,23 @@ jobs:
         id: meta
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          # `enable=` on the last two is what keeps a rehearsal from being mistaken for a
+          # release. `{{major}}.{{minor}}` and `latest` are *moving pointers*: an operator who
+          # follows docs/self-hosting.md without setting TAG gets `latest`, so publishing an
+          # `-rc` under it would hand a release-candidate to everyone who never asked for one.
+          # The exact-version tags are still published — a rehearsal has to produce a real,
+          # pullable image or it has not rehearsed anything — they just do not move anything
+          # that somebody else is following.
+          #
+          # The condition is written out rather than left to the action's own pre-release
+          # handling, because `type=raw` has none: raw is unconditional by definition, and a
+          # future reader comparing the four lines should be able to see which of them can
+          # point at an `-rc` without cross-checking upstream's semver table.
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern=v{{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
+            type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
 
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         # `id:` so the steps below can address the image by `outputs.digest` — the digest of
@@ -305,8 +326,20 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${files[@]}" --clobber
           else
+            # `--prerelease` on an `-rc` tag: GitHub's own flag for "this is not the release
+            # you want", which keeps it out of the repository's "Latest release" slot and out
+            # of the API consumers that read it.
+            prerelease=()
+            case "$TAG" in *-*) prerelease=(--prerelease) ;; esac
+
+            # `${arr[@]+"${arr[@]}"}` rather than `"${arr[@]}"`: this block runs under
+            # `set -u`, and expanding an empty array is an unbound-variable error on bash 3.2.
+            # The runner ships bash 5, where it is not — but the guard costs one line and the
+            # alternative is a script that depends on the runner image's bash version without
+            # saying so.
             gh release create "$TAG" "${files[@]}" \
               --draft \
+              ${prerelease[@]+"${prerelease[@]}"} \
               --title "$TAG" \
               --notes 'Release notes pending — replace this with the CHANGELOG.md section for this version (docs/git-strategy.md#release-process, step 6).'
           fi
