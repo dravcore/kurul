@@ -50,19 +50,25 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch|rou3|nanostores|file-type|@tokenizer|strtok3|token-types|peek-readable|uint8array-extras|@borewit)/)',
   ],
-  // `file-type@21`'s `exports` map offers `import` and `module-sync` and no `require`
-  // condition at all, so Jest's CommonJS resolver — which asks for `require`/`default` —
-  // answers `Cannot find module 'file-type'` even though the package is installed and
-  // `transformIgnorePatterns` above is ready to transform it. Pointing the specifier at the
-  // file that map would have chosen is the narrow fix.
+  // No `moduleNameMapper` for `file-type`, and the reason is worth keeping because it was
+  // needed until this bump.
   //
-  // The broad fix, `testEnvironmentOptions.customExportConditions: ['node', 'import']`, was
-  // tried first and rejected on measurement: it flips *every* dual-published dependency to its
-  // ESM entry, and the suite immediately failed on `synckit`'s untransformed `import` — a
-  // package nothing in this API imports on purpose. One mapped specifier changes one package.
-  moduleNameMapper: {
-    '^file-type$': require.resolve('file-type/node'),
-  },
+  // `file-type@21`'s `exports` map offered `import` and `module-sync` and no `require`
+  // condition at all, so Jest's CommonJS resolver — which asks for `require`/`default` —
+  // answered `Cannot find module 'file-type'` even though the package was installed. The fix
+  // was to map the specifier straight at the file that map would have chosen,
+  // `file-type/node`.
+  //
+  // `file-type@22` collapsed the whole map to `{ types, default }`: the `./node` and `./core`
+  // subpaths are gone, so the old mapping stopped resolving — and because it ran inside
+  // `require.resolve` at config load, it took the entire suite down before a single test could
+  // run, rather than failing the one file that imports the package. A `default` condition is
+  // also exactly what the CJS resolver was missing, so Jest now finds the package on its own
+  // and the mapping has nothing left to do. Deleted rather than repointed: an indirection that
+  // no longer indirects is a thing the next reader has to disprove.
+  //
+  // `transformIgnorePatterns` above still lists `file-type` — the entry it resolves to is ESM
+  // either way, and that has not changed.
   collectCoverageFrom: ['**/*.(t|j)s', '!**/generated/**'],
   coveragePathIgnorePatterns: ['/generated/'],
   coverageDirectory: '../coverage',
