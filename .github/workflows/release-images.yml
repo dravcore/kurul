@@ -56,42 +56,60 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
+  # -----------------------------------------------------------------------------------
+  # One leg per image *and* per architecture, each on a runner of that architecture.
+  #
+  # This used to be one leg per image building both platforms at once, with QEMU emulating
+  # arm64. It worked for `kurul-web` and it did not work for `kurul-api`: measured twice on
+  # real runners, the web image finished in 13m49s and the api image was still inside
+  # `docker/build-push-action` after **5h40m**, against a 6-hour job limit. The difference is
+  # what the two Dockerfiles do under emulation — the api build runs `pnpm install`,
+  # `prisma generate`, `nest build` and `pnpm deploy --prod`, all CPU-bound Node work, and
+  # emulated CPU-bound work is roughly an order of magnitude slower. Nothing was wrong with the
+  # image; the arm64 half was being *interpreted*.
+  #
+  # So the emulation is gone and each architecture builds natively. `ubuntu-24.04-arm` is a
+  # GitHub-hosted arm64 runner, free for public repositories. `setup-qemu-action` is gone with
+  # it — it exists to run foreign-architecture instructions, and there are none left.
+  #
+  # The cost of the split is that a leg can no longer push a tag: two legs pushing
+  # `kurul-api:v0.2.0` would race, and the winner would publish a single-architecture image
+  # under a tag that promises two. Each leg therefore pushes **by digest only**, and the `merge`
+  # job below assembles the digests into one multi-platform index and puts the tags on that.
+  # -----------------------------------------------------------------------------------
+  build:
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
-      # Pushes the image, and the cosign signature that GHCR stores beside it as a second tag
-      # on the same repository (`sha256-<digest>.sig`).
+      # Pushes the per-platform image by digest. No `id-token` here: nothing in this job signs,
+      # because there is nothing worth signing yet — the artifact a user pulls is the index the
+      # `merge` job creates, and that is what carries the signature.
       packages: write
-      # Keyless signing, and the only reason this grant exists. Without it
-      # `ACTIONS_ID_TOKEN_REQUEST_URL` is unset and `cosign sign` cannot get the OIDC token it
-      # trades for a short-lived Fulcio certificate — it does not fall back to anything, it
-      # fails.
-      id-token: write
     strategy:
-      # api and web have independent Dockerfiles and share no build cache, so there is nothing
-      # to serialize for — and fail-fast: false means a broken `web` build still lets a working
-      # `api` image reach GHCR (and vice versa) instead of the matrix aborting both on one
-      # image's failure.
+      # api and web have independent Dockerfiles and share no build cache, and neither does one
+      # architecture with the other — so there is nothing to serialize for, and a failure in any
+      # one leg should not abort the other three.
       fail-fast: false
       matrix:
         include:
           - image: kurul-api
             dockerfile: apps/api/Dockerfile
+            platform: amd64
+            runner: ubuntu-latest
+          - image: kurul-api
+            dockerfile: apps/api/Dockerfile
+            platform: arm64
+            runner: ubuntu-24.04-arm
           - image: kurul-web
             dockerfile: apps/web/Dockerfile
+            platform: amd64
+            runner: ubuntu-latest
+          - image: kurul-web
+            dockerfile: apps/web/Dockerfile
+            platform: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # QEMU is what lets this amd64 runner execute arm64 instructions during the build itself
-      # (pnpm install, tsc, next build all run *as* arm64 under emulation) — Buildx alone only
-      # handles the multi-arch manifest/layer plumbing around a build, not running foreign-arch
-      # RUN steps. This is exactly what OPS-04's "ARM için önceden derlenmiş imaj yok, kaynaktan
-      # build teorik ama doğrulanmamış" gap asks for: a real, tested arm64 artifact instead of
-      # an unverified claim that source-building on ARM hardware works.
-      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-        with:
-          platforms: arm64
 
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
@@ -101,50 +119,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Turns the git ref alone into every tag this push should carry, so nothing in this
-      # workflow hardcodes a version number. For a `refs/tags/v0.2.0` push that's `0.2.0`,
-      # `v0.2.0`, `0.2` (float onto patch releases without opting into the next minor — a middle
-      # ground between a full `:0.2.0` pin and unpinned `:latest`), and `latest` itself, which
-      # `docker-compose.yml`'s `image: ghcr.io/dravcore/${{ matrix.image }}:${TAG:-latest}`
-      # relies on as the default a self-hoster gets without setting TAG at all.
-      #
-      # `v{{version}}` is the odd one out and it is a bug fix, not a preference. `{{version}}`
-      # strips the `v` — upstream's own table has git tag `v1.2.3` producing `1.2.3` — while
-      # every place in this repository that tells an operator how to pin a release says
-      # `TAG=vX.Y.Z`: README.md, README.tr.md, docs/self-hosting.md, docs/development.md (three
-      # times), their Turkish mirrors, and the comment beside `image:` in docker-compose.yml.
-      # Nine documented instructions against three published tags, none of which was `v0.2.0`,
-      # so `TAG=v0.2.0` + `docker compose pull` could only ever have failed. Publishing the tag
-      # the documentation already promises is a one-line fix; rewriting nine documented
-      # instructions in two languages is not.
+      # Only the labels are used here. Tags are applied once, by `merge`, to the index — a tag
+      # written by a leg would name a half of an image.
       - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         id: meta
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
-          # `enable=` on the last two is what keeps a rehearsal from being mistaken for a
-          # release. `{{major}}.{{minor}}` and `latest` are *moving pointers*: an operator who
-          # follows docs/self-hosting.md without setting TAG gets `latest`, so publishing an
-          # `-rc` under it would hand a release-candidate to everyone who never asked for one.
-          # The exact-version tags are still published — a rehearsal has to produce a real,
-          # pullable image or it has not rehearsed anything — they just do not move anything
-          # that somebody else is following.
-          #
-          # The condition is written out rather than left to the action's own pre-release
-          # handling, because `type=raw` has none: raw is unconditional by definition, and a
-          # future reader comparing the four lines should be able to see which of them can
-          # point at an `-rc` without cross-checking upstream's semver table.
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern=v{{version}}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
-            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
 
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        # `id:` so the steps below can address the image by `outputs.digest` — the digest of
-        # the multi-arch index this push created — rather than by one of the tags above. A tag
-        # is a mutable pointer even seconds after it is written, so signing or scanning "the
-        # thing tagged 0.2.0" would leave a race between the push and the signature. The digest
-        # cannot move.
         id: build
         with:
           context: .
@@ -154,31 +136,148 @@ jobs:
           # stage wins" so a future stage added after `runner` for some other purpose can't
           # silently retarget what gets published here.
           target: runner
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          platforms: linux/${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Neither Dockerfile's build ARGs are set here. apps/api/Dockerfile's DATABASE_URL
-          # only needs to be well-formed for `prisma generate`, never reachable, so its
-          # Dockerfile default is fine unmodified. apps/web/Dockerfile's NEXT_PUBLIC_API_URL
-          # and NEXT_PUBLIC_SENTRY_* are baked in at build time (Next.js inlines
-          # NEXT_PUBLIC_* into the client bundle, they cannot be swapped at container start —
-          # see docs/development.md#full-stack-in-docker) — this published web image therefore
-          # only serves the common case where the browser reaches the API at
-          # http://localhost:4000, its Dockerfile default. A deployment needing a different
-          # API origin still builds locally (`docker compose build web`, which is what the
-          # `build:` fallback beside `image:` in docker-compose.yml is for) until the runtime
-          # API URL work tracked as this finding's own follow-up lands.
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,scope=${{ matrix.image }},mode=max
-          # provenance/sbom left at build-push-action's default (both on). These are BuildKit
-          # attestations living inside the index as extra manifests — useful, but unsigned, so
-          # they answer "what did the build say it did" and not "who says so". That is why the
-          # cosign step below exists rather than being considered already covered. Reading them
-          # needs `docker buildx imagetools inspect ghcr.io/dravcore/<image>:<tag>`, not `docker
-          # manifest inspect` — imagetools understands the attestation manifests as attached
-          # metadata and lists platforms and attestations separately instead of interleaving
-          # them the way a plain manifest list read would.
+          # Push the manifest under its own digest and let `merge` name it. `name-canonical`
+          # records the full registry name inside the pushed manifest so `imagetools create`
+          # can resolve it by digest afterwards.
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
+          # BuildKit's own provenance and SBOM attestations are **off** here, and that is a
+          # deliberate loss rather than an oversight. They attach as extra manifests inside a
+          # per-platform push, which is exactly what `imagetools create` then has to merge —
+          # and the resulting index is a shape the tooling handles inconsistently. They were
+          # never the guarantee this workflow makes either: an unsigned attestation says what
+          # the build claims about itself. What is promised in docs/self-hosting.md is the
+          # cosign signature and the SPDX SBOM published as a release asset, and both of those
+          # are produced below, after the merge, over the artifact a user actually pulls.
+          provenance: false
+          sbom: false
+          # Scope is per image *and* per platform: an arm64 cache is useless to an amd64 build
+          # and sharing one scope between them means each eviction costs the other.
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }}
+          cache-to: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }},mode=max
+
+      # The digest is the whole output of this job. It travels as a filename rather than as
+      # file content because the merge step globs the directory — see its `printf` below.
+      - name: Export the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digests-${{ matrix.image }}-${{ matrix.platform }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # -----------------------------------------------------------------------------------
+  # One index per image, and everything that has to happen exactly once: the tags, the
+  # signature, the SBOMs.
+  #
+  # `needs: build` without `if: !cancelled()` on purpose — unlike the SBOM publisher below,
+  # there is nothing partial to salvage here. An index assembled from one architecture when two
+  # were built is not a smaller success, it is a tag that lies about what it contains.
+  # -----------------------------------------------------------------------------------
+  merge:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Writes the tags onto the index, and the cosign signature GHCR stores beside it as a
+      # second tag on the same repository (`sha256-<digest>.sig`).
+      packages: write
+      # Keyless signing, and the only reason this grant exists. Without it
+      # `ACTIONS_ID_TOKEN_REQUEST_URL` is unset and `cosign sign` cannot get the OIDC token it
+      # trades for a short-lived Fulcio certificate — it does not fall back to anything, it
+      # fails.
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [kurul-api, kurul-web]
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: digests-${{ matrix.image }}-*
+          merge-multiple: true
+          path: /tmp/digests
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The tag policy lives here now, unchanged in substance: exact versions always, moving
+      # pointers only for a release. `v{{version}}` is the odd one out and it is a bug fix, not
+      # a preference. `{{version}}` strips the `v` — upstream's own table has git tag `v1.2.3`
+      # producing `1.2.3` — while every place in this repository that tells an operator how to
+      # pin a release says `TAG=vX.Y.Z`: README.md, README.tr.md, docs/self-hosting.md,
+      # docs/development.md (three times), their Turkish mirrors, and the comment beside
+      # `image:` in docker-compose.yml.
+      #
+      # `enable=` on the last two is what keeps a rehearsal from being mistaken for a release.
+      # `{{major}}.{{minor}}` and `latest` are moving pointers: an operator who follows
+      # docs/self-hosting.md without setting TAG gets `latest`, so publishing an `-rc` under it
+      # would hand a release candidate to everyone who never asked for one. The condition is
+      # written out rather than left to the action's own pre-release handling, because
+      # `type=raw` has none: raw is unconditional by definition.
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern=v{{version}}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+
+      # `imagetools create` writes a manifest list referencing the per-platform manifests the
+      # build legs pushed. Nothing is re-uploaded: the layers are already in the registry, and
+      # this is the small piece of metadata that says "these two are one image".
+      - name: Assemble the multi-platform index
+        working-directory: /tmp/digests
+        env:
+          REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          # One file per architecture, named after its digest. Two is the expected count, and
+          # asserting it is what keeps a silently-missing leg from producing a single-arch
+          # image under a two-arch tag — the exact failure `needs: build` alone would not catch
+          # if a leg were ever allowed to be skipped.
+          count=$(ls -1 | wc -l)
+          if [ "$count" -ne 2 ]; then
+            echo "Expected 2 per-platform digests, found $count:"; ls -l
+            exit 1
+          fi
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${REGISTRY_IMAGE}@sha256:%s " *)
+
+      # The digest of the index just written — the thing every tag above now resolves to, and
+      # the thing that gets signed. Read back from the registry rather than assumed, because
+      # what is signed must be what was published.
+      - name: Read the index digest
+        id: index
+        env:
+          REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          digest=$(docker buildx imagetools inspect "${REGISTRY_IMAGE}:${TAG}" \
+            --format '{{json .Manifest}}' | jq -r '.digest')
+          case "$digest" in
+            sha256:*) ;;
+            *) echo "imagetools returned no digest for ${REGISTRY_IMAGE}:${TAG}"; exit 1 ;;
+          esac
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Index digest: $digest"
 
       # ---------------------------------------------------------------------------------
       # SEC-06 / P3-5, part 1: sign the image.
@@ -191,27 +290,22 @@ jobs:
       # file at this ref* rather than to "somebody who holds the key". The identity a verifier
       # checks is therefore a URL anybody can read in this repository, which is the property
       # that makes verification meaningful for a self-hoster who has never met the maintainer.
-      # The trade is a dependency on the public Sigstore instances (Fulcio, Rekor) at both sign
-      # and verify time; for a public repository publishing public images that is the right side
-      # of the trade.
       # ---------------------------------------------------------------------------------
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Sign the image with cosign
         env:
-          # By digest, from the step above — see the note on `id: build`.
-          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.index.outputs.digest }}
         # `--yes` skips the confirmation prompt for writing to the public transparency log.
         # There is no interactive terminal here to answer it, and the entry being public is the
         # point: Rekor is what lets a verifier check the signature years later, after the
         # ten-minute certificate has long expired.
         #
-        # The digest signed is the index's, which is what every tag written above resolves to,
-        # so `cosign verify ghcr.io/dravcore/kurul-api:v0.2.0` works for amd64 and arm64
-        # users alike — one signature, not one per architecture. `--recursive` (additionally
-        # signing each per-platform manifest) is deliberately not used: it would also walk the
-        # BuildKit attestation manifests in the same index and produce a set of signatures
-        # nobody in docs/self-hosting.md is told to check.
+        # The digest signed is the index's, so `cosign verify ghcr.io/dravcore/kurul-api:v0.2.0`
+        # works for amd64 and arm64 users alike — one signature, not one per architecture.
+        # `--recursive` is deliberately not used: it would sign each per-platform manifest
+        # separately and produce a set of signatures nobody in docs/self-hosting.md is told to
+        # check.
         run: cosign sign --yes "$IMAGE"
 
       # ---------------------------------------------------------------------------------
@@ -220,10 +314,7 @@ jobs:
       # Format is SPDX 2.3 JSON. It is the ISO standard (ISO/IEC 5962:2021), it is what GitHub's
       # own dependency-graph SBOM export emits, and it is what syft's own action defaults to —
       # so an operator feeding it to grype, trivy, Dependency-Track or a corporate intake form
-      # does not have to convert anything first. CycloneDX would have been the other defensible
-      # answer; it was passed over only because nothing in this project or its documented
-      # tooling asks for it, and publishing both would double the assets to explain for no
-      # reader we can name.
+      # does not have to convert anything first.
       #
       # One SBOM per platform, not one per image. The two platform images do not contain the
       # same packages — apps/web alone pulls @next/swc-linux-x64-gnu on one and
@@ -233,18 +324,14 @@ jobs:
       #
       # syft is pinned transitively: the version this action installs is baked into the action
       # release, so the SHA above pins the scanner too (v0.24.0 installs syft v1.42.3), and
-      # Dependabot bumping the action bumps the scanner with it. Naming it again here as a
-      # `syft-version:` input would create a second number to remember to update.
+      # Dependabot bumping the action bumps the scanner with it.
       # ---------------------------------------------------------------------------------
       - uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
 
       - name: Generate an SBOM per published platform
         env:
-          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.index.outputs.digest }}
           IMAGE_NAME: ${{ matrix.image }}
-          # `v0.2.0` — the git ref this run was triggered by. The asset ends up on the GitHub
-          # Release for that same ref, so naming the file after it is what makes the pairing
-          # obvious in the release's file list.
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
@@ -275,9 +362,9 @@ jobs:
   # matrix above must finish before there is anything to attach.
   # -----------------------------------------------------------------------------------
   publish-sbom:
-    needs: build-and-push
-    # `!cancelled()` rather than the default `success()`: build-and-push runs `fail-fast: false`
-    # precisely so a broken `web` build still lets a working `api` image reach GHCR. Gating on
+    needs: merge
+    # `!cancelled()` rather than the default `success()`: `merge` runs `fail-fast: false`
+    # precisely so a broken `web` image still lets a working `api` image reach GHCR. Gating on
     # success would then throw away the SBOM of the image that did publish, which contradicts
     # the reason fail-fast was turned off. If neither leg produced anything the step below fails
     # loudly instead of quietly attaching nothing.
