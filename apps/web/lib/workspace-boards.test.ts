@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BoardDto } from '@kurultay/shared-types';
+import type { BoardDto } from '@kurul/shared-types';
 import { fetchWorkspaceBoards } from './workspace-boards';
 import { api } from '@/lib/api';
 

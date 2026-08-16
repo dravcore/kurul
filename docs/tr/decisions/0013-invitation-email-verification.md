@@ -14,7 +14,7 @@ kayıt olan bir saldırgan — davet edilen adresle, gerçek sahibi hiç kayıt 
 ele geçirip onun yerine workspace'e katılabilir. Better Auth 1.6, kontrolü tamamen kaldırmak
 yerine plugin'in _varsayılanını_ sağlamlaştırdı: `accept-invitation` ve `get-invitation` artık
 davet id'si plugin'in kendi opak id üretecinden gelmediğinde doğrulanmış bir e-posta talep
-ediyor. Kurultay'ın `advanced.database.generateId`'si her tablo için — davetler dahil —
+ediyor. Kurul'un `advanced.database.generateId`'si her tablo için — davetler dahil —
 `uuidv7()` kullanıyor, dolayısıyla "built-in" sayılmıyor ve sağlamlaştırılmış varsayılan bize
 otomatik olarak uygulanırdı — ancak `apps/api/src/auth/auth.ts`,
 `requireEmailVerificationOnInvitation: false`'ı açıkça set ediyor, ki bu varsayılanın önüne
@@ -47,7 +47,7 @@ doğrulanmış bir e-posta adresi gerektirir.
   açık olan yolu düzeltmek, tehdit modelinin gerektirmediği alakasız, daha yüksek sürtünmeli
   bir değişiklikten (her kayıtta zorunlu doğrulama) kaçınır.
 - Sağlayıcıya özel bir SDK (Resend, SendGrid, Postmark, …) değil SMTP + ortam değişkenleri,
-  çünkü Kurultay AGPL ve self-hosted: bir sağlayıcı API key'i, yazılımı çalıştırmak için bir
+  çünkü Kurul AGPL ve self-hosted: bir sağlayıcı API key'i, yazılımı çalıştırmak için bir
   self-hoster'ın oluşturması ve ödemesi gereken bir hesap daha demek. Zaten çalıştırdıkları
   herhangi bir mail sunucusu SMTP konuşur.
 - `SMTP_HOST` set edilmediğinde no-op fallback, henüz mail yapılandırmaya hazır olmayanlar için

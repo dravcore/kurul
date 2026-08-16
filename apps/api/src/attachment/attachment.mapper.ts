@@ -1,4 +1,4 @@
-import type { AttachmentDto, AttachmentKind } from '@kurultay/shared-types';
+import type { AttachmentDto, AttachmentKind } from '@kurul/shared-types';
 
 /** The row shape both reads produce. Spelled out so unit tests can build one by hand. */
 export type AttachmentRow = {

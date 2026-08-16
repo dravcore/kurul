@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES, type Locale } from '@kurultay/shared-types';
+import { SUPPORTED_LOCALES, type Locale } from '@kurul/shared-types';
 import { buildInvitationEmail, buildVerificationEmail } from './mail-templates';
 
 describe('buildVerificationEmail', () => {
@@ -13,7 +13,7 @@ describe('buildVerificationEmail', () => {
     const message = buildVerificationEmail(params);
 
     expect(message.to).toBe('new-user@example.test');
-    expect(message.subject).toContain('Kurultay');
+    expect(message.subject).toContain('Kurul');
     expect(message.text).toContain('Ada Lovelace');
     expect(message.text).toContain(params.verificationUrl);
     // `&` is escaped in the attribute — that is correct HTML, and mail clients decode it.
@@ -114,7 +114,7 @@ describe('buildInvitationEmail', () => {
   it('drops the inviter cleanly in Turkish when the display name is blank', () => {
     const message = buildInvitationEmail({ ...params, inviterName: '  ', locale: 'tr' });
 
-    expect(message.text.startsWith('Kurultay')).toBe(true);
+    expect(message.text.startsWith('Kurul')).toBe(true);
     expect(message.text).toContain('davet edildiniz');
   });
 });

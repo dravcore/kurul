@@ -5,7 +5,7 @@ import type { AuthedRequest } from '../types/request-context';
 /**
  * The one authorisation boundary in this codebase that is not a workspace role.
  *
- * Kurultay has no super-user. Every permission is `WorkspaceMember.role`, scoped to a tenant,
+ * Kurul has no super-user. Every permission is `WorkspaceMember.role`, scoped to a tenant,
  * and that was a deliberate shape: nobody can read across workspaces, including the person who
  * runs the server. The activation funnel is the first thing that legitimately has to — its
  * numbers are about the *instance* ("how many people registered", "how many teams were active

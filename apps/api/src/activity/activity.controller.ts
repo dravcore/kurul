@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { ActivityDto, CursorPage } from '@kurultay/shared-types';
+import type { ActivityDto, CursorPage } from '@kurul/shared-types';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';
 import { WorkspaceScoped } from '../common/decorators/workspace-roles.decorator';
 import { ActivityPageSchema } from '../openapi/schemas/feed.schema';

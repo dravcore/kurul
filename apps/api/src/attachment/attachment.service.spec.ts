@@ -3,7 +3,7 @@ import {
   NotFoundException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
-import { ActivityType, AttachmentKind, SocketEvents } from '@kurultay/shared-types';
+import { ActivityType, AttachmentKind, SocketEvents } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';

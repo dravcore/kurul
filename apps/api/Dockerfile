@@ -22,15 +22,15 @@ COPY . .
 #
 # `/app/deploy` is the API runtime: a production deploy, pruned to what the process can resolve.
 # `/app/migrate` is the migration runner: a full (dev-inclusive) deploy — `prisma` is a
-# devDependency of `@kurultay/api` — narrowed to the Prisma CLI and the one module
+# devDependency of `@kurul/api` — narrowed to the Prisma CLI and the one module
 # `prisma.config.ts` imports. Nest, Jest and the TypeScript compiler do not survive that filter.
-RUN pnpm --filter @kurultay/shared-types build \
-  && pnpm --filter @kurultay/auth-access build \
+RUN pnpm --filter @kurul/shared-types build \
+  && pnpm --filter @kurul/auth-access build \
   && pnpm db:generate \
-  && pnpm --filter @kurultay/api build \
-  && pnpm --filter @kurultay/api deploy --prod /app/deploy \
+  && pnpm --filter @kurul/api build \
+  && pnpm --filter @kurul/api deploy --prod /app/deploy \
   && node scripts/prune-deployed-modules.mjs /app/deploy \
-  && pnpm --filter @kurultay/api deploy /app/migrate \
+  && pnpm --filter @kurul/api deploy /app/migrate \
   && node scripts/prune-deployed-modules.mjs /app/migrate prisma dotenv
 
 # One-shot migration runner, invoked as its own compose service and never as part of the app's

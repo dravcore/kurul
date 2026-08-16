@@ -7,7 +7,7 @@
 
 ## Bağlam
 
-Kurultay'ın şemasında `checklist` veya `subtask`'ın izi yok. Bu boşluğu kapatan ROADMAP kalemi
+Kurul'un şemasında `checklist` veya `subtask`'ın izi yok. Bu boşluğu kapatan ROADMAP kalemi
 "Checklist / subtask" başlığını taşıyor, ve bu iki kelime bir çatalı gizliyor: checklist maddesi
 onay kutulu bir satırdır, subtask ise kendi kartı, kendi kolonu, atananı ve sürükle-bırak
 semantiği olan ayrı bir karttır. İkisini tek geçişte inşa etmek board DnD'sine task paneli kadar
@@ -129,7 +129,7 @@ sonraki ROADMAP kalemi, kaynağı zaten çoklu-liste olan bir modeli import ediy
 kartı birden çok adlandırılmış checklist taşıyabilir. O şekli tek düzeyli bir modele import
 etmek, geldiğinde düzleştirmek demek: sessiz veri kaybı, ancak bir kullanıcı eski board'unu
 yenisiyle karşılaştırdığında fark edilir. `Checklist`'i birinci sınıf bir satır olarak
-modellemek, importer'ın Trello checklist'lerini Kurultay checklist'lerine birebir eşlemesi ve
+modellemek, importer'ın Trello checklist'lerini Kurul checklist'lerine birebir eşlemesi ve
 hiçbir şeyin atılmaması demektir.
 
 **Neden yeni socket event yok.** İki önceki karar bunu zaten cevaplıyor. `TaskLabelService`, bir

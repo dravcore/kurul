@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { NotificationType, type NotificationDto } from '@kurultay/shared-types';
+import { NotificationType, type NotificationDto } from '@kurul/shared-types';
 import { toast } from 'sonner';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';

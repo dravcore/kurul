@@ -1,4 +1,4 @@
-import { LabelColorSlot } from '@kurultay/shared-types';
+import { LabelColorSlot } from '@kurul/shared-types';
 import { IsEnum, IsString, MaxLength, MinLength } from 'class-validator';
 import { OptionalNonNullable } from '../../common/validation/optional';
 

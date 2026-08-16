@@ -26,10 +26,10 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { AttachmentKind } from '@kurultay/shared-types';
+import { AttachmentKind } from '@kurul/shared-types';
 import { ErrorEnvelopeSchema } from '../openapi/schemas/error.schema';
 import { AttachmentSchema } from '../openapi/schemas/attachment.schema';
-import type { AttachmentDto } from '@kurultay/shared-types';
+import type { AttachmentDto } from '@kurul/shared-types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';
 import {

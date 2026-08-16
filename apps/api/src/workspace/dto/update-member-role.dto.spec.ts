@@ -1,4 +1,4 @@
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { acceptedDto, rejectedDto } from '../../common/validation/dto-test-helpers';
 import { UpdateMemberRoleDto } from './update-member-role.dto';
 

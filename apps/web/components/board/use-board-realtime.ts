@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type { ColumnDto, TaskDto } from '@kurultay/shared-types';
+import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { useBoardSocket } from './use-board-socket';

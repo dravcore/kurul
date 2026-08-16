@@ -1,10 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { NotificationType, SocketEvents } from '@kurultay/shared-types';
-import type {
-  CursorPage,
-  NotificationDto,
-  NotificationUnreadCountDto,
-} from '@kurultay/shared-types';
+import { NotificationType, SocketEvents } from '@kurul/shared-types';
+import type { CursorPage, NotificationDto, NotificationUnreadCountDto } from '@kurul/shared-types';
 import type { Prisma } from '../generated/prisma';
 import { toCursorPage } from '../common/pagination/cursor-page';
 import { PrismaService } from '../prisma/prisma.service';

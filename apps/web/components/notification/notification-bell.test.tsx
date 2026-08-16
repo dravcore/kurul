@@ -6,7 +6,7 @@ import {
   SocketClientEvents,
   SocketEvents,
   type NotificationDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { toast } from 'sonner';
 import messages from '@/messages/en.json';
 import { NotificationBell } from './notification-bell';

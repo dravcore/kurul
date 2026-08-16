@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { UserDto } from '@kurultay/shared-types';
+import type { UserDto } from '@kurul/shared-types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { SessionAuthGuard } from '../common/guards/session-auth.guard';
 import type { AuthenticatedUser } from '../common/types/request-context';

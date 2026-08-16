@@ -7,7 +7,7 @@ import type {
   AccountDeletionPreviewDto,
   DeleteAccountRequest,
   WorkspaceDispositionRequest,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { useApiResource } from '@/lib/use-api-resource';
 import { disconnectSocket } from '@/lib/socket';

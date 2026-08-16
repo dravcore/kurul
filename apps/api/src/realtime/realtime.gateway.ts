@@ -18,7 +18,7 @@ import {
   type BoardLeavePayload,
   type NotificationsJoinPayload,
   type NotificationsLeavePayload,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import type { Server, Socket } from 'socket.io';
 import { auth } from '../auth/auth';
 import { envString, isTestEnv } from '../common/env';

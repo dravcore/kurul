@@ -15,7 +15,7 @@
 
 ## Global Constraints
 
-- Run all package scripts from the repo root: `pnpm --filter @kurultay/web lint` / `typecheck` / `build`. Lint runs with `--max-warnings 0`.
+- Run all package scripts from the repo root: `pnpm --filter @kurul/web lint` / `typecheck` / `build`. Lint runs with `--max-warnings 0`.
 - **Tokens only:** no raw hex, no Tailwind palette colors (`text-red-600` etc.), and no `text-[var(--color-…)]`-style arbitrary values in components. Use the utilities generated from `globals.css` (`text-destructive`, `bg-signature-subtle`, …).
 - **Every user-visible string** goes through next-intl (`apps/web/messages/en.json`); no string literals in JSX. English, sentence case.
 - `apps/web/components/ui/` is shadcn-generated output: only shadcn-style additions (the sonner wrapper) and the shadow-token class swap are allowed there. Brand/custom components live in `components/brand/` or `components/layout/`.
@@ -68,7 +68,7 @@ These are the design.md §3 steps. Tailwind v4 derives `text-<name>` utilities (
 
 - [x] **Step 3: Verify**
 
-Run: `pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build`
+Run: `pnpm --filter @kurul/web typecheck && pnpm --filter @kurul/web build`
 Expected: both pass (tokens are additive; nothing consumes them yet).
 
 - [x] **Step 4: Commit**
@@ -123,7 +123,7 @@ This keeps the skeleton's opacity pulse and color fades (per design.md §5 "fewe
 
 - [x] **Step 2: Verify**
 
-Run: `pnpm --filter @kurultay/web build`
+Run: `pnpm --filter @kurul/web build`
 Expected: PASS.
 
 - [x] **Step 3: Commit**
@@ -189,7 +189,7 @@ In `board-list.tsx` and `board-view.tsx`: delete the local `function DamgaMark(�
 
 - [x] **Step 3: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck`
 Expected: PASS, no unused imports.
 
 - [x] **Step 4: Commit**
@@ -213,12 +213,12 @@ git commit -m "refactor(web): extract shared DamgaMark brand component"
 - [x] **Step 1: Install**
 
 ```bash
-pnpm --filter @kurultay/web add sonner
+pnpm --filter @kurul/web add sonner
 ```
 
 - [x] **Step 2: Create the themed wrapper**
 
-Create `apps/web/components/ui/sonner.tsx` (shadcn's sonner component, themed with Kurultay tokens):
+Create `apps/web/components/ui/sonner.tsx` (shadcn's sonner component, themed with Kurul tokens):
 
 ```tsx
 'use client';
@@ -262,7 +262,7 @@ In `apps/web/app/layout.tsx`, add `import { Toaster } from '@/components/ui/sonn
 
 - [x] **Step 4: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web build`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web build`
 Expected: PASS.
 
 - [x] **Step 5: Commit**
@@ -306,7 +306,7 @@ In the `@theme inline` block add:
 
 - [x] **Step 3: Verify**
 
-Run: `pnpm --filter @kurultay/web build && grep -rn "shadow-lg\|shadow-md" apps/web/components apps/web/app --include='*.tsx'`
+Run: `pnpm --filter @kurul/web build && grep -rn "shadow-lg\|shadow-md" apps/web/components apps/web/app --include='*.tsx'`
 Expected: build PASS; grep finds nothing.
 
 - [x] **Step 4: Commit**
@@ -323,7 +323,7 @@ git commit -m "feat(web): add elevation tokens, route overlay shadows through th
 - [x] **Step 1: Full verification**
 
 ```bash
-pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build
+pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck && pnpm --filter @kurul/web build
 ```
 
 Expected: all PASS.
@@ -387,7 +387,7 @@ export function Topbar({
 
 - [x] **Step 2: Verify and commit**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS.
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck` — expected PASS.
 
 ```bash
 git checkout -b feat/shell-chrome
@@ -503,7 +503,7 @@ and remove the now-unused `isBoardRoute`, `usePathname`, and `cn` imports if not
 
 - [x] **Step 5: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck && pnpm --filter @kurul/web build`
 Expected: PASS. Manual: dashboard and board both show one 48px sticky topbar; workspaces/new is padded.
 
 - [x] **Step 6: Commit**
@@ -613,7 +613,7 @@ In `app-sidebar.tsx`:
 
 - [x] **Step 4: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck`
 Expected: PASS. Manual: switcher opens in both sidebar widths; active workspace shows a check; "New workspace" navigates.
 
 - [x] **Step 5: Commit**
@@ -700,7 +700,7 @@ const railBox = useSancakRail(navRef, [pathname, collapsed]);
 
 - [x] **Step 3: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck`
 Expected: PASS (the exhaustive-deps disable comment is required for zero warnings). Manual: rail sits beside the active item and repositions when the sidebar collapses.
 
 - [x] **Step 4: Commit**
@@ -749,7 +749,7 @@ Add `import { Skeleton } from '@/components/ui/skeleton';`.
 
 - [x] **Step 2: Verify and commit**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS.
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck` — expected PASS.
 
 ```bash
 git add apps/web/components/layout/app-shell.tsx
@@ -834,7 +834,7 @@ export function AuthFormField({
 
 - [x] **Step 2: Verify and commit**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS.
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck` — expected PASS.
 
 ```bash
 git checkout -b feat/auth-visual
@@ -967,7 +967,7 @@ Add the `Button` import; remove every `text-[var(--color-…)]` and `bg-[var(--c
 - [x] **Step 6: Verify**
 
 ```bash
-pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && \
+pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck && \
 grep -rnE "text-red-|text-\[var\(|bg-\[var\(--color" "apps/web/app/(auth)" apps/web/components/auth "apps/web/app/(app)/workspaces"
 ```
 
@@ -984,7 +984,7 @@ git commit -m "feat(web): auth and workspace forms on the identity system"
 
 **Files:** none (verification only)
 
-- [x] **Step 1: Build** — `pnpm --filter @kurultay/web build`, PASS.
+- [x] **Step 1: Build** — `pnpm --filter @kurul/web build`, PASS.
 - [x] **Step 2: Manual pass** — login, register, invite in both themes; keyboard-only submit; exactly one copper element per screen (the primary button; the damga and the footer link are the sanctioned exceptions per design.md §2).
 - [x] **Step 3: PR**
 
@@ -1085,7 +1085,7 @@ Columns created after the first paint mount with `entranceDone === true` and get
 
 - [x] **Step 4: Verify and commit**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS. Manual: columns cascade in once on load; adding a column later does not re-animate.
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck` — expected PASS. Manual: columns cascade in once on load; adding a column later does not re-animate.
 
 ```bash
 git checkout -b feat/board-polish
@@ -1116,7 +1116,7 @@ Replace the loading grid's `<Skeleton className="h-24 w-full" />` with `<Skeleto
 
 - [x] **Step 3: Verify and commit**
 
-Run: `pnpm --filter @kurultay/web lint` — expected PASS.
+Run: `pnpm --filter @kurul/web lint` — expected PASS.
 
 ```bash
 git add apps/web/components/board/board-list.tsx
@@ -1164,7 +1164,7 @@ In `board-view.tsx`:
 
 - [x] **Step 3: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck`
 Expected: PASS, no unused-variable warnings from the removed state.
 
 - [x] **Step 4: Commit**
@@ -1181,7 +1181,7 @@ git commit -m "feat(web): surface column action failures as toasts with retry"
 - [x] **Step 1: Full verification**
 
 ```bash
-pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build
+pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck && pnpm --filter @kurul/web build
 ```
 
 Expected: all PASS.

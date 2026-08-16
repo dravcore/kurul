@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ActivityType } from '@kurultay/shared-types';
-import type { TrelloImportReportDto } from '@kurultay/shared-types';
+import { ActivityType } from '@kurul/shared-types';
+import type { TrelloImportReportDto } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {

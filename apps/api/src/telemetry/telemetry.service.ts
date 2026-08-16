@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import type { TelemetryPingPayload } from '@kurultay/shared-types';
+import type { TelemetryPingPayload } from '@kurul/shared-types';
 import { readAppVersion } from '../common/app-version';
 import { envBool, envInt, envString, isTestEnv } from '../common/env';
 
@@ -42,7 +42,7 @@ export function telemetrySettings(): TelemetrySettings {
 }
 
 /**
- * The only code path in Kurultay that sends anything to a third party, and it is off.
+ * The only code path in Kurul that sends anything to a third party, and it is off.
  *
  * ## What it sends
  *

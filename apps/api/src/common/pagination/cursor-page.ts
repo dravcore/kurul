@@ -1,4 +1,4 @@
-import type { CursorPage } from '@kurultay/shared-types';
+import type { CursorPage } from '@kurul/shared-types';
 
 /**
  * Splits an over-fetched result set into a cursor page.

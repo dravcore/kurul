@@ -20,7 +20,7 @@ export const OPENAPI_JSON_PATH = 'openapi.json';
  * `docker compose up` gets whatever the image decided. Three things are true of a console
  * served by default there, and only the first is about information:
  *
- * 1. **The spec itself leaks almost nothing.** Kurultay is AGPL and the routes are in the
+ * 1. **The spec itself leaks almost nothing.** Kurul is AGPL and the routes are in the
  *    repository; a scanner learns nothing from `/openapi.json` it could not read on GitHub.
  *    This is the weakest of the three reasons and is not, on its own, why the default is off.
  * 2. **It is an unauthenticated HTML surface on an API that has none.** The whole service is

@@ -73,19 +73,19 @@ services:
     # exec'ing a setuid-bit binary, so there is nothing for no-new-privileges to block.
     cap_add: [CHOWN, FOWNER, SETUID, SETGID, DAC_OVERRIDE]
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-kurultay}
+      POSTGRES_USER: ${POSTGRES_USER:-kurul}
       # No baked-in default: compose fails loudly instead of initializing (or, on every later
-      # boot, connecting to) a database with a well-known password shared by every Kurultay
+      # boot, connecting to) a database with a well-known password shared by every Kurul
       # install. This only bites on the *first* boot of an empty postgres_data volume — initdb
       # bakes the password into the role once, so changing this value later does not rotate an
       # already-initialized database's password. See the [Unreleased] entry in CHANGELOG.md for
       # how to roll an existing volume onto a new password with `ALTER USER`.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
-      POSTGRES_DB: ${POSTGRES_DB:-kurultay}
+      POSTGRES_DB: ${POSTGRES_DB:-kurul}
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-kurultay} -d ${POSTGRES_DB:-kurultay}']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-kurul} -d ${POSTGRES_DB:-kurul}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -189,9 +189,9 @@ services:
       # unrelated to the host .env DATABASE_URL used by the dev loop.
       PGHOST: postgres
       PGPORT: 5432
-      PGUSER: ${POSTGRES_USER:-kurultay}
+      PGUSER: ${POSTGRES_USER:-kurul}
       PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
-      PGDATABASE: ${POSTGRES_DB:-kurultay}
+      PGDATABASE: ${POSTGRES_DB:-kurul}
       BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
       # Where the read-only attachments mount lands. Blank would skip the file archive
@@ -230,7 +230,7 @@ services:
   # own. It does not block the ≤5-minute pull-based install target either (that budget has
   # headroom for one 45-50s build), and the `migrate` container's own logs make it obvious
   # when this is what's happening, unlike a silent full rebuild of api or web would be. A
-  # published `kurultay-migrate` image is a reasonable next step if this ever needs to shrink
+  # published `kurul-migrate` image is a reasonable next step if this ever needs to shrink
   # further, not something this fix requires.
   migrate:
     build:
@@ -252,7 +252,7 @@ services:
     environment:
       # postgres:5432 (not localhost) — this is the in-network address, unrelated to
       # whatever DATABASE_URL a developer has in their host .env for the dev loop.
-      DATABASE_URL: postgresql://${POSTGRES_USER:-kurultay}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}@postgres:5432/${POSTGRES_DB:-kurultay}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kurul}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}@postgres:5432/${POSTGRES_DB:-kurul}
     depends_on:
       postgres:
         condition: service_healthy
@@ -270,7 +270,7 @@ services:
     # `${TAG:-latest}` (not a hardcoded version) so an operator pins a release with `TAG=v0.2.0`
     # in `.env` and gets `latest` — the tag `.github/workflows/release-images.yml` always
     # publishes alongside every numbered release — when they leave it unset.
-    image: ghcr.io/dravcore/kurultay-api:${TAG:-latest}
+    image: ghcr.io/dravcore/kurul-api:${TAG:-latest}
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -288,7 +288,7 @@ services:
       # postgres:5432 / redis:6379 are the in-network addresses; they're intentionally not
       # sourced from the host .env, whose DATABASE_URL/REDIS_URL point at localhost for the
       # dev-loop run mode (docs/development.md#run-modes) and would not resolve in-container.
-      DATABASE_URL: postgresql://${POSTGRES_USER:-kurultay}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}@postgres:5432/${POSTGRES_DB:-kurultay}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kurul}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}@postgres:5432/${POSTGRES_DB:-kurul}
       # `${REDIS_PASSWORD:+:${REDIS_PASSWORD}@}` expands to `:<password>@` when REDIS_PASSWORD
       # is set and to nothing when it isn't, so this URL matches whichever branch the redis
       # service's own entrypoint took above without a second flag to keep in sync.
@@ -416,7 +416,7 @@ services:
     # really does want the API on a separate domain overrides the ARG directly
     # (`docker build --build-arg NEXT_PUBLIC_API_URL=https://api.example.com …`) and accepts
     # that the resulting image is specific to that domain.
-    image: ghcr.io/dravcore/kurultay-web:${TAG:-latest}
+    image: ghcr.io/dravcore/kurul-web:${TAG:-latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -499,7 +499,7 @@ services:
     cap_add: [NET_BIND_SERVICE]
     environment:
       # The public origin, scheme included — `http://localhost` (the default) for a local
-      # stack with no domain, `https://kurultay.example.com` to switch automatic HTTPS on.
+      # stack with no domain, `https://kurul.example.com` to switch automatic HTTPS on.
       # This is the single value an operator changes to put the stack on their own domain;
       # nothing has to be rebuilt for it, which is the entire point of this service existing.
       SITE_URL: ${SITE_URL:-http://localhost}

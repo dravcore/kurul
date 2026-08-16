@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { negotiateLocale, resolveLocale, type Locale } from '@kurultay/shared-types';
+import { negotiateLocale, resolveLocale, type Locale } from '@kurul/shared-types';
 
 const logger = new Logger('MailLocale');
 

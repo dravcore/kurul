@@ -10,7 +10,7 @@ import {
   type Locale,
   type UpdateMeRequest,
   type UserDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';

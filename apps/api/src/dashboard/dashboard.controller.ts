@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UsagePingKind } from '@kurultay/shared-types';
-import type { DashboardSummaryDto } from '@kurultay/shared-types';
+import { UsagePingKind } from '@kurul/shared-types';
+import type { DashboardSummaryDto } from '@kurul/shared-types';
 import { UsagePingService } from '../activation/usage-ping.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';

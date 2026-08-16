@@ -7,7 +7,7 @@
 
 ## Context
 
-Kurultay has been telling people it cannot do this, and telling them why. `README.md` lists "no
+Kurul has been telling people it cannot do this, and telling them why. `README.md` lists "no
 task attachments" among the things the product is not at `v0.1.0` and points at
 [roadmap.md — Beyond MVP](../roadmap.md#beyond-mvp), where the entry reads `Task attachments —
 Needs an object-storage decision (ADR)`. [tech-stack.md](../tech-stack.md) says the same thing
@@ -20,7 +20,7 @@ self-hosted boards treat it as baseline. A team evaluating a migration asks thre
 can I bring my boards, can I put files on cards, do I have checklists — and a "no" to any of
 them ends the evaluation before the differentiators are ever reached.
 
-**The storage question is harder than the feature.** Attachments are the first thing Kurultay
+**The storage question is harder than the feature.** Attachments are the first thing Kurul
 stores that is not a row in Postgres, and every operational promise made so far was made about a
 database. The nightly backup runs one command, `pg_dump --format=custom`; the `backup` service
 mounts its own script and the backup volume and nothing else. The rehearsed restore's definition
@@ -35,7 +35,7 @@ file, but nobody reads it _as a backup_. It is answered only by the copy being r
 on the same rehearsed schedule as the dump.
 
 The deployment target is what keeps the question genuinely open rather than a matter of taste.
-Kurultay ships as a Compose stack on one machine ([ADR 0001](0001-monorepo-modular-monolith.md))
+Kurul ships as a Compose stack on one machine ([ADR 0001](0001-monorepo-modular-monolith.md))
 to an audience promised a five-minute install. Requiring MinIO or an S3 account to attach a PDF
 breaks that promise for the majority in order to serve the minority who already run object
 storage; hard-coding `fs` strands that minority and makes the eventual move a rewrite.
@@ -203,7 +203,7 @@ schema has exactly 17 models today and `Attachment` makes it 18. Its restore ver
 checks `\dt` and three row counts and nothing on disk. Its paragraph naming Redis as the one
 thing deliberately not backed up "because it is all rebuildable", which now needs a second entry
 with the opposite reasoning. `.env.example`'s "Scheduled **database** backups". `backup.sh`'s
-header comment scoping itself to "the Kurultay database". `configure-app.ts`'s CSP comment,
+header comment scoping itself to "the Kurul database". `configure-app.ts`'s CSP comment,
 "This service only ever answers with JSON". `api-conventions.md`'s requirement of
 `Content-Type: application/json; charset=utf-8` on every response with a body, which gains a
 documented exception, and its status-code table, which lists neither 413 nor 415. The Turkish

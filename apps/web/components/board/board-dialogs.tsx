@@ -1,6 +1,6 @@
 'use client';
 
-import type { ColumnDto, TaskDto } from '@kurultay/shared-types';
+import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 import { CreateTaskDialog } from '@/components/task/create-task-dialog';
 import { DeleteTaskDialog } from '@/components/task/delete-task-dialog';
 import { CreateColumnDialog } from './create-column-dialog';

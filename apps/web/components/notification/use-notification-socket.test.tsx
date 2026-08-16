@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { SocketClientEvents } from '@kurultay/shared-types';
+import { SocketClientEvents } from '@kurul/shared-types';
 import { useNotificationSocket } from './use-notification-socket';
 
 type Ack = (response: { ok: boolean }) => void;

@@ -29,7 +29,7 @@
 ## How this roadmap works
 
 **This file holds high-level phases only.** Task-level tracking lives in GitHub Issues:
-[github.com/dravcore/kurultay/issues](https://github.com/dravcore/kurultay/issues).
+[github.com/dravcore/kurul/issues](https://github.com/dravcore/kurul/issues).
 
 | Level    | Where                       | Granularity                                                        |
 | -------- | --------------------------- | ------------------------------------------------------------------ |
@@ -63,7 +63,7 @@ recorded in [project-skeleton.md](../project-skeleton.md) and repeated per phase
 ### Governance and community files
 
 - [x] `LICENSE` — AGPL-3.0
-- [x] `README.md` — what Kurultay is, status, quick start, stack
+- [x] `README.md` — what Kurul is, status, quick start, stack
 - [x] `CONTRIBUTING.md` — contribution process
 - [x] `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1
 - [x] `SECURITY.md` — vulnerability reporting policy
@@ -177,7 +177,7 @@ tenant-safely until this exists.
 - [x] Tests: auth flows, workspace isolation, role matrix
       ([testing.md](../testing.md#what-must-be-tested))
 - [x] Phase 2 quality hardening (pre-boards): Nest-only workspace mutations (BA org HTTP
-      firewall), shared `pg` pool, query indexes, `@kurultay/auth-access`, typed web API
+      firewall), shared `pg` pool, query indexes, `@kurul/auth-access`, typed web API
       client + middleware session gate, workspace-nested scaffold routes, `format:check` in CI
 
 ---
@@ -314,7 +314,7 @@ schema is one pass of work; building it early is a tax on all eight phases befor
 
 - [x] Socket.io gateway with the Redis adapter (horizontal scaling)
 - [x] Socket auth using the existing session; **rooms scoped per workspace/board**
-- [x] Event contract in `@kurultay/shared-types` — single source for both sides
+- [x] Event contract in `@kurul/shared-types` — single source for both sides
 - [x] Events: task created/updated/moved/deleted, column changed, comment added
 - [x] Web: subscribe on board mount, reconcile with local optimistic state, resync on
       reconnect
@@ -384,4 +384,4 @@ backwards compatibility.
 - [git-strategy.md](../git-strategy.md) — how a phase becomes a release
 - [development.md](../development.md) — how to build any of this locally
 - [../CHANGELOG.md](../../CHANGELOG.md) — what has actually shipped
-- [GitHub Issues](https://github.com/dravcore/kurultay/issues) — task-level tracking
+- [GitHub Issues](https://github.com/dravcore/kurul/issues) — task-level tracking

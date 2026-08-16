@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTranslator } from 'next-intl';
-import { ActivityType, type ActivityDto } from '@kurultay/shared-types';
+import { ActivityType, type ActivityDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { formatActivitySummary } from './activity-summary';
 

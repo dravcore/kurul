@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { TrelloImportReportDto } from '@kurultay/shared-types';
+import type { TrelloImportReportDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { ApiError, api } from '@/lib/api';
 import { ImportTrelloDialog } from './import-trello-dialog';

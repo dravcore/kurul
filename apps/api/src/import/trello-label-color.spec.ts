@@ -1,4 +1,4 @@
-import { LabelColorSlot } from '@kurultay/shared-types';
+import { LabelColorSlot } from '@kurul/shared-types';
 import { toLabelColorSlot } from '../common/label-color';
 import { TRELLO_COLOR_TO_SLOT, trelloColorToSlot } from './trello-label-color';
 

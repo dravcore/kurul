@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Priority, type CursorPage, type TaskDto } from '@kurultay/shared-types';
+import { Priority, type CursorPage, type TaskDto } from '@kurul/shared-types';
 import {
   BOARD_TASK_PAGE_LIMIT,
   countActiveFilters,

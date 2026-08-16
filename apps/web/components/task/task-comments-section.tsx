@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { CommentDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import type { CommentDto, WorkspaceMemberDto } from '@kurul/shared-types';
 import { authorLabel } from '@/lib/author-label';
 import { getActiveMentionQuery, insertMentionMarkup } from '@/lib/mentions';
 import { Button } from '@/components/ui/button';

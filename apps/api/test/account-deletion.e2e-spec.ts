@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
-import { ActivityType, AttachmentKind, MemberRole } from '@kurultay/shared-types';
-import type { AccountDeletionPreviewDto } from '@kurultay/shared-types';
+import { ActivityType, AttachmentKind, MemberRole } from '@kurul/shared-types';
+import type { AccountDeletionPreviewDto } from '@kurul/shared-types';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { ANONYMOUS_USER_NAME, anonymisedEmailFor } from '../src/account/anonymised-user';

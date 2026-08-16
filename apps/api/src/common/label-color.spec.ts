@@ -1,4 +1,4 @@
-import { LabelColorSlot } from '@kurultay/shared-types';
+import { LabelColorSlot } from '@kurul/shared-types';
 import { toLabelColorSlot } from './label-color';
 
 describe('toLabelColorSlot', () => {

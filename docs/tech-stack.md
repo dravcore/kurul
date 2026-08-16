@@ -1,6 +1,6 @@
 # Tech Stack
 
-The technology chosen for each layer of Kurultay, with a short rationale and the alternative it was weighed against.
+The technology chosen for each layer of Kurul, with a short rationale and the alternative it was weighed against.
 
 > 🌐 English (canonical) | [Türkçe](tr/tech-stack.md)
 
@@ -53,7 +53,7 @@ Both commercial reference points run this way: ClickUp on TypeScript/Node.js/Nes
 
 Uncontroversial: ClickUp, Linear, Plane, Taiga, and Focalboard all sit on Postgres. JSON columns cover flexible metadata (custom fields, activity payloads) while relational integrity covers the task/board graph. Redis then serves four needs with one tool: notification queue, session store, rate limiting, and the Socket.io pub/sub adapter.
 
-Both versions are pinned on purpose. **PostgreSQL 18** is the current major; the previous one is supported for years yet, but a major bump after v0.1 ships costs every self-hoster a `pg_dump`/restore — the official image refuses to start against a `PGDATA` volume initialized by a different major ([development.md](development.md#upgrading-and-backups)). Doing it now, with no data in existence, is free. **Redis 8** is a licensing choice as much as a version one: the 7.4–7.8 band is RSALv2/SSPLv1 only, which is source-available and not OSI open source, and Redis 8 restored an OSI option — AGPLv3, the same licence Kurultay ships under. A self-hoster who redistributes the stack inherits no licence question they did not ask for. Valkey (BSD-3-Clause, the Linux Foundation fork of Redis 7.2.4) is protocol-compatible and remains a one-line image swap if a permissive licence is ever needed downstream.
+Both versions are pinned on purpose. **PostgreSQL 18** is the current major; the previous one is supported for years yet, but a major bump after v0.1 ships costs every self-hoster a `pg_dump`/restore — the official image refuses to start against a `PGDATA` volume initialized by a different major ([development.md](development.md#upgrading-and-backups)). Doing it now, with no data in existence, is free. **Redis 8** is a licensing choice as much as a version one: the 7.4–7.8 band is RSALv2/SSPLv1 only, which is source-available and not OSI open source, and Redis 8 restored an OSI option — AGPLv3, the same licence Kurul ships under. A self-hoster who redistributes the stack inherits no licence question they did not ask for. Valkey (BSD-3-Clause, the Linux Foundation fork of Redis 7.2.4) is protocol-compatible and remains a one-line image swap if a permissive licence is ever needed downstream.
 
 ### ORM — Prisma
 
@@ -65,7 +65,7 @@ For self-hosted infrastructure, Socket.io with `@socket.io/redis-adapter` is the
 
 ### Drag & drop — @dnd-kit
 
-`react-beautiful-dnd` is deprecated — Atlassian withdrew from it. Kurultay uses the **classic `@dnd-kit` line** (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0, pinned): MIT, ~6 KB core, accessible (keyboard and screen reader), framework-agnostic, and the most widely deployed React drag-and-drop library. It is also **frozen** — no release since December 2024, docs-site repo archived in February 2026, maintainer effort moved to a pre-1.0 rewrite (`@dnd-kit/react`) with a different API that we are not adopting. Atlassian's `pragmatic-drag-and-drop` (Apache-2.0) is actively released and is the fallback, at the cost of hand-writing collision detection. Frozen-but-stable beats moving-and-pre-1.0 for a solo maintainer at 50–200 cards per board; the full argument and the re-evaluation trigger are in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md). The critical companion rule is ordering: positions are stored as floats and reordered by **fractional indexing**, never as renumbered integers.
+`react-beautiful-dnd` is deprecated — Atlassian withdrew from it. Kurul uses the **classic `@dnd-kit` line** (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0, pinned): MIT, ~6 KB core, accessible (keyboard and screen reader), framework-agnostic, and the most widely deployed React drag-and-drop library. It is also **frozen** — no release since December 2024, docs-site repo archived in February 2026, maintainer effort moved to a pre-1.0 rewrite (`@dnd-kit/react`) with a different API that we are not adopting. Atlassian's `pragmatic-drag-and-drop` (Apache-2.0) is actively released and is the fallback, at the cost of hand-writing collision detection. Frozen-but-stable beats moving-and-pre-1.0 for a solo maintainer at 50–200 cards per board; the full argument and the re-evaluation trigger are in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md). The critical companion rule is ordering: positions are stored as floats and reordered by **fractional indexing**, never as renumbered integers.
 
 ### Charts — Recharts
 
@@ -77,7 +77,7 @@ Multi-tenant workspaces are the heart of this product, so auth is a load-bearing
 
 ### Email — nodemailer over SMTP
 
-Kurultay sends one class of transactional email so far: the verification link an invitee needs before `better-auth`'s hardened invitation-acceptance check will let them join a workspace (see [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)). `nodemailer` talks plain SMTP, configured only through `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` / `MAIL_FROM` — no provider SDK, so self-hosters point it at whatever mail server they already run instead of creating a new vendor account. `docker-compose.dev.yml` runs [Mailpit](https://mailpit.axllent.org/) as a local SMTP catch-all so development never sends real mail; see [development.md#smtp-and-mailpit](development.md#smtp-and-mailpit).
+Kurul sends one class of transactional email so far: the verification link an invitee needs before `better-auth`'s hardened invitation-acceptance check will let them join a workspace (see [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)). `nodemailer` talks plain SMTP, configured only through `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` / `MAIL_FROM` — no provider SDK, so self-hosters point it at whatever mail server they already run instead of creating a new vendor account. `docker-compose.dev.yml` runs [Mailpit](https://mailpit.axllent.org/) as a local SMTP catch-all so development never sends real mail; see [development.md#smtp-and-mailpit](development.md#smtp-and-mailpit).
 
 ### Frontend — Next.js 16
 

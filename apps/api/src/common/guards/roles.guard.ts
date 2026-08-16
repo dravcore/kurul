@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { MemberRole } from '@kurultay/shared-types';
+import type { MemberRole } from '@kurul/shared-types';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import type { AuthedRequest } from '../types/request-context';
 

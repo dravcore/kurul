@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Logger } from '@nestjs/common';
-import { NotificationType, SocketEvents } from '@kurultay/shared-types';
+import { NotificationType, SocketEvents } from '@kurul/shared-types';
 import { Queue, Worker, type Job } from 'bullmq';
 import { initSentry, resetSentryForTesting } from '../common/observability/sentry';
 import { PrismaService } from '../prisma/prisma.service';

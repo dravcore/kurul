@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { RolesGuard } from '../guards/roles.guard';
 import { WorkspaceGuard } from '../guards/workspace.guard';
 import { ROLES_KEY } from './roles.decorator';

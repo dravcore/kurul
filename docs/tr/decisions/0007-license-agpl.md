@@ -9,7 +9,7 @@
 
 ## Bağlam
 
-Kurultay, üçüncü bir tarafça alınıp katkıda bulunma zorunluluğu olmadan kapalı kaynak bir SaaS olarak yeniden satılması makul biçimde mümkün olan, açık kaynak bir proje yönetim aracı. Lisans, bu sonucu engellerken maintainer'lar için sürdürülebilir bir iş modeline gerçekçi bir yol bırakmalı.
+Kurul, üçüncü bir tarafça alınıp katkıda bulunma zorunluluğu olmadan kapalı kaynak bir SaaS olarak yeniden satılması makul biçimde mümkün olan, açık kaynak bir proje yönetim aracı. Lisans, bu sonucu engellerken maintainer'lar için sürdürülebilir bir iş modeline gerçekçi bir yol bırakmalı.
 
 ## Karar
 
@@ -24,7 +24,7 @@ Kurultay, üçüncü bir tarafça alınıp katkıda bulunma zorunluluğu olmadan
 
 ## Sonuçlar
 
-- Kurultay'ın rakipler veya bulut sağlayıcıları tarafından kapalı kaynak olarak yeniden satılması, değişikliklerini yayınlamadan mümkün değil.
+- Kurul'un rakipler veya bulut sağlayıcıları tarafından kapalı kaynak olarak yeniden satılması, değişikliklerini yayınlamadan mümkün değil.
 - Open-core yolu (AGPL çekirdek + proprietary enterprise eklentileri) bu iş modeli izlenirse gelecek için açık kalıyor.
 - AGPL'in copyleft gücü, network-use maddesinden çekinen bazı enterprise benimseyicileri ve katkıda bulunanları caydırabilir — sağladığı korumaya karşı tartılan gerçek bir maliyet.
 - AGPL community kodunu gelecekteki herhangi bir proprietary enterprise özellikle birleştirmek, proprietary kodu kirletmekten kaçınmak için dikkatli bir mimari ayrım (ve muhtemelen bir CLA) gerektiriyor.

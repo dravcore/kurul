@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { MemberRole, type WorkspaceDto } from '@kurultay/shared-types';
+import { MemberRole, type WorkspaceDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { WorkspaceSettings } from './workspace-settings';
@@ -12,8 +12,8 @@ const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00';
 
 const workspace: WorkspaceDto = {
   id: WORKSPACE_ID,
-  name: 'Kurultay',
-  slug: 'kurultay',
+  name: 'Kurul',
+  slug: 'kurul',
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
@@ -102,14 +102,14 @@ describe('WorkspaceSettings — what an OWNER sees', () => {
   });
 
   it('renaming through the dialog updates the name shown on the row', async () => {
-    apiPatch.mockResolvedValue({ ...workspace, name: 'Kurultay Labs' } as never);
+    apiPatch.mockResolvedValue({ ...workspace, name: 'Kurul Labs' } as never);
     renderSection();
 
-    expect(screen.getByText('Kurultay')).toBeTruthy();
+    expect(screen.getByText('Kurul')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: copy.renameAction }));
     const nameField = screen.getByLabelText(copy.name) as HTMLInputElement;
-    fireEvent.change(nameField, { target: { value: 'Kurultay Labs' } });
+    fireEvent.change(nameField, { target: { value: 'Kurul Labs' } });
     // Two buttons now share the "Rename" label — the row's opener and the dialog's submit —
     // so the submit is the last one in document order.
     const submitButtons = screen.getAllByRole('button', { name: copy.renameAction });
@@ -117,10 +117,10 @@ describe('WorkspaceSettings — what an OWNER sees', () => {
 
     await waitFor(() => expect(apiPatch).toHaveBeenCalled());
     expect(apiPatch).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}`, {
-      name: 'Kurultay Labs',
+      name: 'Kurul Labs',
     });
-    await waitFor(() => expect(screen.getByText('Kurultay Labs')).toBeTruthy());
-    expect(screen.queryByText('Kurultay')).toBeNull();
+    await waitFor(() => expect(screen.getByText('Kurul Labs')).toBeTruthy());
+    expect(screen.queryByText('Kurul')).toBeNull();
   });
 });
 
@@ -139,7 +139,7 @@ describe('WorkspaceSettings — what a MEMBER sees', () => {
     context.value = { ...context.value, activeRole: MemberRole.MEMBER };
     renderSection();
 
-    expect(screen.getByText('Kurultay')).toBeTruthy();
+    expect(screen.getByText('Kurul')).toBeTruthy();
     expect(screen.queryByRole('button', { name: copy.renameAction })).toBeNull();
     expect(screen.queryByRole('button', { name: copy.deleteAction })).toBeNull();
   });

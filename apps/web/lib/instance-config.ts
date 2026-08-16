@@ -1,11 +1,11 @@
-import type { InstanceConfigDto } from '@kurultay/shared-types';
+import type { InstanceConfigDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 
 /**
  * Where an operator goes to switch outbound email on.
  *
  * A GitHub URL rather than an in-app page or a relative link: the docs live in the repository
- * and Kurultay ships no documentation site, so this is the only address that resolves for a
+ * and Kurul ships no documentation site, so this is the only address that resolves for a
  * self-hosted install. Pinned to `main` — a self-hoster is running a release, and `develop`
  * would show them setup steps their build may not have.
  *
@@ -14,7 +14,7 @@ import { api } from '@/lib/api';
  * catalogue key would not.
  */
 export const SMTP_SETUP_DOCS_URL =
-  'https://github.com/dravcore/kurultay/blob/main/docs/development.md#smtp-and-mailpit';
+  'https://github.com/dravcore/kurul/blob/main/docs/development.md#smtp-and-mailpit';
 
 /**
  * What this API instance is configured to do — see `InstanceConfigDto`.

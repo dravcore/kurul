@@ -3,7 +3,7 @@ import type {
   TrelloImportScope,
   TrelloImportSkipGroupDto,
   TrelloImportSkipReason,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 
 /**
  * Aliased because `implements` takes an identifier, not an indexed access — the shape itself is

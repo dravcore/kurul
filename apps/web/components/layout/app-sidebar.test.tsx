@@ -29,7 +29,7 @@ vi.mock('@/components/auth/email-verification-link', () => ({
 
 import { AppSidebar } from './app-sidebar';
 
-const STORAGE_KEY = 'kurultay:sidebar-collapsed';
+const STORAGE_KEY = 'kurul:sidebar-collapsed';
 
 type MediaChangeListener = () => void;
 

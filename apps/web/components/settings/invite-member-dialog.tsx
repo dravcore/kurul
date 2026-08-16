@@ -8,7 +8,7 @@ import {
   MemberRole,
   type CreateInvitationRequest,
   type InvitationDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { INVITABLE_ROLES } from '@/lib/member-permissions';
 import { FormDialog } from '@/components/common/form-dialog';
@@ -56,7 +56,7 @@ export function InviteMemberDialog({
     //
     // Which message depends on whether the API watched the email go out. `emailDelivery` is
     // absent when no send was observed, and absent is deliberately not a verdict (see the
-    // field's contract in `@kurultay/shared-types`) — so only a value that positively says
+    // field's contract in `@kurul/shared-types`) — so only a value that positively says
     // "not delivered" downgrades the confirmation. Before this existed, an invitation on a
     // deployment with no SMTP host was reported as sent, to an inbox that would never receive
     // it (audit PM-04).

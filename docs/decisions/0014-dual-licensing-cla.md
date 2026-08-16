@@ -26,7 +26,7 @@ gets exactly the rights everyone else gets. That is enough to keep shipping the 
 project and not enough to sell anyone an exemption from the AGPL, because the maintainer
 cannot grant terms over code he does not control.
 
-The window for fixing this is now. Kurultay has one contributor — the maintainer — so
+The window for fixing this is now. Kurul has one contributor — the maintainer — so
 establishing a contribution agreement today costs a pull request. Once external contributions
 land without one, the code they touched is permanently AGPL-only unless every one of those
 authors can be found and persuaded to relicense, which in practice does not happen. This is a

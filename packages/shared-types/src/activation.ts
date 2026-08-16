@@ -106,7 +106,7 @@ export interface ActivationStepDto {
  * Weekly Active *Team* Workspaces — the North Star.
  *
  * "Team", not "workspace", is the whole of it. A workspace one person opens every day is a
- * to-do list, and Kurultay does not need to exist for that; a workspace where two or more
+ * to-do list, and Kurul does not need to exist for that; a workspace where two or more
  * members were active in the same week is the thing the product claims to be for. The metric
  * is therefore deliberately harder to move than any of the funnel steps, and it is the only
  * number here that a growth in registrations cannot inflate on its own.
@@ -166,6 +166,6 @@ export type UsagePingKind = (typeof UsagePingKind)[keyof typeof UsagePingKind];
 export interface TelemetryPingPayload {
   /** Always `instance_started`. A field rather than a constant so a collector can route on it. */
   event: 'instance_started';
-  /** The `@kurultay/api` package version this process was built from, e.g. `0.1.0`. */
+  /** The `@kurul/api` package version this process was built from, e.g. `0.1.0`. */
   version: string;
 }

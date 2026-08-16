@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { type AttachmentDto, AttachmentKind } from '@kurultay/shared-types';
+import { type AttachmentDto, AttachmentKind } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { AttachmentRow } from './attachment-row';
@@ -65,7 +65,7 @@ const revokeObjectURL = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
   mintedUrls = 0;
-  URL.createObjectURL = vi.fn(() => `blob:kurultay/${(mintedUrls += 1)}`);
+  URL.createObjectURL = vi.fn(() => `blob:kurul/${(mintedUrls += 1)}`);
   URL.revokeObjectURL = revokeObjectURL;
 });
 

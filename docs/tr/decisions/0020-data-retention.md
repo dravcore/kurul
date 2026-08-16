@@ -7,7 +7,7 @@
 
 ## Bağlam
 
-Bu karara kadar Kurultay bir satırı yalnızca bir kullanıcı istediğinde siliyordu. Due-soon
+Bu karara kadar Kurul bir satırı yalnızca bir kullanıcı istediğinde siliyordu. Due-soon
 taraması dışında hiçbir zamanlanmış iş yoktu ve o da yalnızca INSERT üretiyor. Dört tablo
 sınırsız büyüyordu:
 
@@ -24,7 +24,7 @@ Bu tablonun içinde iki ayrı problem yaşıyor.
 gerektirdiğinden uzun süre saklanamayacağını söylüyor. Süresi dolmuş bir oturumun IP adresi
 hiçbir amaca hizmet etmiyor — o satır artık kimseyi kimliklendiremez. Kullanılmış ya da süresi
 dolmuş bir doğrulama token'ı da öyle; geriye kalan yalnızca _şu e-posta adresinin_ _şu tarihte_
-bir şey istediğinin çıplak kaydı. AB'de veya Türkiye'de Kurultay çalıştıran bir self-hoster'ın
+bir şey istediğinin çıplak kaydı. AB'de veya Türkiye'de Kurul çalıştıran bir self-hoster'ın
 şu an "bunu ne kadar saklıyorsunuz?" sorusuna cevabı yok, çünkü cevap "sonsuza dek, ve üründe
 bunun aksini söyleyen hiçbir şey yok". Bu, koddaki kadar dokümantasyondaki de bir eksiklik:
 yalnızca birinin kafasında olan bir saklama süresi, saklama politikası değildir.
@@ -62,7 +62,7 @@ kaldırılır.
 seçildi çünkü akışa gerçekten sorulan her soruyu kapsıyor — "geçen çeyrekte bu board'da ne oldu",
 "bunu sürümden önce kim değiştirdi" — ve kullanıcının ufku fark etmeden yıllık bir gözden geçirme
 döngüsünü atlatan en kısa pencere bu. Soğuk depolamaya arşivleme ertelenmedi, doğrudan reddedildi:
-Kurultay bir Compose stack'i olarak, bir Postgres volume'u ile ve nesne deposu olmadan deploy
+Kurul bir Compose stack'i olarak, bir Postgres volume'u ile ve nesne deposu olmadan deploy
 ediliyor ([ADR 0001](0001-monorepo-modular-monolith.md)); dolayısıyla "arşiv", aynı diskte kimsenin
 okumadığı ve kimsenin restore etmediği bir dosya olurdu. Backup sidecar'ı zaten `BACKUP_KEEP` adet
 tam `pg_dump` arşivi yazıyor — soğuk kopya _odur_, ve bir denetim için bir yıllık aktiviteye

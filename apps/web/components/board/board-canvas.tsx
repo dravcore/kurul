@@ -10,7 +10,7 @@ import {
   type DropAnimation,
   type ScreenReaderInstructions,
 } from '@dnd-kit/core';
-import type { ColumnDto, TaskDto } from '@kurultay/shared-types';
+import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 import { Button } from '@/components/ui/button';
 import { TaskDragPreview } from '@/components/task/sortable-task-card';
 import type { BoardTaskDndController } from '@/components/task/use-board-task-dnd';

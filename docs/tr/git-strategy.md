@@ -1,6 +1,6 @@
 # Git Stratejisi
 
-Kurultay için branch modeli, commit convention'ı, PR süreci ve release prosedürü.
+Kurul için branch modeli, commit convention'ı, PR süreci ve release prosedürü.
 
 > 🌐 [English (canonical)](../git-strategy.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
@@ -17,7 +17,7 @@ Kurultay için branch modeli, commit convention'ı, PR süreci ve release prosed
 
 ## Branch modeli
 
-Kurultay **Git Flow** kullanır. İki branch kalıcıdır; geri kalan her şey kısa ömürlüdür ve
+Kurul **Git Flow** kullanır. İki branch kalıcıdır; geri kalan her şey kısa ömürlüdür ve
 merge sonrası silinir.
 
 | Branch      | Ömür        | Şuradan dallanır | Şuraya merge olur  | Amaç                                                                        |
@@ -75,7 +75,7 @@ pull request zorunlu. Zorunlu status check'ler [`.github/workflows/ci.yml`](../.
 Dependabot `main`'e değil, `develop`'a açmalıdır. Her iki ekosistem
 [`.github/dependabot.yml`](../../.github/dependabot.yml) içinde bu yüzden
 `target-branch: develop` ayarlıdır. Bağımlılık bump'larını doğrudan `main`'e merge etmek
-([#82](https://github.com/dravcore/kurultay/pull/82)'de olduğu gibi) Git Flow'u atlar ve
+([#82](https://github.com/dravcore/kurul/pull/82)'de olduğu gibi) Git Flow'u atlar ve
 `develop`'ı CI config'te geride bırakır — tekrarlanmamalı. Bir Dependabot PR bir şekilde
 `main`'i hedefliyorsa, merge'den önce `develop`'a retarget edin.
 
@@ -356,12 +356,12 @@ yeniden ortaya çıkar.
 
 ## Versiyonlama politikası (SemVer)
 
-Kurultay, SemVer'ın garantilerinin 1.0 öncesi daha zayıf olduğu dürüst çekincesiyle
+Kurul, SemVer'ın garantilerinin 1.0 öncesi daha zayıf olduğu dürüst çekincesiyle
 [Semantic Versioning 2.0.0](https://semver.org/)'ı takip eder.
 
 **1.0 öncesi (`0.y.z`) — projenin şu anda bulunduğu yer:**
 
-- Public API (REST endpoint'leri, `@kurultay/shared-types`, `@kurultay/auth-access`,
+- Public API (REST endpoint'leri, `@kurul/shared-types`, `@kurul/auth-access`,
   veritabanı şeması, env değişken isimleri) **kararlı değildir**. Breaking değişiklikler
   herhangi bir `0.y.0`'da gelebilir.
 - `0.y.0` (MINOR): yeni özellikler **ve** breaking değişiklikler.

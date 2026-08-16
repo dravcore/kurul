@@ -31,7 +31,7 @@ interface SmtpTransporter {
 /**
  * Delivers mail over SMTP via nodemailer.
  *
- * SMTP rather than a provider SDK on purpose: Kurultay is AGPL and meant to be self-hosted,
+ * SMTP rather than a provider SDK on purpose: Kurul is AGPL and meant to be self-hosted,
  * and every plausible target — Resend, SES, Postmark, Mailgun, a company's own Postfix —
  * exposes an SMTP endpoint. One transport covers all of them with environment variables and
  * no vendor dependency.

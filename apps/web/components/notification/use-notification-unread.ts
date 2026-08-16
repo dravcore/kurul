@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import { useTranslations } from 'next-intl';
-import type { NotificationUnreadCountDto } from '@kurultay/shared-types';
+import type { NotificationUnreadCountDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { useApiResource } from '@/lib/use-api-resource';
 import { usePollFallback } from '@/lib/use-poll-fallback';

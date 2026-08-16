@@ -5,13 +5,13 @@
  *
  * ## The problem this exists for
  *
- * `pnpm --filter @kurultay/api deploy --prod` does prune: it drops `@kurultay/api`'s own
+ * `pnpm --filter @kurul/api deploy --prod` does prune: it drops `@kurul/api`'s own
  * `devDependencies`. What it does not drop is *optional peer dependencies* — peers that the
  * publishing package itself marked `"optional": true`, meaning "load this only if the host
  * application brought it". pnpm's `auto-install-peers` (on by default since v8) installs them
  * anyway, and `deploy` copies whatever the lockfile resolved.
  *
- * Measured on this repository's `@kurultay/api` deploy, that is the majority of the tree.
+ * Measured on this repository's `@kurul/api` deploy, that is the majority of the tree.
  * `better-auth` declares optional peers on `next`, `react`, `react-dom`, `svelte`, `vue`,
  * `solid-js`, `drizzle-orm`, `mongodb`, `mysql2`, `better-sqlite3` and `vitest`; `@prisma/client`
  * declares them on `prisma` (the CLI) and `typescript`. Following those edges drags in
@@ -38,7 +38,7 @@
  * judgement call about whether the code "probably" runs — there is no resolution path.
  *
  * The one deliberate looseness is optional peers that *are* also reachable some other way:
- * `pg` is an optional peer of `better-auth` and a direct dependency of `@kurultay/api`, so it
+ * `pg` is an optional peer of `better-auth` and a direct dependency of `@kurul/api`, so it
  * stays, as it must.
  *
  * ## The risk this cannot see, stated plainly

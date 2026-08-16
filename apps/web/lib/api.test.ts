@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CreateColumnRequest, UpdateBoardRequest } from '@kurultay/shared-types';
+import type { CreateColumnRequest, UpdateBoardRequest } from '@kurul/shared-types';
 import { api, apiFetch, ApiError, apiStatus, resolveApiMessage } from './api';
 
 const t = (key: string): string => `t:${key}`;

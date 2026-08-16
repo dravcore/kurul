@@ -1,4 +1,4 @@
-import { LabelColorSlot } from '@kurultay/shared-types';
+import { LabelColorSlot } from '@kurul/shared-types';
 import { acceptedDto, dtoFields, rejectedDto } from '../../common/validation/dto-test-helpers';
 import { CreateLabelDto } from './create-label.dto';
 

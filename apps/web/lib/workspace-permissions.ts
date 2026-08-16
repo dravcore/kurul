@@ -1,4 +1,4 @@
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 
 /**
  * Who may rename the workspace.

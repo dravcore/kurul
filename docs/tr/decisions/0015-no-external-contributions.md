@@ -15,7 +15,7 @@ Sahip bu görüşmeyi şimdi yapmayacak ve aklında bir tarih de yok. Bu da CLA'
 
 ## Karar
 
-**Kurultay dış katkı kabul etmiyor.** Dışarıdan gelen hiçbir kod, doküman veya çeviri pull request'i merge edilmiyor. Kod tabanı tek yazarlı kalıyor: sahip kodu kendisi yazıyor ve kodun tamamının telifi tek elde kalıyor — [SQLite](https://www.sqlite.org/copyright.html)'ın onlarca yıldır yürüttüğü model. Hata bildirimleri, özellik fikirleri, tasarım geri bildirimi ve tartışma her zamanki kadar isteniyor; tek satırlık bir yazım hatası veya kırık bağlantı düzeltmesi hâlâ tartışmaya değer bir telif taşımıyor ve hâlâ hoş karşılanıyor.
+**Kurul dış katkı kabul etmiyor.** Dışarıdan gelen hiçbir kod, doküman veya çeviri pull request'i merge edilmiyor. Kod tabanı tek yazarlı kalıyor: sahip kodu kendisi yazıyor ve kodun tamamının telifi tek elde kalıyor — [SQLite](https://www.sqlite.org/copyright.html)'ın onlarca yıldır yürüttüğü model. Hata bildirimleri, özellik fikirleri, tasarım geri bildirimi ve tartışma her zamanki kadar isteniyor; tek satırlık bir yazım hatası veya kırık bağlantı düzeltmesi hâlâ tartışmaya değer bir telif taşımıyor ve hâlâ hoş karşılanıyor.
 
 **CLA taslağı korunuyor, yürürlüğe konmuyor.** [docs/cla.md](../cla.md) "yürürlükte değil" uyarısı yerinde kalmak üzere depoda duruyor ve CLA workflow'u ([`.github/workflows/cla.yml`](../../../.github/workflows/cla.yml)) silinmek yerine devre dışı bırakılıyor — tetikleyiciler `workflow_dispatch`'e indirildi ve job `if: ${{ false }}` ile korumaya alındı. İş yapılmış ve hazır bekliyor; hukuki inceleme bir gün gerçekleşirse etkinleştirmek küçük bir değişiklik, yeniden yazım değil.
 

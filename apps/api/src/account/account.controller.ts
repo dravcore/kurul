@@ -8,7 +8,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import type { AccountDeletionPreviewDto } from '@kurultay/shared-types';
+import type { AccountDeletionPreviewDto } from '@kurul/shared-types';
 import type { Response } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { SessionAuthGuard } from '../common/guards/session-auth.guard';

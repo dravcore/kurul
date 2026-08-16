@@ -81,7 +81,7 @@ module.exports = {
   // Floor set a few points below the measured baseline, so CI fails on real regressions without
   // being so tight that routine refactors trip it.
   //
-  // Baseline history, all `pnpm --filter @kurultay/api test:cov`, stmts/branch/funcs/lines:
+  // Baseline history, all `pnpm --filter @kurul/api test:cov`, stmts/branch/funcs/lines:
   //
   //   2026-08-09  57.19 / 48.29 / 59.68 / 58.12
   //   2026-08-14  77.86 / 69.31 / 79.64 / 79.24  after closing the workspace/activity/label/

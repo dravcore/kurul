@@ -1,6 +1,6 @@
 # API Konvansiyonları
 
-Kurultay API'si için REST konvansiyonları: URL'ler, verb'ler, payload'lar, hatalar,
+Kurul API'si için REST konvansiyonları: URL'ler, verb'ler, payload'lar, hatalar,
 pagination ve DTO'lar.
 
 > 🌐 [English (canonical)](../api-conventions.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
@@ -24,7 +24,7 @@ pagination ve DTO'lar.
 ## Kapsam
 
 Bu kurallar `apps/api`'deki her HTTP endpoint'i için geçerlidir. Socket.io event'leri,
-`@kurultay/shared-types`'ta tanımlanan ve [architecture.md](architecture.md)'de tarif
+`@kurul/shared-types`'ta tanımlanan ve [architecture.md](architecture.md)'de tarif
 edilen kendi kontratını takip eder.
 
 Geliştirmede base URL: `http://localhost:4000`.
@@ -506,7 +506,7 @@ olduğu gibi bırakır.
 `imported`, gerçekten yazılan satırları sayar. `skipped` ise geri kalan her şeyi `(scope, reason)`
 çiftine göre gruplar; `count` her zaman gerçek sayıdır, `samples` ise 20 isimle sınırlıdır — böylece
 cevap export'un boyutuyla değil, sorun **türlerinin** sayısıyla büyür. Sözlükler kapalıdır —
-`@kurultay/shared-types` içindeki `TrelloImportScope` ve `TrelloImportSkipReason` — çünkü web her
+`@kurul/shared-types` içindeki `TrelloImportScope` ve `TrelloImportSkipReason` — çünkü web her
 sebep için çevrilmiş tek bir cümle basıyor ve serbest metin bir sebep, Türkçe bir arayüze İngilizce
 taşırdı (ADR 0018).
 
@@ -521,7 +521,7 @@ kullanıcının göreceği bir şeyi değiştirdi, ve import sonrası sorulan so
 - **İdempotans yok.** Aynı export'u iki kez göndermek **iki board** yaratır. Tekilleştirme
   anahtarı, yerinde güncelleme, "zaten aktarılmıştı" cevabı yok. Var olan bir board'u güncellemek
   import değil senkronizasyondur ve bu API'de olmayan bir çakışma politikası ister.
-- **Üye eşlemesi yok.** Bir Trello hesabı bir Kurultay hesabı değildir; atamalar düşer ve sayılır.
+- **Üye eşlemesi yok.** Bir Trello hesabı bir Kurul hesabı değildir; atamalar düşer ve sayılır.
   Yazılan her satır — task'lar da attachment'lar da — çağıranın üzerine yazılır.
 - **Kolon kategorisi yok.** İçe aktarılan her kolon `UNSTARTED`; kategori ne list'in adından ne de
   konumundan çıkarılır ([ADR 0019](decisions/0019-column-category.md) ikisini de reddediyor).
@@ -794,7 +794,7 @@ GET /workspaces/w_1/some-bounded-collection?page=1&perPage=25
 ```
 
 Bugün hiçbir endpoint bu şekli kullanmıyor — sayfalanan her liste
-`@kurultay/shared-types` içindeki `CursorPage<T>`. Gerçekten sayfa numarasına ihtiyaç duyan
+`@kurul/shared-types` içindeki `CursorPage<T>`. Gerçekten sayfa numarasına ihtiyaç duyan
 bir koleksiyon, ayrı bir tip yazmaya değene kadar yukarıdaki satır içi şekli kullanabilir;
 ikinci bir varsayılan paylaşılan sayfalama tipi eklemeyin.
 
@@ -843,7 +843,7 @@ tavanına ayarlar; dolayısıyla sıradan bir workspace tek istekte `hasMore: fa
 - `UpdateXDto`, alanları yeniden yazmak yerine `PartialType` üzerinden `CreateXDto`'dan
   türetilir.
 - Request DTO'ları `class-validator` decorator'ları taşır; response DTO'ları
-  `@kurultay/shared-types`'ta yansıtılan düz şekillerdir.
+  `@kurul/shared-types`'ta yansıtılan düz şekillerdir.
 
 Tam DTO/validation kuralları: [coding-standards.md](coding-standards.md#dtolar-ve-validation).
 
@@ -909,7 +909,7 @@ Spec'te bilinçli olarak **bulunmayan** iki şey var ve ikisi de Nest route'u ol
 
 - **`/auth/*`.** Better Auth, Nest router'ının altında ham Express üzerine mount ediliyor
   ([ADR 0004](decisions/0004-auth-better-auth.md)), dolayısıyla taranacak bir controller yok.
-- **Socket.io kontratı.** HTTP değil. `@kurultay/shared-types` içinde ve
+- **Socket.io kontratı.** HTTP değil. `@kurul/shared-types` içinde ve
   [architecture.md](architecture.md)'de yaşıyor.
 
 ## Versiyonlama
@@ -924,7 +924,7 @@ bump edilmesi gerekirdi. Bkz.
 - Breaking API değişiklikleri herhangi bir `0.y.0` release'inde gelebilir.
 - Her biri, eski ve yeni şekil ile bir migration notuyla birlikte `CHANGELOG.md`'de
   `### Changed` / `### Removed` altında belgelenir.
-- `@kurultay/shared-types` monorepo ile birlikte versiyonlanır, dolayısıyla paket
+- `@kurul/shared-types` monorepo ile birlikte versiyonlanır, dolayısıyla paket
   versiyonunu pinleyen bir client kontratı da pinler.
 
 1.0'da API SemVer'ın arkasında dondurulur. Bundan sonra bir versiyonlama şeması gerekirse,

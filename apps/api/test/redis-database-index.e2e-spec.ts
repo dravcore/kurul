@@ -123,7 +123,7 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
   });
 
   it('sanity-checks that the two observers really are on different databases', async () => {
-    const key = `kurultay:190:observer-check:${Date.now()}`;
+    const key = `kurul:190:observer-check:${Date.now()}`;
     await onTestDb.set(key, 'x', 'EX', 30);
     expect(await onTestDb.get(key)).toBe('x');
     expect(await onDbZero.get(key)).toBeNull();
@@ -247,7 +247,7 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
   it('does not isolate pub/sub channels, only keyspaces', async () => {
     const subscriber = new Redis({ ...parseRedisUrl(urlWithDb(TEST_DB)) });
     const publisher = new Redis({ ...parseRedisUrl(urlWithDb(0)) });
-    const channel = `kurultay:190:channel:${Date.now()}`;
+    const channel = `kurul:190:channel:${Date.now()}`;
 
     try {
       const delivered = new Promise<string>((resolve) => {

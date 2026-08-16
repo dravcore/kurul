@@ -5,7 +5,7 @@ import {
   ColumnCategory,
   LabelColorSlot,
   MemberRole,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';

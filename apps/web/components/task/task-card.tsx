@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
 import { formatEstimate } from '@/lib/duration';
 import { cn } from '@/lib/utils';
 import { AttachmentBadge } from './attachment-badge';

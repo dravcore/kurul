@@ -1,6 +1,6 @@
 # Architecture
 
-The shape of the Kurultay system: how the code is stored, how it runs, and how the data is modelled.
+The shape of the Kurul system: how the code is stored, how it runs, and how the data is modelled.
 
 > 🌐 English (canonical) | [Türkçe](tr/architecture.md)
 
@@ -22,11 +22,11 @@ The shape of the Kurultay system: how the code is stored, how it runs, and how t
 
 ## 1. Decision summary
 
-Kurultay is a **monorepo** containing a **modular monolith**.
+Kurul is a **monorepo** containing a **modular monolith**.
 
 These are two independent axes, and keeping them apart matters:
 
-| Axis                       | Question it answers       | Kurultay's answer                    |
+| Axis                       | Question it answers       | Kurul's answer                       |
 | -------------------------- | ------------------------- | ------------------------------------ |
 | Monorepo vs. polyrepo      | How is the code _stored_? | Monorepo (single pnpm workspace)     |
 | Monolith vs. microservices | How does the code _run_?  | Modular monolith (single deployable) |
@@ -52,7 +52,7 @@ These are two independent axes, and keeping them apart matters:
 | Linear  | One codebase, deployed as several workloads with different roles: WebSocket servers, public/private GraphQL API, background job runners — each scaled independently |
 | Huly    | Monorepo with many services, at the cost of building their own Rush-based build system                                                                              |
 
-Linear's model is the one Kurultay follows: **one codebase, several process roles when needed.** Running the WebSocket server as its own container means splitting the deployment, not the code.
+Linear's model is the one Kurul follows: **one codebase, several process roles when needed.** Running the WebSocket server as its own container means splitting the deployment, not the code.
 
 Full rationale: [`decisions/0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md).
 
@@ -61,7 +61,7 @@ Full rationale: [`decisions/0001-monorepo-modular-monolith.md`](decisions/0001-m
 ## 2. Monorepo layout
 
 ```
-kurultay/
+kurul/
 ├── apps/
 │   ├── api/               # NestJS backend (modular monolith)
 │   └── web/               # Next.js App Router frontend
@@ -180,7 +180,7 @@ apps/web/
     ├── api.ts             # typed REST client
     ├── socket.ts          # Socket.io client (board realtime)
     ├── board-permissions.ts
-    └── auth.ts            # Better Auth client (`@kurultay/auth-access`)
+    └── auth.ts            # Better Auth client (`@kurul/auth-access`)
 ```
 
 Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. Next.js middleware checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run; the client shell still bootstraps workspaces once the session is present. Board interaction uses `@dnd-kit` with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events.
@@ -209,7 +209,7 @@ The single source of truth for anything that crosses the wire. Backend and front
 | Pagination      | `CursorPage<T>` (default list shape; keyed on `id`)                                |
 | Socket contract | Event name constants and their payload types                                       |
 
-Better Auth organization **roles / access-control** live in `@kurultay/auth-access` (not in this package), so api and web share one AC definition without pulling Better Auth into the types package.
+Better Auth organization **roles / access-control** live in `@kurul/auth-access` (not in this package), so api and web share one AC definition without pulling Better Auth into the types package.
 
 Enums and DTOs are **hand-maintained** to match the Prisma schema today; a mechanical Prisma→shared-types codegen path remains an aspiration (see ADR 0002). The package stays free of a runtime Prisma dependency. The Prisma 7 client still emits to `apps/api/src/generated/prisma` for Nest and the Better Auth adapter.
 
@@ -236,7 +236,7 @@ Enums and DTOs are **hand-maintained** to match the Prisma schema today; a mecha
 | `Notification`    | `id`, `workspaceId`, `userId`, `type`, `taskId` (nullable), `activityId` (nullable), `payload` (Json), `readAt` (nullable), `createdAt`              | In-app alerts (assignment, mention, due-soon). Fan-out from activity writes; due-soon via BullMQ on `REDIS_URL`. See [roadmap Phase 8](archive/roadmap-mvp-phases.md#phase-8--activity-log-and-notifications)                                                                                                                                                                                                                                                                                                                                                                                 |
 
 Invitations persist as `WorkspaceInvitation`, mapped from Better Auth's organization
-plugin tables (Kurultay names, plugin `schema` config). Product language and REST
+plugin tables (Kurul names, plugin `schema` config). Product language and REST
 paths use **Workspace** — see [ADR 0004](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
 
 Better Auth also manages the auth infrastructure tables `Session`, `Account`, and `Verification`, which are plugin-managed and deliberately omitted from the domain model table above.
@@ -274,7 +274,7 @@ Four properties are deliberate:
   precisely because an invited address belongs to someone who has agreed to nothing yet, so
   `invitation.*` payloads carry the **invitation id and role only** — an admin joins
   `WorkspaceInvitation` for the address. Forensic value is kept; the audience is not enlarged.
-- **`AUDIT_ACTIVITY_TYPES`** (`@kurultay/shared-types`) is the exported list of these types, so
+- **`AUDIT_ACTIVITY_TYPES`** (`@kurul/shared-types`) is the exported list of these types, so
   "who removed, granted or destroyed something here?" is one statement —
   `WHERE "workspaceId" = $1 AND type = ANY($2) ORDER BY id DESC`, served by the existing
   `(workspaceId, type, createdAt)` index.

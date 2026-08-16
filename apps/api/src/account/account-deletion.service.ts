@@ -4,12 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, MemberRole } from '@kurultay/shared-types';
+import { ActivityType, MemberRole } from '@kurul/shared-types';
 import type {
   AccountDeletionPreviewDto,
   DepartingMembershipDto,
   SoleOwnedWorkspaceDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import type { Prisma } from '../generated/prisma';
 import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
 import { redactMentionsOf } from '../common/mentions/redact-mentions';

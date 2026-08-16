@@ -14,7 +14,7 @@ an attacker who registers first — using the invited address, before its real o
 up — holds the invitation and joins the workspace in their place. Better Auth 1.6 hardened the
 plugin's _default_ rather than removing the check outright: `accept-invitation` and
 `get-invitation` now demand a verified email whenever the invitation id was not produced by
-the plugin's own opaque id generator. Kurultay's `advanced.database.generateId` uses
+the plugin's own opaque id generator. Kurul's `advanced.database.generateId` uses
 `uuidv7()` for every table, invitations included, so it does not count as "built-in" and the
 hardened default would apply to us automatically — except `apps/api/src/auth/auth.ts` sets
 `requireEmailVerificationOnInvitation: false` explicitly, which wins over the default and
@@ -46,7 +46,7 @@ now requires a verified email address.
   path avoids an unrelated, higher-friction change (forcing verification on every
   registration) that the threat model does not call for.
 - SMTP + environment variables, not a provider SDK (Resend, SendGrid, Postmark, …), because
-  Kurultay is AGPL and self-hostable: a provider API key is one more account a self-hoster
+  Kurul is AGPL and self-hostable: a provider API key is one more account a self-hoster
   would have to create and pay for just to run the software. Any mail server they already
   operate speaks SMTP.
 - A no-op fallback when `SMTP_HOST` is unset preserves the existing boot behavior for anyone

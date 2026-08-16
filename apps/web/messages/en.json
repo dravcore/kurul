@@ -6,7 +6,7 @@
   "auth": {
     "login": {
       "loading": "Loading sign-in…",
-      "title": "Sign in to Kurultay",
+      "title": "Sign in to Kurul",
       "subtitle": "Use your email and password to continue.",
       "email": "Email",
       "password": "Password",
@@ -62,7 +62,7 @@
       "signInCta": "Sign in",
       "failedTitle": "This link didn't work",
       "pendingTitle": "Confirm your email",
-      "pendingBody": "A confirmed address is what lets you accept workspace invitations. Everything else in Kurultay works without it.",
+      "pendingBody": "A confirmed address is what lets you accept workspace invitations. Everything else in Kurul works without it.",
       "noAccount": "Need an account?",
       "registerLink": "Create one",
       "back": "Back to your workspace"
@@ -85,7 +85,7 @@
   },
   "app": {
     "meta": {
-      "title": "Kurultay",
+      "title": "Kurul",
       "description": "Open-source Kanban-focused project management"
     },
     "errors": {
@@ -100,7 +100,7 @@
       "notFoundBody": "The link may be out of date, or what it pointed at was deleted."
     },
     "shell": {
-      "title": "Kurultay",
+      "title": "Kurul",
       "createWorkspace": "New workspace",
       "switchWorkspace": "Switch workspace",
       "confirmEmail": "Confirm your email",
@@ -123,7 +123,7 @@
       "title": "Settings",
       "language": {
         "title": "Language",
-        "description": "Choose the language Kurultay speaks to you in. It applies everywhere you sign in, and to the email we send you.",
+        "description": "Choose the language Kurul speaks to you in. It applies everywhere you sign in, and to the email we send you.",
         "label": "Interface language",
         "followBrowser": "Match my browser",
         "help": "New boards start with columns named in this language. Columns you already have keep their names.",
@@ -272,7 +272,7 @@
         "windowSuffix": "in the last {days} days",
         "configured": "configured",
         "notConfigured": "not configured",
-        "localOnly": "These numbers are computed on this server and shown only to the accounts you listed as instance administrators. Kurultay sends nothing outside this server unless you switch telemetry on yourself."
+        "localOnly": "These numbers are computed on this server and shown only to the accounts you listed as instance administrators. Kurul sends nothing outside this server unless you switch telemetry on yourself."
       }
     },
     "workspace": {
@@ -378,12 +378,12 @@
             "comment": "{count, plural, one {# comment} other {# comments}}"
           },
           "reason": {
-            "outOfScope": "{count, plural, one {{items} was not imported: Kurultay has no equivalent for it.} other {{items} were not imported: Kurultay has no equivalent for them.}}",
-            "archived": "{count, plural, one {{items} was not imported: it was archived in Trello, and Kurultay has no archive.} other {{items} were not imported: they were archived in Trello, and Kurultay has no archive.}}",
-            "unmappable": "{count, plural, one {{items} was not imported: a Trello account is not a Kurultay account, so the assignment was dropped.} other {{items} were not imported: a Trello account is not a Kurultay account, so the assignments were dropped.}}",
+            "outOfScope": "{count, plural, one {{items} was not imported: Kurul has no equivalent for it.} other {{items} were not imported: Kurul has no equivalent for them.}}",
+            "archived": "{count, plural, one {{items} was not imported: it was archived in Trello, and Kurul has no archive.} other {{items} were not imported: they were archived in Trello, and Kurul has no archive.}}",
+            "unmappable": "{count, plural, one {{items} was not imported: a Trello account is not a Kurul account, so the assignment was dropped.} other {{items} were not imported: a Trello account is not a Kurul account, so the assignments were dropped.}}",
             "unsupportedScheme": "{count, plural, one {{items} was not imported: its address was neither http nor https.} other {{items} were not imported: their addresses were neither http nor https.}}",
             "malformed": "{count, plural, one {{items} was not imported: the export did not carry the fields the importer needs.} other {{items} were not imported: the export did not carry the fields the importer needs.}}",
-            "defaulted": "{count, plural, one {{items} came across changed: Kurultay had no matching value, so the default was used.} other {{items} came across changed: Kurultay had no matching value, so the default was used.}}"
+            "defaulted": "{count, plural, one {{items} came across changed: Kurul had no matching value, so the default was used.} other {{items} came across changed: Kurul had no matching value, so the default was used.}}"
           }
         }
       },

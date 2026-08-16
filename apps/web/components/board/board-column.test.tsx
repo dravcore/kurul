@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { DndContext } from '@dnd-kit/core';
 import { NextIntlClientProvider } from 'next-intl';
-import { ColumnCategory, Priority, type ColumnDto, type TaskDto } from '@kurultay/shared-types';
+import { ColumnCategory, Priority, type ColumnDto, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import {
   BoardColumn,

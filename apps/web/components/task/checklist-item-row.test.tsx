@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { ChecklistItemDto } from '@kurultay/shared-types';
+import type { ChecklistItemDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { ChecklistItemRow } from './checklist-item-row';
 

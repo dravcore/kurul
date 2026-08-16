@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, type FormEvent } from 'react';
-import type { CreateWorkspaceRequest, WorkspaceDto } from '@kurultay/shared-types';
+import type { CreateWorkspaceRequest, WorkspaceDto } from '@kurul/shared-types';
 import { AuthFormField } from '@/components/auth/auth-form-field';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';

@@ -1,7 +1,7 @@
 'use client';
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { DashboardCountByAssignee } from '@kurultay/shared-types';
+import type { DashboardCountByAssignee } from '@kurul/shared-types';
 import { useTranslations } from 'next-intl';
 import { ChartTableToggle } from './chart-table-toggle';
 

@@ -5,7 +5,7 @@ import {
   SocketClientEvents,
   SocketEvents,
   type NotificationUnreadChangedPayload,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { connectSocket, getSocket } from '@/lib/socket';
 
 export type NotificationSocketHandlers = {

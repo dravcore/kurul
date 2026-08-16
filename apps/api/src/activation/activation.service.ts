@@ -6,12 +6,12 @@ import {
   ColumnCategory,
   MemberRole,
   UsagePingKind,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import type {
   ActivationFunnelDto,
   ActivationNorthStarDto,
   ActivationStepDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { Prisma } from '../generated/prisma';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';

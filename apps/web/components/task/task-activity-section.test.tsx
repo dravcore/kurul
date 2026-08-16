@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { ActivityDto } from '@kurultay/shared-types';
+import type { ActivityDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { TaskActivitySection } from './task-activity-section';
 

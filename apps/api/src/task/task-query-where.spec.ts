@@ -1,4 +1,4 @@
-import { Priority } from '@kurultay/shared-types';
+import { Priority } from '@kurul/shared-types';
 import { DEFAULT_PAGE_LIMIT } from '../common/pagination/page-limit';
 import type { TaskQueryDto } from './dto/task-query.dto';
 import { buildListWhere } from './task-query-where';

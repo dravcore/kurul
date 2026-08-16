@@ -1,6 +1,6 @@
 # Geliştirme
 
-Kurultay geliştirme ortamının nasıl kurulacağı ve günden güne nasıl çalışılacağı.
+Kurul geliştirme ortamının nasıl kurulacağı ve günden güne nasıl çalışılacağı.
 
 > 🌐 [English (canonical)](../development.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
@@ -50,8 +50,8 @@ Yerel bir PostgreSQL veya Redis kurulumu gerekmiyor — ikisi de Docker içinde 
 ## Klonlama ve kurulum
 
 ```bash
-git clone https://github.com/dravcore/kurultay.git
-cd kurultay
+git clone https://github.com/dravcore/kurul.git
+cd kurul
 pnpm install          # her workspace paketini kurar
 pnpm db:generate       # apps/api/prisma/schema.prisma'dan Prisma client'ı üret
 ```
@@ -69,14 +69,14 @@ ve o dizinler de aynı sebeple git-ignore'ludur; dolayısıyla temiz bir klonda,
 tipi import eden herhangi bir şey koşmadan önce bunların build edilmesi gerekir:
 
 ```bash
-pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access build
+pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build
 ```
 
 Bu adımı atlamak yardımcı bir hata üretmez. `pnpm test`, paylaşılan bir tipi import eden her
-dosyada `Failed to resolve entry for package "@kurultay/shared-types"` ile düşer; `pnpm dev`,
-`apps/api` içinde `TS2307: Cannot find module '@kurultay/shared-types'` ile düşer; `pnpm
+dosyada `Failed to resolve entry for package "@kurul/shared-types"` ile düşer; `pnpm dev`,
+`apps/api` içinde `TS2307: Cannot find module '@kurul/shared-types'` ile düşer; `pnpm
 db:seed` ise veritabanına hiç ulaşamadan `Cannot find module
-'.../@kurultay/auth-access/dist/cjs/index.js'` ile ölür — hepsi eksik bir build'den çok bozuk
+'.../@kurul/auth-access/dist/cjs/index.js'` ile ölür — hepsi eksik bir build'den çok bozuk
 bir checkout gibi okunur. `pnpm build` ve `pnpm typecheck` bunu yan etki olarak zaten yapar;
 `pnpm dev`, `pnpm db:seed`, `pnpm test` ve `pnpm lint` yapmaz. CI bunları hem lint hem test
 job'ından önce açıkça build eder.
@@ -89,47 +89,47 @@ cp .env.example .env
 
 Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit edilmemelidir.
 
-| Değişken                              | Örnek                                                               | Amaç                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma bağlantı string'i — şifre kısmı aşağıdaki `POSTGRES_PASSWORD` ile eşleşmelidir                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `REDIS_URL`                           | `redis://localhost:6379`                                            | Socket.io Redis adapter'ı, caching, BullMQ zamanlanmış işler (`due-soon` ve `cleanup` kuyrukları). Veritabanı indeksi dikkate alınır — bkz. [Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri)                                                                                                                                                                                                                                                                                   |
-| `BETTER_AUTH_SECRET`                  | _(üret)_                                                            | Session imzalama secret'ı — zorunlu, varsayılan yok                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `BETTER_AUTH_URL`                     | `http://localhost:4000`                                             | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir). Yalnızca geliştirme döngüsü — `docker-compose.yml` bunu `SITE_URL`'den türetir                                                                                                                                                                                                                                                                                                                                                           |
-| `API_PORT`                            | `4000`                                                              | NestJS dinleme portu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `WEB_URL`                             | `http://localhost:3000`                                             | API için CORS origin'i. Yalnızca geliştirme döngüsü — `docker-compose.yml` bunu `SITE_URL`'den türetir                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `SITE_URL`                            | `http://localhost`                                                  | **Yalnızca compose.** Tüm stack'in yanıt verdiği tek public origin, şema dahil; `https://…` Caddy'nin otomatik HTTPS'ini açar. Bkz. [Self-hosting](self-hosting.md)                                                                                                                                                                                                                                                                                                                                         |
-| `INTERNAL_API_URL`                    | `http://api:4000`                                                   | **Web sunucusunun** middleware ve SSR için kullandığı mutlak API adresi (aynı origin'deki `/api`'nin Node içinde çözülecek bir origin'i yoktur). `docker-compose.yml` ayarlar; gömülmez, container başlangıcında okunur                                                                                                                                                                                                                                                                                     |
-| `API_DOCS_ENABLED`                    | _(`NODE_ENV`'i izler)_                                              | `/docs`'taki etkileşimli konsolu ve `/openapi.json`'daki OpenAPI belgesini yayınlar. Ayarlanmazsa `NODE_ENV`'i izler: development'ta açık, **production'da kapalı**. `/docs` kimlik doğrulaması olmayan bir HTML sayfası ve içindeki konsol okuyucunun kendi oturumuyla gerçek istek atıyor; bu yüzden bir production instance'ı bunu devre dışı bırakmak yerine bilerek açıyor. Aynı belge `apps/api/openapi.json`'da versiyon kontrolünde — bkz. [api-conventions.md](api-conventions.md#openapi-belgesi) |
-| `RATE_LIMIT_ENABLED`                  | `true`                                                              | [Rate limiting](api-conventions.md#rate-limiting) ana anahtarı. Varsayılan açık; yalnızca entegrasyon testleri kapatır                                                                                                                                                                                                                                                                                                                                                                                      |
-| `TRUST_PROXY`                         | `false`                                                             | Gerçek client IP'si için güvenilecek reverse proxy hop'(lar)ı — `false` (varsayılan), hop sayısı (`1`) veya IP/CIDR listesi. Bkz. [rate limiting](api-conventions.md#rate-limiting) — doğrudan expose edilen bir kurulumda **asla `true` olmasın**                                                                                                                                                                                                                                                          |
-| `NEXT_PUBLIC_API_URL`                 | `http://localhost:4000`                                             | Web bundle'ına derlenen API URL'i — **build sırasında gömülür**. Yalnızca geliştirme döngüsü; Docker imajı bunun yerine aynı origin'deki `/api` yolunu gömer — tek imajın her domain'de çalışmasının nedeni budur                                                                                                                                                                                                                                                                                           |
-| `REQUEST_BODY_MAX_BYTES`              | `1048576`                                                           | API'nin parse ettiği en büyük JSON veya form-encoded gövde, byte cinsinden (1 MiB). Aşılırsa cevap `413`'tür ve hata takibine **bildirilmez**. Bir multipart yüklemeyi hiç görmez — bkz. [api-conventions.md](api-conventions.md#request-body-boyutu)                                                                                                                                                                                                                                                       |
-| `STORAGE_PATH`                        | _(geliştirme döngüsünde boş)_                                       | Yüklenen ek dosyalarını tutan dizin. **Boş olması ek'lerin kapalı olması demektir**: `GET /config` `attachmentsEnabled: false` döner ve UI yükleme kontrolünü gizler. Bağlantılar her hâlükârda çalışır. `docker-compose.yml` bunu `attachment_data` volume'ünün içine kendisi ayarlar                                                                                                                                                                                                                      |
-| `ATTACHMENT_MAX_BYTES`                | `26214400`                                                          | Tek bir ek **dosyasının** en büyük boyutu, byte cinsinden (25 MiB). Hem disk hem bellek tavanı — tip sniff edilebilsin diye yükleme tamponlanır. Ters proxy'nin gövde limitinin altında kalmalı; sıralama kuralı [self-hosting.md](self-hosting.md#kendi-reverse-proxynizi-kullanmak) içinde                                                                                                                                                                                                                |
-| `TRELLO_IMPORT_MAX_BYTES`             | `20971520`                                                          | Importer'ın kabul ettiği en büyük Trello export'u, byte cinsinden (20 MiB). Disk değil **heap** tavanı — parse edilmiş grafik, onu üreten byte'ların birkaç katıdır. Yukarıdaki iki limitten de ayrı, ve import `STORAGE_PATH` istemez ([ADR 0025](decisions/0025-trello-import-mapping.md))                                                                                                                                                                                                                |
-| `SMTP_HOST`                           | `localhost` (geliştirme, Mailpit üzerinden)                         | SMTP sunucu host'u. Tamamen boş bırakılırsa mail modülü göndermek yerine loglar — bkz. [SMTP ve Mailpit](#smtp-ve-mailpit)                                                                                                                                                                                                                                                                                                                                                                                  |
-| `SMTP_PORT`                           | `1025` (geliştirme, Mailpit üzerinden) / `587` (tipik production)   | SMTP sunucu portu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `SMTP_USER`                           | _(Mailpit için boş)_                                                | SMTP auth kullanıcı adı, sunucunuz gerektiriyorsa                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `SMTP_PASSWORD`                       | _(Mailpit için boş)_                                                | SMTP auth şifresi, sunucunuz gerektiriyorsa                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `SMTP_SECURE`                         | `false`                                                             | Örtük TLS için (port 465) `true`, STARTTLS/plaintext için (587/25, ve Mailpit) `false`                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `MAIL_FROM`                           | `Kurultay <noreply@example.com>`                                    | Giden mail'lerdeki `From:` başlığı                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `CLEANUP_ENABLED`                     | `true`                                                              | Gecelik [veri saklama süpürmesi](#veri-saklama) ana anahtarı. Kapalıysa instance kendi saklama politikasını uygulamayı bırakır                                                                                                                                                                                                                                                                                                                                                                              |
-| `NOTIFICATION_RETENTION_DAYS`         | `90`                                                                | Bir bildirimin **okunduktan sonra** saklandığı gün sayısı. Okunmamış bildirimler hangi yaşta olursa olsun silinmez. `0` = sonsuza dek                                                                                                                                                                                                                                                                                                                                                                       |
-| `ACTIVITY_RETENTION_DAYS`             | `365`                                                               | Bir aktivite satırının yazıldıktan sonra saklandığı gün sayısı. `0` = sonsuza dek — yasal denetim izi yükümlülüğünüz varsa bunu kullanın                                                                                                                                                                                                                                                                                                                                                                    |
-| `DATABASE_POOL_MAX`                   | `20`                                                                | Paylaşılan `pg` havuzunun Postgres'e açtığı azami eşzamanlı bağlantı sayısı — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                                                |
-| `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                             | Tüm `DATABASE_POOL_MAX` bağlantılar meşgulken bir isteğin havuzdan bağlantı için ne kadar bekleyeceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                      |
-| `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                             | Postgres'in tek bir SQL ifadesini öldürmeden önce ne kadar çalışmasına izin vereceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                                       |
-| `SENTRY_DSN`                          | _(boş)_                                                             | API hata takibi. **Boş = kapalı, ve kapalı SDK'nın hiç yüklenmemesi demektir** — bkz. [Gözlemlenebilirlik](#gözlemlenebilirlik)                                                                                                                                                                                                                                                                                                                                                                             |
-| `SENTRY_ENVIRONMENT`                  | _(boş)_ / `production`                                              | API event'lerindeki ortam etiketi; boşsa `NODE_ENV`'e düşer. Staging ve production aynı imajı çalıştırıyorsa açıkça ayarlayın                                                                                                                                                                                                                                                                                                                                                                               |
-| `SENTRY_RELEASE`                      | _(boş)_ / `v0.2.0`                                                  | API event'lerindeki sürüm etiketi; en iyisi dağıtılan tag. Boşsa hiç gönderilmez                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `NEXT_PUBLIC_SENTRY_DSN`              | _(boş)_                                                             | Web hata takibi, aynı opt-in kuralı — **build sırasında gömülür**, değiştirdikten sonra web imajını yeniden build edin                                                                                                                                                                                                                                                                                                                                                                                      |
-| `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(boş)_ / `production`                                              | `SENTRY_ENVIRONMENT`'ın web karşılığı, o da build zamanlı                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `NEXT_PUBLIC_SENTRY_RELEASE`          | _(boş)_ / `v0.2.0`                                                  | `SENTRY_RELEASE`'in web karşılığı, o da build zamanlı                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `SEED_LARGE_BOARD_TASKS`              | _(boş)_ / `1000`                                                    | Yalnızca `pnpm db:seed` okur. Demo board'un yanına bu kadar task taşıyan sentetik bir board ekler. Boş ya da `0` atlar — bkz. [Büyük board seed'lemek](#büyük-board-seedlemek)                                                                                                                                                                                                                                                                                                                              |
-| `INSTANCE_ADMIN_EMAILS`               | _(boş)_                                                             | Kurulum genelindeki [aktivasyon hunisini](#aktivasyon-hunisi-ve-telemetri) okumasına izin verilen, virgülle ayrılmış adresler. **Boş, hiç kimse demektir** — makinedeki her workspace'in sahibi olan hesap dahil                                                                                                                                                                                                                                                                                            |
-| `TELEMETRY_ENABLED`                   | `false`                                                             | Dışa telemetri. **Varsayılan kapalı; bu `false` iken hiçbir şey gönderilmez** — bkz. [Aktivasyon hunisi ve telemetri](#aktivasyon-hunisi-ve-telemetri)                                                                                                                                                                                                                                                                                                                                                      |
-| `TELEMETRY_ENDPOINT`                  | _(boş)_                                                             | Opt-in ping'in POST edileceği adres. **Varsayılanı yok**; `TELEMETRY_ENABLED=true` iken bu boşsa hata loglanır ve hiçbir şey gönderilmez                                                                                                                                                                                                                                                                                                                                                                    |
-| `TELEMETRY_TIMEOUT_MS`                | `5000`                                                              | Açılıştaki tek ping'in terk edilmeden önce sürebileceği süre. Başarısızlık tek bir uyarı satırıdır, başka hiçbir şey değil                                                                                                                                                                                                                                                                                                                                                                                  |
+| Değişken                              | Örnek                                                             | Amaç                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                        | `postgresql://kurul:<POSTGRES_PASSWORD>@localhost:5432/kurul`     | Prisma bağlantı string'i — şifre kısmı aşağıdaki `POSTGRES_PASSWORD` ile eşleşmelidir                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `REDIS_URL`                           | `redis://localhost:6379`                                          | Socket.io Redis adapter'ı, caching, BullMQ zamanlanmış işler (`due-soon` ve `cleanup` kuyrukları). Veritabanı indeksi dikkate alınır — bkz. [Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri)                                                                                                                                                                                                                                                                                   |
+| `BETTER_AUTH_SECRET`                  | _(üret)_                                                          | Session imzalama secret'ı — zorunlu, varsayılan yok                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `BETTER_AUTH_URL`                     | `http://localhost:4000`                                           | API'nin public URL'i (Better Auth `/auth/*` altında monte edilir). Yalnızca geliştirme döngüsü — `docker-compose.yml` bunu `SITE_URL`'den türetir                                                                                                                                                                                                                                                                                                                                                           |
+| `API_PORT`                            | `4000`                                                            | NestJS dinleme portu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `WEB_URL`                             | `http://localhost:3000`                                           | API için CORS origin'i. Yalnızca geliştirme döngüsü — `docker-compose.yml` bunu `SITE_URL`'den türetir                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `SITE_URL`                            | `http://localhost`                                                | **Yalnızca compose.** Tüm stack'in yanıt verdiği tek public origin, şema dahil; `https://…` Caddy'nin otomatik HTTPS'ini açar. Bkz. [Self-hosting](self-hosting.md)                                                                                                                                                                                                                                                                                                                                         |
+| `INTERNAL_API_URL`                    | `http://api:4000`                                                 | **Web sunucusunun** middleware ve SSR için kullandığı mutlak API adresi (aynı origin'deki `/api`'nin Node içinde çözülecek bir origin'i yoktur). `docker-compose.yml` ayarlar; gömülmez, container başlangıcında okunur                                                                                                                                                                                                                                                                                     |
+| `API_DOCS_ENABLED`                    | _(`NODE_ENV`'i izler)_                                            | `/docs`'taki etkileşimli konsolu ve `/openapi.json`'daki OpenAPI belgesini yayınlar. Ayarlanmazsa `NODE_ENV`'i izler: development'ta açık, **production'da kapalı**. `/docs` kimlik doğrulaması olmayan bir HTML sayfası ve içindeki konsol okuyucunun kendi oturumuyla gerçek istek atıyor; bu yüzden bir production instance'ı bunu devre dışı bırakmak yerine bilerek açıyor. Aynı belge `apps/api/openapi.json`'da versiyon kontrolünde — bkz. [api-conventions.md](api-conventions.md#openapi-belgesi) |
+| `RATE_LIMIT_ENABLED`                  | `true`                                                            | [Rate limiting](api-conventions.md#rate-limiting) ana anahtarı. Varsayılan açık; yalnızca entegrasyon testleri kapatır                                                                                                                                                                                                                                                                                                                                                                                      |
+| `TRUST_PROXY`                         | `false`                                                           | Gerçek client IP'si için güvenilecek reverse proxy hop'(lar)ı — `false` (varsayılan), hop sayısı (`1`) veya IP/CIDR listesi. Bkz. [rate limiting](api-conventions.md#rate-limiting) — doğrudan expose edilen bir kurulumda **asla `true` olmasın**                                                                                                                                                                                                                                                          |
+| `NEXT_PUBLIC_API_URL`                 | `http://localhost:4000`                                           | Web bundle'ına derlenen API URL'i — **build sırasında gömülür**. Yalnızca geliştirme döngüsü; Docker imajı bunun yerine aynı origin'deki `/api` yolunu gömer — tek imajın her domain'de çalışmasının nedeni budur                                                                                                                                                                                                                                                                                           |
+| `REQUEST_BODY_MAX_BYTES`              | `1048576`                                                         | API'nin parse ettiği en büyük JSON veya form-encoded gövde, byte cinsinden (1 MiB). Aşılırsa cevap `413`'tür ve hata takibine **bildirilmez**. Bir multipart yüklemeyi hiç görmez — bkz. [api-conventions.md](api-conventions.md#request-body-boyutu)                                                                                                                                                                                                                                                       |
+| `STORAGE_PATH`                        | _(geliştirme döngüsünde boş)_                                     | Yüklenen ek dosyalarını tutan dizin. **Boş olması ek'lerin kapalı olması demektir**: `GET /config` `attachmentsEnabled: false` döner ve UI yükleme kontrolünü gizler. Bağlantılar her hâlükârda çalışır. `docker-compose.yml` bunu `attachment_data` volume'ünün içine kendisi ayarlar                                                                                                                                                                                                                      |
+| `ATTACHMENT_MAX_BYTES`                | `26214400`                                                        | Tek bir ek **dosyasının** en büyük boyutu, byte cinsinden (25 MiB). Hem disk hem bellek tavanı — tip sniff edilebilsin diye yükleme tamponlanır. Ters proxy'nin gövde limitinin altında kalmalı; sıralama kuralı [self-hosting.md](self-hosting.md#kendi-reverse-proxynizi-kullanmak) içinde                                                                                                                                                                                                                |
+| `TRELLO_IMPORT_MAX_BYTES`             | `20971520`                                                        | Importer'ın kabul ettiği en büyük Trello export'u, byte cinsinden (20 MiB). Disk değil **heap** tavanı — parse edilmiş grafik, onu üreten byte'ların birkaç katıdır. Yukarıdaki iki limitten de ayrı, ve import `STORAGE_PATH` istemez ([ADR 0025](decisions/0025-trello-import-mapping.md))                                                                                                                                                                                                                |
+| `SMTP_HOST`                           | `localhost` (geliştirme, Mailpit üzerinden)                       | SMTP sunucu host'u. Tamamen boş bırakılırsa mail modülü göndermek yerine loglar — bkz. [SMTP ve Mailpit](#smtp-ve-mailpit)                                                                                                                                                                                                                                                                                                                                                                                  |
+| `SMTP_PORT`                           | `1025` (geliştirme, Mailpit üzerinden) / `587` (tipik production) | SMTP sunucu portu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `SMTP_USER`                           | _(Mailpit için boş)_                                              | SMTP auth kullanıcı adı, sunucunuz gerektiriyorsa                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `SMTP_PASSWORD`                       | _(Mailpit için boş)_                                              | SMTP auth şifresi, sunucunuz gerektiriyorsa                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `SMTP_SECURE`                         | `false`                                                           | Örtük TLS için (port 465) `true`, STARTTLS/plaintext için (587/25, ve Mailpit) `false`                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `MAIL_FROM`                           | `Kurul <noreply@example.com>`                                     | Giden mail'lerdeki `From:` başlığı                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `CLEANUP_ENABLED`                     | `true`                                                            | Gecelik [veri saklama süpürmesi](#veri-saklama) ana anahtarı. Kapalıysa instance kendi saklama politikasını uygulamayı bırakır                                                                                                                                                                                                                                                                                                                                                                              |
+| `NOTIFICATION_RETENTION_DAYS`         | `90`                                                              | Bir bildirimin **okunduktan sonra** saklandığı gün sayısı. Okunmamış bildirimler hangi yaşta olursa olsun silinmez. `0` = sonsuza dek                                                                                                                                                                                                                                                                                                                                                                       |
+| `ACTIVITY_RETENTION_DAYS`             | `365`                                                             | Bir aktivite satırının yazıldıktan sonra saklandığı gün sayısı. `0` = sonsuza dek — yasal denetim izi yükümlülüğünüz varsa bunu kullanın                                                                                                                                                                                                                                                                                                                                                                    |
+| `DATABASE_POOL_MAX`                   | `20`                                                              | Paylaşılan `pg` havuzunun Postgres'e açtığı azami eşzamanlı bağlantı sayısı — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                                                |
+| `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                           | Tüm `DATABASE_POOL_MAX` bağlantılar meşgulken bir isteğin havuzdan bağlantı için ne kadar bekleyeceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                      |
+| `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                           | Postgres'in tek bir SQL ifadesini öldürmeden önce ne kadar çalışmasına izin vereceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                                       |
+| `SENTRY_DSN`                          | _(boş)_                                                           | API hata takibi. **Boş = kapalı, ve kapalı SDK'nın hiç yüklenmemesi demektir** — bkz. [Gözlemlenebilirlik](#gözlemlenebilirlik)                                                                                                                                                                                                                                                                                                                                                                             |
+| `SENTRY_ENVIRONMENT`                  | _(boş)_ / `production`                                            | API event'lerindeki ortam etiketi; boşsa `NODE_ENV`'e düşer. Staging ve production aynı imajı çalıştırıyorsa açıkça ayarlayın                                                                                                                                                                                                                                                                                                                                                                               |
+| `SENTRY_RELEASE`                      | _(boş)_ / `v0.2.0`                                                | API event'lerindeki sürüm etiketi; en iyisi dağıtılan tag. Boşsa hiç gönderilmez                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `NEXT_PUBLIC_SENTRY_DSN`              | _(boş)_                                                           | Web hata takibi, aynı opt-in kuralı — **build sırasında gömülür**, değiştirdikten sonra web imajını yeniden build edin                                                                                                                                                                                                                                                                                                                                                                                      |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(boş)_ / `production`                                            | `SENTRY_ENVIRONMENT`'ın web karşılığı, o da build zamanlı                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `NEXT_PUBLIC_SENTRY_RELEASE`          | _(boş)_ / `v0.2.0`                                                | `SENTRY_RELEASE`'in web karşılığı, o da build zamanlı                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `SEED_LARGE_BOARD_TASKS`              | _(boş)_ / `1000`                                                  | Yalnızca `pnpm db:seed` okur. Demo board'un yanına bu kadar task taşıyan sentetik bir board ekler. Boş ya da `0` atlar — bkz. [Büyük board seed'lemek](#büyük-board-seedlemek)                                                                                                                                                                                                                                                                                                                              |
+| `INSTANCE_ADMIN_EMAILS`               | _(boş)_                                                           | Kurulum genelindeki [aktivasyon hunisini](#aktivasyon-hunisi-ve-telemetri) okumasına izin verilen, virgülle ayrılmış adresler. **Boş, hiç kimse demektir** — makinedeki her workspace'in sahibi olan hesap dahil                                                                                                                                                                                                                                                                                            |
+| `TELEMETRY_ENABLED`                   | `false`                                                           | Dışa telemetri. **Varsayılan kapalı; bu `false` iken hiçbir şey gönderilmez** — bkz. [Aktivasyon hunisi ve telemetri](#aktivasyon-hunisi-ve-telemetri)                                                                                                                                                                                                                                                                                                                                                      |
+| `TELEMETRY_ENDPOINT`                  | _(boş)_                                                           | Opt-in ping'in POST edileceği adres. **Varsayılanı yok**; `TELEMETRY_ENABLED=true` iken bu boşsa hata loglanır ve hiçbir şey gönderilmez                                                                                                                                                                                                                                                                                                                                                                    |
+| `TELEMETRY_TIMEOUT_MS`                | `5000`                                                            | Açılıştaki tek ping'in terk edilmeden önce sürebileceği süre. Başarısızlık tek bir uyarı satırıdır, başka hiçbir şey değil                                                                                                                                                                                                                                                                                                                                                                                  |
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` ve `SENTRY_PROJECT` yalnızca `next build` tarafından, source
 map yüklenirken ve yalnızca ayarlanmışlarsa okunur; bunlar olmadan build sessizce başarılı
@@ -158,7 +158,7 @@ noktası — bugün ayrı bir Zod/tipli env şeması yok), güvenli bir placehol
 ## Veritabanı ve cache kimlik bilgileri
 
 Ne `docker-compose.yml` ne de `docker-compose.dev.yml` artık Postgres konteynerine bilinen bir
-`kurultay`/`kurultay` şifresi gömüyor — `POSTGRES_PASSWORD` zorunlu bir `.env` değeridir ve
+`kurul`/`kurul` şifresi gömüyor — `POSTGRES_PASSWORD` zorunlu bir `.env` değeridir ve
 ayarlanmadan compose başlamayı reddeder:
 
 ```bash
@@ -168,7 +168,7 @@ error while interpolating services.migrate.environment.DATABASE_URL: required va
 
 Bu, yukarıdaki `BETTER_AUTH_SECRET` ile aynı fail-loud kalıbıdır: bir placeholder varsayılan,
 `.env.example`'ı dikkatlice okumayan her self-hosted kurulumun, Docker ağını paylaşan başka
-her şeye açık bir veritabanında, diğer her Kurultay kurulumuyla aynı şifreyle ayağa kalkması
+her şeye açık bir veritabanında, diğer her Kurul kurulumuyla aynı şifreyle ayağa kalkması
 anlamına gelirdi.
 
 **`POSTGRES_PASSWORD` ve `REDIS_PASSWORD`'ü, yukarıdaki `BETTER_AUTH_SECRET` için kullanılan
@@ -179,7 +179,7 @@ karakterlerinden biri değere düşerse URL bozulur — en keskin durum `/`'dir,
 yerde authority bölümünü doğrudan sonlandırır:
 
 ```bash
-$ node -e "new URL('postgresql://kurultay:ab/cd@postgres:5432/kurultay')"
+$ node -e "new URL('postgresql://kurul:ab/cd@postgres:5432/kurul')"
 TypeError: Invalid URL
     at new URL (node:internal/url:840:25)
   code: 'ERR_INVALID_URL'
@@ -195,9 +195,9 @@ kaçınılması gereken böyle bir karakter yok.
 
 | Değişken            | Varsayılan      | Amaç                                                                                                                   |
 | ------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `POSTGRES_USER`     | `kurultay`      | Compose'un ilk açılışta oluşturduğu ve her servisin bağlandığı Postgres rolü                                           |
+| `POSTGRES_USER`     | `kurul`         | Compose'un ilk açılışta oluşturduğu ve her servisin bağlandığı Postgres rolü                                           |
 | `POSTGRES_PASSWORD` | _yok — zorunlu_ | Postgres rol şifresi. Varsayılanı yok; ayarlanmazsa `docker compose config`/`up` sesli şekilde başarısız olur          |
-| `POSTGRES_DB`       | `kurultay`      | Compose'un ilk açılışta oluşturduğu veritabanı adı                                                                     |
+| `POSTGRES_DB`       | `kurul`         | Compose'un ilk açılışta oluşturduğu veritabanı adı                                                                     |
 | `REDIS_PASSWORD`    | _(boş)_         | `redis` servisi için opsiyonel `requirepass`. Boş bırakılırsa Redis bu değişken var olmadan önceki gibi şifresiz kalır |
 
 Bu dört değişken, `docker-compose.yml`'in kendi `migrate`/`api` servisleri için kurduğu
@@ -220,13 +220,13 @@ konteynere karşı savunma derinliği ekler.
 `redis://localhost:6379/3`, bu instance'ın anahtarlarını — auth rate-limit sayaçları ve her iki
 BullMQ kuyruğu — 3 numaralı indekse koyar; birkaç uygulamanın tek bir Redis'i birbirinin
 keyspace'ine basmadan paylaşma yolu budur.
-[#190](https://github.com/dravcore/kurultay/issues/190) öncesinde indeks ayrıştırılıp atılıyordu:
+[#190](https://github.com/dravcore/kurul/issues/190) öncesinde indeks ayrıştırılıp atılıyordu:
 böyle bir URL kabul ediliyor ama yine de 0 numaralı veritabanı kullanılıyordu; o düzeltmeden
 önce bir indeks belirlediyseniz ve 0 numaralı veritabanındaki bir şey başka bir uygulamaya
 aitmiş gibi görünüyorsa, muhtemelen öyleydi. Bilinmesi gereken iki sınır var. **Pub/sub
 veritabanına göre ayrılmaz:** Redis, yayımlanan bir mesajı, her bağlantının hangi indeksi
 seçtiğinden bağımsız olarak o kanalın tüm abonelerine iletir; dolayısıyla farklı indekslerdeki
-iki Kurultay instance'ı Socket.io fan-out kanalını yine paylaşır — indeks keyspace'leri ayırır,
+iki Kurul instance'ı Socket.io fan-out kanalını yine paylaşır — indeks keyspace'leri ayırır,
 kanalları değil. Bir de: indeks negatif olmayan düz bir tam sayı değilse
 (`redis://host:6379/staging`) ya da path ile `?db=` birbiriyle çelişiyorsa
 (`redis://host:6379/3?db=4`), sessizce 0 diye okunmak yerine bağlantı anında reddedilir — bu
@@ -239,6 +239,35 @@ veritabanının şifresini döndürmez.** Resmi Postgres image'ı `POSTGRES_PASS
 initialize edilmiş bir stack'i yeniden başlatmak, rolün şifresini tam olarak eskisi gibi
 bırakır. Çalışan bir instance'ta şifreyi döndüren `ALTER USER ... PASSWORD` komutu için
 `CHANGELOG.md`'deki `[Unreleased]` girdisine bakın.
+
+### Checkout'unuz yeniden adlandırmadan eskiyse
+
+Postgres rolü ve veritabanı artık `kurul`; v0.2.0 öncesinde `kurultay`'dı. Elinde zaten bir
+`.env` ve çalışan bir dev stack olan bir working tree eskisini korur ve bir şey bozulana kadar
+bunu size kimse söylemez — o yüzden tek seferde, bilinçli olarak yapmaya değer:
+
+```bash
+# 1. .env'i yeni kimliklere çevirin (DATABASE_URL, POSTGRES_USER, POSTGRES_DB).
+# 2. Rolü ve iki veritabanını, elinizdeki volume üzerinde yaratın:
+docker compose -f docker-compose.dev.yml exec -T postgres psql -U kurultay -d kurultay \
+  -c "CREATE ROLE kurul LOGIN SUPERUSER PASSWORD 'kurul';" \
+  -c 'CREATE DATABASE kurul OWNER kurul;' \
+  -c 'CREATE DATABASE kurul_test OWNER kurul;'
+
+# 3. İkisini de migrate edin. Test veritabanı ayrı bir veritabanıdır, kendi koşusunu ister:
+pnpm db:migrate
+DATABASE_URL=postgresql://kurul:kurul@localhost:5432/kurul_test pnpm db:migrate
+```
+
+İki hatayı hata ayıklamak yerine tanımak daha iyi. Entegrasyon suite'inden gelen
+`The table public.UsagePing does not exist`, 3. adımın yalnız dev veritabanında koşturulduğu
+anlamına gelir. `DATABASE_URL does not name a test database` ise yeniden adlandırmayla hiç
+ilgili değildir — `setup-e2e.ts`'in, adında `kurul_test` geçmeyen bir veritabanını truncate
+etmeyi reddetmesidir; yani koruma çalışıyordur. O komut için `DATABASE_URL`'i test
+veritabanına yöneltin ya da tamamen boş bırakın.
+
+Eski `kurultay` rolünü ve veritabanlarını düşürmek isteğe bağlıdır; yerelde hiçbir şeyin
+onlara bakmadığından emin olana kadar bekleyebilir.
 
 ## Veritabanı bağlantı havuzu
 
@@ -280,7 +309,7 @@ taşır.
 
 ## SMTP ve Mailpit
 
-Kurultay bugün tek bir akış için e-posta gönderiyor: `accept-invitation`'ın bir davet
+Kurul bugün tek bir akış için e-posta gönderiyor: `accept-invitation`'ın bir davet
 edilenin workspace'e katılmasına izin vermeden önce ihtiyaç duyduğu doğrulama linki (bkz.
 [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
 `SMTP_HOST`'u boş bırakmak geçerli bir seçenek — API yine ayağa kalkar ve mail modülü mesajı
@@ -312,7 +341,7 @@ SMTP_HOST=localhost
 SMTP_PORT=1025
 SMTP_SECURE=false
 # SMTP_USER / SMTP_PASSWORD boş kalır — Mailpit auth gerektirmez
-MAIL_FROM=Kurultay <noreply@example.com>
+MAIL_FROM=Kurul <noreply@example.com>
 ```
 
 | URL                   | Ne                                                                                    |
@@ -353,7 +382,7 @@ volume'unu da düşürüp temiz bir sayfadan başlamak için `-v` ekleyin).
 ### Docker'da tam stack
 
 Her şey container'da, production'a en yakın hâl. Dockerfile'ları ve compose bağlantısını
-doğrulamak için, veya Kurultay'ı geliştirmek değil sadece çalıştırmak istediğinizde kullanın.
+doğrulamak için, veya Kurul'u geliştirmek değil sadece çalıştırmak istediğinizde kullanın.
 
 ```bash
 docker compose pull && docker compose up -d
@@ -363,7 +392,7 @@ Ardından **http://localhost** adresini açın — `localhost:3000` değil. Stac
 girişi bir `proxy` (Caddy) servisidir: web uygulamasını ve API'yi tek origin'den sunar, `/api/*`
 ile `/auth/*`'ı `api`'ye, geri kalan her şeyi `web`'e yönlendirir. `api` ve `web` kendi host
 portlarını yayınlamaz. Tamamını bir domain'e taşımak için `.env`'de
-`SITE_URL=https://kurultay.example.com` ayarlayın; bu aynı zamanda otomatik HTTPS'i de açar —
+`SITE_URL=https://kurul.example.com` ayarlayın; bu aynı zamanda otomatik HTTPS'i de açar —
 SMTP ve yedekler dahil adım adım rehber: [Self-hosting](self-hosting.md).
 
 `docker-compose.yml`'de `api` ve `web`, hem `image:` hem `build:` bildirir. Her etiketli
@@ -389,7 +418,7 @@ Tek istisna `migrate`: `image:` eşleniği yok (neden olmadığı `docker-compos
 yorumda açıklanıyor), dolayısıyla her zaman kaynaktan build eder — `api`/`web`'i GHCR'dan
 çeken bir `docker compose up -d` bile bu tek servisin build maliyetini bir kez öder. Kapsam
 gerekçesinin tamamı için bkz.
-[denetim bulgusu OPS-04](https://github.com/dravcore/kurultay/issues/126).
+[denetim bulgusu OPS-04](https://github.com/dravcore/kurul/issues/126).
 
 ### İki API imajı ne kadar yer kaplıyor
 
@@ -521,7 +550,7 @@ Repository kökünden çalıştırın.
 | `lint`           | `pnpm lint`           | Tüm paketlerde ESLint                                                                                                                                                                                                                                                                                   |
 | `format`         | `pnpm format`         | Repo genelinde Prettier write                                                                                                                                                                                                                                                                           |
 | `format:check`   | `pnpm format:check`   | Prettier check (CI kapısı)                                                                                                                                                                                                                                                                              |
-| `typecheck`      | `pnpm typecheck`      | `@kurultay/shared-types` + `@kurultay/auth-access` build, ardından her workspace'te `tsc --noEmit`                                                                                                                                                                                                      |
+| `typecheck`      | `pnpm typecheck`      | `@kurul/shared-types` + `@kurul/auth-access` build, ardından her workspace'te `tsc --noEmit`                                                                                                                                                                                                            |
 | `test`           | `pnpm test`           | Tüm workspace paketlerinin test suite'lerini çalıştırır                                                                                                                                                                                                                                                 |
 | `db:generate`    | `pnpm db:generate`    | `prisma generate`'i çalıştırır: Prisma client'ı şemadan (yeniden) üretir. Migration'lara veya veritabanına dokunmaz. Klonlama sonrasında ve başkasının yaptığı şema/migration değişikliklerini pull'ladıktan sonra gereklidir                                                                           |
 | `db:migrate`     | `pnpm db:migrate`     | `prisma migrate deploy`'u çalıştırır: var olan, zaten commit edilmiş migration'ları uygular. Asla migration oluşturmaz ve client'ı asla yeniden üretmez — CI/production için güvenlidir. Bunu yalnızca yeni migration'ları pull'ladıktan sonra çalıştırdıysanız, ardından `pnpm db:generate` çalıştırın |
@@ -532,9 +561,9 @@ Repository kökünden çalıştırın.
 Tek bir workspace'i hedeflemek için pnpm'in filter flag'ini kullanın:
 
 ```bash
-pnpm --filter @kurultay/api dev
-pnpm --filter @kurultay/web build
-pnpm --filter @kurultay/api test
+pnpm --filter @kurul/api dev
+pnpm --filter @kurul/web build
+pnpm --filter @kurul/api test
 ```
 
 ## Veritabanı iş akışı
@@ -599,7 +628,7 @@ içindeki column başına render bütçesi bu board'a karşı ölçüldü.
 
 ## Veri saklama
 
-Kurultay artık saklamaya hakkı olmayan satırları siler. Bir BullMQ işi `REDIS_URL` üzerinde
+Kurul artık saklamaya hakkı olmayan satırları siler. Bir BullMQ işi `REDIS_URL` üzerinde
 **günde bir kez** koşar — due-soon taramasıyla aynı mekanizma — ve beş tabloyu, artı attachment
 dizinini süpürür:
 
@@ -674,7 +703,7 @@ gerekçe: [ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md).
 
 ### 1. Aktivasyon hunisi — burada hesaplanır, size gösterilir, hiçbir yere gönderilmez
 
-Kurultay, kurulumunuzun zaten tuttuğu satırlardan on bir adımlık bir aktivasyon hunisi türetir;
+Kurul, kurulumunuzun zaten tuttuğu satırlardan on bir adımlık bir aktivasyon hunisi türetir;
 yanında bir de Kuzey Yıldızı metriği: **Haftalık Aktif Takım Workspace'i** — iki veya daha fazla
 üyesi olan ve son yedi günde iki veya daha fazla mevcut üyesi bir şey yapmış workspace'ler.
 
@@ -748,10 +777,10 @@ Açtığınızda, API süreci başlarken tam olarak bir `POST` yapılır; gövde
 
 Alan alan, listenin tamamı budur:
 
-| Alan      | Değer                | Not                                                |
-| --------- | -------------------- | -------------------------------------------------- |
-| `event`   | `"instance_started"` | Her zaman bu düz metin. Tek bir olay vardır        |
-| `version` | örn. `"0.1.0"`       | Bu derlemenin geldiği `@kurultay/api` paket sürümü |
+| Alan      | Değer                | Not                                             |
+| --------- | -------------------- | ----------------------------------------------- |
+| `event`   | `"instance_started"` | Her zaman bu düz metin. Tek bir olay vardır     |
+| `version` | örn. `"0.1.0"`       | Bu derlemenin geldiği `@kurul/api` paket sürümü |
 
 Gönderil**mey**en ve gönderilmesi için kod yolu bulunmayanlar: herhangi bir kurulum kimliği,
 hostname'iniz, IP adresiniz, URL'iniz, veritabanınız, kullanıcı/workspace/board/task sayıları,
@@ -774,7 +803,7 @@ takas [ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md)'de ta
 
 ## Yükseltme ve yedekleme
 
-Bu, önemsediği veriyle Kurultay çalıştıran herkes için geçerlidir, atılabilir yerel
+Bu, önemsediği veriyle Kurul çalıştıran herkes için geçerlidir, atılabilir yerel
 veritabanları için değil. 1.0 öncesi, kırıcı şema değişiklikleri herhangi bir `0.y.0`
 release'inde gelebilir ([git-strategy.md](git-strategy.md#versiyonlama-politikası-semver)),
 dolayısıyla iki kural var: zamanlanmış yedeğin çalışmasına izin verin ve **her yükseltmeden
@@ -788,10 +817,10 @@ hemen önce bir dump daha alın.**
 eşleşir — ve döngüye girer:
 
 1. `pg_dump --format=custom` ile `backup_data` volume'üne
-   `/backups/kurultay-<UTC timestamp>.dump` yazar (önce `.part` olarak yazılır, başarıda
+   `/backups/kurul-<UTC timestamp>.dump` yazar (önce `.part` olarak yazılır, başarıda
    yeniden adlandırılır; yarıda kesilen bir dump asla tamamlanmış bir arşiv gibi görünmez),
 2. `/attachments` altında salt-okunur bağlanmış attachment volume'ünü `tar -czf` ile
-   `/backups/kurultay-<AYNI UTC timestamp>-files.tar.gz` olarak arşivler. Ortak damga, bir
+   `/backups/kurul-<AYNI UTC timestamp>-files.tar.gz` olarak arşivler. Ortak damga, bir
    restore'un hangi tar'ın hangi dump'a ait olduğunu bilme yoludur,
 3. **her iki seride de** en yeni `BACKUP_KEEP` arşivinden eskisini siler,
 4. `BACKUP_INTERVAL` saniye uyur, tekrarlar.
@@ -834,7 +863,7 @@ bir kurulumda da vardır. Bkz. [ADR 0022](decisions/0022-attachment-storage.md).
 Kontrol edin — test edilmemiş bir yedek yedek değildir, okunmamış bir log da öyle:
 
 ```bash
-docker compose logs backup | tail            # döngü başına iki "wrote /backups/kurultay-…" satırı
+docker compose logs backup | tail            # döngü başına iki "wrote /backups/kurul-…" satırı
 docker compose exec backup ls -lh /backups   # en yeni çift ve kaç tanesi saklanıyor
 ```
 
@@ -864,9 +893,9 @@ Volume dışında bir kopya tutmak için (yükseltme öncesi önerilir, çünkü
 ```bash
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 docker compose exec -T postgres \
-  pg_dump -U kurultay --format=custom kurultay > "kurultay-$stamp.dump"
+  pg_dump -U kurul --format=custom kurul > "kurul-$stamp.dump"
 docker compose run --rm -T --entrypoint tar backup -czf - -C /attachments . \
-  > "kurultay-$stamp-files.tar.gz"
+  > "kurul-$stamp-files.tar.gz"
 ```
 
 İkisi için tek bir `stamp`, sidecar'ın tek damga paylaşmasıyla aynı sebeple: çift yalnız
@@ -905,31 +934,31 @@ docker compose run --rm --entrypoint ls backup -1 /backups
 
 # 3. Veritabanını boş olarak yeniden oluşturun. Yıkıcı adım budur — arşiv alındıktan sonra
 #    yazılan her şey buradan itibaren gitmiştir.
-docker compose exec -T postgres psql -U kurultay -d postgres \
-  -c 'DROP DATABASE kurultay WITH (FORCE);' \
-  -c 'CREATE DATABASE kurultay OWNER kurultay;'
+docker compose exec -T postgres psql -U kurul -d postgres \
+  -c 'DROP DATABASE kurul WITH (FORCE);' \
+  -c 'CREATE DATABASE kurul OWNER kurul;'
 
 # 4. Restore edin. --exit-on-error, kısmi bir restore'u iyi görünen yarı dolu bir veritabanı
 #    yerine gürültülü bir hataya çevirir.
 docker compose run --rm --entrypoint pg_restore backup \
-  --host=postgres --username=kurultay --dbname=kurultay \
-  --no-owner --exit-on-error /backups/kurultay-<timestamp>.dump
+  --host=postgres --username=kurul --dbname=kurul \
+  --no-owner --exit-on-error /backups/kurul-<timestamp>.dump
 
 # 4b. AYNI damgaya ait attachment dosyalarını geri yükleyin. `backup` servisi volume'ü
 #     salt-okunur mount ettiği için bu adımın kendi yazılabilir mount'u gerekir — ve
 #     `--user 1000:1000`, çünkü dosyalar api'nin `node` kullanıcısına aittir ve bu stack
 #     `cap_drop: [ALL]` ile koşar, bu da root'tan CAP_DAC_OVERRIDE'ı alır. Bayrak olmadan
 #     `rm`, adı root olan bir container'da "Permission denied" ile düşer. Tahmin değil, ölçüm.
-docker compose run --rm --user 1000:1000 -v kurultay_attachment_data:/restore \
+docker compose run --rm --user 1000:1000 -v kurul_attachment_data:/restore \
   --entrypoint sh backup -c \
-  'rm -rf /restore/* && tar -xzf /backups/kurultay-<timestamp>-files.tar.gz -C /restore'
+  'rm -rf /restore/* && tar -xzf /backups/kurul-<timestamp>-files.tar.gz -C /restore'
 
 # 5. Migration durumunu kontrol edin. Arşiv _prisma_migrations'ı taşıdığı için kayıtlı durum
 #    restore edilen şemayla eşleşir ve bunun yapacak bir şey bulmaması beklenir.
 docker compose run --rm migrate
 
 # 6. Trafiği geri almadan önce doğrulayın: şema, satır sayıları ve dosyaların geri geldiği.
-docker compose exec -T postgres psql -U kurultay -d kurultay \
+docker compose exec -T postgres psql -U kurul -d kurul \
   -c '\dt' \
   -c 'SELECT count(*) FROM "User";' \
   -c 'SELECT count(*) FROM "Workspace";' \
@@ -950,7 +979,7 @@ docker compose run --rm --entrypoint sh backup -c 'find /attachments -type f | w
 #     `find -printf` değil, `find -exec stat -c`: backup container'ı postgres:18-alpine'dir ve
 #     BusyBox `find`'ın `-printf`'i yoktur. Tek komut, seçenek değil — bir operatör restore'un
 #     ortasında taşınabilirlik kararı vermek zorunda kalmamalı.
-docker compose exec -T postgres psql -U kurultay -d kurultay -At \
+docker compose exec -T postgres psql -U kurul -d kurul -At \
   -c 'SELECT "storageKey" || '"'"' '"'"' || "size" FROM "Attachment" WHERE kind = '"'"'FILE'"'"';' \
   | sort > /tmp/expected.txt
 docker compose run --rm --entrypoint sh backup -c \
@@ -970,8 +999,8 @@ Tatbikat iki değil **üç** şey üzerinden geçer:
    ve `diff` onları isimleriyle raporlar. Sessiz bir fark asla kabul edilmez: raporlanırsa
    yukarıdaki "`tar` snapshot değildir" sınırı ölçülmüş olur, raporlanmazsa yalnızca yazılmış.
 
-4b'deki `kurultay_attachment_data`, volume'ün Compose'un proje adıyla öneklediği tam adıdır —
-dizininizin adı `kurultay` değilse `docker volume ls`.
+4b'deki `kurul_attachment_data`, volume'ün Compose'un proje adıyla öneklediği tam adıdır —
+dizininizin adı `kurul` değilse `docker volume ls`.
 
 Checkout edilmiş kod arşivin şemasından yeniyse, 5. adım eksik migration'ları ileri doğru
 uygular; bu doğrudur. **Eskiyse**, 5. adımdan önce arşive karşılık gelen release tag'ine
@@ -981,14 +1010,14 @@ Volume'dekinin yerine host tarafındaki bir dosyadan restore (4. adımın varyan
 
 ```bash
 docker compose run --rm -T --entrypoint pg_restore backup \
-  --host=postgres --username=kurultay --dbname=kurultay --no-owner \
-  --exit-on-error < kurultay-20260813T194856Z.dump
+  --host=postgres --username=kurul --dbname=kurul --no-owner \
+  --exit-on-error < kurul-20260813T194856Z.dump
 
 # Dosya yarısı, aynı fikir (4b'nin varyantı) — yazılabilir mount ve aynı CAP_DAC_OVERRIDE
 # sebebiyle uid 1000.
-docker compose run --rm -T --user 1000:1000 -v kurultay_attachment_data:/restore \
+docker compose run --rm -T --user 1000:1000 -v kurul_attachment_data:/restore \
   --entrypoint sh backup -c 'rm -rf /restore/* && tar -xzf - -C /restore' \
-  < kurultay-20260813T194856Z-files.tar.gz
+  < kurul-20260813T194856Z-files.tar.gz
 ```
 
 **PostgreSQL major sürüm yükseltmeleri bir dump ve restore gerektirir.** Resmi `postgres`
@@ -1027,16 +1056,16 @@ her şey canlı veritabanında duruyor ve tam geri yükleme, tek bir satırı ku
 
 ```bash
 # 1. Silmeden önceki en yeni dump'tan, canlının yanına geçici bir veritabanı.
-docker compose exec -T postgres psql -U kurultay -d postgres \
-  -c 'CREATE DATABASE kurultay_recovery OWNER kurultay;'
+docker compose exec -T postgres psql -U kurul -d postgres \
+  -c 'CREATE DATABASE kurul_recovery OWNER kurul;'
 docker compose run --rm --entrypoint pg_restore backup \
-  --host=postgres --username=kurultay --dbname=kurultay_recovery \
-  --no-owner --exit-on-error /backups/kurultay-<timestamp>.dump
+  --host=postgres --username=kurul --dbname=kurul_recovery \
+  --no-owner --exit-on-error /backups/kurul-<timestamp>.dump
 
 # 2. Hesabı bulun. Silmenin yazdığı log satırı yalnızca id taşır —
 #    `docker compose logs api | jq 'select(.event == "account.deleted")'` — oradan başlayın;
 #    o id'yi yeniden bir isme çeviren şey geçici veritabanıdır.
-docker compose exec -T postgres psql -U kurultay -d kurultay_recovery \
+docker compose exec -T postgres psql -U kurul -d kurul_recovery \
   -c 'SELECT id, email, name FROM "User" WHERE id = '"'"'<userId>'"'"';'
 ```
 
@@ -1064,8 +1093,8 @@ sürecinde çalışır.
 yanında duruyor:
 
 ```bash
-docker compose exec -T postgres psql -U kurultay -d postgres \
-  -c 'DROP DATABASE kurultay_recovery WITH (FORCE);'
+docker compose exec -T postgres psql -U kurul -d postgres \
+  -c 'DROP DATABASE kurul_recovery WITH (FORCE);'
 ```
 
 ### İndeks migration'ları yazma kilidi alır
@@ -1094,7 +1123,7 @@ yazma duraklaması kaldıramayacak herhangi bir kurulumu yükseltmeden önce:**
    ifadeyi `CONCURRENTLY` ile kendiniz uygulayın:
 
    ```bash
-   docker compose exec -T postgres psql -U kurultay kurultay -c \
+   docker compose exec -T postgres psql -U kurul kurul -c \
      'CREATE INDEX CONCURRENTLY IF NOT EXISTS "Task_title_idx" ON "Task" USING GIN ("title" gin_trgm_ops);'
    ```
 
@@ -1222,7 +1251,7 @@ alacağı süreden daha uzun park hâlinde kalmayın.
 ## Gözlemlenebilirlik
 
 Üç sinyal, üç hedef. Buradaki hiçbir şey bir metrik stack'i değildir — Prometheus yok, Grafana
-yok, log toplayıcı yok. Kurultay'ın ölçeğinde cevaplanmaya değer soru "bir şey bozuldu mu ve
+yok, log toplayıcı yok. Kurul'un ölçeğinde cevaplanmaya değer soru "bir şey bozuldu mu ve
 bunu fark eden oldu mu"dur; bunun için tam olarak bu kadarı yeter:
 
 | Sinyal                      | Nereye akar                                                           | Nerede yapılandırılır                              |
@@ -1257,13 +1286,13 @@ başına ulaşabileceği bir kesinti, çünkü access log trafikle birlikte büy
 Doğrulama:
 
 ```bash
-docker inspect kurultay-api-1 --format '{{json .HostConfig.LogConfig}}'
+docker inspect kurul-api-1 --format '{{json .HostConfig.LogConfig}}'
 # {"Type":"json-file","Config":{"max-file":"3","max-size":"10m"}}
 ```
 
 ### Hata takibi (Sentry) — varsayılan kapalı
 
-Kurultay hata takibi **kapalı** gelir ve kapalı olması SDK'nın hiç yüklenmemesi demektir:
+Kurul hata takibi **kapalı** gelir ve kapalı olması SDK'nın hiç yüklenmemesi demektir:
 initialize yok, global handler yok, dışarı bağlantı yok ve web tarafında ziyaretçinin
 tarayıcısının istediği bir Sentry chunk'ı yok. Kimsenin talep etmediği bir telemetri hattını
 sessizce açan self-host yazılım bu projenin gönderdiği bir şey değildir; DSN'leri boş bırakmak
@@ -1379,7 +1408,7 @@ bir dağıtımı kapsar. Yoklamayı, container'ın kendi healthcheck'i gibi, yay
 üzerinden değil ağın içinden yapın — Docker dağıtımında API'nin yayınlanmış portu yoktur:
 
 ```cron
-*/5 * * * * cd /opt/kurultay && docker compose exec -T api wget -qO- http://127.0.0.1:4000/health/ready >/dev/null && curl -fsS <ping-url>
+*/5 * * * * cd /opt/kurul && docker compose exec -T api wget -qO- http://127.0.0.1:4000/health/ready >/dev/null && curl -fsS <ping-url>
 ```
 
 ## Günlük döngü
@@ -1398,7 +1427,7 @@ pnpm dev
 # 4. Push etmeden önce yerelde doğrula
 pnpm lint
 pnpm build
-pnpm --filter @kurultay/api test
+pnpm --filter @kurul/api test
 
 # 5. Conventional Commits formatında, İngilizce commit at
 git commit -m "feat(web): add drag-and-drop to the kanban board"

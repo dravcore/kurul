@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { Readable } from 'node:stream';
-import { AttachmentKind } from '@kurultay/shared-types';
+import { AttachmentKind } from '@kurul/shared-types';
 import { StorageService } from '../storage/storage.service';
 import { AttachmentDownloadService } from './attachment-download.service';
 import { AttachmentService } from './attachment.service';

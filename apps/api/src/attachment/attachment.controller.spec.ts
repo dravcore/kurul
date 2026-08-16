@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { BadRequestException } from '@nestjs/common';
-import { AttachmentKind } from '@kurultay/shared-types';
+import { AttachmentKind } from '@kurul/shared-types';
 import {
   ATTACHMENT_UPLOAD_RATE_LIMIT,
   DEFAULT_RATE_LIMIT,

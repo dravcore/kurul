@@ -1,4 +1,4 @@
-import { LabelColorSlot } from '@kurultay/shared-types';
+import { LabelColorSlot } from '@kurul/shared-types';
 
 /**
  * Trello's colour vocabulary, folded onto this repository's eight design-token slots.

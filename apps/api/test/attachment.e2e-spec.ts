@@ -10,8 +10,8 @@ import {
   AUDIT_ACTIVITY_TYPES,
   MemberRole,
   SocketEvents,
-} from '@kurultay/shared-types';
-import type { AttachmentDto } from '@kurultay/shared-types';
+} from '@kurul/shared-types';
+import type { AttachmentDto } from '@kurul/shared-types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RealtimeService } from '../src/realtime/realtime.service';
 import { CleanupWorker, orphanGraceMs } from '../src/retention/cleanup.worker';
@@ -103,7 +103,7 @@ const PDF = Buffer.from(
 );
 
 const HTML = Buffer.from('<!doctype html><script>alert(1)</script>', 'utf8');
-const CSV = Buffer.from('name,role\nKurultay,kanban\n', 'utf8');
+const CSV = Buffer.from('name,role\nKurul,kanban\n', 'utf8');
 
 /** Collects a binary response body superagent would otherwise decode as text. */
 function binaryParser(

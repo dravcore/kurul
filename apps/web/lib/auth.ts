@@ -1,7 +1,7 @@
 import { createAuthClient } from 'better-auth/react';
 import { organizationClient } from 'better-auth/client/plugins';
 import type { AccessControl } from 'better-auth/plugins/access';
-import { ac as sharedAc, organizationRoles as sharedRoles } from '@kurultay/auth-access';
+import { ac as sharedAc, organizationRoles as sharedRoles } from '@kurul/auth-access';
 import { getApiBaseUrl } from './api';
 import { getServerApiBaseUrl, resolveApiOrigin } from './api-url';
 

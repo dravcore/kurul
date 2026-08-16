@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { ActivityType } from '@kurultay/shared-types';
+import { ActivityType } from '@kurul/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivityService } from './activity.service';
 

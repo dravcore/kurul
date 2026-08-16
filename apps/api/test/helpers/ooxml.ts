@@ -38,7 +38,7 @@ const RELS_XML =
 const DOCUMENT_XML =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
   '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-  '<w:body><w:p><w:r><w:t>Kurultay</w:t></w:r></w:p></w:body>' +
+  '<w:body><w:p><w:r><w:t>Kurul</w:t></w:r></w:p></w:body>' +
   '</w:document>';
 
 interface ZipEntry {

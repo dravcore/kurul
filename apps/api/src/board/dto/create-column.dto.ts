@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { ColumnCategory } from '@kurultay/shared-types';
+import { ColumnCategory } from '@kurul/shared-types';
 import { IsUuidV7 } from '../../common/uuid';
 
 export class CreateColumnDto {

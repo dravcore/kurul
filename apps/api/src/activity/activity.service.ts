@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { ActivityDto, CursorPage } from '@kurultay/shared-types';
+import type { ActivityDto, CursorPage } from '@kurul/shared-types';
 import type { Prisma } from '../generated/prisma';
 import { AUTHOR_SELECT, toAuthorDto, type AuthorRow } from '../common/author';
 import { toCursorPage } from '../common/pagination/cursor-page';

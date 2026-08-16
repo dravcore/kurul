@@ -1,6 +1,6 @@
 # Test
 
-Kurultay'ın neyi, hangi araçlarla test ettiği ve CI'ın neyi zorunlu kıldığı.
+Kurul'un neyi, hangi araçlarla test ettiği ve CI'ın neyi zorunlu kıldığı.
 
 > 🌐 [English (canonical)](../testing.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
@@ -18,7 +18,7 @@ Kurultay'ın neyi, hangi araçlarla test ettiği ve CI'ın neyi zorunlu kıldı�
 
 ## Strateji
 
-Kurultay’ın MVP özellik seti tamamlandı; test stratejisi bilinçli olarak **kapsamlı değil,
+Kurul’ın MVP özellik seti tamamlandı; test stratejisi bilinçli olarak **kapsamlı değil,
 pragmatik** kalır:
 
 - **Doğru yapması zor** ve **yanlış yapması pahalı** olan mantığı test edin — sıralama,
@@ -142,32 +142,32 @@ Mailpit olmadan yedi senaryonun üçü adresini doğrulayamaz veya daveti okuyam
 gerekmez — suite'in onsuz koşmasının nedeni için [İzolasyon](#i̇zolasyon) bölümüne bakın.
 
 ```bash
-pnpm --filter @kurultay/e2e browsers   # bir kez: Chromium'u indirir
+pnpm --filter @kurul/e2e browsers   # bir kez: Chromium'u indirir
 pnpm test:browser                      # stack'i build eder, sonra yedisini de koşar
 ```
 
 `pnpm test:browser` önce `e2e/build-stack.mjs`'i çalıştırır — `shared-types`, `auth-access`,
 API ve standalone web bundle'ını build eder, ardından suite'in veritabanını migrate eder. İki
 sunucuyu Playwright kendi başlatıp durdurur. Build etmeden bir test üzerinde çalışmak için
-doğrudan `pnpm --filter @kurultay/e2e exec playwright test` koşun; yerelde zaten dinleyen bir
+doğrudan `pnpm --filter @kurul/e2e exec playwright test` koşun; yerelde zaten dinleyen bir
 stack'i yeniden kullanır.
 
 **Web build'i `pnpm build` ile birbirinin yerine geçmez.** `NEXT_PUBLIC_API_URL` build
 zamanında gömülür, yani suite'in build'i client bundle'ına 4110 portunu sabitler ve
 `apps/web/.next`'in üzerine yazar. Suite'i yerelde koştuktan sonra
-`pnpm --filter @kurultay/web start` kullanmadan önce yeniden build edin.
+`pnpm --filter @kurul/web start` kullanmadan önce yeniden build edin.
 
 ### İzolasyon
 
 Suite, halihazırda çalışan neyse onun yanına uygulamanın ikinci bir kopyasını açar ve ona
 asla dokunmaz:
 
-| Şey                | Değer                      | Neden                                                                               |
-| ------------------ | -------------------------- | ----------------------------------------------------------------------------------- |
-| Web / API portları | 3110 / 4110                | 3000/4000 `pnpm dev`'in                                                             |
-| Veritabanı         | `kurultay_test_playwright` | `kurultay_test` değil — Jest integration suite'i onu testler arasında truncate eder |
-| Redis              | yok — `REDIS_URL` boş      | Aşağıya bakın; Redis'siz koşmak desteklenen bir yapılandırmadır                     |
-| Posta              | paylaşılan Mailpit         | Hiçbir şey silinmez; her arama suite'in ürettiği bir adrese göre daraltılır         |
+| Şey                | Değer                   | Neden                                                                            |
+| ------------------ | ----------------------- | -------------------------------------------------------------------------------- |
+| Web / API portları | 3110 / 4110             | 3000/4000 `pnpm dev`'in                                                          |
+| Veritabanı         | `kurul_test_playwright` | `kurul_test` değil — Jest integration suite'i onu testler arasında truncate eder |
+| Redis              | yok — `REDIS_URL` boş   | Aşağıya bakın; Redis'siz koşmak desteklenen bir yapılandırmadır                  |
+| Posta              | paylaşılan Mailpit      | Hiçbir şey silinmez; her arama suite'in ürettiği bir adrese göre daraltılır      |
 
 Bunların hiçbiri `.env` üzerinden ayarlanabilir değil ve hiç yeni environment değişkeni
 eklemiyor: Postgres _bağlantısı_ `DATABASE_URL`'den, yalnızca veritabanı adı değiştirilerek
@@ -178,7 +178,7 @@ Gerekçe `e2e/stack-env.ts` içinde yazılı.
 **Neden Redis yok.** Bariz sınır bir logical database indeksiydi ve bir zamanlar kurgudan
 ibaretti: `parseRedisUrl` URL'in pathname'ini düşürüyordu ve `apps/api`'deki her ioredis/BullMQ
 kurulumu oradan geçtiği için `redis://…/8` database 0'a bağlanıyordu
-(issue [#190](https://github.com/dravcore/kurultay/issues/190)). Bu düzeldi — indeks artık her
+(issue [#190](https://github.com/dravcore/kurul/issues/190)). Bu düzeldi — indeks artık her
 tüketiciye ulaşıyor — ama bir _keyspace_ ayırıyor, kanal değil: Redis pub/sub veritabanını
 yok sayar, dolayısıyla Socket.io fan-out kanalı, hangi indeksi seçmiş olursa olsun o sunucunun
 tüm istemcileri arasında paylaşılır; anahtar öneki de kullanılabilir değil, çünkü BullMQ'nun
@@ -253,19 +253,19 @@ korunuyor.
 # Integration testler için servisler ayakta olmalı
 docker compose -f docker-compose.dev.yml up -d
 
-pnpm --filter @kurultay/api test          # api unit
-pnpm --filter @kurultay/api test:watch    # api unit, watch modu
-pnpm --filter @kurultay/api test:e2e      # integration (Postgres gerektirir)
-pnpm --filter @kurultay/api test:cov      # api coverage raporu
+pnpm --filter @kurul/api test          # api unit
+pnpm --filter @kurul/api test:watch    # api unit, watch modu
+pnpm --filter @kurul/api test:e2e      # integration (Postgres gerektirir)
+pnpm --filter @kurul/api test:cov      # api coverage raporu
 
-pnpm --filter @kurultay/web test          # web unit (Vitest)
-pnpm --filter @kurultay/web test:watch    # web unit, watch modu
+pnpm --filter @kurul/web test          # web unit (Vitest)
+pnpm --filter @kurul/web test:watch    # web unit, watch modu
 
 pnpm test:browser                         # browser e2e (Mailpit de gerekir)
 ```
 
 Integration testler, test setup'ı tarafından oluşturulan ve migrate edilen **ayrı bir
-veritabanına** (`kurultay_test`) karşı çalışır. Geliştirme veritabanına asla dokunmazlar.
+veritabanına** (`kurul_test`) karşı çalışır. Geliştirme veritabanına asla dokunmazlar.
 Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#izolasyon).
 
 ## Test yazma
@@ -354,15 +354,15 @@ Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalı
 
 | Adım                | Komut                                                                                                 |
 | ------------------- | ----------------------------------------------------------------------------------------------------- |
-| Shared paket build  | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build`             |
+| Shared paket build  | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                   |
 | Lint                | `pnpm lint`                                                                                           |
 | Format kontrolü     | `pnpm format:check`                                                                                   |
 | Typecheck           | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                             |
 | Audit               | `pnpm audit --audit-level high`                                                                       |
-| Unit testler (api)  | `pnpm --filter @kurultay/api test:cov`                                                                |
-| Unit testler (web)  | `pnpm --filter @kurultay/web exec vitest run --coverage`                                              |
+| Unit testler (api)  | `pnpm --filter @kurul/api test:cov`                                                                   |
+| Unit testler (web)  | `pnpm --filter @kurul/web exec vitest run --coverage`                                                 |
 | Unit testler (pkgs) | `pnpm --filter "./packages/*" test`                                                                   |
-| Integration testler | Postgres ve Redis service container'larına karşı `pnpm --filter @kurultay/api test:e2e`               |
+| Integration testler | Postgres ve Redis service container'larına karşı `pnpm --filter @kurul/api test:e2e`                  |
 | Build               | `pnpm build`                                                                                          |
 | **Kapı** (zorunlu)  | `ci-ok` — tüm upstream job'lar (`lint`, `test`, `build`) başarıysa geçer (atlanmamış/iptal edilmemiş) |
 
@@ -371,7 +371,7 @@ tek zorunlu status kontrol — eğer herhangi bir upstream job başarısızsa, a
 edilirse, kapı başarısız olur. Bu iki koruma sağlar:
 
 1. **Doğruluk**: hiç koşmamış bir job kapıyı geçemez. Dal koruması _atlanmış_ bir zorunlu
-   kontrolü karşılanmış sayar; [#89](https://github.com/dravcore/kurultay/pull/89) tam olarak
+   kontrolü karşılanmış sayar; [#89](https://github.com/dravcore/kurul/pull/89) tam olarak
    böyle merge oldu (`test` kırmızı, `build` atlanmış). `ci-ok` `if: always()` ile koşar ve
    her `needs.*.result` değerinin tam olarak `success` olduğunu doğrular — `failure`, `skipped`
    ve `cancelled` üçü de kapıyı düşürür.

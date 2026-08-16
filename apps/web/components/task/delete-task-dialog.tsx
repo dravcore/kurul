@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 

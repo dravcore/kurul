@@ -32,18 +32,18 @@ function run(command, args, extraEnv = {}) {
 // `shared-types` and `auth-access` are workspace sources, not published artifacts: the API
 // build and the web build both resolve them through their `dist/`, so a stale one produces a
 // type error or, worse, a silently outdated enum.
-run('pnpm', ['--filter', '@kurultay/shared-types', 'build']);
-run('pnpm', ['--filter', '@kurultay/auth-access', 'build']);
+run('pnpm', ['--filter', '@kurul/shared-types', 'build']);
+run('pnpm', ['--filter', '@kurul/auth-access', 'build']);
 
 // Prisma's generated client is gitignored, so a fresh checkout has none and `nest build`
 // would fail on the import rather than on anything meaningful.
 run('pnpm', ['db:generate']);
 
-run('pnpm', ['--filter', '@kurultay/api', 'build']);
+run('pnpm', ['--filter', '@kurul/api', 'build']);
 
 // The client bundle inlines NEXT_PUBLIC_API_URL, so the suite needs its own build — see the
 // note in `e2e/stack-env.ts`. This overwrites `apps/web/.next`.
-run('pnpm', ['--filter', '@kurultay/web', 'exec', 'next', 'build'], {
+run('pnpm', ['--filter', '@kurul/web', 'exec', 'next', 'build'], {
   NEXT_PUBLIC_API_URL: API_URL,
 });
 

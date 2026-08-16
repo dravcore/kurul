@@ -2,8 +2,8 @@
 
 import { Filter } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { LabelDto, Priority, WorkspaceMemberDto } from '@kurultay/shared-types';
-import { Priority as PriorityEnum } from '@kurultay/shared-types';
+import type { LabelDto, Priority, WorkspaceMemberDto } from '@kurul/shared-types';
+import { Priority as PriorityEnum } from '@kurul/shared-types';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,

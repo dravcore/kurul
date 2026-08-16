@@ -1,4 +1,4 @@
-# Kurultay Dokümantasyon Yapısı — Tasarım Spec'i
+# Kurul Dokümantasyon Yapısı — Tasarım Spec'i
 
 **Tarih:** 2026-08-08
 **Durum:** Onaylandı (kullanıcı ile Q&A sonucu)
@@ -8,7 +8,7 @@
 
 ## 1. Amaç
 
-Kurultay (açık kaynak Kanban proje yönetim aracı, dravcore/kurultay, AGPL-3.0) henüz iskelet
+Kurul (açık kaynak Kanban proje yönetim aracı, dravcore/kurul, AGPL-3.0) henüz iskelet
 öncesi aşamada. Kod yazılmaya başlamadan önce projenin tüm standartlarını tanımlayan,
 tutarlı formatta, iki dilli bir dokümantasyon yapısı kurulacak. Root'taki mevcut
 `tech-stack.md` ve `project-skeleton.md` bu yapıya taşınacak ve aynı standarda

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { UsagePingKind } from '@kurultay/shared-types';
+import type { UsagePingKind } from '@kurul/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**

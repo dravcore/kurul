@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { WorkspaceDto } from '@kurultay/shared-types';
+import type { WorkspaceDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { ApiError, api } from '@/lib/api';
 import { DeleteWorkspaceDialog } from './delete-workspace-dialog';
@@ -30,8 +30,8 @@ const apiDelete = vi.mocked(api.delete);
 
 const workspace: WorkspaceDto = {
   id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00',
-  name: 'Kurultay',
-  slug: 'kurultay',
+  name: 'Kurul',
+  slug: 'kurul',
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
@@ -85,10 +85,10 @@ describe('DeleteWorkspaceDialog', () => {
 
     expect(deleteButton().disabled).toBe(true);
 
-    fireEvent.change(confirmField(), { target: { value: 'kurultay' } });
+    fireEvent.change(confirmField(), { target: { value: 'kurul' } });
     expect(deleteButton().disabled).toBe(true);
 
-    fireEvent.change(confirmField(), { target: { value: 'Kurultay Labs' } });
+    fireEvent.change(confirmField(), { target: { value: 'Kurul Labs' } });
     expect(deleteButton().disabled).toBe(true);
 
     expect(apiDelete).not.toHaveBeenCalled();
@@ -97,7 +97,7 @@ describe('DeleteWorkspaceDialog', () => {
   it('never calls the endpoint from a mistyped confirmation click', () => {
     renderDialog();
 
-    fireEvent.change(confirmField(), { target: { value: 'kurultay' } });
+    fireEvent.change(confirmField(), { target: { value: 'kurul' } });
     // The button stays disabled, so a click event never reaches its handler at all.
     fireEvent.click(deleteButton());
 

@@ -11,7 +11,7 @@
 
 ## Context
 
-Kurultay is an open-source project management tool that could plausibly be
+Kurul is an open-source project management tool that could plausibly be
 taken by a third party and resold as closed-source SaaS without any
 obligation to contribute back. The license must prevent that outcome while
 leaving a realistic path to a sustainable business model for the maintainers.
@@ -36,7 +36,7 @@ leaving a realistic path to a sustainable business model for the maintainers.
 
 ## Consequences
 
-- Closed-source resale of Kurultay by competitors or cloud providers is not
+- Closed-source resale of Kurul by competitors or cloud providers is not
   permitted without releasing their modifications.
 - The open-core path (AGPL core + proprietary enterprise add-ons) stays open
   for the future if that business model is pursued.

@@ -12,7 +12,7 @@ import base from './playwright.config';
  *
  * So they live here, behind their own config and their own command:
  *
- *     pnpm --filter @kurultay/e2e exec playwright test -c measure.config.ts
+ *     pnpm --filter @kurul/e2e exec playwright test -c measure.config.ts
  *
  * It sits beside `playwright.config.ts` rather than inside `measure/` for a mechanical reason:
  * Playwright resolves a `webServer` command's working directory against the *config's*

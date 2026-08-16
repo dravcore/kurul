@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, File as FileIcon, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { type AttachmentDto, AttachmentKind } from '@kurultay/shared-types';
+import { type AttachmentDto, AttachmentKind } from '@kurul/shared-types';
 import { Button } from '@/components/ui/button';
 import { api, getApiBaseUrl } from '@/lib/api';
 

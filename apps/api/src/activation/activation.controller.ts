@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { ActivationFunnelDto } from '@kurultay/shared-types';
+import type { ActivationFunnelDto } from '@kurul/shared-types';
 import { InstanceAdminGuard } from '../common/guards/instance-admin.guard';
 import { ErrorEnvelopeSchema } from '../openapi/schemas/error.schema';
 import { ActivationFunnelSchema } from '../openapi/schemas/instance.schema';

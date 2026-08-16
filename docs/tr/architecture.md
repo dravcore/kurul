@@ -1,6 +1,6 @@
 # Mimari
 
-Kurultay sisteminin şekli: kod nasıl saklanıyor, nasıl çalışıyor ve veri nasıl modelleniyor.
+Kurul sisteminin şekli: kod nasıl saklanıyor, nasıl çalışıyor ve veri nasıl modelleniyor.
 
 > 🌐 [English (canonical)](../architecture.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
@@ -22,11 +22,11 @@ Kurultay sisteminin şekli: kod nasıl saklanıyor, nasıl çalışıyor ve veri
 
 ## 1. Karar özeti
 
-Kurultay bir **modüler monolit** içeren bir **monorepo**'dur.
+Kurul bir **modüler monolit** içeren bir **monorepo**'dur.
 
 Bu iki bağımsız eksendir ve ikisini ayrı tutmak önemlidir:
 
-| Eksen                   | Hangi soruyu yanıtlar | Kurultay'ın cevabı                            |
+| Eksen                   | Hangi soruyu yanıtlar | Kurul'un cevabı                               |
 | ----------------------- | --------------------- | --------------------------------------------- |
 | Monorepo vs. polyrepo   | Kod nasıl _saklanır_? | Monorepo (tek pnpm workspace)                 |
 | Monolit vs. mikroservis | Kod nasıl _çalışır_?  | Modüler monolit (tek deploy edilebilir birim) |
@@ -59,7 +59,7 @@ Bu iki bağımsız eksendir ve ikisini ayrı tutmak önemlidir:
 | Linear | Tek kod tabanı, farklı rollerde birkaç workload olarak deploy edilir: WebSocket sunucuları, public/private GraphQL API, arka plan iş çalıştırıcıları — her biri bağımsız ölçeklenir |
 | Huly   | Kendi Rush-tabanlı build sistemini kurmak pahasına, çok servisli monorepo                                                                                                           |
 
-Kurultay'ın izlediği model Linear'ınki: **tek kod tabanı, gerektiğinde birkaç process rolü.**
+Kurul'un izlediği model Linear'ınki: **tek kod tabanı, gerektiğinde birkaç process rolü.**
 WebSocket sunucusunu kendi container'ında çalıştırmak kodu değil, deployment'ı bölmek
 demektir.
 
@@ -70,7 +70,7 @@ Tam gerekçe: [`decisions/0001-monorepo-modular-monolith.md`](decisions/0001-mon
 ## 2. Monorepo yerleşimi
 
 ```
-kurultay/
+kurul/
 ├── apps/
 │   ├── api/               # NestJS backend (modüler monolit)
 │   └── web/               # Next.js App Router frontend
@@ -198,7 +198,7 @@ apps/web/
     ├── api.ts             # typed REST client
     ├── socket.ts          # Socket.io client (board realtime)
     ├── board-permissions.ts
-    └── auth.ts            # Better Auth client (`@kurultay/auth-access`)
+    └── auth.ts            # Better Auth client (`@kurul/auth-access`)
 ```
 
 İki route group layout ağacını böler: `(auth)` sade bir kabuk render eder, `(app)` workspace
@@ -235,7 +235,7 @@ dönüşür.
 | Sayfalama       | `CursorPage<T>` (varsayılan liste şekli; anahtar `id`)                             |
 | Socket kontratı | Event isim sabitleri ve payload tipleri                                            |
 
-Better Auth organization **rol / access-control** tanımları `@kurultay/auth-access` içindedir
+Better Auth organization **rol / access-control** tanımları `@kurul/auth-access` içindedir
 (bu pakette değil); böylece api ve web tek AC tanımını paylaşır, types paketine Better Auth
 çekilmez.
 
@@ -264,7 +264,7 @@ client hâlâ Nest ve Better Auth adapter için `apps/api/src/generated/prisma`'
 | `Notification`    | `id`, `workspaceId`, `userId`, `type`, `taskId` (nullable), `activityId` (nullable), `payload` (Json), `readAt` (nullable), `createdAt`              | Uygulama içi bildirimler (atama, mention, due-soon). Activity yazımlarından fan-out; due-soon BullMQ ile `REDIS_URL` üzerinde. Bkz. [roadmap Faz 8](../archive/roadmap-mvp-phases.md)                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Davetler `WorkspaceInvitation` olarak saklanır; Better Auth organization plugin
-tablolarından Kurultay adlarına map edilir. Ürün dili ve REST path'leri
+tablolarından Kurul adlarına map edilir. Ürün dili ve REST path'leri
 **Workspace** kullanır — bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
 
 Better Auth ayrıca auth altyapısı tablolarını `Session`, `Account` ve `Verification` yönetir; bunlar plugin tarafından yönetilir ve yukarıdaki domain model tablosundan bilerek hariç tutulur.
@@ -304,7 +304,7 @@ Dört özellik bilinçlidir:
   hiçbir şeye rıza göstermemiş birine aittir. Bu nedenle `invitation.*` payload'ları **yalnızca
   davet id'sini ve rolü** taşır — adres gerektiğinde admin `WorkspaceInvitation`'a join eder.
   Adli değer korunur, kitle genişlemez.
-- **`AUDIT_ACTIVITY_TYPES`** (`@kurultay/shared-types`) bu tiplerin dışa aktarılan listesidir;
+- **`AUDIT_ACTIVITY_TYPES`** (`@kurul/shared-types`) bu tiplerin dışa aktarılan listesidir;
   böylece "burada kim neyi kaldırdı, yetkilendirdi ya da yok etti?" tek bir sorgudur —
   `WHERE "workspaceId" = $1 AND type = ANY($2) ORDER BY id DESC`, mevcut
   `(workspaceId, type, createdAt)` indeksiyle karşılanır.

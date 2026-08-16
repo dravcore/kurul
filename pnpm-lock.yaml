@@ -59,10 +59,10 @@ importers:
 
   apps/api:
     dependencies:
-      '@kurultay/auth-access':
+      '@kurul/auth-access':
         specifier: workspace:*
         version: link:../../packages/auth-access
-      '@kurultay/shared-types':
+      '@kurul/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
       '@nestjs/common':
@@ -207,10 +207,10 @@ importers:
       '@dnd-kit/utilities':
         specifier: 3.2.2
         version: 3.2.2(react@19.2.8)
-      '@kurultay/auth-access':
+      '@kurul/auth-access':
         specifier: workspace:*
         version: link:../../packages/auth-access
-      '@kurultay/shared-types':
+      '@kurul/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
       '@sentry/nextjs':
@@ -292,7 +292,7 @@ importers:
 
   e2e:
     dependencies:
-      '@kurultay/shared-types':
+      '@kurul/shared-types':
         specifier: workspace:*
         version: link:../packages/shared-types
     devDependencies:
@@ -311,7 +311,7 @@ importers:
 
   packages/auth-access:
     devDependencies:
-      '@kurultay/shared-types':
+      '@kurul/shared-types':
         specifier: workspace:*
         version: link:../shared-types
       better-auth:

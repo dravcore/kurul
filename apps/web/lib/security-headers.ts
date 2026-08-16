@@ -156,7 +156,7 @@ export function buildContentSecurityPolicy(apiBaseUrl: string): string {
  * ask.
  *
  * `interest-cohort=()` opts out of the FLoC/Topics-API cohort tracking Chrome computes from
- * browsing history by default; it costs nothing here since Kurultay does no ad-adjacent
+ * browsing history by default; it costs nothing here since Kurul does no ad-adjacent
  * tracking, and it is the one entry in this list that protects the *user's* privacy on other
  * sites rather than this app's own attack surface.
  */

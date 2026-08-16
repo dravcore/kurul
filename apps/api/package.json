@@ -1,5 +1,5 @@
 {
-  "name": "@kurultay/api",
+  "name": "@kurul/api",
   "version": "0.1.0",
   "private": true,
   "license": "AGPL-3.0-only",
@@ -18,8 +18,8 @@
     "openapi:check": "node dist/openapi/generate-openapi.js --check"
   },
   "dependencies": {
-    "@kurultay/auth-access": "workspace:*",
-    "@kurultay/shared-types": "workspace:*",
+    "@kurul/auth-access": "workspace:*",
+    "@kurul/shared-types": "workspace:*",
     "@nestjs/common": "^11.1.29",
     "@nestjs/core": "^11.1.29",
     "@nestjs/platform-express": "^11.1.29",

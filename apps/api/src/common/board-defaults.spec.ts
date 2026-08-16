@@ -1,4 +1,4 @@
-import { ColumnCategory, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@kurultay/shared-types';
+import { ColumnCategory, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@kurul/shared-types';
 import { defaultColumnsFor } from './board-defaults';
 
 /**

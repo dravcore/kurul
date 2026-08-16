@@ -20,9 +20,9 @@ Bu repository'deki TypeScript, NestJS ve Next.js kodu için konvansiyonlar.
 
 1. **Stil için doğruluk kaynağı linter'dır.** Formatting code review'da asla tartışılmaz.
    Bir kural sahip olmaya değerse, ESLint veya Prettier'a kodlanmaya da değer.
-2. **Modül sınırları mimaridir.** Kurultay bir modüler monolit; onu bir çamur yumağına
+2. **Modül sınırları mimaridir.** Kurul bir modüler monolit; onu bir çamur yumağına
    dönüşmekten alıkoyan tek şey kimin kimi import edebileceği konusundaki disiplindir.
-3. **Tipler bir kez deklare edilir.** API sınırını geçen her şey `@kurultay/shared-types`
+3. **Tipler bir kez deklare edilir.** API sınırını geçen her şey `@kurul/shared-types`
    içinde yaşar ve import edilir, asla yeniden tiplenmez.
 4. **Zekice olan yerine açık olan.** Kod, yazıldığından çok daha sık okunur.
 
@@ -235,21 +235,21 @@ components/
 
 ## Paylaşılan tipler (`packages/shared-types`)
 
-API sınırını geçen her şey **bir kez**, `@kurultay/shared-types` içinde deklare edilir ve
+API sınırını geçen her şey **bir kez**, `@kurul/shared-types` içinde deklare edilir ve
 her iki taraftan da import edilir:
 
 - DTO/response şekilleri
 - Enum'lar (`Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot`)
 - Socket.io event isimleri ve payload tipleri
 
-Better Auth organization **access-control rolleri** `@kurultay/auth-access` içindedir
+Better Auth organization **access-control rolleri** `@kurul/auth-access` içindedir
 (`better-auth` peer dependency). Rolleri oradan import edin — `permissions`
 açıklamalarını `apps/api` ile `apps/web` arasında kopyalamayın.
 
 ```ts
 // Doğru
-import type { TaskResponse, Priority } from '@kurultay/shared-types';
-import { ac, roles } from '@kurultay/auth-access';
+import type { TaskResponse, Priority } from '@kurul/shared-types';
+import { ac, roles } from '@kurul/auth-access';
 
 // Yanlış — sessizce sapacak yeniden deklare edilmiş bir şekil
 interface Task {
@@ -275,7 +275,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 // 3. Workspace paketleri
-import type { TaskResponse } from '@kurultay/shared-types';
+import type { TaskResponse } from '@kurul/shared-types';
 
 // 4. Mutlak dahili (path alias)
 import { PrismaService } from '@/prisma/prisma.service';

@@ -1,5 +1,5 @@
 import type { Server } from 'socket.io';
-import { SocketEvents } from '@kurultay/shared-types';
+import { SocketEvents } from '@kurul/shared-types';
 import { boardRoom, RealtimeService, userRoom } from './realtime.service';
 
 function attachedService() {

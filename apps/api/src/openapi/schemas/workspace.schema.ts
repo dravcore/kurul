@@ -8,7 +8,7 @@ import type {
   UserDto,
   WorkspaceDto,
   WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 
 /** The caller's own account. */
 export class UserSchema implements UserDto {

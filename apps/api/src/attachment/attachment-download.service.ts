@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Readable } from 'node:stream';
-import { AttachmentKind } from '@kurultay/shared-types';
+import { AttachmentKind } from '@kurul/shared-types';
 import { StorageService } from '../storage/storage.service';
 import { contentDisposition } from './attachment-disposition';
 import { TEXT_MEDIA_TYPES } from './attachment-mime';

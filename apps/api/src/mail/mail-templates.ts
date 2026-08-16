@@ -1,7 +1,7 @@
-import { DEFAULT_LOCALE, type Locale } from '@kurultay/shared-types';
+import { DEFAULT_LOCALE, type Locale } from '@kurul/shared-types';
 import type { MailMessage } from './mail-sender';
 
-const PRODUCT_NAME = 'Kurultay';
+const PRODUCT_NAME = 'Kurul';
 
 /**
  * Escapes the five characters that can break out of HTML text or an attribute value.

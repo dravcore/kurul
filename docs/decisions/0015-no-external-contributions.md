@@ -28,7 +28,7 @@ no longer describing reality, so the reality has to be written down instead.
 
 ## Decision
 
-**Kurultay does not accept external contributions.** No outside code, documentation, or
+**Kurul does not accept external contributions.** No outside code, documentation, or
 translation pull request is merged. The codebase stays single-authored: the maintainer writes
 it, and copyright in all of it stays in one pair of hands — the model [SQLite](https://www.sqlite.org/copyright.html)
 has run on for decades. Bug reports, feature ideas, design feedback and discussion are wanted

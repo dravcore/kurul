@@ -8,7 +8,7 @@ import {
   AttachmentKind,
   type CreateAttachmentLinkRequest,
   type TaskDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { fetchInstanceConfig } from '@/lib/instance-config';
 

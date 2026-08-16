@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import type { BoardDto, DashboardSummaryDto } from '@kurultay/shared-types';
+import type { BoardDto, DashboardSummaryDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { useApiResource } from '@/lib/use-api-resource';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';

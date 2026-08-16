@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { BoardDto, UpdateBoardRequest } from '@kurultay/shared-types';
+import type { BoardDto, UpdateBoardRequest } from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { FormDialog } from '@/components/common/form-dialog';
 import { Input } from '@/components/ui/input';

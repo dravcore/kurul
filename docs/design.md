@@ -1,6 +1,6 @@
 # Design
 
-The visual and interaction language of the Kurultay web app: principles, tokens, layout, motion, states, and copy.
+The visual and interaction language of the Kurul web app: principles, tokens, layout, motion, states, and copy.
 
 > 🌐 English (canonical) | [Türkçe](tr/design.md)
 
@@ -40,9 +40,11 @@ The visual and interaction language of the Kurultay web app: principles, tokens,
 
 ## 2. Identity
 
-Kurultay is named for the grand assembly of Turkic-Mongol tradition: clans gather, banners are
-planted, matters are decided, work is divided. The identity comes from _that_ world — banner
-(_sancak_), seal (_damga_), steppe — not from generic productivity-tool language.
+Kurul is named for the council that convenes, decides, and divides the work — and, until
+v0.2.0, for the _kurultay_ that gave the project its first name: the grand assembly where
+clans gather, banners are planted, matters are decided. The identity still comes from _that_
+world — banner (_sancak_), seal (_damga_), steppe — not from generic productivity-tool
+language. The name got shorter; the visual language did not change.
 
 **Signature element — the sancak rail:** a 2px copper rule on the leading edge of whatever is
 currently in play (active sidebar item, focused column, selected card, the open panel's
@@ -68,7 +70,7 @@ If two copper things are visible at once and neither is a primary action, one is
 | All product UI                                 | **lucide** (ships with shadcn/ui) — 16px in dense rows, 20px in the sidebar, 1.5px stroke, `currentColor` only                                                   |
 
 **Anti-brief.** Deliberately _not_: warm-cream ground with a serif and terracotta accent;
-near-black with an acid accent; broadsheet hairlines at zero radius. Kurultay's neutrals run
+near-black with an acid accent; broadsheet hairlines at zero radius. Kurul's neutrals run
 cool green-gray precisely so the warm copper has something to sit against — warm accent on
 warm ground is both the current default look and a way to make the accent vanish.
 
@@ -76,7 +78,7 @@ warm ground is both the current default look and a way to make the accent vanish
 
 Proposals for Phase 3, named to the shadcn/ui CSS-variable convention so `components/ui/`
 stays unmodified generated output. **Caution:** in shadcn's vocabulary `--primary` is the
-brand action color and `--accent` is the subtle hover surface, so Kurultay's signature copper
+brand action color and `--accent` is the subtle hover surface, so Kurul's signature copper
 is `--primary` and `--accent` stays a quiet neutral tint. Do not rename shadcn's variables.
 
 ### Neutrals and accent
@@ -397,7 +399,7 @@ never a generated ninth hue — fold the tail into "Other" or facet into small m
 | Column composition over time                   | **Stacked area / column**, ≤ 6 series                                            | categorical                |
 | More than ~7 categories that all matter        | **Table**, or table plus chart                                                   | —                          |
 
-Palette validated against Kurultay's own surfaces (`#FFFFFF` light, `#161918` dark). These slots
+Palette validated against Kurul's own surfaces (`#FFFFFF` light, `#161918` dark). These slots
 also back `Label.color`.
 
 | Slot | Hue    | Light     | Dark      |     | Slot | Hue     | Light     | Dark      |

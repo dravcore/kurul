@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { NotificationType, type NotificationDto } from '@kurultay/shared-types';
+import { NotificationType, type NotificationDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { NotificationMenuContent } from './notification-menu-content';

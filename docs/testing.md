@@ -1,6 +1,6 @@
 # Testing
 
-What Kurultay tests, with which tools, and what CI enforces.
+What Kurul tests, with which tools, and what CI enforces.
 
 > 🌐 English (canonical) | [Türkçe](tr/testing.md)
 
@@ -18,7 +18,7 @@ What Kurultay tests, with which tools, and what CI enforces.
 
 ## Strategy
 
-Kurultay’s MVP feature set is complete; the testing strategy stays deliberately
+Kurul’s MVP feature set is complete; the testing strategy stays deliberately
 **pragmatic, not exhaustive**:
 
 - Test the logic that is **hard to get right** and **expensive to get wrong** — ordering,
@@ -140,32 +140,32 @@ without Mailpit three of the seven scenarios cannot confirm an address or read a
 Redis is not needed — see [Isolation](#isolation) for why the suite runs without it.
 
 ```bash
-pnpm --filter @kurultay/e2e browsers   # once: downloads Chromium
+pnpm --filter @kurul/e2e browsers   # once: downloads Chromium
 pnpm test:browser                      # builds the stack, then runs all seven
 ```
 
 `pnpm test:browser` runs `e2e/build-stack.mjs` first — it builds `shared-types`,
 `auth-access`, the API and a standalone web bundle, then migrates the suite's database.
 Playwright starts and stops both servers itself. To iterate on a test without rebuilding, run
-`pnpm --filter @kurultay/e2e exec playwright test` directly; locally it reuses a stack that is
+`pnpm --filter @kurul/e2e exec playwright test` directly; locally it reuses a stack that is
 already listening.
 
 **The web build is not interchangeable with `pnpm build`.** `NEXT_PUBLIC_API_URL` is inlined
 at build time, so the suite's build hard-codes port 4110 into the client bundle and overwrites
 `apps/web/.next`. After running the suite locally, rebuild before using
-`pnpm --filter @kurultay/web start`.
+`pnpm --filter @kurul/web start`.
 
 ### Isolation
 
 The suite boots a second copy of the application next to whatever is already running, and
 never touches it:
 
-| Thing           | Value                      | Why                                                                               |
-| --------------- | -------------------------- | --------------------------------------------------------------------------------- |
-| Web / API ports | 3110 / 4110                | 3000/4000 belong to `pnpm dev`                                                    |
-| Database        | `kurultay_test_playwright` | Not `kurultay_test` — the Jest integration suite truncates that one between tests |
-| Redis           | none — `REDIS_URL` blank   | See below; running without Redis is a supported configuration                     |
-| Mail            | the shared Mailpit         | Nothing is ever deleted; every lookup is scoped to an address the suite generated |
+| Thing           | Value                    | Why                                                                               |
+| --------------- | ------------------------ | --------------------------------------------------------------------------------- |
+| Web / API ports | 3110 / 4110              | 3000/4000 belong to `pnpm dev`                                                    |
+| Database        | `kurul_test_playwright`  | Not `kurul_test` — the Jest integration suite truncates that one between tests    |
+| Redis           | none — `REDIS_URL` blank | See below; running without Redis is a supported configuration                     |
+| Mail            | the shared Mailpit       | Nothing is ever deleted; every lookup is scoped to an address the suite generated |
 
 None of it is configurable through `.env`, and it adds no environment variables: the Postgres
 _connection_ is derived from `DATABASE_URL` with only the database name swapped. A
@@ -176,7 +176,7 @@ is written out in `e2e/stack-env.ts`.
 **Why no Redis.** A logical database index was the obvious boundary and it used to be a fiction:
 `parseRedisUrl` dropped the URL's pathname, and every ioredis/BullMQ construction in `apps/api`
 goes through it, so `redis://…/8` connected to database 0
-(issue [#190](https://github.com/dravcore/kurultay/issues/190)). That is fixed — the index now
+(issue [#190](https://github.com/dravcore/kurul/issues/190)). That is fixed — the index now
 reaches every consumer — but it separates a _keyspace_, not a channel: Redis pub/sub ignores the
 database, so the Socket.io fan-out channel is shared by every client of that server whichever
 index it selected, and a key prefix is not available either since BullMQ's prefix and the
@@ -250,18 +250,18 @@ compatibility even though these are API integration tests, not browser e2e.
 # Services must be up for integration tests
 docker compose -f docker-compose.dev.yml up -d
 
-pnpm --filter @kurultay/api test          # api unit
-pnpm --filter @kurultay/api test:watch    # api unit, watch mode
-pnpm --filter @kurultay/api test:e2e      # integration (needs Postgres)
-pnpm --filter @kurultay/api test:cov      # api coverage report
+pnpm --filter @kurul/api test          # api unit
+pnpm --filter @kurul/api test:watch    # api unit, watch mode
+pnpm --filter @kurul/api test:e2e      # integration (needs Postgres)
+pnpm --filter @kurul/api test:cov      # api coverage report
 
-pnpm --filter @kurultay/web test          # web unit (Vitest)
-pnpm --filter @kurultay/web test:watch    # web unit, watch mode
+pnpm --filter @kurul/web test          # web unit (Vitest)
+pnpm --filter @kurul/web test:watch    # web unit, watch mode
 
 pnpm test:browser                         # browser e2e (needs Mailpit too)
 ```
 
-Integration tests run against a **separate database** (`kurultay_test`), created and
+Integration tests run against a **separate database** (`kurul_test`), created and
 migrated by the test setup. They never touch the development database. The browser suite
 uses a third one — see [Isolation](#isolation).
 
@@ -350,15 +350,15 @@ Every pull request runs, on `develop` and `main` as well:
 
 | Step                | Command                                                                                     |
 | ------------------- | ------------------------------------------------------------------------------------------- |
-| Build shared pkgs   | `pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build`   |
+| Build shared pkgs   | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`         |
 | Lint                | `pnpm lint`                                                                                 |
 | Format check        | `pnpm format:check`                                                                         |
 | Typecheck           | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                         |
 | Audit               | `pnpm audit --audit-level high`                                                             |
-| Unit tests (api)    | `pnpm --filter @kurultay/api test:cov`                                                      |
-| Unit tests (web)    | `pnpm --filter @kurultay/web exec vitest run --coverage`                                    |
+| Unit tests (api)    | `pnpm --filter @kurul/api test:cov`                                                         |
+| Unit tests (web)    | `pnpm --filter @kurul/web exec vitest run --coverage`                                       |
 | Unit tests (pkgs)   | `pnpm --filter "./packages/*" test`                                                         |
-| Integration tests   | `pnpm --filter @kurultay/api test:e2e` against Postgres and Redis service containers        |
+| Integration tests   | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers           |
 | Build               | `pnpm build`                                                                                |
 | **Gate** (required) | `ci-ok` — passes only if `lint`, `test`, and `build` all succeed (not skipped or cancelled) |
 
@@ -367,7 +367,7 @@ configured in branch protection — if any upstream job fails, is skipped, or is
 gate fails. This provides two protections:
 
 1. **Correctness**: a job that never ran cannot pass the gate. Branch protection treats a
-   _skipped_ required check as satisfied, which is how [#89](https://github.com/dravcore/kurultay/pull/89)
+   _skipped_ required check as satisfied, which is how [#89](https://github.com/dravcore/kurul/pull/89)
    merged with `test` red and `build` skipped. `ci-ok` runs under `if: always()` and asserts
    every `needs.*.result` is exactly `success`, so `failure`, `skipped` and `cancelled` all
    fail the gate.

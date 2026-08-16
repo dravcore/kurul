@@ -2,7 +2,7 @@ import { loadRootEnv } from '../src/common/env';
 
 loadRootEnv();
 
-const FALLBACK_DATABASE_URL = 'postgresql://kurultay:kurultay@localhost:5432/kurultay_test';
+const FALLBACK_DATABASE_URL = 'postgresql://kurul:kurul@localhost:5432/kurul_test';
 
 /**
  * Integration tests always target the dedicated test database — they truncate between specs,
@@ -18,12 +18,12 @@ const FALLBACK_DATABASE_URL = 'postgresql://kurultay:kurultay@localhost:5432/kur
 function resolveTestDatabaseUrl(): string {
   const configured = process.env.DATABASE_URL?.trim();
   if (!configured) return FALLBACK_DATABASE_URL;
-  if (configured.includes('kurultay_test')) return configured;
+  if (configured.includes('kurul_test')) return configured;
 
   throw new Error(
     `DATABASE_URL does not name a test database, and integration tests truncate between specs.\n` +
       `  got:      ${configured}\n` +
-      `  expected: a URL whose database name contains "kurultay_test"\n` +
+      `  expected: a URL whose database name contains "kurul_test"\n` +
       `Unset DATABASE_URL to use ${FALLBACK_DATABASE_URL}, or point it at a test database.`,
   );
 }

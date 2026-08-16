@@ -1,5 +1,5 @@
 import type { ExecutionContext } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { CurrentMembership } from './current-membership.decorator';
 import { getParamDecoratorFactory } from './decorator-test-helpers';
 import type { AuthedRequest, WorkspaceMembership } from '../types/request-context';

@@ -5,8 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, MemberRole } from '@kurultay/shared-types';
-import type { WorkspaceMemberDto } from '@kurultay/shared-types';
+import { ActivityType, MemberRole } from '@kurul/shared-types';
+import type { WorkspaceMemberDto } from '@kurul/shared-types';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
 import { ActivityService } from '../activity/activity.service';

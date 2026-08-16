@@ -9,7 +9,7 @@
 
 Phase 3 introduces board and column mutations under workspace tenancy. Nest
 already gates product routes with `WorkspaceGuard` + `@Roles`, while Better Auth
-organization statements in `@kurultay/auth-access` cover org/member/invitation
+organization statements in `@kurul/auth-access` cover org/member/invitation
 only — not boards or columns. [design.md](../design.md) already ships a `403`
 copy that assumes Admin access for column changes. We needed an explicit role
 matrix before handlers land, so API guards and UI enablement stay aligned, and

@@ -15,7 +15,7 @@ const logger = new Logger('TrustProxy');
  * because `configureTrustProxy`'s middleware overwrites it on every request, and nothing else
  * in this codebase or in `better-auth` reads it for any other purpose.
  */
-export const RESOLVED_CLIENT_IP_HEADER = 'x-kurultay-client-ip';
+export const RESOLVED_CLIENT_IP_HEADER = 'x-kurul-client-ip';
 
 /**
  * Parses the `TRUST_PROXY` environment string into the value Express's `trust proxy` setting

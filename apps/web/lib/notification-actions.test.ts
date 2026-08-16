@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NotificationType, type NotificationDto } from '@kurultay/shared-types';
+import { NotificationType, type NotificationDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import {
   markAllNotificationsRead,

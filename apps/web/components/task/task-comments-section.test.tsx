@@ -1,8 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { CommentDto, WorkspaceMemberDto } from '@kurultay/shared-types';
-import { MemberRole } from '@kurultay/shared-types';
+import type { CommentDto, WorkspaceMemberDto } from '@kurul/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { TaskCommentsSection } from './task-comments-section';
 

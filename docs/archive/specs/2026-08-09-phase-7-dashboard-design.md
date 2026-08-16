@@ -36,7 +36,7 @@ GET /workspaces/:workspaceId/dashboard/summary?boardId=
 
 `WorkspaceGuard`. Optional `boardId` must belong to the workspace; else `404`.
 
-**`DashboardSummaryDto`** (`@kurultay/shared-types`):
+**`DashboardSummaryDto`** (`@kurul/shared-types`):
 
 | Field          | Meaning                                                                                                                                       |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -10,7 +10,7 @@ import type {
   CreateChecklistRequest,
   TaskDto,
   UpdateChecklistItemRequest,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 
 export interface UseTaskChecklistsOptions {

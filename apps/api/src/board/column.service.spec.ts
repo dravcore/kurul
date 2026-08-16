@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { ActivityType, ColumnCategory, SocketEvents, type Locale } from '@kurultay/shared-types';
+import { ActivityType, ColumnCategory, SocketEvents, type Locale } from '@kurul/shared-types';
 import type { ActivityService } from '../activity/activity.service';
 import type { LocaleService } from '../locale/locale.service';
 import { PrismaService } from '../prisma/prisma.service';

@@ -1,6 +1,6 @@
-# Kurultay
+# Kurul
 
-Open-source Kanban-focused project management tool. `dravcore/kurultay` — AGPL-3.0.
+Open-source Kanban-focused project management tool. `dravcore/kurul` — AGPL-3.0.
 
 ## Architecture
 

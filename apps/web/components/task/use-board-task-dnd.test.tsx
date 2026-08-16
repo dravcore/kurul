@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
-import { Priority, type TaskDto } from '@kurultay/shared-types';
+import { Priority, type TaskDto } from '@kurul/shared-types';
 import { columnDroppableId } from '@/components/board/board-column';
 import { useBoardTaskDnd, type TaskMovePayload } from './use-board-task-dnd';
 

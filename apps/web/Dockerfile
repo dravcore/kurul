@@ -9,7 +9,7 @@ FROM base AS build
 #
 # The default is a *path*, not an origin, and that is what makes one published image work on
 # every domain (audit finding PM-02): `/api` is correct whether the deployment answers on
-# kurultay.example.com or on localhost, so nothing about this build is deployment-specific and
+# kurul.example.com or on localhost, so nothing about this build is deployment-specific and
 # nobody has to rebuild the image to change their API URL. It relies on a reverse proxy in
 # front of the stack routing `/api/*` to the API and everything else here — `docker/Caddyfile`
 # ships one, and `docs/self-hosting.md` documents the contract for operators who bring their
@@ -41,9 +41,9 @@ COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/auth-access/package.json packages/auth-access/
 RUN pnpm install --frozen-lockfile
 COPY . .
-RUN pnpm --filter @kurultay/shared-types build \
-  && pnpm --filter @kurultay/auth-access build \
-  && pnpm --filter @kurultay/web build
+RUN pnpm --filter @kurul/shared-types build \
+  && pnpm --filter @kurul/auth-access build \
+  && pnpm --filter @kurul/web build
 
 FROM node:24-alpine AS runner
 WORKDIR /app

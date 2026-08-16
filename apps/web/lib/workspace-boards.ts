@@ -1,4 +1,4 @@
-import type { BoardDto } from '@kurultay/shared-types';
+import type { BoardDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 
 /** In-flight dedupe so DashboardSummary + BoardList share one boards GET. */

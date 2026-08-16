@@ -6,7 +6,7 @@ import type {
   ActivationUnit,
   ActivationWindow,
   InstanceConfigDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import type { DependencyStatus, ReadinessReport } from '../../health/health.service';
 
 /** What this deployment is configured to do. Capability, never tenant state. */

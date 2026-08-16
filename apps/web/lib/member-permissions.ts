@@ -1,4 +1,4 @@
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 
 /**
  * Who may invite, revoke an invitation, change a role, and remove a member.

@@ -10,7 +10,7 @@
 
 **Architecture:** One read endpoint `GET /workspaces/:workspaceId/dashboard/summary?boardId?` returns `DashboardSummaryDto`. Web loads summary + boards; board filter in URL. Completion time series deferred to Phase 8.
 
-**Tech Stack:** NestJS DashboardModule, Prisma groupBy/count, `@kurultay/shared-types`, Next.js App Router, Recharts, design.md §8, next-intl.
+**Tech Stack:** NestJS DashboardModule, Prisma groupBy/count, `@kurul/shared-types`, Next.js App Router, Recharts, design.md §8, next-intl.
 
 ## Global Constraints
 

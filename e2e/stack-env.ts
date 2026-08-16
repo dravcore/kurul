@@ -2,7 +2,7 @@
  * Where the browser suite's stack lives, and why it lives there.
  *
  * The suite boots a *second* copy of the application next to whatever the developer already
- * has running. That is the whole point: `pnpm dev` on 3000/4000 against the `kurultay`
+ * has running. That is the whole point: `pnpm dev` on 3000/4000 against the `kurul`
  * database is a working session with real data in it, and a suite that signs up users,
  * accepts invitations and drags cards around must never be pointed at it. Every value below
  * is therefore deliberately off the beaten path, and none of it is configurable through
@@ -99,7 +99,7 @@ export function apiEnv(): Record<string, string> {
     // changes with the developer's `.env` would make a failure depend on their machine. It is
     // padded past 32 characters only to keep Better Auth's startup warning out of the test
     // output — nothing here is protecting anything.
-    BETTER_AUTH_SECRET: 'kurultay-playwright-e2e-secret-not-a-real-secret',
+    BETTER_AUTH_SECRET: 'kurul-playwright-e2e-secret-not-a-real-secret',
     RATE_LIMIT_ENABLED: 'false',
     CLEANUP_ENABLED: 'false',
     // Attachments on. Stated here rather than inherited for the same reason as everything else
@@ -118,7 +118,7 @@ export function apiEnv(): Record<string, string> {
     SMTP_HOST,
     SMTP_PORT,
     SMTP_SECURE: 'false',
-    MAIL_FROM: 'Kurultay E2E <e2e@kurultay.test>',
+    MAIL_FROM: 'Kurul E2E <e2e@kurul.test>',
     // Sentry stays off: the suite deliberately provokes 4xx responses, and a configured DSN
     // would ship them somewhere.
     SENTRY_DSN: '',
@@ -133,7 +133,7 @@ export function apiEnv(): Record<string, string> {
  * is not interchangeable with a normal `pnpm build`: it hard-codes port 4110 into the client
  * bundle. Both the local runner (`e2e/build-stack.mjs`) and the CI workflow set it for the
  * build, and both overwrite `apps/web/.next` — after a local suite run, rebuild before using
- * `pnpm --filter @kurultay/web start`. This is documented in docs/testing.md rather than
+ * `pnpm --filter @kurul/web start`. This is documented in docs/testing.md rather than
  * worked around with a second `distDir`, because a `distDir` switch would have to live in
  * `apps/web/next.config.ts` and change how the shipped app is configured for the benefit of
  * a test.

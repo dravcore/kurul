@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { Priority } from '@kurultay/shared-types';
+import { Priority } from '@kurul/shared-types';
 import { createTaskAttributes, planTaskUpdate } from './task-fields';
 
 const existing = {

@@ -58,8 +58,8 @@ describe('resolveApiOrigin', () => {
     // `BetterAuthError: Invalid base URL: /api` on a path. That happens at module import, so
     // it blanks the whole page rather than failing one request — a real browser-visible
     // outage seen while building the same-origin topology, not a hypothetical.
-    const origin = resolveApiOrigin('/api', 'https://kurultay.example.com');
-    expect(origin).toBe('https://kurultay.example.com');
+    const origin = resolveApiOrigin('/api', 'https://kurul.example.com');
+    expect(origin).toBe('https://kurul.example.com');
     expect(() => new URL(origin)).not.toThrow();
   });
 
@@ -69,9 +69,7 @@ describe('resolveApiOrigin', () => {
     // `/api/sign-up/email`, the `/auth` segment silently gone, answered with 404 and shown as
     // a generic "could not create your account". Better Auth is served at `/auth` on the
     // origin root and the proxy forwards that path unchanged, so the prefix must not leak in.
-    expect(resolveApiOrigin('/api', 'https://kurultay.example.com')).toBe(
-      'https://kurultay.example.com',
-    );
+    expect(resolveApiOrigin('/api', 'https://kurul.example.com')).toBe('https://kurul.example.com');
     expect(resolveApiOrigin('https://example.com/api', 'https://example.com')).toBe(
       'https://example.com',
     );
@@ -81,9 +79,7 @@ describe('resolveApiOrigin', () => {
     expect(resolveApiOrigin('https://api.example.com', 'https://app.example.com')).toBe(
       'https://api.example.com',
     );
-    expect(resolveApiOrigin('', 'https://kurultay.example.com')).toBe(
-      'https://kurultay.example.com',
-    );
+    expect(resolveApiOrigin('', 'https://kurul.example.com')).toBe('https://kurul.example.com');
   });
 });
 

@@ -10,7 +10,7 @@ import {
   type TaskDeletedPayload,
   type TaskMovedPayload,
   type TaskUpdatedPayload,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { connectSocket, getSocket } from '@/lib/socket';
 
 export type BoardSocketHandlers = {

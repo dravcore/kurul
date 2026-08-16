@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { CursorPage, TaskDto, TrelloImportReportDto } from '@kurultay/shared-types';
+import type { CursorPage, TaskDto, TrelloImportReportDto } from '@kurul/shared-types';
 import { expect, test } from '../support/fixtures';
 import { API_URL, WEB_URL } from '../stack-env';
 import { machine, median, ms, p95, report, sorted } from './stats';
@@ -146,7 +146,7 @@ test('500-card Trello import: wall clock, peak RSS, and the rows that landed', a
   const owner = await stack.createUser();
   const workspace = await stack.createWorkspace(owner);
 
-  const dir = await mkdtemp(join(tmpdir(), 'kurultay-trello-measure-'));
+  const dir = await mkdtemp(join(tmpdir(), 'kurul-trello-measure-'));
   const file = join(dir, 'trello-500.json');
   const generated = execFileSync('node', [GENERATOR, ...FIXTURE_ARGS, '--out', file], {
     encoding: 'utf8',

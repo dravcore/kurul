@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { MoreHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { BoardDto, TrelloImportReportDto } from '@kurultay/shared-types';
+import type { BoardDto, TrelloImportReportDto } from '@kurul/shared-types';
 import { canCreateOrUpdateBoard, canDeleteBoard, canMutateColumns } from '@/lib/board-permissions';
 import { useApiResource } from '@/lib/use-api-resource';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';

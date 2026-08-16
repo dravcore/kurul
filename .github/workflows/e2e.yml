@@ -39,15 +39,15 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_USER: kurultay
-          POSTGRES_PASSWORD: kurultay
-          # The suite migrates `kurultay_test_playwright` itself (Prisma creates it on first
+          POSTGRES_USER: kurul
+          POSTGRES_PASSWORD: kurul
+          # The suite migrates `kurul_test_playwright` itself (Prisma creates it on first
           # `migrate deploy`); this is only the database the connection is opened against.
-          POSTGRES_DB: kurultay
+          POSTGRES_DB: kurul
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U kurultay -d kurultay"
+          --health-cmd "pg_isready -U kurul -d kurul"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -75,9 +75,9 @@ jobs:
 
     env:
       # `e2e/stack-env.ts` derives the suite's own URLs from these two by swapping the
-      # database name (`kurultay_test_playwright`) and the Redis index (8), so the values here
+      # database name (`kurul_test_playwright`) and the Redis index (8), so the values here
       # only have to name the right server.
-      DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay
+      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul
       REDIS_URL: redis://localhost:6379
 
     steps:
@@ -100,7 +100,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Chromium
-        run: pnpm --filter @kurultay/e2e exec playwright install --with-deps chromium
+        run: pnpm --filter @kurul/e2e exec playwright install --with-deps chromium
 
       - name: Wait for Mailpit
         run: |
@@ -124,7 +124,7 @@ jobs:
         run: node e2e/build-stack.mjs
 
       - name: Run browser suite
-        run: pnpm --filter @kurultay/e2e exec playwright test
+        run: pnpm --filter @kurul/e2e exec playwright test
 
       # `if: always()` — the report is worth most when the run failed, and on a nightly it is
       # the only record anyone will have. It carries the traces, which is what makes a

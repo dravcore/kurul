@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { MailDeliveryStatus } from '@kurultay/shared-types';
+import { MailDeliveryStatus } from '@kurul/shared-types';
 import { captureMailDelivery } from './mail-delivery-scope';
 import type { MailMessage, MailSender } from './mail-sender';
 import {
@@ -13,7 +13,7 @@ import {
 
 const MESSAGE: MailMessage = {
   to: 'invitee@example.test',
-  subject: 'Confirm your email address for Kurultay',
+  subject: 'Confirm your email address for Kurul',
   text: 'Open http://localhost:3000/verify-email to continue',
   html: '<p>Open http://localhost:3000/verify-email to continue</p>',
 };
@@ -31,19 +31,19 @@ describe('mail transport selection', () => {
   });
 
   it('falls back to the log transport when SMTP is not configured', () => {
-    const sender = createMailSender({ from: 'Kurultay <noreply@localhost>', smtp: undefined });
+    const sender = createMailSender({ from: 'Kurul <noreply@localhost>', smtp: undefined });
 
     expect(sender.transport).toBe('log');
   });
 
   it('warns loudly when it falls back, because nothing is delivered in that state', () => {
-    createMailSender({ from: 'Kurultay <noreply@localhost>', smtp: undefined });
+    createMailSender({ from: 'Kurul <noreply@localhost>', smtp: undefined });
 
     expect(Logger.prototype.warn).toHaveBeenCalledWith(expect.stringContaining('SMTP_HOST'));
   });
 
   it('logs the recipient, subject and body so a dev can follow the link from the console', async () => {
-    const sender = createMailSender({ from: 'Kurultay <noreply@localhost>', smtp: undefined });
+    const sender = createMailSender({ from: 'Kurul <noreply@localhost>', smtp: undefined });
 
     await sender.send(MESSAGE);
 
@@ -55,7 +55,7 @@ describe('mail transport selection', () => {
 
   it('uses SMTP when a host is configured', () => {
     const sender = createMailSender({
-      from: 'Kurultay <noreply@example.test>',
+      from: 'Kurul <noreply@example.test>',
       smtp: { host: 'smtp.example.test', port: 587, secure: false },
     });
 
@@ -63,9 +63,9 @@ describe('mail transport selection', () => {
   });
 
   it('marks the log transport as delivering nothing, and SMTP as delivering', () => {
-    const log = createMailSender({ from: 'Kurultay <noreply@localhost>', smtp: undefined });
+    const log = createMailSender({ from: 'Kurul <noreply@localhost>', smtp: undefined });
     const smtp = createMailSender({
-      from: 'Kurultay <noreply@example.test>',
+      from: 'Kurul <noreply@example.test>',
       smtp: { host: 'smtp.example.test', port: 587, secure: false },
     });
 

@@ -1,4 +1,4 @@
-import type { TaskDto } from '@kurultay/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 
 export async function resolveBoardIdForNotification(

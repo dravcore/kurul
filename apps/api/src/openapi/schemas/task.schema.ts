@@ -6,7 +6,7 @@ import type {
   Priority,
   TaskAssigneeDto,
   TaskDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { LabelSchema } from './board.schema';
 
 /** One person assigned to a task. */

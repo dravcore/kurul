@@ -9,7 +9,7 @@ import type {
   UserDto,
   WorkspaceDto,
   WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { API_URL, WEB_URL } from '../stack-env';
 import { extractLink, openMailbox, type Mailbox } from './mailpit';
 
@@ -66,7 +66,7 @@ export class Stack {
    */
   async createUser(options: { confirmEmail?: boolean } = {}): Promise<TestUser> {
     const suffix = uniqueId();
-    const email = `e2e-${suffix}@kurultay.test`;
+    const email = `e2e-${suffix}@kurul.test`;
     const name = `E2E ${suffix}`;
     const api = await this.newApiContext();
 

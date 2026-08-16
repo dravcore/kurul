@@ -8,8 +8,8 @@ import {
   ColumnCategory,
   MemberRole,
   UsagePingKind,
-} from '@kurultay/shared-types';
-import type { ActivationFunnelDto, ActivationStepDto } from '@kurultay/shared-types';
+} from '@kurul/shared-types';
+import type { ActivationFunnelDto, ActivationStepDto } from '@kurul/shared-types';
 import { INSTANCE_ADMIN_EMAILS_ENV } from '../src/common/guards/instance-admin.guard';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';

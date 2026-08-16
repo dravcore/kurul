@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { SocketClientEvents } from '@kurultay/shared-types';
+import { SocketClientEvents } from '@kurul/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from './realtime.gateway';
 import { boardRoom, RealtimeService, userRoom } from './realtime.service';

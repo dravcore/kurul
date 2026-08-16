@@ -1,6 +1,6 @@
 # API Conventions
 
-REST conventions for the Kurultay API: URLs, verbs, payloads, errors, pagination, and DTOs.
+REST conventions for the Kurul API: URLs, verbs, payloads, errors, pagination, and DTOs.
 
 > 🌐 English (canonical) | [Türkçe](tr/api-conventions.md)
 
@@ -23,7 +23,7 @@ REST conventions for the Kurultay API: URLs, verbs, payloads, errors, pagination
 ## Scope
 
 These rules apply to every HTTP endpoint in `apps/api`. Socket.io events follow their own
-contract, defined in `@kurultay/shared-types` and described in
+contract, defined in `@kurul/shared-types` and described in
 [architecture.md](architecture.md).
 
 Base URL in development: `http://localhost:4000`.
@@ -497,7 +497,7 @@ workspace byte-for-byte as it was.
 `imported` counts rows actually written. `skipped` groups everything else by `(scope, reason)`;
 `count` is always the real number, while `samples` is capped at 20 names so the response scales
 with the number of _kinds_ of problem rather than with the size of the export. The vocabularies
-are closed — `TrelloImportScope` and `TrelloImportSkipReason` in `@kurultay/shared-types` — because
+are closed — `TrelloImportScope` and `TrelloImportSkipReason` in `@kurul/shared-types` — because
 the web renders one translated sentence per reason and a free-text reason would ship English into
 a Turkish UI (ADR 0018).
 
@@ -512,7 +512,7 @@ different", not "what did I lose".
 - **No idempotency.** Posting the same export twice creates **two boards**. There is no dedupe
   key, no update-in-place, no "already imported" answer. Updating an existing board is
   synchronisation, not import, and it needs a conflict policy this API does not have.
-- **No member mapping.** A Trello account is not a Kurultay account, so assignments are dropped
+- **No member mapping.** A Trello account is not a Kurul account, so assignments are dropped
   and counted. Every row written — tasks and attachments alike — is attributed to the caller.
 - **No column categories.** Every imported column is `UNSTARTED`; the category is never inferred
   from a list's name or its position ([ADR 0019](decisions/0019-column-category.md) refuses both).
@@ -776,7 +776,7 @@ GET /workspaces/w_1/some-bounded-collection?page=1&perPage=25
 ```
 
 No endpoint uses this shape today — every paginated list is a `CursorPage<T>` from
-`@kurultay/shared-types`. A collection that genuinely needs page numbers may return the
+`@kurul/shared-types`. A collection that genuinely needs page numbers may return the
 inline shape above until a dedicated type is worth it; do not invent a second shared
 pagination default.
 
@@ -822,7 +822,7 @@ client walks the cursor only when there is something left to walk to.
   `create-task.dto.ts`.
 - `UpdateXDto` derives from `CreateXDto` via `PartialType` rather than restating fields.
 - Request DTOs carry `class-validator` decorators; response DTOs are plain shapes mirrored in
-  `@kurultay/shared-types`.
+  `@kurul/shared-types`.
 
 Full DTO/validation rules: [coding-standards.md](coding-standards.md#dtos-and-validation).
 
@@ -886,7 +886,7 @@ Nest routes:
 
 - **`/auth/*`.** Better Auth is mounted on raw Express below the Nest router
   ([ADR 0004](decisions/0004-auth-better-auth.md)), so there is no controller to scan.
-- **The Socket.io contract.** Not HTTP. It lives in `@kurultay/shared-types` and in
+- **The Socket.io contract.** Not HTTP. It lives in `@kurul/shared-types` and in
   [architecture.md](architecture.md).
 
 ## Versioning
@@ -901,7 +901,7 @@ Until 1.0:
 - Breaking API changes may ship in any `0.y.0` release.
 - Every one is documented in `CHANGELOG.md` under `### Changed` / `### Removed`, with the
   old and new shape and a migration note.
-- `@kurultay/shared-types` is versioned with the monorepo, so a client that pins the package
+- `@kurul/shared-types` is versioned with the monorepo, so a client that pins the package
   version pins the contract.
 
 At 1.0, the API is frozen behind SemVer. If a versioning scheme is needed after that, it will

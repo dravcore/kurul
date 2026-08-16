@@ -1,4 +1,4 @@
-import { ActivityType, type ActivityDto } from '@kurultay/shared-types';
+import { ActivityType, type ActivityDto } from '@kurul/shared-types';
 
 type Translate = (key: string, values?: Record<string, string | number | Date>) => string;
 

@@ -1,6 +1,6 @@
 import { cookies, headers } from 'next/headers';
 import { getRequestConfig } from 'next-intl/server';
-import { LOCALE_COOKIE_NAME } from '@kurultay/shared-types';
+import { LOCALE_COOKIE_NAME } from '@kurul/shared-types';
 import { resolveRequestLocale } from './user-locale';
 
 /**

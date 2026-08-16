@@ -1,5 +1,5 @@
 {
-  "name": "kurultay",
+  "name": "kurul",
   "private": true,
   "version": "0.1.0",
   "description": "Open-source Kanban-focused project management",
@@ -9,19 +9,19 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel --filter @kurultay/api --filter @kurultay/web dev",
-    "build": "pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access --filter @kurultay/api --filter @kurultay/web build",
+    "dev": "pnpm -r --parallel --filter @kurul/api --filter @kurul/web dev",
+    "build": "pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access --filter @kurul/api --filter @kurul/web build",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r --filter @kurultay/api --filter @kurultay/web --filter @kurultay/shared-types --filter @kurultay/auth-access test",
-    "test:browser": "node e2e/build-stack.mjs && pnpm --filter @kurultay/e2e exec playwright test",
-    "typecheck": "pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build && pnpm -r typecheck",
+    "test": "pnpm -r --filter @kurul/api --filter @kurul/web --filter @kurul/shared-types --filter @kurul/auth-access test",
+    "test:browser": "node e2e/build-stack.mjs && pnpm --filter @kurul/e2e exec playwright test",
+    "typecheck": "pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build && pnpm -r typecheck",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "openapi": "pnpm --filter @kurultay/api build && pnpm --filter @kurultay/api openapi",
-    "openapi:check": "pnpm --filter @kurultay/api openapi:check",
+    "openapi": "pnpm --filter @kurul/api build && pnpm --filter @kurul/api openapi",
+    "openapi:check": "pnpm --filter @kurul/api openapi:check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"

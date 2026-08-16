@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { SocketEvents } from '@kurultay/shared-types';
-import type { TaskDto } from '@kurultay/shared-types';
+import { SocketEvents } from '@kurul/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
 import { RealtimeService } from '../realtime/realtime.service';
 import { TaskReadService } from './task-read.service';
 import { toTaskDetailDto } from './task.mapper';
