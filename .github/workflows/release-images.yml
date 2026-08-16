@@ -118,7 +118,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
 
-      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         # `id:` so the steps below can address the image by `outputs.digest` — the digest of
         # the multi-arch index this push created — rather than by one of the tags above. A tag
         # is a mutable pointer even seconds after it is written, so signing or scanning "the
