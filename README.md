@@ -54,7 +54,7 @@ Kurul's answer is deliberately narrow:
 - **Realtime and multi-tenancy in the core.** Socket.io board sync and workspace-scoped queries
   were designed in, not added on top.
 
-And what it is not, at `v0.1.0`: no subtasks, no time tracking, no public API tokens or
+And what it is not, at `v0.2.0`: no subtasks, no time tracking, no public API tokens or
 webhooks. The UI speaks English and Turkish — every interface string, the columns a new board
 is seeded with, and the email we send you — and a third language is a catalog away. API tokens,
 webhooks and further language packs are listed under
