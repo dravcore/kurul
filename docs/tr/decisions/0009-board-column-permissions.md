@@ -9,7 +9,7 @@
 
 Faz 3, workspace tenancy altında board ve column mutasyonlarını getiriyor. Nest
 zaten ürün route'larını `WorkspaceGuard` + `@Roles` ile kapıyor; Better Auth
-organization statement'ları (`@kurultay/auth-access`) yalnızca org/member/invitation
+organization statement'ları (`@kurul/auth-access`) yalnızca org/member/invitation
 kapsamında — board veya column yok. [design.md](../design.md) column
 değişiklikleri için Admin erişimi varsayan bir `403` metni zaten taşıyor.
 Handler'lar gelmeden önce açık bir rol matrisi gerekti; böylece API guard'ları

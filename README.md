@@ -1,32 +1,36 @@
-# Kurultay
+# Kurul
 
 Open-source, Kanban-focused project management tool.
 
-[![CI](https://github.com/dravcore/kurultay/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurultay/actions/workflows/ci.yml) [![CodeQL](https://github.com/dravcore/kurultay/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurultay/actions/workflows/codeql.yml) [![Release](https://img.shields.io/github/v/release/dravcore/kurultay)](https://github.com/dravcore/kurultay/releases) [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![CI](https://github.com/dravcore/kurul/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurul/actions/workflows/ci.yml) [![CodeQL](https://github.com/dravcore/kurul/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurul/actions/workflows/codeql.yml) [![Release](https://img.shields.io/github/v/release/dravcore/kurul)](https://github.com/dravcore/kurul/releases) [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-![Kurultay board](docs/assets/board.png)
+![Kurul board](docs/assets/board.png)
 
 > 🌐 English (canonical) | [Türkçe](README.tr.md)
 
 ## Status
 
-Kurultay’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards) — auth/workspaces, boards and
+Kurul’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards) — auth/workspaces, boards and
 tasks, filtering, dashboard, activity/notifications, and realtime board sync. See
 [docs/roadmap.md](docs/roadmap.md). A six-scenario Playwright smoke pack covers the critical
 browser flows ([docs/testing.md](docs/testing.md#browser-end-to-end)). Beyond-MVP items (email
 notifications, presence, extra locales, …) remain listed under Beyond MVP.
 
-## What is Kurultay?
+## What is Kurul?
 
-A _kurultay_ was the great assembly of Turkic-Mongol tradition, where clans gathered to
-discuss matters, reach decisions, and divide the work ahead. That's the shape of what this
-tool does for a team: people gather around a board, discuss the work, decide what matters,
-and divide tasks among themselves — tracked, prioritized, and visible to everyone.
+**Kurul** is Turkish for a council — the body that convenes, decides, and divides the work
+among itself. That is the shape of what this tool does for a team: people gather around a
+board, discuss the work, decide what matters, and divide tasks among themselves — tracked,
+prioritized, and visible to everyone.
 
-Kurultay aims to be a self-hostable, AGPL-licensed alternative to commercial Kanban/PM tools
+The project was called **Kurultay** until v0.2.0, after the great assembly of Turkic-Mongol
+tradition. The shorter name keeps the same idea and the same root, and fits the domain the
+project now lives on.
+
+Kurul aims to be a self-hostable, AGPL-licensed alternative to commercial Kanban/PM tools
 (Trello, Linear, Jira) for teams who want to own their data and their workflow.
 
-## Why Kurultay
+## Why Kurul
 
 Teams picking a self-hosted board rarely compare it to Trello — they compare it to the other
 self-hostable options. Where that field stands today:
@@ -39,7 +43,7 @@ self-hostable options. Where that field stands today:
 | [Vikunja](https://vikunja.io/pricing/)                           | AGPLv3 core, but the admin panel, audit logs and time tracking are Pro-only even on an instance you host yourself                  |
 | [OpenProject](https://www.openproject.org/pricing/)              | GPLv3 Community Edition, Rails-based and enterprise-shaped; a set of features stays Enterprise-only                                |
 
-Kurultay's answer is deliberately narrow:
+Kurul's answer is deliberately narrow:
 
 - **One license, one tier.** AGPL-3.0 for the whole codebase, nothing held back. The commercial
   model is dual licensing of that same code, not a paid feature build
@@ -74,14 +78,14 @@ Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
   the URL, so no preview fetch can be turned into a probe of your network
   ([ADR 0022](docs/decisions/0022-attachment-storage.md),
   [ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md))
-- **Trello import (one-way)** — upload a Trello board's JSON export and get a Kurultay board:
+- **Trello import (one-way)** — upload a Trello board's JSON export and get a Kurul board:
   lists, cards, labels and checklists. It is one-way and not repeatable: **importing the same
   export twice creates two boards** — there is no update-in-place and no dedupe. Three things
   deliberately do not come across, and the import report tells you how many of each: **files**
   (a Trello export carries attachment URLs, not bytes, so they arrive as links the server never
-  requests), **members** (a Trello account is not a Kurultay account, so assignments are dropped
+  requests), **members** (a Trello account is not a Kurul account, so assignments are dropped
   and everything is attributed to you) and **comments**. Archived lists and cards are skipped too,
-  and every imported column arrives as "not started" — Kurultay never guesses which of your
+  and every imported column arrives as "not started" — Kurul never guesses which of your
   columns means "done", so you set that yourself afterwards. The report exists only in the
   response: it is shown once, it is not stored, and dismissing it is permanent
   ([ADR 0025](docs/decisions/0025-trello-import-mapping.md))
@@ -101,11 +105,11 @@ Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
 ## Quick start
 
 ```bash
-git clone https://github.com/dravcore/kurultay.git
-cd kurultay
+git clone https://github.com/dravcore/kurul.git
+cd kurul
 cp .env.example .env   # set BETTER_AUTH_SECRET (openssl rand -base64 32) and POSTGRES_PASSWORD (openssl rand -hex 32)
 pnpm install
-pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access build   # shared packages, consumed from gitignored dist/
+pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build   # shared packages, consumed from gitignored dist/
 pnpm db:generate        # generate the Prisma client (gitignored, not created automatically)
 docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
@@ -132,7 +136,7 @@ that flow locally without a real mail provider; see
 
 Full stack in Docker, pull-based: `docker compose pull && docker compose up -d`, then open
 http://localhost. Every tagged release publishes `api`/`web` images to GHCR
-(`ghcr.io/dravcore/kurultay-api`, `ghcr.io/dravcore/kurultay-web`), so this installs and
+(`ghcr.io/dravcore/kurul-api`, `ghcr.io/dravcore/kurul-web`), so this installs and
 upgrades without a local build; set `TAG=vX.Y.Z` in `.env` to pin a release instead of
 `latest`. No image published yet for your `TAG` (or no network route to `ghcr.io`)?
 `docker compose up -d` still falls back to building from source automatically —
@@ -141,7 +145,7 @@ Day-to-day details: [docs/development.md](docs/development.md).
 
 Both apps are served from one origin behind a bundled Caddy reverse proxy, so the **same
 published image runs on any domain with no rebuild** — put it on your own by setting
-`SITE_URL=https://kurultay.example.com` in `.env`, which also turns on automatic HTTPS.
+`SITE_URL=https://kurul.example.com` in `.env`, which also turns on automatic HTTPS.
 The one-page walkthrough, SMTP included: [docs/self-hosting.md](docs/self-hosting.md).
 
 ## Stack
@@ -179,7 +183,7 @@ product, coding, API, releases, roadmap).
 Bug reports, feature ideas, and design feedback are welcome and genuinely useful. **Outside
 code, documentation, and translation pull requests are not accepted** — the codebase stays
 single-authored, indefinitely ([ADR 0015](docs/decisions/0015-no-external-contributions.md)).
-Kurultay is issue-first: propose before you implement. See
+Kurul is issue-first: propose before you implement. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the process, and
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work together.
 

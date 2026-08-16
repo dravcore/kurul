@@ -1,8 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { LabelDto, WorkspaceMemberDto } from '@kurultay/shared-types';
-import { MemberRole, Priority } from '@kurultay/shared-types';
+import type { LabelDto, WorkspaceMemberDto } from '@kurul/shared-types';
+import { MemberRole, Priority } from '@kurul/shared-types';
 import type { BoardTaskFilters } from '@/lib/task-query';
 import messages from '@/messages/en.json';
 import { BoardFilters } from './board-filters';

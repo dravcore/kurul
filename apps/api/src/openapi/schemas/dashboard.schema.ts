@@ -5,7 +5,7 @@ import type {
   DashboardSummaryDto,
   DashboardThroughputDay,
   Priority,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 
 /** Task count for one priority. */
 export class DashboardCountByPrioritySchema implements DashboardCountByPriority {

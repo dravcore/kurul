@@ -7,7 +7,7 @@ import {
   MemberRole,
   type InvitationDto,
   type WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { ApiError, api } from '@/lib/api';
 import { SMTP_SETUP_DOCS_URL, fetchInstanceConfig } from '@/lib/instance-config';
@@ -84,7 +84,7 @@ function invitation(
     role,
     status: 'pending',
     expiresAt: '2099-01-01T00:00:00.000Z',
-    acceptUrl: `https://kurultay.test/invite/${id}`,
+    acceptUrl: `https://kurul.test/invite/${id}`,
   };
 }
 
@@ -157,13 +157,13 @@ afterEach(() => {
 
 describe('MembersSettings — inviting', () => {
   it('sends the address and role the admin chose to the invitations endpoint', async () => {
-    const created = invitation('inv-1', 'yeni@kurultay.test', MemberRole.ADMIN);
+    const created = invitation('inv-1', 'yeni@kurul.test', MemberRole.ADMIN);
     apiPost.mockResolvedValue(created as never);
     renderSection();
 
     fireEvent.click(await screen.findByRole('button', { name: copy.inviteAction }));
     fireEvent.change(screen.getByLabelText(copy.inviteEmail), {
-      target: { value: '  yeni@kurultay.test  ' },
+      target: { value: '  yeni@kurul.test  ' },
     });
     fireEvent.change(screen.getByLabelText(copy.inviteRole), {
       target: { value: MemberRole.ADMIN },
@@ -172,11 +172,11 @@ describe('MembersSettings — inviting', () => {
 
     await waitFor(() => expect(apiPost).toHaveBeenCalled());
     expect(apiPost).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/invitations`, {
-      email: 'yeni@kurultay.test',
+      email: 'yeni@kurul.test',
       role: MemberRole.ADMIN,
     });
     // The point of the flow: the invitation an admin just sent is now something they can see.
-    expect(await screen.findByText('yeni@kurultay.test')).toBeTruthy();
+    expect(await screen.findByText('yeni@kurul.test')).toBeTruthy();
   });
 
   /**
@@ -186,12 +186,12 @@ describe('MembersSettings — inviting', () => {
    */
   it('confirms the invitation as sent when the server delivered it', async () => {
     apiPost.mockResolvedValue({
-      ...invitation('inv-1', 'yeni@kurultay.test'),
+      ...invitation('inv-1', 'yeni@kurul.test'),
       emailDelivery: MailDeliveryStatus.SENT,
     } as never);
     renderSection();
 
-    await sendInvitation('yeni@kurultay.test');
+    await sendInvitation('yeni@kurul.test');
 
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
     expect(toast.warning).not.toHaveBeenCalled();
@@ -199,28 +199,28 @@ describe('MembersSettings — inviting', () => {
 
   it('downgrades the confirmation when no email went out, and names the way out', async () => {
     apiPost.mockResolvedValue({
-      ...invitation('inv-1', 'yeni@kurultay.test'),
+      ...invitation('inv-1', 'yeni@kurul.test'),
       emailDelivery: MailDeliveryStatus.NOT_CONFIGURED,
     } as never);
     renderSection();
 
-    await sendInvitation('yeni@kurultay.test');
+    await sendInvitation('yeni@kurul.test');
 
     await waitFor(() => expect(toast.warning).toHaveBeenCalled());
     expect(toast.success).not.toHaveBeenCalled();
-    expect(vi.mocked(toast.warning).mock.calls[0]?.[0]).toContain('yeni@kurultay.test');
+    expect(vi.mocked(toast.warning).mock.calls[0]?.[0]).toContain('yeni@kurul.test');
     // The exit route is the Copy link control on the row this invitation just joined.
     expect(vi.mocked(toast.warning).mock.calls[0]?.[0]).toContain(copy.copyLink);
   });
 
   it('warns on a refused relay too, not only on a missing one', async () => {
     apiPost.mockResolvedValue({
-      ...invitation('inv-1', 'yeni@kurultay.test'),
+      ...invitation('inv-1', 'yeni@kurul.test'),
       emailDelivery: MailDeliveryStatus.FAILED,
     } as never);
     renderSection();
 
-    await sendInvitation('yeni@kurultay.test');
+    await sendInvitation('yeni@kurul.test');
 
     await waitFor(() => expect(toast.warning).toHaveBeenCalled());
   });
@@ -230,10 +230,10 @@ describe('MembersSettings — inviting', () => {
    * would cry wolf on every deployment whose invitation flow works perfectly.
    */
   it('confirms normally when the server reported no delivery status at all', async () => {
-    apiPost.mockResolvedValue(invitation('inv-1', 'yeni@kurultay.test') as never);
+    apiPost.mockResolvedValue(invitation('inv-1', 'yeni@kurul.test') as never);
     renderSection();
 
-    await sendInvitation('yeni@kurultay.test');
+    await sendInvitation('yeni@kurul.test');
 
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
     expect(toast.warning).not.toHaveBeenCalled();
@@ -253,18 +253,18 @@ describe('MembersSettings — inviting', () => {
 
 describe('MembersSettings — revoking an invitation', () => {
   it('drops the row from the pending list once the server confirms', async () => {
-    loadInvitations.mockResolvedValue([invitation('inv-1', 'bekleyen@kurultay.test')]);
+    loadInvitations.mockResolvedValue([invitation('inv-1', 'bekleyen@kurul.test')]);
     apiDelete.mockResolvedValue(undefined as never);
     renderSection();
 
-    expect(await screen.findByText('bekleyen@kurultay.test')).toBeTruthy();
+    expect(await screen.findByText('bekleyen@kurul.test')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: copy.revokeAction }));
     clickLastButton(copy.revokeAction);
 
     await waitFor(() => expect(apiDelete).toHaveBeenCalled());
     expect(apiDelete).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/invitations/inv-1`);
-    await waitFor(() => expect(screen.queryByText('bekleyen@kurultay.test')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('bekleyen@kurul.test')).toBeNull());
   });
 });
 
@@ -390,7 +390,7 @@ describe('MembersSettings — a deployment that cannot send email', () => {
    */
   it('points at the copy-link way out, and the control it names exists', async () => {
     loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
-    loadInvitations.mockResolvedValue([invitation('inv-1', 'bekleyen@kurultay.test')]);
+    loadInvitations.mockResolvedValue([invitation('inv-1', 'bekleyen@kurul.test')]);
     renderSection();
 
     expect(await screen.findByText(copy.mailDisabledBody)).toBeTruthy();

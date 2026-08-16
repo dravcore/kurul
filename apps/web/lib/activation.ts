@@ -1,5 +1,5 @@
-import { ActivationEvent } from '@kurultay/shared-types';
-import type { ActivationFunnelDto } from '@kurultay/shared-types';
+import { ActivationEvent } from '@kurul/shared-types';
+import type { ActivationFunnelDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 
 /**

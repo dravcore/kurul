@@ -5,7 +5,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ArrowLeft, ArrowRight, MoreHorizontal, Plus, Settings2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { ColumnDto, TaskDto } from '@kurultay/shared-types';
+import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {

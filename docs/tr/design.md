@@ -1,6 +1,6 @@
 # Tasarım
 
-Kurultay web uygulamasının görsel ve etkileşim dili: ilkeler, token'lar, yerleşim, hareket,
+Kurul web uygulamasının görsel ve etkileşim dili: ilkeler, token'lar, yerleşim, hareket,
 durumlar ve metin.
 
 > 🌐 [English (canonical)](../design.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
@@ -43,9 +43,10 @@ durumlar ve metin.
 
 ## 2. Kimlik
 
-Kurultay adını Türk-Moğol geleneğinin büyük meclisinden alır: boylar toplanır, sancaklar
-dikilir, meseleler karara bağlanır, iş bölüştürülür. Kimlik _bu_ dünyadan gelir — sancak, damga,
-bozkır — jenerik prodüktivite-aracı dilinden değil.
+Kurul, adını toplanıp karar alan ve işi bölüşen heyetten alır — ve v0.2.0'a kadar projeye ilk
+adını veren _kurultay_'dan: boylar toplanır, sancaklar dikilir, meseleler karara bağlanır, iş
+bölüştürülür. Kimlik hâlâ _bu_ dünyadan gelir — sancak, damga, bozkır — jenerik
+prodüktivite-aracı dilinden değil. Ad kısaldı, görsel dil değişmedi.
 
 **Signature eleman — sancak rail'i:** o an aktif olan neyse onun leading edge'inde 2px'lik bakır
 renginde bir çizgi (aktif sidebar öğesi, focus'taki column, seçili kart, açık panelin leading
@@ -72,7 +73,7 @@ Aynı anda iki bakır şey görünüyorsa ve hiçbiri bir primary action değils
 
 **Anti-brief.** Bilinçli olarak _şu değil_: serif bir font ve kiremit rengi bir accent'le sıcak
 krem bir ground; asit bir accent'le neredeyse siyah; sıfır radius'ta broadsheet hairline'ları.
-Kurultay'ın nötrleri bilinçli olarak soğuk yeşil-gri akar — tam olarak sıcak bakırın karşısına
+Kurul'un nötrleri bilinçli olarak soğuk yeşil-gri akar — tam olarak sıcak bakırın karşısına
 oturacağı bir şey olsun diye; sıcak bir ground üzerinde sıcak bir accent hem şu anki varsayılan
 görünüm hem de accent'i kaybettirmenin bir yolu.
 
@@ -81,7 +82,7 @@ görünüm hem de accent'i kaybettirmenin bir yolu.
 Faz 3 için öneriler, `components/ui/`'ın değiştirilmemiş generated output olarak kalması için
 shadcn/ui CSS-variable konvansiyonuna göre adlandırıldı. **Dikkat:** shadcn'in kendi
 vokabülerinde `--primary` marka action rengidir ve `--accent` ise subtle hover surface'idir; bu
-yüzden Kurultay'ın signature bakırı `--primary`'dir ve `--accent` sakin bir nötr tint olarak
+yüzden Kurul'un signature bakırı `--primary`'dir ve `--accent` sakin bir nötr tint olarak
 kalır. shadcn'in variable'larını yeniden adlandırma.
 
 ### Nötrler ve accent
@@ -417,7 +418,7 @@ multiple'lara facet'le.
 | Zaman içinde column composition'ı                | **Stacked area / column**, ≤ 6 series                                                            | categorical                      |
 | Hepsi önemli olan ~7'den fazla category          | **Table**, ya da table artı chart                                                                | —                                |
 
-Palette, Kurultay'ın kendi surface'lerine karşı validate edildi (`#FFFFFF` açık, `#161918` koyu).
+Palette, Kurul'un kendi surface'lerine karşı validate edildi (`#FFFFFF` açık, `#161918` koyu).
 Bu slot'lar aynı zamanda `Label.color`'ın arkasındadır.
 
 | Slot | Ton     | Açık      | Koyu      |     | Slot | Ton     | Açık      | Koyu      |

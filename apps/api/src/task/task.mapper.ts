@@ -4,7 +4,7 @@ import type {
   LabelDto,
   TaskAssigneeDto,
   TaskDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { toLabelColorSlot } from '../common/label-color';
 import type { TaskDetailRow, TaskListRow, TaskRowBase } from './task.include';
 

@@ -66,18 +66,18 @@ describe('normalizeOrigin', () => {
     // (it is also the base for links in outgoing mail), and none of them appear in the header
     // a browser sends.
     ['http://localhost:3000/', 'http://localhost:3000'],
-    ['https://kurultay.example.com/app?x=1', 'https://kurultay.example.com'],
+    ['https://kurul.example.com/app?x=1', 'https://kurul.example.com'],
     // The scheme's default port is omitted from the serialised origin, so both spellings of
     // the same deployment resolve to the one string the browser will send.
-    ['https://kurultay.example.com:443', 'https://kurultay.example.com'],
-    ['http://kurultay.example.com:80', 'http://kurultay.example.com'],
-    ['HTTPS://Kurultay.Example.COM', 'https://kurultay.example.com'],
+    ['https://kurul.example.com:443', 'https://kurul.example.com'],
+    ['http://kurul.example.com:80', 'http://kurul.example.com'],
+    ['HTTPS://Kurul.Example.COM', 'https://kurul.example.com'],
   ])('reduces %s to the origin a browser would send: %s', (input, expected) => {
     expect(normalizeOrigin(input)).toBe(expected);
   });
 
   it('refuses a value that is not a URL, rather than yielding an allowlist nothing matches', () => {
-    expect(() => normalizeOrigin('kurultay.example.com')).toThrow(/not a valid origin url/i);
+    expect(() => normalizeOrigin('kurul.example.com')).toThrow(/not a valid origin url/i);
   });
 
   it.each([

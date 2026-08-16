@@ -1,4 +1,4 @@
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import type { MailMessage } from '../mail/mail-sender';
 import { sendMail } from '../mail/send-mail';
 import { readStoredLocale } from '../mail/stored-locale';

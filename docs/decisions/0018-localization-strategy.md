@@ -26,7 +26,7 @@ So the real decision is not "which library" but the three questions that line de
 locale gets chosen, where the preference lives, and what happens to strings that are stored
 in the database rather than in a message catalog.
 
-Two constraints shape the answer. First, every page in Kurultay is behind authentication —
+Two constraints shape the answer. First, every page in Kurul is behind authentication —
 there is no indexable content, and a marketing or documentation site, if one is built, will
 live outside this Next.js application. Second, `apps/api` has no locale awareness at all:
 errors are returned as stable codes plus an HTTP status, and the web maps them to translation
@@ -61,7 +61,7 @@ There is no `[locale]` path segment and no i18n middleware. Alongside that:
 ## Rationale
 
 - The one real payoff of a `[locale]` path segment is SEO: distinct URLs per language plus
-  `hreflang`. Nothing in Kurultay is indexed, so that payoff does not apply, and the marketing
+  `hreflang`. Nothing in Kurul is indexed, so that payoff does not apply, and the marketing
   site that would need it is planned to live elsewhere.
 - The costs of the path segment are paid immediately and in full: the entire `app/` tree moves
   under `app/[locale]/`, and every `<Link>` and `router.push` has to switch to next-intl's
@@ -105,7 +105,7 @@ There is no `[locale]` path segment and no i18n middleware. Alongside that:
   as a missing key.
 - The API gains a small amount of locale awareness — reading `Accept-Language` — which it did
   not have before. It is confined to database seeding and email.
-- **The seed column names live in the API, not in `@kurultay/shared-types`.** Settled during
+- **The seed column names live in the API, not in `@kurul/shared-types`.** Settled during
   implementation, because §3 leaves it open. They are data the API writes on the user's behalf,
   and once the web stopped seeding — `POST …/columns/defaults` replaced its three-request loop —
   the API became their only writer. A shared copy would ship every language's seed vocabulary
@@ -130,7 +130,7 @@ There is no `[locale]` path segment and no i18n middleware. Alongside that:
   measured against.
 - **Role names are translated in the interface (`Sahip / Yönetici / Üye / Misafir`) and left in
   English in `docs/tr/**` (`owner'ından`, `admin'e`) — a deliberate split, not drift.** The docs
-  are talking about the `OWNER`/`ADMIN` enum values and the `@kurultay/auth-access` role
+  are talking about the `OWNER`/`ADMIN` enum values and the `@kurul/auth-access` role
   identifiers, which are never translated; the badge is a word a person reads.
 - **"100% translated" is a gate, not a claim.** `apps/web/messages/catalog.test.ts` fails the
   build on a key `en.json` has and another catalogue does not, on a key another catalogue has

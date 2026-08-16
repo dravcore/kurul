@@ -2,7 +2,7 @@ import {
   LOCALE_COOKIE_MAX_AGE_SECONDS,
   LOCALE_COOKIE_NAME,
   type Locale,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 
 /**
  * Builds the `document.cookie` assignment mirroring the language choice into the browser.

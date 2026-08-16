@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import type { WorkspaceMemberDto } from '@kurultay/shared-types';
+import type { WorkspaceMemberDto } from '@kurul/shared-types';
 import { VerificationResend } from '@/components/auth/verification-resend';
 import { Button } from '@/components/ui/button';
 import { api, authClientError, resolveApiMessage } from '@/lib/api';

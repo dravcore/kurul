@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { Priority } from '@kurultay/shared-types';
+import { Priority } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { AssigneeChart } from './assignee-chart';
 import { ColumnChart } from './column-chart';

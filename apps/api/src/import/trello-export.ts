@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { TrelloImportScope, TrelloImportSkipReason } from '@kurultay/shared-types';
+import { TrelloImportScope, TrelloImportSkipReason } from '@kurul/shared-types';
 
 /**
  * Only the fields the importer reads. Everything else in a Trello export is ignored on purpose:

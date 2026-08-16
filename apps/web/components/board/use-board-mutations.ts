@@ -8,7 +8,7 @@ import {
   type MoveColumnRequest,
   type MoveTaskRequest,
   type TaskDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { api, apiStatus } from '@/lib/api';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import type { TaskMovePayload } from '@/components/task/use-board-task-dnd';

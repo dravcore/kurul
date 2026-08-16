@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { ChecklistItemDto } from '@kurultay/shared-types';
+import type { ChecklistItemDto } from '@kurul/shared-types';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 

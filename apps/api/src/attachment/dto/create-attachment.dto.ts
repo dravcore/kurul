@@ -1,5 +1,5 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
-import { AttachmentKind } from '@kurultay/shared-types';
+import { AttachmentKind } from '@kurul/shared-types';
 
 /**
  * The body of `POST .../attachments`, for both shapes it accepts.

@@ -1,4 +1,4 @@
-import { MailDeliveryStatus } from '@kurultay/shared-types';
+import { MailDeliveryStatus } from '@kurul/shared-types';
 import { captureMailDelivery, recordMailDelivery } from './mail-delivery-scope';
 
 describe('captureMailDelivery', () => {

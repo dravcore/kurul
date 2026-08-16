@@ -1,35 +1,38 @@
-# Kurultay
+# Kurul
 
 Açık kaynak, Kanban odaklı proje yönetim aracı.
 
-[![CI](https://github.com/dravcore/kurultay/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurultay/actions/workflows/ci.yml) [![CodeQL](https://github.com/dravcore/kurultay/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurultay/actions/workflows/codeql.yml) [![Sürüm](https://img.shields.io/github/v/release/dravcore/kurultay)](https://github.com/dravcore/kurultay/releases) [![Lisans](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![CI](https://github.com/dravcore/kurul/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurul/actions/workflows/ci.yml) [![CodeQL](https://github.com/dravcore/kurul/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/dravcore/kurul/actions/workflows/codeql.yml) [![Sürüm](https://img.shields.io/github/v/release/dravcore/kurul)](https://github.com/dravcore/kurul/releases) [![Lisans](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-![Kurultay panosu](docs/assets/board.png)
+![Kurul panosu](docs/assets/board.png)
 
 > 🌐 [English (canonical)](README.md) | Türkçe
 
 ## Durum
 
-Kurultay’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı) — auth/workspace’ler, board ve
+Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı) — auth/workspace’ler, board ve
 task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Bkz.
 [docs/roadmap.md](docs/tr/roadmap.md). Kritik tarayıcı akışlarını altı senaryoluk bir
 Playwright smoke paketi kapsıyor ([docs/testing.md](docs/tr/testing.md#browser-uçtan-uca)).
 MVP ötesi maddeler (e-posta bildirimleri, presence, ek diller, …) hâlâ MVP ötesi altında
 listelenir.
 
-## Kurultay nedir?
+## Kurul nedir?
 
-_Kurultay_, Türk-Moğol geleneğinde boyların bir araya gelip meseleleri tartıştığı, kararlar
-aldığı ve önündeki işi bölüştüğü büyük meclisin adıdır. Bu aracın bir ekip için yaptığı şey
-de tam olarak bu: insanlar bir board etrafında toplanır, işi konuşur, neyin önemli olduğuna
-karar verir ve görevleri aralarında paylaştırır — herkes için izlenebilir, önceliklendirilmiş
-ve görünür şekilde.
+**Kurul**, toplanıp konuşan, karar alan ve önündeki işi kendi arasında bölüşen heyettir. Bu
+aracın bir ekip için yaptığı şey de tam olarak bu: insanlar bir board etrafında toplanır, işi
+konuşur, neyin önemli olduğuna karar verir ve görevleri aralarında paylaştırır — herkes için
+izlenebilir, önceliklendirilmiş ve görünür şekilde.
 
-Kurultay, verisinin ve iş akışının sahibi olmak isteyen ekipler için ticari Kanban/PM
+Proje v0.2.0'a kadar **Kurultay** adını taşıyordu — Türk-Moğol geleneğinde boyların toplanıp
+meseleleri tartıştığı, karar aldığı büyük meclis. Kısa ad aynı fikri ve aynı kökü koruyor, ve
+projenin artık üzerinde yaşadığı domain'e uyuyor.
+
+Kurul, verisinin ve iş akışının sahibi olmak isteyen ekipler için ticari Kanban/PM
 araçlarına (Trello, Linear, Jira) kendi kendine barındırılabilir, AGPL lisanslı bir
 alternatif olmayı hedefliyor.
 
-## Neden Kurultay
+## Neden Kurul
 
 Kendi kendine barındırılan bir board seçen ekipler bunu genelde Trello ile değil, diğer
 self-host seçenekleriyle kıyaslar. Bugün o alanın durumu:
@@ -42,7 +45,7 @@ self-host seçenekleriyle kıyaslar. Bugün o alanın durumu:
 | [Vikunja](https://vikunja.io/pricing/)                           | Çekirdek AGPLv3, ama admin paneli, audit log'ları ve zaman takibi kendi barındırdığınız instance'ta bile yalnız Pro'da                        |
 | [OpenProject](https://www.openproject.org/pricing/)              | GPLv3 Community Edition, Rails tabanlı ve kurumsal ölçekli; bir grup özellik Enterprise'a özel kalıyor                                        |
 
-Kurultay'ın cevabı bilinçli olarak dar:
+Kurul'un cevabı bilinçli olarak dar:
 
 - **Tek lisans, tek katman.** Kod tabanının tamamı AGPL-3.0, hiçbir şey saklı değil. Ticari
   model, aynı kodun ikili lisanslanması; ücretli bir özellik sürümü değil
@@ -78,14 +81,14 @@ MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadma
   ([ADR 0022](docs/tr/decisions/0022-attachment-storage.md),
   [ADR 0024](docs/tr/decisions/0024-attachment-kinds-and-serving-policy.md))
 - **Trello import'u (tek yönlü)** — bir Trello board'unun JSON export'unu yükleyin, karşılığında
-  bir Kurultay board'u alın: list'ler, kart'lar, label'lar ve checklist'ler. Tek yönlüdür ve
+  bir Kurul board'u alın: list'ler, kart'lar, label'lar ve checklist'ler. Tek yönlüdür ve
   tekrarlanabilir değildir: **aynı export'u iki kez import etmek iki board yaratır** — yerinde
   güncelleme de yok, tekilleştirme de. Üç şey bilinçli olarak gelmez ve import raporu her birinin
   kaç tane olduğunu söyler: **dosyalar** (Trello export'u attachment'ların baytlarını değil
   URL'lerini taşır, dolayısıyla bağlantı olarak gelirler ve sunucu o URL'lere hiç istek atmaz),
-  **üyeler** (bir Trello hesabı bir Kurultay hesabı değildir; atamalar düşer ve her şey sizin
+  **üyeler** (bir Trello hesabı bir Kurul hesabı değildir; atamalar düşer ve her şey sizin
   üzerinize yazılır) ve **yorumlar**. Arşivlenmiş list ve kartlar da atlanır, ve içe aktarılan her
-  kolon "başlanmadı" olarak gelir — Kurultay hangi kolonunuzun "bitti" demek olduğunu asla tahmin
+  kolon "başlanmadı" olarak gelir — Kurul hangi kolonunuzun "bitti" demek olduğunu asla tahmin
   etmez, onu sonradan siz ayarlarsınız. Rapor yalnız cevabın içindedir: bir kez gösterilir,
   saklanmaz, kapatmak kalıcıdır
   ([ADR 0025](docs/tr/decisions/0025-trello-import-mapping.md))
@@ -105,11 +108,11 @@ MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadma
 ## Hızlı başlangıç
 
 ```bash
-git clone https://github.com/dravcore/kurultay.git
-cd kurultay
+git clone https://github.com/dravcore/kurul.git
+cd kurul
 cp .env.example .env   # BETTER_AUTH_SECRET ayarla (openssl rand -base64 32), POSTGRES_PASSWORD ayarla (openssl rand -hex 32)
 pnpm install
-pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access build   # paylaşılan paketler, git-ignored dist/ üzerinden tüketilir
+pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build   # paylaşılan paketler, git-ignored dist/ üzerinden tüketilir
 pnpm db:generate        # Prisma client'ı üret (git-ignored, otomatik oluşmaz)
 docker compose -f docker-compose.dev.yml up -d
 pnpm db:migrate
@@ -136,7 +139,7 @@ bkz. [docs/tr/development.md#smtp-ve-mailpit](docs/tr/development.md#smtp-ve-mai
 
 Tam stack Docker, pull tabanlı: `docker compose pull && docker compose up -d`, ardından
 http://localhost adresini açın. Her etiketli release, `api`/`web` imajlarını GHCR'a yayınlar
-(`ghcr.io/dravcore/kurultay-api`, `ghcr.io/dravcore/kurultay-web`) — bu sayede kurulum ve
+(`ghcr.io/dravcore/kurul-api`, `ghcr.io/dravcore/kurul-web`) — bu sayede kurulum ve
 upgrade lokal build gerektirmez; `latest` yerine belirli bir sürümü sabitlemek için `.env`'de
 `TAG=vX.Y.Z` ayarlayın. `TAG`'iniz için henüz yayınlanmış bir imaj yoksa (veya `ghcr.io`'ya ağ
 erişimi yoksa) `docker compose up -d` otomatik olarak kaynaktan build'e döner —
@@ -145,7 +148,7 @@ devam eder. Günlük detaylar: [docs/tr/development.md](docs/tr/development.md).
 
 Her iki uygulama da pakete dahil Caddy reverse proxy'sinin arkasında **tek origin**'den
 sunulur; bu sayede **aynı yayınlanmış imaj her domain'de yeniden build edilmeden çalışır** —
-kendi domain'inize taşımak için `.env`'de `SITE_URL=https://kurultay.example.com` ayarlamanız
+kendi domain'inize taşımak için `.env`'de `SITE_URL=https://kurul.example.com` ayarlamanız
 yeterli, bu aynı zamanda otomatik HTTPS'i de açar. SMTP dahil tek sayfalık rehber:
 [docs/tr/self-hosting.md](docs/tr/self-hosting.md).
 
@@ -185,7 +188,7 @@ Hata bildirimleri, özellik fikirleri ve tasarım geri bildirimi hoş karşılan
 faydalı. **Dışarıdan gelen kod, doküman ve çeviri pull request'leri kabul edilmiyor** — kod
 tabanı belirsiz süreyle tek yazarlı kalıyor
 ([ADR 0015](docs/tr/decisions/0015-no-external-contributions.md)).
-Kurultay issue-first çalışıyor: uygulamaya geçmeden önce öner. Süreç için
+Kurul issue-first çalışıyor: uygulamaya geçmeden önce öner. Süreç için
 [CONTRIBUTING.md](CONTRIBUTING.md)'ye, birlikte nasıl çalıştığımız için ise
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)'ye bakın.
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { BoardDto } from '@kurultay/shared-types';
+import type { BoardDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { RenameBoardDialog } from './rename-board-dialog';

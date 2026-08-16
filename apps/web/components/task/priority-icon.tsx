@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp, ChevronsUp, Minus, type LucideIcon } from 'lucide-react';
-import { Priority } from '@kurultay/shared-types';
+import { Priority } from '@kurul/shared-types';
 import { cn } from '@/lib/utils';
 
 const PRIORITY_META: Record<Priority, { icon: LucideIcon; className: string; labelKey: Priority }> =

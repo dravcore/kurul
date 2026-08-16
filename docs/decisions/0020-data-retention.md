@@ -7,7 +7,7 @@
 
 ## Context
 
-Until this decision, Kurultay deleted a row only when a user asked it to. There was no
+Until this decision, Kurul deleted a row only when a user asked it to. There was no
 scheduled job of any kind except the due-soon scan, which only ever inserts. Four tables grew
 without bound:
 
@@ -24,7 +24,7 @@ Two separate problems live in that table.
 personal data is kept no longer than the purpose requires. An expired session's IP address
 serves no purpose at all — the row cannot authenticate anybody. Neither can a redeemed or
 expired verification token, which is a bare record that _this e-mail address_ asked for
-something on _this date_. A self-hoster running Kurultay in the EU or Turkey currently has no
+something on _this date_. A self-hoster running Kurul in the EU or Turkey currently has no
 answer to "how long do you keep this?", because the answer is "forever, and nothing in the
 product says otherwise". That is a documentation failure as much as a code one: a retention
 period that exists only in someone's head is not a retention policy.
@@ -61,7 +61,7 @@ workspace tree are untouched by retention and are removed only by an explicit us
 because it covers every question the feed is actually asked — "what happened on this board
 last quarter", "who changed this before the release" — and because it is the shortest window
 that survives an annual review cycle without a user noticing the horizon. Archiving to cold
-storage is rejected outright, not deferred: Kurultay deploys as a Compose stack with a
+storage is rejected outright, not deferred: Kurul deploys as a Compose stack with a
 Postgres volume and no object store ([ADR 0001](0001-monorepo-modular-monolith.md)), so an
 "archive" would be a file on the same disk that nobody reads and nobody restores. The backup
 sidecar already writes `BACKUP_KEEP` full `pg_dump` archives — _that_ is the cold copy, and an

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { BoardDto } from '@kurultay/shared-types';
+import type { BoardDto } from '@kurul/shared-types';
 import { repoRoot } from '../load-env.mjs';
 import { column, expectCardOrder } from '../support/board-page';
 import { expect, test } from '../support/fixtures';
@@ -43,7 +43,7 @@ import { expect, test } from '../support/fixtures';
  * available, so nothing here is evidence about Trello's real schema, only about this stack.
  *
  * The plan's sketch for this scenario asserted `/\d+ cards?/`. That is wrong and was measured to
- * be wrong: the panel counts what it *wrote* in Kurultay's vocabulary — "4 tasks" — and reserves
+ * be wrong: the panel counts what it *wrote* in Kurul's vocabulary — "4 tasks" — and reserves
  * "cards" for the Trello cards that did not come across. A `cards` regex would pass on the
  * skipped-group sentence while the imported count silently rendered nothing.
  */

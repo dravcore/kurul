@@ -16,7 +16,7 @@ import type {
   LabelDto,
   TaskDto,
   WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { api, apiStatus } from '@/lib/api';
 import { fetchAllWorkspaceMembers } from '@/lib/member-query';
 import { fetchAllBoardTasks, type BoardTaskFilters } from '@/lib/task-query';

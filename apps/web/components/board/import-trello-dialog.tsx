@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { TrelloImportReportDto } from '@kurultay/shared-types';
+import type { TrelloImportReportDto } from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {

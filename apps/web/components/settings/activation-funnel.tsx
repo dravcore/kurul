@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { ActivationFunnelDto, ActivationStepDto } from '@kurultay/shared-types';
+import type { ActivationFunnelDto, ActivationStepDto } from '@kurul/shared-types';
 import {
   ACTIVATION_STEP_LABEL_KEYS,
   fetchActivationFunnel,

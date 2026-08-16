@@ -4,8 +4,8 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ActivityType, SocketEvents } from '@kurultay/shared-types';
-import type { CursorPage, TaskDto } from '@kurultay/shared-types';
+import { ActivityType, SocketEvents } from '@kurul/shared-types';
+import type { CursorPage, TaskDto } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
 import { toCursorPage } from '../common/pagination/cursor-page';

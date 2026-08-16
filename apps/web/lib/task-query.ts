@@ -1,5 +1,5 @@
-import type { CursorPage, Priority, TaskDto } from '@kurultay/shared-types';
-import { Priority as PriorityEnum } from '@kurultay/shared-types';
+import type { CursorPage, Priority, TaskDto } from '@kurul/shared-types';
+import { Priority as PriorityEnum } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 
 const PRIORITY_VALUES = new Set<string>(Object.values(PriorityEnum));

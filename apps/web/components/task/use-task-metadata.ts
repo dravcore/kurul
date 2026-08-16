@@ -9,7 +9,7 @@ import type {
   CursorPage,
   LabelDto,
   WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { fetchAllWorkspaceMembers } from '@/lib/member-query';
 import { useApiResource, useResourceField } from '@/lib/use-api-resource';

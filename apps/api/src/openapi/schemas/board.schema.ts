@@ -4,7 +4,7 @@ import type {
   ColumnDto,
   LabelColorSlot,
   LabelDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 
 /** A board. */
 export class BoardSchema implements BoardDto {

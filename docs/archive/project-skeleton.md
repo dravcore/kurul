@@ -4,11 +4,11 @@
 > [../architecture.md](../architecture.md). Day-to-day map: [../README.md](../README.md).
 > This file is how the monorepo was first built — not a checklist for new work.
 
-A step-by-step reference for building the Kurultay monorepo skeleton: workspace, apps, schema, containers, and the checks that say it is done.
+A step-by-step reference for building the Kurul monorepo skeleton: workspace, apps, schema, containers, and the checks that say it is done.
 
 > 🌐 English (canonical) | [Türkçe](../tr/project-skeleton.md)
 
-**Package name:** `kurultay` · **Organization:** dravcore · **License:** AGPL-3.0 · **Architecture:** monorepo + modular monolith
+**Package name:** `kurul` · **Organization:** dravcore · **License:** AGPL-3.0 · **Architecture:** monorepo + modular monolith
 
 ## Contents
 
@@ -34,12 +34,17 @@ docker compose version
 pnpm -v
 ```
 
-Name checks, as they resolved: the npm package name `kurultay` is available and still
-unclaimed — nothing is published yet. `github.com/dravcore/kurultay` was taken and is where
-this lives. `kurultay.dev` was **not** available; no domain is registered, and the project is
+Name checks, as they resolved: the npm package name `kurul` is available and still
+unclaimed — nothing is published yet. `github.com/dravcore/kurul` was taken and is where
+this lives. `kurul.dev` was **not** available; no domain is registered, and the project is
 reachable only through the repository. A domain decision is still open.
 
-> **Name origin.** A _kurultay_ is the great assembly of the Turkic-Mongol tradition, where the tribes gathered, debated, decided, and divided the work — a fair description of what the tool does. (`kurultay` is the Turkish spelling; `kurultai` the Mongolian/English transliteration.) The README should tell this story.
+> **Name origin (historical).** The project was called Kurultay when this scaffold was
+> written; it was renamed **Kurul** before v0.2.0, when `kurultay` turned out to be taken as a
+> domain. The note below is left as it was — this is an archive, and the reasoning it records
+> is still why the shorter name was chosen.
+>
+> A _kurultay_ is the great assembly of the Turkic-Mongol tradition, where the tribes gathered, debated, decided, and divided the work — a fair description of what the tool does. (`kurul` is the Turkish spelling; `kurultai` the Mongolian/English transliteration.) The README should tell this story.
 
 ---
 
@@ -48,7 +53,7 @@ reachable only through the repository. A domain decision is still open.
 pnpm workspaces (npm workspaces would also work; pnpm wins on disk usage and install speed).
 
 ```
-kurultay/
+kurul/
 ├── apps/
 │   ├── api/                 # NestJS backend
 │   └── web/                 # Next.js frontend
@@ -216,13 +221,13 @@ Prisma 7 dropped the Rust query engine, which is why it was chosen
 ([`decisions/0002-backend-stack.md`](../decisions/0002-backend-stack.md)). It is not a free
 upgrade, and each of these shapes the skeleton rather than being a detail discovered later:
 
-| Requirement                           | Effect on the skeleton                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A driver adapter is mandatory         | `@prisma/adapter-pg` is a dependency of `apps/api`, and `PrismaService` owns a `pg` Pool's lifecycle in `OnModuleInit`/`OnModuleDestroy` — not just a connection string                                                                                                                                                                  |
-| `prisma.config.ts` at the repo root   | Replaces env-var config inside `schema.prisma`, and declares the seed entry point (`db:seed` above)                                                                                                                                                                                                                                      |
-| Generator `output` is required        | The client is no longer emitted into `node_modules`. It goes to `apps/api/src/generated/prisma` for Nest and the Better Auth adapter. Shared DTO/enums in `@kurultay/shared-types` are hand-maintained to match the schema today; mechanical codegen remains aspirational ([architecture.md](../architecture.md#5-packagesshared-types)) |
-| Client middleware (`$use`) is removed | Any query-level cross-cutting concern — the `workspaceId` scoping helper, a compare-and-swap guard on `position` — is a **Client Extension** now. Design for extensions from the start; there is no middleware to fall back to                                                                                                           |
-| Env vars are not auto-loaded          | `dotenv` is called explicitly. `.env.example` below still describes the same variables; only the loading is manual                                                                                                                                                                                                                       |
+| Requirement                           | Effect on the skeleton                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A driver adapter is mandatory         | `@prisma/adapter-pg` is a dependency of `apps/api`, and `PrismaService` owns a `pg` Pool's lifecycle in `OnModuleInit`/`OnModuleDestroy` — not just a connection string                                                                                                                                                               |
+| `prisma.config.ts` at the repo root   | Replaces env-var config inside `schema.prisma`, and declares the seed entry point (`db:seed` above)                                                                                                                                                                                                                                   |
+| Generator `output` is required        | The client is no longer emitted into `node_modules`. It goes to `apps/api/src/generated/prisma` for Nest and the Better Auth adapter. Shared DTO/enums in `@kurul/shared-types` are hand-maintained to match the schema today; mechanical codegen remains aspirational ([architecture.md](../architecture.md#5-packagesshared-types)) |
+| Client middleware (`$use`) is removed | Any query-level cross-cutting concern — the `workspaceId` scoping helper, a compare-and-swap guard on `position` — is a **Client Extension** now. Design for extensions from the start; there is no middleware to fall back to                                                                                                        |
+| Env vars are not auto-loaded          | `dotenv` is called explicitly. `.env.example` below still describes the same variables; only the loading is manual                                                                                                                                                                                                                    |
 
 Minimum versions that follow from this: Node ≥ 20.19.0 (the project's floor is higher — see
 [development.md](../development.md#prerequisites)) and TypeScript (see root `package.json`).
@@ -276,7 +281,7 @@ Setup: Next.js (App Router) + Tailwind + `shadcn/ui` init + `@dnd-kit/core` + `@
 
 Both tags are pinned deliberately. **Redis 8, not 7:** the `redis:7` band is RSALv2/SSPLv1
 only — source-available, not OSI open source. Redis 8 restored an OSI licence, and that
-licence is AGPLv3 — the same one Kurultay ships under
+licence is AGPLv3 — the same one Kurul ships under
 ([`decisions/0007-license-agpl.md`](../decisions/0007-license-agpl.md)), so the compose file a
 self-hoster runs is licence-aligned end to end. **Postgres 18** is the current major;
 bumping majors later costs every self-hoster a dump and restore
@@ -290,7 +295,7 @@ exists.
 ## 6. .env.example
 
 ```
-DATABASE_URL=postgresql://kurultay:kurultay@localhost:5432/kurultay
+DATABASE_URL=postgresql://kurul:kurul@localhost:5432/kurul
 REDIS_URL=redis://localhost:6379
 BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:4000
@@ -304,13 +309,13 @@ The real `.env` must be in `.gitignore`.
 
 ## 7. Repository files
 
-| File                       | Content                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `README.md`                | What it does, screenshot (later), quick start (`docker compose up`), stack list, contribution link                                                                                                                                                                                                                                                                                                                                     |
-| `LICENSE`                  | AGPL-3.0 — its network-use clause means anyone running a modified Kurultay as a service must release their modifications, which removes the incentive for a closed-source SaaS fork without forbidding commercial hosting. Leaves an open-core path available. Relaxing AGPL later requires every contributor's consent, so it must be right from the start. See [`decisions/0007-license-agpl.md`](../decisions/0007-license-agpl.md) |
-| `CONTRIBUTING.md`          | Environment setup, commit convention, PR process                                                                                                                                                                                                                                                                                                                                                                                       |
-| `CODE_OF_CONDUCT.md`       | Contributor Covenant                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `.github/workflows/ci.yml` | lint + typecheck + test + build, on push and PR                                                                                                                                                                                                                                                                                                                                                                                        |
+| File                       | Content                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `README.md`                | What it does, screenshot (later), quick start (`docker compose up`), stack list, contribution link                                                                                                                                                                                                                                                                                                                                  |
+| `LICENSE`                  | AGPL-3.0 — its network-use clause means anyone running a modified Kurul as a service must release their modifications, which removes the incentive for a closed-source SaaS fork without forbidding commercial hosting. Leaves an open-core path available. Relaxing AGPL later requires every contributor's consent, so it must be right from the start. See [`decisions/0007-license-agpl.md`](../decisions/0007-license-agpl.md) |
+| `CONTRIBUTING.md`          | Environment setup, commit convention, PR process                                                                                                                                                                                                                                                                                                                                                                                    |
+| `CODE_OF_CONDUCT.md`       | Contributor Covenant                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `.github/workflows/ci.yml` | lint + typecheck + test + build, on push and PR                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ---
 

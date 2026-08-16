@@ -421,7 +421,7 @@ describe('configureApp rejects a cross-origin upload before multer buffers it', 
   let stdout: jest.SpyInstance;
 
   beforeAll(async () => {
-    destination = await mkdtemp(join(tmpdir(), 'kurultay-origin-buffer-'));
+    destination = await mkdtemp(join(tmpdir(), 'kurul-origin-buffer-'));
     const moduleRef = await Test.createTestingModule({
       imports: [
         // No `limits` on purpose: a 413 would end the request for a reason other than the one

@@ -1,6 +1,6 @@
-# Kurultay'ı kendi domain'inizde barındırma
+# Kurul'u kendi domain'inizde barındırma
 
-Kurultay'ı bir sunucuya, kendi domain'inize, HTTPS ve çalışan e-posta ile kurun. Aşağıdakilerin
+Kurul'u bir sunucuya, kendi domain'inize, HTTPS ve çalışan e-posta ile kurun. Aşağıdakilerin
 tamamı bilinçli olarak tek sayfa; çoğu DNS beklemekle geçen yaklaşık bir saat ayırın.
 
 Build adımı yok. `docker compose pull` her sürüm için yayınlanan imajları indirir ve aynı imaj
@@ -13,7 +13,7 @@ her domain'de çalışır — API URL'i imajın içine derlenmiş değildir (ger
   için iki CPU ve 2 GB RAM yeterli.
 - Kontrolünüzdeki bir domain ve o sunucuya **açık 80 ve 443 portları**. İkisi de zorunlu:
   Let's Encrypt doğrulamayı 80 üzerinden yapar, tarayıcılar 443'ü kullanır.
-- Bir SMTP hesabı. Kurultay'da davetlerin kabul edilebilmesi için giden e-posta şart —
+- Bir SMTP hesabı. Kurul'da davetlerin kabul edilebilmesi için giden e-posta şart —
   nedeni ve atlarsanız ne olduğu için bkz. [E-posta](#e-posta-smtp).
 - Gelen trafikte SSH, 80 ve 443 dışında hiçbir şeye izin vermeyen bir host firewall'ı. Bu
   stack'in çalıştırdığı geri kalan her şey zaten kendiliğinden public internetin dışında kalır:
@@ -37,41 +37,41 @@ açılışta sertifika ister ve DNS henüz canlı olmadığı için başarısız
 Encrypt'in rate limit'ine sayılır.
 
 ```
-kurultay.example.com.   A     203.0.113.10
-kurultay.example.com.   AAAA  2001:db8::10      # yalnızca sunucunun IPv6'sı varsa
+kurul.example.com.   A     203.0.113.10
+kurul.example.com.   AAAA  2001:db8::10      # yalnızca sunucunun IPv6'sı varsa
 ```
 
 Sunucunun kendisi dışında bir yerden doğrulayın:
 
 ```bash
-dig +short kurultay.example.com
+dig +short kurul.example.com
 ```
 
 ## 2. Compose dosyasını indirin ve yapılandırın
 
 ```bash
-mkdir -p /opt/kurultay && cd /opt/kurultay
-curl -fsSLO https://raw.githubusercontent.com/dravcore/kurultay/main/docker-compose.yml
+mkdir -p /opt/kurul && cd /opt/kurul
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
 curl -fsSL --create-dirs -o docker/Caddyfile \
-  https://raw.githubusercontent.com/dravcore/kurultay/main/docker/Caddyfile
-curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurultay/main/.env.example
+  https://raw.githubusercontent.com/dravcore/kurul/main/docker/Caddyfile
+curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/main/.env.example
 ```
 
 `.env`'i düzenleyin. Yalnızca Docker ile kurulumda önemli olan satırlar şunlar — dosyadaki geri
 kalan her şey ya geliştirme döngüsü için ya da çalışan bir varsayılana sahip:
 
 ```bash
-SITE_URL=https://kurultay.example.com          # domain'iniz, şema dahil
+SITE_URL=https://kurul.example.com          # domain'iniz, şema dahil
 
 POSTGRES_PASSWORD=<openssl rand -hex 32>       # base64 değil hex — bir URL'in içine giriyor
 BETTER_AUTH_SECRET=<openssl rand -hex 32>      # oturum imzalama anahtarı
 
 SMTP_HOST=smtp.example.com                     # aşağıdaki "E-posta" bölümüne bakın
 SMTP_PORT=587
-SMTP_USER=kurultay@example.com
+SMTP_USER=kurul@example.com
 SMTP_PASSWORD=<smtp parolanız>
 SMTP_SECURE=false                              # yalnızca 465 portu için true
-MAIL_FROM=Kurultay <kurultay@example.com>
+MAIL_FROM=Kurul <kurul@example.com>
 ```
 
 İki gizli değeri `openssl rand -hex 32` ile üretin. `-base64` değil `-hex`: base64 çıktısı `/`
@@ -129,7 +129,7 @@ düşülmesi gereken, sıfırdan farklı bir çıkış kodudur (`docker compose 
 `api` zaten hiç başlamamış olur. `backup` ve `proxy` yanında `(healthy)` yazmaması, bir sorun
 olduğu için değil, ikisinin de healthcheck tanımlamamış olmasındandır.
 
-`https://kurultay.example.com` adresine ilk istek, Caddy ACME doğrulamasını tamamlarken birkaç
+`https://kurul.example.com` adresine ilk istek, Caddy ACME doğrulamasını tamamlarken birkaç
 saniye sürebilir. Sürmezse olan biteni izleyin:
 
 ```bash
@@ -137,13 +137,13 @@ docker compose logs -f proxy
 ```
 
 Siteyi açın, ilk hesabı oluşturun ve bir workspace açın. İlk hesap sıradan bir hesaptır —
-Kurultay'ın ayrı bir kurulum sihirbazı veya admin bootstrap adımı yoktur.
+Kurul'un ayrı bir kurulum sihirbazı veya admin bootstrap adımı yoktur.
 
 ## 4. Gerçekten çalıştığını doğrulayın
 
 ```bash
-curl -sI https://kurultay.example.com | head -1          # 307 → /login
-curl -s  https://kurultay.example.com/api/health/ready   # {"status":"ok", …}
+curl -sI https://kurul.example.com | head -1          # 307 → /login
+curl -s  https://kurul.example.com/api/health/ready   # {"status":"ok", …}
 ```
 
 Sonra tarayıcıda bir pano açıp bir kartı sürükleyin. Kart, ikinci bir tarayıcı penceresinde
@@ -153,7 +153,7 @@ ki bu, naif bir reverse-proxy yapılandırmasının sessizce bozduğu tek parça
 Son olarak, HTTPS'in asıl amacı olan şeyi kontrol edin. Giriş yapın ve dönen çereze bakın:
 
 ```bash
-curl -si https://kurultay.example.com/auth/sign-in/email \
+curl -si https://kurul.example.com/auth/sign-in/email \
   -H 'Content-Type: application/json' \
   -d '{"email":"siz@example.com","password":"<parolanız>"}' | grep -i '^set-cookie'
 ```
@@ -185,7 +185,7 @@ sağ çıkan tek sinyaldir.
 Şu URL'i izleyin:
 
 ```
-https://kurultay.example.com/api/health/ready
+https://kurul.example.com/api/health/ready
 ```
 
 Bu URL'de yanlış yapılması kolay iki ayrıntı var ve ikisi de sessizce başarısız olur.
@@ -215,10 +215,10 @@ bir varsayımdır:
 
 ```bash
 docker compose stop postgres
-curl -s https://kurultay.example.com/api/health/ready   # 503, "database":"down"
+curl -s https://kurul.example.com/api/health/ready   # 503, "database":"down"
 # iki aralık bekleyin, kırmızı alarmı bekleyin
 docker compose start postgres
-curl -s https://kurultay.example.com/api/health/ready   # 200, "database":"up"
+curl -s https://kurul.example.com/api/health/ready   # 200, "database":"up"
 # kurtarma e-postasını bekleyin
 ```
 
@@ -261,10 +261,10 @@ veritabanıyla aynı makinede durur. Onları makine dışına kopyalayın — ya
 yeni döngünün iki yarısını da**:
 
 ```bash
-docker run --rm -v kurultay_backup_data:/backups -v "$PWD:/out" alpine \
-  sh -c 'stamp=$(ls -t /backups/*.dump | head -1 | sed "s|.*/kurultay-||;s|\.dump$||"); \
-         cp /backups/kurultay-$stamp.dump /out/; \
-         cp /backups/kurultay-$stamp-files.tar.gz /out/ 2>/dev/null || true'
+docker run --rm -v kurul_backup_data:/backups -v "$PWD:/out" alpine \
+  sh -c 'stamp=$(ls -t /backups/*.dump | head -1 | sed "s|.*/kurul-||;s|\.dump$||"); \
+         cp /backups/kurul-$stamp.dump /out/; \
+         cp /backups/kurul-$stamp-files.tar.gz /out/ 2>/dev/null || true'
 ```
 
 Dosya arşivi olmadan geri yüklenen bir dump bütün satırları geri getirir ve yüklenmiş her
@@ -283,6 +283,52 @@ Migration'lar otomatik çalışır: tek seferlik `migrate` servisi, `api` başla
 migration'ları uygular. `latest`'i takip etmek yerine bilinçli upgrade etmeyi tercih
 ediyorsanız `.env`'de `TAG=v0.2.0` ile bir sürümü sabitleyin.
 
+### Kurultay'dan geliyorsanız (v0.1.0)
+
+Proje v0.2.0 öncesinde yeniden adlandırıldı ve bu, README'deki etiketten fazlasına dokunuyor:
+Postgres rolü ve veritabanı artık `kurul`, yayınlanan imajlar `ghcr.io/dravcore/kurul-api` ve
+`-web`, ve Compose volume önekini kurulum dizininden türettiği için yukarıdaki talimatların
+`/opt/kurul` demesi de bir fark yaratıyor. Mevcut bir v0.1.0 kurulumu bunların hiçbirini
+kendiliğinden almaz; eski imaj adlarına `docker compose pull` demek size eskisini vermeye devam
+eder.
+
+**Çalışan bir veritabanını sizin yerinize yeniden adlandıran bir yükseltme yolu yok.** Şu sırayla,
+stack kapalıyken yapın ve önce yedeği alın — bu, projenin geçmişinde şemaya değil **kimliklere**
+dokunan tek yükseltmedir.
+
+```bash
+cd /opt/kurultay
+docker compose exec postgres pg_dump -U kurultay -Fc kurultay > /tmp/kurul-migration.dump
+docker compose down                     # -v DEĞİL: volume'ler zaten koruduğunuz şey
+```
+
+Sonra dizini yeniden adlandırın ve yeni compose dosyasını alın:
+
+```bash
+cd /opt && mv kurultay kurul && cd kurul
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
+```
+
+`.env`'i düzenleyin: `POSTGRES_USER` ve `POSTGRES_DB` `kurul` olur, `DATABASE_URL`'in kimlik ve
+veritabanı bölümleri de onlarla birlikte değişir. Ardından koruduğunuz volume üzerinde yeni rolü
+ve veritabanını yaratıp restore edin:
+
+```bash
+docker compose up -d postgres
+docker compose exec -T postgres psql -U kurultay -d kurultay   -c "CREATE ROLE kurul LOGIN PASSWORD '<POSTGRES_PASSWORD değeriniz>';"   -c 'CREATE DATABASE kurul OWNER kurul;'
+docker compose exec -T postgres pg_restore -U kurul -d kurul --no-owner < /tmp/kurul-migration.dump
+docker compose up -d
+curl -s https://alan.adiniz/api/health/ready
+```
+
+Eski rol ve veritabanı, yeni stack bir gün gerçek trafik gördükten sonra düşürülebilir. Dump'ı o
+zamana kadar saklayın; yeniden adlandırma öncesine ait tek kopya odur.
+
+**Volume'leri taşıyan şey dizinin yeniden adlandırılmasıdır**, çünkü Compose onları proje adıyla
+isimlendirir — `kurultay_postgres_data`, `kurul_postgres_data` olur. Taşımak istemiyorsanız
+`.env`'e `COMPOSE_PROJECT_NAME=kurultay` yazın, eski volume'ler eski adlarıyla kullanılmaya devam
+eder. İkisi de desteklenir ve ikincisi biraz kafa karıştırıcıdır; yeter ki bilinçli seçin.
+
 ## Çektiğiniz imajı doğrulamak
 
 `docker compose pull`, ghcr.io ne verirse ona güvenir. Her sürümle birlikte yayınlanan iki şey
@@ -297,12 +343,12 @@ varsayılan olarak kullandığı Sigstore bundle formatında yazılır ve cosign
 
 ```bash
 cosign verify \
-  --certificate-identity "https://github.com/dravcore/kurultay/.github/workflows/release-images.yml@refs/tags/v0.2.0" \
+  --certificate-identity "https://github.com/dravcore/kurul/.github/workflows/release-images.yml@refs/tags/v0.2.0" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  ghcr.io/dravcore/kurultay-api:v0.2.0
+  ghcr.io/dravcore/kurul-api:v0.2.0
 ```
 
-Aynısını `kurultay-web` için tekrarlayın; başka bir sürümü doğrularken `v0.2.0`'ı iki yerde de
+Aynısını `kurul-web` için tekrarlayın; başka bir sürümü doğrularken `v0.2.0`'ı iki yerde de
 değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi anlatıyor: biri imzalayan workflow'un
 üzerinde çalıştığı git ref'i, diğeri sorduğunuz imaj tag'i.
 
@@ -318,7 +364,7 @@ Başarılı bir çalıştırma yaptığı kontrolleri ve doğruladığı digest'
 yazdırır:
 
 ```
-Verification for ghcr.io/dravcore/kurultay-api:v0.2.0 --
+Verification for ghcr.io/dravcore/kurul-api:v0.2.0 --
 The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
@@ -337,27 +383,27 @@ Son argüman olarak hem tag hem digest çalışır; imajı çoktan çekmiş bir 
 katı soruyu sorar — tag'in şu anda neyi gösterdiğini değil, diskteki baytları sorar:
 
 ```bash
-docker image inspect ghcr.io/dravcore/kurultay-api:v0.2.0 --format '{{index .RepoDigests 0}}'
+docker image inspect ghcr.io/dravcore/kurul-api:v0.2.0 --format '{{index .RepoDigests 0}}'
 ```
 
 ### SBOM nerede
 
-Sürümün [GitHub Release](https://github.com/dravcore/kurultay/releases) sayfasında, indirilebilir
+Sürümün [GitHub Release](https://github.com/dravcore/kurul/releases) sayfasında, indirilebilir
 asset olarak — imaj başına ve mimari başına bir tane, çünkü iki mimari gerçekten aynı paketleri
 içermiyor:
 
 ```
-kurultay-api-v0.2.0-linux-amd64.spdx.json
-kurultay-api-v0.2.0-linux-arm64.spdx.json
-kurultay-web-v0.2.0-linux-amd64.spdx.json
-kurultay-web-v0.2.0-linux-arm64.spdx.json
+kurul-api-v0.2.0-linux-amd64.spdx.json
+kurul-api-v0.2.0-linux-arm64.spdx.json
+kurul-web-v0.2.0-linux-amd64.spdx.json
+kurul-web-v0.2.0-linux-arm64.spdx.json
 ```
 
 Format SPDX 2.3 JSON; `grype`, `trivy` ve Dependency-Track'in üçü de dönüştürmeden okur:
 
 ```bash
-gh release download v0.2.0 --repo dravcore/kurultay --pattern '*.spdx.json'
-grype sbom:./kurultay-api-v0.2.0-linux-amd64.spdx.json
+gh release download v0.2.0 --repo dravcore/kurul --pattern '*.spdx.json'
+grype sbom:./kurul-api-v0.2.0-linux-amd64.spdx.json
 ```
 
 **SBOM dosyasının kendisi imzalı değildir** — yukarıdaki imza imajı kapsar, SBOM ise aynı
@@ -367,7 +413,7 @@ güvenmeyin: zaten doğruladığınız imajdan [syft](https://github.com/anchore
 yeniden üretip karşılaştırın.
 
 ```bash
-syft scan registry:ghcr.io/dravcore/kurultay-api:v0.2.0 --platform linux/amd64 -o spdx-json
+syft scan registry:ghcr.io/dravcore/kurul-api:v0.2.0 --platform linux/amd64 -o spdx-json
 ```
 
 ## Kendi reverse proxy'nizi kullanmak
@@ -493,7 +539,7 @@ location /api/  {
 location /      { proxy_pass http://web:3000;  }
 ```
 
-Proxy'niz Kurultay'ın kendi `proxy` servisini değiştirmek yerine onun önünde duruyorsa,
+Proxy'niz Kurul'un kendi `proxy` servisini değiştirmek yerine onun önünde duruyorsa,
 `docker-compose.yml`'deki `api` servisinin `TRUST_PROXY` değerini hop sayısına yükseltin
 (Caddy'nin önündeki bir CDN bunu `2` yapar). `1`'de bırakılırsa tüm rate-limit kovaları ve
 access log'daki tüm IP'ler dıştaki proxy'nizin adresine çöker.
@@ -502,12 +548,12 @@ access log'daki tüm IP'ler dıştaki proxy'nizin adresine çöker.
 
 Next.js, `NEXT_PUBLIC_*` değişkenlerini build zamanında gönderdiği JavaScript'in içine derler.
 Bu nedenle mutlak bir `NEXT_PUBLIC_API_URL`, web imajını tek bir dağıtıma özgü hale getirir ve
-"imajı çek, env'i ver" modeli çalışamaz — Kurultay'ın eskiden tam olarak dayattığı şey buydu
-([denetim bulgusu PM-02](https://github.com/dravcore/kurultay/issues/119)).
+"imajı çek, env'i ver" modeli çalışamaz — Kurul'un eskiden tam olarak dayattığı şey buydu
+([denetim bulgusu PM-02](https://github.com/dravcore/kurul/issues/119)).
 
 Çözüm değeri gömülmekten çıkarmak değil, zaten her yerde doğru olan bir değeri gömmek.
 Yayınlanan imaj `NEXT_PUBLIC_API_URL=/api` taşır; bu, sayfanın sunulduğu origin üzerinde bir
-yoldur ve `kurultay.example.com`'da da `boards.acme.internal`'da da doğrudur. Bu ancak reverse
+yoldur ve `kurul.example.com`'da da `boards.acme.internal`'da da doğrudur. Bu ancak reverse
 proxy her iki uygulamayı tek origin'e koyduğu için geçerlidir — `proxy`'nin isteğe bağlı bir
 ek değil, varsayılan stack'in parçası olmasının nedeni budur.
 
@@ -539,7 +585,7 @@ HTTPS'in hiçbiri az önce indirdiğiniz şey için geçerli değildir. Ya relea
 çekmek yerine kaynaktan build edin:
 
 ```bash
-git clone https://github.com/dravcore/kurultay.git && cd kurultay
+git clone https://github.com/dravcore/kurul.git && cd kurul
 docker compose up -d --build
 ```
 

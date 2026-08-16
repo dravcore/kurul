@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import type { ColumnDto, TaskDto } from '@kurultay/shared-types';
+import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 
 /**
  * Which board dialog is open, and what it is acting on. Column and task dialogs are keyed

@@ -13,7 +13,7 @@
 
 Bunların hepsini mümkün kılan şey AGPL-3.0. Permissive bir lisans, kodu kimseye sormadan kapalı hâle getirmeye izin verir; dolayısıyla satacak bir şey kalmaz. AGPL'in network-use copyleft'i ise bir kurumun gerçekten parayla kurtulmayı tercih edebileceği somut bir yükümlülük yaratır. Lisans, ürünün sahip olduğu tek kaldıraçtır. Ama bu kaldıraç **telif hakkı sahibine** aittir ve varsayılan olarak her katkıda bulunan kendi yamasının telifini elinde tutar. Yalnızca AGPL-3.0 altında, gelen bir katkı dünyaya AGPL-3.0 ile lisanslanmış olarak gelir ve fazlası olmaz — maintainer tam olarak herkesin sahip olduğu hakları alır. Bu, açık kaynak projeyi yayımlamaya devam etmek için yeterli, birine AGPL'den muafiyet satmak için yeterli değildir; çünkü maintainer kontrol etmediği kod üzerinde şart veremez.
 
-Bunu düzeltme penceresi şimdi. Kurultay'ın tek katkıda bulunanı var — maintainer'ın kendisi — dolayısıyla bugün bir katkı sözleşmesi kurmanın maliyeti bir pull request. Dış katkılar sözleşmesiz geldikten sonra, dokundukları kod kalıcı olarak yalnızca AGPL kalır; bu yazarların hepsi bulunup yeniden lisanslamaya ikna edilmedikçe. Bu, ADR 0007'nin tarif ettiği anlamda, ters yöne bakan bir tek yönlü kapı.
+Bunu düzeltme penceresi şimdi. Kurul'un tek katkıda bulunanı var — maintainer'ın kendisi — dolayısıyla bugün bir katkı sözleşmesi kurmanın maliyeti bir pull request. Dış katkılar sözleşmesiz geldikten sonra, dokundukları kod kalıcı olarak yalnızca AGPL kalır; bu yazarların hepsi bulunup yeniden lisanslamaya ikna edilmedikçe. Bu, ADR 0007'nin tarif ettiği anlamda, ters yöne bakan bir tek yönlü kapı.
 
 ## Karar
 

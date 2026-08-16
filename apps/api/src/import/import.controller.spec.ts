@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { BadRequestException } from '@nestjs/common';
 import { PATH_METADATA } from '@nestjs/common/constants';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { ROLES_KEY } from '../common/decorators/roles.decorator';
 import { ADMIN_ROLES, CONTENT_ROLES } from '../common/decorators/workspace-roles.decorator';
 import {

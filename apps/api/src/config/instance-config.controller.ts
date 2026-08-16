@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { InstanceConfigDto } from '@kurultay/shared-types';
+import type { InstanceConfigDto } from '@kurul/shared-types';
 import { InstanceConfigSchema } from '../openapi/schemas/instance.schema';
 import { MailService } from '../mail/mail.service';
 import { StorageService } from '../storage/storage.service';

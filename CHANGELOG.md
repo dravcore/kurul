@@ -1,11 +1,39 @@
 # Changelog
 
-All notable changes to Kurultay are documented in this file.
+All notable changes to Kurul are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+
+- **The project is now called Kurul.** `kurultay` was not available as a domain, so the name
+  shortened to the word underneath it: a _kurul_ is a council, the body that convenes, decides
+  and divides the work — the same idea and the same root as the _kurultay_ it was named for,
+  and what the tool does for a team either way. The identity does not change with it; the
+  banner, the seal and the steppe are still where the visual language comes from
+  ([design.md](docs/design.md#2-identity)).
+
+  **What this renames, beyond the label.** The npm scope (`@kurultay/*` → `@kurul/*`), the
+  repository (`dravcore/kurultay` → `dravcore/kurul`), the published images
+  (`ghcr.io/dravcore/kurul-api` and `-web`), the Postgres role and database, the test and CI
+  databases, and the install directory the self-hosting guide uses — which is what Compose
+  derives its volume prefix from.
+
+  **For an existing v0.1.0 install this is a breaking change, and there is no in-place upgrade
+  that renames a running database for you.** The step-by-step path — dump, rename the
+  directory, create the new role and database, restore, verify — is in
+  [self-hosting.md](docs/self-hosting.md#coming-from-kurultay-v010), including the one-line
+  alternative for an operator who would rather keep the old volume names
+  (`COMPOSE_PROJECT_NAME`). Take the dump before anything else: it is the only copy that
+  predates the rename.
+
+  The old repository URL keeps working — GitHub redirects it — but **the old image names do
+  not become the new ones**. `docker compose pull` against `kurultay-api` will keep serving
+  the last image published under that name, silently and indefinitely, which is exactly what a
+  rename cannot fix for you.
 
 ### Added
 
@@ -34,7 +62,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   nullable moves the document too. Both cases were measured red before the check was declared
   done.
 
-  Response schemas are classes that `implements` the interfaces in `@kurultay/shared-types`, so
+  Response schemas are classes that `implements` the interfaces in `@kurul/shared-types`, so
   a field added to a DTO and forgotten here fails `pnpm typecheck` rather than quietly producing
   a spec that describes a shape the API no longer returns. Three facts that belong to global
   providers — the `401` from the session guard, the `429` and rate-limit headers from the
@@ -188,7 +216,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   too — `Sahip / Yönetici / Üye / Misafir` — in the badge and in all 17 sentences that name a
   role inline, where they take Turkish case suffixes rather than the apostrophe form
   (`Bir workspace sahibinden isteyin`). The `OWNER`/`ADMIN`/`MEMBER`/`GUEST` enum values, the
-  `@kurultay/auth-access` identifiers and the API contract are untouched; only what a person
+  `@kurul/auth-access` identifiers and the API contract are untouched; only what a person
   reads changed. Adding a third language needs no new mechanism: a catalogue file, one row in
   `SEED_COLUMN_NAMES` and one in `MAIL_COPY`, both `Record<Locale, …>` and both compile errors
   until they exist.
@@ -270,7 +298,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Trello board import, one-way.** A workspace admin uploads a Trello board's JSON export at
   `POST /workspaces/:workspaceId/imports/trello` and gets a new board: lists become columns,
   cards become tasks, labels fold onto the eight design-token colour slots, and Trello's
-  checklists arrive as checklists — one Kurultay list per Trello list, unflattened, which is the
+  checklists arrive as checklists — one Kurul list per Trello list, unflattened, which is the
   shape [ADR 0023](docs/decisions/0023-checklist-data-model.md) chose in advance for exactly this
   ([ADR 0025](docs/decisions/0025-trello-import-mapping.md)). The board list gains an "Import from
   Trello" entry; the report comes back in the response and is rendered as a panel that stays until
@@ -285,10 +313,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   **Four things deliberately do not come across, and the report counts every one of them rather
   than dropping them silently.** *Files*: a Trello export carries attachment URLs, not bytes, so
   every attachment becomes a `LINK` row — and the server never requests those URLs, the same SSRF
-  rule the attachment feature already follows. *Members*: a Trello account is not a Kurultay
+  rule the attachment feature already follows. *Members*: a Trello account is not a Kurul
   account, so assignments are dropped and every row written — tasks and attachments alike — is
   attributed to the person who ran the import. *Comments*: out of scope for this pass. *Archived
-  lists and cards*: Kurultay has no archive, and importing what a user deliberately filed away
+  lists and cards*: Kurul has no archive, and importing what a user deliberately filed away
   would be the wrong default. Alongside them the report also carries what came across *changed*:
   **every imported column arrives `UNSTARTED`**, because [ADR 0019](docs/decisions/0019-column-category.md)
   refuses to infer completion from a column's name or its position and a Trello list carries
@@ -327,7 +355,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it to break.
 
 - **An activation funnel you can read about your own instance, and telemetry that is off.**
-  Kurultay measured nothing about its own use — a grep for `telemetry`, `analytics`, `posthog`,
+  Kurul measured nothing about its own use — a grep for `telemetry`, `analytics`, `posthog`,
   `plausible` or `umami` across `apps/` and `docs/` returned zero matches in source — so where
   onboarding broke, whether invitations converted, and whether anyone used this as a *team* were
   all answered by intuition (audit finding PM-07). Two layers now exist, decided separately.
@@ -355,7 +383,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (EN + TR) lists the payload field by field; the reasoning, including why the ping carries no
   instance id and therefore counts starts rather than installs, is
   [ADR 0021](docs/decisions/0021-activation-funnel-and-opt-in-telemetry.md). Closes audit
-  finding PM-07 ([#128](https://github.com/dravcore/kurultay/issues/128)).
+  finding PM-07 ([#128](https://github.com/dravcore/kurul/issues/128)).
 
 - **Administrative actions now leave an audit trail.** `Activity` recorded only what happened to
   cards and comments, so board, column and label creation and deletion, workspace renames,
@@ -372,7 +400,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   widens who can read something: the activity feed is readable by every member down to GUEST,
   while the pending-invitation list is admin-only, so `invitation.*` entries record the
   invitation id and role and never the invited address — an admin joins `WorkspaceInvitation`
-  for that. `AUDIT_ACTIVITY_TYPES` in `@kurultay/shared-types` makes the whole question a single
+  for that. `AUDIT_ACTIVITY_TYPES` in `@kurul/shared-types` makes the whole question a single
   tenant-scoped query. Workspace *deletion* is the one act that cannot be stored this way —
   `Activity` cascades on `workspaceId`, so the row would delete itself — and is emitted on the
   JSON-line log instead, as a `workspace.deleted` event carrying the name, slug, member count
@@ -398,31 +426,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`.github/workflows/e2e.yml`) nightly and on pull requests into `main` — i.e. before every
   release and hotfix — deliberately **outside** the required `ci-ok` gate, so an infrastructure
   hiccup in a full-stack browser run can never block every merge in the repository. The suite
-  isolates itself completely: ports 3110/4110, database `kurultay_test_playwright`, no Redis at
+  isolates itself completely: ports 3110/4110, database `kurul_test_playwright`, no Redis at
   all, and no new environment variables (the Postgres connection is derived from `DATABASE_URL`
   with only the database name swapped). A Redis logical database index was the obvious boundary
   and does not hold — `parseRedisUrl` drops the URL's pathname, so `redis://…/8` reaches database
-  0 ([#190](https://github.com/dravcore/kurultay/issues/190)) — so the suite runs the API with no
+  0 ([#190](https://github.com/dravcore/kurul/issues/190)) — so the suite runs the API with no
   Redis, which it supports, and which is the only option here that is isolated rather than merely
   documented as such. Run
   it with `pnpm test:browser`. Closes audit finding QA-01
-  ([#129](https://github.com/dravcore/kurultay/issues/129)); `docs/testing.md` (EN + TR) now
+  ([#129](https://github.com/dravcore/kurul/issues/129)); `docs/testing.md` (EN + TR) now
   names these flows as the concrete definition of the "critical flows later" it had been
   reserving Playwright for.
 - **One image, any domain — and a one-page guide for putting it on yours.** The published
   `web` image no longer has a deployment's API URL compiled into it, so
-  `docker compose pull && docker compose up -d` now works on `kurultay.example.com` exactly as
+  `docker compose pull && docker compose up -d` now works on `kurul.example.com` exactly as
   it does on `localhost`, with no rebuild. Verified by running two independent stacks from the
   same image ID side by side on two hostnames — sign-up, email verification, boards and the
   realtime WebSocket all working on both. Closes audit finding PM-02
-  ([#119](https://github.com/dravcore/kurultay/issues/119)).
+  ([#119](https://github.com/dravcore/kurul/issues/119)).
   - `docker-compose.yml` gains a **`proxy` service (Caddy)** that is now the stack's only
     published entrance. It serves the web app and the API from one origin — `/auth/*` and
     `/api/*` to `api`, everything else to `web` — with automatic HTTPS once a domain is set.
     Its routing contract, and why the two API rules differ, is documented in `docker/Caddyfile`
     for anyone replacing it with their own proxy.
   - **`SITE_URL`** is the new (compose-only) `.env` variable for that origin, scheme included:
-    `http://localhost` by default, `https://kurultay.example.com` to go live. The API's
+    `http://localhost` by default, `https://kurul.example.com` to go live. The API's
     `WEB_URL` and `BETTER_AUTH_URL` are derived from it, so app, API and cookies agree on one
     origin without three variables to keep in sync.
   - **New guide: `docs/self-hosting.md`** (EN + TR) — DNS, HTTPS, SMTP, backups, upgrades,
@@ -439,17 +467,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   relevant field (password, email) with a message that tells the user exactly what to fix.
   Unknown errors fall back to the generic message to avoid leaking unnecessary details.
 - **GHCR image publishing** — `.github/workflows/release-images.yml` builds and pushes
-  `ghcr.io/dravcore/kurultay-api` and `ghcr.io/dravcore/kurultay-web` (`linux/amd64` +
+  `ghcr.io/dravcore/kurul-api` and `ghcr.io/dravcore/kurul-web` (`linux/amd64` +
   `linux/arm64`, tagged with the release's SemVer, its `major.minor`, and `latest`) on every
   `vX.Y.Z` tag push. `docker-compose.yml`'s `api`/`web` services now declare `image:
-  ghcr.io/dravcore/kurultay-{api,web}:${TAG:-latest}` alongside their existing `build:`, so
+  ghcr.io/dravcore/kurul-{api,web}:${TAG:-latest}` alongside their existing `build:`, so
   `docker compose pull && docker compose up -d` installs and upgrades from a published image
   with no local build — falling back to `build:` automatically (same source build as before)
   when no image exists for the configured `TAG` or the registry is unreachable. `TAG` is a new
   compose-only `.env` variable (see `.env.example`) for pinning a specific release instead of
   tracking `latest`. `migrate` (the one-shot migration runner) still always builds from source
   — see the comment beside it in `docker-compose.yml` for why that's scoped out of this change.
-  Closes audit finding OPS-04 ([#126](https://github.com/dravcore/kurultay/issues/126)); README (EN + TR)
+  Closes audit finding OPS-04 ([#126](https://github.com/dravcore/kurul/issues/126)); README (EN + TR)
   and `docs/development.md` (EN + TR) now document the pull-based flow as the default, with
   `docker compose up --build` kept as the explicit build-on-purpose path.
 - `SEED_LARGE_BOARD_TASKS` — `pnpm db:seed` can now build a board of arbitrary size next to the
@@ -597,7 +625,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Scheduled database backups with a rehearsed restore path. `docker compose up` now starts a
   `backup` sidecar (`postgres:18-alpine`, `restart: unless-stopped`, waits for a healthy
   `postgres`) that runs `scripts/backup.sh`: every `BACKUP_INTERVAL` seconds it writes a
-  `pg_dump --format=custom` archive to `/backups/kurultay-<UTC timestamp>.dump` in the new
+  `pg_dump --format=custom` archive to `/backups/kurul-<UTC timestamp>.dump` in the new
   `backup_data` volume — via a `.part` file renamed on success, so an interrupted dump never
   looks like a finished archive — and prunes to the newest `BACKUP_KEEP` archives. The
   defaults (`86400`/`7`, both compose-only settings in `.env.example`) give a recovery point
@@ -747,20 +775,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   keyboard reordering and drops all behave as before, including onto and out of columns whose
   tail is not mounted. `content-visibility` alone was measured too and is not a substitute: it
   halved the frame time and left the main thread saturated (audit finding FE-03,
-  [#125](https://github.com/dravcore/kurultay/issues/125)).
+  [#125](https://github.com/dravcore/kurul/issues/125)).
 - CI gate job: `.github/workflows/ci.yml` now defines a single required status check, `ci-ok`,
   instead of relying on multiple job names in branch protection. The gate runs only when all
   upstream jobs (lint, test, build) have completed, and fails if any is not successful — even
   if skipped or cancelled via concurrency — preventing PRs from silently passing when a job is
   renamed or a workflow is cancelled. See [docs/testing.md](docs/testing.md#ci) and
-  [#145](https://github.com/dravcore/kurultay/issues/145).
+  [#145](https://github.com/dravcore/kurul/issues/145).
 - **BREAKING:** `docker-compose.yml` and `docker-compose.dev.yml` no longer bake a fixed
-  `kurultay`/`kurultay` Postgres password (or a passwordless Redis by omission of any choice)
+  `kurul`/`kurul` Postgres password (or a passwordless Redis by omission of any choice)
   into the compose files themselves — every container on the same Docker network could
-  previously connect to the database with a password identical across every Kurultay install,
+  previously connect to the database with a password identical across every Kurul install,
   with no separate secret to guess. `POSTGRES_PASSWORD` is now a required `.env` value with no
   default, using the same fail-loud pattern as `BETTER_AUTH_SECRET`: `docker compose config`/
-  `up` refuses to start until it is set. `POSTGRES_USER`/`POSTGRES_DB` keep the `kurultay`
+  `up` refuses to start until it is set. `POSTGRES_USER`/`POSTGRES_DB` keep the `kurul`
   default so an otherwise-unmodified `.env` still works once the password is filled in, and
   `REDIS_PASSWORD` is new and optional — leaving it unset keeps `redis` passwordless exactly
   as before, so this half is not a breaking change on its own. See
@@ -774,14 +802,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   volume keeps the role's original password no matter what `.env` now says. Two ways to bring
   them back in sync:
   - Set `POSTGRES_PASSWORD` in `.env` to whatever the running role's password **already is**
-    (`kurultay`, if this is the first time upgrading past this change) — the value only needs
+    (`kurul`, if this is the first time upgrading past this change) — the value only needs
     to be present and correct, not different from today.
   - Or actually rotate the role's password to a new value, on the running instance, before
     updating `.env` to match:
 
     ```bash
-    docker compose exec -T postgres psql -U kurultay -d postgres \
-      -c "ALTER USER kurultay WITH PASSWORD 'the-new-password';"
+    docker compose exec -T postgres psql -U kurul -d postgres \
+      -c "ALTER USER kurul WITH PASSWORD 'the-new-password';"
     ```
 
     then set `POSTGRES_PASSWORD=the-new-password` in `.env` and restart the stack. Doing this
@@ -818,7 +846,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- **Board columns never scrolled independently; the page did** ([#184](https://github.com/dravcore/kurultay/issues/184)).
+- **Board columns never scrolled independently; the page did** ([#184](https://github.com/dravcore/kurul/issues/184)).
   The app shell was `min-h-screen` — a floor with no ceiling — so nothing under it was bounded,
   a column's `overflow-y-auto` had nothing to clip against, and a long column grew the
   *document* instead. Measured on a board seeded with 1 000 tasks, the document reached
@@ -882,7 +910,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `apps/api/test/redis-database-index.e2e-spec.ts`, which connects on index 3 and asks the
   server — `CLIENT LIST`, plus observer clients on 3 and 0 — where each connection and key
   actually landed, rather than asserting what the parser returned).
-  Closes [#190](https://github.com/dravcore/kurultay/issues/190).
+  Closes [#190](https://github.com/dravcore/kurul/issues/190).
 - **The uptime monitor the docs tell you to build was pointed at a URL that is not the API.**
   `docs/development.md` said to monitor `https://<your-host>/health/ready`, which predates the
   reverse proxy: behind `proxy` that path matches the catch-all rule, reaches the web app and
@@ -961,13 +989,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the final failure — every configured attempt spent, nothing left to retry it — logs at
   `error` and is reported through `captureServerError` (opt-in Sentry, `docs/development.md`),
   since `removeOnFail: 50` alone only helps someone who already knew to go looking. Closes
-  audit finding BE-06 ([#148](https://github.com/dravcore/kurultay/issues/148)).
+  audit finding BE-06 ([#148](https://github.com/dravcore/kurul/issues/148)).
 
 ### Security
 
 - **Release images are signed, ship an SBOM, and are built by workflows whose every action is
   pinned to a commit.** Three parts of audit finding SEC-06
-  ([#157](https://github.com/dravcore/kurultay/issues/157)), all of them things a self-hoster
+  ([#157](https://github.com/dravcore/kurul/issues/157)), all of them things a self-hoster
   can now check rather than take on trust. Every `uses:` across the five workflow files moved
   from a mutable major tag (`@v7`, `@v3`) to a full commit SHA with the release in a same-line
   comment — a major tag is a pointer its owner can move, so an action compromised upstream
@@ -1198,7 +1226,7 @@ commit; this is the point it becomes a version.
 - Phase 2 auth and workspaces: Better Auth (organization plugin) on Nest `/auth/*`,
   `GET /me`, session/workspace/role guards, workspace CRUD + invitations, web
   login/register/invite + workspace switcher, and auth/isolation/role-matrix tests.
-- `@kurultay/auth-access` — shared Better Auth organization access-control roles for api
+- `@kurul/auth-access` — shared Better Auth organization access-control roles for api
   and web.
 - Shared Prisma/`pg` pool for Nest and Better Auth; FK and list query indexes migration;
   workspace-nested scaffold routes (`/workspaces/:workspaceId/...`).
@@ -1225,7 +1253,7 @@ commit; this is the point it becomes a version.
   re-fails on every press teaches the user the product is broken — and a control still on
   screen and still live already is the retry.
 
-- Kurultay no longer accepts external code, documentation, or translation contributions
+- Kurul no longer accepts external code, documentation, or translation contributions
   ([ADR 0015](docs/decisions/0015-no-external-contributions.md)): the codebase stays
   single-authored, the CLA draft is kept but not enacted, and legal review is deferred to the
   first commercial sale. The `CLA` workflow is disabled (manual trigger only, plus an
@@ -1248,7 +1276,7 @@ commit; this is the point it becomes a version.
   workspace-role decorators across API controllers, enriched `CreateTaskDto` label/assignee
   handling, and fixed board a11y (drag-handle ARIA, localized DnD announcements, mention
   combobox keyboard support).
-- Tech-debt refactor (Wave 6): shared request DTOs in `@kurultay/shared-types`
+- Tech-debt refactor (Wave 6): shared request DTOs in `@kurul/shared-types`
   (`packages/shared-types/src/requests.ts`), split `board-view` and `task-metadata-panel` into
   focused modules/hooks, and added test coverage for `TaskService.remove`, `WorkspaceGuard`,
   notifications, and realtime edge cases.
@@ -1266,7 +1294,7 @@ commit; this is the point it becomes a version.
   remain).
 - Pagination docs: cursor `CursorPage<T>` is the shared typed default; no `OffsetPage`
   export.
-- Product enums in `@kurultay/shared-types` include `InvitationStatus` and
+- Product enums in `@kurul/shared-types` include `InvitationStatus` and
   `LabelColorSlot` (`slot-1`…`slot-8`); invitation DTO status is no longer a free string.
 - ESLint docs aligned with the flat config actually shipped (no Nest/Next/import plugins
   yet).
@@ -1326,5 +1354,5 @@ commit; this is the point it becomes a version.
   session cookie cache, batch due-soon scans and rebalance SQL, paginate comments, and add
   `pg_trgm` search indexes.
 
-[unreleased]: https://github.com/dravcore/kurultay/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/dravcore/kurultay/releases/tag/v0.1.0
+[unreleased]: https://github.com/dravcore/kurul/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/dravcore/kurul/releases/tag/v0.1.0

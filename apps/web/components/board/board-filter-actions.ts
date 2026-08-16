@@ -1,4 +1,4 @@
-import type { Priority } from '@kurultay/shared-types';
+import type { Priority } from '@kurul/shared-types';
 import type { BoardTaskFilters } from '@/lib/task-query';
 
 /**

@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
-import type { AccountDeletionPreviewDto } from '@kurultay/shared-types';
+import type { AccountDeletionPreviewDto } from '@kurul/shared-types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';
 import { InstanceAdminGuard } from '../common/guards/instance-admin.guard';

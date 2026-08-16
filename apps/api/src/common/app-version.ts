@@ -11,7 +11,7 @@ export const UNKNOWN_VERSION = 'unknown';
  * same reason `loadRootEnv` does: it has to give the same answer from `apps/api` under
  * `pnpm dev` (`__dirname` is `apps/api/dist/common`), from a Jest run (`apps/api/src/common`),
  * and from the runtime image, where `pnpm deploy` puts `dist/` and `package.json` side by side
- * under `/app`. All three land on `@kurultay/api`'s own `package.json`.
+ * under `/app`. All three land on `@kurul/api`'s own `package.json`.
  *
  * `npm_package_version` was the obvious alternative and is wrong: the environment variable only
  * exists when the process was started by a package manager script, and the container's

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { MailDeliveryStatus } from '@kurultay/shared-types';
+import { MailDeliveryStatus } from '@kurul/shared-types';
 import { LogMailSender } from './log-mail-sender';
 import { recordMailDelivery } from './mail-delivery-scope';
 import { readMailConfig, type MailConfig } from './mail-config';

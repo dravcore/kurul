@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { canDeleteWorkspace, canRenameWorkspace } from './workspace-permissions';
 
 const { OWNER, ADMIN, MEMBER, GUEST } = MemberRole;

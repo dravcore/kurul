@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Locale, UserDto } from '@kurultay/shared-types';
+import type { Locale, UserDto } from '@kurul/shared-types';
 import { LocaleService } from '../locale/locale.service';
 import { assertAccountNotDeleted } from '../common/deleted-account';
 import type { AuthenticatedUser } from '../common/types/request-context';

@@ -5,7 +5,7 @@ import { GripVertical } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
 import { cn } from '@/lib/utils';
 import { LabelDots } from './label-chip';
 import { PriorityIcon } from './priority-icon';

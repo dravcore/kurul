@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { ADMIN, GUEST, MEMBER, OWNER, organizationRoles } from '../src/permissions.js';
 
 /**

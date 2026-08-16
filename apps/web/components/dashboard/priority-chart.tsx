@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { DashboardCountByPriority } from '@kurultay/shared-types';
+import type { DashboardCountByPriority } from '@kurul/shared-types';
 import { useTranslations } from 'next-intl';
 import { ChartTableToggle } from './chart-table-toggle';
 

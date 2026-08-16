@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ActivityType, MemberRole } from '@kurultay/shared-types';
+import { ActivityType, MemberRole } from '@kurul/shared-types';
 import { APIError } from 'better-auth/api';
 import type { Request } from 'express';
 import { ActivityService } from '../activity/activity.service';

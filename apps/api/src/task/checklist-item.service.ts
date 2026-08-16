@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
 import { POSITION_GAP, midpoint } from '../common/position/fractional-index';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateChecklistItemDto } from './dto/create-checklist-item.dto';

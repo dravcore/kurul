@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { ActivityType, NotificationType, UsagePingKind } from '@kurultay/shared-types';
+import { ActivityType, NotificationType, UsagePingKind } from '@kurul/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CleanupWorker } from '../src/retention/cleanup.worker';

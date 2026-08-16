@@ -9,7 +9,7 @@
 
 Bu kaydın hizmet ettiği ROADMAP kalemi tek yönlü bir Trello JSON import'u: board, liste, kart,
 label ve checklist; dosya ekleri URL olarak taşınıyor. Kapsam bilerek dar; dar olmayan şey,
-Trello'nun modeliyle Kurultay'ın modelinin örtüşmediği yerlerin sayısı — yani bir import'un ya
+Trello'nun modeliyle Kurul'un modelinin örtüşmediği yerlerin sayısı — yani bir import'un ya
 tahmin etmek ya da tahmin edemeyeceğini kabul etmek zorunda kaldığı yerler.
 
 Girdinin üç özelliği aşağıdaki her kararı şekillendiriyor.
@@ -25,9 +25,9 @@ dipnot değil, sonucu olan bir sınırlama: import'un okuduğu her alan adı haf
 hiçbir şeye karşı doğrulanmadı. "Üç gerçek export'la doğrulandı" diyen ROADMAP metriği tam da bu
 yüzden **partial** kapanıyor ve ilk gerçek export elimize geçtiğinde yeniden açılıyor.
 
-**Trello'nun sözlüğü kimi yerde Kurultay'ınkinden geniş, kimi yerde ise karşılığı hiç yok.**
+**Trello'nun sözlüğü kimi yerde Kurul'unkinden geniş, kimi yerde ise karşılığı hiç yok.**
 Trello'nun on label rengi var; bu deponun sekiz tasarım-token slotu. Trello'da arşivlenmiş liste
-ve kart var; Kurultay'da arşiv kavramı yok. Trello'da kartın üyeleri var; Kurultay'ın üyeleri
+ve kart var; Kurul'da arşiv kavramı yok. Trello'da kartın üyeleri var; Kurul'un üyeleri
 başka bir tenant'ın kullanıcı tablosundaki satırlar. Trello'da yorum var; bu import onları
 taşımıyor.
 
@@ -45,7 +45,7 @@ Somut olarak:
 
 ### Yapı
 
-| Trello              | Kurultay                          | Not                                                      |
+| Trello              | Kurul                             | Not                                                      |
 | ------------------- | --------------------------------- | -------------------------------------------------------- |
 | board               | `Board`                           | `name`, `desc` → `description`                           |
 | liste               | `Column`                          | her zaman `category: UNSTARTED` — aşağıya bakın          |
@@ -143,7 +143,7 @@ seçmeden **önce** import diyaloğunda söyleniyor.
 
 ### Sütun kategorisi neden hiç çıkarsanmıyor
 
-[ADR 0019](0019-column-category.md) var, çünkü Kurultay eskiden tamamlanmışlığı sütunun adından
+[ADR 0019](0019-column-category.md) var, çünkü Kurul eskiden tamamlanmışlığı sütunun adından
 çıkarsıyordu; ve o ADR çıkarsamanın üç yolunu adıyla anıp üçünü de reddediyor:
 
 - **İsimle eşleme yumuşatılmadı, kaldırıldı** (`0019-column-category.md:51-52`). "Done"u
@@ -158,7 +158,7 @@ seçmeden **önce** import diyaloğunda söyleniyor.
 Bir Trello export'unda kategori yok. Elde yalnız iki sinyal var — isim ve konum — ve ikisi de o
 listede. Yani çıkarsanacak bir şey kalmıyor; yine de çıkarsamak, ADR 0019'un kaldırdığı defekti
 **daha çok** ıskalayacağı bir yerde geri koymak olurdu: bir Trello board'unun sütun adları herhangi
-bir dilde herhangi bir şey olabilir, oysa ADR 0019'un kendi migration'ı yalnız Kurultay'ın kendi
+bir dilde herhangi bir şey olabilir, oysa ADR 0019'un kendi migration'ı yalnız Kurul'un kendi
 seed ettiği İngilizce `Done`'ı tanıyordu. O migration (`:55-56`) isimle eşlemeye emsal gibi
 görünüyor ama değil — bilinen bir yazıcının bilinen çıktısını tanıyordu.
 
@@ -187,7 +187,7 @@ testle çivileniyor, sürpriz olmasın diye diyalogda yazıyor.
 
 ### Arşivlenmiş liste ve kart neden düşürülüyor
 
-`closed: true` Trello'nun arşividir. Kurultay'da arşiv yok, yani arşivlenmiş bir kart ancak normal
+`closed: true` Trello'nun arşividir. Kurul'da arşiv yok, yani arşivlenmiş bir kart ancak normal
 bir kart olarak gelebilir — yani kullanıcının bilerek görüş alanından kaldırdığı şey, önüne geri
 konur. Uzun ömürlü 500 kartlık bir board'un arkasında çoğu zaman bunun birkaç katı arşivlenmiş kart
 durur, yani bu bir yuvarlama hatası da değil.
@@ -201,7 +201,7 @@ sayıyı taşıyan bir `(comment, outOfScope)` satırı bunu cevabın içinde ya
 
 ### Üyeler neden düşürülüyor
 
-Bir Trello üyesi bir Kurultay kullanıcısı değildir. Export güvenilir biçimde e-posta taşımıyor,
+Bir Trello üyesi bir Kurul kullanıcısı değildir. Export güvenilir biçimde e-posta taşımıyor,
 taşıdığı durumda bile onunla eşleşmek, işi bugün o adrese sahip olan kişiye atamak demek olurdu.
 Bu import'un yazdığı her satır, import'u koşturan kişiyi `createdById` / `uploadedById` alanına
 yazar. Bu bir eşleme değil — bir sorumluluk kaydı, ve dürüst olanı bu.

@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { NotificationType, SocketEvents } from '@kurultay/shared-types';
+import { NotificationType, SocketEvents } from '@kurul/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { NotificationService } from './notification.service';

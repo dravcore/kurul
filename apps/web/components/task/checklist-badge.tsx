@@ -2,7 +2,7 @@
 
 import { SquareCheckBig } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { ChecklistSummaryDto } from '@kurultay/shared-types';
+import type { ChecklistSummaryDto } from '@kurul/shared-types';
 import { cn } from '@/lib/utils';
 
 /**

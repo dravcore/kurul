@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@kurultay/shared-types';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@kurul/shared-types';
 import messages from './en.json';
 
 /**

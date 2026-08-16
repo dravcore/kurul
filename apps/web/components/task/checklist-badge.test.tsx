@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { ChecklistSummaryDto } from '@kurultay/shared-types';
+import type { ChecklistSummaryDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { ChecklistBadge } from './checklist-badge';
 

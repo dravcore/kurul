@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { LabelDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import type { LabelDto, WorkspaceMemberDto } from '@kurul/shared-types';
 import type { BoardTaskFilters } from '@/lib/task-query';
 import {
   resolveDuePreset,

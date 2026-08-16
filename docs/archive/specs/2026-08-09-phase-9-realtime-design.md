@@ -36,7 +36,7 @@ separate `ws` process role.
 
 ## Events
 
-Contract: `@kurultay/shared-types` `SocketEvents` / payload map. Every payload includes
+Contract: `@kurul/shared-types` `SocketEvents` / payload map. Every payload includes
 `actorId` for self-echo handling.
 
 | Event            | Emit after                       | Client action                                      |

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { type AttachmentDto, AttachmentKind, Priority, type TaskDto } from '@kurultay/shared-types';
+import { type AttachmentDto, AttachmentKind, Priority, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { toast } from 'sonner';
 import { useTaskAttachments } from './use-task-attachments';

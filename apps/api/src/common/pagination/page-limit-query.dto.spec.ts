@@ -11,7 +11,7 @@ const VALID_CURSOR = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
  * `WorkspaceMemberQueryDto`) all resolve to the same `@PageLimit()` + optional `@IsUuidV7()
  * cursor` shape, and none of them was reachable from a unit test before this file — the audit's
  * `src/*\/dto` 0% finding covers all three, and `PageLimit()` itself (`page-limit.ts:37-40`) was
- * likewise never invoked outside `pnpm --filter @kurultay/api test:e2e`. One table drives all
+ * likewise never invoked outside `pnpm --filter @kurul/api test:e2e`. One table drives all
  * three instead of copy-pasting the same cases per file, since a drift between them (e.g. one
  * DTO's default silently changing to something other than its documented ceiling/floor) is
  * exactly the kind of thing that is easy to miss when each file's tests are separate.

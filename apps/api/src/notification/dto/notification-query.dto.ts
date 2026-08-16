@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsOptional } from 'class-validator';
-import { NotificationType } from '@kurultay/shared-types';
+import { NotificationType } from '@kurul/shared-types';
 import { DEFAULT_PAGE_LIMIT, PageLimit } from '../../common/pagination/page-limit';
 import { IsUuidV7 } from '../../common/uuid';
 

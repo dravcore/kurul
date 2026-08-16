@@ -21,7 +21,7 @@ function env(overrides: Partial<WebSentryEnv> = {}): WebSentryEnv {
 
 describe('buildWebSentryOptions', () => {
   /**
-   * The load-bearing assertion. Kurultay is self-hosted: a browser that contacts Sentry
+   * The load-bearing assertion. Kurul is self-hosted: a browser that contacts Sentry
    * because the app shipped with tracking wired in — rather than because the operator turned
    * it on — is a broken promise, and `undefined` here is what lets `instrumentation-client.ts`
    * skip loading the SDK chunk entirely rather than initializing a no-op client.
@@ -80,7 +80,7 @@ describe('scrubWebEvent', () => {
     const event = scrubWebEvent(
       errorEvent({
         request: {
-          url: 'https://kurultay.example/boards/b_1',
+          url: 'https://kurul.example/boards/b_1',
           headers: {
             Cookie: 'better-auth.session_token=secret',
             AUTHORIZATION: 'Bearer secret',
@@ -97,7 +97,7 @@ describe('scrubWebEvent', () => {
     const event = scrubWebEvent(
       errorEvent({
         request: {
-          url: 'https://kurultay.example/boards/b_1?q=confidential+search',
+          url: 'https://kurul.example/boards/b_1?q=confidential+search',
           query_string: 'q=confidential+search',
           cookies: { 'better-auth.session_token': 'secret' },
           data: { title: 'a task title' },
@@ -105,7 +105,7 @@ describe('scrubWebEvent', () => {
       }),
     );
 
-    expect(event.request?.url).toBe('https://kurultay.example/boards/b_1');
+    expect(event.request?.url).toBe('https://kurul.example/boards/b_1');
     expect(event.request?.query_string).toBeUndefined();
     expect(event.request?.cookies).toBeUndefined();
     expect(event.request?.data).toBeUndefined();

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DEFAULT_LOCALE, matchLocale, negotiateLocale, type Locale } from '@kurultay/shared-types';
+import { DEFAULT_LOCALE, matchLocale, negotiateLocale, type Locale } from '@kurul/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { WorkspaceMemberDto } from '@kurultay/shared-types';
+import type { WorkspaceMemberDto } from '@kurul/shared-types';
 
 interface TaskAssigneesSectionProps {
   members: WorkspaceMemberDto[];

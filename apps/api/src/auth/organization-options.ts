@@ -1,6 +1,6 @@
 import type { OrganizationOptions } from 'better-auth/plugins';
 import type { AccessControl } from 'better-auth/plugins/access';
-import { ac as sharedAc, organizationRoles as sharedRoles } from '@kurultay/auth-access';
+import { ac as sharedAc, organizationRoles as sharedRoles } from '@kurul/auth-access';
 import { buildInvitationEmail } from '../mail/mail-templates';
 import { acceptLanguageOf, resolveRecipientLocale } from '../mail/recipient-locale';
 import { sendMail } from '../mail/send-mail';

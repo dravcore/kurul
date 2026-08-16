@@ -151,7 +151,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
  * Writes take the request type as a second explicit type argument
  * (`api.post<ColumnDto, CreateColumnRequest>(path, body)`). It defaults to `never` rather
  * than being inferred from `body`, which is the whole point: an inferred body type accepts
- * whatever it is handed, so the `@kurultay/shared-types` request shapes were documentation
+ * whatever it is handed, so the `@kurul/shared-types` request shapes were documentation
  * that the compiler never read. With `never` as the default, a call that passes a body
  * without naming its type does not compile at all, and one that names it is checked against
  * the DTO the endpoint actually validates.

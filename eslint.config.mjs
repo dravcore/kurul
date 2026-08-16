@@ -34,7 +34,7 @@ const jsxA11yConfigs = (() => {
   return [
     {
       ...recommended,
-      name: 'kurultay/jsx-a11y',
+      name: 'kurul/jsx-a11y',
       files: ['apps/web/**/*.tsx'],
     },
   ];

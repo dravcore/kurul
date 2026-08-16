@@ -30,7 +30,7 @@ type ResponseHeaders = NonNullable<Extract<ResponseOrRef, { description: string 
  * Version the spec advertises.
  *
  * Deliberately the monorepo version rather than an independent one. `api-conventions.md` says
- * there is no `/v1` prefix before 1.0 and that `@kurultay/shared-types` is versioned with the
+ * there is no `/v1` prefix before 1.0 and that `@kurul/shared-types` is versioned with the
  * monorepo, so a client that pins the package pins the contract. A second version number here
  * would be a second promise, and the two would disagree the first time one of them moved.
  */
@@ -83,20 +83,20 @@ const UUID_PATH_PARAMS: ReadonlySet<string> = new Set([
 ]);
 
 const DESCRIPTION = `
-The REST contract of one Kurultay instance, generated from the running application: every path,
+The REST contract of one Kurul instance, generated from the running application: every path,
 parameter, request body and response below is what the NestJS router and the DTO classes
 actually declare, not a hand-maintained copy of them.
 
-The prose contract is [\`docs/api-conventions.md\`](https://github.com/dravcore/kurultay/blob/develop/docs/api-conventions.md).
+The prose contract is [\`docs/api-conventions.md\`](https://github.com/dravcore/kurul/blob/develop/docs/api-conventions.md).
 Where this document and that one disagree, one of them is wrong and neither wins by default.
 
 ### What is not in here
 
 **\`/auth/*\`.** Better Auth is mounted on raw Express below the Nest router
-([ADR 0004](https://github.com/dravcore/kurultay/blob/develop/docs/decisions/0004-auth-better-auth.md)),
+([ADR 0004](https://github.com/dravcore/kurul/blob/develop/docs/decisions/0004-auth-better-auth.md)),
 so it has no controller to scan and no route this document can discover. Sign-in, sign-up,
 sign-out and session refresh live there. **The Socket.io contract** is likewise absent: it is
-not HTTP, and it is defined in \`@kurultay/shared-types\`.
+not HTTP, and it is defined in \`@kurul/shared-types\`.
 
 ### Authentication
 
@@ -350,7 +350,7 @@ function applyGlobalContract(document: OpenAPIObject): void {
  */
 export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
   const builder = new DocumentBuilder()
-    .setTitle('Kurultay API')
+    .setTitle('Kurul API')
     .setDescription(DESCRIPTION)
     .setVersion(OPENAPI_VERSION)
     .setLicense('AGPL-3.0-only', 'https://www.gnu.org/licenses/agpl-3.0.en.html')

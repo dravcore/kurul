@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ActivityType, MemberRole, SocketEvents } from '@kurultay/shared-types';
-import type { CommentDto, CursorPage } from '@kurultay/shared-types';
+import { ActivityType, MemberRole, SocketEvents } from '@kurul/shared-types';
+import type { CommentDto, CursorPage } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { AUTHOR_SELECT, toAuthorDto, type AuthorRow } from '../common/author';
 import { parseMentions } from '../common/mentions/parse-mentions';

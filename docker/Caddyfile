@@ -1,4 +1,4 @@
-# The single public entrance to a Kurultay deployment.
+# The single public entrance to a Kurul deployment.
 #
 # Everything a browser loads — the app and the API — is served from ONE origin, and that is a
 # deliberate architectural choice, not just tidiness (audit finding PM-02):
@@ -43,7 +43,7 @@
 }
 
 # The public address. `http://localhost` (the default) serves plain HTTP on port 80 for a
-# local `docker compose up` with no domain; `https://kurultay.example.com` triggers automatic
+# local `docker compose up` with no domain; `https://kurul.example.com` triggers automatic
 # HTTPS, including the HTTP→HTTPS redirect Caddy installs on port 80 for it. The value carries
 # the scheme because that is what tells Caddy which of the two to do — see
 # docs/self-hosting.md.

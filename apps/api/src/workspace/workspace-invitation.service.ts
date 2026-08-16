@@ -5,13 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, MemberRole } from '@kurultay/shared-types';
+import { ActivityType, MemberRole } from '@kurul/shared-types';
 import type {
   CursorPage,
   InvitationDto,
   InvitationStatus,
   WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
 import { ActivityService } from '../activity/activity.service';
@@ -68,7 +68,7 @@ type InvitationRow = {
  *
  * `emailDelivery` is deliberately absent here. A listed invitation is a stored row and delivery
  * is not stored, so this mapper has nothing to report; only `createInvitation`, which watched
- * the send happen, sets it. See the field's contract in `@kurultay/shared-types`.
+ * the send happen, sets it. See the field's contract in `@kurul/shared-types`.
  */
 function toInvitationDto(row: InvitationRow): InvitationDto {
   return {

@@ -12,7 +12,7 @@ import { join } from 'node:path';
  * this spec own and clean up itself (`docs/testing.md:259-261`).
  */
 export async function createTempStorageDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'kurultay-storage-'));
+  return mkdtemp(join(tmpdir(), 'kurul-storage-'));
 }
 
 /** Idempotent: safe in an `afterEach` that runs after a failed `beforeEach`. */

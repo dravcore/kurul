@@ -4,7 +4,7 @@ import type { ValidationDetail } from '../../common/validation/validation-except
  * Every schema in this directory is a **class that `implements` the interface it describes**.
  *
  * `@nestjs/swagger` builds schemas from classes, and every response type in this API is a bare
- * TypeScript interface in `@kurultay/shared-types` — erased at compile time, so it produces no
+ * TypeScript interface in `@kurul/shared-types` — erased at compile time, so it produces no
  * schema at all. Mirroring one by hand normally means creating a second source of truth that
  * drifts on the first field nobody remembers to copy. `implements` is what stops that: a field
  * added to the interface, removed from it, or retyped makes this file fail `pnpm typecheck`,

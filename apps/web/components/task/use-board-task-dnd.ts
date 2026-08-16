@@ -11,7 +11,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
 import { midpoint } from '@/lib/position';
 import { parseColumnDroppableId } from '@/components/board/board-column';
 

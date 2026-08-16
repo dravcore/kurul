@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import type { ActivityDto } from '@kurultay/shared-types';
+import type { ActivityDto } from '@kurul/shared-types';
 import { formatActivitySummary } from '@/lib/activity-summary';
 import { authorLabel } from '@/lib/author-label';
 import { formatRelativeTime } from '@/lib/relative-time';

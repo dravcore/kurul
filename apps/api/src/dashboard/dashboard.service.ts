@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ActivityType, ColumnCategory, Priority } from '@kurultay/shared-types';
+import { ActivityType, ColumnCategory, Priority } from '@kurul/shared-types';
 import type {
   DashboardCountByAssignee,
   DashboardCountByColumn,
   DashboardCountByPriority,
   DashboardSummaryDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { Prisma } from '../generated/prisma';
 import { assertBoard } from '../common/board-access';
 import { PrismaService } from '../prisma/prisma.service';

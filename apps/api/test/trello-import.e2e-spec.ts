@@ -12,8 +12,8 @@ import {
   MemberRole,
   TrelloImportScope,
   TrelloImportSkipReason,
-} from '@kurultay/shared-types';
-import type { TrelloImportReportDto, TrelloImportSkipGroupDto } from '@kurultay/shared-types';
+} from '@kurul/shared-types';
+import type { TrelloImportReportDto, TrelloImportSkipGroupDto } from '@kurul/shared-types';
 import { SKIP_SAMPLE_LIMIT } from '../src/import/import-skip';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';
@@ -392,7 +392,7 @@ describe('Trello import (e2e)', () => {
       expect(attachments).toHaveLength(2);
       expect(tasks.every((task) => task.createdById === actorId)).toBe(true);
       expect(attachments.every((row) => row.uploadedById === actorId)).toBe(true);
-      // K5: a Trello member is not a Kurultay user, so nothing was assigned to anybody.
+      // K5: a Trello member is not a Kurul user, so nothing was assigned to anybody.
       expect(await prisma.taskAssignee.count()).toBe(0);
     });
   });

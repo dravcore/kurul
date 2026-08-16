@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BadRequestException } from '@nestjs/common';
-import { TrelloImportScope, TrelloImportSkipReason } from '@kurultay/shared-types';
+import { TrelloImportScope, TrelloImportSkipReason } from '@kurul/shared-types';
 import { parseTrelloExport, type TrelloReadIssue } from './trello-export';
 
 const FIXTURE_DIR = join(__dirname, '..', '..', 'test', 'fixtures', 'trello');

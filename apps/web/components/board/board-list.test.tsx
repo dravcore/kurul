@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { MemberRole, type BoardDto, type TrelloImportReportDto } from '@kurultay/shared-types';
+import { MemberRole, type BoardDto, type TrelloImportReportDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';

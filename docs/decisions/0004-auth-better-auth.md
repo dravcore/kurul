@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-08-08
 **Updated:** 2026-08-09 — Phase 2 quality hardening: Nest-only org mutations, HTTP
-firewall on Better Auth organization writes, shared `@kurultay/auth-access` roles.
+firewall on Better Auth organization writes, shared `@kurul/auth-access` roles.
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0004-auth-better-auth.md)
 
@@ -37,26 +37,26 @@ invite-acceptance screens are ours to design and build.
 ## Domain mapping: organization → Workspace
 
 Better Auth's organization plugin speaks _organization_, _member_, and
-_invitation_. Kurultay's product language and REST API use **Workspace**,
+_invitation_. Kurul's product language and REST API use **Workspace**,
 **WorkspaceMember**, and workspace-scoped invitation routes
 (`POST /workspaces/:workspaceId/invitations`, …). Treat the mapping as 1:1:
 
-| Better Auth (plugin) | Kurultay (product / API)                         |
+| Better Auth (plugin) | Kurul (product / API)                            |
 | -------------------- | ------------------------------------------------ |
 | Organization         | Workspace                                        |
 | Member               | WorkspaceMember                                  |
 | Invitation           | Invitation (no separate Prisma model in Phase 1) |
 
 Invite persistence lives in Better Auth's organization tables. Phase 1 did
-**not** add a Kurultay `Invitation` model.
+**not** add a Kurul `Invitation` model.
 
 **Phase 2 resolution (2026-08-09):** single source of truth — Prisma models keep
-Kurultay names (`Workspace`, `WorkspaceMember`, `WorkspaceInvitation`) and
+Kurul names (`Workspace`, `WorkspaceMember`, `WorkspaceInvitation`) and
 Better Auth's organization plugin maps onto them via `schema.modelName` /
 field maps (`organizationId` → `workspaceId`). No sync layer. Roles are the
 `MemberRole` enum values (`OWNER` / `ADMIN` / `MEMBER` / `GUEST`) registered
 1:1 with Better Auth access control (`creatorRole: "OWNER"`). Access-control role
-statements live in `@kurultay/auth-access` and are imported by both api and web.
+statements live in `@kurul/auth-access` and are imported by both api and web.
 Nest mounts the framework-agnostic Node handler on Express at `/auth/{*splat}`
 (escape hatch — the community Nest wrapper is not used). **Workspace/org mutations
 go only through Nest `/workspaces/*`.** Better Auth `/auth/organization/*` mutation

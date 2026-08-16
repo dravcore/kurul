@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { WorkspaceDto } from '@kurultay/shared-types';
+import type { WorkspaceDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { RenameWorkspaceDialog } from './rename-workspace-dialog';
@@ -17,8 +17,8 @@ const apiPatch = vi.mocked(api.patch);
 
 const workspace: WorkspaceDto = {
   id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00',
-  name: 'Kurultay',
-  slug: 'kurultay',
+  name: 'Kurul',
+  slug: 'kurul',
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
@@ -67,21 +67,21 @@ describe('RenameWorkspaceDialog', () => {
   it('opens with the workspace’s current name', () => {
     renderDialog();
 
-    expect(nameField().value).toBe('Kurultay');
+    expect(nameField().value).toBe('Kurul');
   });
 
   it('sends the trimmed name to the workspace endpoint and reports the update back', async () => {
     const { onRenamed } = renderDialog();
 
-    fireEvent.change(nameField(), { target: { value: '  Kurultay Labs  ' } });
+    fireEvent.change(nameField(), { target: { value: '  Kurul Labs  ' } });
     fireEvent.click(saveButton());
 
     await waitFor(() => expect(apiPatch).toHaveBeenCalled());
     expect(apiPatch).toHaveBeenCalledWith(`/workspaces/${workspace.id}`, {
-      name: 'Kurultay Labs',
+      name: 'Kurul Labs',
     });
     expect(onRenamed).toHaveBeenCalledWith(
-      expect.objectContaining({ id: workspace.id, name: 'Kurultay Labs' }),
+      expect.objectContaining({ id: workspace.id, name: 'Kurul Labs' }),
     );
   });
 

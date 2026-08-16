@@ -11,7 +11,7 @@ import {
   ValidatorConstraintInterface,
   ValidationArguments,
 } from 'class-validator';
-import { Priority } from '@kurultay/shared-types';
+import { Priority } from '@kurul/shared-types';
 import { DEFAULT_PAGE_LIMIT, PageLimit } from '../../common/pagination/page-limit';
 import { isUuidV7, IsUuidV7 } from '../../common/uuid';
 

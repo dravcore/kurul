@@ -7,7 +7,7 @@
 
 ## Bağlam
 
-Kurultay kendi kullanımı hakkında hiçbir şey ölçmüyordu. `apps/` ve `docs/` altında
+Kurul kendi kullanımı hakkında hiçbir şey ölçmüyordu. `apps/` ve `docs/` altında
 `telemetry`, `analytics`, `posthog`, `plausible`, `umami` araması kaynak kodda sıfır eşleşme
 veriyordu; `docs/roadmap.md`'nin "Beyond MVP" listesinde metrik maddesi yoktu. Dolayısıyla her
 ürün sorusu sezgiyle yanıtlanıyordu:
@@ -23,7 +23,7 @@ yoksa yapması en kolay olan şeye mi harcayacağınızı belirler.
 
 Bariz çözüm aynı zamanda en çok zarar verebilecek olan. Self-host kullanıcıları bu yazılımı
 büyük ölçüde _kendilerini raporlamadığı için_ seçer; başarısızlık biçimi kaybedilen bir
-kullanıcı değil, özelliğin değerinden uzun yaşayan "Kurultay eve telefon ediyor" başlığıdır.
+kullanıcı değil, özelliğin değerinden uzun yaşayan "Kurul eve telefon ediyor" başlığıdır.
 Birçok proje, ne kadar anonim olursa olsun, varsayılan açık bir ping için bu bedeli ödedi.
 
 Bu yüzden iki soru ayrı ayrı yanıtlanmalı, çünkü yanıtları farklı:
@@ -85,7 +85,7 @@ tam yük, başka hiçbir alan olmaksızın:
 
 Kurulum kimliği yok, hostname yok, IP yok, sayaç yok, workspace veya kullanıcı verisi yok.
 `await` edilmez, yeniden denenmez, açılışı düşüremez. `docs/development.md` bu alan listesini
-verilen söz olarak tekrarlar; `@kurultay/shared-types` içindeki `TelemetryPingPayload` ise
+verilen söz olarak tekrarlar; `@kurul/shared-types` içindeki `TelemetryPingPayload` ise
 spesifikasyonudur — `telemetry.service.spec.ts` anahtar kümesinin tam olarak `event` ve
 `version` olduğunu doğrular.
 

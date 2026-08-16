@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type { WorkspaceDto } from '@kurultay/shared-types';
+import type { WorkspaceDto } from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 import { disconnectSocket } from '@/lib/socket';

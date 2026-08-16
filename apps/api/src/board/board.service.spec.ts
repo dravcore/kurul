@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { ActivityType, ColumnCategory, type Locale } from '@kurultay/shared-types';
+import { ActivityType, ColumnCategory, type Locale } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { LocaleService } from '../locale/locale.service';
 import { PrismaService } from '../prisma/prisma.service';

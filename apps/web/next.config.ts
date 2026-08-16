@@ -7,7 +7,7 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  transpilePackages: ['@kurultay/shared-types', '@kurultay/auth-access'],
+  transpilePackages: ['@kurul/shared-types', '@kurul/auth-access'],
   // Applied to every route (`source: '/:path*'`) — there is no route in this app that should
   // ship without them, including the public `(auth)` shell.
   //

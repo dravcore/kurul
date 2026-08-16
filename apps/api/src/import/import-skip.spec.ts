@@ -1,4 +1,4 @@
-import { TrelloImportScope, TrelloImportSkipReason } from '@kurultay/shared-types';
+import { TrelloImportScope, TrelloImportSkipReason } from '@kurul/shared-types';
 import { SKIP_SAMPLE_LIMIT, SkipCollector } from './import-skip';
 
 describe('SkipCollector', () => {

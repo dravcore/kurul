@@ -1,6 +1,6 @@
 # Roadmap
 
-Where Kurultay is, and what is explicitly out of scope for now.
+Where Kurul is, and what is explicitly out of scope for now.
 
 > 🌐 English (canonical) | [Türkçe](tr/roadmap.md)
 
@@ -18,7 +18,7 @@ ordinary bugs/refactors on `develop`.
 | Post-MVP hardening | Done — same archive                                                                        |
 | Beyond MVP         | Not scheduled — compatibility list only                                                    |
 
-Task-level work lives in [GitHub Issues](https://github.com/dravcore/kurultay/issues), not
+Task-level work lives in [GitHub Issues](https://github.com/dravcore/kurul/issues), not
 here. Process for cutting a release: [git-strategy.md](git-strategy.md).
 
 ## Shipped MVP (summary)
@@ -97,4 +97,4 @@ Three things this section deliberately does **not** promise:
 - [architecture.md](architecture.md) — how the modules fit together
 - [git-strategy.md](git-strategy.md) — how work becomes a release
 - [../CHANGELOG.md](../CHANGELOG.md) — what has actually shipped
-- [GitHub Issues](https://github.com/dravcore/kurultay/issues) — task-level tracking
+- [GitHub Issues](https://github.com/dravcore/kurul/issues) — task-level tracking

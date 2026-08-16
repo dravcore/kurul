@@ -6,8 +6,8 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { UsagePingKind } from '@kurultay/shared-types';
-import type { BoardDto } from '@kurultay/shared-types';
+import { UsagePingKind } from '@kurul/shared-types';
+import type { BoardDto } from '@kurul/shared-types';
 import { UsagePingService } from '../activation/usage-ping.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';

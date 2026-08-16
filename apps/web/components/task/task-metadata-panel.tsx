@@ -14,7 +14,7 @@ import type {
   TaskDto,
   UpdateTaskRequest,
   WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { TaskActivitySection } from './task-activity-section';
 import { TaskAssigneesSection } from './task-assignees-section';

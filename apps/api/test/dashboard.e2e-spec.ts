@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { DAY_COUNT_SELECT } from '../src/dashboard/dashboard.service';
 import { createTestApp } from './helpers/app';

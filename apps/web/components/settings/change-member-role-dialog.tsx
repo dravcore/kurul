@@ -6,7 +6,7 @@ import {
   MemberRole,
   type UpdateMemberRoleRequest,
   type WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { assignableRoles } from '@/lib/member-permissions';
 import { FormDialog } from '@/components/common/form-dialog';

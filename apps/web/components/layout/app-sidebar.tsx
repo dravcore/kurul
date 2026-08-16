@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { SidebarBody } from './sidebar-body';
 
 const COLLAPSE_MQ = '(max-width: 1279px)';
-const COLLAPSE_STORAGE_KEY = 'kurultay:sidebar-collapsed';
+const COLLAPSE_STORAGE_KEY = 'kurul:sidebar-collapsed';
 
 /**
  * `localStorage` throws in private-browsing/quota-exceeded states and does not exist during

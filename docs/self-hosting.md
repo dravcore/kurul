@@ -1,6 +1,6 @@
-# Self-hosting Kurultay on your own domain
+# Self-hosting Kurul on your own domain
 
-Put Kurultay on a server, on your domain, with HTTPS and working email. Everything below is
+Put Kurul on a server, on your domain, with HTTPS and working email. Everything below is
 one page on purpose; budget about an hour, most of it waiting for DNS.
 
 There is no build step. `docker compose pull` fetches images published for every release, and
@@ -13,7 +13,7 @@ the same image works on every domain — the API URL is not compiled into it (se
   RAM is enough for a small team.
 - A domain you control, with **ports 80 and 443 open** to that server. Both are required:
   Let's Encrypt validates over port 80, browsers use 443.
-- An SMTP account. Kurultay needs outgoing mail before anyone can accept an invitation — see
+- An SMTP account. Kurul needs outgoing mail before anyone can accept an invitation — see
   [Email](#email-smtp) for why, and what happens if you skip it.
 - A host firewall that allows nothing inbound beyond SSH, 80 and 443. Everything else this
   stack runs stays off the public internet on its own: `proxy` is the only service in
@@ -36,41 +36,41 @@ for a certificate on its first boot, and a request that fails because DNS is not
 counts against Let's Encrypt's rate limit.
 
 ```
-kurultay.example.com.   A     203.0.113.10
-kurultay.example.com.   AAAA  2001:db8::10      # only if the server has IPv6
+kurul.example.com.   A     203.0.113.10
+kurul.example.com.   AAAA  2001:db8::10      # only if the server has IPv6
 ```
 
 Check it from somewhere that is not the server itself:
 
 ```bash
-dig +short kurultay.example.com
+dig +short kurul.example.com
 ```
 
 ## 2. Fetch the compose file and configure
 
 ```bash
-mkdir -p /opt/kurultay && cd /opt/kurultay
-curl -fsSLO https://raw.githubusercontent.com/dravcore/kurultay/main/docker-compose.yml
+mkdir -p /opt/kurul && cd /opt/kurul
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
 curl -fsSL --create-dirs -o docker/Caddyfile \
-  https://raw.githubusercontent.com/dravcore/kurultay/main/docker/Caddyfile
-curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurultay/main/.env.example
+  https://raw.githubusercontent.com/dravcore/kurul/main/docker/Caddyfile
+curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/main/.env.example
 ```
 
 Edit `.env`. For a Docker-only install these are the lines that matter — everything else in the
 file is either for the development loop or has a working default:
 
 ```bash
-SITE_URL=https://kurultay.example.com          # your domain, scheme included
+SITE_URL=https://kurul.example.com          # your domain, scheme included
 
 POSTGRES_PASSWORD=<openssl rand -hex 32>       # hex, not base64 — it goes inside a URL
 BETTER_AUTH_SECRET=<openssl rand -hex 32>      # session signing key
 
 SMTP_HOST=smtp.example.com                     # see "Email" below
 SMTP_PORT=587
-SMTP_USER=kurultay@example.com
+SMTP_USER=kurul@example.com
 SMTP_PASSWORD=<your smtp password>
 SMTP_SECURE=false                              # true only for port 465
-MAIL_FROM=Kurultay <kurultay@example.com>
+MAIL_FROM=Kurul <kurul@example.com>
 ```
 
 Generate the two secrets with `openssl rand -hex 32`. Use `-hex`, not `-base64`: a base64
@@ -126,7 +126,7 @@ the one to chase (`docker compose logs migrate`), and `api` will not have starte
 `backup` and `proxy` show no `(healthy)` because neither declares a healthcheck, not because
 anything is wrong with them.
 
-The first request to `https://kurultay.example.com` may take a few seconds while Caddy
+The first request to `https://kurul.example.com` may take a few seconds while Caddy
 completes the ACME challenge. Watch it happen if it does not:
 
 ```bash
@@ -134,13 +134,13 @@ docker compose logs -f proxy
 ```
 
 Open the site, create the first account, and create a workspace. The first account is a normal
-account — Kurultay has no separate installer or admin bootstrap step.
+account — Kurul has no separate installer or admin bootstrap step.
 
 ## 4. Check it actually works
 
 ```bash
-curl -sI https://kurultay.example.com | head -1          # 307 → /login
-curl -s  https://kurultay.example.com/api/health/ready   # {"status":"ok", …}
+curl -sI https://kurul.example.com | head -1          # 307 → /login
+curl -s  https://kurul.example.com/api/health/ready   # {"status":"ok", …}
 ```
 
 Then, in the browser, open a board and drag a card. If the card moves for a second browser
@@ -150,7 +150,7 @@ one part of the stack a naive reverse-proxy configuration tends to break silentl
 Last, check the thing HTTPS was actually for. Sign in and look at the cookie you get back:
 
 ```bash
-curl -si https://kurultay.example.com/auth/sign-in/email \
+curl -si https://kurul.example.com/auth/sign-in/email \
   -H 'Content-Type: application/json' \
   -d '{"email":"you@example.com","password":"<your password>"}' | grep -i '^set-cookie'
 ```
@@ -182,7 +182,7 @@ machine it is watching.
 Monitor this URL:
 
 ```
-https://kurultay.example.com/api/health/ready
+https://kurul.example.com/api/health/ready
 ```
 
 Two details in that URL are easy to get wrong, and both fail quietly.
@@ -211,10 +211,10 @@ Then fire it once on purpose, because an alerting setup that has never fired is 
 
 ```bash
 docker compose stop postgres
-curl -s https://kurultay.example.com/api/health/ready   # 503, "database":"down"
+curl -s https://kurul.example.com/api/health/ready   # 503, "database":"down"
 # wait two intervals, expect the red alert
 docker compose start postgres
-curl -s https://kurultay.example.com/api/health/ready   # 200, "database":"up"
+curl -s https://kurul.example.com/api/health/ready   # 200, "database":"up"
 # expect the recovery mail
 ```
 
@@ -256,10 +256,10 @@ on the same host as the database. Copy them off the machine, **both halves of th
 cycle**, not just the dump:
 
 ```bash
-docker run --rm -v kurultay_backup_data:/backups -v "$PWD:/out" alpine \
-  sh -c 'stamp=$(ls -t /backups/*.dump | head -1 | sed "s|.*/kurultay-||;s|\.dump$||"); \
-         cp /backups/kurultay-$stamp.dump /out/; \
-         cp /backups/kurultay-$stamp-files.tar.gz /out/ 2>/dev/null || true'
+docker run --rm -v kurul_backup_data:/backups -v "$PWD:/out" alpine \
+  sh -c 'stamp=$(ls -t /backups/*.dump | head -1 | sed "s|.*/kurul-||;s|\.dump$||"); \
+         cp /backups/kurul-$stamp.dump /out/; \
+         cp /backups/kurul-$stamp-files.tar.gz /out/ 2>/dev/null || true'
 ```
 
 A dump restored without its file archive brings every row back and leaves every uploaded file
@@ -278,6 +278,53 @@ Migrations run automatically: the one-shot `migrate` service applies them before
 Pin a release with `TAG=v0.2.0` in `.env` if you would rather upgrade deliberately than track
 `latest`.
 
+### Coming from Kurultay (v0.1.0)
+
+The project was renamed before v0.2.0, and the rename reaches further than the label on the
+README: the Postgres role and database are now `kurul`, the published images are
+`ghcr.io/dravcore/kurul-api` and `-web`, and Compose derives its volume prefix from the install
+directory, which the instructions above now call `/opt/kurul`. An existing v0.1.0 install does
+not pick any of that up on its own, and `docker compose pull` against the old image names will
+simply keep serving you the old ones.
+
+**There is no in-place upgrade path that renames a running database for you.** Do it in this
+order, with the stack down, and take the backup first — this is the one upgrade in this
+project's history that touches identifiers rather than schema.
+
+```bash
+cd /opt/kurultay
+docker compose exec postgres pg_dump -U kurultay -Fc kurultay > /tmp/kurul-migration.dump
+docker compose down                     # NOT -v: the volumes are what you are keeping
+```
+
+Then rename the directory and take the new compose file:
+
+```bash
+cd /opt && mv kurultay kurul && cd kurul
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
+```
+
+Edit `.env`: `POSTGRES_USER` and `POSTGRES_DB` become `kurul`, and the `DATABASE_URL`
+credentials and database segment change with them. Then create the new role and database
+against the volume you kept, and restore into it:
+
+```bash
+docker compose up -d postgres
+docker compose exec -T postgres psql -U kurultay -d kurultay   -c "CREATE ROLE kurul LOGIN PASSWORD '<your POSTGRES_PASSWORD>';"   -c 'CREATE DATABASE kurul OWNER kurul;'
+docker compose exec -T postgres pg_restore -U kurul -d kurul --no-owner < /tmp/kurul-migration.dump
+docker compose up -d
+curl -s https://your.domain/api/health/ready
+```
+
+The old role and database can be dropped once the new stack has served real traffic for a day.
+Keep the dump until then; it is the only copy that predates the rename.
+
+**Renaming the directory is what moves the volumes**, because Compose namespaces them by
+project name — `kurultay_postgres_data` becomes `kurul_postgres_data`. If you would rather not
+move them, set `COMPOSE_PROJECT_NAME=kurultay` in `.env` and the old volumes keep being used
+under their old names. That is supported and slightly confusing; either is fine, as long as you
+pick one deliberately.
+
 ## Verifying what you pulled
 
 `docker compose pull` trusts whatever ghcr.io hands it. Two things published with every release
@@ -293,12 +340,12 @@ them.
 
 ```bash
 cosign verify \
-  --certificate-identity "https://github.com/dravcore/kurultay/.github/workflows/release-images.yml@refs/tags/v0.2.0" \
+  --certificate-identity "https://github.com/dravcore/kurul/.github/workflows/release-images.yml@refs/tags/v0.2.0" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  ghcr.io/dravcore/kurultay-api:v0.2.0
+  ghcr.io/dravcore/kurul-api:v0.2.0
 ```
 
-Repeat it for `kurultay-web`, and replace `v0.2.0` in both places when you verify another
+Repeat it for `kurul-web`, and replace `v0.2.0` in both places when you verify another
 release. The version appears twice for two different reasons: once as the git ref the signing
 workflow ran on, and once as the image tag you are asking about.
 
@@ -313,7 +360,7 @@ pushed a tag to their own fork of this repository.
 A successful run prints the checks it performed and a JSON claim naming the digest it verified:
 
 ```
-Verification for ghcr.io/dravcore/kurultay-api:v0.2.0 --
+Verification for ghcr.io/dravcore/kurul-api:v0.2.0 --
 The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
@@ -334,28 +381,28 @@ the digest is the stricter question — it asks about the exact bytes on disk ra
 whatever the tag points at now:
 
 ```bash
-docker image inspect ghcr.io/dravcore/kurultay-api:v0.2.0 --format '{{index .RepoDigests 0}}'
+docker image inspect ghcr.io/dravcore/kurul-api:v0.2.0 --format '{{index .RepoDigests 0}}'
 ```
 
 ### Where the SBOM lives
 
-On the [GitHub Release](https://github.com/dravcore/kurultay/releases) for the version, as
+On the [GitHub Release](https://github.com/dravcore/kurul/releases) for the version, as
 downloadable assets — one per image per architecture, because the two architectures genuinely
 do not contain the same packages:
 
 ```
-kurultay-api-v0.2.0-linux-amd64.spdx.json
-kurultay-api-v0.2.0-linux-arm64.spdx.json
-kurultay-web-v0.2.0-linux-amd64.spdx.json
-kurultay-web-v0.2.0-linux-arm64.spdx.json
+kurul-api-v0.2.0-linux-amd64.spdx.json
+kurul-api-v0.2.0-linux-arm64.spdx.json
+kurul-web-v0.2.0-linux-amd64.spdx.json
+kurul-web-v0.2.0-linux-arm64.spdx.json
 ```
 
 The format is SPDX 2.3 JSON, which is what `grype`, `trivy` and Dependency-Track all read
 without conversion:
 
 ```bash
-gh release download v0.2.0 --repo dravcore/kurultay --pattern '*.spdx.json'
-grype sbom:./kurultay-api-v0.2.0-linux-amd64.spdx.json
+gh release download v0.2.0 --repo dravcore/kurul --pattern '*.spdx.json'
+grype sbom:./kurul-api-v0.2.0-linux-amd64.spdx.json
 ```
 
 **The SBOM file itself is not signed** — the signature above covers the image, and the SBOM is a
@@ -365,7 +412,7 @@ trust the file: regenerate it yourself from the image you have already verified,
 [syft](https://github.com/anchore/syft), and compare.
 
 ```bash
-syft scan registry:ghcr.io/dravcore/kurultay-api:v0.2.0 --platform linux/amd64 -o spdx-json
+syft scan registry:ghcr.io/dravcore/kurul-api:v0.2.0 --platform linux/amd64 -o spdx-json
 ```
 
 ## Bringing your own reverse proxy
@@ -489,7 +536,7 @@ location /api/  {
 location /      { proxy_pass http://web:3000;  }
 ```
 
-If your proxy sits in front of Kurultay's own `proxy` rather than replacing it, raise
+If your proxy sits in front of Kurul's own `proxy` rather than replacing it, raise
 `TRUST_PROXY` in `docker-compose.yml`'s `api` service to the number of hops (a CDN in front of
 Caddy makes it `2`). Left at `1`, every rate-limit bucket and every access-log IP collapses
 onto your outer proxy's address.
@@ -498,12 +545,12 @@ onto your outer proxy's address.
 
 Next.js compiles `NEXT_PUBLIC_*` variables into the JavaScript it ships, at build time. An
 absolute `NEXT_PUBLIC_API_URL` therefore makes a web image specific to one deployment, and
-"pull the image, set the environment" cannot work — which is exactly what Kurultay used to
-require ([audit finding PM-02](https://github.com/dravcore/kurultay/issues/119)).
+"pull the image, set the environment" cannot work — which is exactly what Kurul used to
+require ([audit finding PM-02](https://github.com/dravcore/kurul/issues/119)).
 
 The fix is not to un-bake the value but to bake a value that is already correct everywhere. The
 published image carries `NEXT_PUBLIC_API_URL=/api`, a path on whatever origin the page was
-served from, so it is right on `kurultay.example.com` and on `boards.acme.internal` alike. That
+served from, so it is right on `kurul.example.com` and on `boards.acme.internal` alike. That
 only holds because the reverse proxy puts both apps on one origin, which is why `proxy` is part
 of the default stack rather than an optional extra.
 
@@ -535,7 +582,7 @@ guide applies to what you just downloaded. Either wait for the release, or build
 instead of pulling:
 
 ```bash
-git clone https://github.com/dravcore/kurultay.git && cd kurultay
+git clone https://github.com/dravcore/kurul.git && cd kurul
 docker compose up -d --build
 ```
 

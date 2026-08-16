@@ -1,4 +1,4 @@
-import type { LabelColorSlot, LabelDto } from '@kurultay/shared-types';
+import type { LabelColorSlot, LabelDto } from '@kurul/shared-types';
 import { cn } from '@/lib/utils';
 
 const SLOT_CLASS: Record<LabelColorSlot, string> = {

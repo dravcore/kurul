@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { NotificationType, type CursorPage, type NotificationDto } from '@kurultay/shared-types';
+import { NotificationType, type CursorPage, type NotificationDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { notificationTitle } from '@/lib/notification-copy';
 import { markAllNotificationsRead, openNotificationTarget } from '@/lib/notification-actions';

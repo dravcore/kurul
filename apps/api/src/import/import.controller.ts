@@ -15,7 +15,7 @@ import {
   ApiPayloadTooLargeResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import type { TrelloImportReportDto } from '@kurultay/shared-types';
+import type { TrelloImportReportDto } from '@kurul/shared-types';
 import { ErrorEnvelopeSchema } from '../openapi/schemas/error.schema';
 import { TrelloImportReportSchema } from '../openapi/schemas/import.schema';
 import type { UploadedFile as MulterFile } from '../attachment/multer-file';

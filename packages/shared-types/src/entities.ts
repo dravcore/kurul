@@ -148,7 +148,7 @@ export interface ChecklistSummaryDto {
  *
  * A `const` object rather than a TS `enum`, matching every other enum in this package: the
  * values are the strings Prisma writes and the API sends, and a structural type keeps
- * `@kurultay/shared-types` free of emitted runtime code the web bundle would have to carry.
+ * `@kurul/shared-types` free of emitted runtime code the web bundle would have to carry.
  */
 export const AttachmentKind = {
   File: 'FILE',
@@ -321,11 +321,11 @@ export type TrelloImportScope = (typeof TrelloImportScope)[keyof typeof TrelloIm
  * draws. Adding a reason costs a translation key, which is the cost that keeps the list honest.
  */
 export const TrelloImportSkipReason = {
-  /** Kurultay has no equivalent for this at all — comments today (ADR 0025). */
+  /** Kurul has no equivalent for this at all — comments today (ADR 0025). */
   OutOfScope: 'outOfScope',
-  /** Trello had it archived (`closed: true`) and Kurultay has no archive (ADR 0025). */
+  /** Trello had it archived (`closed: true`) and Kurul has no archive (ADR 0025). */
   Archived: 'archived',
-  /** A Trello member; nothing in Kurultay to map them onto (ADR 0025). */
+  /** A Trello member; nothing in Kurul to map them onto (ADR 0025). */
   Unmappable: 'unmappable',
   /** An attachment URL that is neither `http:` nor `https:` (ADR 0024, ADR 0025). */
   UnsupportedScheme: 'unsupportedScheme',

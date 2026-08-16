@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LOCALE_COOKIE_MAX_AGE_SECONDS } from '@kurultay/shared-types';
+import { LOCALE_COOKIE_MAX_AGE_SECONDS } from '@kurul/shared-types';
 import { buildLocaleCookie, writeLocaleCookie } from './locale-cookie';
 
 describe('buildLocaleCookie', () => {

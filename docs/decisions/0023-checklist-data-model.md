@@ -7,7 +7,7 @@
 
 ## Context
 
-Kurultay's schema carries no trace of `checklist` or `subtask`. The ROADMAP item that closes
+Kurul's schema carries no trace of `checklist` or `subtask`. The ROADMAP item that closes
 this gap is titled "Checklist / subtask", and the two words hide a fork: a checklist item is a
 line with a checkbox, a subtask is its own card with its own column, assignee and drag-and-drop
 semantics. Building both in one pass would touch board DnD as much as the task panel, and the
@@ -125,7 +125,7 @@ smaller schema and would have been the faster patch. It was rejected because Tre
 card can carry several named checklists. Importing that shape into a single-level model means
 flattening on arrival: silent data loss, discovered only when a user compares their old board to
 the new one. Modeling `Checklist` as a first-class row means the importer maps Trello checklists
-onto Kurultay checklists one-to-one and nothing is thrown away.
+onto Kurul checklists one-to-one and nothing is thrown away.
 
 **Why no new socket event.** Two prior decisions already answer this one. `TaskLabelService`
 established the sub-resource pattern used everywhere else on a task: resolve the tenant through

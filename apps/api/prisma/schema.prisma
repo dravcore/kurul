@@ -541,7 +541,7 @@ model UsagePing {
   id          String   @id @default(uuid(7))
   userId      String
   workspaceId String
-  /// `UsagePingKind` in @kurultay/shared-types — `board_view` or `dashboard_view`. A string
+  /// `UsagePingKind` in @kurul/shared-types — `board_view` or `dashboard_view`. A string
   /// rather than an enum for the same reason `Activity.type` is one: adding the next kind must
   /// be an insert, not a migration that locks the table.
   kind        String

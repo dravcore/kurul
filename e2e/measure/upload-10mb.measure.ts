@@ -140,7 +140,7 @@ test('10 MB upload: what the user waits for', async ({ stack, openAs }) => {
   // Written to disk and handed over as a path. `setInputFiles` with a `buffer` would push all
   // 10 MB through the CDP connection as base64 first, and that transfer is Playwright's cost,
   // not the product's — it would land inside the number and inflate it.
-  const dir = await mkdtemp(join(tmpdir(), 'kurultay-measure-'));
+  const dir = await mkdtemp(join(tmpdir(), 'kurul-measure-'));
   const file = join(dir, 'measure-10mb.pdf');
   await writeFile(file, tenMegabytePdf());
 

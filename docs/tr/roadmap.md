@@ -1,6 +1,6 @@
 # Roadmap
 
-Kurultay’ın durumu ve şimdilik bilinçli olarak kapsam dışı bırakılanlar.
+Kurul’ın durumu ve şimdilik bilinçli olarak kapsam dışı bırakılanlar.
 
 > 🌐 [English (canonical)](../roadmap.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
@@ -18,7 +18,7 @@ MVP maddeleri ve `develop` üzerindeki sıradan bug/refactor’lar.
 | MVP sonrası sağlamlaştırma | Bitti — aynı arşiv                                                              |
 | Beyond MVP                 | Planlanmadı — yalnızca uyumluluk listesi                                        |
 
-Görev seviyesi iş [GitHub Issues](https://github.com/dravcore/kurultay/issues)’ta.
+Görev seviyesi iş [GitHub Issues](https://github.com/dravcore/kurul/issues)’ta.
 Release süreci: [git-strategy.md](git-strategy.md).
 
 ## Teslim edilen MVP (özet)
@@ -96,4 +96,4 @@ Bu bölümün bilinçli olarak vaat **etmediği** üç şey:
 - [architecture.md](architecture.md) — modüller
 - [git-strategy.md](git-strategy.md) — release
 - [../../CHANGELOG.md](../../CHANGELOG.md) — ne yayınlandı
-- [GitHub Issues](https://github.com/dravcore/kurultay/issues)
+- [GitHub Issues](https://github.com/dravcore/kurul/issues)

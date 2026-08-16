@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { ColumnCategory, type ColumnDto, type UpdateColumnRequest } from '@kurultay/shared-types';
+import { ColumnCategory, type ColumnDto, type UpdateColumnRequest } from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { FormDialog } from '@/components/common/form-dialog';
 import { Input } from '@/components/ui/input';

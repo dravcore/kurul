@@ -1,4 +1,4 @@
-import type { CursorPage, InvitationDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import type { CursorPage, InvitationDto, WorkspaceMemberDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 
 /**

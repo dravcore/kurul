@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { UserDto } from '@kurultay/shared-types';
+import type { UserDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { useApiResource } from '@/lib/use-api-resource';
 import { Button } from '@/components/ui/button';

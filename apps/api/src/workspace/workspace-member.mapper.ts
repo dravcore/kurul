@@ -1,5 +1,5 @@
-import { MemberRole } from '@kurultay/shared-types';
-import type { WorkspaceMemberDto } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
+import type { WorkspaceMemberDto } from '@kurul/shared-types';
 
 /** The membership row shape every member read maps from. */
 export type MemberRow = {

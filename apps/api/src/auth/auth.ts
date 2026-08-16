@@ -57,7 +57,7 @@ export const auth = betterAuth({
     },
     // Left off, and that is now a deployment decision rather than a local-dev convenience.
     //
-    // A published Kurultay serves the web app and this API from one hostname
+    // A published Kurul serves the web app and this API from one hostname
     // (`docker/Caddyfile`), so the session cookie is same-site with the page that reads it and
     // Better Auth's defaults apply: both `session_token` and `session_data` go out
     // `HttpOnly; SameSite=Lax` (measured, not assumed). Turning this on would widen the cookie

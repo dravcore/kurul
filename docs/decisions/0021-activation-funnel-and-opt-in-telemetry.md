@@ -7,7 +7,7 @@
 
 ## Context
 
-Kurultay measured nothing about its own use. A grep for `telemetry`, `analytics`, `posthog`,
+Kurul measured nothing about its own use. A grep for `telemetry`, `analytics`, `posthog`,
 `plausible` or `umami` across `apps/` and `docs/` returned zero matches in source, and
 `docs/roadmap.md` listed no metrics item under "Beyond MVP". So every product question was
 answered by intuition:
@@ -24,7 +24,7 @@ build.
 
 The obvious fix is also the one that would do the most damage. Self-hosters choose self-hosted
 software substantially _because_ it does not report on them, and the failure mode is not a
-lost user — it is the "Kurultay phones home" thread that outlives whatever the feature was
+lost user — it is the "Kurul phones home" thread that outlives whatever the feature was
 worth. Several projects have paid that price for a default-on ping, however anonymous.
 
 So two questions have to be answered separately, because they have different answers:
@@ -86,7 +86,7 @@ anything. The complete payload, with no other fields at all:
 
 No instance identifier, no hostname, no IP, no counts, no workspace or user data. Not awaited,
 never retried, cannot fail a boot. `docs/development.md` repeats this field list as the
-promise, and `TelemetryPingPayload` in `@kurultay/shared-types` is its specification —
+promise, and `TelemetryPingPayload` in `@kurul/shared-types` is its specification —
 `telemetry.service.spec.ts` asserts the key set is exactly `event` and `version`.
 
 ## Rationale

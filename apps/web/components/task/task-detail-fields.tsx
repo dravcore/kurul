@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Priority, type TaskDto, type UpdateTaskRequest } from '@kurultay/shared-types';
+import { Priority, type TaskDto, type UpdateTaskRequest } from '@kurul/shared-types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';

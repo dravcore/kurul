@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
 import { authClient } from '@/lib/auth';
 import { canMutateColumns, canMutateLabels, canMutateTasks } from '@/lib/board-permissions';
 import {

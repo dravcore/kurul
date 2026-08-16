@@ -4,7 +4,7 @@ import {
   resolveLocale,
   type Locale,
   type UserDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { getServerApiBaseUrl } from '@/lib/api-url';
 
 /**

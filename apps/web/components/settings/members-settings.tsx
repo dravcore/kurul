@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type { InvitationDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import type { InvitationDto, WorkspaceMemberDto } from '@kurul/shared-types';
 import { authClient } from '@/lib/auth';
 import { fetchInstanceConfig } from '@/lib/instance-config';
 import { canManageMember, canManageMembers } from '@/lib/member-permissions';

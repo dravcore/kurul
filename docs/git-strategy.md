@@ -1,6 +1,6 @@
 # Git Strategy
 
-Branch model, commit convention, PR process, and release procedure for Kurultay.
+Branch model, commit convention, PR process, and release procedure for Kurul.
 
 > 🌐 English (canonical) | [Türkçe](tr/git-strategy.md)
 
@@ -17,7 +17,7 @@ Branch model, commit convention, PR process, and release procedure for Kurultay.
 
 ## Branch model
 
-Kurultay uses **Git Flow**. Two branches are permanent; everything else is short-lived and
+Kurul uses **Git Flow**. Two branches are permanent; everything else is short-lived and
 deleted after merge.
 
 | Branch      | Lifetime    | Branches from | Merges into        | Purpose                                                 |
@@ -73,7 +73,7 @@ required. Required status checks are enforced by [`.github/workflows/ci.yml`](..
 
 Dependabot must open against `develop`, never `main`. Both ecosystems in
 [`.github/dependabot.yml`](../.github/dependabot.yml) set `target-branch: develop` for that
-reason. Merging dependency bumps straight into `main` (as happened in [#82](https://github.com/dravcore/kurultay/pull/82))
+reason. Merging dependency bumps straight into `main` (as happened in [#82](https://github.com/dravcore/kurul/pull/82))
 bypasses Git Flow and leaves `develop` behind on CI config — do not repeat it. If a
 Dependabot PR somehow targets `main`, retarget it to `develop` before merge.
 
@@ -347,12 +347,12 @@ release.
 
 ## Versioning policy (SemVer)
 
-Kurultay follows [Semantic Versioning 2.0.0](https://semver.org/) — with the honest caveat
+Kurul follows [Semantic Versioning 2.0.0](https://semver.org/) — with the honest caveat
 that SemVer's guarantees are weaker before 1.0.
 
 **Pre-1.0 (`0.y.z`) — where the project is now:**
 
-- The public API (REST endpoints, `@kurultay/shared-types`, `@kurultay/auth-access`, database schema, env var names)
+- The public API (REST endpoints, `@kurul/shared-types`, `@kurul/auth-access`, database schema, env var names)
   is **not stable**. Breaking changes can ship in any `0.y.0`.
 - `0.y.0` (MINOR): new features **and** breaking changes.
 - `0.0.z` / `0.y.z` (PATCH): bug fixes and non-breaking changes only.

@@ -7,7 +7,7 @@
 
 ## Context
 
-Kurultay is pre-skeleton: no code exists yet, so both the code-organization axis
+Kurul is pre-skeleton: no code exists yet, so both the code-organization axis
 (monorepo vs. polyrepo) and the runtime axis (monolith vs. microservices) must be
 decided before the first line is written. The two axes are independent — how code
 is _stored_ is not how it _runs_ — and both need an explicit answer.

@@ -6,7 +6,7 @@ import {
   type NamespaceKeys,
   type NestedKeyOf,
 } from 'next-intl';
-import type { TrelloImportReportDto } from '@kurultay/shared-types';
+import type { TrelloImportReportDto } from '@kurul/shared-types';
 import messages from '@/messages/tr.json';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { BoardList } from '@/components/board/board-list';
@@ -122,8 +122,8 @@ describe('the Turkish interface', () => {
       soleOwnedWorkspaces: [
         {
           workspaceId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d21',
-          name: 'Kurultay',
-          slug: 'kurultay',
+          name: 'Kurul',
+          slug: 'kurul',
           memberCount: 4,
           boardCount: 2,
           transferCandidates: [],

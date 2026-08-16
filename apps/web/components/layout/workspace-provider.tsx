@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import type { MemberRole, WorkspaceDto } from '@kurultay/shared-types';
+import type { MemberRole, WorkspaceDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 import { fetchOwnMembership } from '@/lib/member-query';

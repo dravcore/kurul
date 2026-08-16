@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
-import { ActivityType, AttachmentKind, SocketEvents } from '@kurultay/shared-types';
-import type { AttachmentDto } from '@kurultay/shared-types';
+import { ActivityType, AttachmentKind, SocketEvents } from '@kurul/shared-types';
+import type { AttachmentDto } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';

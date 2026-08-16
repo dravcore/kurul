@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { MemberRole, type AccountDeletionPreviewDto } from '@kurultay/shared-types';
+import { MemberRole, type AccountDeletionPreviewDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { ApiError, api } from '@/lib/api';
 import { DeleteAccountDialog } from './delete-account-dialog';
@@ -43,8 +43,8 @@ function soleOwned(candidates: { userId: string; name: string }[]): AccountDelet
     soleOwnedWorkspaces: [
       {
         workspaceId: WORKSPACE_ID,
-        name: 'Kurultay',
-        slug: 'kurultay',
+        name: 'Kurul',
+        slug: 'kurul',
         memberCount: candidates.length + 1,
         boardCount: 2,
         transferCandidates: candidates.map((candidate) => ({
@@ -153,7 +153,7 @@ describe('DeleteAccountDialog', () => {
 
       const select = (await screen.findByLabelText(
         copy.ownedWorkspace
-          .replace('{name}', 'Kurultay')
+          .replace('{name}', 'Kurul')
           .replace('{members, plural, one {# member} other {# members}}', '2 members')
           .replace('{boards, plural, one {# board} other {# boards}}', '2 boards'),
       )) as HTMLSelectElement;

@@ -6,7 +6,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import type { CommentDto, CursorPage } from '@kurultay/shared-types';
+import type { CommentDto, CursorPage } from '@kurul/shared-types';
 import { CurrentMembership } from '../common/decorators/current-membership.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';

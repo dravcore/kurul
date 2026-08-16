@@ -9,7 +9,7 @@
 
 The roadmap item this record serves is a one-way Trello JSON import: board, list, card, label
 and checklist, with attachments carried as URLs. The scope is deliberately small; what is not
-small is the number of places where Trello's model and Kurultay's model do not line up, and
+small is the number of places where Trello's model and Kurul's model do not line up, and
 where an importer therefore has to either guess or admit it cannot.
 
 Three properties of the input shape every decision below.
@@ -26,9 +26,9 @@ importer reads was written from memory and verified against nothing. The roadmap
 asks for validation against three real exports closes as **partial** for exactly this reason,
 and reopens when a real export arrives.
 
-**Trello's vocabulary is larger than Kurultay's in some places and absent in others.** Trello
+**Trello's vocabulary is larger than Kurul's in some places and absent in others.** Trello
 has ten label colours; this repository has eight design-token slots. Trello has archived lists
-and cards; Kurultay has no archive. Trello has members on cards; Kurultay's members are rows in
+and cards; Kurul has no archive. Trello has members on cards; Kurul's members are rows in
 a different tenant's user table. Trello has comments; this import does not carry them.
 
 A mapping under those three conditions can fail in two very different ways. It can be wrong —
@@ -46,7 +46,7 @@ Concretely:
 
 ### Structure
 
-| Trello                | Kurultay                       | Notes                                                     |
+| Trello                | Kurul                          | Notes                                                     |
 | --------------------- | ------------------------------ | --------------------------------------------------------- |
 | board                 | `Board`                        | `name`, `desc` → `description`                            |
 | list                  | `Column`                       | always `category: UNSTARTED` — see below                  |
@@ -144,7 +144,7 @@ It joins the audit subset alongside `board.created`.
 
 ### Why the column category is not inferred, at all
 
-[ADR 0019](0019-column-category.md) exists because Kurultay used to infer completion from a
+[ADR 0019](0019-column-category.md) exists because Kurul used to infer completion from a
 column's name, and it names three ways of inferring it and rejects all three:
 
 - **Name matching was removed**, not softened (`0019-column-category.md:51-52`). A user who
@@ -159,7 +159,7 @@ A Trello export contains no category. The only two signals available are the nam
 position, and both are on that list. So there is nothing left to infer from, and inferring
 anyway would be re-adding the defect ADR 0019 removed, in a place where it is _more_ likely to
 misfire: a Trello board's column names can be in any language and any wording, whereas ADR
-0019's own migration only ever recognized Kurultay's own seeded English `Done`. That migration
+0019's own migration only ever recognized Kurul's own seeded English `Done`. That migration
 (`:55-56`) looks like a precedent for name matching and is not one — it matched a known writer's
 known output.
 
@@ -190,7 +190,7 @@ test so it cannot drift into an accident, and it is stated in the dialog so it c
 
 ### Why archived lists and cards are dropped rather than imported
 
-`closed: true` is Trello's archive. Kurultay has no archive, so an archived card can only arrive
+`closed: true` is Trello's archive. Kurul has no archive, so an archived card can only arrive
 as a normal card — that is, as something the user deliberately removed from view, put back in
 front of them. A long-lived 500-card board commonly carries several times that many archived
 cards behind it, so this is not a rounding error either.
@@ -204,7 +204,7 @@ count answers that in the response.
 
 ### Why members are dropped
 
-A Trello member is not a Kurultay user. The export does not reliably carry an email, and even
+A Trello member is not a Kurul user. The export does not reliably carry an email, and even
 when it does, matching on it would mean assigning work to whoever holds that address in this
 workspace today. Every row this importer writes records the person who ran the import in
 `createdById` / `uploadedById`. That is not a mapping — it is an accountability record, and it

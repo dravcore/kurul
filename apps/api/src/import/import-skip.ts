@@ -1,5 +1,5 @@
-import { TrelloImportScope, TrelloImportSkipReason } from '@kurultay/shared-types';
-import type { TrelloImportSkipGroupDto } from '@kurultay/shared-types';
+import { TrelloImportScope, TrelloImportSkipReason } from '@kurul/shared-types';
+import type { TrelloImportSkipGroupDto } from '@kurul/shared-types';
 
 /**
  * Up to this many names per `(scope, reason)` group reach the report.

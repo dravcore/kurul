@@ -1,5 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable, NotFoundException } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthedRequest, WorkspaceMembership } from '../types/request-context';
 

@@ -4,7 +4,7 @@ import type {
   CursorPage,
   NotificationDto,
   NotificationUnreadCountDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 
 /** The person a comment or activity row is attributed to. */
 export class AuthorSchema {

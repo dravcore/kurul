@@ -2,7 +2,7 @@
 
 import { useId } from 'react';
 import { useTranslations } from 'next-intl';
-import type { AttachmentDto } from '@kurultay/shared-types';
+import type { AttachmentDto } from '@kurul/shared-types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AttachmentAddLink } from './attachment-add-link';

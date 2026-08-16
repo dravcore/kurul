@@ -31,7 +31,7 @@ describe('shared database shutdown', () => {
 
   beforeEach(() => {
     jest.resetModules();
-    process.env.DATABASE_URL = 'postgresql://kurultay:kurultay@localhost:5432/kurultay';
+    process.env.DATABASE_URL = 'postgresql://kurul:kurul@localhost:5432/kurul';
     // Every pool-option test below sets a subset of these; clearing all three up front means
     // a test that forgets to clean up after itself fails at its own assertion, not two tests
     // later on an unrelated one.
@@ -121,7 +121,7 @@ describe('shared pool timeout configuration (DB-09)', () => {
 
   beforeEach(() => {
     jest.resetModules();
-    process.env.DATABASE_URL = 'postgresql://kurultay:kurultay@localhost:5432/kurultay';
+    process.env.DATABASE_URL = 'postgresql://kurul:kurul@localhost:5432/kurul';
     for (const name of POOL_ENV_VARS) delete process.env[name];
   });
 

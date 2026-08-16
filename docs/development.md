@@ -1,6 +1,6 @@
 # Development
 
-How to set up a Kurultay development environment and work in it day to day.
+How to set up a Kurul development environment and work in it day to day.
 
 > 🌐 English (canonical) | [Türkçe](tr/development.md)
 
@@ -50,8 +50,8 @@ No local PostgreSQL or Redis installation is needed — both run in Docker.
 ## Clone and install
 
 ```bash
-git clone https://github.com/dravcore/kurultay.git
-cd kurultay
+git clone https://github.com/dravcore/kurul.git
+cd kurul
 pnpm install          # installs every workspace package
 pnpm db:generate       # generate the Prisma client from apps/api/prisma/schema.prisma
 ```
@@ -69,14 +69,14 @@ which is git-ignored for the same reason, so a fresh clone needs them built befo
 that imports a shared type will run:
 
 ```bash
-pnpm -r --filter @kurultay/shared-types --filter @kurultay/auth-access build
+pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build
 ```
 
 Skipping this does not produce a helpful error. `pnpm test` fails in `apps/web` with
-`Failed to resolve entry for package "@kurultay/shared-types"` across every file that imports
+`Failed to resolve entry for package "@kurul/shared-types"` across every file that imports
 a shared type, `pnpm dev` fails in `apps/api` with `TS2307: Cannot find module
-'@kurultay/shared-types'`, and `pnpm db:seed` dies with `Cannot find module
-'.../@kurultay/auth-access/dist/cjs/index.js'` before it ever reaches the database — all of
+'@kurul/shared-types'`, and `pnpm db:seed` dies with `Cannot find module
+'.../@kurul/auth-access/dist/cjs/index.js'` before it ever reaches the database — all of
 which read like a broken checkout rather than a missing build. `pnpm build` and
 `pnpm typecheck` both do this for you as a side effect; `pnpm dev`, `pnpm db:seed`,
 `pnpm test`, and `pnpm lint` do not. CI builds them explicitly before both the lint and test
@@ -90,47 +90,47 @@ cp .env.example .env
 
 Then fill in the blanks. `.env` is git-ignored and must never be committed.
 
-| Variable                              | Example                                                             | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                        | `postgresql://kurultay:<POSTGRES_PASSWORD>@localhost:5432/kurultay` | Prisma connection string — password segment must match `POSTGRES_PASSWORD` below                                                                                                                                                                                                                                                                                                                                                                       |
-| `REDIS_URL`                           | `redis://localhost:6379`                                            | Socket.io Redis adapter, caching, BullMQ scheduled jobs (`due-soon` and `cleanup` queues). A database index is honoured — see [Database and cache credentials](#database-and-cache-credentials)                                                                                                                                                                                                                                                        |
-| `BETTER_AUTH_SECRET`                  | _(generate)_                                                        | Session signing secret — required, no default                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `BETTER_AUTH_URL`                     | `http://localhost:4000`                                             | Public URL of the API (Better Auth is mounted at `/auth/*`). Dev loop only — `docker-compose.yml` derives it from `SITE_URL`                                                                                                                                                                                                                                                                                                                           |
-| `API_PORT`                            | `4000`                                                              | NestJS listen port                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `WEB_URL`                             | `http://localhost:3000`                                             | CORS origin for the API. Dev loop only — `docker-compose.yml` derives it from `SITE_URL`                                                                                                                                                                                                                                                                                                                                                               |
-| `SITE_URL`                            | `http://localhost`                                                  | **Compose only.** The one public origin the whole stack answers on, scheme included; `https://…` turns on Caddy's automatic HTTPS. See [Self-hosting](self-hosting.md)                                                                                                                                                                                                                                                                                 |
-| `INTERNAL_API_URL`                    | `http://api:4000`                                                   | Absolute API address the **web server** uses for middleware and SSR (a same-origin `/api` has no origin to resolve against inside Node). Set by `docker-compose.yml`; read at container start, not baked                                                                                                                                                                                                                                               |
-| `API_DOCS_ENABLED`                    | _(follows `NODE_ENV`)_                                              | Publishes the interactive console at `/docs` and the OpenAPI document at `/openapi.json`. Unset it follows `NODE_ENV`: on in development, **off in production**. `/docs` is an unauthenticated HTML page with a request console that carries the reader's own session, so a production instance opts in rather than out. The same document is committed at `apps/api/openapi.json` — see [api-conventions.md](api-conventions.md#the-openapi-document) |
-| `RATE_LIMIT_ENABLED`                  | `true`                                                              | Master switch for [rate limiting](api-conventions.md#rate-limiting). On by default; only the integration suite turns it off                                                                                                                                                                                                                                                                                                                            |
-| `TRUST_PROXY`                         | `false`                                                             | Reverse-proxy hop(s) to trust for the real client IP — `false` (default), a hop count (`1`), or an IP/CIDR list. See [rate limiting](api-conventions.md#rate-limiting) — **never `true` on a directly-exposed instance**                                                                                                                                                                                                                               |
-| `NEXT_PUBLIC_API_URL`                 | `http://localhost:4000`                                             | API URL compiled into the web bundle — **baked at build time**. Dev loop only; the Docker image bakes the same-origin path `/api` instead, which is why one image serves every domain                                                                                                                                                                                                                                                                  |
-| `REQUEST_BODY_MAX_BYTES`              | `1048576`                                                           | Largest JSON or form-encoded body the API parses, in bytes (1 MiB). Over it the answer is `413`, and it is **not** reported to error tracking. It never sees a multipart upload — see [api-conventions.md](api-conventions.md#request-body-size)                                                                                                                                                                                                       |
-| `STORAGE_PATH`                        | _(blank in the dev loop)_                                           | Directory that holds uploaded attachment files. **Blank means attachments are off**: `GET /config` reports `attachmentsEnabled: false` and the UI hides the upload control. Links work either way. `docker-compose.yml` sets it itself, inside the `attachment_data` volume                                                                                                                                                                            |
-| `ATTACHMENT_MAX_BYTES`                | `26214400`                                                          | Largest single attachment **file**, in bytes (25 MiB). A disk ceiling and a memory one — an upload is buffered so its type can be sniffed. It must stay under the reverse proxy's body limit; the ordering rule is in [self-hosting.md](self-hosting.md#bringing-your-own-reverse-proxy)                                                                                                                                                               |
-| `TRELLO_IMPORT_MAX_BYTES`             | `20971520`                                                          | Largest Trello export the importer accepts, in bytes (20 MiB). A **heap** ceiling rather than a disk one — the parsed graph is several times the bytes that produced it. Separate from both limits above, and importing needs no `STORAGE_PATH` ([ADR 0025](decisions/0025-trello-import-mapping.md))                                                                                                                                                  |
-| `SMTP_HOST`                           | `localhost` (dev, via Mailpit)                                      | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)                                                                                                                                                                                                                                                                                                                               |
-| `SMTP_PORT`                           | `1025` (dev, via Mailpit) / `587` (typical production)              | SMTP server port                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `SMTP_USER`                           | _(blank for Mailpit)_                                               | SMTP auth username, if your server requires one                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `SMTP_PASSWORD`                       | _(blank for Mailpit)_                                               | SMTP auth password, if your server requires one                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `SMTP_SECURE`                         | `false`                                                             | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                                                                                                                                                                                                                                                                                                                                               |
-| `MAIL_FROM`                           | `Kurultay <noreply@example.com>`                                    | `From:` header on outgoing mail                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `CLEANUP_ENABLED`                     | `true`                                                              | Master switch for the nightly [data-retention sweep](#data-retention). Off means the instance stops enforcing its own retention policy                                                                                                                                                                                                                                                                                                                 |
-| `NOTIFICATION_RETENTION_DAYS`         | `90`                                                                | Days a notification is kept **after it was read**. Unread notifications are never deleted, at any age. `0` = keep forever                                                                                                                                                                                                                                                                                                                              |
-| `ACTIVITY_RETENTION_DAYS`             | `365`                                                               | Days an activity row is kept after it was written. `0` = keep forever — set this if you have a statutory audit-trail duty                                                                                                                                                                                                                                                                                                                              |
-| `DATABASE_POOL_MAX`                   | `20`                                                                | Max simultaneous connections the shared `pg` pool opens to Postgres — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                                                        |
-| `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                             | How long a request waits for a pool connection before failing, once all `DATABASE_POOL_MAX` are busy — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                       |
-| `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                             | How long a single SQL statement may run before Postgres kills it — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                                                           |
-| `SENTRY_DSN`                          | _(blank)_                                                           | API error tracking. **Blank = off, and off means the SDK is never loaded** — see [Observability](#observability)                                                                                                                                                                                                                                                                                                                                       |
-| `SENTRY_ENVIRONMENT`                  | _(blank)_ / `production`                                            | Label on API events; blank falls back to `NODE_ENV`. Set it if staging and production run the same image                                                                                                                                                                                                                                                                                                                                               |
-| `SENTRY_RELEASE`                      | _(blank)_ / `v0.2.0`                                                | Version label on API events; best set to the deployed tag. Blank sends none                                                                                                                                                                                                                                                                                                                                                                            |
-| `NEXT_PUBLIC_SENTRY_DSN`              | _(blank)_                                                           | Web error tracking, same opt-in rule — **baked at build time**, so rebuild the web image after changing it                                                                                                                                                                                                                                                                                                                                             |
-| `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(blank)_ / `production`                                            | `SENTRY_ENVIRONMENT`'s web counterpart, also build-time                                                                                                                                                                                                                                                                                                                                                                                                |
-| `NEXT_PUBLIC_SENTRY_RELEASE`          | _(blank)_ / `v0.2.0`                                                | `SENTRY_RELEASE`'s web counterpart, also build-time                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `SEED_LARGE_BOARD_TASKS`              | _(blank)_ / `1000`                                                  | Read only by `pnpm db:seed`. Adds a synthetic board of this many tasks next to the demo one. Blank or `0` skips it — see [Seeding a large board](#seeding-a-large-board)                                                                                                                                                                                                                                                                               |
-| `INSTANCE_ADMIN_EMAILS`               | _(blank)_                                                           | Comma-separated addresses allowed to read the instance-wide [activation funnel](#activation-funnel-and-telemetry). **Blank means nobody**, including the account that owns every workspace                                                                                                                                                                                                                                                             |
-| `TELEMETRY_ENABLED`                   | `false`                                                             | Outbound telemetry. **Off by default; nothing is sent while this is `false`** — see [Activation funnel and telemetry](#activation-funnel-and-telemetry)                                                                                                                                                                                                                                                                                                |
-| `TELEMETRY_ENDPOINT`                  | _(blank)_                                                           | Where the opt-in ping is POSTed. **No default**; `TELEMETRY_ENABLED=true` with this blank logs an error and sends nothing                                                                                                                                                                                                                                                                                                                              |
-| `TELEMETRY_TIMEOUT_MS`                | `5000`                                                              | How long the single boot-time ping may take before it is abandoned. Failure is a warning line and nothing else                                                                                                                                                                                                                                                                                                                                         |
+| Variable                              | Example                                                       | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                        | `postgresql://kurul:<POSTGRES_PASSWORD>@localhost:5432/kurul` | Prisma connection string — password segment must match `POSTGRES_PASSWORD` below                                                                                                                                                                                                                                                                                                                                                                       |
+| `REDIS_URL`                           | `redis://localhost:6379`                                      | Socket.io Redis adapter, caching, BullMQ scheduled jobs (`due-soon` and `cleanup` queues). A database index is honoured — see [Database and cache credentials](#database-and-cache-credentials)                                                                                                                                                                                                                                                        |
+| `BETTER_AUTH_SECRET`                  | _(generate)_                                                  | Session signing secret — required, no default                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `BETTER_AUTH_URL`                     | `http://localhost:4000`                                       | Public URL of the API (Better Auth is mounted at `/auth/*`). Dev loop only — `docker-compose.yml` derives it from `SITE_URL`                                                                                                                                                                                                                                                                                                                           |
+| `API_PORT`                            | `4000`                                                        | NestJS listen port                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `WEB_URL`                             | `http://localhost:3000`                                       | CORS origin for the API. Dev loop only — `docker-compose.yml` derives it from `SITE_URL`                                                                                                                                                                                                                                                                                                                                                               |
+| `SITE_URL`                            | `http://localhost`                                            | **Compose only.** The one public origin the whole stack answers on, scheme included; `https://…` turns on Caddy's automatic HTTPS. See [Self-hosting](self-hosting.md)                                                                                                                                                                                                                                                                                 |
+| `INTERNAL_API_URL`                    | `http://api:4000`                                             | Absolute API address the **web server** uses for middleware and SSR (a same-origin `/api` has no origin to resolve against inside Node). Set by `docker-compose.yml`; read at container start, not baked                                                                                                                                                                                                                                               |
+| `API_DOCS_ENABLED`                    | _(follows `NODE_ENV`)_                                        | Publishes the interactive console at `/docs` and the OpenAPI document at `/openapi.json`. Unset it follows `NODE_ENV`: on in development, **off in production**. `/docs` is an unauthenticated HTML page with a request console that carries the reader's own session, so a production instance opts in rather than out. The same document is committed at `apps/api/openapi.json` — see [api-conventions.md](api-conventions.md#the-openapi-document) |
+| `RATE_LIMIT_ENABLED`                  | `true`                                                        | Master switch for [rate limiting](api-conventions.md#rate-limiting). On by default; only the integration suite turns it off                                                                                                                                                                                                                                                                                                                            |
+| `TRUST_PROXY`                         | `false`                                                       | Reverse-proxy hop(s) to trust for the real client IP — `false` (default), a hop count (`1`), or an IP/CIDR list. See [rate limiting](api-conventions.md#rate-limiting) — **never `true` on a directly-exposed instance**                                                                                                                                                                                                                               |
+| `NEXT_PUBLIC_API_URL`                 | `http://localhost:4000`                                       | API URL compiled into the web bundle — **baked at build time**. Dev loop only; the Docker image bakes the same-origin path `/api` instead, which is why one image serves every domain                                                                                                                                                                                                                                                                  |
+| `REQUEST_BODY_MAX_BYTES`              | `1048576`                                                     | Largest JSON or form-encoded body the API parses, in bytes (1 MiB). Over it the answer is `413`, and it is **not** reported to error tracking. It never sees a multipart upload — see [api-conventions.md](api-conventions.md#request-body-size)                                                                                                                                                                                                       |
+| `STORAGE_PATH`                        | _(blank in the dev loop)_                                     | Directory that holds uploaded attachment files. **Blank means attachments are off**: `GET /config` reports `attachmentsEnabled: false` and the UI hides the upload control. Links work either way. `docker-compose.yml` sets it itself, inside the `attachment_data` volume                                                                                                                                                                            |
+| `ATTACHMENT_MAX_BYTES`                | `26214400`                                                    | Largest single attachment **file**, in bytes (25 MiB). A disk ceiling and a memory one — an upload is buffered so its type can be sniffed. It must stay under the reverse proxy's body limit; the ordering rule is in [self-hosting.md](self-hosting.md#bringing-your-own-reverse-proxy)                                                                                                                                                               |
+| `TRELLO_IMPORT_MAX_BYTES`             | `20971520`                                                    | Largest Trello export the importer accepts, in bytes (20 MiB). A **heap** ceiling rather than a disk one — the parsed graph is several times the bytes that produced it. Separate from both limits above, and importing needs no `STORAGE_PATH` ([ADR 0025](decisions/0025-trello-import-mapping.md))                                                                                                                                                  |
+| `SMTP_HOST`                           | `localhost` (dev, via Mailpit)                                | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)                                                                                                                                                                                                                                                                                                                               |
+| `SMTP_PORT`                           | `1025` (dev, via Mailpit) / `587` (typical production)        | SMTP server port                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `SMTP_USER`                           | _(blank for Mailpit)_                                         | SMTP auth username, if your server requires one                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `SMTP_PASSWORD`                       | _(blank for Mailpit)_                                         | SMTP auth password, if your server requires one                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `SMTP_SECURE`                         | `false`                                                       | `true` for implicit TLS (port 465), `false` for STARTTLS/plaintext (587/25, and Mailpit)                                                                                                                                                                                                                                                                                                                                                               |
+| `MAIL_FROM`                           | `Kurul <noreply@example.com>`                                 | `From:` header on outgoing mail                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `CLEANUP_ENABLED`                     | `true`                                                        | Master switch for the nightly [data-retention sweep](#data-retention). Off means the instance stops enforcing its own retention policy                                                                                                                                                                                                                                                                                                                 |
+| `NOTIFICATION_RETENTION_DAYS`         | `90`                                                          | Days a notification is kept **after it was read**. Unread notifications are never deleted, at any age. `0` = keep forever                                                                                                                                                                                                                                                                                                                              |
+| `ACTIVITY_RETENTION_DAYS`             | `365`                                                         | Days an activity row is kept after it was written. `0` = keep forever — set this if you have a statutory audit-trail duty                                                                                                                                                                                                                                                                                                                              |
+| `DATABASE_POOL_MAX`                   | `20`                                                          | Max simultaneous connections the shared `pg` pool opens to Postgres — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                                                        |
+| `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                       | How long a request waits for a pool connection before failing, once all `DATABASE_POOL_MAX` are busy — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                       |
+| `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                       | How long a single SQL statement may run before Postgres kills it — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                                                           |
+| `SENTRY_DSN`                          | _(blank)_                                                     | API error tracking. **Blank = off, and off means the SDK is never loaded** — see [Observability](#observability)                                                                                                                                                                                                                                                                                                                                       |
+| `SENTRY_ENVIRONMENT`                  | _(blank)_ / `production`                                      | Label on API events; blank falls back to `NODE_ENV`. Set it if staging and production run the same image                                                                                                                                                                                                                                                                                                                                               |
+| `SENTRY_RELEASE`                      | _(blank)_ / `v0.2.0`                                          | Version label on API events; best set to the deployed tag. Blank sends none                                                                                                                                                                                                                                                                                                                                                                            |
+| `NEXT_PUBLIC_SENTRY_DSN`              | _(blank)_                                                     | Web error tracking, same opt-in rule — **baked at build time**, so rebuild the web image after changing it                                                                                                                                                                                                                                                                                                                                             |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(blank)_ / `production`                                      | `SENTRY_ENVIRONMENT`'s web counterpart, also build-time                                                                                                                                                                                                                                                                                                                                                                                                |
+| `NEXT_PUBLIC_SENTRY_RELEASE`          | _(blank)_ / `v0.2.0`                                          | `SENTRY_RELEASE`'s web counterpart, also build-time                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `SEED_LARGE_BOARD_TASKS`              | _(blank)_ / `1000`                                            | Read only by `pnpm db:seed`. Adds a synthetic board of this many tasks next to the demo one. Blank or `0` skips it — see [Seeding a large board](#seeding-a-large-board)                                                                                                                                                                                                                                                                               |
+| `INSTANCE_ADMIN_EMAILS`               | _(blank)_                                                     | Comma-separated addresses allowed to read the instance-wide [activation funnel](#activation-funnel-and-telemetry). **Blank means nobody**, including the account that owns every workspace                                                                                                                                                                                                                                                             |
+| `TELEMETRY_ENABLED`                   | `false`                                                       | Outbound telemetry. **Off by default; nothing is sent while this is `false`** — see [Activation funnel and telemetry](#activation-funnel-and-telemetry)                                                                                                                                                                                                                                                                                                |
+| `TELEMETRY_ENDPOINT`                  | _(blank)_                                                     | Where the opt-in ping is POSTed. **No default**; `TELEMETRY_ENABLED=true` with this blank logs an error and sends nothing                                                                                                                                                                                                                                                                                                                              |
+| `TELEMETRY_TIMEOUT_MS`                | `5000`                                                        | How long the single boot-time ping may take before it is abandoned. Failure is a warning line and nothing else                                                                                                                                                                                                                                                                                                                                         |
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` are read only by `next build` when
 uploading source maps, and only when they are set; they are absent from `.env.example`
@@ -159,7 +159,7 @@ reads `process.env` — there is no separate Zod/typed env schema today), add it
 ## Database and cache credentials
 
 Neither `docker-compose.yml` nor `docker-compose.dev.yml` bakes a well-known
-`kurultay`/`kurultay` password into the Postgres container any more — `POSTGRES_PASSWORD` is
+`kurul`/`kurul` password into the Postgres container any more — `POSTGRES_PASSWORD` is
 a required `.env` value, and compose refuses to start until it is set:
 
 ```bash
@@ -169,7 +169,7 @@ error while interpolating services.migrate.environment.DATABASE_URL: required va
 
 This is the same fail-loud pattern as `BETTER_AUTH_SECRET` above: a placeholder default would
 mean every self-hosted instance that skips reading `.env.example` carefully starts up with a
-password every other Kurultay install also has, on a database exposed to whatever else shares
+password every other Kurul install also has, on a database exposed to whatever else shares
 its Docker network.
 
 **Generate `POSTGRES_PASSWORD` and `REDIS_PASSWORD` with `openssl rand -hex 32`, not the
@@ -180,7 +180,7 @@ landing in the value corrupts the URL — `/` is the sharpest case, since it end
 authority section right where it appears:
 
 ```bash
-$ node -e "new URL('postgresql://kurultay:ab/cd@postgres:5432/kurultay')"
+$ node -e "new URL('postgresql://kurul:ab/cd@postgres:5432/kurul')"
 TypeError: Invalid URL
     at new URL (node:internal/url:840:25)
   code: 'ERR_INVALID_URL'
@@ -196,9 +196,9 @@ flip on whether a freshly generated password silently breaks its own connection 
 
 | Variable            | Default           | Purpose                                                                                                                 |
 | ------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `POSTGRES_USER`     | `kurultay`        | Postgres role compose creates on first boot and every service connects as                                               |
+| `POSTGRES_USER`     | `kurul`           | Postgres role compose creates on first boot and every service connects as                                               |
 | `POSTGRES_PASSWORD` | _none — required_ | Postgres role password. No default; `docker compose config`/`up` fails loudly if unset                                  |
-| `POSTGRES_DB`       | `kurultay`        | Database name compose creates on first boot                                                                             |
+| `POSTGRES_DB`       | `kurul`           | Database name compose creates on first boot                                                                             |
 | `REDIS_PASSWORD`    | _(blank)_         | Optional `requirepass` for the `redis` service. Unset keeps Redis passwordless, exactly as before this variable existed |
 
 These four feed the `DATABASE_URL`/`REDIS_URL` that `docker-compose.yml` assembles for its own
@@ -220,12 +220,12 @@ lands on the same Docker network.
 **A `REDIS_URL` may name a database index, and it is honoured.** `redis://localhost:6379/3`
 puts this instance's keys — auth rate-limit counters and both BullMQ queues — on index 3, which
 is how several apps share one Redis without stepping on each other's keyspace. Until
-[#190](https://github.com/dravcore/kurultay/issues/190) the
+[#190](https://github.com/dravcore/kurul/issues/190) the
 index was parsed off and thrown away, so such a URL was accepted and then used database 0
 anyway; if you set one before that fix and something in database 0 looked like it belonged to
 another app, it probably did. Two limits are worth knowing. **Pub/sub is not scoped by
 database:** Redis delivers a published message to every subscriber of that channel whatever
-index each connection selected, so two Kurultay instances on different indexes still share the
+index each connection selected, so two Kurul instances on different indexes still share the
 Socket.io fan-out channel — the index separates keyspaces, not channels. And an index that is
 not a plain non-negative integer (`redis://host:6379/staging`), or a path and a `?db=` that
 disagree (`redis://host:6379/3?db=4`), is refused at connection time rather than quietly read
@@ -238,6 +238,34 @@ running database's password.** The official Postgres image only applies
 and restarting an already-initialized stack leaves the role's password exactly as it was. See
 the `[Unreleased]` entry in `CHANGELOG.md` for the `ALTER USER ... PASSWORD` command that
 rotates it on a running instance.
+
+### If your checkout predates the rename
+
+The Postgres role and database are `kurul`; before v0.2.0 they were `kurultay`. A working tree
+that already has a `.env` and a running dev stack keeps the old ones, and nothing tells you so
+until something fails — so it is worth doing deliberately in one go:
+
+```bash
+# 1. Point .env at the new identifiers (DATABASE_URL, POSTGRES_USER, POSTGRES_DB).
+# 2. Create the role and both databases in the volume you already have:
+docker compose -f docker-compose.dev.yml exec -T postgres psql -U kurultay -d kurultay \
+  -c "CREATE ROLE kurul LOGIN SUPERUSER PASSWORD 'kurul';" \
+  -c 'CREATE DATABASE kurul OWNER kurul;' \
+  -c 'CREATE DATABASE kurul_test OWNER kurul;'
+
+# 3. Migrate both. The test database is a separate database and needs its own run:
+pnpm db:migrate
+DATABASE_URL=postgresql://kurul:kurul@localhost:5432/kurul_test pnpm db:migrate
+```
+
+Two failures are worth recognising rather than debugging. `The table public.UsagePing does not
+exist` from the integration suite means step 3 was run against the dev database only. And
+`DATABASE_URL does not name a test database` is not a rename problem at all — it is
+`setup-e2e.ts` refusing to truncate a database whose name does not contain `kurul_test`, which
+is the guard working. Point `DATABASE_URL` at the test database for that command, or unset it.
+
+Dropping the old `kurultay` role and databases is optional and can wait until you are sure
+nothing local still points at them.
 
 ## Database connection pool
 
@@ -277,7 +305,7 @@ not fix that, it just moves the exhaustion from this app to whatever else shares
 
 ## SMTP and Mailpit
 
-Kurultay sends email for one flow today: the verification link an invitee needs before
+Kurul sends email for one flow today: the verification link an invitee needs before
 `accept-invitation` will let them join a workspace (see
 [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
 Leaving `SMTP_HOST` unset is a valid choice — the API still boots, and the mail module logs
@@ -309,7 +337,7 @@ SMTP_HOST=localhost
 SMTP_PORT=1025
 SMTP_SECURE=false
 # SMTP_USER / SMTP_PASSWORD stay blank — Mailpit does not require auth
-MAIL_FROM=Kurultay <noreply@example.com>
+MAIL_FROM=Kurul <noreply@example.com>
 ```
 
 | URL                   | What                                                                        |
@@ -350,7 +378,7 @@ drop the database volume and start from a clean slate).
 ### Full stack in Docker
 
 Everything containerized, closest to production. Use it to verify the Dockerfiles and
-compose wiring, or when you just want to run Kurultay rather than develop it.
+compose wiring, or when you just want to run Kurul rather than develop it.
 
 ```bash
 docker compose pull && docker compose up -d
@@ -359,7 +387,7 @@ docker compose pull && docker compose up -d
 Then open **http://localhost** — not `localhost:3000`. A `proxy` service (Caddy) is the stack's
 only published entrance: it serves the web app and the API from one origin, routing `/api/*`
 and `/auth/*` to `api` and everything else to `web`. `api` and `web` publish no host ports of
-their own. Point the whole thing at a domain by setting `SITE_URL=https://kurultay.example.com`
+their own. Point the whole thing at a domain by setting `SITE_URL=https://kurul.example.com`
 in `.env`, which also switches automatic HTTPS on — the walkthrough for that, SMTP and backups
 included, is [Self-hosting](self-hosting.md).
 
@@ -384,7 +412,7 @@ editing a Dockerfile or testing an unreleased change to `api`/`web`.
 The one exception is `migrate`: it has no `image:` pair (see the comment beside it in
 `docker-compose.yml` for why), so it always builds from source — a `docker compose up -d`
 that pulls `api`/`web` from GHCR still pays that one service's build cost once. See
-[audit finding OPS-04](https://github.com/dravcore/kurultay/issues/126) for the full scoping
+[audit finding OPS-04](https://github.com/dravcore/kurul/issues/126) for the full scoping
 rationale.
 
 ### What the two API images weigh
@@ -510,7 +538,7 @@ Run from the repository root.
 | `lint`           | `pnpm lint`           | ESLint across all packages                                                                                                                                                                                                                              |
 | `format`         | `pnpm format`         | Prettier write across the repo                                                                                                                                                                                                                          |
 | `format:check`   | `pnpm format:check`   | Prettier check (CI gate)                                                                                                                                                                                                                                |
-| `typecheck`      | `pnpm typecheck`      | Builds `@kurultay/shared-types` + `@kurultay/auth-access`, then `tsc --noEmit` in every workspace                                                                                                                                                       |
+| `typecheck`      | `pnpm typecheck`      | Builds `@kurul/shared-types` + `@kurul/auth-access`, then `tsc --noEmit` in every workspace                                                                                                                                                             |
 | `test`           | `pnpm test`           | Runs the test suites of every workspace package                                                                                                                                                                                                         |
 | `db:generate`    | `pnpm db:generate`    | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made                                                    |
 | `db:migrate`     | `pnpm db:migrate`     | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate` |
@@ -521,9 +549,9 @@ Run from the repository root.
 To target a single workspace, use pnpm's filter flag:
 
 ```bash
-pnpm --filter @kurultay/api dev
-pnpm --filter @kurultay/web build
-pnpm --filter @kurultay/api test
+pnpm --filter @kurul/api dev
+pnpm --filter @kurul/web build
+pnpm --filter @kurul/api test
 ```
 
 ## Database workflow
@@ -590,7 +618,7 @@ was measured against.
 
 ## Data retention
 
-Kurultay deletes rows it is no longer entitled to keep. A BullMQ job runs **once a day** on
+Kurul deletes rows it is no longer entitled to keep. A BullMQ job runs **once a day** on
 `REDIS_URL` — the same mechanism as the due-soon scan — and sweeps five tables, plus the
 attachment directory:
 
@@ -666,7 +694,7 @@ either one. The full reasoning is
 
 ### 1. The activation funnel — computed here, shown to you, sent nowhere
 
-Kurultay derives an eleven-step activation funnel from rows your instance already holds, plus a
+Kurul derives an eleven-step activation funnel from rows your instance already holds, plus a
 North Star metric: **Weekly Active Team Workspaces** — workspaces with two or more members where
 two or more current members did something in the last seven days.
 
@@ -740,10 +768,10 @@ body and **nothing else**:
 
 Field by field, that is the whole list:
 
-| Field     | Value                | Notes                                                    |
-| --------- | -------------------- | -------------------------------------------------------- |
-| `event`   | `"instance_started"` | Always this literal string. There is only one event      |
-| `version` | e.g. `"0.1.0"`       | The `@kurultay/api` package version this build came from |
+| Field     | Value                | Notes                                                 |
+| --------- | -------------------- | ----------------------------------------------------- |
+| `event`   | `"instance_started"` | Always this literal string. There is only one event   |
+| `version` | e.g. `"0.1.0"`       | The `@kurul/api` package version this build came from |
 
 What is **not** sent, and has no code path to be sent: any instance or installation identifier,
 your hostname, your IP address, your URL, your database, any count of users, workspaces, boards
@@ -766,7 +794,7 @@ trade is argued out in [ADR 0021](decisions/0021-activation-funnel-and-opt-in-te
 
 ## Upgrading and backups
 
-This applies to anyone running Kurultay with data they care about, not to throwaway local
+This applies to anyone running Kurul with data they care about, not to throwaway local
 databases. Pre-1.0, breaking schema changes can ship in any `0.y.0` release
 ([git-strategy.md](git-strategy.md#versioning-policy-semver)), so there are two rules: let
 the scheduled backup run, and **take one more dump immediately before every upgrade.**
@@ -778,10 +806,10 @@ the scheduled backup run, and **take one more dump immediately before every upgr
 image as the server, so `pg_dump`/`pg_restore` always match the server major — and loops:
 
 1. `pg_dump --format=custom` into the `backup_data` volume as
-   `/backups/kurultay-<UTC timestamp>.dump` (written as `.part` and renamed on success, so an
+   `/backups/kurul-<UTC timestamp>.dump` (written as `.part` and renamed on success, so an
    interrupted dump never looks like a finished archive),
 2. `tar -czf` the attachments volume — mounted read-only at `/attachments` — into
-   `/backups/kurultay-<the same UTC timestamp>-files.tar.gz`. The shared timestamp is how a
+   `/backups/kurul-<the same UTC timestamp>-files.tar.gz`. The shared timestamp is how a
    restore knows which tar belongs to which dump,
 3. delete everything past the newest `BACKUP_KEEP` archives **of each series**,
 4. sleep `BACKUP_INTERVAL` seconds, repeat.
@@ -824,7 +852,7 @@ has never taken a dump. See [ADR 0022](decisions/0022-attachment-storage.md).
 Check on it — an untested backup is not a backup, and neither is an unread log:
 
 ```bash
-docker compose logs backup | tail            # two "wrote /backups/kurultay-…" lines per cycle
+docker compose logs backup | tail            # two "wrote /backups/kurul-…" lines per cycle
 docker compose exec backup ls -lh /backups   # newest pair, and how many are kept
 ```
 
@@ -853,9 +881,9 @@ To hold a copy outside the volume (recommended before an upgrade, since it survi
 ```bash
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 docker compose exec -T postgres \
-  pg_dump -U kurultay --format=custom kurultay > "kurultay-$stamp.dump"
+  pg_dump -U kurul --format=custom kurul > "kurul-$stamp.dump"
 docker compose run --rm -T --entrypoint tar backup -czf - -C /attachments . \
-  > "kurultay-$stamp-files.tar.gz"
+  > "kurul-$stamp-files.tar.gz"
 ```
 
 One `stamp` for both, for the same reason the sidecar shares one: the pair is only useful
@@ -893,31 +921,31 @@ docker compose run --rm --entrypoint ls backup -1 /backups
 
 # 3. Recreate the database empty. This is the destructive step — everything written after
 #    the archive was taken is gone from here on.
-docker compose exec -T postgres psql -U kurultay -d postgres \
-  -c 'DROP DATABASE kurultay WITH (FORCE);' \
-  -c 'CREATE DATABASE kurultay OWNER kurultay;'
+docker compose exec -T postgres psql -U kurul -d postgres \
+  -c 'DROP DATABASE kurul WITH (FORCE);' \
+  -c 'CREATE DATABASE kurul OWNER kurul;'
 
 # 4. Restore. --exit-on-error turns a partial restore into a loud failure instead of a
 #    half-populated database that looks fine.
 docker compose run --rm --entrypoint pg_restore backup \
-  --host=postgres --username=kurultay --dbname=kurultay \
-  --no-owner --exit-on-error /backups/kurultay-<timestamp>.dump
+  --host=postgres --username=kurul --dbname=kurul \
+  --no-owner --exit-on-error /backups/kurul-<timestamp>.dump
 
 # 4b. Restore the attachment files that belong to the SAME timestamp. The `backup` service
 #     mounts the volume read-only, so this needs its own writable mount — and `--user 1000:1000`,
 #     because the files belong to the api's `node` user and this stack runs `cap_drop: [ALL]`,
 #     which takes CAP_DAC_OVERRIDE away from root. Without the flag, `rm` fails with
 #     "Permission denied" on a container that is nominally root. Measured, not predicted.
-docker compose run --rm --user 1000:1000 -v kurultay_attachment_data:/restore \
+docker compose run --rm --user 1000:1000 -v kurul_attachment_data:/restore \
   --entrypoint sh backup -c \
-  'rm -rf /restore/* && tar -xzf /backups/kurultay-<timestamp>-files.tar.gz -C /restore'
+  'rm -rf /restore/* && tar -xzf /backups/kurul-<timestamp>-files.tar.gz -C /restore'
 
 # 5. Check the migration state. The archive carries _prisma_migrations, so the recorded
 #    state matches the restored schema and this should report nothing to do.
 docker compose run --rm migrate
 
 # 6. Verify before letting traffic back in: schema, row counts, and that the files came back.
-docker compose exec -T postgres psql -U kurultay -d kurultay \
+docker compose exec -T postgres psql -U kurul -d kurul \
   -c '\dt' \
   -c 'SELECT count(*) FROM "User";' \
   -c 'SELECT count(*) FROM "Workspace";' \
@@ -937,7 +965,7 @@ docker compose run --rm --entrypoint sh backup -c 'find /attachments -type f | w
 #     `find -exec stat -c`, not `find -printf`: the backup container is postgres:18-alpine and
 #     BusyBox `find` has no `-printf`. One command, not a choice — an operator should not have
 #     to make a portability decision in the middle of a restore.
-docker compose exec -T postgres psql -U kurultay -d kurultay -At \
+docker compose exec -T postgres psql -U kurul -d kurul -At \
   -c 'SELECT "storageKey" || '"'"' '"'"' || "size" FROM "Attachment" WHERE kind = '"'"'FILE'"'"';' \
   | sort > /tmp/expected.txt
 docker compose run --rm --entrypoint sh backup -c \
@@ -958,8 +986,8 @@ The drill passes on **three** things, not two:
    reported, the `tar`-is-not-a-snapshot limit above has been measured; unreported, it has only
    been written down.
 
-`kurultay_attachment_data` in step 4b is the volume's full name, which Compose prefixes with the
-project name — `docker volume ls` if your directory is not called `kurultay`.
+`kurul_attachment_data` in step 4b is the volume's full name, which Compose prefixes with the
+project name — `docker volume ls` if your directory is not called `kurul`.
 
 If the checked-out code is newer than the archive's schema, step 5 applies the missing
 migrations forward, which is correct. If it is **older**, check out the release tag that
@@ -969,14 +997,14 @@ Restoring from a host-side file instead of one in the volume (step 4 variant):
 
 ```bash
 docker compose run --rm -T --entrypoint pg_restore backup \
-  --host=postgres --username=kurultay --dbname=kurultay --no-owner \
-  --exit-on-error < kurultay-20260813T194856Z.dump
+  --host=postgres --username=kurul --dbname=kurul --no-owner \
+  --exit-on-error < kurul-20260813T194856Z.dump
 
 # The file half, same idea (step 4b variant) — writable mount, and uid 1000 for the same
 # CAP_DAC_OVERRIDE reason.
-docker compose run --rm -T --user 1000:1000 -v kurultay_attachment_data:/restore \
+docker compose run --rm -T --user 1000:1000 -v kurul_attachment_data:/restore \
   --entrypoint sh backup -c 'rm -rf /restore/* && tar -xzf - -C /restore' \
-  < kurultay-20260813T194856Z-files.tar.gz
+  < kurul-20260813T194856Z-files.tar.gz
 ```
 
 **PostgreSQL major-version upgrades need a dump and restore.** The official `postgres` image
@@ -1013,16 +1041,16 @@ is still in the live database, and a full restore would throw all of it away to 
 
 ```bash
 # 1. A scratch database beside the live one, from the newest dump that predates the deletion.
-docker compose exec -T postgres psql -U kurultay -d postgres \
-  -c 'CREATE DATABASE kurultay_recovery OWNER kurultay;'
+docker compose exec -T postgres psql -U kurul -d postgres \
+  -c 'CREATE DATABASE kurul_recovery OWNER kurul;'
 docker compose run --rm --entrypoint pg_restore backup \
-  --host=postgres --username=kurultay --dbname=kurultay_recovery \
-  --no-owner --exit-on-error /backups/kurultay-<timestamp>.dump
+  --host=postgres --username=kurul --dbname=kurul_recovery \
+  --no-owner --exit-on-error /backups/kurul-<timestamp>.dump
 
 # 2. Find the account. The log line the deletion wrote carries the id and nothing else —
 #    `docker compose logs api | jq 'select(.event == "account.deleted")'` — so start there;
 #    the scratch database is what turns that id back into a name.
-docker compose exec -T postgres psql -U kurultay -d kurultay_recovery \
+docker compose exec -T postgres psql -U kurul -d kurul_recovery \
   -c 'SELECT id, email, name FROM "User" WHERE id = '"'"'<userId>'"'"';'
 ```
 
@@ -1050,8 +1078,8 @@ Drop the scratch database when you are finished with it — it is a full copy of
 data, sitting beside the instance:
 
 ```bash
-docker compose exec -T postgres psql -U kurultay -d postgres \
-  -c 'DROP DATABASE kurultay_recovery WITH (FORCE);'
+docker compose exec -T postgres psql -U kurul -d postgres \
+  -c 'DROP DATABASE kurul_recovery WITH (FORCE);'
 ```
 
 ### Index migrations take a write lock
@@ -1081,7 +1109,7 @@ thousand rows), or any instance that cannot take a write pause:**
    `CONCURRENTLY`, while the old version is still serving traffic:
 
    ```bash
-   docker compose exec -T postgres psql -U kurultay kurultay -c \
+   docker compose exec -T postgres psql -U kurul kurul -c \
      'CREATE INDEX CONCURRENTLY IF NOT EXISTS "Task_title_idx" ON "Task" USING GIN ("title" gin_trgm_ops);'
    ```
 
@@ -1204,7 +1232,7 @@ hotfix ships as `v0.2.1`; do not stay parked on the old tag longer than it takes
 ## Observability
 
 Three signals, three destinations. Nothing here is a metrics stack — no Prometheus, no
-Grafana, no log shipper. At Kurultay's scale the question worth answering is "did something
+Grafana, no log shipper. At Kurul's scale the question worth answering is "did something
 break, and did anyone notice", and that needs exactly this much:
 
 | Signal                   | Where it goes                                             | Configured in                                   |
@@ -1237,13 +1265,13 @@ needs a `docker compose up -d` (which recreates containers) for it to take effec
 `restart` will not do it. Verify with:
 
 ```bash
-docker inspect kurultay-api-1 --format '{{json .HostConfig.LogConfig}}'
+docker inspect kurul-api-1 --format '{{json .HostConfig.LogConfig}}'
 # {"Type":"json-file","Config":{"max-file":"3","max-size":"10m"}}
 ```
 
 ### Error tracking (Sentry) — off by default
 
-Kurultay ships with error tracking **disabled**, and disabled means the SDK is never loaded:
+Kurul ships with error tracking **disabled**, and disabled means the SDK is never loaded:
 no initialization, no global handlers, no outbound connection, and on the web side no Sentry
 chunk requested by the visitor's browser. Self-hosted software that quietly opens a telemetry
 pipeline nobody asked for is not something this project ships; leaving the DSNs blank is a
@@ -1357,7 +1385,7 @@ does, from inside the network rather than through a published port — on a Dock
 API has none:
 
 ```cron
-*/5 * * * * cd /opt/kurultay && docker compose exec -T api wget -qO- http://127.0.0.1:4000/health/ready >/dev/null && curl -fsS <ping-url>
+*/5 * * * * cd /opt/kurul && docker compose exec -T api wget -qO- http://127.0.0.1:4000/health/ready >/dev/null && curl -fsS <ping-url>
 ```
 
 ## Day-to-day loop
@@ -1376,7 +1404,7 @@ pnpm dev
 # 4. Verify locally before pushing
 pnpm lint
 pnpm build
-pnpm --filter @kurultay/api test
+pnpm --filter @kurul/api test
 
 # 5. Commit in Conventional Commits format, in English
 git commit -m "feat(web): add drag-and-drop to the kanban board"

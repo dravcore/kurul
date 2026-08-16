@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { Priority, type TaskDto } from '@kurultay/shared-types';
+import { Priority, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { TaskCard } from './task-card';
 

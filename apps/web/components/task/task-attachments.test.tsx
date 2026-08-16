@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { type AttachmentDto, AttachmentKind } from '@kurultay/shared-types';
+import { type AttachmentDto, AttachmentKind } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { TaskAttachments } from './task-attachments';
 
@@ -70,7 +70,7 @@ function renderSection(overrides: Overrides = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  URL.createObjectURL = vi.fn(() => 'blob:kurultay/1');
+  URL.createObjectURL = vi.fn(() => 'blob:kurul/1');
   URL.revokeObjectURL = vi.fn();
 });
 

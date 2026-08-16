@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { ChecklistDto } from '@kurultay/shared-types';
+import type { ChecklistDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { TaskChecklists } from './task-checklists';
 

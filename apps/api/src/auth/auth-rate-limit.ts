@@ -14,7 +14,7 @@ const logger = new Logger('AuthRateLimit');
 export const AUTH_RATE_LIMIT_MAX = 100;
 
 /** Namespace so the counters cannot collide with the Socket.io adapter or the BullMQ queue. */
-export const AUTH_RATE_LIMIT_KEY_PREFIX = 'kurultay:auth-rate-limit:';
+export const AUTH_RATE_LIMIT_KEY_PREFIX = 'kurul:auth-rate-limit:';
 
 /**
  * Fixed-window counter, evaluated in one round trip so the check and the increment cannot be
@@ -157,7 +157,7 @@ export function authRateLimitOptions(): AuthRateLimitOptions {
 
   const redisUrl = envString('REDIS_URL', '');
   if (redisUrl === '') {
-    // Kurultay runs without Redis by design (see `HealthService`), so this is a supported
+    // Kurul runs without Redis by design (see `HealthService`), so this is a supported
     // configuration, not an error: Better Auth's in-memory store still limits this instance.
     logger.warn(
       'REDIS_URL unset — auth rate-limit counters stay in memory (per instance, lost on restart)',

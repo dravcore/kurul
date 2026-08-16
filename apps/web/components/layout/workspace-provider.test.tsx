@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { MemberRole, type WorkspaceDto, type WorkspaceMemberDto } from '@kurultay/shared-types';
+import { MemberRole, type WorkspaceDto, type WorkspaceMemberDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { WorkspaceProvider, useWorkspaceContext } from './workspace-provider';
@@ -45,8 +45,8 @@ const apiGet = vi.mocked(api.get);
 
 const workspace: WorkspaceDto = {
   id: WORKSPACE_ID,
-  name: 'Kurultay',
-  slug: 'kurultay',
+  name: 'Kurul',
+  slug: 'kurul',
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
@@ -246,9 +246,9 @@ describe('WorkspaceProvider bootstrap', () => {
     await waitFor(() => expect(result.current.bootstrapped).toBe(true));
 
     act(() => {
-      result.current.renameActiveWorkspace({ ...workspace, name: 'Kurultay Labs' });
+      result.current.renameActiveWorkspace({ ...workspace, name: 'Kurul Labs' });
     });
 
-    expect(result.current.workspaces).toEqual([{ ...workspace, name: 'Kurultay Labs' }, other]);
+    expect(result.current.workspaces).toEqual([{ ...workspace, name: 'Kurul Labs' }, other]);
   });
 });

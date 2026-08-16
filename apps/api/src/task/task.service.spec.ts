@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ActivityType, SocketEvents } from '@kurultay/shared-types';
+import { ActivityType, SocketEvents } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { MIN_GAP } from '../common/position/fractional-index';
 import { NotificationService } from '../notification/notification.service';

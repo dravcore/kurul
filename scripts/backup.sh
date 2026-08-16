@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Scheduled logical backups for a Kurultay instance — the database and the uploaded files.
+# Scheduled logical backups for a Kurul instance — the database and the uploaded files.
 #
 # Runs as the `backup` sidecar in docker-compose.yml (image: postgres:18-alpine, so pg_dump
 # always matches the server major). Every BACKUP_INTERVAL seconds it writes one
@@ -26,8 +26,8 @@
 # Configuration (all optional except the password):
 #   PGHOST           postgres        # in-network address of the database server
 #   PGPORT           5432
-#   PGUSER           kurultay
-#   PGDATABASE       kurultay
+#   PGUSER           kurul
+#   PGDATABASE       kurul
 #   PGPASSWORD       -               # required; passed by compose, read by pg_dump directly
 #   BACKUP_DIR       /backups        # the backup_data named volume
 #   ATTACHMENT_DIR   -               # read-only mount of the attachments volume; blank = skip
@@ -45,8 +45,8 @@ set -eu
 
 PGHOST="${PGHOST:-postgres}"
 PGPORT="${PGPORT:-5432}"
-PGUSER="${PGUSER:-kurultay}"
-PGDATABASE="${PGDATABASE:-kurultay}"
+PGUSER="${PGUSER:-kurul}"
+PGDATABASE="${PGDATABASE:-kurul}"
 export PGHOST PGPORT PGUSER PGDATABASE
 
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
@@ -68,8 +68,8 @@ log() {
 # chronological sort. Time only moves forward, so this cannot spin.
 next_stamp() {
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
-  while [ -e "$BACKUP_DIR/kurultay-$stamp.dump" ] ||
-    [ -e "$BACKUP_DIR/kurultay-$stamp-files.tar.gz" ]; do
+  while [ -e "$BACKUP_DIR/kurul-$stamp.dump" ] ||
+    [ -e "$BACKUP_DIR/kurul-$stamp-files.tar.gz" ]; do
     sleep 1
     stamp=$(date -u +%Y%m%dT%H%M%SZ)
   done
@@ -79,7 +79,7 @@ next_stamp() {
 # Write to a .part file first and rename only on success. A dump interrupted by a container
 # stop therefore never looks like a finished archive, and never survives rotation as one.
 take_dump() {
-  target="$BACKUP_DIR/kurultay-$1.dump"
+  target="$BACKUP_DIR/kurul-$1.dump"
 
   if pg_dump --format=custom --file="$target.part" "$PGDATABASE"; then
     mv "$target.part" "$target"
@@ -107,7 +107,7 @@ take_files() {
     return 1
   }
 
-  target="$BACKUP_DIR/kurultay-$1-files.tar.gz"
+  target="$BACKUP_DIR/kurul-$1-files.tar.gz"
 
   if tar -czf "$target.part" -C "$ATTACHMENT_DIR" .; then
     mv "$target.part" "$target"
@@ -138,11 +138,11 @@ prune_pattern() {
 # not two — a file series kept for fewer cycles than the dump series would let the sweep delete
 # files a restorable dump still knows nothing about.
 #
-# `kurultay-*.dump` and `kurultay-*-files.tar.gz` cannot match each other's files, so the two
+# `kurul-*.dump` and `kurul-*-files.tar.gz` cannot match each other's files, so the two
 # passes are independent even though the dump glob looks broader than it is.
 prune() {
-  prune_pattern "kurultay-*.dump"
-  prune_pattern "kurultay-*-files.tar.gz"
+  prune_pattern "kurul-*.dump"
+  prune_pattern "kurul-*-files.tar.gz"
 }
 
 mkdir -p "$BACKUP_DIR"

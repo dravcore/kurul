@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { MailDeliveryStatus } from '@kurultay/shared-types';
+import { MailDeliveryStatus } from '@kurul/shared-types';
 
 /**
  * The return channel for a send that has no return channel.

@@ -53,7 +53,7 @@ share types cleanly with the Next.js frontend.
   PostgreSQL 19 is in beta and deliberately skipped.
 - **Redis 8, for the licence.** Redis 7.4–7.8 are RSALv2/SSPLv1 only —
   source-available, not OSI open source. Redis 8 restored an OSI-approved
-  option, **AGPLv3**, which is the licence Kurultay itself ships under (see
+  option, **AGPLv3**, which is the licence Kurul itself ships under (see
   [0007](0007-license-agpl.md)), so the stack a self-hoster pulls is
   licence-aligned end to end. Valkey (BSD-3-Clause, the Linux Foundation fork
   of Redis 7.2.4) is protocol-compatible and remains a one-line image change
@@ -77,7 +77,7 @@ share types cleanly with the Next.js frontend.
     was removed, so `db:seed` is always explicit.
   - The generator **`output` path is required** and must sit outside
     `node_modules`. The client emits to `apps/api/src/generated/prisma` for Nest
-    and the Better Auth adapter. `@kurultay/shared-types` DTOs/enums are
+    and the Better Auth adapter. `@kurul/shared-types` DTOs/enums are
     hand-maintained against the schema today; mechanical Prisma→shared-types
     codegen remains aspirational.
   - **Client middleware (`$use`) is removed.** Query-level cross-cutting

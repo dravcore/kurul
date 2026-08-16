@@ -6,7 +6,7 @@ import {
   ActivationEvent,
   type ActivationFunnelDto,
   type ActivationStepDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { ApiError, api } from '@/lib/api';
 import { ActivationFunnel } from './activation-funnel';

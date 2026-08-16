@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import type { MailDeliveryStatus } from '@kurultay/shared-types';
+import type { MailDeliveryStatus } from '@kurul/shared-types';
 import type { MailMessage } from './mail-sender';
 import { closeMailSender, mailEnabled, sendMail } from './send-mail';
 

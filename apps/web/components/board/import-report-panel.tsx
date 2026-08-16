@@ -7,7 +7,7 @@ import {
   TrelloImportSkipReason,
   type TrelloImportReportDto,
   type TrelloImportSkipGroupDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { Button } from '@/components/ui/button';
 
 interface ImportReportPanelProps {

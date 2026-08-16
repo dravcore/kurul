@@ -7,7 +7,7 @@
 
 ## Bağlam
 
-Kurultay insanlara bunu yapamadığını, üstelik nedenini de söyleyerek anlatıyor. `README.md`,
+Kurul insanlara bunu yapamadığını, üstelik nedenini de söyleyerek anlatıyor. `README.md`,
 ürünün `v0.1.0`'da olmadığı şeyler arasında "no task attachments" satırını taşıyor ve
 [roadmap.md — Beyond MVP](../roadmap.md#beyond-mvp)'ye işaret ediyor; oradaki kayıt
 `Task attachments — Needs an object-storage decision (ADR)` diyor.
@@ -20,7 +20,7 @@ panolar bunu temel kabul ediyor. Geçişi değerlendiren bir takım üç soru so
 getirebilir miyim, kartlara dosya koyabilir miyim, checklist'lerim var mı. Herhangi birine "hayır"
 demek, değerlendirmeyi farklılaştırıcılara hiç sıra gelmeden bitiriyor.
 
-**Depolama sorusu özellikten daha zor.** Attachments, Kurultay'ın sakladığı **Postgres satırı
+**Depolama sorusu özellikten daha zor.** Attachments, Kurul'un sakladığı **Postgres satırı
 olmayan ilk şey** ve bugüne kadar verilen her operasyonel söz bir veritabanı hakkında verildi.
 Gecelik yedek tek komut çalıştırıyor, `pg_dump --format=custom`; `backup` servisi kendi script'ini
 ve yedek volume'ünü mount ediyor, başka hiçbir şeyi. Prova edilmiş restore'un başarı tanımı
@@ -34,7 +34,7 @@ nobody restores" gerekçesiyle doğrudan reddedildi. Attachments tam olarak o c�
 dosyayı okur, ama kimse onu _yedek olarak_ okumaz. Yalnızca kopyanın dump'la aynı prova edilmiş
 takvimde okunup restore edilmesiyle karşılanır.
 
-Soruyu bir zevk meselesi değil gerçekten açık kılan şey dağıtım hedefi. Kurultay tek makinede
+Soruyu bir zevk meselesi değil gerçekten açık kılan şey dağıtım hedefi. Kurul tek makinede
 Compose yığını olarak çıkıyor ([ADR 0001](0001-monorepo-modular-monolith.md)) ve hedef kitle beş
 dakikalık kurulum sözü verilmiş bir self-hoster. Bir PDF eklemek için MinIO ya da S3 hesabı
 şart koşmak, çoğunluğun sözünü zaten object storage çalıştıran azınlık için bozar; `fs`'i
@@ -208,7 +208,7 @@ nedeniyle yazılmaya değer.
 edip diskte hiçbir şeye bakmayan restore doğrulaması. Redis'i bilinçli olarak yedeklenmeyen tek
 şey diye adlandıran ve gerekçesini "because it is all rebuildable" diye veren paragrafı — ki artık
 karşıt gerekçeli ikinci bir kayda ihtiyacı var. `.env.example`'ın "Scheduled **database** backups"
-ifadesi. `backup.sh`'nin kendini "the Kurultay database" ile sınırlayan başlık yorumu.
+ifadesi. `backup.sh`'nin kendini "the Kurul database" ile sınırlayan başlık yorumu.
 `configure-app.ts`'in "This service only ever answers with JSON" diyen CSP yorumu.
 `api-conventions.md`'nin gövdesi olan her yanıtta `Content-Type: application/json; charset=utf-8`
 şartı — ki dokümante bir istisna kazanıyor — ve ne 413 ne 415 içeren durum kodu tablosu.

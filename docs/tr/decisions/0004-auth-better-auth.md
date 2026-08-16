@@ -4,7 +4,7 @@
 **Tarih:** 2026-08-08
 **Güncellendi:** 2026-08-09 — Faz 2 kalite sertleştirmesi: yalnızca Nest üzerinden org
 mutation'ları, Better Auth organization yazıları için HTTP firewall, paylaşılan
-`@kurultay/auth-access` rolleri.
+`@kurul/auth-access` rolleri.
 
 > 🌐 [English (canonical)](../../decisions/0004-auth-better-auth.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
@@ -28,26 +28,26 @@ Auth.js/NextAuth ve Clerk yerine, **organization plugin**'ini kullanan **Better 
 ## Alan eşlemesi: organization → Workspace
 
 Better Auth organization plugin'i _organization_, _member_ ve _invitation_ dilini
-konuşur. Kurultay'ın ürün dili ve REST API'si **Workspace**, **WorkspaceMember**
+konuşur. Kurul'un ürün dili ve REST API'si **Workspace**, **WorkspaceMember**
 ve workspace-scoped davet route'larını kullanır
 (`POST /workspaces/:workspaceId/invitations`, …). Eşleme 1:1 kabul edilir:
 
-| Better Auth (plugin) | Kurultay (ürün / API)                        |
+| Better Auth (plugin) | Kurul (ürün / API)                           |
 | -------------------- | -------------------------------------------- |
 | Organization         | Workspace                                    |
 | Member               | WorkspaceMember                              |
 | Invitation           | Invitation (Faz 1'de ayrı Prisma modeli yok) |
 
 Davet persistence'ı Better Auth'un organization tablolarında yaşar. Faz 1 bir
-Kurultay `Invitation` modeli **eklemedi**.
+Kurul `Invitation` modeli **eklemedi**.
 
-**Faz 2 kararı (2026-08-09):** tek kaynak — Prisma modelleri Kurultay adlarını
+**Faz 2 kararı (2026-08-09):** tek kaynak — Prisma modelleri Kurul adlarını
 korur (`Workspace`, `WorkspaceMember`, `WorkspaceInvitation`); Better Auth
 organization plugin'i `schema.modelName` / alan eşlemeleriyle
 (`organizationId` → `workspaceId`) bu tablolara bağlanır. Sync katmanı yok.
 Roller `MemberRole` enum değerleridir (`OWNER` / `ADMIN` / `MEMBER` / `GUEST`)
 ve Better Auth access control'de 1:1 kayıtlıdır (`creatorRole: "OWNER"`). Access-control
-rol tanımları `@kurultay/auth-access` içindedir; api ve web buradan import eder. Nest,
+rol tanımları `@kurul/auth-access` içindedir; api ve web buradan import eder. Nest,
 framework-agnostik Node handler'ı Express üzerinde `/auth/{*splat}` olarak
 monte eder (çıkış yolu — topluluk Nest wrapper'ı kullanılmaz). **Workspace/org
 mutation'ları yalnızca Nest `/workspaces/*` üzerinden gider.** Better Auth

@@ -25,7 +25,7 @@ const locale = 'en';
 Yani asıl karar "hangi kütüphane" değil, o satırın ertelediği üç soru: locale nasıl seçilecek,
 tercih nerede yaşayacak ve mesaj kataloğunda değil veritabanında duran metinlere ne olacak?
 
-Cevabı iki kısıt şekillendiriyor. Birincisi, Kurultay'daki her sayfa kimlik doğrulama arkasında
+Cevabı iki kısıt şekillendiriyor. Birincisi, Kurul'daki her sayfa kimlik doğrulama arkasında
 — indekslenecek içerik yok ve bir tanıtım ya da dokümantasyon sitesi yapılırsa bu Next.js
 uygulamasının dışında yaşayacak. İkincisi, `apps/api` tarafında hiç locale farkındalığı yok:
 hatalar sabit kodlar ve bir HTTP durumu olarak dönüyor, web bunları `resolveApiMessage` ile
@@ -60,7 +60,7 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
 ## Gerekçe
 
 - `[locale]` yol parçasının tek gerçek getirisi SEO'dur: her dil için ayrı URL artı `hreflang`.
-  Kurultay'da indekslenen hiçbir şey yok, dolayısıyla bu getiri geçerli değil; ona ihtiyaç
+  Kurul'da indekslenen hiçbir şey yok, dolayısıyla bu getiri geçerli değil; ona ihtiyaç
   duyacak tanıtım sitesinin de başka yerde yaşaması planlanıyor.
 - Yol parçasının maliyeti ise anında ve eksiksiz ödenir: tüm `app/` ağacı `app/[locale]/`
   altına taşınır ve her `<Link>` ile `router.push` next-intl'in locale-farkında
@@ -104,7 +104,7 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
   anahtar olarak da ortaya çıkmaz.
 - API daha önce hiç sahip olmadığı küçük bir locale farkındalığı — `Accept-Language` okuma —
   kazanır. Bu, veritabanı tohumlaması ve e-posta ile sınırlıdır.
-- **Tohum kolon adları `@kurultay/shared-types`'ta değil API'de yaşar.** §3 bunu açık bıraktığı
+- **Tohum kolon adları `@kurul/shared-types`'ta değil API'de yaşar.** §3 bunu açık bıraktığı
   için uygulama sırasında karara bağlandı. Bu adlar API'nin kullanıcı adına yazdığı veridir ve
   web tohumlamayı bıraktığı anda — `POST …/columns/defaults` onun üç istekli döngüsünün yerini
   aldı — API tek yazıcı hâline geldi. Paylaşılan bir kopya, tarayıcının hiç render etmediği bir
@@ -128,7 +128,7 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
   metnin eklendiği dosya hâlâ `en.json`'dır ve Türkçe katalog ona göre ölçülür.
 - **Rol adları arayüzde çevrilir (`Sahip / Yönetici / Üye / Misafir`), `docs/tr/**` içinde ise
   İngilizce kalır (`owner'ından`, `admin'e`) — bu bir drift değil, bilinçli bir ayrım.** Doküman
-  `OWNER`/`ADMIN` enum değerlerinden ve `@kurultay/auth-access` rol tanımlayıcılarından söz eder
+  `OWNER`/`ADMIN` enum değerlerinden ve `@kurul/auth-access` rol tanımlayıcılarından söz eder
   ve bunlar hiç çevrilmez; arayüzdeki rozet ise bir insanın okuduğu bir kelimedir.
 - **"%100 çevrildi" bir iddia değil, bir kapıdır.** `apps/web/messages/catalog.test.ts`,
   `en.json`'da olup başka bir katalogda olmayan bir key'de, başka bir katalogda olup

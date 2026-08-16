@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { MailDeliveryStatus, MemberRole } from '@kurultay/shared-types';
+import { MailDeliveryStatus, MemberRole } from '@kurul/shared-types';
 import { createTestApp } from './helpers/app';
 import { createWorkspace, signUp, type TestUser } from './helpers/auth';
 

@@ -76,9 +76,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - image: kurultay-api
+          - image: kurul-api
             dockerfile: apps/api/Dockerfile
-          - image: kurultay-web
+          - image: kurul-web
             dockerfile: apps/web/Dockerfile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -207,7 +207,7 @@ jobs:
         # ten-minute certificate has long expired.
         #
         # The digest signed is the index's, which is what every tag written above resolves to,
-        # so `cosign verify ghcr.io/dravcore/kurultay-api:v0.2.0` works for amd64 and arm64
+        # so `cosign verify ghcr.io/dravcore/kurul-api:v0.2.0` works for amd64 and arm64
         # users alike — one signature, not one per architecture. `--recursive` (additionally
         # signing each per-platform manifest) is deliberately not used: it would also walk the
         # BuildKit attestation manifests in the same index and produce a set of signatures
@@ -227,7 +227,7 @@ jobs:
       #
       # One SBOM per platform, not one per image. The two platform images do not contain the
       # same packages — apps/web alone pulls @next/swc-linux-x64-gnu on one and
-      # @next/swc-linux-arm64-gnu on the other — so a single file labelled "kurultay-web" would
+      # @next/swc-linux-arm64-gnu on the other — so a single file labelled "kurul-web" would
       # be accurate for amd64 and quietly wrong for every arm64 operator, which is worse than
       # publishing nothing.
       #

@@ -3,7 +3,7 @@ import type {
   BoardSocketEventName,
   SocketEventPayloadMap,
   UserSocketEventName,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import type { Server } from 'socket.io';
 import { registerWorkspaceSocketEviction } from './workspace-socket-eviction';
 

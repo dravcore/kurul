@@ -1,4 +1,4 @@
-import { NotificationType, type NotificationDto } from '@kurultay/shared-types';
+import { NotificationType, type NotificationDto } from '@kurul/shared-types';
 
 /** Resolve display title for a notification using next-intl keys under app.notifications. */
 export function notificationTitle(

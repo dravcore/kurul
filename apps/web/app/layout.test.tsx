@@ -97,7 +97,7 @@ describe('RootLayout', () => {
   });
 
   it('keeps the English metadata copy in the catalogue', () => {
-    expect(messages.app.meta.title).toBe('Kurultay');
+    expect(messages.app.meta.title).toBe('Kurul');
     expect(messages.app.meta.description).toBe('Open-source Kanban-focused project management');
   });
 });

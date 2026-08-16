@@ -6,13 +6,13 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import type {
   CursorPage,
   InvitationDto,
   WorkspaceDto,
   WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import type { Request } from 'express';
 import { CurrentMembership } from '../common/decorators/current-membership.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';

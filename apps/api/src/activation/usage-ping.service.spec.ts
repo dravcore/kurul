@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { UsagePingKind } from '@kurultay/shared-types';
+import { UsagePingKind } from '@kurul/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsagePingService, utcDayStart } from './usage-ping.service';
 

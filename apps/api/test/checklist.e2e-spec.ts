@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { App } from 'supertest/types';
-import { SocketEvents } from '@kurultay/shared-types';
+import { SocketEvents } from '@kurul/shared-types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RealtimeService } from '../src/realtime/realtime.service';
 import { createTestApp } from './helpers/app';

@@ -1,12 +1,12 @@
 # Mimari Karar Kayıtları
 
-Kurultay'ın ardındaki önemli kararların hafif, MADR tarzı kayıtları.
+Kurul'un ardındaki önemli kararların hafif, MADR tarzı kayıtları.
 
 > 🌐 [English (canonical)](../../decisions/README.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
 ## Neden ADR
 
-Kurultay, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğunlukla solo) tarafından inşa ediliyor. "Neden Drizzle yerine Prisma" veya "neden AGPL" gibi kararlar, gerçek trade-off'lar tartılarak bir kez veriliyor ve yazılı hale getirilmedikçe unutuluyor. Bir ADR, kararın verildiği anda bağlamı, kararı ve gerekçeyi yakalar, böylece gelecekteki bir katkıda bulunanın (gelecekteki biz dahil) gerekçeyi bir Slack thread'inden yeniden inşa etmesi veya kapanmış bir tartışmayı yeniden açması gerekmez. Bunlar bilinçli olarak kısa ve olgusal, tasarım dokümanları değil.
+Kurul, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğunlukla solo) tarafından inşa ediliyor. "Neden Drizzle yerine Prisma" veya "neden AGPL" gibi kararlar, gerçek trade-off'lar tartılarak bir kez veriliyor ve yazılı hale getirilmedikçe unutuluyor. Bir ADR, kararın verildiği anda bağlamı, kararı ve gerekçeyi yakalar, böylece gelecekteki bir katkıda bulunanın (gelecekteki biz dahil) gerekçeyi bir Slack thread'inden yeniden inşa etmesi veya kapanmış bir tartışmayı yeniden açması gerekmez. Bunlar bilinçli olarak kısa ve olgusal, tasarım dokümanları değil.
 
 ## Dizin
 

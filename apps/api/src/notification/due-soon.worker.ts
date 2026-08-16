@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { NotificationType } from '@kurultay/shared-types';
+import { NotificationType } from '@kurul/shared-types';
 import { Queue, Worker, type Job } from 'bullmq';
 import { envString } from '../common/env';
 import { captureServerError } from '../common/observability/sentry';

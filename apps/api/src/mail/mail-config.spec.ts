@@ -34,10 +34,10 @@ describe('readMailConfig', () => {
     process.env.SMTP_USER = 'postmaster';
     process.env.SMTP_PASSWORD = 'hunter2';
     process.env.SMTP_SECURE = 'true';
-    process.env.MAIL_FROM = 'Kurultay <noreply@example.test>';
+    process.env.MAIL_FROM = 'Kurul <noreply@example.test>';
 
     expect(readMailConfig()).toEqual({
-      from: 'Kurultay <noreply@example.test>',
+      from: 'Kurul <noreply@example.test>',
       smtp: {
         host: 'smtp.example.test',
         port: 2525,

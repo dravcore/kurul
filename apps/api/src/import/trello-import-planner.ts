@@ -4,8 +4,8 @@ import {
   ColumnCategory,
   TrelloImportScope,
   TrelloImportSkipReason,
-} from '@kurultay/shared-types';
-import type { LabelColorSlot, TrelloImportSkipGroupDto } from '@kurultay/shared-types';
+} from '@kurul/shared-types';
+import type { LabelColorSlot, TrelloImportSkipGroupDto } from '@kurul/shared-types';
 import { POSITION_GAP, rebalancePositions } from '../common/position/fractional-index';
 import { SkipCollector } from './import-skip';
 import type {
@@ -239,7 +239,7 @@ export function planTrelloImport(
   const archivedListIds = new Set<string>();
   for (const list of source.lists) {
     if (list.closed) {
-      // ADR 0025: Kurultay has no archive, so an archived list could only arrive as a live one —
+      // ADR 0025: Kurul has no archive, so an archived list could only arrive as a live one —
       // putting back in front of the user what they deliberately removed.
       archivedListIds.add(list.id);
       skips.add(TrelloImportScope.List, TrelloImportSkipReason.Archived, list.name);

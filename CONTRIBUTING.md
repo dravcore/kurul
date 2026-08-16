@@ -1,8 +1,8 @@
-# Contributing to Kurultay
+# Contributing to Kurul
 
 How to propose, build, and submit changes.
 
-Kurultay is AGPL-3.0 — see [LICENSE](LICENSE). Outside code, documentation, and translation
+Kurul is AGPL-3.0 — see [LICENSE](LICENSE). Outside code, documentation, and translation
 pull requests are **not accepted**; the reasoning is immediately below. Everything else —
 bug reports, feature ideas, design feedback — is wanted as much as ever.
 
@@ -15,7 +15,7 @@ bug reports, feature ideas, design feedback — is wanted as much as ever.
 > One exception: a typo or a dead link is still welcome as a one-line PR. A corrected spelling
 > is not an original work, so there is nothing to license and nothing to unpick later.
 
-Kurultay is meant to fund itself by **dual licensing** — the same AGPL-3.0 codebase, also sold
+Kurul is meant to fund itself by **dual licensing** — the same AGPL-3.0 codebase, also sold
 to organizations under a commercial license — and that only works if one person holds the right
 to license every line. A merged outside patch would sit in the codebase with its copyright
 unresolved unless its author had signed a
@@ -53,7 +53,7 @@ opening an issue or PR.
 > collected even if you offered one. **This section describes how the agreement would work if
 > it were ever activated. None of it is happening today.**
 
-**Why it exists.** Kurultay is AGPL-3.0 and stays that way — one codebase, nothing withheld
+**Why it exists.** Kurul is AGPL-3.0 and stays that way — one codebase, nothing withheld
 from the community. The project is meant to fund itself through **dual licensing**: the
 maintainer also sells organizations a commercial license to the same code, exempting them from
 AGPL's obligations. Selling that exemption requires the right to distribute _all_ of the code
@@ -145,7 +145,7 @@ Test expectations: [docs/testing.md](docs/testing.md).
   (`--no-ff`) so multi-commit history stays readable; squash into `develop` is allowed for
   Dependabot / single-commit noise. Squash into `main` is never allowed — see
   [docs/git-strategy.md](docs/git-strategy.md#merge-strategy).
-  While Kurultay has a single maintainer there is nobody to review _their_ PRs, so
+  While Kurul has a single maintainer there is nobody to review _their_ PRs, so
   maintainer-authored PRs are self-reviewed and self-merged once CI is green. Your PRs are
   reviewed as normal, and the review requirement applies to everyone again as soon as a
   second maintainer exists.
@@ -154,5 +154,5 @@ Test expectations: [docs/testing.md](docs/testing.md).
 
 ## Need help?
 
-Open a [GitHub Discussion](https://github.com/dravcore/kurultay/discussions) or comment on
+Open a [GitHub Discussion](https://github.com/dravcore/kurul/discussions) or comment on
 the relevant issue.

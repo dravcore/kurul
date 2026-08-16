@@ -6,7 +6,7 @@
   "auth": {
     "login": {
       "loading": "Giriş ekranı yükleniyor…",
-      "title": "Kurultay'a giriş yapın",
+      "title": "Kurul'a giriş yapın",
       "subtitle": "Devam etmek için e-posta adresinizi ve parolanızı kullanın.",
       "email": "E-posta",
       "password": "Parola",
@@ -62,7 +62,7 @@
       "signInCta": "Giriş yap",
       "failedTitle": "Bu bağlantı işe yaramadı",
       "pendingTitle": "E-posta adresinizi doğrulayın",
-      "pendingBody": "Workspace davetlerini kabul etmenizi sağlayan şey, doğrulanmış bir adrestir. Kurultay'daki diğer her şey bu olmadan da çalışır.",
+      "pendingBody": "Workspace davetlerini kabul etmenizi sağlayan şey, doğrulanmış bir adrestir. Kurul'daki diğer her şey bu olmadan da çalışır.",
       "noAccount": "Hesabınız yok mu?",
       "registerLink": "Hesap oluşturun",
       "back": "Workspace'inize dön"
@@ -85,7 +85,7 @@
   },
   "app": {
     "meta": {
-      "title": "Kurultay",
+      "title": "Kurul",
       "description": "Açık kaynak, Kanban odaklı proje yönetimi"
     },
     "errors": {
@@ -100,7 +100,7 @@
       "notFoundBody": "Bağlantı eskimiş ya da işaret ettiği şey silinmiş olabilir."
     },
     "shell": {
-      "title": "Kurultay",
+      "title": "Kurul",
       "createWorkspace": "Yeni workspace",
       "switchWorkspace": "Workspace değiştir",
       "confirmEmail": "E-posta adresinizi doğrulayın",
@@ -123,7 +123,7 @@
       "title": "Ayarlar",
       "language": {
         "title": "Dil",
-        "description": "Kurultay'ın sizinle konuştuğu dili seçin. Giriş yaptığınız her yerde ve size gönderdiğimiz e-postalarda geçerli olur.",
+        "description": "Kurul'un sizinle konuştuğu dili seçin. Giriş yaptığınız her yerde ve size gönderdiğimiz e-postalarda geçerli olur.",
         "label": "Arayüz dili",
         "followBrowser": "Tarayıcımı izle",
         "help": "Yeni board'lar bu dilde adlandırılmış column'larla başlar. Mevcut column'larınız adlarını korur.",
@@ -272,7 +272,7 @@
         "windowSuffix": "son {days} günde",
         "configured": "kurulu",
         "notConfigured": "kurulu değil",
-        "localOnly": "Bu sayılar bu sunucuda hesaplanır ve yalnızca instance yöneticisi olarak listelediğiniz hesaplara gösterilir. Siz telemetriyi kendiniz açmadıkça Kurultay bu sunucunun dışına hiçbir şey göndermez."
+        "localOnly": "Bu sayılar bu sunucuda hesaplanır ve yalnızca instance yöneticisi olarak listelediğiniz hesaplara gösterilir. Siz telemetriyi kendiniz açmadıkça Kurul bu sunucunun dışına hiçbir şey göndermez."
       }
     },
     "workspace": {
@@ -378,12 +378,12 @@
             "comment": "{count, plural, other {# yorum}}"
           },
           "reason": {
-            "outOfScope": "{count, plural, other {{items} içe aktarılmadı: Kurultay'da karşılığı yok.}}",
-            "archived": "{count, plural, other {{items} içe aktarılmadı: Trello'da arşivlenmişti, Kurultay'da ise arşiv yok.}}",
-            "unmappable": "{count, plural, other {{items} içe aktarılmadı: bir Trello hesabı bir Kurultay hesabı değil, atama düşürüldü.}}",
+            "outOfScope": "{count, plural, other {{items} içe aktarılmadı: Kurul'da karşılığı yok.}}",
+            "archived": "{count, plural, other {{items} içe aktarılmadı: Trello'da arşivlenmişti, Kurul'da ise arşiv yok.}}",
+            "unmappable": "{count, plural, other {{items} içe aktarılmadı: bir Trello hesabı bir Kurul hesabı değil, atama düşürüldü.}}",
             "unsupportedScheme": "{count, plural, other {{items} içe aktarılmadı: adresi ne http ne de https idi.}}",
             "malformed": "{count, plural, other {{items} içe aktarılmadı: export, içe aktarıcının ihtiyaç duyduğu alanları taşımıyordu.}}",
-            "defaulted": "{count, plural, other {{items} değişerek geldi: Kurultay'da eşleşen bir değer yoktu, varsayılan kullanıldı.}}"
+            "defaulted": "{count, plural, other {{items} değişerek geldi: Kurul'da eşleşen bir değer yoktu, varsayılan kullanıldı.}}"
           }
         }
       },

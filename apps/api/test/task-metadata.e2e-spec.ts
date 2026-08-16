@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { LabelColorSlot, MemberRole, Priority } from '@kurultay/shared-types';
+import { LabelColorSlot, MemberRole, Priority } from '@kurul/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';

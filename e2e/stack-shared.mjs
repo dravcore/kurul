@@ -25,10 +25,10 @@ export const WEB_URL = `http://localhost:${WEB_PORT}`;
 export const API_URL = `http://localhost:${API_PORT}`;
 
 /**
- * Not the `kurultay_test` the Jest integration suite truncates between tests — a shared
+ * Not the `kurul_test` the Jest integration suite truncates between tests — a shared
  * database is how two parallel runs delete each other's rows mid-assertion.
  */
-export const E2E_DATABASE_NAME = 'kurultay_test_playwright';
+export const E2E_DATABASE_NAME = 'kurul_test_playwright';
 
 /**
  * Where the suite's API writes attachment bytes.
@@ -50,7 +50,7 @@ export const E2E_DATABASE_NAME = 'kurultay_test_playwright';
  * and never reads a row it did not write, while bytes are pure ballast — the upload
  * measurement alone writes 100 MB of them.
  */
-export const E2E_STORAGE_PATH = join(tmpdir(), 'kurultay-e2e-attachments');
+export const E2E_STORAGE_PATH = join(tmpdir(), 'kurul-e2e-attachments');
 
 /**
  * The suite's own Postgres URL: the developer's (or CI's) connection with the database name

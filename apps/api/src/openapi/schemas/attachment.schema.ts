@@ -1,4 +1,4 @@
-import type { AttachmentDto, AttachmentKind } from '@kurultay/shared-types';
+import type { AttachmentDto, AttachmentKind } from '@kurul/shared-types';
 
 /**
  * One attachment on a task.

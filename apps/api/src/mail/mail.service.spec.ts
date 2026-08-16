@@ -1,12 +1,12 @@
 import { Logger } from '@nestjs/common';
-import { MailDeliveryStatus } from '@kurultay/shared-types';
+import { MailDeliveryStatus } from '@kurul/shared-types';
 import type { MailMessage } from './mail-sender';
 import { MailService } from './mail.service';
 import { closeMailSender, getMailSender } from './send-mail';
 
 const MESSAGE: MailMessage = {
   to: 'invitee@example.test',
-  subject: 'You have been invited to join Analytical Engine on Kurultay',
+  subject: 'You have been invited to join Analytical Engine on Kurul',
   text: 'http://localhost:3000/invite/1',
   html: '<p>http://localhost:3000/invite/1</p>',
 };

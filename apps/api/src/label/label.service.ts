@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ActivityType } from '@kurultay/shared-types';
-import type { LabelDto } from '@kurultay/shared-types';
+import { ActivityType } from '@kurul/shared-types';
+import type { LabelDto } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
 import { fieldChanges } from '../common/field-changes';

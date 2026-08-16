@@ -9,7 +9,7 @@ import {
   SocketEvents,
   type ColumnCategory,
   type ColumnDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
 import { defaultColumnsFor } from '../common/board-defaults';

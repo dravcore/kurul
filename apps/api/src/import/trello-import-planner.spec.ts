@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AttachmentKind, ColumnCategory, LabelColorSlot } from '@kurultay/shared-types';
-import type { TrelloImportSkipGroupDto } from '@kurultay/shared-types';
+import { AttachmentKind, ColumnCategory, LabelColorSlot } from '@kurul/shared-types';
+import type { TrelloImportSkipGroupDto } from '@kurul/shared-types';
 import { SKIP_SAMPLE_LIMIT } from './import-skip';
 import { parseTrelloExport, type TrelloExportReadResult } from './trello-export';
 import {

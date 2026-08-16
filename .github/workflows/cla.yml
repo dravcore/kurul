@@ -5,7 +5,7 @@ name: CLA (disabled)
 # ============================================================================
 #
 # WHY THIS IS OFF
-#   Kurultay does not accept external code, documentation, or translation pull requests
+#   Kurul does not accept external code, documentation, or translation pull requests
 #   (ADR 0015 — docs/decisions/0015-no-external-contributions.md). With no outside patch
 #   ever being merged, there is nobody to ask for a signature.
 #
@@ -98,7 +98,7 @@ jobs:
         if: >-
           github.event_name == 'pull_request_target' ||
           github.event.comment.body == 'recheck' ||
-          contains(github.event.comment.body, 'I have read the Kurultay CLA')
+          contains(github.event.comment.body, 'I have read the Kurul CLA')
         # contributor-assistant/github-action, pinned to the v2.6.1 commit. The upstream repo was
         # archived in March 2026 and is no longer maintained; released versions still work, and
         # pinning to a SHA means an abandoned repo cannot change under us. Revisit if the node20
@@ -107,28 +107,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-document: 'https://github.com/dravcore/kurultay/blob/develop/docs/cla.md'
+          path-to-document: 'https://github.com/dravcore/kurul/blob/develop/docs/cla.md'
           # Version is part of the path AND of the signing sentence below, so a signature can
           # never be silently carried over to an amended CLA text.
           path-to-signatures: 'signatures/v0.1/cla.json'
           branch: 'cla-signatures'
           # Maintainers already hold the rights this CLA grants, and bots cannot sign.
           allowlist: dogancanyildiz,dependabot[bot],github-actions[bot]
-          custom-pr-sign-comment: 'I have read the Kurultay CLA v0.1 and I hereby sign it'
+          custom-pr-sign-comment: 'I have read the Kurul CLA v0.1 and I hereby sign it'
           custom-notsigned-prcomment: |
             Thanks for the pull request! Before it can be merged, every commit author on it
-            needs to sign the [Kurultay Contributor License Agreement](https://github.com/dravcore/kurultay/blob/develop/docs/cla.md).
+            needs to sign the [Kurul Contributor License Agreement](https://github.com/dravcore/kurul/blob/develop/docs/cla.md).
 
-            Kurultay is AGPL-3.0 and intends to stay that way. The CLA exists because the
+            Kurul is AGPL-3.0 and intends to stay that way. The CLA exists because the
             project is funded by **dual licensing** — the maintainer also sells a commercial
             license to the same code — and that requires permission from every contributor to
             distribute their work under a license other than AGPL-3.0. You keep the copyright
             in your code and every right to reuse it, and the CLA guarantees your contribution
             stays published under AGPL-3.0 as well. The reasoning, including the downsides, is
-            in [ADR 0014](https://github.com/dravcore/kurultay/blob/develop/docs/decisions/0014-dual-licensing-cla.md).
+            in [ADR 0014](https://github.com/dravcore/kurul/blob/develop/docs/decisions/0014-dual-licensing-cla.md).
 
             If you agree, post a new comment on this pull request containing exactly:
           custom-allsigned-prcomment: |
-            All contributors have signed the Kurultay CLA. Thank you.
+            All contributors have signed the Kurul CLA. Thank you.
           # Signature comments must not be editable after the PR is merged.
           lock-pullrequest-aftermerge: true

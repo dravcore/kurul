@@ -1,4 +1,4 @@
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import type { Request } from 'express';
 import type { AuthenticatedUser, WorkspaceMembership } from '../common/types/request-context';
 import { WorkspaceController } from './workspace.controller';

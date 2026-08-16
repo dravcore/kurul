@@ -1,6 +1,6 @@
 import { UseGuards, applyDecorators } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiNotFoundResponse } from '@nestjs/swagger';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { ErrorEnvelopeSchema } from '../../openapi/schemas/error.schema';
 import { RolesGuard } from '../guards/roles.guard';
 import { WorkspaceGuard } from '../guards/workspace.guard';

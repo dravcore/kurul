@@ -179,7 +179,7 @@ describe('initSentry', () => {
   });
 
   /**
-   * The single most important assertion in this file. Kurultay is self-hosted; an install
+   * The single most important assertion in this file. Kurul is self-hosted; an install
    * that loads a telemetry SDK nobody configured — even one that then sends nothing — is a
    * broken promise. Asserting on the *loader* rather than on `init` is what makes this a
    * real guarantee: it proves `@sentry/node` is never even required.

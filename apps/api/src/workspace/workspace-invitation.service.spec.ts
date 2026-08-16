@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, MailDeliveryStatus, MemberRole } from '@kurultay/shared-types';
+import { ActivityType, MailDeliveryStatus, MemberRole } from '@kurul/shared-types';
 import { APIError } from 'better-auth/api';
 import type { Request } from 'express';
 import { ActivityService } from '../activity/activity.service';

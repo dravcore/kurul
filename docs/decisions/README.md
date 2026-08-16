@@ -1,12 +1,12 @@
 # Architecture Decision Records
 
-Lightweight, MADR-style records of the significant decisions behind Kurultay.
+Lightweight, MADR-style records of the significant decisions behind Kurul.
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/README.md)
 
 ## Why ADRs
 
-Kurultay is built by a small team (often solo) before and during active
+Kurul is built by a small team (often solo) before and during active
 development. Decisions like "why Prisma over Drizzle" or "why AGPL" get made
 once, with real trade-offs weighed, and then forgotten unless they're written
 down. An ADR captures the context, the decision, and the reasoning at the

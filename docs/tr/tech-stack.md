@@ -1,6 +1,6 @@
 # Teknoloji Stack'i
 
-Kurultay'ın her katmanı için seçilen teknoloji, kısa bir gerekçe ve karşılaştırıldığı
+Kurul'un her katmanı için seçilen teknoloji, kısa bir gerekçe ve karşılaştırıldığı
 alternatif.
 
 > 🌐 [English (canonical)](../tech-stack.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
@@ -75,7 +75,7 @@ edilmiş bir `PGDATA` volume'üne karşı başlamayı reddediyor
 ([development.md](development.md#yükseltme-ve-yedekleme)). Bunu şimdi, hiçbir veri yokken
 yapmak bedava. **Redis 8** bir versiyon kadar bir lisans tercihi de: 7.4–7.8 bandı yalnızca
 RSALv2/SSPLv1, ki bu source-available ve OSI açık kaynak değil, ve Redis 8 bir OSI seçeneğini
-geri getirdi — AGPLv3, Kurultay'ın kendisinin altında dağıtıldığı lisansla aynı. Stack'i
+geri getirdi — AGPLv3, Kurul'un kendisinin altında dağıtıldığı lisansla aynı. Stack'i
 yeniden dağıtan bir self-hoster, sormadığı bir lisans sorusu miras almıyor. Valkey
 (BSD-3-Clause, Linux Foundation'ın Redis 7.2.4 fork'u) protokol uyumlu ve aşağı akışta
 izinli bir lisans gerekirse tek satırlık bir imaj değişimi olarak duruyor.
@@ -101,7 +101,7 @@ bir serverless problemini çözüyor.
 
 ### Drag & drop — @dnd-kit
 
-`react-beautiful-dnd` deprecated — Atlassian projeden çekildi. Kurultay **klasik `@dnd-kit`
+`react-beautiful-dnd` deprecated — Atlassian projeden çekildi. Kurul **klasik `@dnd-kit`
 hattını** kullanıyor (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0, pinlenmiş): MIT,
 ~6 KB çekirdek, erişilebilir (klavye ve ekran okuyucu), framework-agnostik ve en yaygın
 kullanılan React drag-and-drop kütüphanesi. Aynı zamanda **donmuş** — Aralık 2024'ten beri
@@ -142,7 +142,7 @@ register UI'ının bizim yazmamız gerektiğini unutma.
 
 ### E-posta — SMTP üzerinden nodemailer
 
-Kurultay bugüne kadar tek bir sınıf e-posta gönderiyor: `better-auth`'un sağlamlaştırılmış
+Kurul bugüne kadar tek bir sınıf e-posta gönderiyor: `better-auth`'un sağlamlaştırılmış
 davet-kabul kontrolünün bir davet edilenin workspace'e katılmasına izin vermeden önce
 ihtiyaç duyduğu doğrulama linki (bkz.
 [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).

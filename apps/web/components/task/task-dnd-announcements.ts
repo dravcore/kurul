@@ -1,5 +1,5 @@
 import type { Announcements } from '@dnd-kit/core';
-import type { ColumnDto, TaskDto } from '@kurultay/shared-types';
+import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 import { parseColumnDroppableId } from '@/components/board/board-column';
 
 /**

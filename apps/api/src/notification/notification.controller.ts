@@ -1,10 +1,6 @@
 import { Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type {
-  CursorPage,
-  NotificationDto,
-  NotificationUnreadCountDto,
-} from '@kurultay/shared-types';
+import type { CursorPage, NotificationDto, NotificationUnreadCountDto } from '@kurul/shared-types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UuidParam } from '../common/decorators/uuid-param.decorator';
 import { WorkspaceScoped } from '../common/decorators/workspace-roles.decorator';
