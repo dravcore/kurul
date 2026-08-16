@@ -47,8 +47,13 @@ module.exports = {
   // followed adding the rest failed with `Unexpected token 'export'` in
   // `@borewit/text-codec/lib/index.js`. Extend the list the same way — run it, read the package
   // the error names, add that one. Keep in sync with `apps/api/test/jest-e2e.config.cjs`.
+  //
+  // `kysely` arrived the same way and is worth naming, because the version that brought it
+  // was a *patch*: `better-auth@1.6.27` added it to its own chain, and two suites that had
+  // nothing to do with the change stopped parsing. A dependency allowlist maintained by hand
+  // does not break when we change something; it breaks when somebody else does.
   transformIgnorePatterns: [
-    'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch|rou3|nanostores|file-type|@tokenizer|strtok3|token-types|peek-readable|uint8array-extras|@borewit)/)',
+    'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch|rou3|nanostores|file-type|@tokenizer|strtok3|token-types|peek-readable|uint8array-extras|@borewit|kysely)/)',
   ],
   // `file-type@21`'s `exports` map offers `import` and `module-sync` and no `require`
   // condition at all, so Jest's CommonJS resolver — which asks for `require`/`default` —
