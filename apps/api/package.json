@@ -51,7 +51,7 @@
   "devDependencies": {
     "@nestjs/cli": "^11.0.5",
     "@nestjs/schematics": "^11.0.2",
-    "@nestjs/testing": "^11.0.12",
+    "@nestjs/testing": "^11.1.29",
     "@types/express": "^5.0.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.2.0",
@@ -63,7 +63,7 @@
     "prisma": "^7.0.0",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.6",
-    "tsx": "^4.19.3",
+    "tsx": "^4.23.12",
     "typescript": "^5.8.2"
   }
 }
