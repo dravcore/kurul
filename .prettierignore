@@ -7,3 +7,13 @@ pnpm-lock.yaml
 CHANGELOG.md
 apps/web/next-env.d.ts
 .claude/
+# Playwright's own output: reports, traces, screenshots and the run manifest. Generated on
+# every browser-suite run, gitignored, and not source.
+e2e/test-results
+e2e/playwright-report
+e2e/blob-report
+# A Trello export cut off mid-object — invalid JSON on purpose, so that the importer can be shown
+# answering 400 instead of crashing on a half-finished download. `prettier --check` parses `.json`
+# and would fail on it. Every other fixture in that directory is formatted normally; this is the
+# one file whose brokenness is the point.
+apps/api/test/fixtures/trello/edge-truncated.json

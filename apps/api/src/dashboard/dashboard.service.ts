@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ActivityType, ColumnCategory, Priority } from '@kurultay/shared-types';
+import { ActivityType, ColumnCategory, Priority } from '@kurul/shared-types';
 import type {
   DashboardCountByAssignee,
   DashboardCountByColumn,
   DashboardCountByPriority,
   DashboardSummaryDto,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { Prisma } from '../generated/prisma';
 import { assertBoard } from '../common/board-access';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,12 +22,22 @@ const ASSIGNEE_TOP_N = 8;
 type DayCountRow = { day: Date; count: number | bigint };
 
 /**
- * One row per UTC day. `date_trunc` is applied to the timestamp cast into UTC so the
- * bucket boundaries match the `YYYY-MM-DD` keys the throughput series is built from,
- * whatever the server's local zone happens to be.
+ * One row per UTC day. `a."createdAt"` is stored as naive UTC (TIMESTAMP(3), not timestamptz),
+ * and `date_trunc` is called with three arguments where the second is the cast and the third
+ * explicitly specifies UTC as the truncation zone. This ensures bucket boundaries are always
+ * aligned to UTC midnight regardless of the database session's timezone setting — critical for
+ * environments that override PostgreSQL's default UTC with a different `TZ` or `PGTZ`.
+ *
+ * The two-argument form `date_trunc('day', value)` would truncate in the session timezone
+ * instead, causing midnight boundaries to misalign with throughput keys (which are always UTC).
+ * This was masked in development by Docker's UTC default but would break in self-hosted
+ * deployments setting TZ=Europe/Istanbul or similar.
+ *
+ * Exported for regression testing: tests can import and verify that this form produces
+ * timezone-independent results.
  */
-const DAY_COUNT_SELECT = Prisma.sql`
-  SELECT date_trunc('day', a."createdAt" AT TIME ZONE 'UTC') AS day,
+export const DAY_COUNT_SELECT = Prisma.sql`
+  SELECT date_trunc('day', a."createdAt" AT TIME ZONE 'UTC', 'UTC') AS day,
          COUNT(*)::int AS count
   FROM "Activity" a
 `;

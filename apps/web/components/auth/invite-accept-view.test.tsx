@@ -112,8 +112,11 @@ describe('InviteAcceptView', () => {
   it('sends a signed-out visitor to sign in and back again', () => {
     renderView();
 
+    // `/login` reads this parameter and returns the invitee here once they are signed in
+    // (`lib/auth-redirect.ts`); the destination is escaped because it is a whole path living
+    // inside a query value.
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe(
-      `/login?next=/invite/${INVITATION_ID}`,
+      `/login?next=${encodeURIComponent(`/invite/${INVITATION_ID}`)}`,
     );
     expect(mocks.getInvitation).not.toHaveBeenCalled();
   });

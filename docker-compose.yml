@@ -1,58 +1,332 @@
+# Log rotation, applied to every service below via `logging: *logging`.
+#
+# Docker's default `json-file` driver has **no size limit**: container stdout accumulates in
+# /var/lib/docker/containers until the disk fills, and a full disk takes the whole host down —
+# a second outage vector on top of whatever produced the log volume in the first place. This
+# API writes one JSON line per request (`apps/api/src/common/logging/access-log.middleware.ts`),
+# so the volume scales with traffic and there is no natural ceiling.
+#
+# 10 MB × 3 files ≈ 30 MB per container, ~180 MB for the stack — enough history to debug an
+# incident from yesterday, small enough that no self-hoster has to think about it. It applies
+# at container *creation*, so an existing deployment needs `docker compose up -d` (which
+# recreates containers) for it to take effect, not just a restart.
+#
+# A YAML anchor rather than six copies: a rotation policy that drifts between services is
+# worse than none, because the one service you forgot is the one that fills the disk. Compose
+# merges `<<`-free anchors like this one by value, so `logging: *logging` is exact.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+# SEC-02's non-root half landed in PR #109 (`USER node` in both Dockerfiles' runner
+# stages); this is the capability half the finding also asked for. The Linux capability
+# set a container gets by default (CAP_NET_RAW, CAP_SYS_PTRACE, CAP_CHOWN, …) is attack
+# surface regardless of which user is running: an RCE or dependency-confusion bug inherits
+# whatever the kernel handed the container, not whatever the app process dropped on its
+# own. Dropping the full set and re-adding only what a service is verified to need shrinks
+# that surface to exactly what's load-bearing. `no-new-privileges` closes the matching
+# escalation path — a setuid/setcap binary reached through a supply-chain dependency
+# could otherwise claw back what was dropped here.
+#
+# A mapping merge (`<<: *hardened`), not a scalar anchor like `x-logging` above: postgres
+# and redis below need this baseline *plus* a couple of narrowly-scoped `cap_add` entries,
+# so the anchor has to be mergeable into a service block that also declares its own keys.
+# Every cap_add is commented at its call site with which entrypoint step demands it and how
+# that was confirmed — a service that "probably" needs a capability doesn't get one; only
+# a service that failed without it and passed with it does. Api/web/migrate/backup below
+# take the anchor with no additions: verified running with the full set dropped and nothing
+# else, because none of them chown, setuid, or bind privileged ports.
+x-hardened: &hardened
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
+
 services:
   postgres:
     image: postgres:18-alpine
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # The official postgres entrypoint always starts as root (regardless of any `--user`
+    # flag) so it can fix up a fresh or host-mounted data directory before dropping to the
+    # `postgres` role — see `docker-entrypoint.sh`'s `docker_create_db_directories()` and
+    # its final `exec gosu postgres "$BASH_SOURCE" "$@"`. Verified by running the image
+    # with `cap_drop: [ALL]` and nothing else against a fresh named volume: it fails at
+    # `chmod: /var/run/postgresql: Operation not permitted` / `chown: ...: Operation not
+    # permitted` before initdb ever runs. Re-added one capability at a time until both a
+    # first boot (empty volume, runs initdb) and a *second* boot (existing volume, skips
+    # initdb) succeeded end-to-end:
+    #   - CAP_CHOWN, CAP_FOWNER — `docker_create_db_directories` chowns/chmods PGDATA and
+    #     /var/run/postgresql to the postgres uid on every start, not just the first.
+    #   - CAP_SETUID, CAP_SETGID — the final `gosu postgres` re-exec needs both to drop
+    #     from root to the postgres uid/gid.
+    #   - CAP_DAC_OVERRIDE — *not* needed on the very first boot (root just created PGDATA,
+    #     so it already owns it), but every boot after the first calls
+    #     `find "$PGDATA" \! -user postgres -exec chown …`, and by then PGDATA is `chmod
+    #     0700` owned by `postgres`. Without DAC_OVERRIDE, root can't even `find` its way
+    #     into a 0700 directory it doesn't own the traversal rights to — confirmed: a
+    #     restart with the other four caps but not this one failed with `find:
+    #     /var/lib/postgresql/18/docker: Permission denied` and the container exited.
+    # `no-new-privileges` (from the anchor) does not conflict with `gosu`: gosu drops
+    # privilege via the setuid()/setgid() syscalls under an already-held capability, not by
+    # exec'ing a setuid-bit binary, so there is nothing for no-new-privileges to block.
+    cap_add: [CHOWN, FOWNER, SETUID, SETGID, DAC_OVERRIDE]
     environment:
-      POSTGRES_USER: kurultay
-      POSTGRES_PASSWORD: kurultay
-      POSTGRES_DB: kurultay
+      POSTGRES_USER: ${POSTGRES_USER:-kurul}
+      # No baked-in default: compose fails loudly instead of initializing (or, on every later
+      # boot, connecting to) a database with a well-known password shared by every Kurul
+      # install. This only bites on the *first* boot of an empty postgres_data volume — initdb
+      # bakes the password into the role once, so changing this value later does not rotate an
+      # already-initialized database's password. See the [Unreleased] entry in CHANGELOG.md for
+      # how to roll an existing volume onto a new password with `ALTER USER`.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
+      POSTGRES_DB: ${POSTGRES_DB:-kurul}
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U kurultay -d kurultay']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-kurul} -d ${POSTGRES_DB:-kurul}']
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:8-alpine
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # CAP_SETUID / CAP_SETGID, not DAC_OVERRIDE: the redis image's own entrypoint drops
+    # privilege via `setpriv --reuid redis --regid redis` (see `docker-entrypoint.sh`), but
+    # only when its *first* argument is literally `redis-server` — that's how it tells "I
+    # was asked to run the server" apart from "I was asked to run some other command in
+    # this image". An earlier version of this block ran `sh -c '...'` to make
+    # `REDIS_PASSWORD` optional, which handed the entrypoint `sh` as $1 instead, so the
+    # `redis-server` check never matched, the privilege drop never ran, and the process
+    # spent its whole life as root — confirmed with `docker top` (not `docker exec ... id`,
+    # which reports the *exec session's* user from the image's `USER`, not PID 1's actual
+    # runtime user, and would have shown root either way). That was a real regression
+    # introduced when `REDIS_PASSWORD` went from a hardcoded default to an optional
+    # variable (PR #166), not something inherent to running in a container — the `command:`
+    # below now passes `redis-server` as `$1` directly (exec form, empty string included
+    # even when the array element is blank — a plain shell string would have dropped it),
+    # so the entrypoint's own detection matches again and the drop to uid 999 happens as
+    # the image intends.
+    #
+    # With that fixed, `cap_drop: [ALL]` alone still isn't enough — `has_cap setuid && has_cap
+    # setgid` is exactly what gates whether the entrypoint's `setpriv` re-exec runs at all,
+    # so the two capabilities it needs to perform the drop have to survive the drop:
+    # `CAP_SETUID`/`CAP_SETGID` back on the allowlist lets `setpriv` switch to `redis`
+    # (confirmed via `docker top`: `999 ... redis-server`, not `root ...`), after which
+    # `setpriv`'s own `--bounding-set=-all` strips capabilities right back down inside the
+    # container — so the end state has *fewer* capabilities than the DAC_OVERRIDE approach
+    # this replaced, and none of them belong to root. `DAC_OVERRIDE` is no longer needed at
+    # all once the process actually owns `/data` as uid 999 instead of trying to write into
+    # it as root: verified with the same SET → restart cycle used to catch the original
+    # regression — `DB saved on disk` at shutdown, `Done loading RDB, keys loaded: 1` on the
+    # next boot, value intact after `GET`, capability set never touching DAC_OVERRIDE.
+    cap_add: [SETUID, SETGID]
+    environment:
+      # Optional, unlike POSTGRES_PASSWORD above: this Redis instance holds cache entries,
+      # sessions, rate-limit counters and the notification queue — no board data (see
+      # "Redis is not backed up" in docs/development.md#upgrading-and-backups) — so requiring
+      # a password here would break every existing deployment's docker-compose.yml on upgrade
+      # for comparatively little gain. Leave it unset and redis keeps behaving exactly as
+      # before; set it in .env to add defense in depth against another container reachable on
+      # the same Docker network.
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    # Exec form, and substituted by Compose itself (`${REDIS_PASSWORD:-}`, not the
+    # `$$REDIS_PASSWORD` escape used elsewhere in this file for values read inside a
+    # container's own shell) — there is no shell in this command line to resolve a runtime
+    # reference, and there does not need to be: `--requirepass ''` when the variable is
+    # unset is exactly `requirepass` unset, so a blank `.env` value reproduces the
+    # passwordless default this project has always shipped, without a conditional. Must
+    # stay array form: a single command *string* here would go through `sh -c` again (the
+    # same trap this replaces) and a string with a trailing blank argument silently loses
+    # it, whereas the array passes an explicit empty element through to `redis-server`.
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']
     volumes:
       - redis_data:/data
+    # Still branches on REDIS_PASSWORD, even though `redis-cli -a "" ping` was confirmed to
+    # work either way (it prints `AUTH failed: ... without any password configured` to
+    # stderr and then still answers PONG with exit 0 — the auth attempt fails but the
+    # command it's chained to doesn't). Kept conditional anyway: that stderr line would
+    # repeat on every 5s probe on every install that never sets a password, which is most
+    # of them, turning `docker compose logs` / `docker inspect`'s health log into a
+    # permanent false alarm about auth failing. Correctness alone doesn't win against that.
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test:
+        [
+          'CMD-SHELL',
+          'if [ -n "$$REDIS_PASSWORD" ]; then redis-cli -a "$$REDIS_PASSWORD" ping; else redis-cli ping; fi',
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  # Scheduled logical backups. Every BACKUP_INTERVAL seconds `scripts/backup.sh` writes one
+  # `pg_dump -Fc` archive into the backup_data volume and prunes it to BACKUP_KEEP archives,
+  # so a self-hosted instance has a recovery point without anyone remembering to take one.
+  # The image is the same postgres:18-alpine as the server, so pg_dump/pg_restore always
+  # match the server major. Restore procedure: docs/development.md#upgrading-and-backups.
+  #
+  # backup_data lives on the same host as postgres_data — that covers "I dropped the wrong
+  # table", not "the disk died". Copy the volume off-host as well; see the same section.
+  backup:
+    image: postgres:18-alpine
+    logging: *logging
+    <<: *hardened
+    # Unlike postgres above, `entrypoint:` here replaces docker-entrypoint.sh outright —
+    # backup.sh runs directly, so the chown/gosu dance that needs postgres's extra
+    # capabilities never executes and this container runs as root (the image's default)
+    # for its whole life without ever touching ownership of anything. All it does is talk
+    # pg_dump over the network and write into its own backup_data volume, which docker
+    # creates owned by root — nothing here needs a capability beyond the default-safe
+    # baseline. Verified by running the image standalone against a live postgres with
+    # `cap_drop: [ALL]` and no `cap_add`: `backup.sh once` wrote a valid non-empty dump
+    # file and exited 0.
+    environment:
+      # postgres:5432 is the in-network address, same as the api/migrate services above —
+      # unrelated to the host .env DATABASE_URL used by the dev loop.
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-kurul}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
+      PGDATABASE: ${POSTGRES_DB:-kurul}
+      BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
+      # Where the read-only attachments mount lands. Blank would skip the file archive
+      # entirely; it is set unconditionally because the volume exists on every deployment and
+      # an instance with attachments off simply archives an empty directory. ADR 0020 rejected
+      # cold-storage archiving as "a file on the same disk that nobody reads and nobody
+      # restores" — the answer here is not that the files are visible to users, but that this
+      # copy is read and restored on the same rehearsed schedule as the dump beside it.
+      ATTACHMENT_DIR: /attachments
+    volumes:
+      - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
+      - backup_data:/backups
+      # Read-only on purpose: this container's whole job is to copy, and a backup process that
+      # can write to the thing it is backing up is one bug away from being the outage. The
+      # restore direction therefore needs its own `docker compose run` with a writable mount —
+      # docs/development.md#restoring-from-a-backup spells that out rather than leaving an
+      # operator to discover it mid-restore.
+      - attachment_data:/attachments:ro
+    entrypoint: ['/bin/sh', '/usr/local/bin/backup.sh']
+    # The one service that must come back by itself: a backup sidecar that stays down after
+    # a reboot silently stops producing recovery points.
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # One-shot: applies pending Prisma migrations, then exits. `api` waits for it to finish
   # successfully before starting, so the schema is never missing on first boot.
+  #
+  # `build:` only, deliberately no `image:` fallback pair like api/web below: OPS-04
+  # (audit/findings/devops.md) scopes GHCR publishing to the two long-running services, and
+  # `.github/workflows/release-images.yml` only builds `runner` targets, not this Dockerfile's
+  # `migrate` stage. A source build still runs on every `docker compose up -d` for this one
+  # service — it reuses the same `build` stage the `api` image already paid for above it in
+  # the Dockerfile, ~45-50s uncached, so it does not fully deliver a build-free install on its
+  # own. It does not block the ≤5-minute pull-based install target either (that budget has
+  # headroom for one 45-50s build), and the `migrate` container's own logs make it obvious
+  # when this is what's happening, unlike a silent full rebuild of api or web would be. A
+  # published `kurul-migrate` image is a reasonable next step if this ever needs to shrink
+  # further, not something this fix requires.
   migrate:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
       target: migrate
+    # Included even though this one is short-lived: its container is reused on every
+    # `up`, so its log file accumulates one migration run's output per deploy forever.
+    # Uniformity also means nobody has to re-derive which services were exempt.
+    logging: *logging
+    <<: *hardened
+    # The `migrate` build target (apps/api/Dockerfile) runs as `USER node`, same as `runner`.
+    # It used to run as root — not by choice, but because the stage was `FROM build` and
+    # inherited no USER; the stage now starts from a clean base and drops root like every other
+    # service here. `prisma migrate deploy` only opens a network connection to postgres and
+    # reads files it does not own, so nothing about it ever needed root. Verified by bringing
+    # the stack up with `cap_drop: [ALL]` and no `cap_add`: all 19 migrations applied and the
+    # container exited 0.
     environment:
       # postgres:5432 (not localhost) — this is the in-network address, unrelated to
       # whatever DATABASE_URL a developer has in their host .env for the dev loop.
-      DATABASE_URL: postgresql://kurultay:kurultay@postgres:5432/kurultay
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kurul}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}@postgres:5432/${POSTGRES_DB:-kurul}
     depends_on:
       postgres:
         condition: service_healthy
 
   api:
+    # OPS-04 (audit/findings/devops.md): `image:` alongside `build:` is not an either/or —
+    # Compose's default pull_policy (`missing`) means `docker compose up -d` only builds when
+    # the tag below isn't already resolvable, so `docker compose pull && docker compose up -d`
+    # (docs/development.md#full-stack-in-docker) now installs and upgrades from a published
+    # image with no local build at all, while a plain `docker compose up -d --build` (or `up
+    # -d` on a host that can't reach ghcr.io) still falls all the way back to `build:` below,
+    # unchanged from before this image existed — verified empirically: pointing this pattern
+    # at a deliberately unpublished tag, `docker compose pull` fails loudly, and the immediately
+    # following `docker compose up -d` builds from `build:` and starts anyway, exit 0.
+    # `${TAG:-latest}` (not a hardcoded version) so an operator pins a release with `TAG=v0.2.0`
+    # in `.env` and gets `latest` — the tag `.github/workflows/release-images.yml` always
+    # publishes alongside every numbered release — when they leave it unset.
+    image: ghcr.io/dravcore/kurul-api:${TAG:-latest}
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    # `unless-stopped` (not `on-failure`) so the whole stack comes back after a host
+    # reboot or daemon restart, not only after an in-container crash. `migrate` is the
+    # deliberate exception: it is a one-shot job that must stay exited.
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # `runner` (apps/api/Dockerfile) already runs as `USER node` (PR #109, SEC-02's other
+    # half) and never chowns, binds a privileged port, or otherwise needs a capability the
+    # kernel doesn't hand every process by default. Verified: full stack up with `cap_drop:
+    # [ALL]` and no `cap_add`, `/health/ready` → 200.
     environment:
       # postgres:5432 / redis:6379 are the in-network addresses; they're intentionally not
       # sourced from the host .env, whose DATABASE_URL/REDIS_URL point at localhost for the
       # dev-loop run mode (docs/development.md#run-modes) and would not resolve in-container.
-      DATABASE_URL: postgresql://kurultay:kurultay@postgres:5432/kurultay
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kurul}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}@postgres:5432/${POSTGRES_DB:-kurul}
+      # `${REDIS_PASSWORD:+:${REDIS_PASSWORD}@}` expands to `:<password>@` when REDIS_PASSWORD
+      # is set and to nothing when it isn't, so this URL matches whichever branch the redis
+      # service's own entrypoint took above without a second flag to keep in sync.
+      REDIS_URL: redis://${REDIS_PASSWORD:+:${REDIS_PASSWORD}@}redis:6379
       API_PORT: 4000
-      WEB_URL: ${WEB_URL:-http://localhost:3000}
+      # Both derive from SITE_URL — the one public origin the `proxy` service answers on —
+      # because that is now the only address a browser ever uses for either app (see
+      # docker/Caddyfile). `WEB_URL` is the CORS origin and the base for links in outgoing
+      # mail; `BETTER_AUTH_URL` is where Better Auth believes it is mounted — the bare origin,
+      # with no `/api` prefix, because Better Auth appends its own `/auth` basePath and the
+      # proxy forwards that path unchanged (the `/api` prefix, which the proxy strips, is only
+      # for the Nest routes). A `/api` here would make it expect `/api/auth/…` on requests that
+      # arrive as `/auth/…` and answer every one of them 404.
+      #
+      # Deliberately *not* `${WEB_URL:-…}` / `${BETTER_AUTH_URL:-…}` as they were before this
+      # became a proxied stack: those two names belong to the dev loop, where the apps are on
+      # separate ports (`.env.example`), and reading them here meant a developer's
+      # `WEB_URL=http://localhost:3000` silently became a deployment's CORS origin.
+      WEB_URL: ${SITE_URL:-http://localhost}
       # No baked-in default: compose fails loudly instead of booting with a known secret.
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env — see docs/development.md#environment-variables}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:4000}
+      BETTER_AUTH_URL: ${SITE_URL:-http://localhost}
+      # Exactly one proxy hop stands in front of this service, and there is no route around it:
+      # the port below is not published, so nothing outside the compose network can reach the
+      # API directly to forge an X-Forwarded-For. That is what makes a fixed `1` correct here
+      # and what makes it safe — the warning in `.env.example` is about `true` (trust the whole
+      # chain) on a *directly exposed* instance, which this no longer is. Without it every
+      # rate-limit bucket and every access-log `ip` would collapse onto the proxy's container
+      # address, i.e. one bucket for the entire internet. Add a hop for each additional proxy
+      # you put in front (a CDN in front of `proxy` makes this `2`) — see
+      # docs/self-hosting.md.
+      TRUST_PROXY: 1
+      # Largest JSON/form-encoded body the API reads (issue #214). Passed through rather than
+      # left to the default so an operator who sets it in .env actually gets it — a limit that
+      # silently ignores its own variable is the same class of defect as the unconfigured
+      # default it replaced. Nothing in `docker/Caddyfile` has to move with it: the proxy's
+      # `request_body max_size` is sized for attachments and already sits far above this.
+      REQUEST_BODY_MAX_BYTES: ${REQUEST_BODY_MAX_BYTES:-1048576}
       # SMTP is optional — unlike BETTER_AUTH_SECRET above, compose does not fail loudly when
       # it's unset. The mail module falls back to logging instead of sending, so the API still
       # boots, but no invitation can be accepted until these are set in .env (see
@@ -63,8 +337,63 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_SECURE: ${SMTP_SECURE:-false}
       MAIL_FROM: ${MAIL_FROM:-}
-    ports:
-      - '4000:4000'
+      # Error tracking. Blank — the default — means the API never loads the Sentry SDK at
+      # all: no third-party connection is opened by an install that did not ask for one
+      # (apps/api/src/common/observability/sentry.ts). Unlike the web variables below this
+      # is read at container *start*, so switching it on is a restart, not a rebuild.
+      # See docs/development.md#observability.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      # Attachments (docs/decisions/0022-attachment-storage.md). Presence enables the feature,
+      # exactly as SMTP_HOST does for mail — there is deliberately no ATTACHMENTS_ENABLED. The
+      # path is inside the named volume mounted below; unset it and the API still boots, `GET
+      # /config` reports attachmentsEnabled=false, and the UI hides the upload control.
+      # Hardcoded rather than `${STORAGE_PATH:-…}`: the host .env's copy belongs to the dev
+      # loop, where it names a directory on the developer's machine that has no meaning here.
+      STORAGE_PATH: /data/attachments
+      # The API half of the two-layer size limit. `docker/Caddyfile` carries the same number and
+      # the two are not independently tunable — raising one alone is a misconfiguration that
+      # produces a 413 logged as a successful proxied request in one direction and logged
+      # nowhere at all in the other (ADR 0022, ADR 0024).
+      ATTACHMENT_MAX_BYTES: ${ATTACHMENT_MAX_BYTES:-26214400}
+      # The Trello importer's own ceiling, passed through for the same reason
+      # REQUEST_BODY_MAX_BYTES above is: a limit that silently ignores its own variable is worse
+      # than one nobody can change. It measures heap rather than disk and is unrelated to
+      # ATTACHMENT_MAX_BYTES, which is why it is a separate number rather than a derived one, and
+      # it needs no STORAGE_PATH — an import writes link rows and stores no bytes.
+      TRELLO_IMPORT_MAX_BYTES: ${TRELLO_IMPORT_MAX_BYTES:-20971520}
+      # Read by the orphan sweep, which refuses to delete a file while a dump old enough to
+      # disown it is still restorable — its grace period is BACKUP_KEEP × BACKUP_INTERVAL, with
+      # a 24h floor the API applies whatever these say (the window also covers an upload whose
+      # row has not committed, which is not a backup concern). The same two values the `backup`
+      # service below reads: one setting, not two that can silently disagree, which is why they
+      # are passed here rather than defaulted in code.
+      BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
+    # The first `volumes:` this service has ever had, and with it the first deployment
+    # constraint naming which host a replica may run on (ADR 0022). The directory is created in
+    # the image already owned by `node` (apps/api/Dockerfile), so nothing chowns at runtime and
+    # the `cap_drop: [ALL]` note above stands unchanged.
+    volumes:
+      - attachment_data:/data/attachments
+    # No `ports:` — the API is reached only through `proxy` below, at ${SITE_URL}/api. This is
+    # not merely tidiness: an API also published on a host port would be a second, unproxied
+    # way in, which would invalidate the `TRUST_PROXY: 1` above (anyone could connect straight
+    # to :4000 and hand themselves a fabricated client IP) and would put a second origin —
+    # http://localhost:4000 — in play for cookies that are now scoped to the proxy's. Reach it
+    # for debugging with `docker compose exec api wget -qO- http://127.0.0.1:4000/health/ready`
+    # or by publishing a port in a local `docker-compose.override.yml`.
+    # /health/ready probes DB + Redis (200 only when both respond within 2s), so "healthy"
+    # means "actually able to serve requests", not just "process is up". busybox wget ships
+    # in node:24-alpine — no curl needed. 127.0.0.1, not localhost: busybox wget resolves
+    # localhost to ::1 first, which a v4-only listener refuses.
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:4000/health/ready >/dev/null 2>&1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,18 +403,136 @@ services:
         condition: service_completed_successfully
 
   web:
+    # Same `image:` + `build:` fallback as api above. Next.js still inlines `NEXT_PUBLIC_*`
+    # into the client bundle at build time — that has not changed and cannot be changed — but
+    # the value that gets inlined is no longer deployment-specific: apps/web/Dockerfile bakes
+    # the same-origin path `/api`, which is correct behind `proxy` on every domain. Pulling
+    # this tag therefore works out of the box for any hostname, which is what makes the
+    # published image worth publishing (audit finding PM-02).
+    #
+    # `NEXT_PUBLIC_API_URL` is deliberately absent from `args:` below, so a local
+    # `docker compose build web` produces the same bundle as the released image rather than
+    # quietly baking whatever a developer left in `.env` for the dev loop. A deployment that
+    # really does want the API on a separate domain overrides the ARG directly
+    # (`docker build --build-arg NEXT_PUBLIC_API_URL=https://api.example.com …`) and accepts
+    # that the resulting image is specific to that domain.
+    image: ghcr.io/dravcore/kurul-web:${TAG:-latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        # Next.js inlines NEXT_PUBLIC_* at build time, so it must be a build arg, not just a
-        # runtime environment variable — see apps/web/Dockerfile.
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
-    ports:
-      - '3000:3000'
+        # Next.js inlines NEXT_PUBLIC_* at build time, so these have to be build args rather
+        # than runtime environment variables — see apps/web/Dockerfile. Blank (the default)
+        # means the Sentry chunk is never requested by a visitor's browser, and turning error
+        # tracking on or off requires `docker compose build web`, not just a restart. Unlike
+        # NEXT_PUBLIC_API_URL above, there is no deployment-independent value these could take:
+        # a DSN names one project. Deliberately separate
+        # from the API's SENTRY_DSN — a browser DSN is public by construction (it ships in
+        # the bundle) and should point at a browser-scoped Sentry project.
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-}
+        NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-}
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # Same reasoning as api above: `runner` (apps/web/Dockerfile) already runs as `USER
+    # node` and the Next.js standalone server needs nothing beyond the default-safe
+    # baseline. Verified: full stack up with `cap_drop: [ALL]` and no `cap_add`, web
+    # healthcheck reports healthy.
+    environment:
+      # The one address the *server* half of Next.js uses — middleware's session probe and the
+      # locale lookup during a render. It has to be absolute (a `/api` prefix has no origin to
+      # resolve against inside Node) and it is deliberately the container-network address, not
+      # the public one: a server render then never leaves the compose network, does not depend
+      # on the public hostname resolving from inside this container, and does not pay a TLS
+      # handshake to talk to a service one hop away.
+      #
+      # Unlike NEXT_PUBLIC_*, this is read at container *start*: it is not a `NEXT_PUBLIC_`
+      # name, so Next.js leaves it as a runtime lookup instead of inlining it. See
+      # apps/web/lib/api-url.ts.
+      INTERNAL_API_URL: http://api:4000
+    # No `ports:` — same reasoning as api above: `proxy` is the only entrance, so there is no
+    # second origin (http://localhost:3000) for a session cookie to be scoped to and no way to
+    # bypass the hop the API's TRUST_PROXY setting counts on.
+    # busybox wget follows 3xx redirects, so a redirecting root page still counts as healthy;
+    # only a non-2xx final response (or no response) fails the probe. 127.0.0.1, not
+    # localhost: Next.js standalone listens IPv4-only on 0.0.0.0, and busybox wget resolves
+    # localhost to ::1 first — connection refused despite a healthy server.
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+
+  # The stack's only published entrance: one origin serving both the app and the API, with TLS
+  # obtained and renewed automatically once SITE_URL names a real domain. `docker/Caddyfile`
+  # explains the routing and why the same-origin shape is what makes the published web image
+  # reusable across deployments (audit finding PM-02); docs/self-hosting.md is the operator
+  # walkthrough.
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # The only service in this file that needs a capability for the reason capabilities exist:
+    # Caddy binds 80 and 443 *inside* the container, and ports below 1024 need
+    # CAP_NET_BIND_SERVICE. Verified the same way the postgres/redis sets above were, and the
+    # failure mode is worth writing down because it is not the one you would predict: with
+    # `cap_drop: [ALL]` and nothing added the container does not fail at bind time, it fails
+    # before Caddy runs at all — `exec /usr/bin/caddy: operation not permitted`. The official
+    # image ships the binary with file capabilities (`cap_net_bind_service=+ep`), and the
+    # kernel refuses to exec a file-capability binary when the requested set is not a subset of
+    # the bounding set, `no-new-privileges` included. So this entry is what makes the process
+    # start, not merely what lets it listen. Adding only NET_BIND_SERVICE: `server running …
+    # addr ":80"` and the stack serves. Confirmed standalone (`docker run --cap-drop ALL
+    # --cap-add NET_BIND_SERVICE --security-opt no-new-privileges caddy:2-alpine` with this
+    # Caddyfile and SITE_URL=http://localhost), since the side-by-side two-domain test ran on
+    # high ports where the capability would not have been exercised.
+    #
+    # PID 1 stays root — the official image ships no USER directive — confirmed with
+    # `docker top` (`root … caddy run --config /etc/caddy/Caddyfile`) rather than
+    # `docker exec … id`, which reports the exec session's user and not PID 1's.
+    cap_add: [NET_BIND_SERVICE]
+    environment:
+      # The public origin, scheme included — `http://localhost` (the default) for a local
+      # stack with no domain, `https://kurul.example.com` to switch automatic HTTPS on.
+      # This is the single value an operator changes to put the stack on their own domain;
+      # nothing has to be rebuilt for it, which is the entire point of this service existing.
+      SITE_URL: ${SITE_URL:-http://localhost}
+    ports:
+      - '80:80'
+      # 443 is published even for a plain-HTTP SITE_URL: the ports are fixed at container
+      # creation, so leaving it out would mean recreating the container — not just editing
+      # .env — the day the operator points a domain at it. Nothing listens on it until
+      # SITE_URL is https, and TCP/443 in that state simply refuses connections.
+      - '443:443'
+      # QUIC/HTTP3, which Caddy serves on the same port over UDP when TLS is on. Harmless when
+      # it is off; omitting it would silently cap HTTP/3-capable browsers at HTTP/2.
+      - '443:443/udp'
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Issued certificates and ACME account keys. Without this volume every restart would
+      # request fresh certificates and walk straight into Let's Encrypt's rate limit (5 per
+      # domain per week) — the classic way a self-hosted stack locks itself out of TLS.
+      - caddy_data:/data
+      # Caddy's autosaved config. Separate from /data because it is regenerated state, not
+      # something whose loss costs anything, but it belongs in a volume rather than the
+      # container's writable layer so a `docker compose up -d` recreation is silent.
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
 
 volumes:
   postgres_data:
   redis_data:
+  backup_data:
+  # Uploaded attachment files. The one volume holding data that is neither in Postgres nor
+  # rebuildable, which is why `backup` mounts it read-only and archives it beside the dump.
+  attachment_data:
+  caddy_data:
+  caddy_config:

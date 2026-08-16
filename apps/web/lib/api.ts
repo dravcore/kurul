@@ -1,5 +1,15 @@
+import { resolveApiBaseUrl } from './api-url';
+
+/**
+ * The base every browser-side request is prefixed with.
+ *
+ * May be a same-origin path (`/api`, the shipped image's default) or a full origin — see
+ * `lib/api-url.ts` for why both shapes exist. Server-side callers must use
+ * `getServerApiBaseUrl()` from that module instead: a path has nothing to resolve against
+ * inside Node.
+ */
 export function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+  return resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
 }
 
 /** Nest `AllExceptionsFilter` JSON body. */
@@ -108,7 +118,12 @@ async function parseError(response: Response): Promise<ApiError> {
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
-  if (init?.body !== undefined && !headers.has('Content-Type')) {
+  // `FormData` is the one body shape whose Content-Type the browser has to write itself: the
+  // header carries a boundary token generated with the body, and setting the bare media type
+  // here produces a request no multipart parser can read. Everything else keeps the JSON
+  // default it has always had.
+  const writesOwnContentType = init?.body instanceof FormData;
+  if (init?.body !== undefined && !writesOwnContentType && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -136,7 +151,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
  * Writes take the request type as a second explicit type argument
  * (`api.post<ColumnDto, CreateColumnRequest>(path, body)`). It defaults to `never` rather
  * than being inferred from `body`, which is the whole point: an inferred body type accepts
- * whatever it is handed, so the `@kurultay/shared-types` request shapes were documentation
+ * whatever it is handed, so the `@kurul/shared-types` request shapes were documentation
  * that the compiler never read. With `never` as the default, a call that passes a body
  * without naming its type does not compile at all, and one that names it is checked against
  * the DTO the endpoint actually validates.
@@ -173,5 +188,31 @@ export const api = {
   },
   delete<TResponse = void>(path: string, init?: RequestInit): Promise<TResponse> {
     return request<TResponse>(path, { ...init, method: 'DELETE' });
+  },
+
+  /**
+   * A multipart write, for the one endpoint that takes a file.
+   *
+   * Separate from `post` rather than a branch inside it: `post`'s body is typed `NoInfer<TBody>`
+   * against the shared request DTOs precisely so an untyped object cannot slip through, and a
+   * `FormData` has no such contract to check. Two members keep that guarantee intact for every
+   * other call site.
+   */
+  postForm<TResponse>(path: string, body: FormData, init?: RequestInit): Promise<TResponse> {
+    return request<TResponse>(path, { ...init, method: 'POST', body });
+  },
+
+  /**
+   * Reads a response as bytes.
+   *
+   * `request` cannot serve this: it ends in `response.json()`, which is right for every endpoint
+   * that existed before attachments and wrong for the one that does not answer with JSON. The
+   * failure path stays shared — a non-2xx is still parsed by `parseError`, so an attachment that
+   * 404s raises the same `ApiError` every other call does.
+   */
+  async getBlob(path: string, init?: RequestInit): Promise<Blob> {
+    const response = await apiFetch(path, { ...init, method: 'GET' });
+    if (!response.ok) throw await parseError(response);
+    return response.blob();
   },
 };

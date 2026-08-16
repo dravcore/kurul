@@ -1,6 +1,6 @@
 # Git Strategy
 
-Branch model, commit convention, PR process, and release procedure for Kurultay.
+Branch model, commit convention, PR process, and release procedure for Kurul.
 
 > 🌐 English (canonical) | [Türkçe](tr/git-strategy.md)
 
@@ -17,13 +17,13 @@ Branch model, commit convention, PR process, and release procedure for Kurultay.
 
 ## Branch model
 
-Kurultay uses **Git Flow**. Two branches are permanent; everything else is short-lived and
+Kurul uses **Git Flow**. Two branches are permanent; everything else is short-lived and
 deleted after merge.
 
 | Branch      | Lifetime    | Branches from | Merges into        | Purpose                                                 |
 | ----------- | ----------- | ------------- | ------------------ | ------------------------------------------------------- |
 | `main`      | permanent   | —             | —                  | Released code only. Every commit is a tagged release.   |
-| `develop`   | permanent   | `main`        | —                  | Integration branch. Always deployable to staging.       |
+| `develop`   | permanent   | `main`        | —                  | Integration branch. Always startable (see below).       |
 | `feature/*` | short-lived | `develop`     | `develop`          | New functionality                                       |
 | `fix/*`     | short-lived | `develop`     | `develop`          | Bug fixes that are not urgent                           |
 | `docs/*`    | short-lived | `develop`     | `develop`          | Documentation-only changes                              |
@@ -42,6 +42,24 @@ feature          ●          └─ back-merge
 
 ```
 
+**There is no staging environment.** This table used to promise `develop` was "always deployable
+to staging", and no such deployment has ever existed — there is no host, no workflow and no
+secret anywhere in this repository that points at one (audit finding OPS-08). A standing claim
+that nothing enforces is worse than no claim, so here is the one that is actually checked:
+`develop` must **start**, and the check is a command anyone can run on their own machine.
+
+```bash
+docker compose up -d --build
+docker compose ps -a                              # every service up; migrate Exited (0)
+curl -s http://localhost/api/health/ready         # {"status":"ok","checks":{…}}
+```
+
+That is the same stack a self-hoster runs ([Self-hosting](self-hosting.md)) with `SITE_URL` left
+at its `http://localhost` default, so "it starts" is verified against the real deployment shape
+rather than a staging-only approximation. CI does not run it — the pipeline builds, lints, types
+and tests, and a full compose boot on every pull request would cost more than it catches — which
+makes this a release-time step, and it is [step 4 of the release process](#release-process).
+
 **No direct commits to `main` or `develop`.** All work reaches them through a branch and a
 pull request. This holds for maintainers too.
 
@@ -49,7 +67,15 @@ pull request. This holds for maintainers too.
 `hotfix/*`, something went wrong.
 
 Branch protection on `main` and `develop` enforces this: no direct pushes, pull requests
-required. Required status checks are added once CI lands in Phase 1.
+required. Required status checks are enforced by [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+
+### Dependabot and `main`
+
+Dependabot must open against `develop`, never `main`. Both ecosystems in
+[`.github/dependabot.yml`](../.github/dependabot.yml) set `target-branch: develop` for that
+reason. Merging dependency bumps straight into `main` (as happened in [#82](https://github.com/dravcore/kurul/pull/82))
+bypasses Git Flow and leaves `develop` behind on CI config — do not repeat it. If a
+Dependabot PR somehow targets `main`, retarget it to `develop` before merge.
 
 ## Branch naming
 
@@ -153,8 +179,10 @@ why it was wrong before. Commits are read months later by people without the con
 1. Branch from an up-to-date `develop`.
 2. Open the PR **against `develop`** (never against `main`, except `hotfix/*` and
    `release/*`).
-3. PR title follows Conventional Commits — merges use a merge commit (`--no-ff`), so the
+3. PR title follows Conventional Commits. Prefer a merge commit (`--no-ff`) so the
    individual commits on the branch stay in history; keep them clean before opening the PR.
+   Squash into `develop` is allowed when the branch is noise (Dependabot, single-commit
+   chore). Squash into `main` is never allowed — see Merge strategy below.
 4. Keep PRs small and single-responsibility: one concern, ideally under ~500 changed lines
    excluding lockfiles and generated output. Split schema changes from logic changes, and
    backend from frontend, where possible.
@@ -171,16 +199,18 @@ maintainer exists**, and this paragraph is deleted then.
 
 ### Merge strategy
 
-| Merge                                                 | Strategy                     | Reason                                                                         |
-| ----------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------ |
-| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Merge commit** (`--no-ff`) | Keeps individual, reviewable commits (e.g. a tech-debt wave) intact in history |
-| `release/*` → `main`                                  | **Merge commit** (`--no-ff`) | Preserves the release as a distinct, revertible point in history               |
-| `hotfix/*` → `main`                                   | **Merge commit** (`--no-ff`) | Same reason                                                                    |
-| `main` → `develop` (back-merge)                       | **Merge commit** (`--no-ff`) | Carries the release/hotfix commits back without rewriting them                 |
+| Merge                                                 | Strategy                                                                            | Reason                                                                            |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Merge commit** preferred; **squash allowed** for Dependabot / single-commit noise | Keeps reviewable multi-commit history when it matters; squash collapses bot noise |
+| `release/*` → `main`                                  | **Merge commit only** (`--no-ff`)                                                   | Preserves the release as a distinct, revertible point in history                  |
+| `hotfix/*` → `main`                                   | **Merge commit only** (`--no-ff`)                                                   | Same reason                                                                       |
+| `main` → `develop` (back-merge)                       | **Merge commit** (`--no-ff`)                                                        | Carries the release/hotfix commits back without rewriting them                    |
 
-Every merge into `develop` or `main` is a merge commit — nothing is squashed. Clean up fixup
-noise on the branch (interactive rebase, or amend) **before** opening the PR; once the history
-is readable, merge it as-is instead of squashing it away.
+Into `main`, squash and rebase are forbidden. A repository ruleset on `main` restricts
+allowed merge methods to merge commit so a release/hotfix cannot be flattened by accident.
+Into `develop`, squash is available for Dependabot and other single-commit branches; human
+multi-commit work still prefers a merge commit. Clean up fixup noise on the branch
+(interactive rebase, or amend) **before** opening the PR.
 
 Delete the branch after merge. GitHub's "delete branch on merge" setting handles this.
 
@@ -203,14 +233,35 @@ git commit -am "chore(release): 0.2.0"
 # 3. Only release-blocking fixes may land on this branch.
 #    Everything else keeps going to develop as usual.
 
-# 4. Open a PR: release/0.2.0 -> main. Merge with a merge commit (--no-ff).
+# 4. Boot the stack once from this branch, then open a PR:
+#    release/0.2.0 -> main. Merge with a merge commit (--no-ff).
+#
+#    CI never boots anything: it builds, lints, types and tests the code, and
+#    none of that would notice a docker-compose.yml or Caddyfile that no longer
+#    starts. This is the check behind "always startable" in the branch table,
+#    and the last point at which a broken one is still cheap to fix.
+docker compose up -d --build
+docker compose ps -a                       # -a, or the one-shot migrate row is hidden
+curl -s http://localhost/api/health/ready  # {"status":"ok","checks":{…}}
+docker compose down -v                     # -v: leave no volume behind for the next run
 
-# 5. Tag the merge commit on main
+# 5. Tag the merge commit on main. This is also what publishes the container
+#    images (.github/workflows/release-images.yml) — no tag, no images, and
+#    `docker compose pull` fails for everyone following docs/self-hosting.md.
+#    The same run signs both images with cosign and generates their SBOMs.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
 
-# 6. Publish a GitHub Release for tag v0.2.0, body = the CHANGELOG section for 0.2.0.
+# 6. Wait for the Release images workflow to finish, then publish the GitHub
+#    Release for tag v0.2.0, body = the CHANGELOG section for 0.2.0.
+#
+#    The workflow gets there first and leaves a DRAFT release with the four SBOM
+#    assets already attached — so step 6 is normally "fill in the body and hit
+#    Publish", not "create a release". Publishing by hand before the workflow
+#    finishes is not an error either: it only uploads the assets onto whatever
+#    release it finds and never rewrites the body, the title or the draft flag.
+#    Waiting is still the better order — the assets are part of what a release is.
 
 # 7. Back-merge main into develop so the version bump and any
 #    release-branch fixes are not lost.
@@ -252,6 +303,38 @@ The rule that resolves it:
 `git config rerere.enabled true` is worth setting once — the resolution is structurally the
 same every release, and rerere replays it automatically after the first time.
 
+### Rehearsing the publish path
+
+`release-images.yml` also fires on a pre-release tag (`vX.Y.Z-rc.N`, `-beta.N`, anything after
+a hyphen), and that exists for one reason: the workflow publishes images, signs them with
+cosign and attaches SBOMs, and none of that is exercised by CI. Cutting a version as the first
+run of an unexecuted workflow makes the release itself the test.
+
+So when the publish path has changed — a new action major, a change to the signing or SBOM
+steps, a new registry — rehearse it before step 5:
+
+```bash
+git tag -a v0.2.0-rc.1 -m "v0.2.0-rc.1"
+git push origin v0.2.0-rc.1
+```
+
+The rehearsal is a real publish: real images, a real signature, real SBOM assets, and the
+`cosign verify` command in [self-hosting.md](self-hosting.md#verifying-what-you-pulled) works
+against it. What it deliberately does **not** do is move anything anybody follows —
+`{{major}}.{{minor}}` and `latest` are skipped for a pre-release, so an operator who never set
+`TAG` is unaffected, and the GitHub Release is created as a draft _and_ marked pre-release.
+
+One thing a rehearsal **cannot** cover, measured on `v0.2.0-rc.3`: `metadata-action` emits only
+the bare `{{version}}` tag for a pre-release, so `0.2.0-rc.3` is published and `v0.2.0-rc.3` is
+not. The `v`-prefixed tag — the form every pull command in this repository tells an operator to
+pin — is therefore exercised only by a real release. The merge job asserts it is present on any
+non-pre-release tag, so a regression fails the release rather than shipping a documented command
+that 404s; but the assertion itself first runs when you cut the version.
+
+A rehearsal tag is disposable. Delete it and its release when the real version ships; the
+images stay in the registry under their exact `-rc` tags and cost nothing but a line in the
+package list.
+
 ## Hotfix process
 
 For a bug in a released version that cannot wait for the next release.
@@ -271,12 +354,12 @@ release.
 
 ## Versioning policy (SemVer)
 
-Kurultay follows [Semantic Versioning 2.0.0](https://semver.org/) — with the honest caveat
+Kurul follows [Semantic Versioning 2.0.0](https://semver.org/) — with the honest caveat
 that SemVer's guarantees are weaker before 1.0.
 
 **Pre-1.0 (`0.y.z`) — where the project is now:**
 
-- The public API (REST endpoints, `@kurultay/shared-types`, `@kurultay/auth-access`, database schema, env var names)
+- The public API (REST endpoints, `@kurul/shared-types`, `@kurul/auth-access`, database schema, env var names)
   is **not stable**. Breaking changes can ship in any `0.y.0`.
 - `0.y.0` (MINOR): new features **and** breaking changes.
 - `0.0.z` / `0.y.z` (PATCH): bug fixes and non-breaking changes only.
@@ -304,8 +387,8 @@ API versioning stance (no `/v1` prefix before 1.0) is covered in
 | PR target branch                     | `develop` (except `release/*` and `hotfix/*` → `main`) |
 | Commit language                      | English                                                |
 | Commit format                        | Conventional Commits                                   |
-| Feature merge                        | Merge commit (`--no-ff`)                               |
-| Release/hotfix merge                 | `--no-ff` + back-merge to `develop`                    |
+| Feature → `develop`                  | Merge commit preferred; squash OK for Dependabot/noise |
+| Release/hotfix → `main`              | Merge commit only + back-merge to `develop`            |
 | Tag format                           | `vX.Y.Z`                                               |
 | Changelog                            | Updated in the PR, not at release time                 |
 

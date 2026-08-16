@@ -4,41 +4,23 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
-import type { CursorPage, WorkspaceDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import { ActivityType } from '@kurul/shared-types';
+import type { CursorPage, WorkspaceDto, WorkspaceMemberDto } from '@kurul/shared-types';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
+import { ActivityService } from '../activity/activity.service';
 import { auth } from '../auth/auth';
 import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth-error';
+import { assertAccountNotDeleted } from '../common/deleted-account';
+import { fieldChanges } from '../common/field-changes';
+import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
 import { toCursorPage } from '../common/pagination/cursor-page';
 import { MAX_PAGE_LIMIT } from '../common/pagination/page-limit';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import type { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 import type { WorkspaceMemberQueryDto } from './dto/workspace-member-query.dto';
-
-/** The membership row shape both member reads map from. */
-type MemberRow = {
-  id: string;
-  workspaceId: string;
-  userId: string;
-  role: string;
-  user: { name: string; avatarUrl: string | null };
-};
-
-/** Name and avatar live on the user, so every member read joins the same two columns. */
-const memberInclude = { user: { select: { name: true, avatarUrl: true } } } as const;
-
-function toMemberDto(row: MemberRow): WorkspaceMemberDto {
-  return {
-    id: row.id,
-    workspaceId: row.workspaceId,
-    userId: row.userId,
-    role: row.role as MemberRole,
-    name: row.user.name,
-    avatarUrl: row.user.avatarUrl,
-  };
-}
+import { memberInclude, toMemberDto } from './workspace-member.mapper';
 
 /**
  * The Better Auth organization codes that mean "this slug is already in use".
@@ -49,6 +31,32 @@ function toMemberDto(row: MemberRow): WorkspaceMemberDto {
  * better-auth 1.6). Both are the same uniqueness violation to us, and
  * `docs/api-conventions.md` answers that with a `409`, so both are matched here.
  */
+/**
+ * The audit record of a workspace deletion, as a log aggregator receives it.
+ *
+ * Deliberately *not* an `ActivityType`: that constant is the set of values written to
+ * `Activity.type`, and this event is never written there — see `WorkspaceService.remove` for
+ * why it cannot be. It goes down the same JSON-line transport the access log and the retention
+ * sweep use (`common/logging/json-log.ts`), so `docker logs | jq 'select(.event ==
+ * "workspace.deleted")'` reads it without a regex, exactly as `type = ANY(...)` reads the rest
+ * of the trail out of Postgres.
+ *
+ * `warn`, not `info`: this is the one line in the file whose absence cannot be noticed later,
+ * because the tenant it describes no longer exists to be compared against.
+ */
+export interface WorkspaceDeletedLogLine {
+  ts: string;
+  level: 'warn';
+  event: 'workspace.deleted';
+  workspaceId: string;
+  actorId: string;
+  /** Null only if the row vanished between the pre-read and the delete. */
+  name: string | null;
+  slug: string | null;
+  memberCount: number | null;
+  boardCount: number | null;
+}
+
 const SLUG_CONFLICT_CODES = new Set([
   'ORGANIZATION_ALREADY_EXISTS',
   'ORGANIZATION_SLUG_ALREADY_TAKEN',
@@ -62,7 +70,23 @@ function isSlugConflict(error: unknown): boolean {
 
 @Injectable()
 export class WorkspaceService {
-  constructor(private readonly prisma: PrismaService) {}
+  /**
+   * Test seam, matching `CleanupWorker`: production writes the JSON line to stdout, the spec
+   * swaps in a collector so it can assert on what an aggregator would actually receive. Not a
+   * constructor parameter because Nest resolves those by type and a function type has no
+   * provider to resolve to.
+   */
+  private write: LogWriter = stdoutWriter;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+  ) {}
+
+  /** @internal — for tests. */
+  setLogWriter(write: LogWriter): void {
+    this.write = write;
+  }
 
   private headersFrom(request: Request): Headers {
     return fromNodeHeaders(request.headers);
@@ -92,7 +116,20 @@ export class WorkspaceService {
     return memberships.map((m) => this.toWorkspaceDto(m.workspace));
   }
 
-  async create(_userId: string, dto: CreateWorkspaceDto, request: Request): Promise<WorkspaceDto> {
+  /**
+   * Creates a workspace, with the caller as its OWNER.
+   *
+   * The deleted-account check is the reason `userId` is no longer unused. This is one of the
+   * two writes in the API that are not workspace-scoped, and it is the dangerous one: an
+   * account deleted by an instance administrator keeps a working session cookie for up to five
+   * minutes (Better Auth's `session.cookieCache` answers without a database read), and creating
+   * a workspace is the one thing in that window that would give the tombstone a membership
+   * again — an anonymised row with no credentials, sitting as the sole owner of a live tenant.
+   * See `common/deleted-account.ts` for why the check is here rather than in `SessionAuthGuard`.
+   */
+  async create(userId: string, dto: CreateWorkspaceDto, request: Request): Promise<WorkspaceDto> {
+    await assertAccountNotDeleted(this.prisma, userId);
+
     const existing = await this.prisma.workspace.findUnique({
       where: { slug: dto.slug },
     });
@@ -143,9 +180,18 @@ export class WorkspaceService {
 
   async update(
     workspaceId: string,
+    actorId: string,
     dto: UpdateWorkspaceDto,
     request: Request,
   ): Promise<WorkspaceDto> {
+    // Read before the write, because the plugin only ever hands back the new values. The slug
+    // is what every invitation link and bookmark in circulation is built from, so "who changed
+    // it, and away from what" is the question this row has to answer.
+    const before = await this.prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { name: true, slug: true },
+    });
+
     if (dto.slug !== undefined) {
       const clash = await this.prisma.workspace.findFirst({
         where: { slug: dto.slug, NOT: { id: workspaceId } },
@@ -171,6 +217,23 @@ export class WorkspaceService {
         throw new NotFoundException('Workspace not found');
       }
 
+      // After the plugin call, not before: Better Auth owns this write (ADR 0004) and there is
+      // no transaction spanning the two, so recording first would leave an entry describing a
+      // rename that the uniqueness check downstream refused.
+      await this.activityService.record(this.prisma, {
+        workspaceId,
+        userId: actorId,
+        type: ActivityType.WorkspaceUpdated,
+        payload: {
+          name: updated.name,
+          slug: updated.slug,
+          // `before` is null only if the workspace vanished between the read above and here,
+          // in which case the plugin would have failed; an empty change set is the honest
+          // answer rather than a fabricated `from`.
+          changes: before ? fieldChanges(before, updated, ['name', 'slug']) : {},
+        },
+      });
+
       return this.toWorkspaceDto({
         id: updated.id,
         name: updated.name,
@@ -187,7 +250,32 @@ export class WorkspaceService {
     }
   }
 
-  async remove(workspaceId: string, request: Request): Promise<void> {
+  /**
+   * Deletes the workspace, and leaves the only record of it that can survive the deletion.
+   *
+   * There is no `workspace.deleted` activity row, and there cannot be one: `Activity` cascades
+   * on `workspaceId`, so the entry would be deleted by the statement it describes — along with
+   * every board, task, comment and audit row the tenant ever wrote. Writing one anyway would be
+   * worse than writing none, because it would look like coverage in a table where nothing
+   * remains to be read.
+   *
+   * So the record goes to the JSON log instead (`WorkspaceDeletedLogLine`), and the details are
+   * gathered *before* the call: afterwards the row is gone and even the workspace's name cannot
+   * be looked up. The counts are what turn "workspace X was deleted" into something an incident
+   * responder can size — an empty trial tenant and a workspace with forty members and nine
+   * boards are otherwise the same line. `docs/architecture.md` ("Audit trail") records this as
+   * the one event that lives in the log rather than in the table.
+   */
+  async remove(workspaceId: string, actorId: string, request: Request): Promise<void> {
+    const doomed = await this.prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: {
+        name: true,
+        slug: true,
+        _count: { select: { members: true, boards: true } },
+      },
+    });
+
     try {
       await auth.api.deleteOrganization({
         body: { organizationId: workspaceId },
@@ -198,6 +286,19 @@ export class WorkspaceService {
         404: 'Workspace not found',
       });
     }
+
+    const line: WorkspaceDeletedLogLine = {
+      ts: new Date().toISOString(),
+      level: 'warn',
+      event: 'workspace.deleted',
+      workspaceId,
+      actorId,
+      name: doomed?.name ?? null,
+      slug: doomed?.slug ?? null,
+      memberCount: doomed?._count.members ?? null,
+      boardCount: doomed?._count.boards ?? null,
+    };
+    this.write(JSON.stringify(line));
   }
 
   /**

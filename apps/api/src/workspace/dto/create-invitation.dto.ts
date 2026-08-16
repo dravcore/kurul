@@ -1,4 +1,4 @@
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { IsEmail, IsEnum, IsNotEmpty, IsNotIn } from 'class-validator';
 
 export class CreateInvitationDto {

@@ -7,7 +7,7 @@
 
 ## Bağlam
 
-Kurultay henüz iskelet öncesi aşamada: henüz hiç kod yok, dolayısıyla ilk satır yazılmadan önce hem kod organizasyonu ekseni (monorepo vs. polyrepo) hem de runtime ekseni (monolit vs. mikroservis) karara bağlanmalı. Bu iki eksen birbirinden bağımsız — kodun _nasıl saklandığı_, _nasıl çalıştığı_ değildir — ve ikisi de açık bir cevap gerektiriyor.
+Kurul henüz iskelet öncesi aşamada: henüz hiç kod yok, dolayısıyla ilk satır yazılmadan önce hem kod organizasyonu ekseni (monorepo vs. polyrepo) hem de runtime ekseni (monolit vs. mikroservis) karara bağlanmalı. Bu iki eksen birbirinden bağımsız — kodun _nasıl saklandığı_, _nasıl çalıştığı_ değildir — ve ikisi de açık bir cevap gerektiriyor.
 
 ## Karar
 

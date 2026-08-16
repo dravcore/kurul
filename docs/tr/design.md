@@ -1,6 +1,6 @@
 # Tasarım
 
-Kurultay web uygulamasının görsel ve etkileşim dili: ilkeler, token'lar, yerleşim, hareket,
+Kurul web uygulamasının görsel ve etkileşim dili: ilkeler, token'lar, yerleşim, hareket,
 durumlar ve metin.
 
 > 🌐 [English (canonical)](../design.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
@@ -18,10 +18,9 @@ durumlar ve metin.
 - [9. Erişilebilirlik](#9-erişilebilirlik)
 - [10. Çapraz referanslar](#10-çapraz-referanslar)
 
-> **Durum.** Aşağıdaki her hex, tip boyutu ve piksel ölçüsü bir **öneridir**; gerçek ekranlarda
-> [Faz 3](roadmap.md#faz-3--boardlar-ve-columnlar)'te doğrulanacak ve Faz 7'ye kadar rafine
-> edilecektir. _Kurallar_ — ölçülülük, tokenizasyon, klavye paritesi, kontrast tabanları, i18n —
-> ilk component'ten itibaren bağlayıcıdır.
+> **Durum.** Aşağıdaki renk, tipografi ve spacing token'ları üründe **doğrulanmıştır**
+> (`apps/web/app/globals.css`). Hâlâ aspirasyonel olan etkileşim kalıpları satır içinde
+> belirtilir; her cümleyi shipped davranış sanmayın.
 
 ## 1. Tasarım ilkeleri
 
@@ -44,9 +43,10 @@ durumlar ve metin.
 
 ## 2. Kimlik
 
-Kurultay adını Türk-Moğol geleneğinin büyük meclisinden alır: boylar toplanır, sancaklar
-dikilir, meseleler karara bağlanır, iş bölüştürülür. Kimlik _bu_ dünyadan gelir — sancak, damga,
-bozkır — jenerik prodüktivite-aracı dilinden değil.
+Kurul, adını toplanıp karar alan ve işi bölüşen heyetten alır — ve v0.2.0'a kadar projeye ilk
+adını veren _kurultay_'dan: boylar toplanır, sancaklar dikilir, meseleler karara bağlanır, iş
+bölüştürülür. Kimlik hâlâ _bu_ dünyadan gelir — sancak, damga, bozkır — jenerik
+prodüktivite-aracı dilinden değil. Ad kısaldı, görsel dil değişmedi.
 
 **Signature eleman — sancak rail'i:** o an aktif olan neyse onun leading edge'inde 2px'lik bakır
 renginde bir çizgi (aktif sidebar öğesi, focus'taki column, seçili kart, açık panelin leading
@@ -73,7 +73,7 @@ Aynı anda iki bakır şey görünüyorsa ve hiçbiri bir primary action değils
 
 **Anti-brief.** Bilinçli olarak _şu değil_: serif bir font ve kiremit rengi bir accent'le sıcak
 krem bir ground; asit bir accent'le neredeyse siyah; sıfır radius'ta broadsheet hairline'ları.
-Kurultay'ın nötrleri bilinçli olarak soğuk yeşil-gri akar — tam olarak sıcak bakırın karşısına
+Kurul'un nötrleri bilinçli olarak soğuk yeşil-gri akar — tam olarak sıcak bakırın karşısına
 oturacağı bir şey olsun diye; sıcak bir ground üzerinde sıcak bir accent hem şu anki varsayılan
 görünüm hem de accent'i kaybettirmenin bir yolu.
 
@@ -82,7 +82,7 @@ görünüm hem de accent'i kaybettirmenin bir yolu.
 Faz 3 için öneriler, `components/ui/`'ın değiştirilmemiş generated output olarak kalması için
 shadcn/ui CSS-variable konvansiyonuna göre adlandırıldı. **Dikkat:** shadcn'in kendi
 vokabülerinde `--primary` marka action rengidir ve `--accent` ise subtle hover surface'idir; bu
-yüzden Kurultay'ın signature bakırı `--primary`'dir ve `--accent` sakin bir nötr tint olarak
+yüzden Kurul'un signature bakırı `--primary`'dir ve `--accent` sakin bir nötr tint olarak
 kalır. shadcn'in variable'larını yeniden adlandırma.
 
 ### Nötrler ve accent
@@ -169,17 +169,55 @@ figure veya bir stat-tile değeri üzerinde değil.
 App shell, [architecture.md §4](architecture.md#4-appsweb--yapı)'teki `(app)` route group'una
 göre.
 
-| Bölge                | Spec                                                                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Sidebar              | 240px, üstte pinlenmiş workspace switcher; 1280px altında ve talep üzerine 56px'lik bir icon rail'ine collapse olur                   |
-| Topbar               | 48px sticky — board adı, filter girişi, overflow, presence avatar'ları                                                                |
-| Board canvas         | Full-bleed, horizontal scroll; column header'ları vertical scroll'da sticky kalır                                                     |
-| Column               | 300px fixed (geniş ekranlarda 280 min / 320 max), 12px gap, isim + count + `⋯` içeren 40px sticky header                              |
-| Card                 | 10px 12px padding, 8px gap, min 56px (yalnızca title), tipik 72–92px; hiçbir şeyin ~140px'i aşmaması için title 3 satırda clamp'lenir |
-| Card içerik sırası   | priority ikonu + title · label dot'ları · meta satırı (due date, estimate, assignee'ler)                                              |
-| List / table satırı  | 36px                                                                                                                                  |
-| Settings ve form'lar | 720px max width — prose okunur, taranmaz                                                                                              |
-| Touch target         | Coarse pointer'larda 40px minimum, size'la değil padding'le sağlanır                                                                  |
+| Bölge                | Spec                                                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell yüksekliği     | Tam olarak `100dvh`, `overflow: hidden` — asla `min-height` değil. Her sayfa kendi scroller'ına sahiptir.                                     |
+| Sidebar              | 240px, üstte pinlenmiş workspace switcher; 1280px altında ve talep üzerine 56px'lik bir icon rail'ine collapse olur; 768px altında off-canvas |
+| Topbar               | 48px sticky — board adı, filter girişi, overflow, presence avatar'ları; **768px altında 56px**, ve orada gezinme trigger'ını da taşır         |
+| Board canvas         | Full-bleed, horizontal scroll; column header'ları vertical scroll'da sticky kalır                                                             |
+| Column               | 300px fixed (geniş ekranlarda 280 min / 320 max), 12px gap, isim + count + `⋯` içeren 40px sticky header (768px altında 48px)                 |
+| Card                 | 10px 12px padding, 8px gap, min 56px (yalnızca title), tipik 72–92px; hiçbir şeyin ~140px'i aşmaması için title 3 satırda clamp'lenir         |
+| Card içerik sırası   | priority ikonu + title · label dot'ları · meta satırı (due date, estimate, assignee'ler)                                                      |
+| List / table satırı  | 36px; 768px altında 44px                                                                                                                      |
+| Settings ve form'lar | 720px max width — prose okunur, taranmaz                                                                                                      |
+| Touch target         | **768px altında 44px minimum**, istisnasız her etkileşimli öğede                                                                              |
+
+**Shell tam olarak bir viewport yüksekliğindedir ve bu taşıyıcı bir karardır.**
+`min-height: 100dvh` "en az" der ve altındaki hiçbir şeyi sınırlamaz — yaptığı da buydu, ve
+bir column'un `overflow-y-auto`'sunun neden hiç kırpmadığının sebebi budur: belge büyüyordu,
+1 000 task'lık bir board'da 27 425px'e ulaşıyordu. Column başına scroll, sticky column header'ı
+ve drag autoscroll'un üçü de column'un sınırlı bir kutuya sahip olmasına bağlı; dolayısıyla
+üçü de işlevsizdi. `100vh` değil `100dvh`: telefonda `100vh`, browser chrome'u geri çekilmiş
+haldeki viewport'tur, yani `vh` ile boyutlanmış bir shell ekrandan yüksektir ve ilk paint'te
+topbar'ı adres çubuğunun altına iter. Yeni sayfa eklerken uyulacak sonuç: **uygulamanın hiçbir
+yerinde belge scroll etmez**, bu yüzden `(app)` altındaki yeni bir route kendi
+`flex-1 overflow-y-auto`'sunu bildirmek zorundadır — dashboard, settings ve notifications
+sayfalarının yaptığı gibi.
+
+**768px altında sidebar off-canvas'tır** — topbar'daki bir hamburger, aynı `SidebarBody`'yi
+bir drawer'da açar; kendi link listesi olan ikinci bir gezinme değil. Drawer, uygulamanın
+`Dialog` primitive'inin sol kenara sabitlenmiş hali (`DialogDrawerContent`), ve bu bilinçli
+bir "elle yazmayı reddetme"dir: focus trap, `Escape`, focus'u trigger'a geri verme, arkadaki
+sayfayı inert kılma ve scroll lock, bir off-canvas panelin bütün özüdür — paralel bir
+implementasyon, bunlardan birinin eksik kalabileceği ikinci bir yerdir. 220ms'de
+`--ease-drawer` ile kayar, `prefers-reduced-motion` altında ise kaymak yerine cross-fade eder.
+
+**40 değil 44, ve pointer tipine değil genişliğe bağlı.** 44px, WCAG 2.5.5 (AAA) ve roadmap'in
+bu yerleşimi tuttuğu rakam. `pointer: coarse` yerine drawer'ın kullandığı breakpoint'e —
+`max-md` — bağlıdır: birbiriyle çelişebilecek iki koşul yerine tüm mobil yerleşimi tek bir
+koşul yönetsin diye. Masaüstünde 360px genişliğinde bir pencerenin 44px hedef alması bir şeye
+mal olmaz. Zemin, çağrı yerlerinde değil `Button` ile `Input` variant'larında ve dropdown item
+sınıflarında yaşar; böylece okunacak tek bir liste vardır. Breakpoint üstündeki ölçüler
+değişmez. Ve bu **iddia edilmez, ölçülür**: `e2e/tests/mobile-navigation.spec.ts`, 360px'te
+board'daki ve drawer'daki her button, link, input ve menu item'ını tarar ve iki eksenden
+birinde 44px'in altındaki her kutuda fail eder. jsdom hiçbir şeyi layout etmediği için bir
+unit test bu iddiayı kuramaz.
+
+**Touch'ta drag grip'ten yapılır.** Kart gövdesi column'un scroller'ına aittir — dnd-kit
+listener'larını taşıyan wrapper'ın kendi `touch-action`'ı yoktur, dolayısıyla dikey bir
+hareketi browser üstlenir — grip ise `touch-action: none` bildirir, ve o 44px'lik tek bölgeyi
+dnd-kit'e veren şey budur. Bu bir kısıt değil, bir iş bölümüdür: başparmakla scroll edilemeyen
+bir column, ortasından sürüklenemeyen bir karttan daha kötüdür. İki yarı da test edilir.
 
 **Task detayı: bir modal değil, sağ tarafta bir panel.** Varsayılan 480px, drag-resizable
 420–640px, **non-modal** — board arkasında görünür ve tıklanabilir kalır. 1024px altında
@@ -257,14 +295,14 @@ board'da bu, column'ların ilk paint'idir, başka hiçbir şey değil.
 sonraki hamleyi adlandırırlar; feature'ı açıklamazlar. Damga mark'larının göründüğü tek yer
 burasıdır.
 
-| Surface                           | Mark       | Headline                                                       | Body                                                                                                                                                                                                                                                                   | Action                                                                         |
-| --------------------------------- | ---------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Henüz board yok                   | Damga 96px | No boards yet (Henüz board yok)                                | A board is where the work gets divided. Start with one. (Bir board, işin bölüştüğü yerdir. Bir tane ile başlayın.)                                                                                                                                                     | Create board (Board oluştur)                                                   |
-| Board'da column yok               | Damga 96px | This board has no columns (Bu board'da column yok)             | Columns are the stages work moves through. Start with To Do, In Progress, and Done, or name your own. (Column'lar, işin içinden geçtiği aşamalardır. To Do (Yapılacak), In Progress (Devam Ediyor) ve Done (Tamamlandı) ile başlayın, ya da kendi isimlerinizi verin.) | Add column · Use default columns (Column ekle · Varsayılan column'ları kullan) |
-| Boş column                        | —          | —                                                              | 56px dashed drop zone: "Drop a task here" ("Bir task'ı buraya bırakın")                                                                                                                                                                                                | Add task (Task ekle)                                                           |
-| Filtreler hiçbir şeyle eşleşmiyor | —          | No tasks match these filters (Bu filtrelerle eşleşen task yok) | Three filters are active. (Üç filtre aktif.)                                                                                                                                                                                                                           | Clear filters (Filtreleri temizle)                                             |
-| Dashboard, veri yok               | Damga 64px | Nothing to chart yet (Henüz grafiklenecek bir şey yok)         | Charts fill in as tasks are created and moved. (Task'lar oluşturuldukça ve taşındıkça grafikler dolar.)                                                                                                                                                                | Open a board (Bir board aç)                                                    |
-| Bildirimler                       | —          | You're caught up (Her şeyi gördünüz)                           | —                                                                                                                                                                                                                                                                      | —                                                                              |
+| Surface                           | Mark       | Headline                                                       | Body                                                                                                                                                                                                                                                              | Action                                                                         |
+| --------------------------------- | ---------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Henüz board yok                   | Damga 96px | No boards yet (Henüz board yok)                                | A board is where the work gets divided. Start with one. (Bir board, işin bölüştüğü yerdir. Bir tane ile başlayın.)                                                                                                                                                | Create board (Board oluştur)                                                   |
+| Board'da column yok               | Damga 96px | This board has no columns (Bu board'da column yok)             | Columns are the stages work moves through. Start with To Do, In Progress, and Done, or name your own. (Column'lar, işin içinden geçtiği aşamalardır. To Do (Yapılacak), In Progress (Devam Ediyor) ve Done (Bitti) ile başlayın, ya da kendi isimlerinizi verin.) | Add column · Use default columns (Column ekle · Varsayılan column'ları kullan) |
+| Boş column                        | —          | —                                                              | 56px dashed drop zone: "Drop a task here" ("Bir task'ı buraya bırakın")                                                                                                                                                                                           | Add task (Task ekle)                                                           |
+| Filtreler hiçbir şeyle eşleşmiyor | —          | No tasks match these filters (Bu filtrelerle eşleşen task yok) | Three filters are active. (Üç filtre aktif.)                                                                                                                                                                                                                      | Clear filters (Filtreleri temizle)                                             |
+| Dashboard, veri yok               | Damga 64px | Nothing to chart yet (Henüz grafiklenecek bir şey yok)         | Charts fill in as tasks are created and moved. (Task'lar oluşturuldukça ve taşındıkça grafikler dolar.)                                                                                                                                                           | Open a board (Bir board aç)                                                    |
+| Bildirimler                       | —          | You're caught up (Her şeyi gördünüz)                           | —                                                                                                                                                                                                                                                                 | —                                                                              |
 
 **Loading**, `--muted` içinde final layout'a uyan skeleton'lar kullanır, 1.6s'lik bir opacity
 pulse'ı ile (1.0 → 0.6) ve shimmer sweep olmadan: board, gerçek genişlikte column skeleton'ları
@@ -352,19 +390,19 @@ the application UI" ("uygulama UI'sinde i18n") satırı daha fazla language pack
 ilgilidir, ve plumbing Faz 1 skeleton'uyla birlikte gelir çünkü onu sonradan eklemek, onunla
 başlamaktan çok daha pahalıya mal olur.
 
-| i18n kuralı                      |                                                                                                                                                     |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hardcode edilmiş string yok      | JSX'te bir string literal bir lint error'dur. Server component'lerde `getTranslations`, client olanlarda `useTranslations`.                         |
-| Key'ler                          | Domain'e göre, component tree'yi mirror'layarak: `board.column.addAction`, `task.priority.urgent`, `errors.http.409`                                |
-| Kataloglar                       | `messages/en.json` kanoniktir ve MVP'deki tek pack'tir; Turkish, Faz 5'ten sonraki ilk çeviridir                                                    |
-| Plural'lar, interpolation        | ICU format (`{count, plural, …}`). Cümle parçalarını asla concat etme — word order dilden dile değişir.                                             |
-| Date'ler, sayılar, relative time | Aktif locale ile next-intl formatter'ları üzerinden `Intl.*`; elle formatlanmış date yok                                                            |
-| Casing                           | **Çevrilmiş string'lerde `text-transform: uppercase` yok** — Turkish `i → İ`, CSS casing altında bozuluyor. İstenen casing'i doğrudan kataloğa yaz. |
-| Layout                           | ±35% string uzunluğu varsay; İngilizcesi sığıyor diye hiçbir şey fixed pixel width olmasın                                                          |
+| i18n kuralı                      |                                                                                                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hardcode edilmiş string yok      | JSX'te bir string literal bir lint error'dur. Server component'lerde `getTranslations`, client olanlarda `useTranslations`.                                   |
+| Key'ler                          | Domain'e göre, component tree'yi mirror'layarak: `board.column.addAction`, `task.priority.urgent`, `errors.http.409`                                          |
+| Kataloglar                       | `messages/en.json` kanoniktir; `messages/tr.json` onun yanında gelir ve `messages/catalog.test.ts`, birinde olup diğerinde olmayan bir key'de build'i düşürür |
+| Plural'lar, interpolation        | ICU format (`{count, plural, …}`). Cümle parçalarını asla concat etme — word order dilden dile değişir.                                                       |
+| Date'ler, sayılar, relative time | Aktif locale ile next-intl formatter'ları üzerinden `Intl.*`; elle formatlanmış date yok                                                                      |
+| Casing                           | **Çevrilmiş string'lerde `text-transform: uppercase` yok** — Turkish `i → İ`, CSS casing altında bozuluyor. İstenen casing'i doğrudan kataloğa yaz.           |
+| Layout                           | ±35% string uzunluğu varsay; İngilizcesi sığıyor diye hiçbir şey fixed pixel width olmasın                                                                    |
 
 ## 8. Grafikler ve dashboard
 
-[Faz 7](roadmap.md#faz-7--dashboard) için, Recharts ile render edilir. Form, herhangi bir renk
+[Faz 7](../archive/roadmap-mvp-phases.md) için, Recharts ile render edilir. Form, herhangi bir renk
 kararından önce, reader'ın job'ına göre seçilir. Asla dual bir y-axis, asla iki slice'ı geçen bir
 pie, asla generate edilmiş bir dokuzuncu ton — tail'i "Other" ("Diğer") içine katla ya da small
 multiple'lara facet'le.
@@ -380,7 +418,7 @@ multiple'lara facet'le.
 | Zaman içinde column composition'ı                | **Stacked area / column**, ≤ 6 series                                                            | categorical                      |
 | Hepsi önemli olan ~7'den fazla category          | **Table**, ya da table artı chart                                                                | —                                |
 
-Palette, Kurultay'ın kendi surface'lerine karşı validate edildi (`#FFFFFF` açık, `#161918` koyu).
+Palette, Kurul'un kendi surface'lerine karşı validate edildi (`#FFFFFF` açık, `#161918` koyu).
 Bu slot'lar aynı zamanda `Label.color`'ın arkasındadır.
 
 | Slot | Ton     | Açık      | Koyu      |     | Slot | Ton     | Açık      | Koyu      |
@@ -446,6 +484,6 @@ verify edilmiş olarak.
 | [coding-standards.md](coding-standards.md#nextjs-appsweb)              | `components/ui/` yalnızca shadcn output'udur — token'lar theme'de edit edilir, asla bir primitive'de değil; component'lerde arbitrary hex yok; conditional class'lar `cn()` üzerinden |
 | [architecture.md](architecture.md#4-appsweb--yapı)                     | Bu dokümanın ortaya koyduğu `(auth)` / `(app)` route group'ları ve `board/`, `task/`, `dashboard/`, `layout/` component domain'leri                                                   |
 | [api-conventions.md](api-conventions.md#hatalar)                       | Error metninin türediği problem-JSON şekli, ve `statusCode` üzerinden branch'leme kuralı                                                                                              |
-| [roadmap.md](roadmap.md#faz-3--boardlar-ve-columnlar)                  | Faz 3 token'ları, shell'i ve board chrome'unu getirir; Faz 4 drag etkileşimini ve detay panelini; Faz 5 priority ve label render'ını; Faz 7 grafikleri                                |
+| [roadmap.md](../archive/roadmap-mvp-phases.md)                         | Faz 3 token'ları, shell'i ve board chrome'unu getirir; Faz 4 drag etkileşimini ve detay panelini; Faz 5 priority ve label render'ını; Faz 7 grafikleri                                |
 | [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts — yukarıdaki her kuralın karşısında yazıldığı toolkit                                                                         |
 | [tech-stack.md](tech-stack.md)                                         | Neden o toolkit                                                                                                                                                                       |

@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { ColumnCategory, Priority } from '@kurultay/shared-types';
+import { ColumnCategory, Priority } from '@kurul/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   applyThroughputDayCounts,

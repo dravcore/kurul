@@ -1,8 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { CommentDto, WorkspaceMemberDto } from '@kurultay/shared-types';
-import { MemberRole } from '@kurultay/shared-types';
+import type { CommentDto, WorkspaceMemberDto } from '@kurul/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { TaskCommentsSection } from './task-comments-section';
 
@@ -19,14 +19,14 @@ const members = [
   member('m3', '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d53', 'Bora Kaya'),
 ];
 
-function comment(id: string, body: string): CommentDto {
+function comment(id: string, body: string, author: Partial<CommentDto['author']> = {}): CommentDto {
   return {
     id,
     taskId: 'task-1',
     userId: AYSE_ID,
     body,
     createdAt: '2026-01-01T00:00:00.000Z',
-    author: { id: AYSE_ID, name: 'Ayşe Yıldız', avatarUrl: null },
+    author: { id: AYSE_ID, name: 'Ayşe Yıldız', avatarUrl: null, deleted: false, ...author },
   };
 }
 
@@ -74,6 +74,26 @@ describe('TaskCommentsSection', () => {
    * reads as "nobody has commented" — which invites the author to conclude their comments
    * were deleted. The thread is unknown here, not empty.
    */
+  /**
+   * A comment survives its author's account, unnamed — the whole reason `Comment.user` is a
+   * `Restrict` foreign key and the row is anonymised rather than deleted (ADR 0026).
+   *
+   * **The fixture's stored name is deliberately not `Deleted user`.** In English the catalogue
+   * label and the stored tombstone are the same two words, so seeding the tombstone and
+   * asserting it appears is satisfied by a component that never reads the flag — it passed
+   * against a mutant `authorLabel` that always returned `author.name`. A different stored name
+   * is what makes this assertion mean "the label came from the catalogue".
+   */
+  it('renders a deleted author from the catalogue, and keeps the comment', () => {
+    renderSection({
+      comments: [comment('c1', 'Still worth reading', { name: 'Ayşe Yıldız', deleted: true })],
+    });
+
+    expect(screen.getByText(messages.common.deletedUser)).toBeDefined();
+    expect(screen.queryByText('Ayşe Yıldız')).toBeNull();
+    expect(screen.getByText('Still worth reading')).toBeDefined();
+  });
+
   it('reports a failed load instead of showing an empty thread', () => {
     renderSection({ loadFailed: true });
 

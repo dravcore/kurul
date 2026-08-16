@@ -1,6 +1,6 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { RolesGuard } from './roles.guard';
 import type { AuthedRequest } from '../types/request-context';
 

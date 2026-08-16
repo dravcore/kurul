@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemberRole, type CursorPage, type WorkspaceMemberDto } from '@kurultay/shared-types';
+import { MemberRole, type CursorPage, type WorkspaceMemberDto } from '@kurul/shared-types';
 import {
   WORKSPACE_MEMBER_PAGE_LIMIT,
   fetchAllWorkspaceMembers,

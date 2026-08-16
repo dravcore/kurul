@@ -1,9 +1,9 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import type { MemberRole, WorkspaceDto } from '@kurultay/shared-types';
+import type { MemberRole, WorkspaceDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 import { fetchOwnMembership } from '@/lib/member-query';
@@ -21,6 +21,16 @@ interface WorkspaceContextValue {
   retryBootstrap: () => void;
   onSwitch: (workspaceId: string) => Promise<void>;
   onSignOut: () => Promise<void>;
+  /**
+   * Folds a `PATCH /workspaces/:workspaceId` response back into `workspaces` by id.
+   *
+   * `RenameWorkspaceDialog` already has the updated `WorkspaceDto` in hand — the response body
+   * of the call it just made — so this never re-fetches. It exists at all because the name
+   * shown in `WorkspaceSwitcher` and the one shown in Settings both read the same `workspaces`
+   * array; without this, a rename would be visible on the settings row (which could hold its
+   * own local state) but stale in the switcher until the next full bootstrap.
+   */
+  renameActiveWorkspace: (workspace: WorkspaceDto) => void;
 }
 
 /**
@@ -109,16 +119,26 @@ export function WorkspaceProvider({
     }
   }, [bootstrapped, loadError, workspaces.length, pathname, router]);
 
+  // A second `onSwitch` fired before the first's `fetchOwnMembership` resolves must not let
+  // the first request's late reply land on the second's workspace. Each call stamps its own
+  // generation before awaiting anything; only the call that is still the latest one when its
+  // response arrives is allowed to write `activeRole`, mirroring the `moveGenerationRef`
+  // pattern `use-board-mutations.ts` uses to drop overtaken drag responses.
+  const switchGenerationRef = useRef(0);
+
   const onSwitch = useCallback(
     async (workspaceId: string): Promise<void> => {
+      const generation = ++switchGenerationRef.current;
       // Applied before the role is known so the rest of the shell re-scopes immediately; the
       // role follows a moment later rather than holding the whole switch behind one request.
       setBootstrap((current) => ({ ...current, activeId: workspaceId }));
       await authClient.organization.setActive({ organizationId: workspaceId });
       try {
         const membership = await fetchOwnMembership(workspaceId);
+        if (generation !== switchGenerationRef.current) return;
         setBootstrap((current) => ({ ...current, activeRole: membership.role }));
       } catch {
+        if (generation !== switchGenerationRef.current) return;
         setBootstrap((current) => ({ ...current, activeRole: null }));
       }
       router.refresh();
@@ -133,6 +153,18 @@ export function WorkspaceProvider({
     router.refresh();
   }, [router]);
 
+  const renameActiveWorkspace = useCallback(
+    (updated: WorkspaceDto): void => {
+      setBootstrap((current) => ({
+        ...current,
+        workspaces: current.workspaces.map((workspace) =>
+          workspace.id === updated.id ? updated : workspace,
+        ),
+      }));
+    },
+    [setBootstrap],
+  );
+
   const value = useMemo(
     (): WorkspaceContextValue => ({
       workspaces,
@@ -145,6 +177,7 @@ export function WorkspaceProvider({
       retryBootstrap,
       onSwitch,
       onSignOut,
+      renameActiveWorkspace,
     }),
     [
       workspaces,
@@ -157,6 +190,7 @@ export function WorkspaceProvider({
       retryBootstrap,
       onSwitch,
       onSignOut,
+      renameActiveWorkspace,
     ],
   );
 

@@ -1,6 +1,6 @@
 # Git Stratejisi
 
-Kurultay için branch modeli, commit convention'ı, PR süreci ve release prosedürü.
+Kurul için branch modeli, commit convention'ı, PR süreci ve release prosedürü.
 
 > 🌐 [English (canonical)](../git-strategy.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
@@ -17,13 +17,13 @@ Kurultay için branch modeli, commit convention'ı, PR süreci ve release prosed
 
 ## Branch modeli
 
-Kurultay **Git Flow** kullanır. İki branch kalıcıdır; geri kalan her şey kısa ömürlüdür ve
+Kurul **Git Flow** kullanır. İki branch kalıcıdır; geri kalan her şey kısa ömürlüdür ve
 merge sonrası silinir.
 
 | Branch      | Ömür        | Şuradan dallanır | Şuraya merge olur  | Amaç                                                                        |
 | ----------- | ----------- | ---------------- | ------------------ | --------------------------------------------------------------------------- |
 | `main`      | kalıcı      | —                | —                  | Yalnızca release edilmiş kod. Her commit etiketli (tagged) bir release'tir. |
-| `develop`   | kalıcı      | `main`           | —                  | Entegrasyon branch'i. Her zaman staging'e deploy edilebilir.                |
+| `develop`   | kalıcı      | `main`           | —                  | Entegrasyon branch'i. Her zaman ayağa kalkar (aşağıya bakın).               |
 | `feature/*` | kısa ömürlü | `develop`        | `develop`          | Yeni işlevsellik                                                            |
 | `fix/*`     | kısa ömürlü | `develop`        | `develop`          | Acil olmayan bug fix'leri                                                   |
 | `docs/*`    | kısa ömürlü | `develop`        | `develop`          | Yalnızca dokümantasyon değişiklikleri                                       |
@@ -42,6 +42,25 @@ feature          ●          └─ geri-merge
 
 ```
 
+**Staging ortamı yok.** Bu tablo eskiden `develop`'ın "her zaman staging'e deploy
+edilebilir" olduğunu söylüyordu; böyle bir dağıtım hiç var olmadı — bu depoda onu gösteren bir
+host, bir workflow veya bir secret yok (denetim bulgusu OPS-08). Hiçbir şeyin zorlamadığı
+duran bir iddia, iddiasızlıktan kötüdür; işte gerçekten kontrol edilen iddia: `develop`
+**ayağa kalkmalı** ve kontrolü herkesin kendi makinesinde çalıştırabileceği bir komut.
+
+```bash
+docker compose up -d --build
+docker compose ps -a                              # her servis ayakta; migrate Exited (0)
+curl -s http://localhost/api/health/ready         # {"status":"ok","checks":{…}}
+```
+
+Bu, `SITE_URL` varsayılan `http://localhost` değerinde bırakılmış haliyle bir self-host
+kullanıcısının çalıştırdığı stack'in ta kendisidir ([Self-hosting](self-hosting.md)); yani
+"ayağa kalkıyor", staging'e özgü bir yaklaşıklık üzerinde değil gerçek dağıtım biçimi üzerinde
+doğrulanır. CI bunu çalıştırmaz — pipeline build, lint, tip ve test yapar ve her pull request'te
+tam bir compose açılışı, yakaladığından fazlasına mal olur — bu da onu release zamanına ait bir
+adım yapar; [release sürecinin 4. adımıdır](#release-süreci).
+
 **`main` veya `develop`'a doğrudan commit yok.** Tüm iş onlara bir branch ve bir pull
 request üzerinden ulaşır. Bu maintainer'lar için de geçerlidir.
 
@@ -49,7 +68,16 @@ request üzerinden ulaşır. Bu maintainer'lar için de geçerlidir.
 `hotfix/*`'ten bir merge değilse, bir şeyler ters gitmiştir.
 
 `main` ve `develop` üzerindeki branch protection bunu zorunlu kılar: doğrudan push yok,
-pull request zorunlu. Zorunlu status check'ler Faz 1'de CI geldiğinde eklenir.
+pull request zorunlu. Zorunlu status check'ler [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) ile uygulanır.
+
+### Dependabot ve `main`
+
+Dependabot `main`'e değil, `develop`'a açmalıdır. Her iki ekosistem
+[`.github/dependabot.yml`](../../.github/dependabot.yml) içinde bu yüzden
+`target-branch: develop` ayarlıdır. Bağımlılık bump'larını doğrudan `main`'e merge etmek
+([#82](https://github.com/dravcore/kurul/pull/82)'de olduğu gibi) Git Flow'u atlar ve
+`develop`'ı CI config'te geride bırakır — tekrarlanmamalı. Bir Dependabot PR bir şekilde
+`main`'i hedefliyorsa, merge'den önce `develop`'a retarget edin.
 
 ## Branch adlandırma
 
@@ -156,9 +184,10 @@ insanlar tarafından okunur.
 1. Güncel bir `develop`'tan dallanın.
 2. PR'ı **`develop`'a karşı** açın (`hotfix/*` ve `release/*` dışında, asla `main`'e karşı
    değil).
-3. PR başlığı Conventional Commits'i takip eder — merge'ler merge commit (`--no-ff`) ile
-   yapılır, yani branch'teki commit'ler history'de tek tek kalır; PR açmadan önce onları
-   temiz tutun.
+3. PR başlığı Conventional Commits'i takip eder. Branch'teki commit'lerin history'de
+   kalması için merge commit (`--no-ff`) tercih edin; PR açmadan önce onları temiz tutun.
+   `develop`'a squash, gürültü (Dependabot, tek-commit chore) için serbesttir. `main`'e
+   squash asla serbest değildir — aşağıdaki Merge stratejisine bakın.
 4. PR'ları küçük ve tek sorumluluklu tutun: bir konu, tercihen lockfile'lar ve üretilen
    çıktı hariç ~500 değişen satırın altında. Mümkün olduğunda şema değişikliklerini logic
    değişikliklerinden, backend'i frontend'den ayırın.
@@ -176,16 +205,18 @@ olduğu anda tekrar devreye girer** ve bu paragraf o zaman silinir.
 
 ### Merge stratejisi
 
-| Merge                                                 | Strateji                     | Sebep                                                                           |
-| ----------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------- |
-| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Merge commit** (`--no-ff`) | Tek tek, incelenebilir commit'leri (ör. bir tech-debt dalgası) history'de korur |
-| `release/*` → `main`                                  | **Merge commit** (`--no-ff`) | Release'i history'de ayrı, geri alınabilir bir nokta olarak korur               |
-| `hotfix/*` → `main`                                   | **Merge commit** (`--no-ff`) | Aynı sebep                                                                      |
-| `main` → `develop` (geri-merge)                       | **Merge commit** (`--no-ff`) | Release/hotfix commit'lerini yeniden yazmadan geri taşır                        |
+| Merge                                                 | Strateji                                                                         | Sebep                                                               |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `feature/*`, `fix/*`, `docs/*`, `chore/*` → `develop` | **Merge commit** tercih; Dependabot / tek-commit gürültü için **squash serbest** | Anlamlı çok-commit history korunur; bot gürültüsü squash ile ezilir |
+| `release/*` → `main`                                  | **Yalnızca merge commit** (`--no-ff`)                                            | Release'i history'de ayrı, geri alınabilir bir nokta olarak korur   |
+| `hotfix/*` → `main`                                   | **Yalnızca merge commit** (`--no-ff`)                                            | Aynı sebep                                                          |
+| `main` → `develop` (geri-merge)                       | **Merge commit** (`--no-ff`)                                                     | Release/hotfix commit'lerini yeniden yazmadan geri taşır            |
 
-`develop` veya `main`'e her merge bir merge commit'tir — hiçbir şey squash edilmez. Fixup
-gürültüsünü PR açmadan **önce** branch üzerinde temizleyin (interactive rebase veya amend);
-history okunabilir hale geldiğinde onu squash etmek yerine olduğu gibi merge edin.
+`main`'e squash ve rebase yasaktır. `main` üzerindeki bir repository ruleset, izin verilen
+merge yöntemlerini merge commit ile sınırlar; böylece bir release/hotfix yanlışlıkla
+düzleştirilemez. `develop`'a squash Dependabot ve diğer tek-commit branch'ler için açık;
+insanların çok-commit işi hâlâ merge commit tercih eder. Fixup gürültüsünü PR açmadan
+**önce** branch üzerinde temizleyin (interactive rebase veya amend).
 
 Merge sonrası branch'i silin. GitHub'ın "delete branch on merge" ayarı bunu hallediyor.
 
@@ -208,14 +239,36 @@ git commit -am "chore(release): 0.2.0"
 # 3. Bu branch'e yalnızca release'i engelleyen fix'ler girebilir.
 #    Geri kalan her şey her zamanki gibi develop'a gitmeye devam eder.
 
-# 4. Bir PR aç: release/0.2.0 -> main. Bir merge commit ile (--no-ff) merge et.
+# 4. Bu branch'ten stack'i bir kez ayağa kaldır, sonra bir PR aç:
+#    release/0.2.0 -> main. Bir merge commit ile (--no-ff) merge et.
+#
+#    CI hiçbir şeyi ayağa kaldırmaz: kodu build eder, lint'ler, tiplerini ve
+#    testlerini kontrol eder — bunların hiçbiri artık başlamayan bir
+#    docker-compose.yml veya Caddyfile'ı fark etmez. Branch tablosundaki
+#    "her zaman ayağa kalkar" iddiasının arkasındaki kontrol budur ve bozuk
+#    olanı düzeltmenin hâlâ ucuz olduğu son nokta burasıdır.
+docker compose up -d --build
+docker compose ps -a                       # -a olmazsa tek seferlik migrate satırı gizlenir
+curl -s http://localhost/api/health/ready  # {"status":"ok","checks":{…}}
+docker compose down -v                     # -v: sonraki koşuya volume bırakma
 
-# 5. main üzerindeki merge commit'ini tag'le
+# 5. main üzerindeki merge commit'ini tag'le. Container imajlarını yayınlayan şey
+#    de budur (.github/workflows/release-images.yml) — tag yoksa imaj da yok ve
+#    docs/self-hosting.md'yi izleyen herkes için `docker compose pull` başarısız olur.
+#    Aynı koşu iki imajı cosign ile imzalar ve SBOM'larını üretir.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
 
-# 6. v0.2.0 tag'i için bir GitHub Release yayınla, body = 0.2.0 için CHANGELOG bölümü.
+# 6. Release images workflow'unun bitmesini bekle, sonra v0.2.0 tag'i için GitHub
+#    Release'i yayınla, body = 0.2.0 için CHANGELOG bölümü.
+#
+#    Workflow oraya önce varır ve dört SBOM asset'i çoktan eklenmiş bir TASLAK
+#    release bırakır — yani 6. adım normalde "release oluştur" değil, "body'yi
+#    doldur ve Publish'e bas" olur. Workflow bitmeden elle yayınlamak da hata
+#    değildir: o durumda asset'ler bulduğu release'e yüklenir, body'ye, başlığa
+#    ve taslak bayrağına hiç dokunulmaz. Yine de beklemek daha doğru sıradır —
+#    asset'ler bir release'in parçasıdır.
 
 # 7. Versiyon bump'ının ve herhangi bir release-branch fix'inin kaybolmaması için
 #    main'i develop'a geri-merge et.
@@ -260,6 +313,37 @@ Bunu çözen kural:
 `git config rerere.enabled true`'yu bir kez ayarlamaya değer — çözüm yapısal olarak her
 release'de aynı, ve rerere ilk seferden sonra bunu otomatik olarak tekrarlıyor.
 
+### Yayın yolunu prova etmek
+
+`release-images.yml` bir ön-sürüm tag'inde de (`vX.Y.Z-rc.N`, `-beta.N`, tirenin ardından ne
+gelirse) tetiklenir ve bunun tek bir sebebi vardır: workflow imaj yayınlar, cosign ile imzalar
+ve SBOM ekler — bunların **hiçbiri CI'da koşmaz**. Hiç çalışmamış bir workflow'un ilk koşusunu
+gerçek bir sürüm yapmak, sürümün kendisini teste dönüştürür.
+
+Dolayısıyla yayın yolu değiştiyse — yeni bir action major'ı, imzalama veya SBOM adımlarında bir
+değişiklik, yeni bir registry — 5. adımdan önce prova edin:
+
+```bash
+git tag -a v0.2.0-rc.1 -m "v0.2.0-rc.1"
+git push origin v0.2.0-rc.1
+```
+
+Prova gerçek bir yayındır: gerçek imajlar, gerçek imza, gerçek SBOM asset'leri, ve
+[self-hosting.md](self-hosting.md#çektiğiniz-imajı-doğrulamak)'daki `cosign verify` komutu
+ona karşı çalışır. Bilinçli olarak **yapmadığı** şey, birilerinin takip ettiği bir şeyi
+oynatmaktır: ön-sürümde `{{major}}.{{minor}}` ve `latest` atlanır, yani `TAG` ayarlamamış bir
+operatör etkilenmez; GitHub Release'i de hem draft hem ön-sürüm olarak işaretlenir.
+
+Provanın **kapsayamadığı** bir şey var ve `v0.2.0-rc.3`'te ölçüldü: `metadata-action` ön-sürümde
+yalnız çıplak `{{version}}` tag'ini üretiyor, yani `0.2.0-rc.3` yayınlanıyor, `v0.2.0-rc.3`
+yayınlanmıyor. `v` önekli tag — bu repodaki her pull komutunun operatöre pinlemesini söylediği
+biçim — dolayısıyla ancak gerçek bir sürümle sınanıyor. Merge job'ı, ön-sürüm olmayan her tag'de
+o biçimin üretildiğini doğruluyor; yani bir gerileme, 404 veren belgelenmiş bir komut yayınlamak
+yerine sürümü kırar. Ama bu doğrulama da ilk kez sürümü kestiğinizde koşar.
+
+Prova tag'i tek kullanımlıktır. Gerçek sürüm çıkınca tag'i ve release'ini silin; imajlar kendi
+`-rc` tag'leriyle registry'de kalır ve paket listesinde bir satırdan başka maliyeti olmaz.
+
 ## Hotfix süreci
 
 Bir sonraki release'i bekleyemeyecek, release edilmiş bir versiyondaki bir bug için.
@@ -279,12 +363,12 @@ yeniden ortaya çıkar.
 
 ## Versiyonlama politikası (SemVer)
 
-Kurultay, SemVer'ın garantilerinin 1.0 öncesi daha zayıf olduğu dürüst çekincesiyle
+Kurul, SemVer'ın garantilerinin 1.0 öncesi daha zayıf olduğu dürüst çekincesiyle
 [Semantic Versioning 2.0.0](https://semver.org/)'ı takip eder.
 
 **1.0 öncesi (`0.y.z`) — projenin şu anda bulunduğu yer:**
 
-- Public API (REST endpoint'leri, `@kurultay/shared-types`, `@kurultay/auth-access`,
+- Public API (REST endpoint'leri, `@kurul/shared-types`, `@kurul/auth-access`,
   veritabanı şeması, env değişken isimleri) **kararlı değildir**. Breaking değişiklikler
   herhangi bir `0.y.0`'da gelebilir.
 - `0.y.0` (MINOR): yeni özellikler **ve** breaking değişiklikler.
@@ -314,8 +398,8 @@ API versiyonlama duruşu (1.0 öncesi `/v1` öneki yok)
 | PR hedef branch'i                    | `develop` (`main`'e giden `release/*` ve `hotfix/*` hariç) |
 | Commit dili                          | İngilizce                                                  |
 | Commit formatı                       | Conventional Commits                                       |
-| Feature merge'i                      | Merge commit (`--no-ff`)                                   |
-| Release/hotfix merge'i               | `--no-ff` + `develop`'a geri-merge                         |
+| Feature → `develop`                  | Merge commit tercih; Dependabot/gürültü için squash OK     |
+| Release/hotfix → `main`              | Yalnızca merge commit + `develop`'a geri-merge             |
 | Tag formatı                          | `vX.Y.Z`                                                   |
 | Changelog                            | Release zamanında değil, PR'da güncellenir                 |
 

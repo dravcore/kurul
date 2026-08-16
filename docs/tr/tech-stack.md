@@ -1,9 +1,13 @@
 # Teknoloji Stack'i
 
-Kurultay'ın her katmanı için seçilen teknoloji, kısa bir gerekçe ve karşılaştırıldığı
+Kurul'un her katmanı için seçilen teknoloji, kısa bir gerekçe ve karşılaştırıldığı
 alternatif.
 
 > 🌐 [English (canonical)](../tech-stack.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+
+**Pin’ler.** Aşağıdaki major’lar ve ürün seçimleri kalıcı kararlardır. Tam sürümler kayar;
+bugün neyin kurulu olduğu için kök ve app `package.json` / `pnpm-lock.yaml` kaynağıdır.
+Mimari şekil: [architecture.md](architecture.md).
 
 ## İçindekiler
 
@@ -32,6 +36,8 @@ alternatif.
 | Grafik                 | Recharts                               | Chart.js, Apache ECharts                |
 | Auth                   | Better Auth (organization plugin)      | Auth.js / NextAuth (bakım modunda)      |
 | E-posta                | SMTP üzerinden `nodemailer`            | Sağlayıcı API'si (Resend, SendGrid, …)  |
+| Dosya yükleme          | `multer` + `file-type` magic byte'ları | Beyan edilen `Content-Type`'a güvenmek  |
+| Reverse proxy          | Caddy (tek origin, otomatik HTTPS)     | nginx, Traefik                          |
 | Deployment             | Docker Compose                         | Kubernetes (ölçek gerektirdiğinde)      |
 
 Mimari (monorepo + modüler monolit) ayrı olarak [architecture.md](architecture.md)'de ele
@@ -69,7 +75,7 @@ edilmiş bir `PGDATA` volume'üne karşı başlamayı reddediyor
 ([development.md](development.md#yükseltme-ve-yedekleme)). Bunu şimdi, hiçbir veri yokken
 yapmak bedava. **Redis 8** bir versiyon kadar bir lisans tercihi de: 7.4–7.8 bandı yalnızca
 RSALv2/SSPLv1, ki bu source-available ve OSI açık kaynak değil, ve Redis 8 bir OSI seçeneğini
-geri getirdi — AGPLv3, Kurultay'ın kendisinin altında dağıtıldığı lisansla aynı. Stack'i
+geri getirdi — AGPLv3, Kurul'un kendisinin altında dağıtıldığı lisansla aynı. Stack'i
 yeniden dağıtan bir self-hoster, sormadığı bir lisans sorusu miras almıyor. Valkey
 (BSD-3-Clause, Linux Foundation'ın Redis 7.2.4 fork'u) protokol uyumlu ve aşağı akışta
 izinli bir lisans gerekirse tek satırlık bir imaj değişimi olarak duruyor.
@@ -95,7 +101,7 @@ bir serverless problemini çözüyor.
 
 ### Drag & drop — @dnd-kit
 
-`react-beautiful-dnd` deprecated — Atlassian projeden çekildi. Kurultay **klasik `@dnd-kit`
+`react-beautiful-dnd` deprecated — Atlassian projeden çekildi. Kurul **klasik `@dnd-kit`
 hattını** kullanıyor (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0, pinlenmiş): MIT,
 ~6 KB çekirdek, erişilebilir (klavye ve ekran okuyucu), framework-agnostik ve en yaygın
 kullanılan React drag-and-drop kütüphanesi. Aynı zamanda **donmuş** — Aralık 2024'ten beri
@@ -136,7 +142,7 @@ register UI'ının bizim yazmamız gerektiğini unutma.
 
 ### E-posta — SMTP üzerinden nodemailer
 
-Kurultay bugüne kadar tek bir sınıf e-posta gönderiyor: `better-auth`'un sağlamlaştırılmış
+Kurul bugüne kadar tek bir sınıf e-posta gönderiyor: `better-auth`'un sağlamlaştırılmış
 davet-kabul kontrolünün bir davet edilenin workspace'e katılmasına izin vermeden önce
 ihtiyaç duyduğu doğrulama linki (bkz.
 [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
@@ -156,16 +162,31 @@ asla gerçek mail göndermemesi için lokal bir SMTP catch-all olarak
 
 ### i18n — next-intl
 
-`next-intl`, Faz 1'den beri kurulu — her kullanıcıya görünen metin hardcode edilmek yerine
-`useTranslations()` / `messages/en.json` üzerinden geçiyor — yani locale şu an `en` olarak
-sabitlenmiş ve henüz bir locale switcher olmasa da (MVP İngilizce-only, bkz.
-[roadmap.md — MVP ötesi](roadmap.md#mvp-ötesi)) uygulama çeviriye hazır. Alternatif, string'ler
-component ağacına zaten yayıldıktan sonra i18n'i sonradan eklemekti; bu daha pahalı bir sıra.
+`next-intl`, Faz 1'den beri kurulu — kullanıcıya görünen metinler `useTranslations()` /
+`messages/<locale>.json` üzerinden geçer. Locale çözümü
+`User.locale → locale cookie → Accept-Language → 'en'`
+([ADR 0018](decisions/0018-localization-strategy.md)); **Ayarlar → Dil** tercih veya
+“Tarayıcımı izle” seçebilir. Katalog hâlâ yalnızca İngilizce — ek UI dil paketleri
+[MVP ötesi](roadmap.md#mvp-ötesi).
+
+### Dosya yükleme — `multer` + `file-type`
+
+`multipart/form-data` alan iki uç var: ek yükleme ve Trello import'u. İkisini de `multer`
+okuyor; global değil modül başına kayıtlı, çünkü her biri kendi byte tavanını taşıyor — ek
+tavanı bir disk tavanı, import tavanı bir heap tavanı, ve import ek'leri kapalı bir instance'ta
+da çalışmak zorunda. `file-type` yüklenen dosyanın **magic byte**'larını okur: beyan edilen
+`Content-Type` de dosya uzantısı da çağırandan gelir ve ikisi de kanıt değildir; satıra ve
+sonra indirme header'ına yazılan tip, sniff edilmiş olandır
+([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Düz metnin magic number'ı
+yoktur ve bilinçli olarak dar tutulmuş tek istisnadır; ayrıntısı
+[api-conventions.md](api-conventions.md#dosya-yükleme-ve-indirme) içinde.
 
 ### Deployment — Docker Compose
 
-Dört servis — `api`, `web`, `postgres`, `redis` — mevcut self-managed Linux sunucu
-kurulumuyla eşleşiyor. Ölçek gerektirdiğinde Kubernetes'e giden yol açık kalıyor (hem
+Yedi servis: ürünü taşıyan dördü — `api`, `web`, `postgres`, `redis` — artı `proxy` (Caddy;
+port yayınlayan tek servis, TLS'i sonlandırır ve tüm stack'i tek origin'den sunar), `migrate`
+(tek seferlik `prisma migrate deploy`) ve `backup` (`pg_dump` sidecar'ı; ek volume'ünü de
+arşivler). Bu, mevcut self-managed Linux sunucu kurulumuyla eşleşiyor. Ölçek gerektirdiğinde Kubernetes'e giden yol açık kalıyor (hem
 ClickUp hem Linear sonunda oraya vardı), ama şimdilik tek bir host'ta Compose doğru
 büyüklük.
 
@@ -173,14 +194,14 @@ büyüklük.
 
 ## 3. Bilinçli olarak dahil edilmeyenler
 
-| Teknoloji               | Neden şimdi değil                                                                                                 |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Kafka                   | ClickUp kullanıyor, ama 20M+ kullanıcı ölçeğinde. Redis pub/sub MVP için fazlasıyla yeterli; sonradan eklenebilir |
-| GraphQL                 | Linear kullanıyor. REST'le başlamak daha hızlı; API tüketicileri çeşitlendiğinde yeniden değerlendirilir          |
-| Elasticsearch           | Tam metin arama PostgreSQL'in yerleşik FTS'iyle başlayabilir                                                      |
-| Kubernetes              | Tek bir host'ta Docker Compose yeterli. Trafik gerektirdiğinde geçiş yapılır                                      |
-| MinIO / S3              | Dosya ekleri MVP kapsamı dışında. Eklendiğinde S3-uyumlu bir store seçilir                                        |
-| Local-first sync engine | Linear'ın en büyük teknik yatırımı. Çok yüksek karmaşıklık — server-first ile başla                               |
+| Teknoloji               | Neden şimdi değil                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kafka                   | ClickUp kullanıyor, ama 20M+ kullanıcı ölçeğinde. Redis pub/sub MVP için fazlasıyla yeterli; sonradan eklenebilir                                                                                                                                                                                                                                                     |
+| GraphQL                 | Linear kullanıyor. REST'le başlamak daha hızlı; API tüketicileri çeşitlendiğinde yeniden değerlendirilir                                                                                                                                                                                                                                                              |
+| Elasticsearch           | Tam metin arama PostgreSQL'in yerleşik FTS'iyle başlayabilir                                                                                                                                                                                                                                                                                                          |
+| Kubernetes              | Tek bir host'ta Docker Compose yeterli. Trafik gerektirdiğinde geçiş yapılır                                                                                                                                                                                                                                                                                          |
+| MinIO / S3              | Ekler **yerel diskte, bir `StorageBackend` port'unun arkasında** geliyor; object storage üzerinde değil ([ADR 0022](decisions/0022-attachment-storage.md)). `S3StorageBackend` bir takvime değil, bir tetikleyiciye ertelendi: yerel diskin dayanıklı olmadığı bir dağıtımın ilk operatör raporu — kalıcı olmayan bir container host, ya da çok replikalı bir kurulum |
+| Local-first sync engine | Linear'ın en büyük teknik yatırımı. Çok yüksek karmaşıklık — server-first ile başla                                                                                                                                                                                                                                                                                   |
 
 ---
 
@@ -200,25 +221,7 @@ Mimari ve veri modelleme için incelemeye değer projeler:
 
 ## 5. Karar kayıtları
 
-Tam argümanlar ve sonuçlar burada tekrarlanmak yerine [`decisions/`](decisions/) altında
-yaşıyor:
+Stack ve ürün ADR'leri [decisions/README.md](decisions/README.md) indeksinde (0001–0019).
+Tabloyu burada çoğaltmak yerine oradan başlayın.
 
-| ADR                                                                                            | Konu                                                              |
-| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modüler monolit                                        |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                    |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts           |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Organization plugin'i ile Better Auth (→ Workspace)               |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                                         |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Sıralama için Float position'lar                                  |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                          |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                                 |
-| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board ve column rol matrisi (OWNER/ADMIN yapısı)                  |
-| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task rol matrisi (MEMBER+ içerik işi)                             |
-| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label ve task-metadata rol matrisi                                |
-| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Yorum silme: yazarlık veya OWNER/ADMIN                            |
-| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde |
-| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Çift lisanslama + katkıda bulunan lisans sözleşmesi               |
-| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)             | Dış katkı yok; CLA yürürlükte değil, hukuk masrafı ertelendi      |
-
-İlgili: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)
+İlgili: [architecture.md](architecture.md) · [../archive/project-skeleton.md](../archive/project-skeleton.md) (tarihsel Faz 1 iskeleti)

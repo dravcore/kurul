@@ -1,5 +1,6 @@
-import { io, type Socket } from 'socket.io-client';
+import { io, type ManagerOptions, type Socket, type SocketOptions } from 'socket.io-client';
 import { getApiBaseUrl } from '@/lib/api';
+import { isSameOriginApiBaseUrl } from '@/lib/api-url';
 
 /**
  * One socket per tab, shared by every hook that needs the realtime feed.
@@ -58,18 +59,41 @@ function onReconnectFailed(): void {
   }, RECONNECT_COOLDOWN_MS);
 }
 
+const CONNECT_OPTIONS: Partial<ManagerOptions & SocketOptions> = {
+  autoConnect: false,
+  withCredentials: true,
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: RECONNECT_ATTEMPTS,
+  reconnectionDelay: RECONNECT_DELAY_MS,
+  reconnectionDelayMax: RECONNECT_DELAY_MAX_MS,
+  randomizationFactor: RECONNECT_RANDOMIZATION_FACTOR,
+};
+
+/**
+ * Builds the client for whichever of the two API topologies this build was configured for
+ * (`lib/api-url.ts`).
+ *
+ * The same-origin branch cannot be expressed by passing the base as the URL: socket.io reads
+ * a leading-slash string as a *namespace*, so `io('/api')` would silently connect to
+ * namespace `/api` on this origin over the default `/socket.io` path — a handshake the server
+ * answers with "Invalid namespace" rather than an obvious wiring error. The engine's HTTP
+ * path is a separate option, and it is the one the reverse proxy routes on, so the URL is
+ * omitted (socket.io then uses `window.location`) and the prefix goes into `path` instead.
+ * The API keeps socket.io mounted at its own default `/socket.io`; the proxy strips the
+ * `/api` prefix before forwarding, so neither side has to be told about the other's mount
+ * point.
+ */
+function createSocket(): Socket {
+  const base = getApiBaseUrl();
+  return isSameOriginApiBaseUrl(base)
+    ? io({ ...CONNECT_OPTIONS, path: `${base}/socket.io` })
+    : io(base, CONNECT_OPTIONS);
+}
+
 export function getSocket(): Socket {
   if (!socket) {
-    socket = io(getApiBaseUrl(), {
-      autoConnect: false,
-      withCredentials: true,
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: RECONNECT_ATTEMPTS,
-      reconnectionDelay: RECONNECT_DELAY_MS,
-      reconnectionDelayMax: RECONNECT_DELAY_MAX_MS,
-      randomizationFactor: RECONNECT_RANDOMIZATION_FACTOR,
-    });
+    socket = createSocket();
     socket.io.on('reconnect_failed', onReconnectFailed);
   }
   return socket;

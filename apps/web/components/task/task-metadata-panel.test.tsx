@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { toast } from 'sonner';
-import { Priority, type TaskDto } from '@kurultay/shared-types';
+import { Priority, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1e00';
@@ -55,6 +55,9 @@ const task: TaskDto = {
   estimatedMinutes: null,
   assignees: [],
   labels: [],
+  checklistSummary: { total: 0, done: 0 },
+  checklists: null,
+  attachmentCount: 0,
   createdById: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1e05',
   createdAt: '2026-08-12T09:00:00.000Z',
   updatedAt: '2026-08-12T09:00:00.000Z',

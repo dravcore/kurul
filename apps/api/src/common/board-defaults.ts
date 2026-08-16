@@ -1,7 +1,7 @@
 /**
  * The column vocabulary a fresh board starts with, per locale.
  *
- * **Why this is API-side and not in `@kurultay/shared-types`.** These names are data the API
+ * **Why this is API-side and not in `@kurul/shared-types`.** These names are data the API
  * writes on the user's behalf, not interface text. ADR 0018 §3 draws the line by renameability:
  * a user can rename a column, so its name is user data — seeded once in the creator's language
  * and owned by the board from then on. Interface text is re-rendered from a catalog in each
@@ -19,7 +19,7 @@
  * See docs/decisions/0018-localization-strategy.md and
  * docs/decisions/0019-column-category.md.
  */
-import { ColumnCategory, type Locale } from '@kurultay/shared-types';
+import { ColumnCategory, type Locale } from '@kurul/shared-types';
 
 /**
  * Seed column for a new board; `position` is Float (fractional indexing), never Int.
@@ -59,6 +59,11 @@ type SeedColumnKey = (typeof SEED_COLUMNS)[number]['key'];
  */
 const SEED_COLUMN_NAMES: Record<Locale, Record<SeedColumnKey, string>> = {
   en: { todo: 'To Do', inProgress: 'In Progress', done: 'Done' },
+  // `Bitti` is the case ADR 0019 was written around: it never matches `'done'`, and nothing
+  // here tries to — the category on the row above carries the meaning, so a board seeded in
+  // Turkish reports throughput exactly like one seeded in English. Short forms on purpose;
+  // these render as column headers, the tightest slot in the product.
+  tr: { todo: 'Yapılacak', inProgress: 'Devam Ediyor', done: 'Bitti' },
 };
 
 /**

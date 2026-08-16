@@ -92,9 +92,8 @@ model Column {
   `apps/api/src/common/board-defaults.ts` as `defaultColumnsFor(locale)`, once the web stopped
   seeding columns itself. The category still travels with each seed column; only its home
   changed.
-- **The web needs a way to set a column's category** — otherwise a user's own "Shipped" column
-  can never count as done, and the original defect is only half fixed. This is a follow-up, but
-  it is required before this ADR delivers its value, not optional polish.
+- **The web exposes column category in column settings** — otherwise a user's own "Shipped"
+  column can never count as done. Shipped in `column-settings-dialog.tsx`.
 - A board may legitimately have more than one `COMPLETED` column (for example "Shipped" and
   "Won't Do" split apart later). Metrics must treat completion as a set of columns, not a
   single row. The old name matching had the same property via `mode: 'insensitive'`, so this is

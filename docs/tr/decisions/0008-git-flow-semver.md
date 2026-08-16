@@ -7,7 +7,7 @@
 
 ## Bağlam
 
-Kurultay, tek bir hosted SaaS instance'ını sürekli deploy etmek yerine, self-hosted bir ürünün versiyonlanmış release'lerini yayınlıyor. Branching modelinin, commit konvansiyonunun ve versiyonlama şemasının bu release şekline uyması gerekiyor.
+Kurul, tek bir hosted SaaS instance'ını sürekli deploy etmek yerine, self-hosted bir ürünün versiyonlanmış release'lerini yayınlıyor. Branching modelinin, commit konvansiyonunun ve versiyonlama şemasının bu release şekline uyması gerekiyor.
 
 ## Karar
 
@@ -19,7 +19,7 @@ Kurultay, tek bir hosted SaaS instance'ını sürekli deploy etmek yerine, self-
 - Conventional Commits, ileride changelog ve release otomasyonunu tetikleyebilecek yapılandırılmış bir commit geçmişi üretiyor.
 - SemVer, versiyonlar arasında yükselen self-hoster'lara uyumluluk beklentilerini iletiyor.
 - Keep a Changelog, `CHANGELOG.md`'yi insan-okunabilir ve tutarlı biçimde yapılandırılmış tutuyor (Added / Changed / Fixed / vb.).
-- **Emsallerden bilinçli sapma:** birçok büyük OSS proje, `CHANGELOG.md`'yi atlayıp yalnızca GitHub Releases'e güveniyor. Kurultay ikisini bilinçli olarak senkron tutuyor — repodaki bir changelog dosyası, clone'larından çıkmadan geçmişi tarayan self-hoster'lar için daha erişilebilir.
+- **Emsallerden bilinçli sapma:** birçok büyük OSS proje, `CHANGELOG.md`'yi atlayıp yalnızca GitHub Releases'e güveniyor. Kurul ikisini bilinçli olarak senkron tutuyor — repodaki bir changelog dosyası, clone'larından çıkmadan geçmişi tarayan self-hoster'lar için daha erişilebilir.
 - Maintainer'ın mevcut ev stiliyle eşleşiyor: `main`/`develop` artı tipli branch önekleri (`feature/`, `fix/`, `docs/`, `chore/`, `release/`, `hotfix/`) zaten maintainer'ın kendi repolarında kullanılan desen, süreç-değiştirme maliyetini en aza indiriyor.
 
 ## Sonuçlar

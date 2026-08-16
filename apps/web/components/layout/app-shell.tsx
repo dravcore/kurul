@@ -17,9 +17,11 @@ function AppShellFrame({
 
   if (sessionPending || !hasSession || !bootstrapped) {
     return (
-      <div className="flex min-h-screen bg-background" aria-busy>
+      <div className="flex h-dvh overflow-hidden bg-background" aria-busy>
         <p className="sr-only">{t('shell.loading')}</p>
-        <div className="hidden w-[var(--sidebar-width)] shrink-0 flex-col gap-2 border-r border-border bg-card p-3 lg:flex">
+        {/* `md:flex`, matching `AppSidebar`: the skeleton used to appear only from `lg` up, so
+            between 768px and 1024px the shell painted with no sidebar and then grew one. */}
+        <div className="hidden w-[var(--sidebar-width)] shrink-0 flex-col gap-2 border-r border-border bg-card p-3 md:flex">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="mt-4 h-9 w-full" />
           <Skeleton className="h-9 w-2/3" />
@@ -40,7 +42,7 @@ function AppShellFrame({
 
   if (loadError) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+      <div className="flex h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-body text-destructive">{loadError}</p>
         <Button type="button" onClick={retryBootstrap}>
           {t('shell.retry')}
@@ -50,9 +52,46 @@ function AppShellFrame({
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    /**
+     * `h-dvh overflow-hidden`, not `min-h-screen` — this is the fix for issue #184.
+     *
+     * `min-h-screen` says "at least the viewport" and puts no ceiling on anything below it.
+     * With nothing bounded, a column's `overflow-y-auto` had nothing to clip against and never
+     * scrolled: the *document* grew instead. Measured on a board seeded with 1 000 tasks, the
+     * document reached 27 425px and the reader scrolled the page past a column header that was
+     * `sticky` to a box it had already left. Per-column scrolling — which is most of what makes
+     * a Kanban board readable, and what `docs/design.md` §4 says a column is — did not exist.
+     *
+     * Fixing it here rather than in `components/board/**` is the point: every link in the chain
+     * below this one already declares its bound (`main` is `min-h-0`, the board is `h-full
+     * min-h-0`, the canvas is `min-h-0 flex-1`, the column's card list is `flex-1
+     * overflow-y-auto`). They were all correct and all inert, because the topmost link opted
+     * out. One `min-h` was holding the whole chain open.
+     *
+     * `dvh` and not `vh`: on a phone `100vh` is the viewport with the browser chrome
+     * *retracted*, so a `vh`-sized shell is taller than what is on screen and the topbar is
+     * pushed under the address bar on first paint.
+     *
+     * The trade this makes is deliberate: the document no longer scrolls anywhere in the app,
+     * so every page owns its own scroll container. The three non-board pages already did
+     * (`flex-1 overflow-y-auto` on dashboard, settings and notifications) — they were written
+     * for a bounded shell that had not been built yet.
+     */
+    <div className="flex h-dvh overflow-hidden bg-background">
       <AppSidebar />
-      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+      {/* Skip-link target (see app/(app)/layout.tsx): tabIndex={-1} lets the fragment
+          navigation move keyboard focus here without adding a tab stop.
+
+          `min-h-0` is what passes the bound on: a flex child's default `min-height: auto`
+          refuses to shrink below its content, which would have let the board push `main`
+          taller than the shell and re-opened the chain one level down. */}
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="flex min-h-0 min-w-0 flex-1 flex-col outline-none"
+      >
+        {children}
+      </main>
     </div>
   );
 }

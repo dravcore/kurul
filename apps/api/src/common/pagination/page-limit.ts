@@ -1,4 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
@@ -29,12 +30,26 @@ export function clampLimit(
 /**
  * The `limit` field of a cursor page query: clamped on the way in, then re-validated so a
  * future change to `clampLimit` cannot silently widen the contract.
+ *
+ * `ApiPropertyOptional` is here rather than on each query DTO, and it is not decoration. Every
+ * DTO that uses this decorator declares the field with an initializer (`limit = 50`) and no
+ * `?`, so the Swagger CLI plugin — which reads the TypeScript type, not the class-validator
+ * decorators — infers a **required** query parameter. That is wrong on all four cursor lists:
+ * `IsOptional()` two lines below is the truth. Correcting it once here means a fifth list
+ * cannot get it wrong, and `required: false` in the generated spec now has the same single
+ * source as the validation.
  */
 export function PageLimit(
   fallback: number = DEFAULT_PAGE_LIMIT,
   max: number = MAX_PAGE_LIMIT,
 ): PropertyDecorator {
   return applyDecorators(
+    ApiPropertyOptional({
+      description: `Page size. Absent or unusable falls back to ${fallback}; anything above ${max} is clamped, not rejected.`,
+      minimum: 1,
+      maximum: max,
+      default: fallback,
+    }),
     IsOptional(),
     Transform(({ value }) => clampLimit(value, fallback, max)),
     Type(() => Number),

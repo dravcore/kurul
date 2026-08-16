@@ -25,7 +25,7 @@ const locale = 'en';
 Yani asıl karar "hangi kütüphane" değil, o satırın ertelediği üç soru: locale nasıl seçilecek,
 tercih nerede yaşayacak ve mesaj kataloğunda değil veritabanında duran metinlere ne olacak?
 
-Cevabı iki kısıt şekillendiriyor. Birincisi, Kurultay'daki her sayfa kimlik doğrulama arkasında
+Cevabı iki kısıt şekillendiriyor. Birincisi, Kurul'daki her sayfa kimlik doğrulama arkasında
 — indekslenecek içerik yok ve bir tanıtım ya da dokümantasyon sitesi yapılırsa bu Next.js
 uygulamasının dışında yaşayacak. İkincisi, `apps/api` tarafında hiç locale farkındalığı yok:
 hatalar sabit kodlar ve bir HTTP durumu olarak dönüyor, web bunları `resolveApiMessage` ile
@@ -60,7 +60,7 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
 ## Gerekçe
 
 - `[locale]` yol parçasının tek gerçek getirisi SEO'dur: her dil için ayrı URL artı `hreflang`.
-  Kurultay'da indekslenen hiçbir şey yok, dolayısıyla bu getiri geçerli değil; ona ihtiyaç
+  Kurul'da indekslenen hiçbir şey yok, dolayısıyla bu getiri geçerli değil; ona ihtiyaç
   duyacak tanıtım sitesinin de başka yerde yaşaması planlanıyor.
 - Yol parçasının maliyeti ise anında ve eksiksiz ödenir: tüm `app/` ağacı `app/[locale]/`
   altına taşınır ve her `<Link>` ile `router.push` next-intl'in locale-farkında
@@ -104,7 +104,7 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
   anahtar olarak da ortaya çıkmaz.
 - API daha önce hiç sahip olmadığı küçük bir locale farkındalığı — `Accept-Language` okuma —
   kazanır. Bu, veritabanı tohumlaması ve e-posta ile sınırlıdır.
-- **Tohum kolon adları `@kurultay/shared-types`'ta değil API'de yaşar.** §3 bunu açık bıraktığı
+- **Tohum kolon adları `@kurul/shared-types`'ta değil API'de yaşar.** §3 bunu açık bıraktığı
   için uygulama sırasında karara bağlandı. Bu adlar API'nin kullanıcı adına yazdığı veridir ve
   web tohumlamayı bıraktığı anda — `POST …/columns/defaults` onun üç istekli döngüsünün yerini
   aldı — API tek yazıcı hâline geldi. Paylaşılan bir kopya, tarayıcının hiç render etmediği bir
@@ -112,14 +112,49 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
   `SUPPORTED_LOCALES`'tir; o gerçekten sınırı geçer: web seçiciyi ondan üretir, API `PATCH /me`'yi
   ona karşı doğrular. Tohum listesinin yapısal yarısı (position, `ColumnCategory`) adlardan ayrı
   tutulur, böylece bir çeviri bir kolonu yerinden oynatamaz veya anlamını değiştiremez.
-- Bir dil eklemek `SUPPORTED_LOCALES`'e yapılan bir değişiklik, artı ardından derlenmeyi
-  reddeden iki yerdir: API'nin tohum adları `Record<Locale, …>`'ı ve eksik
-  `messages/<tag>.json`. Veri migration'ı yok, `User.locale` backfill'i yok — sütun nullable
-  kalır ve null "tarayıcıyı izle" demeye devam eder.
+- Bir dil eklemek `SUPPORTED_LOCALES`'e yapılan bir değişiklik, artı ardından kendiliğinden
+  patlayan üç yerdir: API'nin tohum adları `Record<Locale, …>`'ı ve mail metinleri
+  `Record<Locale, …>`'ı derlenmeyi bırakır, `messages/<tag>.json` ise var olup İngilizce ile
+  key key eşleşene kadar katalog parity testini düşürür. Veri migration'ı yok, `User.locale`
+  backfill'i yok — sütun nullable kalır ve null "tarayıcıyı izle" demeye devam eder.
 - `GET /me`, `User.locale`'i session'dan değil veritabanından okur. Better Auth session
   kullanıcısını beş dakika boyunca bir çerezde önbelleğe alır ve web'in zinciri `/me`'ye
   başvurur; session'da taşınan bir locale, kullanıcı dili değiştirdikten sonra arayüzü beş
   dakikaya kadar eski dilde bırakırdı.
+- **§4'ün koşulu karşılandı: Türkçe geldi.** İngilizce arayüz tamamlandığı için
+  `messages/tr.json` onun karşısına yazıldı — 486 key, aynı key kümesi, aynı ICU argümanları.
+  Tohum kolon adları bir `tr` satırı kazandı (`Yapılacak / Devam Ediyor / Bitti`) ve iki
+  transactional e-posta da artık alıcının dilinde yazılıyor. İngilizce kanonik kalır: yeni bir
+  metnin eklendiği dosya hâlâ `en.json`'dır ve Türkçe katalog ona göre ölçülür.
+- **Rol adları arayüzde çevrilir (`Sahip / Yönetici / Üye / Misafir`), `docs/tr/**` içinde ise
+  İngilizce kalır (`owner'ından`, `admin'e`) — bu bir drift değil, bilinçli bir ayrım.** Doküman
+  `OWNER`/`ADMIN` enum değerlerinden ve `@kurul/auth-access` rol tanımlayıcılarından söz eder
+  ve bunlar hiç çevrilmez; arayüzdeki rozet ise bir insanın okuduğu bir kelimedir.
+- **"%100 çevrildi" bir iddia değil, bir kapıdır.** `apps/web/messages/catalog.test.ts`,
+  `en.json`'da olup başka bir katalogda olmayan bir key'de, başka bir katalogda olup
+  İngilizce'de olmayan bir key'de ve ICU argümanları iki dosya arasında farklılaşan bir mesajda
+  build'i düşürür. Sabit bir `['tr']` yerine `SUPPORTED_LOCALES`'i okur; böylece üçüncü dil,
+  ilan edildiği gün kapının arkasına girer. Bunu başka hiçbir şey yakalayamaz: next-intl eksik
+  bir mesajı çalışma zamanında ham key yoluna çözer, dolayısıyla yarım çevrilmiş bir locale
+  derlenir, tip kontrolünden geçer ve kullanıcıya `app.board.column.deleteAction` gösterir.
+- **Giden e-posta, ortada bir request yokken bir dil çözer ve zinciri arayüzünkinden bir halka
+  uzundur.** §2 yalnızca "ve giden e-posta için" dediği için bu, uygulama sırasında karara
+  bağlandı. Zincir şu: `alıcının User.locale'i → gönderenin User.locale'i → tetikleyen
+request'in Accept-Language'i → 'en'` (`apps/api/src/mail/recipient-locale.ts`). Karar olan
+  halka ortadaki: bir davet, bu instance'ta hiç hesabı olmayan bir adrese gidebilir, dolayısıyla
+  okunacak bir tercihi yoktur. Bu kişileri İngilizce'ye düşürmek yerine davet, onu gönderen
+  kişinin dilinde yazılır — bu alışverişte dili bilinen tek insan odur, o adrese yazmayı o
+  seçmiştir ve davet zaten onun adını vererek dilini ele verir. Doğrulama e-postasında ise
+  eyleyen ile alıcı aynı yeni hesaptır, yani zincir kayıt oldukları tarayıcıya iner. Başarısız
+  bir okuma bir sonraki halkaya düşer ve loglanır; kendisini tetikleyen kaydı ya da daveti asla
+  düşürmez.
+- **Mail metinleri, tohum adlarıyla aynı gerekçeyle API'de bir `Record<Locale, …>`'dır.** Arayüz
+  metni değildir — hiçbir şey onu bir izleyicinin dilinde yeniden render etmez — ve
+  `SUPPORTED_LOCALES`'e eklenen bir dil, e-posta metinleri var olana kadar derlenmez; böylece
+  bir locale, arayüzü çevrilmiş ama e-postası İngilizce halde gelemez. Bunu format string'leri
+  değil fonksiyonlar tablosu yapan şey kelime sırasıdır: Türkçe workspace adını fiilden önce,
+  fiili en sona koyar; ortak bir `{inviter} invited you to {workspace}` şablonu dillerden birini
+  diğerinin gramerine zorlardı.
 
 ## Değerlendirilen alternatifler
 

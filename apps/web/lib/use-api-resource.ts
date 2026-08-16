@@ -12,21 +12,45 @@ import {
 export interface ApiResource<T> {
   data: T;
   loading: boolean;
-  /** The caller's message, set on any failure; `null` while the last load succeeded. */
+  /**
+   * The caller's message, set on any failure; `null` while the last load succeeded, and
+   * `null` throughout when the caller passed no message. Read {@link ApiResource.failed} to
+   * ask whether the load failed — this field answers what to *say* about it, not whether.
+   */
   error: string | null;
+  /**
+   * Whether the last load failed, independent of whether there is a message for it.
+   *
+   * A caller that renders its own copy — because one message cannot describe what several
+   * emptied lists now mean — needs the fact without the sentence. Before this existed such a
+   * caller had to invent a message solely to compare it against `null`, which put a string in
+   * the catalogue that nothing ever displayed and that the next translator would have paid to
+   * translate.
+   */
+  failed: boolean;
   /** Refetch without remounting — for a retry button or an external change. */
   reload: () => void;
   /** Local edits (optimistic insert, remove) without a round trip. */
   setData: Dispatch<SetStateAction<T>>;
 }
 
-export interface UseApiResourceOptions {
+export interface UseApiResourceOptions<T> {
   /**
    * Called on a failed load, in the same pass that sets `error` — for screens that report a
    * failure as a toast rather than in place. Never called for an aborted request, and it
    * does not have to be referentially stable.
    */
   onError?: (caught: unknown) => void;
+  /**
+   * Called with the loaded value, in the same pass that sets `data` — for a caller that has
+   * to fold the result into state it already owns. Never called for an aborted request, and
+   * it does not have to be referentially stable.
+   *
+   * The point of it being a callback rather than an effect on `data`: an effect watching the
+   * resolved value runs a second render to do the folding, and in the frame between the two
+   * the caller's own state does not yet contain the row it just fetched.
+   */
+  onSuccess?: (value: T) => void;
   /**
    * Keep the last value that loaded when a later load fails, instead of clearing it.
    *
@@ -53,12 +77,13 @@ export interface UseApiResourceOptions {
 export function useApiResource<T>(
   fetcher: ((signal: AbortSignal) => Promise<T>) | null,
   initialData: T,
-  errorMessage: string,
-  options?: UseApiResourceOptions,
+  errorMessage: string | null,
+  options?: UseApiResourceOptions<T>,
 ): ApiResource<T> {
   const [data, setData] = useState<T>(initialData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const keepStaleOnError = options?.keepStaleOnError ?? false;
 
@@ -66,30 +91,67 @@ export function useApiResource<T>(
   // reset-on-failure path a new dependency on every commit.
   const initialDataRef = useRef(initialData);
 
-  // Held in a ref rather than a dependency: an inline `onError` closure is a new function on
-  // every render, and depending on it would refetch the whole resource on every commit.
+  // Held in refs rather than dependencies: an inline `onError`/`onSuccess` closure is a new
+  // function on every render, and depending on it would refetch the whole resource on every
+  // commit.
   const onErrorRef = useRef(options?.onError);
+  const onSuccessRef = useRef(options?.onSuccess);
   useEffect(() => {
     onErrorRef.current = options?.onError;
+    onSuccessRef.current = options?.onSuccess;
   });
+
+  /**
+   * Put the status back to "loading, nothing wrong yet" the moment the request identity
+   * changes — during render, not from the effect that starts the request.
+   *
+   * The effect used to open with these three setters, which cost a second render on every
+   * refetch and, worse, left one frame in between where a consumer read `loading === false`
+   * next to the *previous* request's error while the new one was already scheduled. Setting
+   * them here means the render that first sees the new request also sees the right status.
+   *
+   * `fetcher === null` is the caller holding off (no workspace id yet), and it deliberately
+   * resets nothing, matching the effect's early return.
+   */
+  const [syncedRequest, setSyncedRequest] = useState({
+    fetcher,
+    errorMessage,
+    reloadCount,
+    keepStaleOnError,
+  });
+  if (
+    syncedRequest.fetcher !== fetcher ||
+    syncedRequest.errorMessage !== errorMessage ||
+    syncedRequest.reloadCount !== reloadCount ||
+    syncedRequest.keepStaleOnError !== keepStaleOnError
+  ) {
+    setSyncedRequest({ fetcher, errorMessage, reloadCount, keepStaleOnError });
+    if (fetcher) {
+      setLoading(true);
+      setError(null);
+      setFailed(false);
+    }
+  }
 
   useEffect(() => {
     if (!fetcher) return;
 
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
 
     void (async () => {
       try {
         const next = await fetcher(controller.signal);
-        if (!controller.signal.aborted) setData(next);
+        if (!controller.signal.aborted) {
+          setData(next);
+          onSuccessRef.current?.(next);
+        }
       } catch (caught) {
         if (!controller.signal.aborted) {
           // Stale rows next to an error message read as current data — drop them, unless the
           // caller said the last value is worth more than a blank (`keepStaleOnError`).
           if (!keepStaleOnError) setData(initialDataRef.current);
           setError(errorMessage);
+          setFailed(true);
           onErrorRef.current?.(caught);
         }
       } finally {
@@ -102,7 +164,7 @@ export function useApiResource<T>(
 
   const reload = useCallback(() => setReloadCount((count) => count + 1), []);
 
-  return { data, loading, error, reload, setData };
+  return { data, loading, error, failed, reload, setData };
 }
 
 /**

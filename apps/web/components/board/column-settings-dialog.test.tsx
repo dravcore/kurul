@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { toast } from 'sonner';
-import { ColumnCategory, type ColumnDto } from '@kurultay/shared-types';
+import { ColumnCategory, type ColumnDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { ColumnSettingsDialog } from './column-settings-dialog';

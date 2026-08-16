@@ -1,10 +1,12 @@
 {
   "common": {
-    "close": "Close"
+    "close": "Close",
+    "deletedUser": "Deleted user"
   },
   "auth": {
     "login": {
-      "title": "Sign in to Kurultay",
+      "loading": "Loading sign-in…",
+      "title": "Sign in to Kurul",
       "subtitle": "Use your email and password to continue.",
       "email": "Email",
       "password": "Password",
@@ -14,6 +16,7 @@
       "error": "Could not sign in. Check your email and password."
     },
     "register": {
+      "loading": "Loading sign-up…",
       "title": "Create an account",
       "subtitle": "Start with a name, email, and password.",
       "name": "Name",
@@ -22,7 +25,18 @@
       "submit": "Create account",
       "hasAccount": "Already have an account?",
       "loginLink": "Sign in",
-      "error": "Could not create your account. Check your details and try again."
+      "error": "Could not create your account. Check your details and try again.",
+      "fieldErrors": {
+        "email": {
+          "invalidEmail": "Please enter a valid email address.",
+          "alreadyExists": "This email address is already in use. Sign in instead, or use a different address."
+        },
+        "password": {
+          "invalidPassword": "Password is required.",
+          "tooShort": "Password must be at least 8 characters long.",
+          "tooLong": "Password is too long."
+        }
+      }
     },
     "invite": {
       "title": "Accept invitation",
@@ -48,7 +62,7 @@
       "signInCta": "Sign in",
       "failedTitle": "This link didn't work",
       "pendingTitle": "Confirm your email",
-      "pendingBody": "A confirmed address is what lets you accept workspace invitations. Everything else in Kurultay works without it.",
+      "pendingBody": "A confirmed address is what lets you accept workspace invitations. Everything else in Kurul works without it.",
       "noAccount": "Need an account?",
       "registerLink": "Create one",
       "back": "Back to your workspace"
@@ -71,7 +85,7 @@
   },
   "app": {
     "meta": {
-      "title": "Kurultay",
+      "title": "Kurul",
       "description": "Open-source Kanban-focused project management"
     },
     "errors": {
@@ -86,7 +100,7 @@
       "notFoundBody": "The link may be out of date, or what it pointed at was deleted."
     },
     "shell": {
-      "title": "Kurultay",
+      "title": "Kurul",
       "createWorkspace": "New workspace",
       "switchWorkspace": "Switch workspace",
       "confirmEmail": "Confirm your email",
@@ -98,23 +112,167 @@
       "themeDark": "Switch to dark theme",
       "collapseSidebar": "Collapse sidebar",
       "expandSidebar": "Expand sidebar",
-      "settings": "Settings"
+      "settings": "Settings",
+      "skipToContent": "Skip to content",
+      "navigation": "Navigation",
+      "navigationDescription": "Switch workspace, open the dashboard or settings, and sign out.",
+      "openNavigation": "Open navigation",
+      "closeNavigation": "Close navigation"
     },
     "settings": {
       "title": "Settings",
       "language": {
         "title": "Language",
-        "description": "Choose the language Kurultay speaks to you in. It applies everywhere you sign in, and to the email we send you.",
+        "description": "Choose the language Kurul speaks to you in. It applies everywhere you sign in, and to the email we send you.",
         "label": "Interface language",
         "followBrowser": "Match my browser",
         "help": "New boards start with columns named in this language. Columns you already have keep their names.",
         "options": {
-          "en": "English"
+          "en": "English",
+          "tr": "Türkçe"
         },
         "saved": "Language updated",
         "loadError": "Your language setting couldn't load.",
         "saveError": "Could not save your language.",
         "saveErrorSignedOut": "Your session ended. Sign in to save this."
+      },
+      "members": {
+        "title": "Members",
+        "description": "Who can open this workspace, and what they can do once they are in it.",
+        "loadError": "The people in this workspace couldn't load.",
+        "you": "You",
+        "cancel": "Cancel",
+        "memberMenu": "Actions for {name}",
+        "roles": {
+          "OWNER": "Owner",
+          "ADMIN": "Admin",
+          "MEMBER": "Member",
+          "GUEST": "Guest"
+        },
+        "roleHints": {
+          "OWNER": "Everything, including deleting the workspace.",
+          "ADMIN": "Invite people, manage boards and columns.",
+          "MEMBER": "Create and move tasks on every board.",
+          "GUEST": "Read the boards, and nothing else."
+        },
+        "inviteAction": "Invite member",
+        "inviteTitle": "Invite member",
+        "inviteEmail": "Email address",
+        "inviteRole": "Role",
+        "inviteSubmit": "Send invitation",
+        "inviteSent": "Invitation sent to {email}",
+        "inviteNotDelivered": "Invitation created, but no email went to {email}. Use Copy link to send it to them yourself.",
+        "inviteError": "The invitation couldn't be sent.",
+        "inviteErrorAddress": "That address can't be invited. Check it, or ask them to sign in with the address they already use.",
+        "inviteErrorForbidden": "You need admin access to invite people. Ask a workspace owner.",
+        "inviteErrorConflict": "Someone changed this invitation while you were filling it in. Send it again.",
+        "inviteErrorTooMany": "That's a lot of invitations at once. Wait a minute and send the rest.",
+        "pendingTitle": "Waiting to be accepted",
+        "pendingExpires": "Expires {when}",
+        "copyLink": "Copy link",
+        "copiedLink": "Invite link copied",
+        "copyLinkError": "The link couldn't be copied. Your browser is blocking it.",
+        "mailDisabledTitle": "Email delivery isn't set up on this server",
+        "mailDisabledBody": "Invitations you send won't reach anyone, and nobody can accept one without confirming their address first. Invite them anyway, then send them the link yourself with Copy link.",
+        "mailDisabledDocs": "How to set up email",
+        "revokeAction": "Revoke",
+        "revokeTitle": "Revoke this invitation?",
+        "revokeBody": "{email} will not be able to join with the link they were sent. You can invite them again later.",
+        "revokeError": "The invitation couldn't be revoked.",
+        "revokeErrorGone": "That invitation is already gone.",
+        "revokeErrorForbidden": "You need admin access to revoke invitations. Ask a workspace owner.",
+        "changeRoleAction": "Change role",
+        "changeRoleTitle": "Change role",
+        "changeRoleSubmit": "Change role",
+        "changeRoleError": "The role couldn't be changed.",
+        "changeRoleErrorForbidden": "Only an owner can change ownership. Ask a workspace owner.",
+        "changeRoleErrorLastOwner": "This is the only owner. Make someone else an owner first.",
+        "changeRoleErrorGone": "They are no longer in this workspace.",
+        "removeAction": "Remove from workspace",
+        "removeTitle": "Remove {name}?",
+        "removeBody": "They lose every board in this workspace straight away. The tasks and comments they wrote stay.",
+        "removeError": "They couldn't be removed.",
+        "removeErrorForbidden": "Only an owner can remove another owner. Ask a workspace owner.",
+        "removeErrorLastOwner": "This is the only owner. Make someone else an owner first.",
+        "removeErrorGone": "They are no longer in this workspace.",
+        "leaveAction": "Leave workspace",
+        "leaveTitle": "Leave this workspace?",
+        "leaveBody": "You lose every board in it. An owner or an admin has to invite you back.",
+        "leaveDone": "You left the workspace",
+        "leaveError": "You couldn't be taken out of this workspace.",
+        "leaveErrorLastOwner": "You're the only owner. Make someone else an owner first, or delete the workspace."
+      },
+      "workspace": {
+        "title": "Workspace",
+        "description": "The workspace's name, and what happens to it.",
+        "name": "Name",
+        "cancel": "Cancel",
+        "renameAction": "Rename",
+        "renameTitle": "Rename workspace",
+        "renameError": "Could not rename this workspace.",
+        "renameErrorForbidden": "You need admin access to rename the workspace. Ask a workspace owner.",
+        "renameErrorGone": "This workspace no longer exists.",
+        "deleteSectionTitle": "Delete this workspace",
+        "deleteSectionBody": "Deletes every board, task, and comment in it. This cannot be undone.",
+        "deleteAction": "Delete workspace",
+        "deleteTitle": "Delete this workspace?",
+        "deleteBody": "Deleting {name} deletes every board, task, and comment in it, for everyone in it. This cannot be undone.",
+        "deleteConfirmLabel": "Type {name} to confirm",
+        "deleteDone": "{name} was deleted",
+        "deleteError": "Could not delete this workspace.",
+        "deleteErrorForbidden": "Only an owner can delete this workspace. Ask a workspace owner.",
+        "deleteErrorGone": "This workspace no longer exists."
+      },
+      "account": {
+        "title": "Account",
+        "description": "The account you sign in with, and how to end it.",
+        "cancel": "Cancel",
+        "loadError": "Your account details couldn't load.",
+        "deleteSectionTitle": "Delete your account",
+        "deleteSectionBody": "Removes you from every workspace on this server and takes your name off everything you wrote. This cannot be undone.",
+        "deleteAction": "Delete account",
+        "deleteTitle": "Delete your account?",
+        "deleteBody": "You will be signed out and removed from every workspace here. Your name and email are erased. This cannot be undone.",
+        "retained": "The {comments, plural, =0 {no comments} one {one comment} other {# comments}} and {tasks, plural, =0 {no tasks} one {one task} other {# tasks}} you wrote stay where they are, credited to “Deleted user”.",
+        "ownedTitle": "You are the only owner of these. Decide what happens to each one.",
+        "ownedWorkspace": "{name} — {members, plural, one {# member} other {# members}}, {boards, plural, one {# board} other {# boards}}",
+        "ownedChoose": "Choose…",
+        "ownedTransferTo": "Make {name} the owner",
+        "ownedDelete": "Delete this workspace and everything in it",
+        "ownedNobodyLeft": "Nobody else is in this workspace, so it can only be deleted.",
+        "confirmLabel": "Type {email} to confirm",
+        "deleteError": "Your account couldn't be deleted.",
+        "deleteErrorConfirm": "That is not the address of this account. Check it and try again.",
+        "deleteErrorTransferGone": "The person you picked is no longer in that workspace. Reopen this and choose again.",
+        "deleteErrorUndecided": "Something changed while you were deciding. Reopen this to see what is left."
+      },
+      "activation": {
+        "title": "Instance activation",
+        "description": "How far people get on this server, from signing up to a team that keeps coming back. Counted from what this instance already stores; nothing here is sent anywhere.",
+        "northStar": {
+          "activeTeams": "Active teams ({days}d)",
+          "activeWorkspaces": "Active workspaces ({days}d)",
+          "teamWorkspaces": "Workspaces with 2+ members",
+          "help": "A workspace counts as an active team when two or more of its current members did something in it — edited a card, or simply opened a board. The two figures beside it are the context: how many workspaces saw any activity at all, and how many have more than one member to begin with."
+        },
+        "steps": {
+          "user_registered": "Created an account",
+          "workspace_created": "Owns a workspace",
+          "board_created": "Created a board",
+          "first_task_created": "Added a card",
+          "first_drag": "Moved a card",
+          "invite_sent": "Invited someone",
+          "smtp_configured": "Outbound email",
+          "invite_accepted": "Joined by invitation",
+          "dashboard_viewed": "Opened the dashboard",
+          "task_completed": "Completed a card",
+          "wau_board_view": "Opened a board"
+        },
+        "peopleCount": "{count, plural, =0 {no one} one {# person} other {# people}}",
+        "windowSuffix": "in the last {days} days",
+        "configured": "configured",
+        "notConfigured": "not configured",
+        "localOnly": "These numbers are computed on this server and shown only to the accounts you listed as instance administrators. Kurul sends nothing outside this server unless you switch telemetry on yourself."
       }
     },
     "workspace": {
@@ -174,6 +332,61 @@
       "name": "Name",
       "description": "Description",
       "boardMenu": "Board actions",
+      "import": {
+        "action": "Import from Trello",
+        "title": "Import from Trello",
+        "description": "Pick the JSON export of a single Trello board. Lists become columns, cards become tasks, and attachments come across as links.",
+        "file": "Trello board export (.json)",
+        "duplicateWarning": "Importing the same export again creates a second board. This importer never updates an existing one, so run it twice and you will have two.",
+        "slowWarning": "A large board can take a couple of minutes. Once the import starts it cannot be cancelled — leave this tab open.",
+        "pending": "Importing… this cannot be cancelled.",
+        "submit": "Import board",
+        "cancel": "Cancel",
+        "error": "The import failed and nothing was created.",
+        "forbidden": "You need admin access to import a board. Ask a workspace owner.",
+        "tooLarge": "That export is larger than this instance accepts.",
+        "badFile": "That file isn't a Trello board export.",
+        "tooMany": "Too many imports in a row. Wait a minute and try again.",
+        "reportRegion": "Import report",
+        "reportTitle": "Imported “{name}”",
+        "notSaved": "This report is not saved anywhere. Dismissing it is permanent — it cannot be shown again. The board itself is unaffected.",
+        "dismiss": "Dismiss report",
+        "goToBoard": "Go to board",
+        "importedTitle": "Written to the board",
+        "imported": {
+          "columns": "{count, plural, one {# column} other {# columns}}",
+          "tasks": "{count, plural, one {# task} other {# tasks}}",
+          "labels": "{count, plural, one {# label} other {# labels}}",
+          "checklists": "{count, plural, one {# checklist} other {# checklists}}",
+          "checklistItems": "{count, plural, one {# checklist item} other {# checklist items}}",
+          "attachments": "{count, plural, one {# attachment link} other {# attachment links}}"
+        },
+        "skippedTitle": "What did not come across as-is",
+        "nothingSkipped": "Everything in the export came across.",
+        "samples": "Showing {shown} of {count, plural, one {# example} other {# examples}}",
+        "setColumnCategories": "Set what each column means",
+        "skip": {
+          "scope": {
+            "list": "{count, plural, one {# list} other {# lists}}",
+            "column": "{count, plural, one {# column} other {# columns}}",
+            "card": "{count, plural, one {# card} other {# cards}}",
+            "label": "{count, plural, one {# label} other {# labels}}",
+            "checklist": "{count, plural, one {# checklist} other {# checklists}}",
+            "checklistItem": "{count, plural, one {# checklist item} other {# checklist items}}",
+            "attachment": "{count, plural, one {# attachment} other {# attachments}}",
+            "member": "{count, plural, one {# member} other {# members}}",
+            "comment": "{count, plural, one {# comment} other {# comments}}"
+          },
+          "reason": {
+            "outOfScope": "{count, plural, one {{items} was not imported: Kurul has no equivalent for it.} other {{items} were not imported: Kurul has no equivalent for them.}}",
+            "archived": "{count, plural, one {{items} was not imported: it was archived in Trello, and Kurul has no archive.} other {{items} were not imported: they were archived in Trello, and Kurul has no archive.}}",
+            "unmappable": "{count, plural, one {{items} was not imported: a Trello account is not a Kurul account, so the assignment was dropped.} other {{items} were not imported: a Trello account is not a Kurul account, so the assignments were dropped.}}",
+            "unsupportedScheme": "{count, plural, one {{items} was not imported: its address was neither http nor https.} other {{items} were not imported: their addresses were neither http nor https.}}",
+            "malformed": "{count, plural, one {{items} was not imported: the export did not carry the fields the importer needs.} other {{items} were not imported: the export did not carry the fields the importer needs.}}",
+            "defaulted": "{count, plural, one {{items} came across changed: Kurul had no matching value, so the default was used.} other {{items} came across changed: Kurul had no matching value, so the default was used.}}"
+          }
+        }
+      },
       "realtime": {
         "reconnecting": "Reconnecting…",
         "dragCancelled": "Someone else moved this task"
@@ -274,6 +487,43 @@
         "labelForbidden": "You need admin access to manage board labels. Ask a workspace owner.",
         "labelSaveError": "Could not update labels.",
         "labelDeleteError": "Could not delete this label.",
+        "checklist": {
+          "sectionLabel": "Checklists",
+          "loading": "Loading…",
+          "loadError": "The checklists couldn't load.",
+          "noItems": "No items yet",
+          "newChecklist": "New checklist",
+          "addChecklist": "Add checklist",
+          "removeChecklist": "Delete checklist {title}",
+          "newItem": "New item",
+          "addItem": "Add item",
+          "removeItem": "Delete item {content}",
+          "progress": "Checklist: {done} of {total} items done",
+          "complete": "Checklist complete: all {total} items done",
+          "saveError": "Could not save this checklist.",
+          "forbidden": "You don't have access to change this task. Ask a workspace admin."
+        },
+        "attachments": {
+          "sectionLabel": "Attachments",
+          "loading": "Loading…",
+          "loadError": "The attachments couldn't load.",
+          "empty": "Nothing attached yet",
+          "addFile": "Attach a file",
+          "addLink": "Attach a link",
+          "linkUrl": "Link URL",
+          "linkLabel": "Label (optional)",
+          "linkSubmit": "Attach",
+          "linkCancel": "Cancel",
+          "remove": "Delete attachment {filename}",
+          "openLink": "Open {filename} in a new tab",
+          "download": "Download {filename}",
+          "count": "{count, plural, one {# attachment} other {# attachments}}",
+          "storageOff": "This instance does not store files. You can still attach links.",
+          "tooLarge": "That file is larger than this instance accepts.",
+          "wrongType": "That file type is not accepted.",
+          "saveError": "Could not attach that.",
+          "forbidden": "You don't have access to change this task. Ask a workspace admin."
+        },
         "comments": "Comments",
         "noComments": "No comments yet",
         "loadMoreComments": "Load more comments",
@@ -313,10 +563,10 @@
             "taskAssigned": "Assigned someone to “{title}”",
             "taskUnassigned": "Unassigned someone from “{title}”",
             "commentCreated": "Commented on “{title}”",
+            "boardImported": "Imported “{title}” from Trello — {count, plural, =0 {everything came across} one {# item did not come across} other {# items did not come across}}",
             "unknown": "{type}"
           }
         },
-        "metaLoadError": "This task's details couldn't load.",
         "openTask": "Open task",
         "panelLabel": "Task details",
         "close": "Close task panel",

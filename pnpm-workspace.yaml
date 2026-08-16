@@ -1,3 +1,8 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+  # Browser end-to-end suite. Repository-level rather than under `apps/*` because it drives
+  # the *stack* (api + web + Postgres + Mailpit), not one app — the location docs/testing.md
+  # reserved for it. Its own package keeps @playwright/test out of the app dependency trees,
+  # which is what lets `pnpm test` (api/web/packages) stay a pure unit-test command.
+  - 'e2e'

@@ -1,6 +1,6 @@
 # Design
 
-The visual and interaction language of the Kurultay web app: principles, tokens, layout, motion, states, and copy.
+The visual and interaction language of the Kurul web app: principles, tokens, layout, motion, states, and copy.
 
 > 🌐 English (canonical) | [Türkçe](tr/design.md)
 
@@ -17,10 +17,9 @@ The visual and interaction language of the Kurultay web app: principles, tokens,
 - [9. Accessibility](#9-accessibility)
 - [10. Cross-references](#10-cross-references)
 
-> **Status.** Every hex, type size, and pixel dimension below is a **proposal**, to be
-> validated on real screens in [Phase 3](roadmap.md#phase-3--boards-and-columns) and refined
-> through Phase 7. The _rules_ — restraint, tokenization, keyboard parity, contrast floors,
-> i18n — bind from the first component.
+> **Status.** Colour, type, and spacing tokens below are **validated in product**
+> (`apps/web/app/globals.css`). Interaction patterns that are still aspirational are called
+> out inline; do not treat every sentence as shipped behaviour.
 
 ## 1. Design principles
 
@@ -41,9 +40,11 @@ The visual and interaction language of the Kurultay web app: principles, tokens,
 
 ## 2. Identity
 
-Kurultay is named for the grand assembly of Turkic-Mongol tradition: clans gather, banners are
-planted, matters are decided, work is divided. The identity comes from _that_ world — banner
-(_sancak_), seal (_damga_), steppe — not from generic productivity-tool language.
+Kurul is named for the council that convenes, decides, and divides the work — and, until
+v0.2.0, for the _kurultay_ that gave the project its first name: the grand assembly where
+clans gather, banners are planted, matters are decided. The identity still comes from _that_
+world — banner (_sancak_), seal (_damga_), steppe — not from generic productivity-tool
+language. The name got shorter; the visual language did not change.
 
 **Signature element — the sancak rail:** a 2px copper rule on the leading edge of whatever is
 currently in play (active sidebar item, focused column, selected card, the open panel's
@@ -69,7 +70,7 @@ If two copper things are visible at once and neither is a primary action, one is
 | All product UI                                 | **lucide** (ships with shadcn/ui) — 16px in dense rows, 20px in the sidebar, 1.5px stroke, `currentColor` only                                                   |
 
 **Anti-brief.** Deliberately _not_: warm-cream ground with a serif and terracotta accent;
-near-black with an acid accent; broadsheet hairlines at zero radius. Kurultay's neutrals run
+near-black with an acid accent; broadsheet hairlines at zero radius. Kurul's neutrals run
 cool green-gray precisely so the warm copper has something to sit against — warm accent on
 warm ground is both the current default look and a way to make the accent vanish.
 
@@ -77,7 +78,7 @@ warm ground is both the current default look and a way to make the accent vanish
 
 Proposals for Phase 3, named to the shadcn/ui CSS-variable convention so `components/ui/`
 stays unmodified generated output. **Caution:** in shadcn's vocabulary `--primary` is the
-brand action color and `--accent` is the subtle hover surface, so Kurultay's signature copper
+brand action color and `--accent` is the subtle hover surface, so Kurul's signature copper
 is `--primary` and `--accent` stays a quiet neutral tint. Do not rename shadcn's variables.
 
 ### Neutrals and accent
@@ -160,29 +161,66 @@ a stat-tile value.
 
 App shell per the `(app)` route group in [architecture.md §4](architecture.md#4-appsweb--structure).
 
-| Region             | Spec                                                                                                                  |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand                     |
-| Topbar             | 48px sticky — board name, filter entry, overflow, presence avatars                                                    |
-| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                |
-| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯`                 |
-| Card               | 10px 12px padding, 8px gap, min 56px (title only), typical 72–92px; title clamps at 3 lines so nothing exceeds ~140px |
-| Card content order | Priority icon + title · label dots · meta row (due date, estimate, assignees)                                         |
-| List / table row   | 36px                                                                                                                  |
-| Settings and forms | 720px max width — prose is read, not scanned                                                                          |
-| Touch target       | 40px minimum on coarse pointers, achieved with padding, not size                                                      |
+| Region             | Spec                                                                                                                                                        |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell height       | Exactly `100dvh`, `overflow: hidden` — never `min-height`. Every page owns its own scroller.                                                                |
+| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand; off-canvas below 768px                                   |
+| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet); **56px below 768px**, where it also carries the navigation trigger |
+| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                                                      |
+| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯` (48px below 768px)                                    |
+| Card               | 10px 12px padding, 8px gap, min 56px (title only), typical 72–92px; title clamps at 3 lines so nothing exceeds ~140px                                       |
+| Card content order | Priority icon + title · label dots · meta row (due date, estimate, assignees)                                                                               |
+| List / table row   | 36px; 44px below 768px                                                                                                                                      |
+| Settings and forms | 720px max width — prose is read, not scanned                                                                                                                |
+| Touch target       | **44px minimum below 768px**, on every interactive element without exception                                                                                |
 
-**Task detail: a right-side panel, not a modal.** 480px default, drag-resizable 420–640px,
-**non-modal** — the board stays visible and clickable behind it. Below 1024px it becomes a
-full-screen sheet. Confirmations, board creation, and destructive actions stay **dialogs**;
-those genuinely need to block.
+**The shell is exactly one viewport tall, and this is load-bearing.** `min-height: 100dvh`
+would say "at least" and bound nothing below it — which is what it did, and why a column's
+`overflow-y-auto` never clipped: the document grew instead, reaching 27 425px on a 1 000-task
+board. Per-column scrolling, the sticky column header and drag autoscroll all depend on the
+column having a bounded box, so all three were inert. `100dvh` and not `100vh`: on a phone
+`100vh` is the viewport with the browser chrome retracted, so a `vh`-sized shell is taller than
+the screen and pushes the topbar under the address bar on first paint. The consequence to
+respect when adding a page: **the document does not scroll anywhere in the app**, so a new
+route under `(app)` must declare its own `flex-1 overflow-y-auto`, exactly as the dashboard,
+settings and notifications pages do.
 
-| Why a panel |                                                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Context     | The point of a board is the surrounding cards; a modal deletes them                                                                              |
-| Flow        | Triage is open → edit → next. A panel keeps the next card one click away instead of a dismiss plus a click.                                      |
-| Realtime    | A card moving under a modal is invisible; behind a panel it is visible                                                                           |
-| Routing     | Deep-linkable at `board/[boardId]/task/[taskId]` via an intercepting route — a shared URL opens the full page, an in-board click opens the panel |
+**Below 768px the sidebar is off-canvas** — a hamburger in the topbar opening the same
+`SidebarBody` in a drawer, not a second navigation with its own list of links. The drawer is
+the app's `Dialog` primitive docked to the left edge (`DialogDrawerContent`), which is a
+deliberate refusal to hand-roll one: the focus trap, `Escape`, returning focus to the trigger,
+inerting the page behind and the scroll lock are the whole substance of an off-canvas panel,
+and a parallel implementation is a second place for one of them to be missing. It slides at
+220ms on `--ease-drawer`, and cross-fades instead under `prefers-reduced-motion`.
+
+**44px, not 40, and keyed on width rather than on pointer type.** 44px is WCAG 2.5.5 (AAA) and
+the figure the roadmap holds this layout to. It is keyed on `max-md` — the same breakpoint the
+drawer uses — rather than on `pointer: coarse`, so one condition governs the whole mobile
+layout instead of two that can disagree; a 360px window on a desktop getting 44px targets costs
+nothing. The floor lives in the `Button` and `Input` variants and in the dropdown item classes,
+not at the call sites, so there is one list to read. Sizes above the breakpoint are untouched.
+It is **measured, not asserted**: `e2e/tests/mobile-navigation.spec.ts` sweeps every button,
+link, input and menu item on the board and in the drawer at 360px and fails on any box under
+44px in either axis. jsdom lays nothing out, so a unit test cannot make this claim.
+
+**Touch drag is by the grip.** The card body belongs to the column's scroller — the wrapper
+carrying dnd-kit's listeners has no `touch-action`, so the browser claims a vertical gesture
+there — and the grip declares `touch-action: none`, which is what hands that one 44px region to
+dnd-kit instead. This is a division, not a limitation: a column that cannot be scrolled with a
+thumb is worse than a card that cannot be dragged from its middle. Both halves are asserted.
+
+**Task detail: a right-side panel, not a modal.** ~480px wide (`min` 420px / `max` 640px via
+CSS), **non-modal** — the board stays visible and clickable behind it on desktop. Below the
+Tailwind `md` breakpoint (768px) it becomes a fullscreen sheet (`fixed inset-0`). Drag-resize
+of the panel width is not implemented; the CSS bounds are fixed. Confirmations, board
+creation, and destructive actions stay **dialogs**; those genuinely need to block.
+
+| Why a panel |                                                                                                                                                                            |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Context     | The point of a board is the surrounding cards; a modal deletes them                                                                                                        |
+| Flow        | Triage is open → edit → next. A panel keeps the next card one click away instead of a dismiss plus a click.                                                                |
+| Realtime    | A card moving under a modal is invisible; behind a panel it is visible                                                                                                     |
+| Routing     | Deep-linkable at `board/[boardId]/task/[taskId]` — both soft navigation and a hard load render `BoardView` with the task selected (no Next.js intercepting/`@modal` route) |
 
 ## 5. Interaction patterns
 
@@ -200,7 +238,7 @@ those genuinely need to block.
 | Remote create / update | `--signature-subtle` background fading out over 1200ms. No movement, no size change. Color-only, so it survives `prefers-reduced-motion` unchanged. |
 | Remote move            | Card animates to its new position over 220ms; during a local drag the update is queued and applied on drop                                          |
 | Remote delete          | Fade to 0 over 160ms, then close the gap over 160ms — two beats, so the eye can follow                                                              |
-| Presence · disconnect  | Avatars in the topbar, a small avatar on a card someone else has open · a quiet inline "Reconnecting…" bar, never a blocking overlay                |
+| Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Reconnecting…" bar, never a blocking overlay                                    |
 
 **Keyboard baseline.** Focus is always visible: 2px `--ring` at 2px offset, and `outline: none`
 without a replacement is a review blocker. Tab order follows visual order; the board is a
@@ -334,19 +372,19 @@ ships English-only. This is the _layer_, not the translations: the roadmap's Bey
 the application UI" row is about shipping further language packs, and the plumbing lands with
 the Phase 1 skeleton because retrofitting it costs far more than starting with it.
 
-| i18n rule                     |                                                                                                                                                 |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| No hardcoded strings          | A string literal in JSX is a lint error. `getTranslations` in server components, `useTranslations` in client ones.                              |
-| Keys                          | By domain, mirroring the component tree: `board.column.addAction`, `task.priority.urgent`, `errors.http.409`                                    |
-| Catalogs                      | `messages/en.json` is canonical and the only pack in MVP; Turkish is the first translation, after Phase 5                                       |
-| Plurals, interpolation        | ICU format (`{count, plural, …}`). Never concatenate sentence fragments — word order differs per language.                                      |
-| Dates, numbers, relative time | `Intl.*` via next-intl formatters with the active locale; no hand-formatted dates                                                               |
-| Casing                        | **No `text-transform: uppercase` on translated strings** — Turkish `i → İ` breaks under CSS casing. Write the intended casing into the catalog. |
-| Layout                        | Assume ±35% string length; nothing is a fixed pixel width because the English fits                                                              |
+| i18n rule                     |                                                                                                                                                                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No hardcoded strings          | User-facing copy goes through `useTranslations` / `getTranslations` and `messages/*.json`. There is no ESLint rule forbidding JSX string literals yet — `messages/catalog.test.ts` catches missing/orphan keys for bound `t('…')` calls. |
+| Keys                          | By domain, mirroring the component tree: `board.column.addAction`, `task.priority.urgent`, `errors.http.409`                                                                                                                             |
+| Catalogs                      | `messages/en.json` is canonical; `messages/tr.json` ships beside it and `messages/catalog.test.ts` fails the build on a key one has and the other does not                                                                               |
+| Plurals, interpolation        | ICU format (`{count, plural, …}`). Never concatenate sentence fragments — word order differs per language.                                                                                                                               |
+| Dates, numbers, relative time | `Intl.*` via next-intl formatters with the active locale; no hand-formatted dates                                                                                                                                                        |
+| Casing                        | **No `text-transform: uppercase` on translated strings** — Turkish `i → İ` breaks under CSS casing. Write the intended casing into the catalog.                                                                                          |
+| Layout                        | Assume ±35% string length; nothing is a fixed pixel width because the English fits                                                                                                                                                       |
 
 ## 8. Charts and dashboard
 
-For [Phase 7](roadmap.md#phase-7--dashboard), rendered with Recharts. Form is chosen by the
+For [Phase 7](archive/roadmap-mvp-phases.md#phase-7--dashboard), rendered with Recharts. Form is chosen by the
 reader's job, before any color decision. Never a dual y-axis, never a pie past two slices,
 never a generated ninth hue — fold the tail into "Other" or facet into small multiples.
 
@@ -361,7 +399,7 @@ never a generated ninth hue — fold the tail into "Other" or facet into small m
 | Column composition over time                   | **Stacked area / column**, ≤ 6 series                                            | categorical                |
 | More than ~7 categories that all matter        | **Table**, or table plus chart                                                   | —                          |
 
-Palette validated against Kurultay's own surfaces (`#FFFFFF` light, `#161918` dark). These slots
+Palette validated against Kurul's own surfaces (`#FFFFFF` light, `#161918` dark). These slots
 also back `Label.color`.
 
 | Slot | Hue    | Light     | Dark      |     | Slot | Hue     | Light     | Dark      |
@@ -420,11 +458,11 @@ Target **WCAG 2.1 AA** in both themes, verified per token pair rather than per s
 
 ## 10. Cross-references
 
-| Document                                                               | What it binds here                                                                                                                                                |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [coding-standards.md](coding-standards.md#nextjs-appsweb)              | `components/ui/` is shadcn output only — tokens are edited in the theme, never in a primitive; no arbitrary hex in components; conditional classes through `cn()` |
-| [architecture.md](architecture.md#4-appsweb--structure)                | The `(auth)` / `(app)` route groups and the `board/`, `task/`, `dashboard/`, `layout/` component domains this document lays out                                   |
-| [api-conventions.md](api-conventions.md#errors)                        | The problem-JSON shape error copy derives from, and the rule to branch on `statusCode`                                                                            |
-| [roadmap.md](roadmap.md#phase-3--boards-and-columns)                   | Phase 3 lands tokens, shell, and board chrome; Phase 4 the drag interaction and detail panel; Phase 5 priority and label rendering; Phase 7 the charts            |
-| [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts — the toolkit every rule above is written against                                                         |
-| [tech-stack.md](tech-stack.md)                                         | Why that toolkit                                                                                                                                                  |
+| Document                                                                                   | What it binds here                                                                                                                                                |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [coding-standards.md](coding-standards.md#nextjs-appsweb)                                  | `components/ui/` is shadcn output only — tokens are edited in the theme, never in a primitive; no arbitrary hex in components; conditional classes through `cn()` |
+| [architecture.md](architecture.md#4-appsweb--structure)                                    | The `(auth)` / `(app)` route groups and the `board/`, `task/`, `dashboard/`, `layout/` component domains this document lays out                                   |
+| [api-conventions.md](api-conventions.md#errors)                                            | The problem-JSON shape error copy derives from, and the rule to branch on `statusCode`                                                                            |
+| [MVP phase checklist — Phase 3](archive/roadmap-mvp-phases.md#phase-3--boards-and-columns) | Phase 3 lands tokens, shell, and board chrome; Phase 4 the drag interaction and detail panel; Phase 5 priority and label rendering; Phase 7 the charts            |
+| [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                     | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts — the toolkit every rule above is written against                                                         |
+| [tech-stack.md](tech-stack.md)                                                             | Why that toolkit                                                                                                                                                  |

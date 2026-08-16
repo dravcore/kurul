@@ -1,7 +1,7 @@
 # Visual Debt and Phase 4 Groundwork — Implementation Plan
 
 > **Status: shipped** — all four layers merged to `develop` (PRs #11, #15, #13, #14).
-> Spec: `docs/specs/2026-08-09-visual-debt-design.md`. Task checkboxes below are retained
+> Spec: `docs/archive/specs/2026-08-09-visual-debt-design.md`. Task checkboxes below are retained
 > as a historical record and marked complete.
 
 > **For agentic workers:** Historical plan — do not re-execute. Steps used checkbox
@@ -9,19 +9,17 @@
 
 **Goal:** Bring every shipped `apps/web` screen into conformance with `docs/design.md` and land the primitives Phase 4 needs (type scale, toast, elevation tokens, sliding sancak rail, reduced-motion policy).
 
-**Architecture:** Four stacked layers, each its own branch and PR: primitives → shell chrome → auth screens → board polish. Later layers consume earlier ones, so the order is a dependency chain. Spec: `docs/specs/2026-08-09-visual-debt-design.md`.
+**Architecture:** Four stacked layers, each its own branch and PR: primitives → shell chrome → auth screens → board polish. Later layers consume earlier ones, so the order is a dependency chain. Spec: `docs/archive/specs/2026-08-09-visual-debt-design.md`.
 
 **Tech Stack:** Next.js 16 App Router, Tailwind v4 (`@theme` tokens in `apps/web/app/globals.css`), shadcn/ui, sonner, next-intl, lucide-react.
 
 ## Global Constraints
 
-- Run all package scripts from the repo root: `pnpm --filter @kurultay/web lint` / `typecheck` / `build`. Lint runs with `--max-warnings 0`.
+- Run all package scripts from the repo root: `pnpm --filter @kurul/web lint` / `typecheck` / `build`. Lint runs with `--max-warnings 0`.
 - **Tokens only:** no raw hex, no Tailwind palette colors (`text-red-600` etc.), and no `text-[var(--color-…)]`-style arbitrary values in components. Use the utilities generated from `globals.css` (`text-destructive`, `bg-signature-subtle`, …).
 - **Every user-visible string** goes through next-intl (`apps/web/messages/en.json`); no string literals in JSX. English, sentence case.
 - `apps/web/components/ui/` is shadcn-generated output: only shadcn-style additions (the sonner wrapper) and the shadow-token class swap are allowed there. Brand/custom components live in `components/brand/` or `components/layout/`.
-- Git Flow + Conventional Commits. Branch layout: `feat/design-primitives` from `develop`; each later layer branches from the previous layer's branch (stacked). Each layer ends with a PR to `develop` (retarget stacked PRs after the parent merges). PR bodies end with: `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 - No new test infrastructure. Verification per task = lint + typecheck; per layer = build + the grep gate in Task 6/12/15/19 + a manual two-theme pass by the reviewer.
-- Commit messages end with `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
 
 ---
 
@@ -70,7 +68,7 @@ These are the design.md §3 steps. Tailwind v4 derives `text-<name>` utilities (
 
 - [x] **Step 3: Verify**
 
-Run: `pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build`
+Run: `pnpm --filter @kurul/web typecheck && pnpm --filter @kurul/web build`
 Expected: both pass (tokens are additive; nothing consumes them yet).
 
 - [x] **Step 4: Commit**
@@ -125,7 +123,7 @@ This keeps the skeleton's opacity pulse and color fades (per design.md §5 "fewe
 
 - [x] **Step 2: Verify**
 
-Run: `pnpm --filter @kurultay/web build`
+Run: `pnpm --filter @kurul/web build`
 Expected: PASS.
 
 - [x] **Step 3: Commit**
@@ -191,7 +189,7 @@ In `board-list.tsx` and `board-view.tsx`: delete the local `function DamgaMark(�
 
 - [x] **Step 3: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck`
 Expected: PASS, no unused imports.
 
 - [x] **Step 4: Commit**
@@ -215,12 +213,12 @@ git commit -m "refactor(web): extract shared DamgaMark brand component"
 - [x] **Step 1: Install**
 
 ```bash
-pnpm --filter @kurultay/web add sonner
+pnpm --filter @kurul/web add sonner
 ```
 
 - [x] **Step 2: Create the themed wrapper**
 
-Create `apps/web/components/ui/sonner.tsx` (shadcn's sonner component, themed with Kurultay tokens):
+Create `apps/web/components/ui/sonner.tsx` (shadcn's sonner component, themed with Kurul tokens):
 
 ```tsx
 'use client';
@@ -264,7 +262,7 @@ In `apps/web/app/layout.tsx`, add `import { Toaster } from '@/components/ui/sonn
 
 - [x] **Step 4: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web build`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web build`
 Expected: PASS.
 
 - [x] **Step 5: Commit**
@@ -308,7 +306,7 @@ In the `@theme inline` block add:
 
 - [x] **Step 3: Verify**
 
-Run: `pnpm --filter @kurultay/web build && grep -rn "shadow-lg\|shadow-md" apps/web/components apps/web/app --include='*.tsx'`
+Run: `pnpm --filter @kurul/web build && grep -rn "shadow-lg\|shadow-md" apps/web/components apps/web/app --include='*.tsx'`
 Expected: build PASS; grep finds nothing.
 
 - [x] **Step 4: Commit**
@@ -325,7 +323,7 @@ git commit -m "feat(web): add elevation tokens, route overlay shadows through th
 - [x] **Step 1: Full verification**
 
 ```bash
-pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build
+pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck && pnpm --filter @kurul/web build
 ```
 
 Expected: all PASS.
@@ -343,9 +341,8 @@ Expected: no matches in files this layer touched (auth files still match until L
 ```bash
 git push -u origin feat/design-primitives
 gh pr create --base develop --title "feat: design primitives (type scale, toast, elevation, reduced motion)" --body "$(cat <<'EOF'
-Layer 1 of docs/specs/2026-08-09-visual-debt-design.md: type-scale tokens, reduced-motion policy that keeps color/opacity, shared DamgaMark, token-themed sonner toasts, elevation tokens.
+Layer 1 of docs/archive/specs/2026-08-09-visual-debt-design.md: type-scale tokens, reduced-motion policy that keeps color/opacity, shared DamgaMark, token-themed sonner toasts, elevation tokens.
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
@@ -390,7 +387,7 @@ export function Topbar({
 
 - [x] **Step 2: Verify and commit**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS.
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck` — expected PASS.
 
 ```bash
 git checkout -b feat/shell-chrome
@@ -506,7 +503,7 @@ and remove the now-unused `isBoardRoute`, `usePathname`, and `cn` imports if not
 
 - [x] **Step 5: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck && pnpm --filter @kurul/web build`
 Expected: PASS. Manual: dashboard and board both show one 48px sticky topbar; workspaces/new is padded.
 
 - [x] **Step 6: Commit**
@@ -616,7 +613,7 @@ In `app-sidebar.tsx`:
 
 - [x] **Step 4: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck`
 Expected: PASS. Manual: switcher opens in both sidebar widths; active workspace shows a check; "New workspace" navigates.
 
 - [x] **Step 5: Commit**
@@ -703,7 +700,7 @@ const railBox = useSancakRail(navRef, [pathname, collapsed]);
 
 - [x] **Step 3: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck`
 Expected: PASS (the exhaustive-deps disable comment is required for zero warnings). Manual: rail sits beside the active item and repositions when the sidebar collapses.
 
 - [x] **Step 4: Commit**
@@ -752,7 +749,7 @@ Add `import { Skeleton } from '@/components/ui/skeleton';`.
 
 - [x] **Step 2: Verify and commit**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS.
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck` — expected PASS.
 
 ```bash
 git add apps/web/components/layout/app-shell.tsx
@@ -770,9 +767,8 @@ git commit -m "feat(web): shell loading skeleton matching final layout"
 ```bash
 git push -u origin feat/shell-chrome
 gh pr create --base feat/design-primitives --title "feat: shell chrome (topbar, workspace switcher, sancak rail)" --body "$(cat <<'EOF'
-Layer 2 of docs/specs/2026-08-09-visual-debt-design.md: shared topbar, workspace switcher dropdown (works from the collapsed rail), sliding sancak rail, shell loading skeleton. Retarget to develop once Layer 1 merges.
+Layer 2 of docs/archive/specs/2026-08-09-visual-debt-design.md: shared topbar, workspace switcher dropdown (works from the collapsed rail), sliding sancak rail, shell loading skeleton. Retarget to develop once Layer 1 merges.
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
@@ -838,7 +834,7 @@ export function AuthFormField({
 
 - [x] **Step 2: Verify and commit**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS.
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck` — expected PASS.
 
 ```bash
 git checkout -b feat/auth-visual
@@ -971,7 +967,7 @@ Add the `Button` import; remove every `text-[var(--color-…)]` and `bg-[var(--c
 - [x] **Step 6: Verify**
 
 ```bash
-pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && \
+pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck && \
 grep -rnE "text-red-|text-\[var\(|bg-\[var\(--color" "apps/web/app/(auth)" apps/web/components/auth "apps/web/app/(app)/workspaces"
 ```
 
@@ -988,16 +984,15 @@ git commit -m "feat(web): auth and workspace forms on the identity system"
 
 **Files:** none (verification only)
 
-- [x] **Step 1: Build** — `pnpm --filter @kurultay/web build`, PASS.
+- [x] **Step 1: Build** — `pnpm --filter @kurul/web build`, PASS.
 - [x] **Step 2: Manual pass** — login, register, invite in both themes; keyboard-only submit; exactly one copper element per screen (the primary button; the damga and the footer link are the sanctioned exceptions per design.md §2).
 - [x] **Step 3: PR**
 
 ```bash
 git push -u origin feat/auth-visual
 gh pr create --base feat/shell-chrome --title "feat: auth screens on the identity system" --body "$(cat <<'EOF'
-Layer 3 of docs/specs/2026-08-09-visual-debt-design.md: Fraunces display headline + damga mark via a shared (auth) layout, ui/input + ui/label + ui/button, all non-token colors removed. Retarget to develop once Layer 2 merges.
+Layer 3 of docs/archive/specs/2026-08-09-visual-debt-design.md: Fraunces display headline + damga mark via a shared (auth) layout, ui/input + ui/label + ui/button, all non-token colors removed. Retarget to develop once Layer 2 merges.
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
@@ -1090,7 +1085,7 @@ Columns created after the first paint mount with `entranceDone === true` and get
 
 - [x] **Step 4: Verify and commit**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck` — expected PASS. Manual: columns cascade in once on load; adding a column later does not re-animate.
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck` — expected PASS. Manual: columns cascade in once on load; adding a column later does not re-animate.
 
 ```bash
 git checkout -b feat/board-polish
@@ -1121,7 +1116,7 @@ Replace the loading grid's `<Skeleton className="h-24 w-full" />` with `<Skeleto
 
 - [x] **Step 3: Verify and commit**
 
-Run: `pnpm --filter @kurultay/web lint` — expected PASS.
+Run: `pnpm --filter @kurul/web lint` — expected PASS.
 
 ```bash
 git add apps/web/components/board/board-list.tsx
@@ -1169,7 +1164,7 @@ In `board-view.tsx`:
 
 - [x] **Step 3: Verify**
 
-Run: `pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck`
+Run: `pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck`
 Expected: PASS, no unused-variable warnings from the removed state.
 
 - [x] **Step 4: Commit**
@@ -1186,7 +1181,7 @@ git commit -m "feat(web): surface column action failures as toasts with retry"
 - [x] **Step 1: Full verification**
 
 ```bash
-pnpm --filter @kurultay/web lint && pnpm --filter @kurultay/web typecheck && pnpm --filter @kurultay/web build
+pnpm --filter @kurul/web lint && pnpm --filter @kurul/web typecheck && pnpm --filter @kurul/web build
 ```
 
 Expected: all PASS.
@@ -1206,9 +1201,8 @@ Expected: no matches.
 ```bash
 git push -u origin feat/board-polish
 gh pr create --base feat/auth-visual --title "feat: board polish (stagger, card states, toast errors)" --body "$(cat <<'EOF'
-Layer 4 of docs/specs/2026-08-09-visual-debt-design.md: first-paint column stagger, board card hover/focus, action errors as toasts with retry. Retarget to develop once Layer 3 merges.
+Layer 4 of docs/archive/specs/2026-08-09-visual-debt-design.md: first-paint column stagger, board card hover/focus, action errors as toasts with retry. Retarget to develop once Layer 3 merges.
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```

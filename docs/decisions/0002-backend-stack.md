@@ -40,8 +40,10 @@ share types cleanly with the Next.js frontend.
 - **Postgres + Redis** is close to undisputed: both commercial peers (ClickUp,
   Linear) and OSS peers (Plane, Taiga, Focalboard) use Postgres — JSON fields
   cover flexible metadata (custom fields), relational integrity covers
-  task/board relations. Redis is one tool covering four needs: notification
-  queue, session store, rate limiting, and the Socket.io pub/sub adapter.
+  task/board relations. Redis covers the Socket.io pub/sub adapter and the BullMQ
+  due-soon notification queue. Sessions live in PostgreSQL (Better Auth); HTTP rate
+  limiting is not wired yet — those two were anticipated Redis jobs at decision time and
+  are not current runtime uses.
 - **PostgreSQL 18, the current major.** Pinning the previous major would be
   supportable for years, but silently: a greenfield project has no reason to
   start one version behind. The deadline matters more than the version — the
@@ -51,7 +53,7 @@ share types cleanly with the Next.js frontend.
   PostgreSQL 19 is in beta and deliberately skipped.
 - **Redis 8, for the licence.** Redis 7.4–7.8 are RSALv2/SSPLv1 only —
   source-available, not OSI open source. Redis 8 restored an OSI-approved
-  option, **AGPLv3**, which is the licence Kurultay itself ships under (see
+  option, **AGPLv3**, which is the licence Kurul itself ships under (see
   [0007](0007-license-agpl.md)), so the stack a self-hoster pulls is
   licence-aligned end to end. Valkey (BSD-3-Clause, the Linux Foundation fork
   of Redis 7.2.4) is protocol-compatible and remains a one-line image change
@@ -75,7 +77,7 @@ share types cleanly with the Next.js frontend.
     was removed, so `db:seed` is always explicit.
   - The generator **`output` path is required** and must sit outside
     `node_modules`. The client emits to `apps/api/src/generated/prisma` for Nest
-    and the Better Auth adapter. `@kurultay/shared-types` DTOs/enums are
+    and the Better Auth adapter. `@kurul/shared-types` DTOs/enums are
     hand-maintained against the schema today; mechanical Prisma→shared-types
     codegen remains aspirational.
   - **Client middleware (`$use`) is removed.** Query-level cross-cutting
@@ -84,7 +86,9 @@ share types cleanly with the Next.js frontend.
     compare-and-swap guard on `Task.position` — must be built as **Client
     Extensions**. There is no middleware layer to fall back to.
   - **Env vars are not auto-loaded**; `dotenv` is called explicitly.
-  - Minimum Node 20.19.0 and TypeScript 5.4 follow from the above.
+  - Minimum Node 20.19.0 and TypeScript 5.4 follow from the above (Prisma’s documented
+    floor at acceptance). The **repository engines field** is stricter today:
+    `"node": ">=24"` in the root `package.json` — see [development.md](../development.md).
 - Redis becomes a hard runtime dependency for basic features, not an optional
   extra.
 - Prisma's schema-first flow is less flexible than raw SQL for complex queries

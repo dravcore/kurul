@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { LabelDto, WorkspaceMemberDto } from '@kurultay/shared-types';
+import type { LabelDto, WorkspaceMemberDto } from '@kurul/shared-types';
 import type { BoardTaskFilters } from '@/lib/task-query';
 import {
   resolveDuePreset,
@@ -88,6 +88,10 @@ export function BoardFilterChips({
 
   if (chips.length === 0) return null;
 
+  // Both controls below take `max-md:min-h-11`. A chip is a 24px pill on desktop by design
+  // (`docs/design.md` §4 — chips are `radius-sm`, read at a glance, and a row of them has to
+  // stay a row), but on the mobile board it is a real control a thumb has to hit, and 24px is
+  // not one. The pill grows; its text and radius do not.
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {chips.map((chip) => (
@@ -95,7 +99,7 @@ export function BoardFilterChips({
           key={chip.key}
           type="button"
           onClick={() => onChange(chip.next)}
-          className="inline-flex h-6 max-w-full items-center gap-1 rounded-sm bg-muted px-2 text-micro text-foreground transition-colors hover:bg-accent"
+          className="inline-flex h-6 max-w-full items-center gap-1 rounded-sm bg-muted px-2 text-micro text-foreground transition-colors hover:bg-accent max-md:min-h-11 max-md:px-3"
         >
           <span className="truncate">{chip.label}</span>
           <X className="size-3 shrink-0 opacity-70" aria-hidden />
@@ -105,7 +109,7 @@ export function BoardFilterChips({
       <button
         type="button"
         onClick={() => onChange({})}
-        className="text-micro text-muted-foreground underline-offset-2 hover:underline"
+        className="inline-flex items-center text-micro text-muted-foreground underline-offset-2 hover:underline max-md:min-h-11 max-md:px-2"
       >
         {t('clearAll')}
       </button>

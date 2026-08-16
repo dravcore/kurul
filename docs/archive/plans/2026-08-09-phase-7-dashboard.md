@@ -1,14 +1,16 @@
 # Phase 7 — Dashboard — Implementation Plan
 
+> **Historical plan — shipped. Do not re-execute.** Checkboxes are a frozen record. Ignore any AI attribution footers in this file.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Spec:** [docs/specs/2026-08-09-phase-7-dashboard-design.md](../specs/2026-08-09-phase-7-dashboard-design.md)
+**Spec:** [docs/archive/specs/2026-08-09-phase-7-dashboard-design.md](../specs/2026-08-09-phase-7-dashboard-design.md)
 
 **Goal:** Workspace aggregate view — total/overdue tiles, priority and assignee charts, optional per-board column chart — above the existing board list on `/dashboard`.
 
 **Architecture:** One read endpoint `GET /workspaces/:workspaceId/dashboard/summary?boardId?` returns `DashboardSummaryDto`. Web loads summary + boards; board filter in URL. Completion time series deferred to Phase 8.
 
-**Tech Stack:** NestJS DashboardModule, Prisma groupBy/count, `@kurultay/shared-types`, Next.js App Router, Recharts, design.md §8, next-intl.
+**Tech Stack:** NestJS DashboardModule, Prisma groupBy/count, `@kurul/shared-types`, Next.js App Router, Recharts, design.md §8, next-intl.
 
 ## Global Constraints
 

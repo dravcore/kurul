@@ -1,6 +1,19 @@
+/**
+ * Longest display name the picker will bind into a mention.
+ *
+ * Kept in sync with `apps/api/src/common/mentions/parse-mentions.ts`. Unbounded,
+ * `[^\]]*` rescans to the end of the body from every `@[` that never closes, so a
+ * 10 000 character comment — the `CreateCommentDto` ceiling — of repeated `@[\`
+ * costs on the order of 10^8 character comparisons on the main thread, once per
+ * viewer that tokenizes the body. Capping the run makes the worst case linear.
+ */
+const MAX_MENTION_NAME = 200;
+
 /** UUIDv7 bound inside `@[Name](userId)` mention markup. */
-const MENTION_RE =
-  /@\[([^\]]*)\]\(([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\)/gi;
+const MENTION_RE = new RegExp(
+  `@\\[([^\\]]{0,${MAX_MENTION_NAME}})\\]\\(([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\)`,
+  'gi',
+);
 
 export type MentionToken =
   { kind: 'text'; text: string } | { kind: 'mention'; name: string; userId: string };

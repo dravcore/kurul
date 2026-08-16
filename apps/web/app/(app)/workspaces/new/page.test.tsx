@@ -59,10 +59,10 @@ describe('NewWorkspacePage', () => {
     renderPage();
 
     fireEvent.change(nameField(), { target: { value: 'Steppe Collective' } });
-    fireEvent.change(slugField(), { target: { value: 'kurultay' } });
+    fireEvent.change(slugField(), { target: { value: 'kurul' } });
     fireEvent.change(nameField(), { target: { value: 'Steppe Collective Renamed' } });
 
-    expect(slugField().value).toBe('kurultay');
+    expect(slugField().value).toBe('kurul');
   });
 
   it('activates the created workspace before leaving for the dashboard', async () => {

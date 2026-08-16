@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { ActivityType } from '@kurultay/shared-types';
-import type { TaskDto } from '@kurultay/shared-types';
+import { ActivityType } from '@kurul/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { NotificationService } from '../notification/notification.service';
 import { PrismaService } from '../prisma/prisma.service';

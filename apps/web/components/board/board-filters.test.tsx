@@ -1,8 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { LabelDto, WorkspaceMemberDto } from '@kurultay/shared-types';
-import { MemberRole, Priority } from '@kurultay/shared-types';
+import type { LabelDto, WorkspaceMemberDto } from '@kurul/shared-types';
+import { MemberRole, Priority } from '@kurul/shared-types';
 import type { BoardTaskFilters } from '@/lib/task-query';
 import messages from '@/messages/en.json';
 import { BoardFilters } from './board-filters';
@@ -97,6 +97,62 @@ describe('BoardFilters search', () => {
     );
 
     expect(searchBox().value).toBe('');
+  });
+
+  it('keeps focus in the box when the committed query catches up', () => {
+    // Re-seeding the draft must not remount the input: the user is still in it after
+    // pressing Enter, and a remount would drop focus and the caret.
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <BoardFilters filters={{}} members={members} labels={labels} onChange={vi.fn()} />
+      </NextIntlClientProvider>,
+    );
+    const before = searchBox();
+    before.focus();
+    fireEvent.change(before, { target: { value: 'login' } });
+    fireEvent.keyDown(before, { key: 'Enter' });
+
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <BoardFilters
+          filters={{ q: 'login' }}
+          members={members}
+          labels={labels}
+          onChange={vi.fn()}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(searchBox()).toBe(before);
+    expect(document.activeElement).toBe(searchBox());
+    expect(searchBox().value).toBe('login');
+  });
+
+  it('keeps a half-typed draft across a re-render that does not change the query', () => {
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <BoardFilters
+          filters={{ q: 'login' }}
+          members={members}
+          labels={labels}
+          onChange={vi.fn()}
+        />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.change(searchBox(), { target: { value: 'login bu' } });
+
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <BoardFilters
+          filters={{ q: 'login' }}
+          members={members}
+          labels={labels}
+          onChange={vi.fn()}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(searchBox().value).toBe('login bu');
   });
 
   it('focuses the box when "/" is pressed on the page', () => {

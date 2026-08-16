@@ -7,7 +7,7 @@
 
 ## Context
 
-Kurultay ships versioned releases of a self-hosted product, rather than
+Kurul ships versioned releases of a self-hosted product, rather than
 continuously deploying a single hosted SaaS instance. The branching model,
 commit convention, and versioning scheme need to fit that release shape.
 
@@ -32,7 +32,7 @@ Changelog** format.
 - Keep a Changelog keeps `CHANGELOG.md` human-readable and consistently
   structured (Added / Changed / Fixed / etc.).
 - **Deliberate deviation from peers:** several large OSS projects skip
-  `CHANGELOG.md` in favor of GitHub Releases alone. Kurultay keeps both in
+  `CHANGELOG.md` in favor of GitHub Releases alone. Kurul keeps both in
   sync deliberately — a changelog file in the repo is more accessible to
   self-hosters scanning history without leaving their clone.
 - Matches the maintainer's existing house style: `main`/`develop` plus typed

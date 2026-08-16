@@ -1,4 +1,4 @@
-import type { LabelColorSlot, LabelDto } from '@kurultay/shared-types';
+import type { LabelColorSlot, LabelDto } from '@kurul/shared-types';
 import { cn } from '@/lib/utils';
 
 const SLOT_CLASS: Record<LabelColorSlot, string> = {
@@ -35,11 +35,11 @@ export function LabelDots({ labels, className }: LabelDotsProps): React.ReactEle
   );
 }
 
-interface LabelChipProps {
+type LabelChipProps = {
   label: LabelDto;
-  onRemove?: () => void;
-  removeLabel?: string;
-}
+} & (
+  { onRemove?: undefined; removeLabel?: undefined } | { onRemove: () => void; removeLabel: string }
+);
 
 export function LabelChip({ label, onRemove, removeLabel }: LabelChipProps): React.ReactElement {
   return (
@@ -50,7 +50,7 @@ export function LabelChip({ label, onRemove, removeLabel }: LabelChipProps): Rea
         <button
           type="button"
           className="text-muted-foreground hover:text-foreground"
-          aria-label={removeLabel ?? 'Remove'}
+          aria-label={removeLabel}
           onClick={onRemove}
         >
           ×

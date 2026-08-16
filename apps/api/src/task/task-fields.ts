@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import type { Priority } from '@kurultay/shared-types';
+import type { Priority } from '@kurul/shared-types';
 import type { CreateTaskDto } from './dto/create-task.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
 

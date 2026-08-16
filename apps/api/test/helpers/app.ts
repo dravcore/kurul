@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
 import { configureApp } from '../../src/common/configure-app';
+import { resolveTrustProxySetting } from '../../src/common/trust-proxy';
 
 export async function createTestApp(): Promise<INestApplication<App>> {
   const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -12,6 +13,11 @@ export async function createTestApp(): Promise<INestApplication<App>> {
   const app = moduleFixture.createNestApplication();
   configureApp(app, {
     corsOrigin: process.env.WEB_URL ?? 'http://localhost:3000',
+    // Off by default, same as production — every integration spec's request is a direct
+    // loopback connection from supertest, so there is no proxy hop to trust. A spec that wants
+    // to exercise the reverse-proxy path builds its own app with `configureApp` directly (see
+    // `src/common/trust-proxy.spec.ts`) rather than overriding process-wide state here.
+    trustProxy: resolveTrustProxySetting(process.env.TRUST_PROXY ?? 'false'),
   });
   await app.init();
 

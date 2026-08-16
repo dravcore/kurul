@@ -1,0 +1,148 @@
+name: Browser E2E
+
+# Nightly, and on every pull request into `main`.
+#
+# Deliberately *not* on every pull request, and deliberately not part of the `ci-ok` gate.
+# This suite boots the whole stack — Postgres, Redis, Mailpit, a compiled API and a
+# production web build — and drives a real Chromium through it. That is the most valuable
+# signal the project has and also its most expensive one to run and its most expensive one to
+# be wrong about: a browser suite wired into the required gate turns any infrastructure hiccup
+# into "nobody can merge anything". `ci.yml` stays the fast, required feedback loop; this runs
+# where a failure means "look at this before shipping", not "stop".
+#
+# `pull_request: branches: [main]` is the release trigger. Per docs/git-strategy.md only
+# `release/*` and `hotfix/*` branches open pull requests against `main`, so this fires exactly
+# once per release candidate and once per hotfix — the two moments when knowing that a person
+# can sign in, drag a card and accept an invitation is worth four minutes.
+on:
+  schedule:
+    # 03:00 UTC. Late enough that the day's merges are in, early enough that a red nightly is
+    # waiting when the working day starts.
+    - cron: '0 3 * * *'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    # The suite itself is capped at five minutes by `globalTimeout` in
+    # e2e/playwright.config.ts. This ceiling covers install and the builds around it, and
+    # exists only so a hung service container cannot burn an hour of runner time.
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: kurul
+          POSTGRES_PASSWORD: kurul
+          # The suite migrates `kurul_test_playwright` itself (Prisma creates it on first
+          # `migrate deploy`); this is only the database the connection is opened against.
+          POSTGRES_DB: kurul
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kurul -d kurul"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      # Mailpit is not optional here: scenario 3 reads the invitation link out of a delivered
+      # message, and scenario 2 and 4 confirm their accounts' addresses the same way. With no
+      # SMTP host the API falls back to logging mail instead of sending it and all three fail.
+      #
+      # No `--health-cmd`: the image ships a single static binary with no shell, and GitHub
+      # passes health commands through `/bin/sh -c`. The wait step below polls the HTTP port
+      # instead, which is the thing the suite actually needs to be up.
+      mailpit:
+        image: axllent/mailpit:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    env:
+      # `e2e/stack-env.ts` derives the suite's own URLs from these two by swapping the
+      # database name (`kurul_test_playwright`) and the Redis index (8), so the values here
+      # only have to name the right server.
+      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul
+      REDIS_URL: redis://localhost:6379
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Keyed on the lockfile so the cache is invalidated exactly when the Playwright version
+      # changes — a browser build that does not match the client is worse than no cache.
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Chromium
+        run: pnpm --filter @kurul/e2e exec playwright install --with-deps chromium
+
+      - name: Wait for Mailpit
+        run: |
+          # Up to 30s. Postgres and Redis have health checks and are already up by the time a
+          # step runs; Mailpit has none, so this is where its readiness is established rather
+          # than inside a test, where the failure would read as "the invitation never arrived".
+          for attempt in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:8025/; then
+              echo "Mailpit is up after ${attempt}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Mailpit did not answer on :8025 within 30s"
+          exit 1
+
+      # Builds the API and the standalone web bundle (with NEXT_PUBLIC_API_URL pinned to the
+      # suite's port) and migrates the suite's database. Its own step so that a slow build is
+      # visible as a slow build rather than as a slow test run.
+      - name: Build the stack
+        run: node e2e/build-stack.mjs
+
+      - name: Run browser suite
+        run: pnpm --filter @kurul/e2e exec playwright test
+
+      # `if: always()` — the report is worth most when the run failed, and on a nightly it is
+      # the only record anyone will have. It carries the traces, which is what makes a
+      # failure diagnosable without reproducing it.
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload failure traces
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-traces
+          path: e2e/test-results
+          retention-days: 14
+          if-no-files-found: ignore

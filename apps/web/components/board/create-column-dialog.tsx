@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { ColumnDto, CreateColumnRequest } from '@kurultay/shared-types';
+import type { ColumnDto, CreateColumnRequest } from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { FormDialog } from '@/components/common/form-dialog';
 import { Input } from '@/components/ui/input';

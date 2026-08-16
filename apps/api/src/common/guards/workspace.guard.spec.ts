@@ -1,5 +1,5 @@
 import { ExecutionContext, NotFoundException } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WorkspaceGuard } from './workspace.guard';
 import type { AuthedRequest, AuthenticatedUser } from '../types/request-context';

@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import {
-  MemberRole,
-  Priority,
-  type TaskDto,
-  type WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+import { MemberRole, Priority, type TaskDto, type WorkspaceMemberDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api, ApiError } from '@/lib/api';
 import type { BoardTaskFilters, BoardTaskPage, FetchBoardTasksOptions } from '@/lib/task-query';
@@ -51,6 +46,9 @@ function task(id: string): TaskDto {
     updatedAt: '2026-01-01T00:00:00.000Z',
     assignees: [],
     labels: [],
+    checklistSummary: { total: 0, done: 0 },
+    checklists: null,
+    attachmentCount: 0,
   };
 }
 

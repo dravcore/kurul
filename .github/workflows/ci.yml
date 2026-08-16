@@ -18,11 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # prisma.config.ts requires DATABASE_URL even for `prisma generate`.
-      DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_ci
+      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_ci
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -33,7 +33,7 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
       - name: Build shared packages
-        run: pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build
+        run: pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build
       - name: Lint
         run: pnpm lint
       - name: Format check
@@ -47,13 +47,13 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_USER: kurultay
-          POSTGRES_PASSWORD: kurultay
-          POSTGRES_DB: kurultay_test
+          POSTGRES_USER: kurul
+          POSTGRES_PASSWORD: kurul
+          POSTGRES_DB: kurul_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U kurultay -d kurultay_test"
+          --health-cmd "pg_isready -U kurul -d kurul_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -67,16 +67,16 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_test
+      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_test
       REDIS_URL: redis://localhost:6379
       API_PORT: 4000
       WEB_URL: http://localhost:3000
       BETTER_AUTH_SECRET: ci-test-secret
       BETTER_AUTH_URL: http://localhost:4000
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -85,41 +85,61 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
       - name: Build shared packages
-        run: pnpm --filter @kurultay/shared-types build && pnpm --filter @kurultay/auth-access build
+        run: pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build
       - name: Unit tests (shared packages)
-        run: pnpm --filter @kurultay/shared-types test
+        run: pnpm --filter "./packages/*" test
       - name: Unit tests with coverage
         run: |
-          pnpm --filter @kurultay/api test:cov
-          pnpm --filter @kurultay/web exec vitest run --coverage
+          pnpm --filter @kurul/api test:cov
+          pnpm --filter @kurul/web exec vitest run --coverage
       - name: Upload API coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: api-coverage
           path: apps/api/coverage
           if-no-files-found: ignore
       - name: Upload web coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: web-coverage
           path: apps/web/coverage
           if-no-files-found: ignore
       - name: Migrate test database
         run: pnpm db:migrate
+      # The database was just built from the checked-in migrations, which is exactly the state
+      # this compares against the schema. Drift is silent by nature: it breaks nothing at
+      # runtime and only surfaces as unrelated statements the next `prisma migrate dev` wants
+      # to emit — which is how issue #196 sat unnoticed until a metrics table needed a
+      # migration. `--exit-code` returns 2 when the diff is non-empty, so the gate is the
+      # command's own answer rather than a grep over its prose.
+      - name: Check for migration drift
+        run: >
+          pnpm exec prisma migrate diff
+          --from-config-datasource
+          --to-schema apps/api/prisma/schema.prisma
+          --exit-code
       - name: Integration tests
-        run: pnpm --filter @kurultay/api test:e2e
+        run: pnpm --filter @kurul/api test:e2e
 
   build:
     needs: [lint, test]
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgresql://kurultay:kurultay@localhost:5432/kurultay_ci
+      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_ci
+      # Neither of these is connected to or dialled in this job — no Postgres service runs here
+      # and the OpenAPI generator opens no sockets. They are needed because *importing* the
+      # application still evaluates module-level configuration: `auth/auth.ts` throws
+      # "BETTER_AUTH_SECRET is required" at import, and `prisma/database.ts` builds a (lazy)
+      # pool from `DATABASE_URL`. `preview: true` skips provider instantiation, not module
+      # evaluation. Both values are placeholders and must stay obviously so.
+      BETTER_AUTH_SECRET: ci-build-secret
+      BETTER_AUTH_URL: http://localhost:4000
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -129,3 +149,64 @@ jobs:
         run: pnpm db:generate
       - name: Build
         run: pnpm build
+      # In this job and not in `lint`, because the generator reads the *built* API: the Swagger
+      # CLI plugin registered in `apps/api/nest-cli.json` is what turns a DTO's TypeScript types
+      # and doc comments into a schema, and it runs during `nest build` and nowhere else. It
+      # needs no database — `NestFactory.create(..., { preview: true })` registers every
+      # controller's metadata without instantiating a single provider — which is why it can sit
+      # in the one job that has no Postgres service.
+      #
+      # This is the gate that makes the committed specification mean something. Adding an
+      # endpoint, renaming a field, widening a validation rule or changing a role gate all move
+      # the generated document; if `apps/api/openapi.json` did not move with them, the
+      # specification is describing an API that no longer exists and this step is the only thing
+      # that would say so. `--check` exits non-zero on a difference and names the first line
+      # that differs, so the gate is the command's own answer rather than a grep over its prose.
+      - name: Check for OpenAPI specification drift
+        run: pnpm openapi:check
+
+  ci-ok:
+    # Gate job: the single required status check. `if: always()` is the whole point —
+    # a `needs` job that is skipped (e.g. via concurrency cancel) or cancelled still runs
+    # this job, so "skipped" or "cancelled" can never silently pass the gate the way a plain
+    # `needs` gate would. Without `if: always()`, a cancelled upstream job causes GitHub to
+    # skip the gate job entirely and report it as "passed" — the exact failure mode from
+    # PR #89 (https://github.com/dravcore/kurul/pull/89).
+    if: always()
+    needs: [lint, test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide gate result
+        run: |
+          # Collect results for all upstream jobs. Each job runs in a context where its
+          # own result is not yet known to downstream jobs — only the result objects of
+          # `needs.*` are visible. A job that was skipped or cancelled has result="skipped"
+          # or "cancelled", not "success". The gate must reject both.
+          declare -A results
+          results[lint]="${{ needs.lint.result }}"
+          results[test]="${{ needs.test.result }}"
+          results[build]="${{ needs.build.result }}"
+
+          # Log each result for diagnosis: if a PR fails, the developer needs to know which
+          # job failed, what its result status was, and whether it was actually a failure
+          # or a skip/cancel (GitHub's skipped jobs are not a failure in the normal sense,
+          # but they halt the pipeline and must be treated as if they were).
+          echo "Gate check results:"
+          for job in lint test build; do
+            echo "  $job: ${results[$job]}"
+          done
+
+          # Reject any result that is not "success". This catches:
+          # - failure: the job failed a step.
+          # - skipped: concurrency cancel, or an upstream job that was skipped.
+          # - cancelled: the workflow was cancelled by the user or timed out.
+          # Using contains(needs.*.result, 'failure') would miss skipped and cancelled.
+          failure=0
+          for job in lint test build; do
+            if [[ "${results[$job]}" != "success" ]]; then
+              echo "ERROR: $job did not succeed (result: ${results[$job]})"
+              failure=1
+            fi
+          done
+
+          exit $failure

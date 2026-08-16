@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import type { TaskDto } from '@kurultay/shared-types';
-import { SocketClientEvents } from '@kurultay/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
+import { SocketClientEvents } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { useBoardRealtime } from './use-board-realtime';
 

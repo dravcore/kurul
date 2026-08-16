@@ -4,8 +4,8 @@ import {
   resolveLocale,
   type Locale,
   type UserDto,
-} from '@kurultay/shared-types';
-import { getApiBaseUrl } from '@/lib/api';
+} from '@kurul/shared-types';
+import { getServerApiBaseUrl } from '@/lib/api-url';
 
 /**
  * Substring identifying Better Auth's session cookie in a raw `Cookie` header.
@@ -27,6 +27,11 @@ export function hasSessionCookie(cookieHeader: string | null | undefined): boole
  * Never throws and never rejects. This runs inside `getRequestConfig`, so anything that
  * escapes here fails the render of every page — an API that is down or slow has to cost the
  * user their preferred language, not the application.
+ *
+ * Uses the server-side API base (`lib/api-url.ts`), not the browser's: this is a server
+ * render, so a same-origin `/api` prefix would have no origin to resolve against, and the
+ * container-network address it resolves to instead skips a round trip out through the reverse
+ * proxy and back.
  */
 export async function fetchStoredLocale(
   cookieHeader: string | null | undefined,
@@ -34,7 +39,7 @@ export async function fetchStoredLocale(
   if (!hasSessionCookie(cookieHeader) || !cookieHeader) return null;
 
   try {
-    const response = await fetch(`${getApiBaseUrl()}/me`, {
+    const response = await fetch(`${getServerApiBaseUrl()}/me`, {
       headers: { cookie: cookieHeader },
       // The answer is per-user; a cached one would hand the first renderer's language to
       // everyone behind the same cache entry.

@@ -5,12 +5,7 @@ import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type {
-  LabelDto,
-  TaskDto,
-  UpdateTaskRequest,
-  WorkspaceMemberDto,
-} from '@kurultay/shared-types';
+import type { LabelDto, TaskDto, UpdateTaskRequest, WorkspaceMemberDto } from '@kurul/shared-types';
 import { api, apiStatus, resolveApiMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +13,11 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { TaskAttachments } from './task-attachments';
+import { TaskChecklists } from './task-checklists';
 import { TaskMetadataPanel } from './task-metadata-panel';
+import { useTaskAttachments } from './use-task-attachments';
+import { useTaskChecklists } from './use-task-checklists';
 
 interface TaskPanelProps {
   workspaceId: string;
@@ -69,10 +68,45 @@ export function TaskPanel({
   const [description, setDescription] = useState(task?.description ?? '');
   const [pending, setPending] = useState(false);
 
-  useEffect(() => {
+  // Its own hook rather than more handlers in this component: the task a board row hands over
+  // carries `checklists: null` — the summary only — so the checklist surface owns a read as
+  // well as five writes, and this file is already the widest in the folder.
+  const checklists = useTaskChecklists({ workspaceId, task, canMutate, onUpdated });
+
+  // Attachments do not ride on the task DTO the way checklists do — `TaskDto` carries only
+  // `attachmentCount` (decision D2), so this hook owns a list of its own. The count is written
+  // back through the same `onUpdated` merge every other write uses, which is what keeps the
+  // board card's badge in step without waiting for this tab's own `task:updated` broadcast.
+  const onAttachmentCountChanged = useCallback(
+    (id: string, attachmentCount: number) => onUpdated({ id, attachmentCount }),
+    [onUpdated],
+  );
+  const attachments = useTaskAttachments({
+    workspaceId,
+    task,
+    canMutate,
+    onCountChanged: onAttachmentCountChanged,
+  });
+
+  // Re-seed the editable fields when the panel switches task, or when the stored title or
+  // description changes under it (our own PATCH coming back, or a realtime edit). Done during
+  // render rather than from an effect so the panel never paints the previous task's title for
+  // one frame first — the flash was visible every time a card was opened from another card.
+  // The three compared values are exactly what the effect's dependency list was.
+  const [synced, setSynced] = useState({
+    id: task?.id,
+    title: task?.title,
+    description: task?.description,
+  });
+  if (
+    synced.id !== task?.id ||
+    synced.title !== task?.title ||
+    synced.description !== task?.description
+  ) {
+    setSynced({ id: task?.id, title: task?.title, description: task?.description });
     setTitle(task?.title ?? '');
     setDescription(task?.description ?? '');
-  }, [task?.id, task?.title, task?.description]);
+  }
 
   // Closing only takes focus back if the user still has it in here. Tracked from `focusin`
   // rather than read on the way out: by the time the unmount cleanup runs, React has already
@@ -85,6 +119,43 @@ export function TaskPanel({
     }
     document.addEventListener('focusin', onFocusIn);
     return () => document.removeEventListener('focusin', onFocusIn);
+  }, []);
+
+  // Below `md` the panel is a fullscreen sheet (`fixed inset-0`). Without a focus trap, Tab
+  // walks onto the board underneath. Desktop keeps the panel in the layout flow, so the
+  // ordinary document tab order is correct there.
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia('(max-width: 767px)');
+
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key !== 'Tab' || !media.matches) return;
+      const root = panelRef.current;
+      if (!root) return;
+
+      const focusable = root.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (active instanceof Node && !root.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   useEffect(() => {
@@ -283,6 +354,35 @@ export function TaskPanel({
                 className="min-h-32"
               />
             </div>
+            <TaskChecklists
+              checklists={checklists.checklists}
+              canMutate={canMutate}
+              pending={checklists.pending}
+              loading={checklists.loading}
+              loadFailed={checklists.loadFailed}
+              onToggle={(itemId, isDone) => void checklists.toggleItem(itemId, isDone)}
+              onAddChecklist={checklists.addChecklist}
+              onRemoveChecklist={(checklistId) => void checklists.removeChecklist(checklistId)}
+              onAddItem={checklists.addItem}
+              onRemoveItem={(itemId) => void checklists.removeItem(itemId)}
+            />
+            {/*
+              Between the checklists and the metadata panel, not at the end: the delete footer
+              below is `mt-auto` and only reaches the bottom of the panel while it is the last
+              child of this flex column.
+            */}
+            <TaskAttachments
+              workspaceId={workspaceId}
+              attachments={attachments.attachments}
+              canMutate={canMutate}
+              storageEnabled={attachments.storageEnabled}
+              pending={attachments.pending}
+              loading={attachments.loading}
+              loadFailed={attachments.loadFailed}
+              onUpload={attachments.upload}
+              onAddLink={attachments.addLink}
+              onRemove={(attachmentId) => void attachments.remove(attachmentId)}
+            />
             <TaskMetadataPanel
               workspaceId={workspaceId}
               boardId={boardId}

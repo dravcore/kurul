@@ -27,6 +27,18 @@ export interface MailMessage {
 export interface MailSender {
   /** Which transport this is; surfaced for diagnostics and tests, never branched on in logic. */
   readonly transport: 'smtp' | 'log';
+  /**
+   * Whether a successful `send` means the message left this process for a real recipient.
+   *
+   * A separate bit rather than `transport === 'smtp'` on purpose. `transport` names *which*
+   * implementation this is and is explicitly not something to branch on — the day a second
+   * delivering transport exists, every `=== 'smtp'` test silently starts answering "no mail
+   * here" for a deployment that sends mail perfectly well. This asks the question the product
+   * actually has, which is a capability and not an identity, and it is the single source the
+   * `mailEnabled` signal and the per-send delivery status both read
+   * (`docs/api-conventions.md#instance-configuration`).
+   */
+  readonly deliversMail: boolean;
   send(message: MailMessage): Promise<void>;
   /** Releases transport resources (pooled SMTP connections). Idempotent. */
   close(): Promise<void>;

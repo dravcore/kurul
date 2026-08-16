@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { Priority, type TaskDto } from '@kurultay/shared-types';
+import { Priority, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { TaskDetailFields } from './task-detail-fields';
 
@@ -21,6 +21,9 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     updatedAt: '2026-01-01T00:00:00.000Z',
     assignees: [],
     labels: [],
+    checklistSummary: { total: 0, done: 0 },
+    checklists: null,
+    attachmentCount: 0,
     ...overrides,
   };
 }

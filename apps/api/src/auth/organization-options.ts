@@ -1,12 +1,25 @@
 import type { OrganizationOptions } from 'better-auth/plugins';
 import type { AccessControl } from 'better-auth/plugins/access';
-import { ac as sharedAc, organizationRoles as sharedRoles } from '@kurultay/auth-access';
+import { ac as sharedAc, organizationRoles as sharedRoles } from '@kurul/auth-access';
 import { buildInvitationEmail } from '../mail/mail-templates';
+import { acceptLanguageOf, resolveRecipientLocale } from '../mail/recipient-locale';
 import { sendMail } from '../mail/send-mail';
+import { readStoredLocale } from '../mail/stored-locale';
+import { evictUserFromWorkspaceSockets } from '../realtime/workspace-socket-eviction';
 import { buildInviteAcceptUrl } from './web-urls';
 
 /** The payload Better Auth hands to `sendInvitationEmail`, derived from the plugin's own type. */
 type InvitationEmailData = Parameters<NonNullable<OrganizationOptions['sendInvitationEmail']>>[0];
+
+/**
+ * The request that triggered the invitation, when the plugin has one.
+ *
+ * It belongs to the *inviter*, never to the invitee — which is precisely how it is used below:
+ * as the last link of the inviter's language, not the recipient's.
+ */
+type InvitationEmailRequest = Parameters<
+  NonNullable<OrganizationOptions['sendInvitationEmail']>
+>[1];
 
 /**
  * Options for the Better Auth organization plugin (our Workspace domain).
@@ -43,15 +56,47 @@ export const organizationOptions = {
   // never sent a verification link can never become verified, and every invitation would be
   // permanently unacceptable.
   requireEmailVerificationOnInvitation: true,
-  async sendInvitationEmail(data: InvitationEmailData): Promise<void> {
+  // The invitee is the one address in the product that may not have an account yet, so this is
+  // where the "no stored preference" branch of `resolveRecipientLocale` actually fires: the
+  // invitation is written in the inviter's language when the invitee has none of their own.
+  async sendInvitationEmail(
+    data: InvitationEmailData,
+    request: InvitationEmailRequest,
+  ): Promise<void> {
+    const locale = await resolveRecipientLocale(readStoredLocale, {
+      to: data.email,
+      actorEmail: data.inviter.user.email,
+      acceptLanguage: acceptLanguageOf(request),
+    });
+
     await sendMail(
       buildInvitationEmail({
         to: data.email,
         inviterName: data.inviter.user.name,
         workspaceName: data.organization.name,
         acceptUrl: buildInviteAcceptUrl(data.id),
+        locale,
       }),
     );
+  },
+  // HTTP membership revocation is immediate; Socket.io rooms are not. When Better Auth
+  // removes a member — which is what `DELETE /workspaces/:workspaceId/members/:userId` does,
+  // through `auth.api.removeMember` — drop their board and notification rooms so they stop
+  // receiving tenant events.
+  //
+  // This covers removal only. `/organization/leave` deletes the membership without running
+  // this hook, so `WorkspaceMemberService.leave` calls `evictUserFromWorkspaceSockets`
+  // itself; the two paths must stay evenly covered.
+  organizationHooks: {
+    afterRemoveMember: async ({
+      member,
+      organization,
+    }: {
+      member: { userId: string };
+      organization: { id: string };
+    }) => {
+      await evictUserFromWorkspaceSockets(organization.id, member.userId);
+    },
   },
   schema: {
     organization: {

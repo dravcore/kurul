@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { LabelColorSlot, type LabelDto } from '@kurultay/shared-types';
+import { LabelColorSlot, type LabelDto } from '@kurul/shared-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,14 +53,18 @@ export function TaskLabelsSection({
     <div className="flex flex-col gap-2">
       <p className="text-small font-medium text-foreground">{t('labels')}</p>
       <div className="flex flex-wrap gap-1.5">
-        {taskLabels.map((label) => (
-          <LabelChip
-            key={label.id}
-            label={label}
-            removeLabel={canMutate ? t('removeLabel', { name: label.name }) : undefined}
-            onRemove={canMutate ? () => onToggleLabel(label.id, true) : undefined}
-          />
-        ))}
+        {taskLabels.map((label) =>
+          canMutate ? (
+            <LabelChip
+              key={label.id}
+              label={label}
+              removeLabel={t('removeLabel', { name: label.name })}
+              onRemove={() => onToggleLabel(label.id, true)}
+            />
+          ) : (
+            <LabelChip key={label.id} label={label} />
+          ),
+        )}
         {taskLabels.length === 0 ? (
           <span className="text-small text-muted-foreground">{t('noLabels')}</span>
         ) : null}
@@ -71,7 +75,7 @@ export function TaskLabelsSection({
             const assigned = taskLabelIds.has(label.id);
             return (
               <li key={label.id} className="flex items-center gap-2">
-                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-body">
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-body max-md:min-h-11">
                   <input
                     type="checkbox"
                     checked={assigned}

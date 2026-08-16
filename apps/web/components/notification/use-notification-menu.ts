@@ -4,7 +4,7 @@ import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type { CursorPage, NotificationDto } from '@kurultay/shared-types';
+import type { CursorPage, NotificationDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { markAllNotificationsRead, openNotificationTarget } from '@/lib/notification-actions';
 import { useApiResource } from '@/lib/use-api-resource';

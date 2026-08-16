@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import type { NotificationDto } from '@kurultay/shared-types';
+import type { NotificationDto } from '@kurul/shared-types';
 import { notificationTitle } from '@/lib/notification-copy';
 import { formatRelativeTime } from '@/lib/relative-time';
 import { cn } from '@/lib/utils';

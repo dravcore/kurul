@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-/* Kurultay design tokens — values from docs/design.md §3 (Phase 3 validated). */
+/* Kurul design tokens — values from docs/design.md §3 (Phase 3 validated). */
 
 :root {
   --background: #f7f8f7;
@@ -47,6 +47,9 @@
   --label-slot-8: #e34948;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* docs/design.md §5 — the panel-and-sheet curve. The off-canvas drawer is the first thing
+     in the app to need it, which is why it was only a line in the spec until now. */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
   --elevation-drag: 0 12px 32px rgb(0 0 0 / 0.18), 0 4px 8px rgb(0 0 0 / 0.1);
@@ -55,6 +58,21 @@
   --sidebar-rail-width: 56px;
   --topbar-height: 48px;
   --column-width: 300px;
+}
+
+/* Below Tailwind's `md` (768px) the shell is the mobile layout: the sidebar is off-canvas and
+   the topbar is the only place navigation lives, so its controls are 44px touch targets
+   (docs/design.md §4). A 48px bar cannot hold a 44px control with any breathing room, so the
+   one number the bar is built from moves with them.
+
+   A token override rather than `max-md:h-14` at each call site because four separate surfaces
+   read `var(--topbar-height)` — the shell skeleton, the board's Suspense fallback, `Topbar`
+   itself and the board page's own header — and a breakpoint only three of them knew about is
+   exactly the kind of split this variable exists to prevent. */
+@media (max-width: 767px) {
+  :root {
+    --topbar-height: 56px;
+  }
 }
 
 .dark {
@@ -235,5 +253,110 @@ body {
   .board-column-enter {
     animation-name: board-column-fade;
     animation-delay: 0ms;
+  }
+}
+
+/* The off-canvas drawer's slide (components/ui/dialog.tsx `DialogDrawerContent`).
+
+   Written here rather than as `slide-in-from-left` utilities because this project imports
+   plain `tailwindcss` with no animation plugin, so those class names generate no CSS at all.
+   Radix's presence layer waits for a running animation before it unmounts the content, so the
+   `closed` half is what makes the drawer slide *out* instead of vanishing.
+
+   `transform` and `opacity` only, per §5. */
+@keyframes drawer-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawer-out-left {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes drawer-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawer-out-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes drawer-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drawer-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+[data-slot='dialog-drawer-content'] {
+  animation-duration: 220ms;
+  animation-timing-function: var(--ease-drawer);
+  animation-fill-mode: both;
+}
+
+[data-slot='dialog-drawer-content'][data-side='left'][data-state='open'] {
+  animation-name: drawer-in-left;
+}
+
+[data-slot='dialog-drawer-content'][data-side='left'][data-state='closed'] {
+  animation-name: drawer-out-left;
+}
+
+[data-slot='dialog-drawer-content'][data-side='right'][data-state='open'] {
+  animation-name: drawer-in-right;
+}
+
+[data-slot='dialog-drawer-content'][data-side='right'][data-state='closed'] {
+  animation-name: drawer-out-right;
+}
+
+/* Reduced motion keeps the layer's arrival and departure legible — it cross-fades instead of
+   sliding — rather than removing the animation, which would also remove Radix's cue to wait
+   before unmounting and make the drawer disappear a frame early. */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='dialog-drawer-content'][data-state='open'] {
+    animation-name: drawer-fade-in;
+  }
+
+  [data-slot='dialog-drawer-content'][data-state='closed'] {
+    animation-name: drawer-fade-out;
   }
 }

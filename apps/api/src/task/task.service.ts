@@ -4,8 +4,8 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ActivityType, SocketEvents } from '@kurultay/shared-types';
-import type { CursorPage, TaskDto } from '@kurultay/shared-types';
+import { ActivityType, SocketEvents } from '@kurul/shared-types';
+import type { CursorPage, TaskDto } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { assertBoard } from '../common/board-access';
 import { toCursorPage } from '../common/pagination/cursor-page';
@@ -20,13 +20,19 @@ import type { CreateTaskDto } from './dto/create-task.dto';
 import type { MoveTaskDto } from './dto/move-task.dto';
 import type { TaskQueryDto } from './dto/task-query.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
+import { countAttachments, countAttachmentsByTask } from './attachment-count';
 import { createTaskAttributes, planTaskUpdate } from './task-fields';
 import { TaskAssigneeService } from './task-assignee.service';
-import { taskInclude, type TaskWithRelations } from './task.include';
+import {
+  taskDetailInclude,
+  taskListInclude,
+  type TaskDetailRow,
+  type TaskListRow,
+} from './task.include';
 import { TaskLabelService } from './task-label.service';
 import { buildListWhere } from './task-query-where';
 import { TaskReadService } from './task-read.service';
-import { emptyTaskRelations, toTaskDto } from './task.mapper';
+import { emptyTaskRelations, toTaskDetailDto, toTaskListDto } from './task.mapper';
 
 @Injectable()
 export class TaskService {
@@ -49,15 +55,30 @@ export class TaskService {
     const where = buildListWhere(boardId, query);
     const limit = query.limit ?? 50;
 
-    const rows = await this.prisma.task.findMany({
+    const found = await this.prisma.task.findMany({
       where,
-      include: taskInclude,
+      // The list include, not the detail one: a board page reads up to `limit` tasks at once,
+      // and the card only needs `done/total` from their checklists.
+      include: taskListInclude,
       // Cursor walks by immutable id (api-conventions); display sort is the client's job.
       orderBy: { id: 'asc' },
       take: limit + 1,
     });
 
-    return toCursorPage(rows, limit, (task) => toTaskDto(task));
+    // Second statement, scoped to the ids this page returned — never an `include`. The full
+    // measurement is in `attachment-count.ts`; the short version is that Prisma's `_count`
+    // aggregates the entire `Attachment` table on every board read, and at 100 000 rows that
+    // is 19.878 ms against 0.168 ms for this.
+    const counts = await countAttachmentsByTask(
+      this.prisma,
+      found.map((task) => task.id),
+    );
+    const rows: TaskListRow[] = found.map((task) => ({
+      ...task,
+      attachmentCount: counts.get(task.id) ?? 0,
+    }));
+
+    return toCursorPage(rows, limit, (task) => toTaskListDto(task));
   }
 
   async create(
@@ -68,28 +89,32 @@ export class TaskService {
   ): Promise<TaskDto> {
     await assertBoard(this.prisma, workspaceId, boardId);
     const column = await this.findColumnOnBoard(workspaceId, boardId, dto.columnId);
-
-    // Only the ordering math reads these rows, and it reads two columns of them. Selecting the
-    // whole task instead drags every title, description and timestamp in the column across the
-    // wire on a create that will use none of it.
-    const siblings = await this.prisma.task.findMany({
-      where: { columnId: column.id },
-      orderBy: [{ position: 'asc' }, { id: 'asc' }],
-      select: { id: true, position: true },
-    });
-
-    // `afterTaskId` is the client's word for "insert after this task", which in position
-    // order makes that task the new row's `prev` — the DTO name is translated here, once.
-    const { insertionIndex, prev, next } = resolveCreateNeighbors(
-      siblings,
-      dto.afterTaskId,
-      'Task not found',
-    );
-    const prevPos = prev?.position ?? null;
-    const nextPos = next?.position ?? null;
     const attributes = createTaskAttributes(dto);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Lock before reading siblings so concurrent creates/moves into the same gap cannot
+      // both compute the same midpoint from a shared snapshot.
+      await tx.$executeRaw`SELECT id FROM "Column" WHERE id = ${column.id} FOR UPDATE`;
+
+      // Only the ordering math reads these rows, and it reads two columns of them. Selecting
+      // the whole task instead drags every title, description and timestamp in the column
+      // across the wire on a create that will use none of it.
+      const siblings = await tx.task.findMany({
+        where: { columnId: column.id },
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        select: { id: true, position: true },
+      });
+
+      // `afterTaskId` is the client's word for "insert after this task", which in position
+      // order makes that task the new row's `prev` — the DTO name is translated here, once.
+      const { insertionIndex, prev, next } = resolveCreateNeighbors(
+        siblings,
+        dto.afterTaskId,
+        'Task not found',
+      );
+      const prevPos = prev?.position ?? null;
+      const nextPos = next?.position ?? null;
+
       let position: number;
 
       if (needsRebalance(prevPos, nextPos)) {
@@ -106,7 +131,10 @@ export class TaskService {
         position = midpoint(prevPos, nextPos);
       }
 
-      const created: Omit<TaskWithRelations, 'assignees' | 'labels'> = await tx.task.create({
+      const created: Omit<
+        TaskDetailRow,
+        'assignees' | 'labels' | 'checklists' | 'attachmentCount'
+      > = await tx.task.create({
         data: {
           boardId,
           columnId: column.id,
@@ -128,7 +156,7 @@ export class TaskService {
         },
       });
 
-      return toTaskDto(emptyTaskRelations(created));
+      return toTaskDetailDto(emptyTaskRelations(created));
     });
 
     this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_CREATED, {
@@ -141,7 +169,7 @@ export class TaskService {
   }
 
   async get(workspaceId: string, taskId: string): Promise<TaskDto> {
-    return toTaskDto(await this.taskRead.findTask(workspaceId, taskId));
+    return toTaskDetailDto(await this.taskRead.findTask(workspaceId, taskId));
   }
 
   async update(
@@ -160,7 +188,7 @@ export class TaskService {
     // was the one thing still leaking. The row was read under the workspace predicate, so
     // returning it needs no further check.
     if (Object.keys(changes).length === 0) {
-      return toTaskDto(existing);
+      return toTaskDetailDto(existing);
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -177,7 +205,7 @@ export class TaskService {
       const updated = await tx.task.update({
         where: { id: taskId, board: { workspaceId } },
         data,
-        include: taskInclude,
+        include: taskDetailInclude,
       });
 
       await this.activityService.record(tx, {
@@ -191,7 +219,10 @@ export class TaskService {
         },
       });
 
-      return toTaskDto(updated);
+      return toTaskDetailDto({
+        ...updated,
+        attachmentCount: await countAttachments(tx, taskId),
+      });
     });
 
     this.realtime.emitToBoard(result.boardId, SocketEvents.TASK_UPDATED, {
@@ -255,7 +286,7 @@ export class TaskService {
     const result = await this.prisma.$transaction(async (tx) => {
       const task = await tx.task.findFirst({
         where: { id: taskId, board: { workspaceId } },
-        include: taskInclude,
+        include: taskDetailInclude,
       });
       if (!task) throw new NotFoundException('Task not found');
 
@@ -278,6 +309,11 @@ export class TaskService {
           : await tx.column.findFirst({ where: { id: fromColumnId } });
       const fromColumnName = fromColumn?.name ?? '';
 
+      // Lock the target column before reading siblings so two concurrent moves into the same
+      // gap cannot both compute the same midpoint from a shared snapshot. Matches the board
+      // row lock used when seeding default columns.
+      await tx.$executeRaw`SELECT id FROM "Column" WHERE id = ${targetColumn.id} FOR UPDATE`;
+
       // Two columns, as on create: the moved task itself is read in full above, and these rows
       // only ever contribute an id and a position to the rebalance.
       const siblings = await tx.task.findMany({
@@ -296,6 +332,10 @@ export class TaskService {
         dto.afterTaskId,
       );
 
+      // Counted once, after the checks that can still reject the move and before either branch
+      // builds a DTO. A move never touches attachments, so both branches share this number
+      // rather than asking the same question twice.
+      const attachmentCount = await countAttachments(tx, taskId);
       let result: TaskDto;
 
       if (needsRebalance(prev?.position ?? null, next?.position ?? null)) {
@@ -324,8 +364,9 @@ export class TaskService {
           },
         });
         await batchUpdateTaskPositions(tx, targetColumn.id, otherUpdates);
-        result = toTaskDto({
+        result = toTaskDetailDto({
           ...task,
+          attachmentCount,
           columnId: targetColumn.id,
           position: positions[insertionIndex]!,
           updatedAt: new Date(),
@@ -337,9 +378,9 @@ export class TaskService {
             columnId: targetColumn.id,
             position: midpoint(prev?.position ?? null, next?.position ?? null),
           },
-          include: taskInclude,
+          include: taskDetailInclude,
         });
-        result = toTaskDto(updated);
+        result = toTaskDetailDto({ ...updated, attachmentCount });
       }
 
       await this.activityService.record(tx, {

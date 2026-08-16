@@ -31,13 +31,20 @@ interface SmtpTransporter {
 /**
  * Delivers mail over SMTP via nodemailer.
  *
- * SMTP rather than a provider SDK on purpose: Kurultay is AGPL and meant to be self-hosted,
+ * SMTP rather than a provider SDK on purpose: Kurul is AGPL and meant to be self-hosted,
  * and every plausible target — Resend, SES, Postmark, Mailgun, a company's own Postfix —
  * exposes an SMTP endpoint. One transport covers all of them with environment variables and
  * no vendor dependency.
  */
 export class SmtpMailSender implements MailSender {
   readonly transport = 'smtp' as const;
+
+  /**
+   * A relay is configured, so a resolved `send` means the message was handed off. Whether the
+   * recipient's server then accepted it is not something SMTP tells the sender, and this bit
+   * does not pretend otherwise — see `MailDeliveryStatus.SENT`.
+   */
+  readonly deliversMail = true;
 
   private transporter: SmtpTransporter | undefined;
 

@@ -20,10 +20,10 @@ Conventions for TypeScript, NestJS, and Next.js code in this repository.
 
 1. **The linter is the source of truth for style.** Formatting is never discussed in code
    review. If a rule is worth having, it is worth encoding in ESLint or Prettier.
-2. **Module boundaries are the architecture.** Kurultay is a modular monolith; the only
+2. **Module boundaries are the architecture.** Kurul is a modular monolith; the only
    thing keeping it from becoming a mud ball is discipline about who may import whom.
 3. **Types are declared once.** Anything crossing the API boundary lives in
-   `@kurultay/shared-types` and is imported, never re-typed.
+   `@kurul/shared-types` and is imported, never re-typed.
 4. **Explicit over clever.** Code is read far more often than written.
 
 ## TypeScript
@@ -130,7 +130,8 @@ Rules:
   a narrow facade rather than the whole service.
 - Cross-module reads that would create a cycle are a design smell. Resolve them by moving
   the shared concern into `common/`, or by emitting an event, not by adding a back-import.
-- `PrismaModule` and `common/` are the only globally available dependencies.
+- `PrismaModule`, `common/`, and `AuthModule` are globally available (`@Global()`);
+  feature modules still import what they need for clarity where the boundary matters.
 
 This is what keeps the modular monolith extractable later — see
 [architecture.md](architecture.md) and
@@ -138,13 +139,14 @@ This is what keeps the modular monolith extractable later — see
 
 ### Multi-tenant isolation
 
-Every query is scoped by `workspaceId`, enforced at guard/interceptor level rather than
-re-implemented in each service. A service method that takes a `boardId` without a
-`workspaceId` in scope is a bug, not a shortcut.
+Every query is scoped by `workspaceId`. `WorkspaceGuard` establishes membership; each
+service method still filters Prisma with that `workspaceId` (or `board: { workspaceId }`).
+A service method that takes a `boardId` without a `workspaceId` in scope is a bug, not a
+shortcut.
 
-> This rule is currently enforced by review, not by a lint rule or a Prisma extension.
-> That gap is known and accepted for now; treat any query without workspace scoping as
-> blocking in review.
+> Request-scoped Prisma Client Extensions remain deferred. Isolation is enforced by
+> review and by the workspace-isolation integration tests — not by a lint rule or an
+> automatic query rewriter. Treat any query without workspace scoping as blocking in review.
 
 ## DTOs and validation
 
@@ -231,20 +233,20 @@ components/
 ## Shared types (`packages/shared-types`)
 
 Anything that crosses the API boundary is declared **once**, in
-`@kurultay/shared-types`, and imported by both sides:
+`@kurul/shared-types`, and imported by both sides:
 
 - DTO/response shapes
 - Enums (`Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot`)
 - Socket.io event names and payload types
 
-Better Auth organization **access-control roles** live in `@kurultay/auth-access`
+Better Auth organization **access-control roles** live in `@kurul/auth-access`
 (peer-depends on `better-auth`). Import roles from there — do not copy
 `permissions` statements between `apps/api` and `apps/web`.
 
 ```ts
 // Right
-import type { TaskResponse, Priority } from '@kurultay/shared-types';
-import { ac, roles } from '@kurultay/auth-access';
+import type { TaskResponse, Priority } from '@kurul/shared-types';
+import { ac, roles } from '@kurul/auth-access';
 
 // Wrong — a redeclared shape that will silently drift
 interface Task {
@@ -269,7 +271,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 // 3. Workspace packages
-import type { TaskResponse } from '@kurultay/shared-types';
+import type { TaskResponse } from '@kurul/shared-types';
 
 // 4. Absolute internal (path alias)
 import { PrismaService } from '@/prisma/prisma.service';
@@ -295,11 +297,11 @@ Use them sparingly.
 
 ## Formatting and linting
 
-| Tool           | Role                                                                                                                                                                           |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Prettier       | All formatting. Config is committed; no editor-local overrides.                                                                                                                |
-| ESLint         | Correctness rules via flat config (`@eslint/js`, `typescript-eslint`, `eslint-config-prettier`). Nest/Next/import plugins are not wired yet — keep import order by convention. |
-| `tsc --noEmit` | Typecheck, run in CI separately from lint                                                                                                                                      |
+| Tool           | Role                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prettier       | All formatting. Config is committed; no editor-local overrides.                                                                                                                                                                                                                                                                                                                                                        |
+| ESLint         | Flat config: `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, plus `apps/web` plugins (`eslint-plugin-react-hooks`, `@next/eslint-plugin-next`, `eslint-plugin-jsx-a11y` recommended). Nest and `eslint-plugin-import` are not wired — keep import order by convention. `jsx-a11y` still peers on eslint ^3–9; root `pnpm.peerDependencyRules.allowedVersions` allows eslint 10 until upstream catches up. |
+| `tsc --noEmit` | Typecheck, run in CI separately from lint                                                                                                                                                                                                                                                                                                                                                                              |
 
 ```bash
 pnpm lint          # ESLint check

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Priority, type CursorPage, type TaskDto } from '@kurultay/shared-types';
+import { Priority, type CursorPage, type TaskDto } from '@kurul/shared-types';
 import {
   BOARD_TASK_PAGE_LIMIT,
   countActiveFilters,
@@ -82,6 +82,9 @@ function task(id: string): TaskDto {
     updatedAt: '2026-01-01T00:00:00.000Z',
     assignees: [],
     labels: [],
+    checklistSummary: { total: 0, done: 0 },
+    checklists: null,
+    attachmentCount: 0,
   };
 }
 

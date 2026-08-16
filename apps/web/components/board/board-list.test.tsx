@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { MemberRole, type BoardDto } from '@kurultay/shared-types';
+import { MemberRole, type BoardDto, type TrelloImportReportDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
+import { api } from '@/lib/api';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { BoardList } from './board-list';
 
@@ -16,8 +17,20 @@ vi.mock('@/lib/workspace-boards', () => ({ fetchWorkspaceBoards: vi.fn() }));
 vi.mock('@/components/layout/workspace-provider', () => ({
   useWorkspaceContext: () => workspace.value,
 }));
+vi.mock('@/lib/api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
+  return { ...actual, api: { ...actual.api, postForm: vi.fn() } };
+});
 
 const fetchBoards = vi.mocked(fetchWorkspaceBoards);
+const postForm = vi.mocked(api.postForm);
+
+const REPORT: TrelloImportReportDto = {
+  boardId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d10',
+  boardName: 'Product roadmap',
+  imported: { columns: 8, tasks: 124, labels: 6, checklists: 0, checklistItems: 0, attachments: 0 },
+  skipped: [{ scope: 'comment', reason: 'outOfScope', count: 31, samples: [] }],
+};
 
 function board(id: string): BoardDto {
   return {
@@ -40,6 +53,7 @@ function renderList(): void {
 
 beforeEach(() => {
   fetchBoards.mockReset();
+  postForm.mockReset();
   workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.ADMIN };
 });
 
@@ -106,5 +120,98 @@ describe('BoardList', () => {
     await waitFor(() => expect(fetchBoards).toHaveBeenCalled());
     expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true');
     expect(screen.queryByText(messages.app.board.listError)).toBeNull();
+  });
+
+  describe('Trello import', () => {
+    async function openImport(): Promise<void> {
+      fetchBoards.mockResolvedValue([]);
+      renderList();
+      fireEvent.click(
+        await screen.findByRole('button', { name: messages.app.board.import.action }),
+      );
+    }
+
+    function submitFixture(): void {
+      const file = new File(['{}'], 'trello.json', { type: 'application/json' });
+      fireEvent.change(screen.getByLabelText(messages.app.board.import.file), {
+        target: { files: [file] },
+      });
+      fireEvent.click(screen.getByRole('button', { name: messages.app.board.import.submit }));
+    }
+
+    /** The endpoint is admin-only, so a MEMBER offered the entry would only ever get a 403. */
+    it('offers the entry to an admin', async () => {
+      fetchBoards.mockResolvedValue([]);
+      renderList();
+
+      expect(
+        await screen.findByRole('button', { name: messages.app.board.import.action }),
+      ).toBeDefined();
+    });
+
+    it('does not offer the entry to a member who could not use it', async () => {
+      workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.MEMBER };
+      fetchBoards.mockResolvedValue([]);
+      renderList();
+
+      await screen.findByText(messages.app.board.emptyTitle);
+      expect(screen.queryByRole('button', { name: messages.app.board.import.action })).toBeNull();
+    });
+
+    /**
+     * The whole reason this is a panel and not a toast. The report exists only in the body of
+     * the `201` (ADR 0025), so anything that removes it on a timer removes the only copy — and
+     * the refetch the import triggers puts this screen back into `loading`, which is the one
+     * moment a panel rendered inside the settled branch would silently disappear.
+     */
+    it('keeps the report on screen after the import, across the refetch it triggers', async () => {
+      await openImport();
+      postForm.mockResolvedValue(REPORT);
+      // The refetch never settles, so the list stays in its loading state for the rest of the
+      // test. The report has to survive that.
+      fetchBoards.mockImplementation(() => new Promise(() => {}));
+
+      submitFixture();
+
+      const report = await screen.findByRole('region', { name: /import report/i });
+      expect(report.textContent).toContain('124 tasks');
+      expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true');
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(screen.getByRole('region', { name: /import report/i })).toBeDefined();
+    });
+
+    it('shows nothing until an import has actually returned one', async () => {
+      fetchBoards.mockResolvedValue([]);
+      renderList();
+
+      await screen.findByText(messages.app.board.emptyTitle);
+      expect(screen.queryByRole('region', { name: /import report/i })).toBeNull();
+    });
+
+    it('removes the report only when the user dismisses it', async () => {
+      await openImport();
+      postForm.mockResolvedValue(REPORT);
+      fetchBoards.mockResolvedValue([]);
+
+      submitFixture();
+
+      await screen.findByRole('region', { name: /import report/i });
+      fireEvent.click(screen.getByRole('button', { name: messages.app.board.import.dismiss }));
+
+      await waitFor(() =>
+        expect(screen.queryByRole('region', { name: /import report/i })).toBeNull(),
+      );
+    });
+
+    it('refetches the list so the imported board appears in it', async () => {
+      await openImport();
+      postForm.mockResolvedValue(REPORT);
+      fetchBoards.mockResolvedValue([board('imported-1')]);
+
+      submitFixture();
+
+      expect(await screen.findByText('Board imported-1')).toBeDefined();
+    });
   });
 });

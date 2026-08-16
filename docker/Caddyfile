@@ -1,0 +1,120 @@
+# The single public entrance to a Kurul deployment.
+#
+# Everything a browser loads — the app and the API — is served from ONE origin, and that is a
+# deliberate architectural choice, not just tidiness (audit finding PM-02):
+#
+#   * It is what lets a published web image work on any domain. Next.js compiles
+#     `NEXT_PUBLIC_API_URL` into the JavaScript at build time, so an *absolute* API URL makes
+#     the image deployment-specific and forces every self-hoster to rebuild it. A same-origin
+#     path (`/api`) is already correct everywhere, so the constant can stay baked and the image
+#     stays reusable. See `apps/web/lib/api-url.ts`.
+#   * It removes the cross-site cookie problem: the session cookie the API sets is same-site
+#     with the page that reads it, so nothing depends on `SameSite=None`.
+#   * It means the API is not published on a host port at all — it is reachable only through
+#     this proxy, on the container network, which is the precondition that makes
+#     `TRUST_PROXY=1` on the API safe (see docker-compose.yml).
+#
+# Operators who already run their own reverse proxy can replace this service, but must keep the
+# same three-rule contract, in this order, all under one hostname:
+#
+#   1. `/auth/*`  → the API, path UNCHANGED        (nginx: `proxy_pass http://api:4000;`)
+#   2. `/api/*`   → the API, `/api` prefix REMOVED (nginx: `proxy_pass http://api:4000/;`)
+#   3. everything else → the web app
+#
+# plus WebSocket upgrades passed through on rule 2, and a request body limit on rule 2 that
+# matches the API's ATTACHMENT_MAX_BYTES (nginx: `client_max_body_size 25m;`). The body limit
+# is part of the contract, not a tuning knob: Caddy imposes none by default and nginx defaults
+# to 1 MB, so a replacement proxy that omits it fails every upload over a megabyte with a 413
+# that appears in no documentation. Rules 1 and 2 differ on purpose; the comments on each below
+# say why.
+{
+	# Nothing here is administered over Caddy's HTTP admin API — the config is this file, and a
+	# change is a container restart. Leaving the endpoint listening (localhost:2019 inside the
+	# container) would give anything that got code execution in this container a way to
+	# rewrite the routing.
+	admin off
+
+	# Automatic HTTPS obtains and renews certificates for the hostname in SITE_URL below when
+	# it is `https://` (the default when a bare hostname is given). ACME notification e-mail is
+	# deliberately not configured: Let's Encrypt does not require one, and an `email` directive
+	# with an empty value is a hard config error, which would turn "operator did not set an
+	# optional variable" into "the stack does not start". Operators who want expiry warnings
+	# add `email you@example.com` here.
+}
+
+# The public address. `http://localhost` (the default) serves plain HTTP on port 80 for a
+# local `docker compose up` with no domain; `https://kurul.example.com` triggers automatic
+# HTTPS, including the HTTP→HTTPS redirect Caddy installs on port 80 for it. The value carries
+# the scheme because that is what tells Caddy which of the two to do — see
+# docs/self-hosting.md.
+{$SITE_URL:http://localhost} {
+	# Better Auth, forwarded with its path INTACT (`handle`, not `handle_path`).
+	#
+	# It is the one part of the API that does not live under the `/api` prefix, and that is a
+	# constraint of the library, not a style choice: Better Auth derives its mount path from the
+	# `baseURL` it is configured with and matches incoming request paths against it, on the
+	# server, in the browser client, and in the verification links it emails out. Those three
+	# have to agree on one string. Serving it under a prefix the proxy then strips makes the
+	# server expect `/api/auth/…` while receiving `/auth/…` — every sign-up answered with a 404
+	# the UI reports as "could not create your account" — and makes the mailed verification link
+	# point at a path that routes to the web app instead. Keeping `/auth` identical end to end
+	# is what avoids all of that without giving the Nest API a deployment-dependent prefix.
+	#
+	# The cost is that `/auth/*` is reserved on this origin: the web app must never own a route
+	# there. It does not (its sign-in pages are `/login`, `/register`, `/verify-email`).
+	handle /auth/* {
+		reverse_proxy api:4000
+	}
+
+	# The rest of the API — `/boards`, `/workspaces/*`, `/me`, `/health/*`, `/socket.io/*`.
+	# `handle_path`, which strips the matched prefix before proxying, so the API keeps serving
+	# these at its own root and needs no global prefix, no per-deployment configuration, and no
+	# change for the dev loop where the two apps really are on separate ports. The browser asks
+	# for `/api/socket.io/…`; the API sees `/socket.io/…`, where socket.io is mounted by default.
+	#
+	# WebSockets need nothing extra here. Caddy's reverse_proxy detects an `Upgrade: websocket`
+	# request and switches to a bidirectional stream itself; a `header_up` dance is only needed
+	# on proxies that strip hop-by-hop headers by default. Verified rather than assumed: with
+	# this file in place the board's realtime feed connects on the `websocket` transport
+	# (HTTP 101 on `/api/socket.io/?…&transport=websocket`), not the polling fallback.
+	handle_path /api/* {
+		# The proxy half of the two-layer size limit, and deliberately ONE MEBIBYTE HIGHER than
+		# the API's ATTACHMENT_MAX_BYTES (25 MiB). Do not "fix" the two into agreeing.
+		#
+		# The two layers do not measure the same thing. `max_size` counts the whole request body;
+		# ATTACHMENT_MAX_BYTES counts the file part. An upload wraps the file in a multipart
+		# envelope — a boundary line and a `Content-Disposition` header per part, plus the closing
+		# boundary — which rides on top of the file's own bytes. Measured on the real request this
+		# API receives (one `kind` field, one file part, a 26214400-byte file): 309 bytes of
+		# envelope for a 5-character filename, 318 for a typical one, 563 for a 255-character one.
+		#
+		# So setting both layers to 25 MiB makes a file of exactly the published limit
+		# unuploadable: the file clears the API's check and the envelope pushes the body past the
+		# proxy's. The user sees a 413 on a file the documentation says is allowed, and the number
+		# they are told to look at is the one that is not the problem — the untraceable 413 of
+		# ADR 0022:170-176 in its quietest form.
+		#
+		# The invariant is therefore not equality but ordering: **the proxy must never reject
+		# something the API would accept.** Its job is to cut absurd bodies before anything
+		# buffers them; the exact file limit belongs to the API, which is the layer that can tell
+		# a user which file was too big. 1 MiB of headroom is ~1860x the worst envelope measured
+		# above and still ~4% of the limit. `two-layer-limit.spec.ts` fails the build if this drops
+		# to or below ATTACHMENT_MAX_BYTES.
+		#
+		# Caddy sets no body limit of its own, which is why this line has to exist at all, and why
+		# the published contract in docs/self-hosting.md carries an nginx `client_max_body_size`
+		# row beside it (nginx defaults to 1 MB, so an operator who replaced this proxy gets the
+		# broken install).
+		request_body {
+			max_size 26MiB
+		}
+		reverse_proxy api:4000
+	}
+
+	# Everything else is the Next.js app, including its `_next/*` assets and the auth
+	# middleware. Last, and unconditional, so a path that matched neither rule above can never
+	# 404 here.
+	handle {
+		reverse_proxy web:3000
+	}
+}

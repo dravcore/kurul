@@ -1,385 +1,100 @@
 # Roadmap
 
-Phased delivery plan for Kurultay, from documentation through MVP (Phases 1–9, complete) and
-beyond.
+Where Kurul is, and what is explicitly out of scope for now.
 
 > 🌐 English (canonical) | [Türkçe](tr/roadmap.md)
 
-**Last updated:** 2026-08-12
-
-## Contents
-
-- [How this roadmap works](#how-this-roadmap-works)
-- [Status legend](#status-legend)
-- [Phase 0 — Documentation and standards](#phase-0--documentation-and-standards)
-- [Phase 1 — Skeleton](#phase-1--skeleton)
-- [Phase 2 — Auth and workspaces](#phase-2--auth-and-workspaces)
-- [Phase 3 — Boards and columns](#phase-3--boards-and-columns)
-- [Phase 4 — Tasks and drag-and-drop](#phase-4--tasks-and-drag-and-drop)
-- [Phase 5 — Task metadata](#phase-5--task-metadata)
-- [Phase 6 — Filtering and search](#phase-6--filtering-and-search)
-- [Phase 7 — Dashboard](#phase-7--dashboard)
-- [Phase 8 — Activity log and notifications](#phase-8--activity-log-and-notifications)
-- [Phase 9 — Realtime](#phase-9--realtime)
-- [Post-MVP hardening](#post-mvp-hardening)
-- [Beyond MVP](#beyond-mvp)
-
-## How this roadmap works
-
-**This file holds high-level phases only.** Task-level tracking lives in GitHub Issues:
-[github.com/dravcore/kurultay/issues](https://github.com/dravcore/kurultay/issues).
-
-| Level    | Where                    | Granularity                                                        |
-| -------- | ------------------------ | ------------------------------------------------------------------ |
-| Phase    | This file                | "Boards and columns" — weeks of work, one coherent capability      |
-| Task     | GitHub Issues            | "Column reorder endpoint returns 409 on cross-board move" — one PR |
-| Decision | [decisions/](decisions/) | Why a phase is built the way it is                                 |
-
-Phases ship in order. Each one ends in a working, merged, demonstrable state — no phase
-leaves half-wired code on `develop`. A phase may map to a `0.y.0` release; see
-[git-strategy.md](git-strategy.md#versioning-policy-semver).
-
-The order is deliberate and is not a backlog to be reprioritized casually. Its rationale is
-recorded in [project-skeleton.md](project-skeleton.md) and repeated per phase below.
-
-## Status legend
-
-| Mark  | Meaning                         |
-| ----- | ------------------------------- |
-| `[x]` | Done — merged to `develop`      |
-| `[~]` | In progress                     |
-| `[ ]` | Not started                     |
-| `[-]` | Deferred / out of scope for now |
-
----
-
-## Phase 0 — Documentation and standards
-
-**Goal:** every project standard is written down before a line of application code exists.
-**Status:** done
-
-### Governance and community files
-
-- [x] `LICENSE` — AGPL-3.0
-- [x] `README.md` — what Kurultay is, status, quick start, stack
-- [x] `CONTRIBUTING.md` — contribution process
-- [x] `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1
-- [x] `SECURITY.md` — vulnerability reporting policy
-- [x] `CHANGELOG.md` — Keep a Changelog, starting at `[Unreleased]`
-- [x] `.github/ISSUE_TEMPLATE/` — bug report and feature request forms
-- [x] `.github/PULL_REQUEST_TEMPLATE.md`
-- [x] `README.tr.md` — Turkish README
-
-### Process documentation
-
-- [x] `docs/git-strategy.md` — Git Flow, Conventional Commits, release process, SemVer
-- [x] `docs/development.md` — environment setup and daily loop
-- [x] `docs/coding-standards.md` — TypeScript, NestJS, Next.js conventions
-- [x] `docs/design.md` — design principles, tokens, layout, motion, states, UI writing
-- [x] `docs/testing.md` — test strategy and CI expectations
-- [x] `docs/api-conventions.md` — REST, errors, pagination, DTOs
-- [x] `docs/roadmap.md` — this file
-
-### Architecture documentation
-
-- [x] `docs/architecture.md` — modular monolith, module map, data model summary
-- [x] `docs/tech-stack.md` — English canonical version
-- [x] `docs/project-skeleton.md` — English canonical version
-- [x] `docs/decisions/` — ADRs 0001–0009 + index
-
-### Localization
-
-- [x] `docs/tr/` — Turkish copy of every published process/architecture doc under `docs/`
-      (excluding `docs/specs/`)
-- [x] Cross-link check: every EN doc links its TR sibling and vice versa
-- [x] `docs/tr/design.md` — Turkish mirror of the design document
-
-### Repository configuration
-
-- [x] `develop` branch created from `main`
-- [x] Branch protection on `main` and `develop` (no direct pushes, PR required; status checks when CI exists)
-- [x] "Delete branch on merge" and squash-merge defaults enabled
-
----
-
-## Phase 1 — Skeleton
-
-**Goal:** an empty but running monorepo. No business logic — every later feature becomes
-"fill in the box."
-**Reference:** [project-skeleton.md](project-skeleton.md)
-**Status:** done
-
-**This phase lands as one large maintainer-authored PR** — a documented exception to the
-<500-line guideline in [CONTRIBUTING.md](../CONTRIBUTING.md). Scaffolding a pnpm workspace,
-a NestJS app, a Next.js app, the Prisma schema, and Docker Compose does not decompose into
-independently mergeable units; each half is unbuildable without the other. Every phase after
-this one follows the usual size rule.
-
-- [x] pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, `pnpm-workspace.yaml`
-- [x] Root `package.json` scripts: `dev`, `build`, `lint`, `test`, `db:migrate`, `db:seed`,
-      `db:studio`
-- [x] Shared tooling: TypeScript strict base config, ESLint, Prettier
-- [x] `.env.example` and `.gitignore`
-- [x] `docker-compose.yml` — postgres 18, redis 8, api, web (healthchecks + `depends_on`)
-- [x] `docker-compose.dev.yml` — postgres + redis only
-- [x] `apps/api` — NestJS bootstrap, `app.module.ts`, global `ValidationPipe`, exception filter
-- [x] `apps/api` — empty module folders: `common/`, `prisma/`, `auth/`, `workspace/`,
-      `board/`, `task/`, `label/`, `comment/`, `activity/`, `dashboard/`, `notification/`,
-      `realtime/`
-- [x] `prisma.config.ts` at the repo root (Prisma 7: schema path, seed entry, env loading)
-- [x] Prisma schema — `User`, `Workspace`, `WorkspaceMember`, `Board`, `Column`, `Task`,
-      `TaskAssignee`, `Label`, `TaskLabel`, `Comment`, `Activity`
-- [x] Ids are `@default(uuid(7))`; `Task.position` and `Column.position` are `Float`;
-      `dueDate` and `estimatedMinutes` are separate fields
-- [x] Join-table unique constraints, the `Column @@unique([boardId, id])` composite FK, and
-      explicit `onDelete` actions ([project-skeleton.md](project-skeleton.md#prisma-schema--initial-tables))
-- [x] First migration committed — Phase 1 tables only; `Notification` is deferred to
-      [Phase 8](#phase-8--activity-log-and-notifications)
-- [x] `db:seed` — one demo workspace, board, default columns, a handful of tasks
-- [x] `GET /health` returning 200
-- [x] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
-      `socket.io-client`, `next-intl` (i18n layer wired; strings through the catalog from
-      the first component — [design.md](design.md) §7)
-- [x] `apps/web` — route groups `(auth)/` and `(app)/`, placeholder login page
-- [x] `packages/shared-types` — `Priority`, `MemberRole` enums; entity and page types
-- [x] `.github/workflows/ci.yml` — lint + typecheck + test + build on push and PR
-
-### Acceptance criteria
-
-```bash
-docker compose up            # all services come up healthy
-pnpm db:migrate              # migration succeeds
-pnpm db:seed                 # demo data loads
-curl localhost:4000/health   # 200
-# localhost:3000 renders the login page
-pnpm lint && pnpm test && pnpm build   # no errors
-```
-
----
-
-## Phase 2 — Auth and workspaces
-
-**Goal:** a user can sign up, log in, and own a workspace. Nothing else can be built
-tenant-safely until this exists.
-**Status:** done
-
-- [x] Better Auth integration (organization plugin), session handling
-- [x] Register / login / logout / session refresh
-- [x] `GET /me`
-- [x] Auth guard on all protected routes
-- [x] **Workspace scoping guard** — every request resolves and verifies `workspaceId`
-- [x] Workspace CRUD, slug uniqueness
-- [x] Membership + roles: `OWNER`, `ADMIN`, `MEMBER`, `GUEST`; role guard
-- [x] Invitations: create, accept, revoke
-- [x] Web: login/register pages, session provider, workspace switcher, app shell layout
-- [x] Tests: auth flows, workspace isolation, role matrix
-      ([testing.md](testing.md#what-must-be-tested))
-- [x] Phase 2 quality hardening (pre-boards): Nest-only workspace mutations (BA org HTTP
-      firewall), shared `pg` pool, query indexes, `@kurultay/auth-access`, typed web API
-      client + middleware session gate, workspace-nested scaffold routes, `format:check` in CI
-
----
-
-## Phase 3 — Boards and columns
-
-**Goal:** the container the Kanban actually lives in.
-**Reference:** [design.md](design.md) — the binding reference for all board UI work from here on
-**Status:** done
-
-- [x] Web: design tokens (light + dark), typography, and app shell chrome per
-      [design.md](design.md) §3–§4 — validate the proposed values on real screens and record
-      any change back into that document
-- [x] Board CRUD, scoped to workspace
-- [x] Column CRUD
-- [x] Column reordering (`position`)
-- [x] Default columns on board creation (To Do / In Progress / Done)
-- [x] Web: board list, board page shell, column rendering, create/rename/delete dialogs
-- [x] Design.md §3–§4 validation on real screens — closed by the visual-debt stack
-      ([spec](specs/2026-08-09-visual-debt-design.md)): type scale, toast, topbar, workspace
-      switcher, sancak rail, auth identity treatment, board polish
-
----
-
-## Phase 4 — Tasks and drag-and-drop
-
-**Goal:** the core interaction of the product.
-**Reference:** [design.md](design.md) §4–§5; [ADR 0010](decisions/0010-task-permissions.md);
-[spec](specs/2026-08-09-phase-4-tasks-design.md)
-**Status:** done
-
-- [x] Task CRUD
-- [x] **Fractional indexing** for `Task.position` — insert between, top, bottom, empty column
-- [x] `PATCH .../tasks/:taskId/position` — move within and across columns
-- [x] On-demand rebalancing: reflow a column when the gap between neighbours falls below the
-      precision threshold, in the same transaction as the move (no scheduled job — see
-      [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md))
-- [x] Concurrent-move handling (deterministic `position, id` tie-break; rebalance on exhausted gaps)
-- [x] Web: `@dnd-kit` board, optimistic reorder with rollback on failure
-- [x] Web: task detail panel (title + description; metadata UI is Phase 5)
-- [x] **Re-evaluate `@dnd-kit`** — kept classic pinned line; recorded in
-      [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)
-- [x] Tests: the full positioning matrix in [testing.md](testing.md#1-fractional-indexing-taskposition)
-
----
-
-## Phase 5 — Task metadata
-
-**Goal:** tasks carry enough information to be planned, not just listed.
-**Status:** done
-
-- [x] Multiple assignees (`TaskAssignee`)
-- [x] Labels: board-scoped CRUD, assign/unassign to tasks
-- [x] Priority (`LOW`/`MEDIUM`/`HIGH`/`URGENT`) — kept separate from labels
-- [x] `dueDate` and `estimatedMinutes` — separate fields, separate UI
-- [x] Comments on tasks
-- [x] Web: assignee picker, label picker, priority control, date/estimate fields, comment thread
-- [x] [ADR 0011](decisions/0011-label-task-metadata-permissions.md) — label CRUD Admin+;
-      metadata/assignee/comment mutate MEMBER+
-- [x] Spec: [`specs/2026-08-09-phase-5-task-metadata-design.md`](specs/2026-08-09-phase-5-task-metadata-design.md)
-
----
-
-## Phase 6 — Filtering and search
-
-**Goal:** boards stay usable past a few dozen cards.
-**Reference:** [api-conventions.md](api-conventions.md#filtering-sorting-field-selection);
-[spec](specs/2026-08-09-phase-6-filtering-design.md)
-**Status:** done
-
-- [x] Query DTO with whitelisted filter/sort fields
-      ([api-conventions.md](api-conventions.md#filtering-sorting-field-selection))
-- [x] Filters: assignee, label, priority, due date range, unassigned/no-due-date
-- [x] Free-text search over title and description
-- [x] Cursor pagination on task lists
-- [x] Indexes for the filtered/sorted columns
-- [x] Web: filter bar, active-filter chips, filter state in the URL
-
----
-
-## Phase 7 — Dashboard
-
-**Goal:** aggregate view across a workspace.
-**Reference:** [design.md](design.md#8-charts-and-dashboard);
-[spec](specs/2026-08-09-phase-7-dashboard-design.md)
-**Status:** done
-
-- [x] Aggregation endpoints: tasks by status, by assignee, by priority; overdue count;
-      completion over time
-- [x] Query performance pass on the aggregations
-- [x] Web: dashboard page with Recharts visualizations
-- [x] Empty and loading states
-
-> Completion-over-time shipped after Activity: `throughput` on
-> `GET .../dashboard/summary` (14 UTC days, created vs moves into a column whose
-> `ColumnCategory` is `COMPLETED` — it keyed off the column _name_ until
-> [ADR 0019](decisions/0019-column-category.md)).
-> Column (“status”) chart requires optional `?boardId=`. See the Phase 7 spec.
-
----
-
-## Phase 8 — Activity log and notifications
-
-**Goal:** users can see what changed and be told about it.
-**Reference:** [spec](specs/2026-08-09-phase-8-activity-notifications-design.md);
-[deferred](archive/specs/2026-08-09-phase-8-deferred.md) (archived; open items below in
-[Beyond MVP](#beyond-mvp))
-**Status:** done
-
-- [x] `Activity` writes on task create/move/update/comment/assign (`payload` as JSON so new
-      activity types need no migration)
-- [x] Activity feed endpoint (task-level and workspace-level), cursor-paginated
-- [x] `Notification` model (new migration): mention, assignment, due-soon — not present in
-      the Phase 1 schema
-- [x] Mark read / mark all read
-- [x] Web: activity timeline in the task panel, notification centre
-- [x] `[-]` Email delivery for notifications — deferred beyond MVP. The SMTP transport itself
-      now ships for transactional mail (verification, invitations) — see
-      [ADR 0013](decisions/0013-invitation-email-verification.md); what remains deferred is
-      routing `Notification` rows to it.
-
----
-
-## Phase 9 — Realtime
-
-**Goal:** two people on the same board see each other's changes live.
-**Reference:** [spec](specs/2026-08-09-phase-9-realtime-design.md);
-[ADR 0005](decisions/0005-realtime-socketio.md)
-**Status:** done
-
-**Realtime is deliberately last.** Socket events mirror the data model, so every event
-written before the model settles has to be rewritten with it. Building realtime on a stable
-schema is one pass of work; building it early is a tax on all eight phases before it.
-
-- [x] Socket.io gateway with the Redis adapter (horizontal scaling)
-- [x] Socket auth using the existing session; **rooms scoped per workspace/board**
-- [x] Event contract in `@kurultay/shared-types` — single source for both sides
-- [x] Events: task created/updated/moved/deleted, column changed, comment added
-- [x] Web: subscribe on board mount, reconcile with local optimistic state, resync on
-      reconnect
-- [x] Conflict behavior when a remote move lands mid-drag
-
----
-
-## Post-MVP hardening
-
-**Goal:** pay down what nine phases of delivery left behind, before adding anything new.
-**Status:** done
-
-Not a phase — the phases are the product, this is the debt they accrued. A six-axis audit
-after Phase 9 found 48 items; the ones that survived verification were closed across nine
-PRs. Recorded here because the roadmap otherwise jumps from "MVP complete" to "beyond MVP"
-with no account of the two weeks in between.
-
-- [x] Correctness: tenant-scoped write predicates across eight services, check-then-act folded
-      into transactions, Prisma error mapping, socket `board:join` tenant leak
-- [x] Guardrails: type-aware ESLint with `jsx-a11y`, coverage measured _and_ floored
-      (API global, `apps/web` scoped to `app/**`), CodeQL, blocking `pnpm audit`
-- [x] Scale: dashboard aggregation moved into SQL, `due-soon` deduplicated by pairs rather
-      than a cross product, ordering reads narrowed, `better-auth` 1.3.34 → 1.6.26
-- [x] Duplication: `toCursorPage`, `useApiResource`, `ConfirmDialog` / `FormDialog`,
-      `resolveApiMessage`, `Textarea` / `Select` primitives
-- [x] [ADR 0016](decisions/0016-foreign-key-violation-status.md) — foreign-key violations map
-      to `409`, not `422`
-- [x] [ADR 0017](decisions/0017-partial-indexes-outside-prisma-schema.md) — partial indexes
-      live in migrations, guarded by tests
-- [x] [ADR 0018](decisions/0018-localization-strategy.md) — localization strategy
-- [x] [ADR 0019](decisions/0019-column-category.md) — column completion is a category, not a name
-
-Test count over the period: 249 API + 80 web → **421 API + 302 web + 28 shared-types**, plus
-89 e2e. Two defects surfaced that no item had named: an e2e harness that re-bound the HTTP
-server on every request, and a focus ring that had already been lost to copy-pasted class
-strings.
-
----
+**Last updated:** 2026-08-15
+
+## Status
+
+**MVP is complete.** Product Phases **1–9** (plus Phase **0** docs/standards) and the post-MVP hardening pass shipped in
+[`v0.1.0`](../CHANGELOG.md#010---2026-08-12). Active work is beyond-MVP items (below) and
+ordinary bugs/refactors on `develop`.
+
+| Track              | State                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| Phases 0–9         | Done — Phase 0 docs; 1–9 product MVP — [archive checklists](archive/roadmap-mvp-phases.md) |
+| Post-MVP hardening | Done — same archive                                                                        |
+| Beyond MVP         | Not scheduled — compatibility list only                                                    |
+
+Task-level work lives in [GitHub Issues](https://github.com/dravcore/kurul/issues), not
+here. Process for cutting a release: [git-strategy.md](git-strategy.md).
+
+## Shipped MVP (summary)
+
+| Phase | Capability                                          |
+| ----- | --------------------------------------------------- |
+| 0     | Docs, standards, ADRs, branch protection            |
+| 1     | Monorepo skeleton, Prisma, Compose, CI              |
+| 2     | Auth, workspaces, roles, invitations                |
+| 3     | Boards and columns                                  |
+| 4     | Tasks, fractional indexing, drag-and-drop           |
+| 5     | Assignees, labels, priority, due/estimate, comments |
+| 6     | Filtering, search, cursor pagination                |
+| 7     | Dashboard aggregations and charts                   |
+| 8     | Activity log and in-app notifications               |
+| 9     | Realtime board sync (Socket.io)                     |
+
+Design records for phases 4–9 and visual debt live under
+[archive/specs/](archive/specs/). Implementation plans are under
+[archive/plans/](archive/plans/).
 
 ## Beyond MVP
 
 Not scheduled. Listed so the architecture stays compatible with them, not as commitments.
 
-| Item                                                   | Note                                                                                                                                                                                                                                                                                                                             |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[-]` E2E test suite (Playwright)                      | Once the UI stops changing shape — [testing.md](testing.md)                                                                                                                                                                                                                                                                      |
-| `[-]` Gantt / timeline view                            | `dueDate` + `estimatedMinutes` are kept separate for this                                                                                                                                                                                                                                                                        |
-| `[-]` Task attachments                                 | Needs an object-storage decision (ADR)                                                                                                                                                                                                                                                                                           |
-| `[-]` Board templates                                  |                                                                                                                                                                                                                                                                                                                                  |
-| `[-]` Public API tokens + `/v1` prefix                 | Post-1.0 — [api-conventions.md](api-conventions.md#versioning)                                                                                                                                                                                                                                                                   |
-| `[-]` Webhooks                                         |                                                                                                                                                                                                                                                                                                                                  |
-| `[-]` Email notifications                              | Transport already ships for transactional mail ([ADR 0013](decisions/0013-invitation-email-verification.md)); this row is routing `Notification` rows to it                                                                                                                                                                      |
-| `[-]` Import from Trello / Jira                        |                                                                                                                                                                                                                                                                                                                                  |
-| `[-]` Further UI language packs                        | The resolution mechanism shipped post-MVP ([ADR 0018](decisions/0018-localization-strategy.md)): `User.locale` → cookie → `Accept-Language`, a language setting, and locale-seeded board columns. What remains is a second locale — `SUPPORTED_LOCALES`, `messages/tr.json`, the API seed names, and translatable mail templates |
-| `[-]` Self-host deployment guide beyond Docker Compose |                                                                                                                                                                                                                                                                                                                                  |
-| `[-]` Due-soon delivery alternatives                   | In-process Nest interval scanner (simpler ops, single-replica fallback) or OS cron → internal HTTP (for self-hosters who prefer cron over BullMQ/Redis)                                                                                                                                                                          |
-| `[-]` Mentions without the member picker               | Plain `@DisplayName` regex, or an API-only `mentionedUserIds[]` — only if the structured `@[Name](userId)` picker UX turns out to be blocked                                                                                                                                                                                     |
-| `[-]` Realtime push of the activity feed               | The notification bell now subscribes to `notification:unread-changed` and only polls as a fallback. The task activity feed is neither pushed nor polled — it loads when the panel opens, so a feed left open goes stale                                                                                                          |
+| Item                                                   | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[-]` Broader E2E suite (Playwright)                   | The smoke pack **shipped** and has grown with the features it covers — seven scenarios today: drag persistence, realtime, invitation by mail, notification navigation, attachment upload, Trello import, and the board at 360px with a touchscreen ([testing.md](testing.md#browser-end-to-end)). Widening it beyond the flows where the stack itself can come apart is not scheduled                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `[-]` Gantt / timeline view                            | `dueDate` + `estimatedMinutes` are kept separate for this                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `[-]` Task attachments                                 | **Shipped** — files and links on a card, on local disk behind a storage port ([ADR 0022](decisions/0022-attachment-storage.md), [ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Object storage, signed share links and a per-workspace quota are the parts still deferred, each to its own trigger                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `[-]` Board templates                                  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `[-]` Public API tokens + `/v1` prefix                 | Post-1.0, and now scoped rather than only named — [API 1.0](#api-10). Versioning policy: [api-conventions.md](api-conventions.md#versioning)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `[-]` Webhooks                                         | Post-1.0. The scope is three events and no more — [API 1.0](#api-10)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `[-]` Email notifications                              | Transport already ships for transactional mail ([ADR 0013](decisions/0013-invitation-email-verification.md)); this row is routing `Notification` rows to it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `[-]` Import from Trello / Jira                        | **Trello shipped, Jira not started.** A board's JSON export becomes a board — lists, cards, labels, checklists; attachments as links. One-way, not idempotent, no member mapping, no comments, and every imported column arrives `UNSTARTED` ([ADR 0025](decisions/0025-trello-import-mapping.md)). A generated 500-card export imported in a median of **572.9 ms** (p95 **655.8 ms**) over five runs on an Apple M3 Max, against a loopback API and Postgres — no reverse proxy, no container, no network in between — so treat it as a floor rather than a deployment figure. **Schema conformance was never measured against a real Trello export** — the fixtures are synthetic, because no real export was available — so the first genuine export is where the reader is most likely to break; it answers with a report rather than an error for that reason. Jira has no design record yet |
+| `[-]` Further UI language packs                        | **Turkish shipped.** `SUPPORTED_LOCALES` is `['en', 'tr']`, `messages/tr.json` carries all 486 keys, boards seed `Yapılacak / Devam Ediyor / Bitti`, and both transactional emails are written in the recipient's language ([ADR 0018](decisions/0018-localization-strategy.md)). `messages/catalog.test.ts` fails the build on a key one catalog has and the other does not, so "100%" is a gate rather than a claim. A **third** language is what this row still names: it needs no new mechanism — a catalog file, a row in `SEED_COLUMN_NAMES` and one in `MAIL_COPY`, both `Record<Locale, …>` and both compile errors until they exist — only a translator                                                                                                                                                                                                                                   |
+| `[-]` Self-host deployment guide beyond Docker Compose |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `[-]` Due-soon delivery alternatives                   | In-process Nest interval scanner or OS cron → internal HTTP                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `[-]` Mentions without the member picker               | Plain `@DisplayName` or API-only `mentionedUserIds[]` — only if the structured picker UX turns out to be blocked                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `[-]` Realtime push of the activity feed               | Bell already gets `notification:unread-changed`; the task activity feed still loads on panel open                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
-**1.0.0** is cut when Phases 1–9 are complete and the REST API is stable enough to promise
-backwards compatibility.
+**1.0.0** is cut when the REST API is stable enough to promise backwards compatibility
+(MVP feature work is already done).
+
+## API 1.0
+
+**Scope declaration, not a plan. Everything in this section is deliberately unimplemented, and
+saying so is the point** — the three rows below are the only API surface 1.0 is expected to
+grow, and anything that arrives instead of them should have to argue with this heading first.
+Two of the three appear in [Beyond MVP](#beyond-mvp) above as unscheduled items; this section is
+where they acquire a shape.
+
+What exists today, and is why this can be scoped at all: the API is described by a generated
+OpenAPI document, committed at [`apps/api/openapi.json`](../apps/api/openapi.json) and served at
+`/docs`, with a CI gate that fails when the code and the document disagree
+([api-conventions.md](api-conventions.md#the-openapi-document)). A compatibility promise is only
+worth making about a contract somebody has written down.
+
+| Item                   | Shape                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/v1` prefix           | A URI prefix on every route, introduced **at** 1.0 and not before — a version segment today would imply a promise this project is not making, during the period the API is most expected to churn ([api-conventions.md](api-conventions.md#versioning)). Introduced by ADR, because the alternative schemes (header negotiation, no versioning at all) deserve to be rejected in writing rather than skipped                 |
+| Personal access tokens | A second authentication path beside the session cookie, for a caller that is not a browser. Workspace-scoped, revocable, listed by their owner, hashed at rest. **Not OAuth**: a self-hosted instance has no third-party app ecosystem to authorise, and issuing tokens to oneself is a different problem from delegating access to somebody else's software                                                                 |
+| Minimal webhooks       | Exactly three events — `task.created`, `task.moved`, `task.completed` — delivered per workspace to an operator-configured URL. Three because they are the events an outside system can act on; the rest of the activity vocabulary is a feed for people. Delivery is at-least-once with a signature, and the failure policy (retries, disabling a dead endpoint) is the part that needs an ADR rather than an implementation |
+
+Three things this section deliberately does **not** promise:
+
+- **No date, and no ordering between the three.** They are a scope, not a sequence.
+- **No general event stream.** `Activity` has a much larger vocabulary than three types, and
+  publishing all of it outward would freeze an internal log as a public contract.
+- **No OAuth, no third-party app model, no per-token scopes beyond the workspace.** Each of
+  those is a product decision that 1.0 does not need in order to be stable.
 
 ## See also
 
-- [project-skeleton.md](project-skeleton.md) — Phase 1 in full detail
+- [archive/roadmap-mvp-phases.md](archive/roadmap-mvp-phases.md) — full phase checklists
 - [architecture.md](architecture.md) — how the modules fit together
-- [git-strategy.md](git-strategy.md) — how a phase becomes a release
-- [development.md](development.md) — how to build any of this locally
+- [git-strategy.md](git-strategy.md) — how work becomes a release
 - [../CHANGELOG.md](../CHANGELOG.md) — what has actually shipped
-- [GitHub Issues](https://github.com/dravcore/kurultay/issues) — task-level tracking
+- [GitHub Issues](https://github.com/dravcore/kurul/issues) — task-level tracking

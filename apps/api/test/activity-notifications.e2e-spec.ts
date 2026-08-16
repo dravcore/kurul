@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { ActivityType, MemberRole, NotificationType } from '@kurultay/shared-types';
+import { ActivityType, MemberRole, NotificationType } from '@kurul/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';

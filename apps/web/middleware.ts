@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { getServerApiBaseUrl } from '@/lib/api-url';
+import { NEXT_PARAM } from '@/lib/auth-redirect';
 
 // `/verify-email` is public because a link can fail before anyone is signed in: Better Auth
 // only signs the user in when the token was *good*, so bouncing an unauthenticated visitor to
@@ -15,10 +17,11 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
-function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-}
-
+/**
+ * This runs inside the Next server, not in the visitor's browser, so it needs the *absolute*
+ * API address (`getServerApiBaseUrl`), never the possibly-relative one the client bundle uses:
+ * `fetch('/api/auth/get-session')` has no origin to resolve against here. See `lib/api-url.ts`.
+ */
 async function hasSession(request: NextRequest): Promise<boolean> {
   const cookie = request.headers.get('cookie');
   if (!cookie) {
@@ -26,7 +29,7 @@ async function hasSession(request: NextRequest): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${getApiBaseUrl()}/auth/get-session`, {
+    const response = await fetch(`${getServerApiBaseUrl()}/auth/get-session`, {
       headers: { cookie },
       cache: 'no-store',
     });
@@ -61,8 +64,14 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   if (!session) {
     const url = request.nextUrl.clone();
+    // The whole deep link goes *inside* the parameter, query string included: cloned onto
+    // `/login` as it stands, the protected route's own parameters would arrive as stray
+    // sign-in parameters and be dropped on the way back. `/login` reads this one and only
+    // honours a same-origin path (`lib/auth-redirect.ts`).
+    const destination = `${pathname}${request.nextUrl.search}`;
     url.pathname = '/login';
-    url.searchParams.set('next', pathname);
+    url.search = '';
+    url.searchParams.set(NEXT_PARAM, destination);
     return NextResponse.redirect(url);
   }
 

@@ -33,6 +33,18 @@ enum ColumnCategory {
   CANCELED
 }
 
+/// Whether an attachment carries bytes this instance stores, or only a URL it points at.
+///
+/// Not derived from nullability: the kind is the column, and the nullability of `storageKey`,
+/// `mimeType`, `size` and `url` is derived *from it*. A row with both a URL and a storage key —
+/// or with neither — is the failure this enum exists to make unwritable, including from a bulk
+/// importer that never runs the application's own create path.
+/// See docs/decisions/0024-attachment-kinds-and-serving-policy.md.
+enum AttachmentKind {
+  FILE
+  LINK
+}
+
 model User {
   id            String   @id @default(uuid(7))
   email         String   @unique
@@ -47,18 +59,33 @@ model User {
   /// email has to know the recipient's language with no request in flight
   /// (docs/decisions/0018-localization-strategy.md).
   locale        String?
+  /// When this account was anonymised on request, or null for a live account.
+  ///
+  /// The row itself is the tombstone: a user who has ever created a card cannot be deleted —
+  /// seven `Restrict` foreign keys reference this table and each of them is a decision that the
+  /// content outlives its author — so an erasure request rewrites `email`, `name`, `avatarUrl`
+  /// and `locale` instead and stamps this column. Every `createdById` / `uploadedById` /
+  /// `userId` in the schema keeps resolving; it just resolves to nobody.
+  ///
+  /// A state rather than a comparison against `name`: "Deleted user" is a display name any live
+  /// account is free to choose. Read by primary key and never scanned, so it carries no index
+  /// (see migration 20260814150000_drop_unused_indexes for the discipline).
+  /// See docs/decisions/0026-account-deletion-anonymisation.md.
+  deletedAt     DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions         Session[]
-  accounts         Account[]
-  memberships      WorkspaceMember[]
-  invitationsSent  WorkspaceInvitation[]
-  createdTasks     Task[]                @relation("TaskCreatedBy")
-  assignees        TaskAssignee[]
-  comments         Comment[]
-  activities       Activity[]
-  notifications    Notification[]
+  sessions        Session[]
+  accounts        Account[]
+  memberships     WorkspaceMember[]
+  invitationsSent WorkspaceInvitation[]
+  createdTasks    Task[]                @relation("TaskCreatedBy")
+  assignees       TaskAssignee[]
+  comments        Comment[]
+  attachments     Attachment[]          @relation("AttachmentUploadedBy")
+  activities      Activity[]
+  notifications   Notification[]
+  usagePings      UsagePing[]
 }
 
 model Session {
@@ -75,6 +102,12 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  /// Backs the nightly expiry sweep in `retention/cleanup.worker.ts` — the only query that
+  /// reads this column at all. Measured at 50k sessions: without it the sweep is a `Seq Scan`
+  /// touching 516 buffers, and it pays that every night forever rather than once. The batch
+  /// `LIMIT` bounds how long a row lock is held, not how much of the table is read: each batch
+  /// is its own scan.
+  @@index([expiresAt])
 }
 
 model Account {
@@ -104,6 +137,12 @@ model Verification {
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  /// The table's only index, and the only query that reads it: the nightly expiry sweep in
+  /// `retention/cleanup.worker.ts`. Verification rows are written once and read by token, so
+  /// nothing else needs an index — but the sweep was a `Seq Scan` over the whole table every
+  /// night (206 buffers at 20k rows, measured), which is the one cost this table had.
+  @@index([expiresAt])
 }
 
 model Workspace {
@@ -119,6 +158,7 @@ model Workspace {
   boards      Board[]
   activities  Activity[]
   notifications Notification[]
+  usagePings  UsagePing[]
 }
 
 model WorkspaceMember {
@@ -183,9 +223,16 @@ model Column {
   tasks Task[]
 
   @@unique([boardId, id])
-  @@index([boardId])
   /// Completion metrics resolve "which columns of this board are done" on every dashboard
   /// read; boardId alone would still have to filter the category in the heap.
+  ///
+  /// No separate `@@index([boardId])` — every read this table serves (board detail's
+  /// column list, dashboard's completed-column lookup, the FK cascade Postgres runs when a
+  /// Board is deleted) issues a bare `boardId` equality, and this index's `(boardId,
+  /// category)` prefix and `@@unique([boardId, id])`'s `boardId` prefix already both satisfy
+  /// that — see migration 20260814150000_drop_unused_indexes for the load-tested proof
+  /// (pg_stat_user_indexes.idx_scan stayed 0 for the narrower index across three seeded
+  /// trials at production-like volume).
   @@index([boardId, category])
 }
 
@@ -203,13 +250,15 @@ model Task {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  board      Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  column     Column         @relation(fields: [boardId, columnId], references: [boardId, id], onDelete: Cascade)
-  createdBy  User           @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  assignees  TaskAssignee[]
-  labels     TaskLabel[]
-  comments   Comment[]
-  activities Activity[]
+  board         Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column        Column         @relation(fields: [boardId, columnId], references: [boardId, id], onDelete: Cascade)
+  createdBy     User           @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  assignees     TaskAssignee[]
+  labels        TaskLabel[]
+  comments      Comment[]
+  attachments   Attachment[]
+  checklists    Checklist[]
+  activities    Activity[]
   notifications Notification[]
 
   @@index([boardId, columnId, position])
@@ -235,6 +284,16 @@ model TaskAssignee {
 
   @@unique([taskId, userId])
   @@index([userId])
+  // Looks like a strict prefix of `@@unique([taskId, userId])` and was flagged as redundant
+  // by that reasoning (audit finding DB-07) — load-tested before touching it and kept: the
+  // task board's list/detail views load assignees with `taskId IN (...)`/`taskId = $1`
+  // (task.include.ts via task.service.ts), and Postgres's planner consistently prefers this
+  // narrower single-column index over the wider unique one for that lookup — fewer bytes per
+  // index tuple means fewer pages for a bitmap/index scan matching the same rows, even though
+  // both share the same leading column. pg_stat_user_indexes.idx_scan confirmed real,
+  // repeated use (~1700+ scans per seeded trial) — see migration
+  // 20260814150000_drop_unused_indexes for the full methodology and why only two of the
+  // finding's five candidates were actually safe to drop.
   @@index([taskId])
 }
 
@@ -260,6 +319,11 @@ model TaskLabel {
 
   @@unique([taskId, labelId])
   @@index([labelId])
+  // Same story and same load-tested outcome as `TaskAssignee.@@index([taskId])` above: the
+  // task board's list/detail views load labels with `taskId IN (...)`/`taskId = $1`, and
+  // Postgres's planner picks this narrower index over `@@unique([taskId, labelId])` for that
+  // lookup. Kept despite audit finding DB-07 flagging it as a strict-prefix duplicate — see
+  // migration 20260814150000_drop_unused_indexes.
   @@index([taskId])
 }
 
@@ -277,6 +341,81 @@ model Comment {
   @@index([userId])
 }
 
+/// A file or a link attached to a task.
+///
+/// `onDelete: Cascade` on the task is deliberate, and it is also the reason the orphan sweep
+/// exists: `Workspace → Board → Task` cascades entirely inside Postgres, so thousands of these
+/// rows can disappear without a single line of application code running. Deleting the bytes is
+/// therefore never a side effect of a delete path — see retention/cleanup.worker.ts and ADR 0022.
+///
+/// `uploadedById` is `Restrict`, matching `Comment.user` (schema.prisma:311). The cost is stated
+/// where it lands: P3-4 (account deletion / anonymisation, finding DB-05) has one more relation
+/// to route around. ADR 0024 argues why an uploaded file is an authored object and a ticked
+/// checkbox is not.
+model Attachment {
+  id           String         @id @default(uuid(7))
+  taskId       String
+  uploadedById String
+  kind         AttachmentKind
+  /// What the user sees. For a FILE this is the name the browser sent; it is a *display* field
+  /// and never a path segment — `storageKey` is derived from `id`, so traversal is not a
+  /// validation problem here, it is unexpressible (ADR 0024).
+  filename     String
+  /// FILE only: the key `StorageBackend` was handed. Derived from `id` on the server.
+  storageKey   String?
+  /// FILE only: the type `file-type` read from the magic bytes — never the declared one.
+  mimeType     String?
+  /// FILE only: bytes on disk.
+  size         Int?
+  /// LINK only: an `http:`/`https:` URL the server has never requested and never will (ADR 0024).
+  url          String?
+  createdAt    DateTime       @default(now())
+
+  task       Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy User @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  /// The panel's list read: `taskId` equality plus `id desc` ordering, served from one index.
+  @@index([taskId, id])
+  /// What the `Restrict` FK makes Postgres scan on every user delete, and what P3-4's
+  /// anonymisation pass will query. The same pair `Comment` carries (schema.prisma:313-314).
+  @@index([uploadedById])
+}
+
+/// A named list of items inside a task. A task may carry several (the Trello model), which is
+/// what keeps a Trello import from having to flatten several lists into one and lose their
+/// names — see docs/decisions/0023-checklist-data-model.md.
+///
+/// `onDelete: Cascade` is deliberate: a checklist is part of a task's content, not a record
+/// with a life of its own, so it goes when the task goes. There is no FK to `User` anywhere in
+/// this model or the next — nothing here records *who* ticked an item.
+model Checklist {
+  id        String   @id @default(uuid(7))
+  taskId    String
+  title     String
+  position  Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task  Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  items ChecklistItem[]
+
+  @@index([taskId, position])
+}
+
+model ChecklistItem {
+  id          String   @id @default(uuid(7))
+  checklistId String
+  content     String
+  isDone      Boolean  @default(false)
+  position    Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId, position])
+}
+
 model Activity {
   id          String   @id @default(uuid(7))
   workspaceId String
@@ -291,6 +430,16 @@ model Activity {
   user          User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   notifications Notification[]
 
+  // Flagged as redundant by audit finding DB-07 on the theory that
+  // `@@index([workspaceId, type, createdAt])` below always subsumes a lookup this index could
+  // serve. Load-tested before dropping it and kept: across three seeded trials at
+  // production-like volume, `countActivitiesByDay`'s `workspaceId = ? AND type = ? AND
+  // createdAt >= ?` picked *this* narrower index over the wider one in some workspaces —
+  // Postgres's planner will take the cheaper-looking index when its per-workspace type/date
+  // selectivity estimate makes the trade-off close, and that happened often enough
+  // (pg_stat_user_indexes.idx_scan nonzero in 2 of 3 trials) that "always subsumed" doesn't
+  // hold in practice. See migration 20260814150000_drop_unused_indexes for the methodology
+  // and why only two of the finding's five candidates were actually safe to drop.
   @@index([workspaceId, createdAt])
   @@index([workspaceId, id])
   // Backs the dashboard throughput aggregates (dashboard.service.ts `countActivitiesByDay`:
@@ -327,7 +476,14 @@ model Notification {
   // on. Scoping it to `due_soon` keeps legitimate repeats of other types (several mentions
   // on one task) legal; scoping it to unread rows lets a task be re-notified once the
   // previous reminder has been read. Do not let a generated migration drop it.
-  @@index([userId, createdAt])
+  //
+  // No separate `@@index([userId, createdAt])` — nothing ever lists or counts notifications
+  // ordered by `createdAt` without `workspaceId` in the predicate too (see the workspace-scoped
+  // indexes below), and the `onDelete: Cascade` FK cascade a deleted User triggers is a bare
+  // `userId` equality, already covered by `@@index([userId, type, taskId])`'s `userId` prefix.
+  // See migration 20260814150000_drop_unused_indexes for the load-tested proof
+  // (pg_stat_user_indexes.idx_scan stayed 0 across three seeded trials at production-like
+  // volume).
   // Backs notification.service.ts `list`: `workspaceId` and `userId` are always equality
   // predicates, `id` carries both the cursor (`id < cursor`) and the sort (`orderBy: id
   // desc`). Equality columns first, ordering column last, so a page is a backwards index
@@ -344,4 +500,82 @@ model Notification {
   // delete's `WHERE "taskId" = $1` scan can't use. Without this, deleting a task forces a
   // sequential scan of the whole (fast-growing) notification table to find its rows.
   @@index([taskId])
+  // Same story for `activityId`, which carries `onDelete: SetNull`. The referential action
+  // Postgres runs per deleted Activity row is `UPDATE ONLY "Notification" SET "activityId" =
+  // NULL WHERE $1 = "activityId"` — a bare equality on a column that led no index. Nothing
+  // deleted an Activity on its own until the retention sweep
+  // (src/retention/cleanup.worker.ts, docs/decisions/0020-data-retention.md) started doing
+  // so nightly in batches; without this index each batch would re-scan the whole table once
+  // per row.
+  @@index([activityId])
+}
+
+/// One row per (user, workspace, kind, UTC day): "this person opened this thing that day".
+///
+/// The activation funnel is otherwise derived entirely from rows that already existed —
+/// `User`, `WorkspaceMember`, `Activity` — and adding a table was a decision, not a default.
+/// Two of the eleven questions cannot be answered from writes at all: `Activity` records what
+/// somebody *changed*, and a team that reads its board every morning and moves nothing changes
+/// nothing. Measuring retention from `Activity` alone reports the quietest healthy instances as
+/// dead, which is the specific way this metric would have lied.
+///
+/// Everything about the shape is chosen to store as little as a "did they show up" answer
+/// needs:
+///
+/// - **Deduplicated to one row per UTC day** by `@@unique`, written with `ON CONFLICT DO
+///   NOTHING`. Not a counter and not a log: a row says the day happened, never how many times,
+///   so no session-by-session browsing history accumulates here even in principle.
+/// - **`day` is a `DATE`, not a timestamp.** The time of day is not in the answer, so it is not
+///   in the table. It is also what makes the unique constraint able to collapse a day's views.
+/// - **No board id, no path, no user agent, no address.** `workspaceId` is the coarsest scope
+///   that still lets the North Star ask "were two members of *this* workspace active", which is
+///   the only question the column exists for.
+/// - **`onDelete: Cascade` on both sides**, unlike `Activity.user` (`Restrict`). An activity row
+///   is evidence and must survive its actor; a record that somebody once looked at a page is
+///   not evidence of anything and must not outlive the account it describes.
+///
+/// Swept by the nightly retention job under `ACTIVITY_RETENTION_DAYS`
+/// (docs/decisions/0020-data-retention.md): same class of row as an activity — instance history
+/// about a named user — so it inherits the same window rather than growing a switch of its own.
+model UsagePing {
+  id          String   @id @default(uuid(7))
+  userId      String
+  workspaceId String
+  /// `UsagePingKind` in @kurul/shared-types — `board_view` or `dashboard_view`. A string
+  /// rather than an enum for the same reason `Activity.type` is one: adding the next kind must
+  /// be an insert, not a migration that locks the table.
+  kind        String
+  /// UTC midnight of the day being recorded. Written from `Date.UTC(...)`, never from a local
+  /// date, so an instance running with `TZ=Europe/Istanbul` buckets identically to one in UTC —
+  /// the same trap `DAY_COUNT_SELECT` in dashboard.service.ts documents at length.
+  day         DateTime @db.Date
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  /// The dedupe. Also the index the `ON CONFLICT` insert probes, so the write costs one index
+  /// lookup and nothing else.
+  @@unique([userId, workspaceId, kind, day])
+  /// Deliberately not `(kind, day)`. `kind` has two values, so leading with it would halve a
+  /// scan that a date range has already cut to a fraction of a percent — see DB-07 in the audit
+  /// for what happens when index columns are added on the theory that a predicate mentions them.
+  ///
+  /// This serves the funnel, which reads the last seven days. It does *not* serve the retention
+  /// sweep, though this comment used to claim it did: the sweep filters `createdAt`, not `day`,
+  /// so it could never use this index and was measured as a `Seq Scan` (416 buffers at 50k rows,
+  /// the slowest of the five sweeps).
+  @@index([day])
+  /// The retention sweep's index. Filtering on `day` instead would have reused the index above
+  /// and cost nothing — and would have been wrong: `day` is the day being *recorded* and
+  /// `createdAt` is when the row was *written*. They match for every row this code writes today,
+  /// but "kept for N days after it was written" is what the policy means, and only `createdAt`
+  /// survives a backfill saying so. The second index is the price of the window meaning what
+  /// [ADR 0020](../../../docs/decisions/0020-data-retention.md) says it means.
+  @@index([createdAt])
+  /// Cascade support. A deleted workspace runs `DELETE FROM "UsagePing" WHERE "workspaceId" =
+  /// $1`, which no other index here leads with (`@@unique` leads with `userId`). Without it,
+  /// deleting one workspace scans the whole table. `userId` needs no twin: the unique index
+  /// already leads with it.
+  @@index([workspaceId])
 }

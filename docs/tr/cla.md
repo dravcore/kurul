@@ -8,21 +8,21 @@
 >
 > **Bu belge, incelenmemiş bir taslaktır.** Bir hukukçu tarafından incelenmemiş veya onaylanmamıştır, şu anda **yürürlükte değildir** ve içeriğinin hiçbir kısmı hukuki tavsiye değildir. Buna güvenmeyin. `[FILL: …]` ve `[HUKUKÇUYA SOR: …]` ile işaretlenmiş yer tutucular henüz çözülmemiştir ve bu metin herhangi biri için bağlayıcı hâle gelmeden önce karara bağlanmalıdır. Bu uyarı, incelenmiş ve merge edilmiş bir pull request ile kaldırılana kadar **hiçbir katkıda bulunandan bir şey imzalaması istenmemektedir.**
 >
-> **Bu belge şu anda kullanılmıyor.** Kurultay dış katkı kabul etmiyor ve CLA kontrolü devre dışı; dolayısıyla bunu kimse imzalamıyor ve hiçbir imza toplanmıyor. Hukuki inceleme bir gün gerçekleşirse diye hazır tutuluyor — bkz. [ADR 0015](decisions/0015-no-external-contributions.md).
+> **Bu belge şu anda kullanılmıyor.** Kurul dış katkı kabul etmiyor ve CLA kontrolü devre dışı; dolayısıyla bunu kimse imzalamıyor ve hiçbir imza toplanmıyor. Hukuki inceleme bir gün gerçekleşirse diye hazır tutuluyor — bkz. [ADR 0015](decisions/0015-no-external-contributions.md).
 >
 > # ⚠️ DRAFT — PENDING LEGAL REVIEW, NOT IN FORCE
 >
 > **This document is an unreviewed draft.** It has **not** been reviewed or approved by a lawyer, it is **not** currently in effect, and nothing in it is legal advice. Do not rely on it. The placeholders marked `[FILL: …]` and `[HUKUKÇUYA SOR: …]` are unresolved and must be settled before this text becomes binding on anyone. Until this banner is removed in a merged, reviewed pull request, **no contributor is being asked to sign anything.**
 >
-> **This document is currently unused.** Kurultay does not accept external contributions and the CLA check is disabled, so nobody signs this and no signature is collected. It is kept ready in case legal review ever happens — see [ADR 0015](decisions/0015-no-external-contributions.md).
+> **This document is currently unused.** Kurul does not accept external contributions and the CLA check is disabled, so nobody signs this and no signature is collected. It is kept ready in case legal review ever happens — see [ADR 0015](decisions/0015-no-external-contributions.md).
 
 ---
 
 > **Çeviri uyarısı:** Bu, İngilizce kanonik metnin bilgilendirme amaçlı çevirisidir. Hukuki inceleme İngilizce metin üzerinden yürütülecek; hangi dilin bağlayıcı olduğu henüz karara bağlanmamış bir sorudur ([Hukukçuya sorulacaklar](#hukukçuya-sorulacaklar), madde 11).
 
-## Kurultay neden CLA istiyor
+## Kurul neden CLA istiyor
 
-Kurultay [AGPL-3.0](../../LICENSE) ile yayımlanıyor. Plan, projeyi **çift lisanslama** ile finanse etmek: tek ve aynı kod tabanı herkes için tamamen AGPL-3.0 kalıyor, AGPL'in yükümlülüklerini kaldıramayan kurumlar ise aynı kod için proje sahibinden ayrı bir ticari lisans satın alabiliyor.
+Kurul [AGPL-3.0](../../LICENSE) ile yayımlanıyor. Plan, projeyi **çift lisanslama** ile finanse etmek: tek ve aynı kod tabanı herkes için tamamen AGPL-3.0 kalıyor, AGPL'in yükümlülüklerini kaldıramayan kurumlar ise aynı kod için proje sahibinden ayrı bir ticari lisans satın alabiliyor.
 
 Bu iş modeli, yalnızca sahibin kodun **tamamını** — senin katkın dahil — AGPL-3.0 dışında bir lisansla dağıtma hakkına sahip olması durumunda çalışır. Varsayılan olarak yazdığın kodun telifi sende kalır ve bunu başka kimse yeniden lisanslayamaz. CLA, bu izni bilerek ve yazılı olarak verdiğin mekanizmadır — kendi işinin mülkiyetini korumaya devam ederken.
 
@@ -39,7 +39,7 @@ Modelin ardındaki gerekçe — ve dürüst dezavantajları — [ADR 0014](decis
 3. Bu belgeyi oku. Kabul ediyorsan, pull request'e tam olarak şunu içeren **yeni bir yorum** yaz:
 
    ```text
-   I have read the Kurultay CLA v0.1 and I hereby sign it
+   I have read the Kurul CLA v0.1 and I hereby sign it
    ```
 
 4. Kontrol yeniden çalışır ve yeşile döner. İmzan, deponun `cla-signatures` dalındaki `signatures/v0.1/cla.json` dosyasına kaydedilir — bu hakları kimin verdiğine dair herkese açık, yalnızca eklemeli bir kayıt.
@@ -50,7 +50,7 @@ CLA sürümü başına **bir kez** imzalarsın. Aynı GitHub hesabından gelen s
 
 ### Bu metnin sürümlenmesi
 
-Sürüm numarası, hem imza cümlesinin hem de saklama yolunun bilinçli olarak bir parçası. İncelenmiş metin geldiğinde sürüm **v1.0** olur, cümle `I have read the Kurultay CLA v1.0 and I hereby sign it` hâline gelir ve imzalar `signatures/v1.0/cla.json` altına taşınır. Böylece bir sürüme verilen imza asla başka bir sürümün imzası sayılamaz — metin değişirse, her katkıda bulunanın tam olarak hangi ifadeyi kabul ettiği ve kimin yeniden imzalaması gerektiği her zaman açıktır.
+Sürüm numarası, hem imza cümlesinin hem de saklama yolunun bilinçli olarak bir parçası. İncelenmiş metin geldiğinde sürüm **v1.0** olur, cümle `I have read the Kurul CLA v1.0 and I hereby sign it` hâline gelir ve imzalar `signatures/v1.0/cla.json` altına taşınır. Böylece bir sürüme verilen imza asla başka bir sürümün imzası sayılamaz — metin değişirse, her katkıda bulunanın tam olarak hangi ifadeyi kabul ettiği ve kimin yeniden imzalaması gerektiği her zaman açıktır.
 
 ### Kayıtta ne tutuluyor
 
@@ -72,7 +72,7 @@ Bu belge **bireysel** sözleşmedir. Şahsen, senin tarafından imzalanır.
 
 **İşinin bir parçası olarak** katkı veriyorsan, işvereniniz varsayılan olarak çalışmanın telifine sahip olabilir; bu durumda Madde 2'deki hakları tek başına veremezsin. Madde 3(c), imzalamadan önce işvereninin onayını almanı gerektirir.
 
-Bunun normal çözümü ayrı bir **Kurumsal CLA**'dır (şirketi bağlamaya yetkili biri tarafından imzalanan, kapsanan çalışanları listeleyen kurumsal bir sözleşme). Kurultay'ın henüz böyle bir belgesi **yok**.
+Bunun normal çözümü ayrı bir **Kurumsal CLA**'dır (şirketi bağlamaya yetkili biri tarafından imzalanan, kapsanan çalışanları listeleyen kurumsal bir sözleşme). Kurul'un henüz böyle bir belgesi **yok**.
 
 > `[HUKUKÇUYA SOR: Şimdiden ayrı bir Kurumsal CLA (Harmony HA-CLA-E) gerekiyor mu, yoksa gerçekten kurumsal bir katkıda bulunan ortaya çıkana kadar bireysel sözleşmenin Madde 3(c)'sindeki işveren-onayı beyanı yeterli mi? Gerekiyorsa imza ve doğrulama süreci ne olacak — ve PR yorumuyla imzalama akışı, PR'ı açan geliştirici yerine yetkili bir imza sahibinin imzalaması gereken bir belgeye nasıl uyarlanacak?]`
 
@@ -80,13 +80,13 @@ Bu karara bağlanana kadar: şirket mesaisinde veya şirket ekipmanıyla katkı 
 
 ---
 
-# Kurultay Bireysel Katkıda Bulunan Lisans Sözleşmesi
+# Kurul Bireysel Katkıda Bulunan Lisans Sözleşmesi
 
 **Taslak sürümü:** 0.1 (incelenmemiş) · **Durum:** Yürürlükte değil
 
 **Harmony Bireysel Katkıda Bulunan Lisans Sözleşmesi (HA-CLA-I-ANY) Sürüm 1.0** temel alınarak, <https://www.harmonyagreements.org>, "any license" (herhangi bir lisans) outbound seçeneğiyle türetilmiştir. Harmony şablonları tam olarak bu durum için — katkıları birden fazla lisansla dağıtmayı amaçlayan bir proje sahibi için — tasarlanmıştır; temel olarak Apache Bireysel CLA'sı yerine bunun seçilmesinin nedeni budur. Apache'nin outbound hak devri tek ve permissive bir çıkış lisansı varsayar ve çift lisanslamanın dayandığı yeniden lisanslama hakkını taşımaz.
 
-Kurultay'a katkıda bulunmaya gösterdiğin ilgi için teşekkürler. Kurultay, gerçek kişi **Doğan Can Yıldız** tarafından yönetilen bir yazılım projesidir; adres: `[FILL: "Biz" olarak tanımlanan gerçek kişinin tam adresi]` ("Biz" veya "Bize").
+Kurul'a katkıda bulunmaya gösterdiğin ilgi için teşekkürler. Kurul, gerçek kişi **Doğan Can Yıldız** tarafından yönetilen bir yazılım projesidir; adres: `[FILL: "Biz" olarak tanımlanan gerçek kişinin tam adresi]` ("Biz" veya "Bize").
 
 Bu Sözleşme kapsamındaki haklar bir **gerçek kişiye** verilmektedir, bir şirkete değil. "Dravcore", projenin yayımlandığı isimdir; tüzel kişilik değildir ve bu hakları tutacak hâlihazırda kurulmuş bir şirket yoktur.
 
@@ -102,7 +102,7 @@ Bu, Harmony Katkıda Bulunan **Devir** Sözleşmesi (CAA) yerine Harmony Katkıd
 
 ### Sonradan şirket kurulursa
 
-Kurultay bir gün tüzel kişilik tarafından yayımlanabilir. Bu olduğunda burada verilen haklar şirkete **kendiliğinden geçmez**: haklar bir gerçek kişiye verilmiştir ve bunları taşımak, o gerçek kişi ile yeni şirket arasında **ayrı bir devir işlemi** gerektirir. Madde 6.3, böyle bir devrin her katkıda bulunandan yeniden imza istemeden mümkün olmasını sağlamayı amaçlayan maddedir.
+Kurul bir gün tüzel kişilik tarafından yayımlanabilir. Bu olduğunda burada verilen haklar şirkete **kendiliğinden geçmez**: haklar bir gerçek kişiye verilmiştir ve bunları taşımak, o gerçek kişi ile yeni şirket arasında **ayrı bir devir işlemi** gerektirir. Madde 6.3, böyle bir devrin her katkıda bulunandan yeniden imza istemeden mümkün olmasını sağlamayı amaçlayan maddedir.
 
 > `[HUKUKÇUYA SOR: Madde 6.3'teki devredilebilirlik (assignability) ifadesi, gerçek kişi olan sahibin katkıda bulunan lisanslarının tamamını — alt lisans verme hakkı dahil — sonradan kuracağı bir şirkete, her katkıda bulunandan yeniden imza almadan devretmesi için yeterli mi? Yeterli değilse; halefleri, iştirakleri ve devralanları açıkça sayan bir devredilebilirlik maddesi ekleyin ve katkıda bulunana bildirim veya onay gerekip gerekmediğini belirtin. Ayrıca gerçek kişiden şirkete yapılacak devrin FSEK kapsamında hangi şekilde yapılması gerektiğini teyit edin.]`
 
@@ -122,7 +122,7 @@ Kurultay bir gün tüzel kişilik tarafından yayımlanabilir. Bu olduğunda bur
 
 **"Yürürlük Tarihi"**, bu Sözleşmeyi imzaladığın tarih ile Bize ilk Katkını Sunduğun tarihten hangisi önceyse onu ifade eder.
 
-> `[HUKUKÇUYA SOR: Harmony şablonu ayrıca, dokümantasyon ve tasarım varlıklarını farklı şartlarla lisanslayan opsiyonel bir maddeyle birlikte kullanılmak üzere "Media" (Katkının yazılım olmayan kısmı) tanımını da içeriyor. Bu tanım ve madde burada çıkarıldı. Kurultay fiilen dokümantasyon, Türkçe çeviri ve tasarım varlığı katkısı alıyor, yani bu varsayımsal bir durum değil — Media maddesine ihtiyacımız var mı, varsa hangi outbound şartlarla?]`
+> `[HUKUKÇUYA SOR: Harmony şablonu ayrıca, dokümantasyon ve tasarım varlıklarını farklı şartlarla lisanslayan opsiyonel bir maddeyle birlikte kullanılmak üzere "Media" (Katkının yazılım olmayan kısmı) tanımını da içeriyor. Bu tanım ve madde burada çıkarıldı. Kurul fiilen dokümantasyon, Türkçe çeviri ve tasarım varlığı katkısı alıyor, yani bu varsayımsal bir durum değil — Media maddesine ihtiyacımız var mı, varsa hangi outbound şartlarla?]`
 
 ## 2. Hakların Verilmesi
 

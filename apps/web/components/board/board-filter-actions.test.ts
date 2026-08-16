@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Priority } from '@kurultay/shared-types';
+import { Priority } from '@kurul/shared-types';
 import {
   resolveDuePreset,
   setDueFilter,

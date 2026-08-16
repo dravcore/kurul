@@ -1,8 +1,9 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import type { ActivityDto } from '@kurultay/shared-types';
+import type { ActivityDto } from '@kurul/shared-types';
 import { formatActivitySummary } from '@/lib/activity-summary';
+import { authorLabel } from '@/lib/author-label';
 import { formatRelativeTime } from '@/lib/relative-time';
 
 interface TaskActivitySectionProps {
@@ -23,6 +24,7 @@ export function TaskActivitySection({
   loadFailed = false,
 }: TaskActivitySectionProps): React.ReactElement {
   const t = useTranslations('app.board.task.activity');
+  const tCommon = useTranslations('common');
   const tErrors = useTranslations('app.errors');
   const locale = useLocale();
 
@@ -33,7 +35,9 @@ export function TaskActivitySection({
         {activities.map((activity) => (
           <li key={activity.id} className="rounded-md border border-border px-3 py-2">
             <div className="flex items-start justify-between gap-2">
-              <p className="text-small font-medium text-foreground">{activity.author.name}</p>
+              <p className="text-small font-medium text-foreground">
+                {authorLabel(activity.author, tCommon('deletedUser'))}
+              </p>
               <time
                 className="shrink-0 text-micro text-muted-foreground"
                 dateTime={activity.createdAt}

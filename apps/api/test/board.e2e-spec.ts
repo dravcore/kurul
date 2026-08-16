@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { MemberRole } from '@kurul/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';
@@ -199,6 +199,43 @@ describe('Boards and columns (e2e)', () => {
       where: { boardId: board.body.id as string },
     });
     expect(remainingTasks).toBe(1);
+  });
+
+  it('serialises concurrent column creates under a board lock', async () => {
+    // BE-05: create had no lock at all — it read siblings outside any transaction and, in
+    // the non-rebalance branch, ran a single unguarded insert. Twenty requests that all
+    // append (no afterColumnId) race for the same "last column" snapshot; without the board
+    // row lock every one of them can read the same trailing sibling and write the same
+    // midpoint. The board FOR UPDATE lock (mirroring createDefaults and the task path's
+    // column lock) forces them to queue, so each sees the previous request's committed
+    // insert and computes a fresh slot.
+    const owner = await signUp(app, { name: 'RaceOwner' });
+    const workspace = await createWorkspace(owner.agent, 'ColRace', `col-race-${Date.now()}`);
+    const board = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards`)
+      .send({ name: 'Race Board' })
+      .expect(201);
+
+    const responses = await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        owner.agent
+          .post(`/workspaces/${workspace.id}/boards/${board.body.id}/columns`)
+          .send({ name: `Race ${index}` }),
+      ),
+    );
+
+    expect(responses.every((response) => response.status === 201)).toBe(true);
+
+    const listed = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${board.body.id}/columns`)
+      .expect(200);
+    const raceColumns = (listed.body as Array<{ name: string; position: number }>).filter(
+      (column) => column.name.startsWith('Race '),
+    );
+    expect(raceColumns).toHaveLength(20);
+
+    const positions = raceColumns.map((column) => column.position);
+    expect(new Set(positions).size).toBe(positions.length);
   });
 
   it('deletes an empty column', async () => {

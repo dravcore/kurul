@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { MemberRole, type LabelDto, type WorkspaceMemberDto } from '@kurultay/shared-types';
+import { MemberRole, type LabelDto, type WorkspaceMemberDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { fetchAllWorkspaceMembers } from '@/lib/member-query';

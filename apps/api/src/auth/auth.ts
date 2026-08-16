@@ -4,9 +4,13 @@ import { organization } from 'better-auth/plugins';
 import { uuidv7 } from 'uuidv7';
 import { PrismaClient } from '../generated/prisma';
 import { loadRootEnv, envString } from '../common/env';
+import { RESOLVED_CLIENT_IP_HEADER } from '../common/trust-proxy';
 import { buildVerificationEmail } from '../mail/mail-templates';
+import { acceptLanguageOf, resolveRecipientLocale } from '../mail/recipient-locale';
 import { sendMail } from '../mail/send-mail';
+import { readStoredLocale } from '../mail/stored-locale';
 import { createSharedPrismaAdapter, registerPoolConsumer } from '../prisma/database';
+import { authRateLimitOptions } from './auth-rate-limit';
 import { organizationOptions } from './organization-options';
 import { resolveVerificationUrl, webAppUrl } from './web-urls';
 
@@ -36,6 +40,9 @@ export const auth = betterAuth({
   baseURL: betterAuthUrl,
   basePath: '/auth',
   trustedOrigins: [webUrl],
+  // `/auth/*` is served by raw Express, below the Nest router, so the global ThrottlerGuard
+  // does not cover it — see `auth-rate-limit.ts` for what this configures and why.
+  rateLimit: authRateLimitOptions(),
   session: {
     // Avoids a database round trip on every authenticated request; the signed cookie
     // is re-validated against the DB once it expires.
@@ -48,10 +55,43 @@ export const auth = betterAuth({
     database: {
       generateId: () => uuidv7(),
     },
-    // Cross-origin SPA (web :3000 → api :4000) needs SameSite=None in production HTTPS;
-    // locally Better Auth defaults work with credentialed fetch on different ports.
+    // Left off, and that is now a deployment decision rather than a local-dev convenience.
+    //
+    // A published Kurul serves the web app and this API from one hostname
+    // (`docker/Caddyfile`), so the session cookie is same-site with the page that reads it and
+    // Better Auth's defaults apply: both `session_token` and `session_data` go out
+    // `HttpOnly; SameSite=Lax` (measured, not assumed). Turning this on would widen the cookie
+    // to `Domain=.example.com`, which makes every sibling subdomain same-site with the API —
+    // `Lax` would keep sending the session for requests one of them initiates, and an operator
+    // does not control all of them. A split-domain deployment (api on its own registrable
+    // domain) is worse still: it needs `SameSite=None`, which removes the `SameSite` defence
+    // outright.
+    //
+    // Neither shape is unsupported — `WEB_URL`, `BETTER_AUTH_URL` and `NEXT_PUBLIC_API_URL` are
+    // independent settings and the dev loop itself runs two ports — so the API no longer relies
+    // on the cookie attribute alone: `common/origin-check.ts` refuses state-changing requests
+    // that announce an origin outside the allowlist, on both routers, whatever `SameSite` says.
     crossSubDomainCookies: {
       enabled: false,
+    },
+    // Better Auth's rate limiter (`authRateLimitOptions` above) keys its counters by client
+    // IP, resolved by re-parsing headers itself — it never consults Express's `trust proxy`
+    // setting. Left at Better Auth's default (`x-forwarded-for`), that resolution accepts a
+    // single-value header outright even with no `trustedProxies` configured, so a directly
+    // exposed instance — no reverse proxy in front of it at all — is still spoofable through
+    // `/auth/*`: any client can send `X-Forwarded-For: 1.2.3.4`, rotate the value per request,
+    // and walk straight past the per-IP sign-in limit.
+    //
+    // Pointing this at `RESOLVED_CLIENT_IP_HEADER` instead closes that: `configureTrustProxy`
+    // (`common/trust-proxy.ts`) stamps that header, on every request, with Express's own
+    // `req.ip` — the same trust-proxy-aware resolution the Nest `ThrottlerGuard` and the
+    // access log use — and a client cannot influence it because the middleware overwrites
+    // whatever value it finds. No separate `trustedProxies` list is configured here: it would
+    // duplicate `TRUST_PROXY`'s hop-count/CIDR parsing in a second library's format for no
+    // benefit, since by the time Better Auth sees this header the trust decision has already
+    // been made once, by Express, for both routers.
+    ipAddress: {
+      ipAddressHeaders: [RESOLVED_CLIENT_IP_HEADER],
     },
   },
   user: {
@@ -79,13 +119,23 @@ export const auth = betterAuth({
     // here, which fixes the staleness, and signs the user in when they opened the link in a
     // browser that had no session.
     autoSignInAfterVerification: true,
-    async sendVerificationEmail({ user, url }) {
+    // Recipient and actor are the same person here, and on sign-up that person has had no
+    // opportunity to store a language yet — so in practice this resolves from the
+    // `Accept-Language` of the browser they signed up in, and from `User.locale` only on a
+    // resend after they picked one.
+    async sendVerificationEmail({ user, url }, request) {
+      const locale = await resolveRecipientLocale(readStoredLocale, {
+        to: user.email,
+        acceptLanguage: acceptLanguageOf(request),
+      });
+
       await sendMail(
         buildVerificationEmail({
           to: user.email,
           name: user.name,
           // Better Auth's link would send the user back to the API origin after verifying.
           verificationUrl: resolveVerificationUrl(url),
+          locale,
         }),
       );
     },

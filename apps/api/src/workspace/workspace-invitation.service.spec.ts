@@ -4,10 +4,12 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { MemberRole } from '@kurultay/shared-types';
+import { ActivityType, MailDeliveryStatus, MemberRole } from '@kurul/shared-types';
 import { APIError } from 'better-auth/api';
 import type { Request } from 'express';
+import { ActivityService } from '../activity/activity.service';
 import { auth } from '../auth/auth';
+import { recordMailDelivery } from '../mail/mail-delivery-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   EMAIL_NOT_VERIFIED_MESSAGE,
@@ -40,14 +42,20 @@ const api = auth.api as unknown as {
 };
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
-const EMAIL = 'invitee@test.kurultay.dev';
+const ACTOR_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d5b';
+const EMAIL = 'invitee@test.example.com';
 
 interface PrismaStub {
   workspaceInvitation: { findMany: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock };
   workspace: { findUnique: jest.Mock; findFirst: jest.Mock };
+  user: { findUniqueOrThrow: jest.Mock };
 }
 
-function buildService(): { service: WorkspaceInvitationService; prisma: PrismaStub } {
+function buildService(): {
+  service: WorkspaceInvitationService;
+  prisma: PrismaStub;
+  activityService: { record: jest.Mock };
+} {
   const prisma: PrismaStub = {
     workspaceInvitation: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -58,11 +66,19 @@ function buildService(): { service: WorkspaceInvitationService; prisma: PrismaSt
       findUnique: jest.fn().mockResolvedValue(null),
       findFirst: jest.fn().mockResolvedValue(null),
     },
+    user: {
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ name: 'Invitee', avatarUrl: null }),
+    },
   };
+  const activityService = { record: jest.fn().mockResolvedValue({ id: 'activity' }) };
 
   return {
-    service: new WorkspaceInvitationService(prisma as unknown as PrismaService),
+    service: new WorkspaceInvitationService(
+      prisma as unknown as PrismaService,
+      activityService as unknown as ActivityService,
+    ),
     prisma,
+    activityService,
   };
 }
 
@@ -90,7 +106,12 @@ describe('WorkspaceInvitationService.createInvitation', () => {
     const { service } = buildService();
 
     await expect(
-      service.createInvitation(WORKSPACE_ID, { email: EMAIL, role: MemberRole.OWNER }, request),
+      service.createInvitation(
+        WORKSPACE_ID,
+        ACTOR_ID,
+        { email: EMAIL, role: MemberRole.OWNER },
+        request,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(api.createInvitation).not.toHaveBeenCalled();
@@ -104,6 +125,7 @@ describe('WorkspaceInvitationService.createInvitation', () => {
 
     const result = await service.createInvitation(
       WORKSPACE_ID,
+      ACTOR_ID,
       { email: EMAIL, role: MemberRole.MEMBER },
       request,
     );
@@ -123,6 +145,7 @@ describe('WorkspaceInvitationService.createInvitation', () => {
 
     const result = await service.createInvitation(
       WORKSPACE_ID,
+      ACTOR_ID,
       { email: EMAIL, role: MemberRole.MEMBER },
       request,
     );
@@ -146,6 +169,7 @@ describe('WorkspaceInvitationService.createInvitation', () => {
 
     const result = await service.createInvitation(
       WORKSPACE_ID,
+      ACTOR_ID,
       { email: EMAIL, role: MemberRole.ADMIN },
       request,
     );
@@ -179,11 +203,163 @@ describe('WorkspaceInvitationService.createInvitation', () => {
 
     await service.createInvitation(
       WORKSPACE_ID,
+      ACTOR_ID,
       { email: EMAIL, role: MemberRole.MEMBER },
       request,
     );
 
     expect(api.cancelInvitation).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets a cancelInvitation failure abort the role-change replace instead of proceeding past it', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([
+      { id: 'inv_a', role: MemberRole.GUEST },
+    ]);
+    api.cancelInvitation.mockRejectedValue(
+      new APIError('FORBIDDEN', { message: 'not allowed to cancel invitation' }),
+    );
+
+    const thrown = await service
+      .createInvitation(WORKSPACE_ID, ACTOR_ID, { email: EMAIL, role: MemberRole.MEMBER }, request)
+      .catch((error: unknown) => error);
+
+    // If this fell through silently, `createInvitation` would go on to call the plugin with
+    // the old invitation still pending — reissuing the same offer twice instead of replacing it.
+    expect(thrown).toBeInstanceOf(ForbiddenException);
+    expect(api.createInvitation).not.toHaveBeenCalled();
+  });
+
+  it('rejects a plugin response missing a required field instead of returning a half-built invitation', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    // `expiresAt` absent — a shape the plugin should never produce, but the guard exists
+    // because "produce a dangling accept link with no expiry" is a worse failure than a 400.
+    api.createInvitation.mockResolvedValue({
+      id: 'inv_new',
+      email: EMAIL,
+      role: MemberRole.MEMBER,
+      status: 'pending',
+      expiresAt: undefined,
+    });
+
+    await expect(
+      service.createInvitation(
+        WORKSPACE_ID,
+        ACTOR_ID,
+        { email: EMAIL, role: MemberRole.MEMBER },
+        request,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  /**
+   * Audit PM-04. The invitation email is sent from inside `auth.api.createInvitation`, by the
+   * plugin's own hook, so these cases stand the mock in for that hook: it records a delivery
+   * outcome exactly where the real one does, and the assertion is that the outcome survives
+   * the trip back to the admin instead of ending in the log.
+   */
+  it('reports that no email went out when the deployment has no mail transport', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    api.createInvitation.mockImplementation(() => {
+      recordMailDelivery(MailDeliveryStatus.NOT_CONFIGURED);
+      return Promise.resolve(invitationRow('inv_new', MemberRole.MEMBER));
+    });
+
+    const result = await service.createInvitation(
+      WORKSPACE_ID,
+      ACTOR_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    expect(result.emailDelivery).toBe(MailDeliveryStatus.NOT_CONFIGURED);
+    // The invitation is still created: the accept link is the way in on a deployment without
+    // mail, and failing the request would take it away.
+    expect(result.id).toBe('inv_new');
+    expect(result.acceptUrl).toContain('/invite/inv_new');
+  });
+
+  it('reports a refused relay too, not only a missing one', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    api.createInvitation.mockImplementation(() => {
+      recordMailDelivery(MailDeliveryStatus.FAILED);
+      return Promise.resolve(invitationRow('inv_new', MemberRole.MEMBER));
+    });
+
+    const result = await service.createInvitation(
+      WORKSPACE_ID,
+      ACTOR_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    expect(result.emailDelivery).toBe(MailDeliveryStatus.FAILED);
+  });
+
+  it('reports a delivered invitation as sent', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    api.createInvitation.mockImplementation(() => {
+      recordMailDelivery(MailDeliveryStatus.SENT);
+      return Promise.resolve(invitationRow('inv_new', MemberRole.MEMBER));
+    });
+
+    const result = await service.createInvitation(
+      WORKSPACE_ID,
+      ACTOR_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    expect(result.emailDelivery).toBe(MailDeliveryStatus.SENT);
+  });
+
+  it('omits the field entirely when no send was observed, rather than guessing', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    api.createInvitation.mockResolvedValue(invitationRow('inv_new', MemberRole.MEMBER));
+
+    const result = await service.createInvitation(
+      WORKSPACE_ID,
+      ACTOR_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    // Absent, not `undefined` and not `SENT`: a client must not be able to read "we did not
+    // look" as "it was delivered".
+    expect('emailDelivery' in result).toBe(false);
+  });
+
+  it('does not leak one invitation delivery outcome into the next', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+    api.createInvitation.mockImplementationOnce(() => {
+      recordMailDelivery(MailDeliveryStatus.NOT_CONFIGURED);
+      return Promise.resolve(invitationRow('inv_a', MemberRole.MEMBER));
+    });
+    api.createInvitation.mockImplementationOnce(() =>
+      Promise.resolve(invitationRow('inv_b', MemberRole.MEMBER)),
+    );
+
+    const first = await service.createInvitation(
+      WORKSPACE_ID,
+      ACTOR_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+    const second = await service.createInvitation(
+      WORKSPACE_ID,
+      ACTOR_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    expect(first.emailDelivery).toBe(MailDeliveryStatus.NOT_CONFIGURED);
+    expect('emailDelivery' in second).toBe(false);
   });
 
   it('looks the pending invitation up by the lower-cased email Better Auth stores', async () => {
@@ -192,14 +368,15 @@ describe('WorkspaceInvitationService.createInvitation', () => {
 
     await service.createInvitation(
       WORKSPACE_ID,
-      { email: 'Mixed.Case@Test.Kurultay.Dev', role: MemberRole.MEMBER },
+      ACTOR_ID,
+      { email: 'Mixed.Case@Test.Example.Com', role: MemberRole.MEMBER },
       request,
     );
 
     expect(prisma.workspaceInvitation.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          email: 'mixed.case@test.kurultay.dev',
+          email: 'mixed.case@test.example.com',
           workspaceId: WORKSPACE_ID,
           status: 'pending',
         }),
@@ -215,7 +392,12 @@ describe('WorkspaceInvitationService.createInvitation', () => {
     api.createInvitation.mockResolvedValue(invitationRow('inv_other', MemberRole.GUEST));
 
     await expect(
-      service.createInvitation(WORKSPACE_ID, { email: EMAIL, role: MemberRole.ADMIN }, request),
+      service.createInvitation(
+        WORKSPACE_ID,
+        ACTOR_ID,
+        { email: EMAIL, role: MemberRole.ADMIN },
+        request,
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -228,7 +410,12 @@ describe('WorkspaceInvitationService.createInvitation', () => {
     );
 
     await expect(
-      service.createInvitation(WORKSPACE_ID, { email: EMAIL, role: MemberRole.MEMBER }, request),
+      service.createInvitation(
+        WORKSPACE_ID,
+        ACTOR_ID,
+        { email: EMAIL, role: MemberRole.MEMBER },
+        request,
+      ),
     ).rejects.toMatchObject({
       status: 400,
       message: 'Failed to create invitation',
@@ -244,7 +431,7 @@ describe('WorkspaceInvitationService.createInvitation', () => {
     );
 
     const thrown = await service
-      .createInvitation(WORKSPACE_ID, { email: EMAIL, role: MemberRole.MEMBER }, request)
+      .createInvitation(WORKSPACE_ID, ACTOR_ID, { email: EMAIL, role: MemberRole.MEMBER }, request)
       .catch((error: unknown) => error);
 
     expect(thrown).toBeInstanceOf(ForbiddenException);
@@ -259,7 +446,12 @@ describe('WorkspaceInvitationService.createInvitation', () => {
     api.createInvitation.mockRejectedValue(failure);
 
     await expect(
-      service.createInvitation(WORKSPACE_ID, { email: EMAIL, role: MemberRole.MEMBER }, request),
+      service.createInvitation(
+        WORKSPACE_ID,
+        ACTOR_ID,
+        { email: EMAIL, role: MemberRole.MEMBER },
+        request,
+      ),
     ).rejects.toBe(failure);
   });
 });
@@ -276,12 +468,23 @@ describe('WorkspaceInvitationService invitation error mapping', () => {
     );
 
     const thrown = await service
-      .revokeInvitation(WORKSPACE_ID, 'inv_1', request)
+      .revokeInvitation(WORKSPACE_ID, ACTOR_ID, 'inv_1', request)
       .catch((error: unknown) => error);
 
     expect(thrown).toBeInstanceOf(ForbiddenException);
     expect((thrown as ForbiddenException).message).toBe('Failed to revoke invitation');
   });
+
+  it('404s a revoke for an invitation outside the workspace, before calling Better Auth', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.revokeInvitation(WORKSPACE_ID, ACTOR_ID, 'inv_missing', request),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(api.cancelInvitation).not.toHaveBeenCalled();
+  });
+
   it('maps a 400 from acceptInvitation to 400 with our message', async () => {
     const { service, prisma } = buildService();
     prisma.workspaceInvitation.findUnique.mockResolvedValue({
@@ -333,5 +536,288 @@ describe('WorkspaceInvitationService invitation error mapping', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
 
     expect(api.acceptInvitation).not.toHaveBeenCalled();
+  });
+
+  it('rejects a plugin response with no member, rather than returning a phantom membership', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findUnique.mockResolvedValue({
+      id: 'inv_1',
+      workspaceId: WORKSPACE_ID,
+      status: 'pending',
+    });
+    api.acceptInvitation.mockResolvedValue({ member: undefined });
+
+    await expect(service.acceptInvitation(WORKSPACE_ID, 'inv_1', request)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.user.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * An invitation is how access is handed to somebody who has none, so the trail has to cover
+ * the whole arc: offered, withdrawn, taken up. These assert the entries and, just as
+ * importantly, that a refused call leaves none.
+ */
+describe('WorkspaceInvitationService audit trail', () => {
+  it('records the invitation by id and the role it grants', async () => {
+    const { service, activityService } = buildService();
+    api.createInvitation.mockResolvedValue(invitationRow('inv_1', MemberRole.ADMIN));
+
+    await service.createInvitation(
+      WORKSPACE_ID,
+      ACTOR_ID,
+      { email: EMAIL, role: MemberRole.ADMIN },
+      request,
+    );
+
+    expect(activityService.record).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        workspaceId: WORKSPACE_ID,
+        userId: ACTOR_ID,
+        type: ActivityType.InvitationCreated,
+        payload: expect.objectContaining({
+          invitationId: 'inv_1',
+          role: MemberRole.ADMIN,
+        }),
+      }),
+    );
+  });
+
+  it('carries the mail delivery verdict on the entry, not only in the response', async () => {
+    const { service, activityService } = buildService();
+    api.createInvitation.mockImplementation(() => {
+      recordMailDelivery(MailDeliveryStatus.NOT_CONFIGURED);
+      return Promise.resolve(invitationRow('inv_1', MemberRole.MEMBER));
+    });
+
+    await service.createInvitation(
+      WORKSPACE_ID,
+      ACTOR_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+
+    // An invitation whose mail never left the building was still an offer of access — the
+    // link in the response works either way, so the trail has to say which happened.
+    expect(activityService.record).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          emailDelivery: MailDeliveryStatus.NOT_CONFIGURED,
+        }),
+      }),
+    );
+  });
+
+  it('records nothing when the plugin refuses the invitation', async () => {
+    const { service, activityService } = buildService();
+    api.createInvitation.mockRejectedValue(
+      new APIError('FORBIDDEN', { message: 'not allowed to invite' }),
+    );
+
+    await expect(
+      service.createInvitation(
+        WORKSPACE_ID,
+        ACTOR_ID,
+        { email: EMAIL, role: MemberRole.MEMBER },
+        request,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(activityService.record).not.toHaveBeenCalled();
+  });
+
+  it('records a revocation by invitation id', async () => {
+    const { service, prisma, activityService } = buildService();
+    prisma.workspaceInvitation.findFirst.mockResolvedValue({
+      id: 'inv_1',
+      workspaceId: WORKSPACE_ID,
+      email: EMAIL,
+      role: MemberRole.ADMIN,
+    });
+    api.cancelInvitation.mockResolvedValue({ id: 'inv_1' });
+
+    await service.revokeInvitation(WORKSPACE_ID, ACTOR_ID, 'inv_1', request);
+
+    expect(activityService.record).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: ACTOR_ID,
+        type: ActivityType.InvitationRevoked,
+        payload: { invitationId: 'inv_1', role: MemberRole.ADMIN },
+      }),
+    );
+  });
+
+  it('records the acceptance against the invitee, who is the one who gained access', async () => {
+    const { service, prisma, activityService } = buildService();
+    prisma.workspaceInvitation.findUnique.mockResolvedValue({
+      id: 'inv_1',
+      workspaceId: WORKSPACE_ID,
+      email: EMAIL,
+      status: 'pending',
+    });
+    api.acceptInvitation.mockResolvedValue({
+      member: {
+        id: 'member-1',
+        userId: 'usr_invitee',
+        role: MemberRole.MEMBER,
+        organizationId: WORKSPACE_ID,
+      },
+    });
+
+    await service.acceptInvitation(WORKSPACE_ID, 'inv_1', request);
+
+    // The one audited event whose actor is not an administrator: the invitee is the person
+    // whose access changed, and naming the inviter here would misattribute it.
+    expect(activityService.record).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        workspaceId: WORKSPACE_ID,
+        userId: 'usr_invitee',
+        type: ActivityType.InvitationAccepted,
+        payload: { invitationId: 'inv_1', role: MemberRole.MEMBER },
+      }),
+    );
+  });
+
+  /**
+   * The regression guard for the whole section above.
+   *
+   * `GET /workspaces/:workspaceId/activities` is `@WorkspaceScoped()` and returns `payload`
+   * verbatim, while the pending-invitation list is `@WorkspaceRoles(...ADMIN_ROLES)`. An address
+   * on any of these payloads would republish the invitation queue to every MEMBER and GUEST —
+   * the exact exposure `WorkspaceController.listInvitations` refuses. Asserted over all three
+   * events at once, and by value rather than by key, so a future payload cannot smuggle it back
+   * under a different name.
+   */
+  it('never puts an invited address on any invitation payload', async () => {
+    const { service, prisma, activityService } = buildService();
+    api.createInvitation.mockResolvedValue(invitationRow('inv_1', MemberRole.MEMBER));
+    prisma.workspaceInvitation.findFirst.mockResolvedValue({
+      id: 'inv_1',
+      workspaceId: WORKSPACE_ID,
+      email: EMAIL,
+      role: MemberRole.MEMBER,
+    });
+    prisma.workspaceInvitation.findUnique.mockResolvedValue({
+      id: 'inv_1',
+      workspaceId: WORKSPACE_ID,
+      email: EMAIL,
+      status: 'pending',
+    });
+    api.cancelInvitation.mockResolvedValue({ id: 'inv_1' });
+    api.acceptInvitation.mockResolvedValue({
+      member: {
+        id: 'member-1',
+        userId: 'usr_invitee',
+        role: MemberRole.MEMBER,
+        organizationId: WORKSPACE_ID,
+      },
+    });
+
+    await service.createInvitation(
+      WORKSPACE_ID,
+      ACTOR_ID,
+      { email: EMAIL, role: MemberRole.MEMBER },
+      request,
+    );
+    await service.revokeInvitation(WORKSPACE_ID, ACTOR_ID, 'inv_1', request);
+    await service.acceptInvitation(WORKSPACE_ID, 'inv_1', request);
+
+    const payloads = activityService.record.mock.calls.map(
+      ([, input]: [unknown, { payload: Record<string, unknown> }]) => input.payload,
+    );
+    expect(payloads).toHaveLength(3);
+    for (const payload of payloads) {
+      expect(JSON.stringify(payload)).not.toContain(EMAIL);
+      // The id is what makes the address recoverable by a reader who is allowed to see it.
+      expect(payload).toHaveProperty('invitationId', 'inv_1');
+    }
+  });
+});
+
+describe('WorkspaceInvitationService.listPendingInvitations', () => {
+  /** A stored row as Prisma hands it back, before the service maps it to a DTO. */
+  function storedRow(id: string, role: string | null) {
+    return {
+      id,
+      workspaceId: WORKSPACE_ID,
+      email: EMAIL,
+      role,
+      status: 'pending',
+      expiresAt: new Date('2026-09-01T00:00:00.000Z'),
+    };
+  }
+
+  it('asks only for live, pending rows of this workspace, ordered by id', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([storedRow('inv_1', MemberRole.MEMBER)]);
+
+    const page = await service.listPendingInvitations(WORKSPACE_ID, { limit: 100 });
+
+    const args = prisma.workspaceInvitation.findMany.mock.calls[0]?.[0] as {
+      where: { workspaceId: string; status: string; expiresAt: { gt: Date } };
+      orderBy: { id: string };
+      take: number;
+    };
+    expect(args.where.workspaceId).toBe(WORKSPACE_ID);
+    expect(args.where.status).toBe('pending');
+    // Expired rows are excluded rather than offered as revocable: revoking one changes nothing.
+    expect(args.where.expiresAt.gt).toBeInstanceOf(Date);
+    expect(args.orderBy).toEqual({ id: 'asc' });
+    // `limit + 1` is the probe that answers `hasMore` without a second count query.
+    expect(args.take).toBe(101);
+    expect(page.items).toHaveLength(1);
+    expect(page.hasMore).toBe(false);
+  });
+
+  it('pages by id and reports the cursor the client should continue from', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([
+      storedRow('inv_1', MemberRole.MEMBER),
+      storedRow('inv_2', MemberRole.ADMIN),
+    ]);
+
+    const page = await service.listPendingInvitations(WORKSPACE_ID, { limit: 1 });
+
+    expect(page.items.map((item) => item.id)).toEqual(['inv_1']);
+    expect(page.hasMore).toBe(true);
+    expect(page.nextCursor).toBe('inv_1');
+  });
+
+  it('carries the cursor into the query as a keyset bound', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([]);
+
+    await service.listPendingInvitations(WORKSPACE_ID, { limit: 100, cursor: 'inv_1' });
+
+    const args = prisma.workspaceInvitation.findMany.mock.calls[0]?.[0] as {
+      where: { id?: { gt: string } };
+    };
+    expect(args.where.id).toEqual({ gt: 'inv_1' });
+  });
+
+  it('rebuilds the accept URL from the id rather than storing a second copy of it', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([storedRow('inv_1', MemberRole.ADMIN)]);
+
+    const page = await service.listPendingInvitations(WORKSPACE_ID, { limit: 100 });
+
+    expect(page.items[0]?.acceptUrl).toContain('inv_1');
+    expect(page.items[0]?.role).toBe(MemberRole.ADMIN);
+    expect(page.items[0]?.email).toBe(EMAIL);
+  });
+
+  it('reads a row with no recorded role as the least privileged one', async () => {
+    const { service, prisma } = buildService();
+    prisma.workspaceInvitation.findMany.mockResolvedValue([storedRow('inv_1', null)]);
+
+    const page = await service.listPendingInvitations(WORKSPACE_ID, { limit: 100 });
+
+    // Nothing this API writes leaves `role` null, so a null row is not ours — reading it as
+    // MEMBER would show an admin a grant the row cannot prove was sent.
+    expect(page.items[0]?.role).toBe(MemberRole.GUEST);
   });
 });

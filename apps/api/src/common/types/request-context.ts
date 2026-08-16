@@ -1,4 +1,4 @@
-import type { MemberRole } from '@kurultay/shared-types';
+import type { MemberRole } from '@kurul/shared-types';
 import type { Request } from 'express';
 
 export interface AuthenticatedUser {

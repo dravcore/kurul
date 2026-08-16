@@ -1,5 +1,5 @@
 import { IsIn } from 'class-validator';
-import { SUPPORTED_LOCALES, type Locale } from '@kurultay/shared-types';
+import { SUPPORTED_LOCALES, type Locale } from '@kurul/shared-types';
 import { OptionalNullable } from '../../common/validation/optional';
 
 export class UpdateMeDto {

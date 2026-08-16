@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { taskInclude, type TaskWithRelations } from './task.include';
+import { countAttachments } from './attachment-count';
+import { taskDetailInclude, type TaskDetailRow } from './task.include';
 
 /**
  * The task module's scoped reads.
@@ -14,13 +15,22 @@ import { taskInclude, type TaskWithRelations } from './task.include';
 export class TaskReadService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findTask(workspaceId: string, taskId: string): Promise<TaskWithRelations> {
+  /**
+   * The single-task read, and the one every mutation's response goes through — so it uses
+   * the detail include: a caller who just edited a task gets the full checklists back, not
+   * the board's summary projection.
+   *
+   * The attachment count is a second statement rather than an `include` — `attachment-count.ts`
+   * has the measurement. Sequential rather than `Promise.all`: the count is only wanted for a
+   * task that exists, and racing it would send a query for one that does not.
+   */
+  async findTask(workspaceId: string, taskId: string): Promise<TaskDetailRow> {
     const task = await this.prisma.task.findFirst({
       where: { id: taskId, board: { workspaceId } },
-      include: taskInclude,
+      include: taskDetailInclude,
     });
     if (!task) throw new NotFoundException('Task not found');
-    return task;
+    return { ...task, attachmentCount: await countAttachments(this.prisma, taskId) };
   }
 
   /**

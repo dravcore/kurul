@@ -1,4 +1,4 @@
-import { ColumnCategory, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@kurultay/shared-types';
+import { ColumnCategory, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@kurul/shared-types';
 import { defaultColumnsFor } from './board-defaults';
 
 /**
@@ -111,6 +111,30 @@ describe('defaultColumnsFor', () => {
       'In Progress',
       'Done',
     ]);
+  });
+
+  it('names the Turkish seed columns the way the Turkish empty state advertises them', () => {
+    // The mirror of the assertion above, against `messages/tr.json`'s
+    // `app.board.column.emptyBody` ("Yapılacak, Devam Ediyor ve Bitti"). Spelled out rather
+    // than derived, because the two files cannot import one another and a promise the product
+    // makes in one language is not checked by the other language's test.
+    expect(defaultColumnsFor('tr').map((column) => column.name)).toStrictEqual([
+      'Yapılacak',
+      'Devam Ediyor',
+      'Bitti',
+    ]);
+  });
+
+  it('seeds a Turkish board with a completed column no name match could find', () => {
+    // ADR 0019's own example. `Bitti` shares no substring with `done`, `complete` or
+    // `finished`, so any reintroduced name-matching heuristic fails this test rather than
+    // silently reporting zero throughput on every Turkish board.
+    const completed = defaultColumnsFor('tr').find(
+      (column) => column.category === ColumnCategory.COMPLETED,
+    );
+
+    expect(completed?.name).toBe('Bitti');
+    expect(completed?.name.toLowerCase()).not.toContain('done');
   });
 
   it('returns a fresh array each call, so a caller cannot mutate the catalog', () => {

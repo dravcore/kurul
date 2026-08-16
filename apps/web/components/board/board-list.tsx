@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { MoreHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { BoardDto } from '@kurultay/shared-types';
-import { canCreateOrUpdateBoard, canDeleteBoard } from '@/lib/board-permissions';
+import type { BoardDto, TrelloImportReportDto } from '@kurul/shared-types';
+import { canCreateOrUpdateBoard, canDeleteBoard, canMutateColumns } from '@/lib/board-permissions';
 import { useApiResource } from '@/lib/use-api-resource';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
@@ -19,6 +19,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateBoardDialog } from './create-board-dialog';
 import { DeleteBoardDialog } from './delete-board-dialog';
+import { ImportReportPanel } from './import-report-panel';
+import { ImportTrelloDialog } from './import-trello-dialog';
 import { RenameBoardDialog } from './rename-board-dialog';
 import { DamgaMark } from '@/components/brand/damga-mark';
 
@@ -28,15 +30,23 @@ export function BoardList(): React.ReactElement {
   const tErrors = useTranslations('app.errors');
   const { activeId, activeRole } = useWorkspaceContext();
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [renameBoard, setRenameBoard] = useState<BoardDto | null>(null);
   const [deleteBoard, setDeleteBoard] = useState<BoardDto | null>(null);
+  // The report lives here rather than inside the dialog: a dialog that stays open to show it
+  // would still be one Escape away from destroying the only copy there is (ADR 0025).
+  const [importReport, setImportReport] = useState<TrelloImportReportDto | null>(null);
 
   const canCreate = canCreateOrUpdateBoard(activeRole);
   const canDelete = canDeleteBoard(activeRole);
   const canRename = canCreateOrUpdateBoard(activeRole);
+  // The endpoint is admin-only because an import creates columns (ADR 0025). Showing the entry
+  // to a MEMBER would be showing a button whose only outcome is a 403 — the same reason every
+  // other action on this screen is behind a role check.
+  const canImport = canMutateColumns(activeRole);
 
   const fetchBoards = useMemo(
-    () => (activeId ? (signal: AbortSignal) => fetchWorkspaceBoards(activeId, { signal }) : null),
+    () => (activeId ? () => fetchWorkspaceBoards(activeId) : null),
     [activeId],
   );
   const {
@@ -52,13 +62,24 @@ export function BoardList(): React.ReactElement {
   // request to, so nothing has been asked and nothing has gone wrong. Saying "Could not load
   // boards." here blamed a request that was never made — and left that as the last word on
   // screen for the whole redirect. Same shape as the load below, because it is the same wait.
+  // Above the load branches, not inside the settled one. Importing ends in `reload()`, which
+  // puts this screen back into `loading` for a moment — and a report that unmounts during that
+  // moment is a report the user can never get back, because nothing stores it (ADR 0025).
+  const reportPanel =
+    importReport === null ? null : (
+      <ImportReportPanel report={importReport} onDismiss={() => setImportReport(null)} />
+    );
+
   if (!activeId || loading) {
     return (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-busy>
-        <span className="sr-only">{tShell('loading')}</span>
-        {Array.from({ length: 3 }).map((_, index) => (
-          <Skeleton key={index} className="h-[88px] w-full rounded-[var(--radius-lg)]" />
-        ))}
+      <div className="space-y-6">
+        {reportPanel}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-busy>
+          <span className="sr-only">{tShell('loading')}</span>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-[88px] w-full rounded-[var(--radius-lg)]" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -67,24 +88,36 @@ export function BoardList(): React.ReactElement {
     // Nothing here explains itself — a list that did not arrive is the retryable case, so the
     // recovery is a control rather than a sentence (docs/design.md §7).
     return (
-      <div className="flex flex-col items-start gap-3">
-        <p className="text-body text-destructive">{error}</p>
-        <Button type="button" onClick={reload}>
-          {tErrors('retry')}
-        </Button>
+      <div className="space-y-6">
+        {reportPanel}
+        <div className="flex flex-col items-start gap-3">
+          <p className="text-body text-destructive">{error}</p>
+          <Button type="button" onClick={reload}>
+            {tErrors('retry')}
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {reportPanel}
+
       <div className="flex items-center justify-between gap-3">
         <p className="text-body text-muted-foreground">{t('listSubtitle')}</p>
-        {canCreate ? (
-          <Button type="button" onClick={() => setCreateOpen(true)}>
-            {t('createAction')}
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {canImport ? (
+            <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
+              {t('import.action')}
+            </Button>
+          ) : null}
+          {canCreate ? (
+            <Button type="button" onClick={() => setCreateOpen(true)}>
+              {t('createAction')}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {boards.length === 0 ? (
@@ -155,6 +188,20 @@ export function BoardList(): React.ReactElement {
         workspaceId={activeId}
         onCreated={(board) => setBoards((current) => [...current, board])}
       />
+      {canImport ? (
+        <ImportTrelloDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          workspaceId={activeId}
+          onImported={(report) => {
+            setImportReport(report);
+            // The report carries an id and a name, not a `BoardDto`. Refetching is the honest
+            // way to get the new board into this list; assembling one from two fields would put
+            // invented timestamps and a guessed description on screen.
+            reload();
+          }}
+        />
+      ) : null}
       <RenameBoardDialog
         open={renameBoard !== null}
         onOpenChange={(open) => {

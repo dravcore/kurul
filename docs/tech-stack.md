@@ -1,8 +1,12 @@
 # Tech Stack
 
-The technology chosen for each layer of Kurultay, with a short rationale and the alternative it was weighed against.
+The technology chosen for each layer of Kurul, with a short rationale and the alternative it was weighed against.
 
 > 🌐 English (canonical) | [Türkçe](tr/tech-stack.md)
+
+**Pins.** Majors and product choices below are the lasting decisions. Exact versions drift;
+treat root and app `package.json` / `pnpm-lock.yaml` as source of truth for what is installed
+today. Architecture shape: [architecture.md](architecture.md).
 
 ## Contents
 
@@ -31,6 +35,8 @@ The technology chosen for each layer of Kurultay, with a short rationale and the
 | Charts                 | Recharts                               | Chart.js, Apache ECharts              |
 | Auth                   | Better Auth (organization plugin)      | Auth.js / NextAuth (maintenance mode) |
 | Email                  | `nodemailer` over SMTP                 | Provider API (Resend, SendGrid, …)    |
+| File uploads           | `multer` + `file-type` magic bytes     | Trusting the declared `Content-Type`  |
+| Reverse proxy          | Caddy (one origin, automatic HTTPS)    | nginx, Traefik                        |
 | Deployment             | Docker Compose                         | Kubernetes (once scale demands it)    |
 
 Architecture (monorepo + modular monolith) is covered separately in [architecture.md](architecture.md).
@@ -47,7 +53,7 @@ Both commercial reference points run this way: ClickUp on TypeScript/Node.js/Nes
 
 Uncontroversial: ClickUp, Linear, Plane, Taiga, and Focalboard all sit on Postgres. JSON columns cover flexible metadata (custom fields, activity payloads) while relational integrity covers the task/board graph. Redis then serves four needs with one tool: notification queue, session store, rate limiting, and the Socket.io pub/sub adapter.
 
-Both versions are pinned on purpose. **PostgreSQL 18** is the current major; the previous one is supported for years yet, but a major bump after v0.1 ships costs every self-hoster a `pg_dump`/restore — the official image refuses to start against a `PGDATA` volume initialized by a different major ([development.md](development.md#upgrading-and-backups)). Doing it now, with no data in existence, is free. **Redis 8** is a licensing choice as much as a version one: the 7.4–7.8 band is RSALv2/SSPLv1 only, which is source-available and not OSI open source, and Redis 8 restored an OSI option — AGPLv3, the same licence Kurultay ships under. A self-hoster who redistributes the stack inherits no licence question they did not ask for. Valkey (BSD-3-Clause, the Linux Foundation fork of Redis 7.2.4) is protocol-compatible and remains a one-line image swap if a permissive licence is ever needed downstream.
+Both versions are pinned on purpose. **PostgreSQL 18** is the current major; the previous one is supported for years yet, but a major bump after v0.1 ships costs every self-hoster a `pg_dump`/restore — the official image refuses to start against a `PGDATA` volume initialized by a different major ([development.md](development.md#upgrading-and-backups)). Doing it now, with no data in existence, is free. **Redis 8** is a licensing choice as much as a version one: the 7.4–7.8 band is RSALv2/SSPLv1 only, which is source-available and not OSI open source, and Redis 8 restored an OSI option — AGPLv3, the same licence Kurul ships under. A self-hoster who redistributes the stack inherits no licence question they did not ask for. Valkey (BSD-3-Clause, the Linux Foundation fork of Redis 7.2.4) is protocol-compatible and remains a one-line image swap if a permissive licence is ever needed downstream.
 
 ### ORM — Prisma
 
@@ -59,7 +65,7 @@ For self-hosted infrastructure, Socket.io with `@socket.io/redis-adapter` is the
 
 ### Drag & drop — @dnd-kit
 
-`react-beautiful-dnd` is deprecated — Atlassian withdrew from it. Kurultay uses the **classic `@dnd-kit` line** (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0, pinned): MIT, ~6 KB core, accessible (keyboard and screen reader), framework-agnostic, and the most widely deployed React drag-and-drop library. It is also **frozen** — no release since December 2024, docs-site repo archived in February 2026, maintainer effort moved to a pre-1.0 rewrite (`@dnd-kit/react`) with a different API that we are not adopting. Atlassian's `pragmatic-drag-and-drop` (Apache-2.0) is actively released and is the fallback, at the cost of hand-writing collision detection. Frozen-but-stable beats moving-and-pre-1.0 for a solo maintainer at 50–200 cards per board; the full argument and the re-evaluation trigger are in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md). The critical companion rule is ordering: positions are stored as floats and reordered by **fractional indexing**, never as renumbered integers.
+`react-beautiful-dnd` is deprecated — Atlassian withdrew from it. Kurul uses the **classic `@dnd-kit` line** (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0, pinned): MIT, ~6 KB core, accessible (keyboard and screen reader), framework-agnostic, and the most widely deployed React drag-and-drop library. It is also **frozen** — no release since December 2024, docs-site repo archived in February 2026, maintainer effort moved to a pre-1.0 rewrite (`@dnd-kit/react`) with a different API that we are not adopting. Atlassian's `pragmatic-drag-and-drop` (Apache-2.0) is actively released and is the fallback, at the cost of hand-writing collision detection. Frozen-but-stable beats moving-and-pre-1.0 for a solo maintainer at 50–200 cards per board; the full argument and the re-evaluation trigger are in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md). The critical companion rule is ordering: positions are stored as floats and reordered by **fractional indexing**, never as renumbered integers.
 
 ### Charts — Recharts
 
@@ -71,7 +77,7 @@ Multi-tenant workspaces are the heart of this product, so auth is a load-bearing
 
 ### Email — nodemailer over SMTP
 
-Kurultay sends one class of transactional email so far: the verification link an invitee needs before `better-auth`'s hardened invitation-acceptance check will let them join a workspace (see [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)). `nodemailer` talks plain SMTP, configured only through `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` / `MAIL_FROM` — no provider SDK, so self-hosters point it at whatever mail server they already run instead of creating a new vendor account. `docker-compose.dev.yml` runs [Mailpit](https://mailpit.axllent.org/) as a local SMTP catch-all so development never sends real mail; see [development.md#smtp-and-mailpit](development.md#smtp-and-mailpit).
+Kurul sends one class of transactional email so far: the verification link an invitee needs before `better-auth`'s hardened invitation-acceptance check will let them join a workspace (see [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)). `nodemailer` talks plain SMTP, configured only through `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` / `MAIL_FROM` — no provider SDK, so self-hosters point it at whatever mail server they already run instead of creating a new vendor account. `docker-compose.dev.yml` runs [Mailpit](https://mailpit.axllent.org/) as a local SMTP catch-all so development never sends real mail; see [development.md#smtp-and-mailpit](development.md#smtp-and-mailpit).
 
 ### Frontend — Next.js 16
 
@@ -79,24 +85,32 @@ Kurultay sends one class of transactional email so far: the verification link an
 
 ### i18n — next-intl
 
-`next-intl` is wired from Phase 1 — every user-facing string goes through `useTranslations()` / `messages/en.json` rather than being hardcoded — so the app is translation-ready even though the locale is currently hardcoded to `en` and there is no locale switcher yet (MVP is English-only, see [roadmap.md — Beyond MVP](roadmap.md#beyond-mvp)). The alternative was retrofitting i18n after strings had already spread through the component tree, which is the more expensive order.
+`next-intl` is wired from Phase 1 — user-facing strings go through `useTranslations()` /
+`messages/<locale>.json` rather than being hardcoded. Locale resolution is
+`User.locale → locale cookie → Accept-Language → 'en'` ([ADR 0018](decisions/0018-localization-strategy.md));
+**Settings → Language** can set a preference or “Match my browser”. English is still the only
+catalog on offer — additional UI language packs remain [Beyond MVP](roadmap.md#beyond-mvp).
+
+### File uploads — `multer` + `file-type`
+
+Two endpoints take `multipart/form-data`: an attachment upload and a Trello import. `multer` reads both, registered per module rather than globally so each carries its own byte ceiling — an attachment ceiling is a disk one, an import ceiling is a heap one, and an import must keep working on an instance with attachments switched off. `file-type` reads the **magic bytes** of an uploaded file, because the declared `Content-Type` and the filename extension both come from the caller and neither is evidence; the type written to the row and later to the download header is the sniffed one ([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Plain text has no magic number and is the one deliberately narrow exception, spelled out in [api-conventions.md](api-conventions.md#file-uploads-and-downloads).
 
 ### Deployment — Docker Compose
 
-Four services — `api`, `web`, `postgres`, `redis` — matching the existing self-managed Linux server setup. The path to Kubernetes stays open for when scale demands it (both ClickUp and Linear ended up there), but Compose on a single host is the right size for now.
+Seven services: the four that carry the product — `api`, `web`, `postgres`, `redis` — plus `proxy` (Caddy, the only one publishing a port, terminating TLS and serving the whole stack from one origin), `migrate` (a one-shot `prisma migrate deploy`) and `backup` (a `pg_dump` sidecar that also archives the attachment volume). This matches the existing self-managed Linux server setup. The path to Kubernetes stays open for when scale demands it (both ClickUp and Linear ended up there), but Compose on a single host is the right size for now.
 
 ---
 
 ## 3. Deliberately not included
 
-| Technology              | Why not now                                                                                                   |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Kafka                   | ClickUp uses it, but at 20M+ user scale. Redis pub/sub is more than enough for the MVP; it can be added later |
-| GraphQL                 | Linear uses it. REST is faster to start with; revisit when API consumers diversify                            |
-| Elasticsearch           | Full-text search can start with PostgreSQL's built-in FTS                                                     |
-| Kubernetes              | Docker Compose on one host is sufficient. Migrate when traffic requires it                                    |
-| MinIO / S3              | File attachments are out of MVP scope. When added, pick an S3-compatible store                                |
-| Local-first sync engine | Linear's largest technical investment. Very high complexity — start server-first                              |
+| Technology              | Why not now                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kafka                   | ClickUp uses it, but at 20M+ user scale. Redis pub/sub is more than enough for the MVP; it can be added later                                                                                                                                                                                                                                       |
+| GraphQL                 | Linear uses it. REST is faster to start with; revisit when API consumers diversify                                                                                                                                                                                                                                                                  |
+| Elasticsearch           | Full-text search can start with PostgreSQL's built-in FTS                                                                                                                                                                                                                                                                                           |
+| Kubernetes              | Docker Compose on one host is sufficient. Migrate when traffic requires it                                                                                                                                                                                                                                                                          |
+| MinIO / S3              | Attachments ship on **local disk behind a `StorageBackend` port**, not on object storage ([ADR 0022](decisions/0022-attachment-storage.md)). An `S3StorageBackend` is deferred to a trigger, not to a schedule: the first operator report of a deployment where local disk is not durable — an ephemeral container host, or a multi-replica install |
+| Local-first sync engine | Linear's largest technical investment. Very high complexity — start server-first                                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -116,24 +130,7 @@ Projects worth studying for architecture and data modelling:
 
 ## 5. Decision records
 
-Full arguments and consequences live in [`decisions/`](decisions/) rather than being repeated here:
+Stack and product ADRs are indexed in [decisions/README.md](decisions/README.md) (0001–0019).
+Start there rather than duplicating the table here.
 
-| ADR                                                                                            | Topic                                                            |
-| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)             | Monorepo + modular monolith                                      |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                     | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                   |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                   | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts          |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                               | Better Auth with the organization plugin (→ Workspace)           |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                             | Socket.io + Redis adapter                                        |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                         | Float positions for ordering                                     |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                       | AGPL-3.0                                                         |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                 | Git Flow + SemVer                                                |
-| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)               | Board and column role matrix (OWNER/ADMIN structure)             |
-| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                               | Task role matrix (MEMBER+ content work)                          |
-| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md) | Label and task-metadata role matrix                              |
-| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)             | Comment delete: authorship or OWNER/ADMIN                        |
-| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)     | SMTP mail delivery, email verification on invitation accept only |
-| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                           | Dual licensing + contributor license agreement                   |
-| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)             | No external contributions; CLA unenacted, legal spend deferred   |
-
-Related: [architecture.md](architecture.md) · [project-skeleton.md](project-skeleton.md)
+Related: [architecture.md](architecture.md) · [archive/project-skeleton.md](archive/project-skeleton.md) (historical Phase 1 scaffold)

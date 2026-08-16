@@ -1,0 +1,70 @@
+{
+  "id": "6512b0a3c3d4e5f602030003",
+  "name": "Colours this repo has never seen",
+  "desc": "",
+  "closed": false,
+  "url": "https://trello.com/b/xXxXxXxX/colours-this-repo-has-never-seen",
+  "lists": [
+    {
+      "id": "6512b0a4c3d4e5f602030020",
+      "name": "Only list",
+      "closed": false,
+      "color": null,
+      "idBoard": "6512b0a3c3d4e5f602030003",
+      "pos": 16384,
+      "subscribed": false,
+      "softLimit": null
+    }
+  ],
+  "labels": [
+    {
+      "id": "6512b0a5c3d4e5f602030030",
+      "idBoard": "6512b0a3c3d4e5f602030003",
+      "name": "Citrus",
+      "color": "tangerine",
+      "uses": 1
+    },
+    {
+      "id": "6512b0a5c3d4e5f602030031",
+      "idBoard": "6512b0a3c3d4e5f602030003",
+      "name": "",
+      "color": null,
+      "uses": 1
+    },
+    {
+      "id": "6512b0a5c3d4e5f602030032",
+      "idBoard": "6512b0a3c3d4e5f602030003",
+      "name": "",
+      "color": "sky_light",
+      "uses": 1
+    }
+  ],
+  "cards": [
+    {
+      "id": "6512b0a6c3d4e5f602030040",
+      "name": "Wears all three labels",
+      "desc": "",
+      "closed": false,
+      "due": null,
+      "dueComplete": false,
+      "idBoard": "6512b0a3c3d4e5f602030003",
+      "idList": "6512b0a4c3d4e5f602030020",
+      "idLabels": [
+        "6512b0a5c3d4e5f602030030",
+        "6512b0a5c3d4e5f602030031",
+        "6512b0a5c3d4e5f602030032"
+      ],
+      "idMembers": [],
+      "idChecklists": [],
+      "idShort": 1,
+      "pos": 16384,
+      "shortLink": "pQrStUvW",
+      "shortUrl": "https://trello.com/c/pQrStUvW",
+      "url": "https://trello.com/c/pQrStUvW/1-wears-all-three-labels",
+      "attachments": []
+    }
+  ],
+  "checklists": [],
+  "members": [],
+  "actions": []
+}

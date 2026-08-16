@@ -5,7 +5,7 @@ import {
   SocketClientEvents,
   SocketEvents,
   type NotificationUnreadChangedPayload,
-} from '@kurultay/shared-types';
+} from '@kurul/shared-types';
 import { connectSocket, getSocket } from '@/lib/socket';
 
 export type NotificationSocketHandlers = {
@@ -64,7 +64,6 @@ export function useNotificationSocket(
 
   useEffect(() => {
     if (!enabled || !workspaceId) {
-      setConnected(false);
       return;
     }
 
@@ -124,5 +123,9 @@ export function useNotificationSocket(
     };
   }, [workspaceId, enabled]);
 
-  return { connected };
+  // Derived rather than reset from the effect: with no room to hold, "connected" is not a
+  // fact that has to be written down and then unwritten — it is false by construction, and
+  // deriving it removes the render that a disabling `setConnected(false)` used to cost. The
+  // teardown below still clears the flag so a *re-enabled* hook starts from disconnected.
+  return { connected: enabled && workspaceId !== null && connected };
 }

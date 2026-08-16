@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { DashboardThroughputDay } from '@kurultay/shared-types';
+import type { DashboardThroughputDay } from '@kurul/shared-types';
 import { useTranslations } from 'next-intl';
 import { ChartTableToggle } from './chart-table-toggle';
 

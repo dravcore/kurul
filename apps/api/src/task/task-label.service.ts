@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import type { TaskDto } from '@kurultay/shared-types';
+import type { TaskDto } from '@kurul/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AddTaskLabelDto } from './dto/add-task-label.dto';
 import { conflictOnUniqueViolation } from './prisma-unique-violation';

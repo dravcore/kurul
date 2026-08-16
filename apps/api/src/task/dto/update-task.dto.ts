@@ -1,4 +1,4 @@
-import { Priority } from '@kurultay/shared-types';
+import { Priority } from '@kurul/shared-types';
 import {
   IsEnum,
   IsInt,

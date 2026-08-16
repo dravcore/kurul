@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { Priority, type TaskDto } from '@kurultay/shared-types';
+import { Priority, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { TaskCard } from './task-card';
 
@@ -25,6 +25,9 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     updatedAt: '2026-01-01T00:00:00.000Z',
     assignees: [],
     labels: [],
+    checklistSummary: { total: 0, done: 0 },
+    checklists: null,
+    attachmentCount: 0,
     ...overrides,
   };
 }
@@ -72,5 +75,45 @@ describe('TaskCard estimate', () => {
     renderCard({ estimatedMinutes: null });
 
     expect(screen.queryByText(/\dh|\dm/)).toBeNull();
+  });
+});
+
+describe('TaskCard checklist badge', () => {
+  it('carries checklist progress on a card that has nothing else in its meta row', () => {
+    // The meta row is conditional. Before the badge was added to that condition, a task whose
+    // only metadata was a checklist rendered no row at all and the badge went missing.
+    renderCard({ checklistSummary: { total: 4, done: 1 } });
+
+    expect(screen.getByText('1/4')).toBeDefined();
+  });
+
+  it('adds nothing to a card whose task has no checklist', () => {
+    renderCard({ checklistSummary: { total: 0, done: 0 } });
+
+    expect(screen.queryByText(/^\d+\/\d+$/)).toBeNull();
+  });
+});
+
+describe('TaskCard attachment badge', () => {
+  it('carries the attachment count on a card that has nothing else in its meta row', () => {
+    // The guard on the meta row is the whole test. A card whose only metadata is an attachment
+    // renders no row at all unless `attachmentCount` is one of the terms in that condition —
+    // and the badge, correct on its own, is then never mounted.
+    renderCard({ attachmentCount: 2 });
+
+    expect(screen.getByLabelText('2 attachments')).toBeDefined();
+  });
+
+  it('still shows the badge beside other metadata', () => {
+    renderCard({ attachmentCount: 1, estimatedMinutes: 45 });
+
+    expect(screen.getByLabelText('1 attachment')).toBeDefined();
+    expect(screen.getByText('45m')).toBeDefined();
+  });
+
+  it('adds nothing to a card whose task has no attachment', () => {
+    renderCard({ attachmentCount: 0 });
+
+    expect(screen.queryByLabelText(/attachment/)).toBeNull();
   });
 });

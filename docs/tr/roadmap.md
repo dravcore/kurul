@@ -1,404 +1,99 @@
 # Roadmap
 
-Kurultay için dokümantasyondan MVP’ye (Faz 1–9, tamam) ve ötesine uzanan, fazlara ayrılmış
-teslimat planı.
+Kurul’ın durumu ve şimdilik bilinçli olarak kapsam dışı bırakılanlar.
 
 > 🌐 [English (canonical)](../roadmap.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
-**Son güncelleme:** 2026-08-12
-
-## İçindekiler
-
-- [Bu roadmap nasıl çalışır](#bu-roadmap-nasıl-çalışır)
-- [Durum lejantı](#durum-lejantı)
-- [Faz 0 — Dokümantasyon ve standartlar](#faz-0--dokümantasyon-ve-standartlar)
-- [Faz 1 — İskelet](#faz-1--iskelet)
-- [Faz 2 — Auth ve workspace'ler](#faz-2--auth-ve-workspaceler)
-- [Faz 3 — Board'lar ve column'lar](#faz-3--boardlar-ve-columnlar)
-- [Faz 4 — Task'lar ve drag-and-drop](#faz-4--tasklar-ve-drag-and-drop)
-- [Faz 5 — Task metadata'sı](#faz-5--task-metadatası)
-- [Faz 6 — Filtreleme ve arama](#faz-6--filtreleme-ve-arama)
-- [Faz 7 — Dashboard](#faz-7--dashboard)
-- [Faz 8 — Aktivite log'u ve bildirimler](#faz-8--aktivite-logu-ve-bildirimler)
-- [Faz 9 — Realtime](#faz-9--realtime)
-- [MVP sonrası sağlamlaştırma](#mvp-sonrası-sağlamlaştırma)
-- [MVP ötesi](#mvp-ötesi)
-
-## Bu roadmap nasıl çalışır
-
-**Bu dosya yalnızca yüksek seviyeli fazları tutar.** Görev seviyesi takip GitHub
-Issues'ta yaşar: [github.com/dravcore/kurultay/issues](https://github.com/dravcore/kurultay/issues).
-
-| Seviye | Nerede                   | Granülerlik                                                           |
-| ------ | ------------------------ | --------------------------------------------------------------------- |
-| Faz    | Bu dosya                 | "Board'lar ve column'lar" — haftalarca iş, tek bir tutarlı yetenek    |
-| Görev  | GitHub Issues            | "Column reorder endpoint'i cross-board taşımada 409 dönüyor" — bir PR |
-| Karar  | [decisions/](decisions/) | Bir fazın neden o şekilde inşa edildiği                               |
-
-Fazlar sırayla teslim edilir. Her biri çalışan, merge edilmiş, gösterilebilir bir durumda
-biter — hiçbir faz `develop`'ta yarım kalmış kod bırakmaz. Bir faz bir `0.y.0` release'ine
-karşılık gelebilir; bkz.
-[git-strategy.md](git-strategy.md#versiyonlama-politikası-semver).
-
-Sıra bilinçlidir ve gelişigüzel yeniden önceliklendirilecek bir backlog değildir. Gerekçesi
-[project-skeleton.md](project-skeleton.md)'de kayıtlıdır ve aşağıda faz başına
-tekrarlanmıştır.
-
-## Durum lejantı
-
-| İşaret | Anlam                            |
-| ------ | -------------------------------- |
-| `[x]`  | Bitti — `develop`'a merge edildi |
-| `[~]`  | Devam ediyor                     |
-| `[ ]`  | Başlanmadı                       |
-| `[-]`  | Ertelendi / şimdilik kapsam dışı |
-
----
-
-## Faz 0 — Dokümantasyon ve standartlar
-
-**Hedef:** bir satır uygulama kodu var olmadan önce her proje standardının yazıya
-dökülmesi.
-**Durum:** tamamlandı
-
-### Governance ve topluluk dosyaları
-
-- [x] `LICENSE` — AGPL-3.0
-- [x] `README.md` — Kurultay'ın ne olduğu, durum, hızlı başlangıç, stack
-- [x] `CONTRIBUTING.md` — katkı süreci
-- [x] `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1
-- [x] `SECURITY.md` — güvenlik açığı bildirim politikası
-- [x] `CHANGELOG.md` — Keep a Changelog, `[Unreleased]`'den başlıyor
-- [x] `.github/ISSUE_TEMPLATE/` — bug report ve feature request formları
-- [x] `.github/PULL_REQUEST_TEMPLATE.md`
-- [x] `README.tr.md` — Türkçe README
-
-### Süreç dokümantasyonu
-
-- [x] `docs/git-strategy.md` — Git Flow, Conventional Commits, release süreci, SemVer
-- [x] `docs/development.md` — ortam kurulumu ve günlük döngü
-- [x] `docs/coding-standards.md` — TypeScript, NestJS, Next.js konvansiyonları
-- [x] `docs/design.md` — tasarım ilkeleri, token'lar, yerleşim, hareket, durumlar, UI writing
-- [x] `docs/testing.md` — test stratejisi ve CI beklentileri
-- [x] `docs/api-conventions.md` — REST, hatalar, pagination, DTO'lar
-- [x] `docs/roadmap.md` — bu dosya
-
-### Mimari dokümantasyonu
-
-- [x] `docs/architecture.md` — modüler monolit, modül haritası, veri modeli özeti
-- [x] `docs/tech-stack.md` — İngilizce kanonik versiyon
-- [x] `docs/project-skeleton.md` — İngilizce kanonik versiyon
-- [x] `docs/decisions/` — ADR 0001–0009 + indeks
-
-### Lokalizasyon
-
-- [x] `docs/tr/` — `docs/` altındaki her yayımlanmış süreç/mimari dokümanın Türkçe kopyası
-      (`docs/specs/` hariç)
-- [x] Cross-link kontrolü: her EN doc kendi TR eşini linkler ve tersi
-- [x] `docs/tr/design.md` — tasarım dokümanının Türkçe çevirisi
-
-### Repository yapılandırması
-
-- [x] `develop` branch'i `main`'den oluşturuldu
-- [x] `main` ve `develop` üzerinde branch protection (doğrudan push yok, PR zorunlu; CI
-      var olunca status check)
-- [x] "Delete branch on merge" ve squash-merge varsayılanları etkinleştirildi
-
----
-
-## Faz 1 — İskelet
-
-**Hedef:** boş ama çalışan bir monorepo. İş mantığı yok — sonraki her özellik "kutuyu
-doldurmak" oluyor.
-**Referans:** [project-skeleton.md](project-skeleton.md)
-**Durum:** tamamlandı
-
-**Bu faz tek büyük bir maintainer-authored PR olarak iniyor** —
-[CONTRIBUTING.md](../../CONTRIBUTING.md)'deki <500 satır kılavuzunun belgelenmiş bir
-istisnası. Bir pnpm workspace, bir NestJS uygulaması, bir Next.js uygulaması, Prisma şeması
-ve Docker Compose'u iskeletlemek, bağımsız olarak merge edilebilir birimlere ayrılmıyor;
-her yarısı diğeri olmadan build edilemiyor. Bundan sonraki her faz olağan boyut kuralını
-takip ediyor.
-
-- [x] pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, `pnpm-workspace.yaml`
-- [x] Kök `package.json` script'leri: `dev`, `build`, `lint`, `test`, `db:migrate`, `db:seed`,
-      `db:studio`
-- [x] Paylaşılan tooling: TypeScript strict base config, ESLint, Prettier
-- [x] `.env.example` ve `.gitignore`
-- [x] `docker-compose.yml` — postgres 18, redis 8, api, web (healthcheck'ler +
-      `depends_on`)
-- [x] `docker-compose.dev.yml` — yalnızca postgres + redis
-- [x] `apps/api` — NestJS bootstrap, `app.module.ts`, global `ValidationPipe`, exception
-      filter
-- [x] `apps/api` — boş modül klasörleri: `common/`, `prisma/`, `auth/`, `workspace/`,
-      `board/`, `task/`, `label/`, `comment/`, `activity/`, `dashboard/`, `notification/`,
-      `realtime/`
-- [x] Repository kökünde `prisma.config.ts` (Prisma 7: şema yolu, seed girişi, env yükleme)
-- [x] Prisma şeması — `User`, `Workspace`, `WorkspaceMember`, `Board`, `Column`, `Task`,
-      `TaskAssignee`, `Label`, `TaskLabel`, `Comment`, `Activity`
-- [x] Id'ler `@default(uuid(7))`; `Task.position` ve `Column.position` `Float`'tır;
-      `dueDate` ve `estimatedMinutes` ayrı alanlardır
-- [x] Join-tablosu unique kısıtları, `Column @@unique([boardId, id])` composite FK'i, ve
-      açık `onDelete` aksiyonları ([project-skeleton.md](project-skeleton.md#prisma-şeması--ilk-tablolar))
-- [x] İlk migration commit edildi — yalnızca Faz 1 tabloları; `Notification`
-      [Faz 8](#faz-8--aktivite-logu-ve-bildirimler)'e ertelenmiştir
-- [x] `db:seed` — bir demo workspace, board, varsayılan column'lar, birkaç task
-- [x] 200 dönen `GET /health`
-- [x] `apps/web` — Next.js App Router, Tailwind, shadcn/ui init, `@dnd-kit`, Recharts,
-      `socket.io-client`, `next-intl` (i18n katmanı bağlanır; string'ler ilk component'ten
-      itibaren katalogdan geçer — [design.md](design.md) §7)
-- [x] `apps/web` — `(auth)/` ve `(app)/` route group'ları, placeholder login sayfası
-- [x] `packages/shared-types` — `Priority`, `MemberRole` enum'ları; entity ve sayfa tipleri
-- [x] `.github/workflows/ci.yml` — push ve PR'da lint + typecheck + test + build
-
-### Kabul kriterleri
-
-```bash
-docker compose up            # tüm servisler sağlıklı ayağa kalkıyor
-pnpm db:migrate               # migration başarılı
-pnpm db:seed                  # demo veri yüklenir
-curl localhost:4000/health   # 200
-# localhost:3000 login sayfasını render ediyor
-pnpm lint && pnpm test && pnpm build   # hata yok
-```
-
----
-
-## Faz 2 — Auth ve workspace'ler
-
-**Hedef:** bir kullanıcı kayıt olabilir, giriş yapabilir ve bir workspace'e sahip
-olabilir. Bu var olmadan tenant-safe hiçbir şey inşa edilemez.
-**Durum:** tamamlandı
-
-- [x] Better Auth entegrasyonu (organization plugin), session yönetimi
-- [x] Kayıt / giriş / çıkış / session yenileme
-- [x] `GET /me`
-- [x] Tüm korunan route'larda auth guard'ı
-- [x] **Workspace scoping guard'ı** — her request `workspaceId`'yi çözümler ve doğrular
-- [x] Workspace CRUD, slug benzersizliği
-- [x] Üyelik + rol'ler: `OWNER`, `ADMIN`, `MEMBER`, `GUEST`; role guard'ı
-- [x] Davetler: oluşturma, kabul etme, iptal etme
-- [x] Web: login/register sayfaları, session provider, workspace switcher, app shell
-      layout'u
-- [x] Testler: auth akışları, workspace izolasyonu, rol matrisi
-      ([testing.md](testing.md#neler-test-edilmeli))
-- [x] Faz 2 kalite sertleştirmesi (board öncesi): Nest-tek workspace mutation (BA org HTTP
-      firewall), paylaşılan `pg` pool, sorgu index'leri, `@kurultay/auth-access`, typed web
-      API client + middleware session gate, workspace-nested scaffold route'lar, CI'da
-      `format:check`
-
----
-
-## Faz 3 — Board'lar ve column'lar
-
-**Hedef:** Kanban'ın gerçekten yaşadığı konteyner.
-**Referans:** [design.md](design.md) — buradan itibaren tüm board UI çalışmaları için bağlayıcı referans
-**Durum:** tamamlandı
-
-- [x] Web: [design.md](design.md) §3–§4'e göre design token'ları (açık + koyu), tipografi ve
-      app shell chrome'u — önerilen değerleri gerçek ekranlarda doğrula ve her değişikliği o
-      dokümana geri kaydet
-- [x] Board CRUD, workspace'e scope'lanmış
-- [x] Column CRUD
-- [x] Column yeniden sıralama (`position`)
-- [x] Board oluşturmada varsayılan column'lar (Yapılacak / Devam Ediyor / Tamamlandı)
-- [x] Web: board listesi, board sayfası kabuğu, column render'ı,
-      oluştur/yeniden adlandır/sil dialog'ları
-- [x] Design.md §3–§4'ün gerçek ekranlarda doğrulanması — visual-debt stack ile kapandı
-      ([spec](../specs/2026-08-09-visual-debt-design.md)): type scale, toast, topbar,
-      workspace switcher, sancak rail, auth kimlik tedavisi, board polish
-
----
-
-## Faz 4 — Task'lar ve drag-and-drop
-
-**Hedef:** ürünün çekirdek etkileşimi.
-**Referans:** [design.md](design.md) §4–§5; [ADR 0010](decisions/0010-task-permissions.md);
-[spec](../specs/2026-08-09-phase-4-tasks-design.md)
-**Durum:** tamamlandı
-
-- [x] Task CRUD
-- [x] `Task.position` için **fractional indexing** — arasına ekleme, üste, alta, boş
-      column'a ekleme
-- [x] `PATCH .../tasks/:taskId/position` — column içinde ve column'lar arası taşıma
-- [x] Talep üzerine yeniden dengeleme: komşular arası boşluk hassasiyet eşiğinin altına
-      düştüğünde bir column'u taşımayla aynı transaction içinde yeniden akıtma (zamanlanmış
-      job yok — bkz.
-      [`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md))
-- [x] Eşzamanlı taşıma yönetimi (deterministik `position, id` tie-break; tükenen boşlukta
-      rebalance)
-- [x] Web: `@dnd-kit` board'u, başarısızlıkta geri alınan optimistic yeniden sıralama
-- [x] Web: task detay paneli (başlık + açıklama; metadata UI Faz 5)
-- [x] **`@dnd-kit` yeniden değerlendirme** — klasik pin'li hat korundu;
-      [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)'e kaydedildi
-- [x] Testler: [testing.md](testing.md#1-fractional-indexing-taskposition)'deki tam
-      positioning matrisi
-
----
-
-## Faz 5 — Task metadata'sı
-
-**Hedef:** task'lar yalnızca listelenmek için değil, planlanmak için yeterli bilgiyi taşır.
-**Durum:** tamam
-
-- [x] Çoklu atanan (`TaskAssignee`)
-- [x] Label'lar: board-scoped CRUD, task'lara atama/kaldırma
-- [x] Priority (`LOW`/`MEDIUM`/`HIGH`/`URGENT`) — label'lardan ayrı tutulur
-- [x] `dueDate` ve `estimatedMinutes` — ayrı alanlar, ayrı UI
-- [x] Task'larda yorumlar
-- [x] Web: atanan seçici, label seçici, priority kontrolü, tarih/tahmin alanları, yorum thread'i
-- [x] [ADR 0011](decisions/0011-label-task-metadata-permissions.md) — label CRUD Admin+;
-      metadata/assignee/comment mutate MEMBER+
-- [x] Spec: [`specs/2026-08-09-phase-5-task-metadata-design.md`](../specs/2026-08-09-phase-5-task-metadata-design.md)
-
----
-
-## Faz 6 — Filtreleme ve arama
-
-**Hedef:** board'lar birkaç düzine kartı geçtikten sonra da kullanılabilir kalır.
-**Referans:** [api-conventions.md](../api-conventions.md#filtering-sorting-field-selection);
-[spec](../specs/2026-08-09-phase-6-filtering-design.md)
-**Durum:** tamam
-
-- [x] Whitelist'lenmiş filtre/sıralama alanlarına sahip Query DTO
-      ([api-conventions.md](api-conventions.md#filtreleme-sıralama-alan-seçimi))
-- [x] Filtreler: atanan, label, priority, due date aralığı, atanmamış/due-date'siz
-- [x] Başlık ve açıklama üzerinde serbest metin arama
-- [x] Task listelerinde cursor pagination
-- [x] Filtrelenen/sıralanan kolonlar için index'ler
-- [x] Web: filtre çubuğu, aktif-filtre chip'leri, URL'de filtre durumu
-
----
-
-## Faz 7 — Dashboard
-
-**Hedef:** bir workspace genelinde agregat görünüm.
-**Referans:** [design.md](../design.md#8-charts-and-dashboard);
-[spec](../specs/2026-08-09-phase-7-dashboard-design.md)
-**Durum:** tamam
-
-- [x] Agregasyon endpoint'leri: statüye göre task'lar, atanana göre, priority'ye göre;
-      gecikmiş sayısı; zaman içinde tamamlanma
-- [x] Agregasyonlar üzerinde sorgu performansı geçişi
-- [x] Web: Recharts görselleştirmeleriyle dashboard sayfası
-- [x] Boş ve yükleniyor durumları
-
-> Zaman içinde tamamlanma Activity sonrası geldi: `GET .../dashboard/summary` üzerinde
-> `throughput` (14 UTC gün, Created vs `ColumnCategory`'si `COMPLETED` olan kolona
-> taşımalar — [ADR 0019](decisions/0019-column-category.md)'a kadar kolon _adına_
-> bakıyordu). Kolon (“status”)
-> grafiği opsiyonel `?boardId=` ister. Phase 7 spec'ine bakın.
-
----
-
-## Faz 8 — Aktivite log'u ve bildirimler
-
-**Hedef:** kullanıcılar neyin değiştiğini görebilir ve bunun hakkında bilgilendirilebilir.
-**Referans:** [spec](../specs/2026-08-09-phase-8-activity-notifications-design.md);
-[deferred](../archive/specs/2026-08-09-phase-8-deferred.md) (arşivlendi; açık kalan
-maddeler aşağıda [MVP ötesi](#mvp-ötesi)'nde)
-**Durum:** tamam
-
-- [x] Task oluşturma/taşıma/güncelleme/yorum/atama üzerinde `Activity` yazımı (yeni
-      aktivite tiplerinin migration gerektirmemesi için `payload` JSON olarak)
-- [x] Aktivite feed endpoint'i (task seviyesi ve workspace seviyesi), cursor-paginated
-- [x] `Notification` modeli (yeni migration): mention, atama, yaklaşan due date —
-      Faz 1 şemasında yok
-- [x] Okundu işaretle / tümünü okundu işaretle
-- [x] Web: task panelinde aktivite zaman çizelgesi, bildirim merkezi
-- [x] `[-]` Bildirimler için e-posta gönderimi — MVP ötesine ertelendi. SMTP taşıyıcısının
-      kendisi artık işlemsel e-posta (doğrulama, davetler) için mevcut —
-      [ADR 0013](decisions/0013-invitation-email-verification.md); ertelenen kısım
-      `Notification` satırlarının bu taşıyıcıya yönlendirilmesi.
-
----
-
-## Faz 9 — Realtime
-
-**Hedef:** aynı board'daki iki kişi birbirlerinin değişikliklerini canlı görür.
-**Referans:** [spec](../specs/2026-08-09-phase-9-realtime-design.md);
-[ADR 0005](../decisions/0005-realtime-socketio.md)
-**Durum:** tamam
-
-**Realtime bilerek en sona bırakıldı.** Socket event'leri veri modelini yansıtır, bu
-yüzden model oturmadan önce yazılan her event onunla birlikte yeniden yazılmak zorunda
-kalır. Realtime'ı kararlı bir şema üzerine inşa etmek tek bir iş turu; onu erken inşa
-etmek ise ondan önceki sekiz fazın tümüne bir vergidir.
-
-- [x] Redis adapter'lı Socket.io gateway'i (yatay ölçekleme)
-- [x] Mevcut session'ı kullanan socket auth'u; **workspace/board başına scope'lanmış
-      oda'lar**
-- [x] `@kurultay/shared-types`'ta event kontratı — her iki taraf için tek kaynak
-- [x] Event'ler: task oluşturuldu/güncellendi/taşındı/silindi, column değişti, yorum
-      eklendi
-- [x] Web: board mount'ta subscribe olma, lokal optimistic state ile uzlaştırma,
-      reconnect'te resync
-- [x] Bir remote taşıma drag ortasında geldiğinde çakışma davranışı
-
----
-
-## MVP sonrası sağlamlaştırma
-
-**Amaç:** dokuz fazlık teslimatın geride bıraktığını, yeni bir şey eklemeden önce ödemek.
-**Durum:** tamamlandı
-
-Bir faz değil — fazlar ürünün kendisi, bu ise onların biriktirdiği borç. Faz 9'dan sonra altı
-eksende yapılan denetim 48 madde buldu; doğrulamadan sağ çıkanlar dokuz PR'da kapatıldı.
-Buraya yazıldı çünkü roadmap aksi hâlde "MVP tamam"dan "MVP ötesi"ne, aradaki iki haftanın
-hesabını vermeden atlıyor.
-
-- [x] Doğruluk: sekiz serviste tenant-scope'lu yazma predikatları, check-then-act'ın tek
-      transaction'a alınması, Prisma hata eşlemesi, socket `board:join` tenant sızıntısı
-- [x] Koruma bantları: `jsx-a11y` ile type-aware ESLint, coverage'ın hem ölçülmesi _hem_
-      tabanlanması (API genel, `apps/web` yalnız `app/**`), CodeQL, bloklayıcı `pnpm audit`
-- [x] Ölçek: dashboard toplamalarının SQL'e taşınması, `due-soon`'un çapraz çarpım yerine
-      çiftlerle tekilleştirilmesi, sıralama okumalarının daraltılması,
-      `better-auth` 1.3.34 → 1.6.26
-- [x] Tekrar: `toCursorPage`, `useApiResource`, `ConfirmDialog` / `FormDialog`,
-      `resolveApiMessage`, `Textarea` / `Select` primitifleri
-- [x] [ADR 0016](decisions/0016-foreign-key-violation-status.md) — yabancı anahtar ihlalleri
-      `422`'ye değil `409`'a eşlenir
-- [x] [ADR 0017](decisions/0017-partial-indexes-outside-prisma-schema.md) — kısmi indeksler
-      migration'larda yaşar, testlerle korunur
-- [x] [ADR 0018](decisions/0018-localization-strategy.md) — yerelleştirme stratejisi
-- [x] [ADR 0019](decisions/0019-column-category.md) — kolon tamamlanmışlığı bir kategoridir,
-      ad değil
-
-Dönem boyunca test sayısı: 249 API + 80 web → **421 API + 302 web + 28 shared-types**, artı
-89 e2e. Hiçbir maddenin adını koymadığı iki kusur da ortaya çıktı: her istekte HTTP sunucusunu
-yeniden bağlayan bir e2e altyapısı, ve kopyala-yapıştır sınıf stringlerine kurban gitmiş bir
-odak halkası.
-
----
+**Son güncelleme:** 2026-08-15
+
+## Durum
+
+**MVP tamam.** Ürün Faz **1–9** (artı Faz **0** docs/standartlar) ve MVP sonrası sağlamlaştırma
+[`v0.1.0`](../../CHANGELOG.md#010---2026-08-12) ile yayınlandı. Aktif iş, aşağıdaki Beyond
+MVP maddeleri ve `develop` üzerindeki sıradan bug/refactor’lar.
+
+| İz                         | Durum                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| Faz 0–9                    | Bitti — Faz 0 docs; 1–9 ürün MVP — [EN arşiv](../archive/roadmap-mvp-phases.md) |
+| MVP sonrası sağlamlaştırma | Bitti — aynı arşiv                                                              |
+| Beyond MVP                 | Planlanmadı — yalnızca uyumluluk listesi                                        |
+
+Görev seviyesi iş [GitHub Issues](https://github.com/dravcore/kurul/issues)’ta.
+Release süreci: [git-strategy.md](git-strategy.md).
+
+## Teslim edilen MVP (özet)
+
+| Faz | Yetenek                                               |
+| --- | ----------------------------------------------------- |
+| 0   | Docs, standartlar, ADR’ler, branch protection         |
+| 1   | Monorepo iskeleti, Prisma, Compose, CI                |
+| 2   | Auth, workspace’ler, roller, davetler                 |
+| 3   | Board’lar ve column’lar                               |
+| 4   | Task’lar, fractional indexing, drag-and-drop          |
+| 5   | Atananlar, etiketler, öncelik, due/estimate, yorumlar |
+| 6   | Filtreleme, arama, cursor pagination                  |
+| 7   | Dashboard toplamları ve grafikler                     |
+| 8   | Aktivite log’u ve uygulama içi bildirimler            |
+| 9   | Realtime board senkronu (Socket.io)                   |
+
+Faz 4–9 ve visual-debt tasarım kayıtları: [archive/specs/](../archive/specs/).
+Uygulama planları: [archive/plans/](../archive/plans/).
 
 ## MVP ötesi
 
-Planlanmadı. Mimarinin bunlarla uyumlu kalması için listelendi, taahhüt olarak değil.
+Planlanmadı. Mimariyi bunlara açık tutmak için listelenir; taahhüt değildir.
 
-| Öğe                                                        | Not                                                                                                                                                                                                                                                                                                                                  |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `[-]` E2E test suite (Playwright)                          | UI şekil değiştirmeyi bıraktığında — [testing.md](testing.md)                                                                                                                                                                                                                                                                        |
-| `[-]` Gantt / zaman çizelgesi görünümü                     | `dueDate` + `estimatedMinutes` bunun için ayrı tutuluyor                                                                                                                                                                                                                                                                             |
-| `[-]` Task ekleri                                          | Bir object-storage kararı (ADR) gerektiriyor                                                                                                                                                                                                                                                                                         |
-| `[-]` Board şablonları                                     |                                                                                                                                                                                                                                                                                                                                      |
-| `[-]` Public API token'ları + `/v1` öneki                  | 1.0 sonrası — [api-conventions.md](api-conventions.md#versiyonlama)                                                                                                                                                                                                                                                                  |
-| `[-]` Webhook'lar                                          |                                                                                                                                                                                                                                                                                                                                      |
-| `[-]` E-posta bildirimleri                                 | Taşıyıcı işlemsel e-posta için hâlihazırda mevcut ([ADR 0013](decisions/0013-invitation-email-verification.md)); bu satır `Notification` satırlarının ona yönlendirilmesi                                                                                                                                                            |
-| `[-]` Trello / Jira'dan import                             |                                                                                                                                                                                                                                                                                                                                      |
-| `[-]` Ek UI dil paketleri                                  | Çözümleme mekanizması MVP sonrasında geldi ([ADR 0018](decisions/0018-localization-strategy.md)): `User.locale` → çerez → `Accept-Language`, bir dil ayarı, ve kolonların yaratıcının dilinde tohumlanması. Kalan iş ikinci bir locale: `SUPPORTED_LOCALES`, `messages/tr.json`, API tohum adları ve çevrilebilir e-posta şablonları |
-| `[-]` Docker Compose ötesinde self-host deployment rehberi |                                                                                                                                                                                                                                                                                                                                      |
-| `[-]` Due-soon teslim alternatifleri                       | In-process Nest interval scanner (daha basit ops, tek-replica fallback'i) veya OS cron → internal HTTP (BullMQ/Redis yerine cron tercih eden self-hoster'lar için)                                                                                                                                                                   |
-| `[-]` Member picker olmadan mention'lar                    | Düz `@DisplayName` regex, veya API-only `mentionedUserIds[]` — yalnızca yapılandırılmış `@[Name](userId)` picker UX'i tıkanırsa                                                                                                                                                                                                      |
-| `[-]` Aktivite akışının realtime push'u                    | Bildirim zili artık `notification:unread-changed`'e abone ve polling yalnız fallback. Task aktivite akışı ise ne push ediliyor ne polling yapıyor — panel açılınca yükleniyor, dolayısıyla açık bırakılan bir akış bayatlıyor                                                                                                        |
+| Madde                                        | Not                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[-]` Geniş E2E suite (Playwright)           | Smoke paketi **geldi** ve kapsadığı özelliklerle birlikte büyüdü — bugün yedi senaryo: sürükleme kalıcılığı, realtime, e-postayla davet, bildirim yönlendirmesi, ek yükleme, Trello import'u, ve 360px'te dokunmatik board ([testing.md](testing.md#browser-uçtan-uca)). Stack'in kendisinin dağılabileceği akışların ötesine genişletmek planlanmadı                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `[-]` Gantt / timeline view                  | `dueDate` + `estimatedMinutes` bunun için ayrı tutuluyor                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `[-]` Task attachments                       | **Geldi** — kartta dosya ve bağlantı, bir depolama port'unun arkasında yerel diskte ([ADR 0022](decisions/0022-attachment-storage.md), [ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Ertelenen kısımlar: object storage, imzalı paylaşım bağlantıları ve workspace başına kota — her biri kendi tetikleyicisine                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `[-]` Board templates                        |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `[-]` Public API tokens + `/v1` prefix       | 1.0 sonrası; artık yalnızca adlandırılmış değil, kapsamı da yazılı — [API 1.0](#api-10). Versiyonlama politikası: [api-conventions.md](api-conventions.md#versiyonlama)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `[-]` Webhooks                               | 1.0 sonrası. Kapsam üç olay, daha fazlası değil — [API 1.0](#api-10)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `[-]` E-posta bildirimleri                   | Transactional SMTP zaten var ([ADR 0013](decisions/0013-invitation-email-verification.md)); kalan, `Notification` satırlarını ona yönlendirmek                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `[-]` Trello / Jira import                   | **Trello geldi, Jira başlamadı.** Bir board'un JSON export'u board'a dönüşüyor — list'ler, kart'lar, label'lar, checklist'ler; attachment'lar bağlantı olarak. Tek yönlü, idempotan değil, üye eşlemesi yok, yorum yok, ve içe aktarılan her kolon `UNSTARTED` geliyor ([ADR 0025](decisions/0025-trello-import-mapping.md)). Üretilmiş 500 kartlık bir export, beş koşuda medyan **572.9 ms** (p95 **655.8 ms**) ile içe aktarıldı — Apple M3 Max üzerinde, loopback'teki bir API ve Postgres'e karşı; arada ters proxy, konteyner ya da ağ yok. Yani bunu bir dağıtım rakamı değil, bir taban olarak okuyun. **Şema uyumu hiçbir gerçek Trello export'una karşı ölçülmedi** — elde gerçek export olmadığı için fikstürler sentetik — yani okuyucunun kırılma ihtimali en yüksek yer ilk gerçek export; okuyucunun hata yerine rapor döndürmesinin sebebi bu. Jira'nın henüz bir tasarım kaydı yok |
+| `[-]` Ek UI dil paketleri                    | **Türkçe geldi.** `SUPPORTED_LOCALES` artık `['en', 'tr']`, `messages/tr.json` 486 key'in hepsini taşıyor, board'lar `Yapılacak / Devam Ediyor / Bitti` ile tohumlanıyor ve iki transactional e-posta da alıcının dilinde yazılıyor ([ADR 0018](decisions/0018-localization-strategy.md)). `messages/catalog.test.ts`, bir katalogda olup diğerinde olmayan bir key'de build'i düşürür; yani "%100" bir iddia değil, bir kapı. Bu satırın hâlâ adlandırdığı şey **üçüncü** dil: yeni bir mekanizma gerekmiyor — bir katalog dosyası, `SEED_COLUMN_NAMES` içinde bir satır ve `MAIL_COPY` içinde bir satır; ikisi de `Record<Locale, …>` ve ikisi de var olana kadar compile error. Gereken tek şey bir çevirmen                                                                                                                                                                                     |
+| `[-]` Docker Compose ötesi self-host rehberi |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `[-]` Due-soon teslim alternatifleri         | Nest interval scanner veya OS cron → internal HTTP                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `[-]` Üye picker’sız mention’lar             | Düz `@DisplayName` veya API-only `mentionedUserIds[]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `[-]` Activity feed realtime push            | Bell zaten `notification:unread-changed` alıyor; task activity hâlâ panel açılışında yükleniyor                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
-**1.0.0**, Faz 1–9 tamamlandığında ve REST API geriye dönük uyumluluk vaat edecek kadar
-kararlı olduğunda kesilir.
+**1.0.0**, REST API geriye uyumluluk vaat edecek kadar kararlı olduğunda kesilir (MVP özellik
+işi zaten bitti).
+
+## API 1.0
+
+**Bir kapsam beyanı; plan değil. Bu bölümdeki her şey bilinçli olarak uygulanmadı ve bunu
+söylemek bölümün asıl amacı** — aşağıdaki üç satır, 1.0'ın büyümesi beklenen tek API yüzeyi;
+onların yerine gelen herhangi bir şeyin önce bu başlıkla tartışması gerekir. Üçünden ikisi
+yukarıdaki [MVP ötesi](#mvp-ötesi) tablosunda planlanmamış madde olarak zaten geçiyor; bu bölüm
+onların şekil kazandığı yer.
+
+Bugün var olan ve bu kapsamı yazmayı mümkün kılan şey: API artık üretilmiş bir OpenAPI belgesiyle
+tanımlı — [`apps/api/openapi.json`](../../apps/api/openapi.json)'da versiyon kontrolünde,
+`/docs`'ta yayında ve kod ile belge çeliştiğinde kıran bir CI kapısı var
+([api-conventions.md](api-conventions.md#openapi-belgesi)). Uyumluluk vaadi, ancak birinin yazıya
+döktüğü bir kontrat için verilmeye değer.
+
+| Madde                  | Şekil                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/v1` prefix'i         | Her route'un başına gelen bir URI prefix'i; 1.0 **ile**, öncesinde değil — bugün bir versiyon segmenti, API'nin en çok değişmesi beklenen dönemde bu projenin vermediği bir sözü ima ederdi ([api-conventions.md](api-conventions.md#versiyonlama)). Bir ADR ile geliyor, çünkü alternatif şemalar (header pazarlığı, hiç versiyonlamamak) atlanmayı değil yazıyla reddedilmeyi hak ediyor     |
+| Kişisel erişim token'ı | Oturum çerezinin yanında, tarayıcı olmayan bir çağıran için ikinci bir kimlik doğrulama yolu. Workspace kapsamlı, iptal edilebilir, sahibi tarafından listelenebilir, saklanırken hash'lenmiş. **OAuth değil**: self-host bir instance'ın yetkilendireceği üçüncü parti uygulama ekosistemi yok ve kendine token vermek, başkasının yazılımına erişim devretmekten farklı bir problem          |
+| Asgari webhook         | Tam olarak üç olay — `task.created`, `task.moved`, `task.completed` — workspace başına, operatörün ayarladığı bir URL'e. Üç, çünkü dışarıdaki bir sistemin üzerine iş yapabileceği olaylar bunlar; activity sözlüğünün geri kalanı insanlar için bir akış. Teslim imzalı ve en-az-bir-kez; ADR gerektiren kısım implementasyon değil, hata politikası (retry'lar, ölü bir endpoint'i kapatmak) |
+
+Bu bölümün bilinçli olarak vaat **etmediği** üç şey:
+
+- **Tarih yok, üçü arasında sıra yok.** Bunlar bir kapsam, bir sıra değil.
+- **Genel bir olay akışı yok.** `Activity`'nin sözlüğü üç tipten çok daha geniş ve hepsini dışarı
+  yayınlamak, dahili bir log'u kamuya açık bir kontrat olarak dondurmak olurdu.
+- **OAuth yok, üçüncü parti uygulama modeli yok, workspace'in ötesinde token başına scope yok.**
+  Bunların her biri, 1.0'ın kararlı olmak için ihtiyaç duymadığı birer ürün kararı.
 
 ## Ayrıca bakınız
 
-- [project-skeleton.md](project-skeleton.md) — Faz 1'in tam detayı
-- [architecture.md](architecture.md) — modüllerin nasıl bir araya geldiği
-- [git-strategy.md](git-strategy.md) — bir fazın nasıl bir release'e dönüştüğü
-- [development.md](development.md) — bunların herhangi birinin yerelde nasıl inşa edileceği
-- [CHANGELOG.md](../../CHANGELOG.md) — gerçekte neyin teslim edildiği
-- [GitHub Issues](https://github.com/dravcore/kurultay/issues) — görev seviyesi takip
+- [archive/roadmap-mvp-phases.md](../archive/roadmap-mvp-phases.md) — tam faz checklist’leri (EN)
+- [architecture.md](architecture.md) — modüller
+- [git-strategy.md](git-strategy.md) — release
+- [../../CHANGELOG.md](../../CHANGELOG.md) — ne yayınlandı
+- [GitHub Issues](https://github.com/dravcore/kurul/issues)

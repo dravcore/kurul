@@ -15,7 +15,7 @@ export interface SmtpConfig {
 }
 
 export interface MailConfig {
-  /** `From` header, e.g. `Kurultay <noreply@example.com>`. */
+  /** `From` header, e.g. `Kurul <noreply@example.com>`. */
   from: string;
   /** `undefined` when `SMTP_HOST` is unset — mail is then written to the log instead. */
   smtp: SmtpConfig | undefined;
@@ -24,7 +24,7 @@ export interface MailConfig {
 const DEFAULT_SMTP_PORT = 587;
 /** The one port where SMTP is TLS from the first byte instead of upgrading via STARTTLS. */
 const IMPLICIT_TLS_PORT = 465;
-const DEFAULT_FROM = 'Kurultay <noreply@localhost>';
+const DEFAULT_FROM = 'Kurul <noreply@localhost>';
 
 /**
  * Reads the mail configuration from the environment.

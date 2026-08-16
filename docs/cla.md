@@ -12,7 +12,7 @@
 > settled before this text becomes binding on anyone. Until this banner is removed in a
 > merged, reviewed pull request, **no contributor is being asked to sign anything.**
 >
-> **This document is currently unused.** Kurultay does not accept external contributions and
+> **This document is currently unused.** Kurul does not accept external contributions and
 > the CLA check is disabled, so nobody signs this and no signature is collected. It is kept
 > ready in case legal review ever happens — see
 > [ADR 0015](decisions/0015-no-external-contributions.md).
@@ -26,16 +26,16 @@
 > karara bağlanmalıdır. Bu uyarı, incelenmiş ve merge edilmiş bir pull request ile
 > kaldırılana kadar **hiçbir katkıda bulunandan bir şey imzalaması istenmemektedir.**
 >
-> **Bu belge şu anda kullanılmıyor.** Kurultay dış katkı kabul etmiyor ve CLA kontrolü devre
+> **Bu belge şu anda kullanılmıyor.** Kurul dış katkı kabul etmiyor ve CLA kontrolü devre
 > dışı; dolayısıyla bunu kimse imzalamıyor ve hiçbir imza toplanmıyor. Hukuki inceleme bir gün
 > gerçekleşirse diye hazır tutuluyor — bkz.
 > [ADR 0015](decisions/0015-no-external-contributions.md).
 
 ---
 
-## Why Kurultay asks for a CLA
+## Why Kurul asks for a CLA
 
-Kurultay is released under [AGPL-3.0](../LICENSE). The plan is to fund the project through
+Kurul is released under [AGPL-3.0](../LICENSE). The plan is to fund the project through
 **dual licensing**: the same single codebase stays fully AGPL-3.0 for everyone, and
 organizations that cannot live with AGPL's obligations can buy a separate commercial license
 for the same code from the project owner.
@@ -66,7 +66,7 @@ Signing happens inside the pull request. No email, no PDF, no scanner.
    exactly:
 
    ```text
-   I have read the Kurultay CLA v0.1 and I hereby sign it
+   I have read the Kurul CLA v0.1 and I hereby sign it
    ```
 
 4. The check re-runs and turns green. Your signature is recorded in
@@ -80,7 +80,7 @@ covered automatically. If a check goes stale, comment `recheck` to re-run it.
 
 The version number is deliberately part of both the signing sentence and the storage path.
 When the reviewed text lands, it becomes **v1.0**, the sentence becomes
-`I have read the Kurultay CLA v1.0 and I hereby sign it`, and signatures move to
+`I have read the Kurul CLA v1.0 and I hereby sign it`, and signatures move to
 `signatures/v1.0/cla.json`. A signature given against one version therefore can never be
 counted as a signature against another — if the text is amended, it is always unambiguous
 which wording each contributor actually agreed to, and who has yet to re-sign.
@@ -120,7 +120,7 @@ work by default, in which case you cannot grant the rights in Section 2 on your 
 Section 3(c) requires you to have your employer's approval before signing.
 
 A separate **Entity CLA** (a corporate agreement signed by someone authorized to bind the
-company, listing the employees covered) is the normal way to handle this. Kurultay does
+company, listing the employees covered) is the normal way to handle this. Kurul does
 **not** have one yet.
 
 > `[ASK A LAWYER: Do we need a separate Entity CLA (Harmony HA-CLA-E) now, or is the employer-approval representation in Section 3(c) of the individual agreement enough until a corporate contributor actually appears? If we need one, what is the signing and verification process — and how does the PR-comment signing flow map onto a document that must be signed by an authorized officer rather than by the developer opening the PR?]`
@@ -131,7 +131,7 @@ discover it later.
 
 ---
 
-# Kurultay Individual Contributor License Agreement
+# Kurul Individual Contributor License Agreement
 
 **Draft version:** 0.1 (unreviewed) · **Status:** Not in force
 
@@ -142,7 +142,7 @@ distribute contributions under more than one license — which is why they are t
 rather than the Apache Individual CLA, whose outbound grant assumes a single, permissive
 outbound license.
 
-Thank you for your interest in contributing to Kurultay, a software project managed by **Doğan
+Thank you for your interest in contributing to Kurul, a software project managed by **Doğan
 Can Yıldız**, a natural person, of `[FILL: full address of the individual identified as "Us"]`
 ("We" or "Us").
 
@@ -176,7 +176,7 @@ not a qualified electronic signature.
 
 ### If a company is formed later
 
-Kurultay may one day be published by an incorporated entity. When that happens the rights
+Kurul may one day be published by an incorporated entity. When that happens the rights
 granted here do **not** move to the company automatically: they were granted to an individual,
 and moving them is a **separate transfer transaction** between that individual and the new
 company. Section 6.3 is the clause intended to make such a transfer possible without asking
@@ -213,7 +213,7 @@ marked or otherwise designated in writing by You as "Not a Contribution."
 **"Effective Date"** means the date You execute this Agreement or the date You first Submit a
 Contribution to Us, whichever is earlier.
 
-> `[ASK A LAWYER: The Harmony template also defines "Media" (the non-software portion of a Contribution) for use with an optional clause licensing documentation and design assets under different terms. That definition and clause are omitted here. Kurultay actively accepts documentation, Turkish translations, and design assets, so this is not hypothetical — do we need the Media clause, and if so under which outbound terms?]`
+> `[ASK A LAWYER: The Harmony template also defines "Media" (the non-software portion of a Contribution) for use with an optional clause licensing documentation and design assets under different terms. That definition and clause are omitted here. Kurul actively accepts documentation, Turkish translations, and design assets, so this is not hypothetical — do we need the Media clause, and if so under which outbound terms?]`
 
 ## 2. Grant of Rights
 

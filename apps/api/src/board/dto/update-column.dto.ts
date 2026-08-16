@@ -1,5 +1,5 @@
 import { IsEnum, IsString, MaxLength, MinLength } from 'class-validator';
-import { ColumnCategory } from '@kurultay/shared-types';
+import { ColumnCategory } from '@kurul/shared-types';
 import { OptionalNonNullable, OptionalNullable } from '../../common/validation/optional';
 
 export class UpdateColumnDto {

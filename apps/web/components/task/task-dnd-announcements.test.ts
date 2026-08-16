@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Active, Over } from '@dnd-kit/core';
-import { ColumnCategory, Priority, type ColumnDto, type TaskDto } from '@kurultay/shared-types';
+import { ColumnCategory, Priority, type ColumnDto, type TaskDto } from '@kurul/shared-types';
 import { columnDroppableId } from '@/components/board/board-column';
 import { buildTaskDndAnnouncements } from './task-dnd-announcements';
 
@@ -23,6 +23,9 @@ function task(id: string, columnId: string): TaskDto {
     updatedAt: '2026-01-01T00:00:00.000Z',
     assignees: [],
     labels: [],
+    checklistSummary: { total: 0, done: 0 },
+    checklists: null,
+    attachmentCount: 0,
   };
 }
 

@@ -75,6 +75,57 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
+});
+
+describe('socket target', () => {
+  it('dials a same-origin API through the engine path, not as a namespace', async () => {
+    // `io('/api')` would connect to socket.io *namespace* `/api` on the default `/socket.io`
+    // path — a handshake the server rejects with "Invalid namespace", and one that would only
+    // surface at runtime in a proxied deployment. The prefix belongs in `path`, and the URL is
+    // omitted so socket.io uses `window.location`. This is the shipped image's configuration
+    // (apps/web/Dockerfile), so it is the branch every self-hosted install runs.
+    vi.stubEnv('NEXT_PUBLIC_API_URL', '/api');
+    vi.resetModules();
+    const { getSocket } = await loadSocketModule();
+
+    getSocket();
+
+    const [first, second] = vi.mocked(io).mock.calls[0] ?? [];
+    expect(second).toBeUndefined();
+    expect(first).toMatchObject({ path: '/api/socket.io', withCredentials: true });
+    expect(typeof first).not.toBe('string');
+  });
+
+  it('still dials an absolute API origin directly, with socket.io’s default path', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.example.com');
+    vi.resetModules();
+    const { getSocket } = await loadSocketModule();
+
+    getSocket();
+
+    const [first, second] = vi.mocked(io).mock.calls[0] ?? [];
+    expect(first).toBe('https://api.example.com');
+    // No `path` override: the API serves socket.io at its own root in this topology.
+    expect(second).not.toHaveProperty('path');
+  });
+
+  it('keeps the same reconnect policy on both topologies', async () => {
+    // The backoff below is what stops a restarted API being retried by every client forever.
+    // It lives in one shared object precisely so the two `io(...)` call shapes cannot drift.
+    vi.stubEnv('NEXT_PUBLIC_API_URL', '/api');
+    vi.resetModules();
+    const { getSocket } = await loadSocketModule();
+
+    getSocket();
+
+    expect(vi.mocked(io).mock.calls[0]?.[0]).toMatchObject({
+      autoConnect: false,
+      reconnection: true,
+      randomizationFactor: 0.5,
+      reconnectionAttempts: 15,
+    });
+  });
 });
 
 describe('socket singleton', () => {

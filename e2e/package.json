@@ -1,0 +1,22 @@
+{
+  "name": "@kurul/e2e",
+  "version": "0.2.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "browsers": "playwright install --with-deps chromium"
+  },
+  "dependencies": {
+    "@kurul/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.2.0",
+    "dotenv": "^17.4.2",
+    "typescript": "^5.8.2"
+  }
+}

@@ -1,4 +1,4 @@
-import type { NotificationDto } from '@kurultay/shared-types';
+import type { NotificationDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { resolveBoardIdForNotification } from '@/lib/notification-nav';
 

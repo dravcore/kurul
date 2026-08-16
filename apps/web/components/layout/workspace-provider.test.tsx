@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { MemberRole, type WorkspaceDto, type WorkspaceMemberDto } from '@kurultay/shared-types';
+import { MemberRole, type WorkspaceDto, type WorkspaceMemberDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
 import { WorkspaceProvider, useWorkspaceContext } from './workspace-provider';
@@ -45,8 +45,8 @@ const apiGet = vi.mocked(api.get);
 
 const workspace: WorkspaceDto = {
   id: WORKSPACE_ID,
-  name: 'Kurultay',
-  slug: 'kurultay',
+  name: 'Kurul',
+  slug: 'kurul',
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
@@ -165,5 +165,90 @@ describe('WorkspaceProvider bootstrap', () => {
     expect(result.current.activeId).toBe(WORKSPACE_ID);
     expect(result.current.activeRole).toBe(MemberRole.MEMBER);
     expect(result.current.workspaces).toHaveLength(1);
+  });
+
+  /**
+   * FE-07: `onSwitch` used to write whichever `fetchOwnMembership` reply landed last in wall
+   * time, not whichever switch was last *requested*. Two rapid switches with the first's
+   * reply arriving after the second's must leave the second switch's role standing — a stale
+   * ADMIN reply must not overwrite a just-applied VIEWER role (or vice versa).
+   */
+  it('drops a stale membership reply from an overtaken switch', async () => {
+    const WORKSPACE_B = 'workspace-b';
+    const WORKSPACE_C = 'workspace-c';
+    let resolveB: ((value: WorkspaceMemberDto) => void) | undefined;
+    const bMembership: WorkspaceMemberDto = {
+      ...membership,
+      workspaceId: WORKSPACE_B,
+      role: MemberRole.ADMIN,
+    };
+    const cMembership: WorkspaceMemberDto = {
+      ...membership,
+      workspaceId: WORKSPACE_C,
+      role: MemberRole.MEMBER,
+    };
+
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/workspaces') return Promise.resolve([workspace]) as never;
+      if (path === `/workspaces/${WORKSPACE_ID}/members/me`) {
+        return Promise.resolve(membership) as never;
+      }
+      // B is the switch that is overtaken: its reply is held open here and only released
+      // once C — the switch that actually wins — has already landed.
+      if (path === `/workspaces/${WORKSPACE_B}/members/me`) {
+        return new Promise<WorkspaceMemberDto>((resolve) => {
+          resolveB = resolve;
+        }) as never;
+      }
+      if (path === `/workspaces/${WORKSPACE_C}/members/me`) {
+        return Promise.resolve(cMembership) as never;
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { result } = renderProvider();
+    await waitFor(() => expect(result.current.bootstrapped).toBe(true));
+
+    // Fired back-to-back without awaiting the first, exactly the race FE-07 describes: B's
+    // `fetchOwnMembership` is still in flight when the switch to C starts, then finishes.
+    const switchB = result.current.onSwitch(WORKSPACE_B);
+    await act(async () => {
+      await result.current.onSwitch(WORKSPACE_C);
+    });
+
+    expect(result.current.activeId).toBe(WORKSPACE_C);
+    expect(result.current.activeRole).toBe(MemberRole.MEMBER);
+
+    // B's reply lands last in wall time. Without the generation guard this would overwrite
+    // `activeRole` with B's ADMIN role even though the shell has already moved on to C.
+    await act(async () => {
+      resolveB?.(bMembership);
+      await switchB;
+    });
+
+    expect(result.current.activeId).toBe(WORKSPACE_C);
+    expect(result.current.activeRole).toBe(MemberRole.MEMBER);
+  });
+
+  /**
+   * `RenameWorkspaceDialog` hands the `PATCH` response straight to this — no second fetch — so
+   * `WorkspaceSwitcher` (which reads the same `workspaces` array) shows the new name without a
+   * full bootstrap. The other workspace stays untouched, matched by id rather than position.
+   */
+  it('folds a rename into the matching workspace by id, and only that one', async () => {
+    const other: WorkspaceDto = { ...workspace, id: 'other-workspace', name: 'Bugs' };
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/workspaces') return Promise.resolve([workspace, other]) as never;
+      return Promise.resolve(membership) as never;
+    });
+
+    const { result } = renderProvider();
+    await waitFor(() => expect(result.current.bootstrapped).toBe(true));
+
+    act(() => {
+      result.current.renameActiveWorkspace({ ...workspace, name: 'Kurul Labs' });
+    });
+
+    expect(result.current.workspaces).toEqual([{ ...workspace, name: 'Kurul Labs' }, other]);
   });
 });

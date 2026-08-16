@@ -1,4 +1,4 @@
-import type { DashboardThroughputDay } from '@kurultay/shared-types';
+import type { DashboardThroughputDay } from '@kurul/shared-types';
 
 export const THROUGHPUT_DAYS = 14;
 

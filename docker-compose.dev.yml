@@ -1,28 +1,81 @@
+# Same rotation policy as docker-compose.yml (see there for the full reasoning), and applied
+# here for the same reason it is applied there: every service in this file carries
+# `restart: unless-stopped`, so these are the containers a developer starts once and leaves
+# running for months. A laptop's disk fills exactly as a server's does, and an unbounded
+# Postgres log on a developer machine is a support question nobody enjoys.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+# Same capability baseline as docker-compose.yml, and for the same SEC-02 reasoning (see
+# there for the full writeup) — a developer's laptop process-isolates a compromised
+# container from the rest of the machine no less than a server does. postgres and redis
+# below carry the identical `cap_add` this file's production counterpart needed, verified
+# against this file's own images/tags (postgres:18-alpine, redis:8-alpine) the same way.
+x-hardened: &hardened
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
+
 services:
   postgres:
     image: postgres:18-alpine
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # See docker-compose.yml's postgres service for the full derivation of this set
+    # (chown on every boot + gosu re-exec, DAC_OVERRIDE only bites on the *second* boot
+    # onward once PGDATA is 0700 postgres-owned) — identical image, identical requirement.
+    cap_add: [CHOWN, FOWNER, SETUID, SETGID, DAC_OVERRIDE]
     environment:
-      POSTGRES_USER: kurultay
-      POSTGRES_PASSWORD: kurultay
-      POSTGRES_DB: kurultay
+      POSTGRES_USER: ${POSTGRES_USER:-kurul}
+      # Same fail-loud requirement as docker-compose.yml (see there for why): no baked-in
+      # default, and only the *first* boot of an empty postgres_data volume applies it.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
+      POSTGRES_DB: ${POSTGRES_DB:-kurul}
     ports:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U kurultay -d kurultay']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-kurul} -d ${POSTGRES_DB:-kurul}']
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:8-alpine
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # See docker-compose.yml's redis service for the full derivation. CAP_SETUID/CAP_SETGID
+    # (not DAC_OVERRIDE) let the image's own entrypoint drop privilege to uid 999 via
+    # `setpriv`, which it only does when its first argument is literally `redis-server` —
+    # the exec-form `command:` below (not a `sh -c` wrapper) is what makes that match again.
+    # Same image, same command shape, same requirement.
+    cap_add: [SETUID, SETGID]
+    # REDIS_PASSWORD is optional here too — see docker-compose.yml for the reasoning. The
+    # host port below means anything on the host can already reach this Redis at
+    # localhost:6379 regardless, so a password mainly matters once other containers share
+    # this compose project's network.
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    # Exec form, substituted by Compose itself — see docker-compose.yml's redis service for
+    # why this replaced the `sh -c` conditional (that form silently kept the container root
+    # for its entire life) and why array form specifically is required (a plain string
+    # would drop the trailing blank argument when REDIS_PASSWORD is unset).
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']
     ports:
       - '6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test:
+        [
+          'CMD-SHELL',
+          'if [ -n "$$REDIS_PASSWORD" ]; then redis-cli -a "$$REDIS_PASSWORD" ping; else redis-cli ping; fi',
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -33,6 +86,14 @@ services:
   # docs/development.md#smtp-and-mailpit.
   mailpit:
     image: axllent/mailpit:latest
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # Mailpit has no chown/setuid dance of its own — it's a single static Go binary that
+    # opens two listen sockets (SMTP 1025, HTTP 8025, both unprivileged) and writes its
+    # sqlite store into its own volume. Verified standalone with `cap_drop: [ALL]` and no
+    # `cap_add`: both listeners came up and the healthcheck (`/mailpit readyz`) passed
+    # immediately.
     ports:
       - '8025:8025' # Web UI
       - '1025:1025' # SMTP

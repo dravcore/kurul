@@ -1,6 +1,6 @@
-# Kurultay
+# Kurul
 
-Open-source Kanban-focused project management tool. `dravcore/kurultay` — AGPL-3.0.
+Open-source Kanban-focused project management tool. `dravcore/kurul` — AGPL-3.0.
 
 ## Architecture
 
@@ -35,4 +35,5 @@ Open-source Kanban-focused project management tool. `dravcore/kurultay` — AGPL
 - Naming: root community files UPPERCASE, `docs/` files kebab-case, ADRs `NNNN-title.md`
 - Architecture/stack details: `docs/architecture.md`, `docs/tech-stack.md`, `docs/design.md` (UI/UX language)
 - Process: `docs/git-strategy.md`, `docs/coding-standards.md`, `docs/testing.md`, `docs/api-conventions.md`
-- Decisions: `docs/decisions/` (lightweight ADRs) · Progress: `docs/roadmap.md`
+- Docs map: `docs/README.md` · Decisions: `docs/decisions/` · Progress: `docs/roadmap.md`
+  (MVP phase checklists: `docs/archive/roadmap-mvp-phases.md`)

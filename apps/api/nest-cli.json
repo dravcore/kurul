@@ -4,6 +4,16 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "tsConfigPath": "tsconfig.build.json",
-    "assets": ["generated/prisma/**/*"]
+    "assets": ["generated/prisma/**/*"],
+    "plugins": [
+      {
+        "name": "@nestjs/swagger",
+        "options": {
+          "dtoFileNameSuffix": [".dto.ts", ".schema.ts"],
+          "introspectComments": true,
+          "classValidatorShim": true
+        }
+      }
+    ]
   }
 }
