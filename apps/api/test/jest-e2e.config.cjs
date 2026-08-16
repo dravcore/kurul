@@ -28,14 +28,11 @@ module.exports = {
   },
   // Keep in sync with `apps/api/jest.config.cjs`: better-auth >=1.6 and its dependency
   // chain (better-call -> rou3, nanostores) are ESM-only and must go through ts-jest, and so
-  // are `file-type` v21 and its chain (`@tokenizer/inflate`, `strtok3`, `token-types`,
+  // are `file-type` and its chain (`@tokenizer/inflate`, `strtok3`, `token-types`,
   // `peek-readable`, `uint8array-extras`, `@borewit/text-codec`) — see the longer note in the
-  // unit config, including why `@borewit` is on this list and why `moduleNameMapper` below is
-  // needed at all.
+  // unit config, including why `@borewit` is on this list and why the `file-type`
+  // `moduleNameMapper` both configs used to carry is gone as of v22.
   transformIgnorePatterns: [
     'node_modules/(?!(.pnpm/[^/]+/node_modules/)?(jose|better-auth|@better-auth|uuidv7|@noble|better-call|@better-fetch|rou3|nanostores|file-type|@tokenizer|strtok3|token-types|peek-readable|uint8array-extras|@borewit|kysely)/)',
   ],
-  moduleNameMapper: {
-    '^file-type$': require.resolve('file-type/node'),
-  },
 };
