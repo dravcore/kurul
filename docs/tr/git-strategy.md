@@ -313,6 +313,30 @@ Bunu çözen kural:
 `git config rerere.enabled true`'yu bir kez ayarlamaya değer — çözüm yapısal olarak her
 release'de aynı, ve rerere ilk seferden sonra bunu otomatik olarak tekrarlıyor.
 
+### Yayın yolunu prova etmek
+
+`release-images.yml` bir ön-sürüm tag'inde de (`vX.Y.Z-rc.N`, `-beta.N`, tirenin ardından ne
+gelirse) tetiklenir ve bunun tek bir sebebi vardır: workflow imaj yayınlar, cosign ile imzalar
+ve SBOM ekler — bunların **hiçbiri CI'da koşmaz**. Hiç çalışmamış bir workflow'un ilk koşusunu
+gerçek bir sürüm yapmak, sürümün kendisini teste dönüştürür.
+
+Dolayısıyla yayın yolu değiştiyse — yeni bir action major'ı, imzalama veya SBOM adımlarında bir
+değişiklik, yeni bir registry — 5. adımdan önce prova edin:
+
+```bash
+git tag -a v0.2.0-rc.1 -m "v0.2.0-rc.1"
+git push origin v0.2.0-rc.1
+```
+
+Prova gerçek bir yayındır: gerçek imajlar, gerçek imza, gerçek SBOM asset'leri, ve
+[self-hosting.md](self-hosting.md#çektiğiniz-imajı-doğrulamak)'daki `cosign verify` komutu
+ona karşı çalışır. Bilinçli olarak **yapmadığı** şey, birilerinin takip ettiği bir şeyi
+oynatmaktır: ön-sürümde `{{major}}.{{minor}}` ve `latest` atlanır, yani `TAG` ayarlamamış bir
+operatör etkilenmez; GitHub Release'i de hem draft hem ön-sürüm olarak işaretlenir.
+
+Prova tag'i tek kullanımlıktır. Gerçek sürüm çıkınca tag'i ve release'ini silin; imajlar kendi
+`-rc` tag'leriyle registry'de kalır ve paket listesinde bir satırdan başka maliyeti olmaz.
+
 ## Hotfix süreci
 
 Bir sonraki release'i bekleyemeyecek, release edilmiş bir versiyondaki bir bug için.
