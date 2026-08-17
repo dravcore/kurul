@@ -7,7 +7,32 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Security
+
+- **Pinned `deepmerge-ts` to `^8.0.1` through a pnpm override**, closing
+  [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) (high: stack
+  exhaustion when merging recursive object graphs). It reaches this repository through exactly
+  one root — `prisma > @prisma/config > deepmerge-ts@7.1.5`, fifteen paths, all of them that
+  chain — and `pnpm audit --audit-level high` began failing on it on 2026-08-17, on a lockfile
+  nothing had changed.
+
+  An override rather than an upgrade because there is nothing to upgrade to: `prisma` and
+  `@prisma/config` are at 7.9.1, the current release, and `@prisma/config` depends on
+  `deepmerge-ts` at an **exact** `7.1.5` rather than a range, so no dependency bump reaches it.
+  That also makes this override a **major** bump (7 → 8) on a version a vendor pinned
+  deliberately, which is worth stating plainly rather than burying: the reason it is acceptable
+  here is that it was verified rather than assumed, not that a major bump is ordinarily safe.
+
+  Verified after the override: `prisma generate` loads `prisma.config.ts` and generates the
+  client (that config load is the code path that reaches `deepmerge-ts` at all), and the full
+  suite is green — 1314 API, 770 web, 44 `shared-types`, 6 `auth-access` — alongside `lint`,
+  `typecheck`, `format:check`, `build` and `openapi:check`.
+
+  Worth keeping in proportion: nothing here was exploitable in a running instance. This
+  dependency is reached only while a Prisma CLI command merges configuration files, at build
+  and migration time, and never touches request-borne input — the thing that was broken was a
+  CI gate, not a deployment. The override should be dropped once Prisma ships a release that
+  depends on `deepmerge-ts >= 8`.
 
 ## [0.2.0] - 2026-08-16
 
