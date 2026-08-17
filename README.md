@@ -104,49 +104,106 @@ Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
 
 ## Quick start
 
+Two paths, and which one you want depends on whether you mean to **run** Kurul or to
+**work on** it. Both start from a clone and a `.env`; only the second needs a toolchain.
+
+### Run it
+
+Docker Compose v2 is the only prerequisite — no Node, no pnpm, no local build.
+
+```bash
+git clone https://github.com/dravcore/kurul.git
+cd kurul
+cp .env.example .env   # set POSTGRES_PASSWORD (openssl rand -hex 32) and BETTER_AUTH_SECRET (openssl rand -base64 32)
+docker compose pull && docker compose up -d
+```
+
+Then open **http://localhost** — not `localhost:3000`. A bundled Caddy reverse proxy is the
+stack's only published entrance and serves both apps from one origin; `api` and `web` publish
+no host ports of their own. Because it serves both from one origin, the **same published image
+runs on any domain with no rebuild** — put it on your own by setting
+`SITE_URL=https://kurul.example.com` in `.env`, which also turns on automatic HTTPS. The
+one-page walkthrough, SMTP included: [docs/self-hosting.md](docs/self-hosting.md).
+
+Every tagged release publishes `api`/`web` images to GHCR (`ghcr.io/dravcore/kurul-api`,
+`ghcr.io/dravcore/kurul-web`), so this installs and upgrades without a local build; set
+`TAG=vX.Y.Z` in `.env` to pin a release instead of `latest`. No image published yet for your
+`TAG` (or no network route to `ghcr.io`)? `docker compose up -d` still falls back to building
+from source automatically — `docker compose up --build` keeps working exactly as before, for
+building on purpose.
+
+### Develop it
+
+| Tool           | Version  | Notes                                                                |
+| -------------- | -------- | -------------------------------------------------------------------- |
+| Node.js        | **≥ 24** | The `engines` floor. 24 LTS is the supported line                    |
+| pnpm           | 9+       | `corepack enable && corepack prepare pnpm@latest --activate`         |
+| Docker Compose | v2       | Plugin form (`docker compose`); v1 `docker-compose` is not supported |
+| Git            | 2.30+    |                                                                      |
+
+No local PostgreSQL or Redis installation is needed — both run in Docker.
+
 ```bash
 git clone https://github.com/dravcore/kurul.git
 cd kurul
 cp .env.example .env   # set BETTER_AUTH_SECRET (openssl rand -base64 32) and POSTGRES_PASSWORD (openssl rand -hex 32)
 pnpm install
-pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build   # shared packages, consumed from gitignored dist/
-pnpm db:generate        # generate the Prisma client (gitignored, not created automatically)
-docker compose -f docker-compose.dev.yml up -d
-pnpm db:migrate
-pnpm db:seed
+pnpm bootstrap         # shared packages → Prisma client → containers → migrations → demo data
 pnpm dev
 ```
 
 - Web: http://localhost:3000
 - API health: http://localhost:4000/health
+- Mailpit (every message the API sends): http://localhost:8025
 
-`POSTGRES_PASSWORD` has no default — compose refuses to start until it's set — and the
-password segment of `DATABASE_URL` a few lines above it in `.env.example` must match it by
-hand. Unlike `BETTER_AUTH_SECRET`, this value is embedded directly in a connection URL, so
+`pnpm bootstrap` ([`scripts/bootstrap.mjs`](scripts/bootstrap.mjs)) is the five commands the dev
+loop used to ask for, in the order it asked for them, plus a preflight on `.env` and a wait on
+the containers' own healthchecks:
+
+```bash
+pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build
+pnpm db:generate
+docker compose -f docker-compose.dev.yml up -d
+pnpm db:migrate
+pnpm db:seed
+```
+
+**Re-run it after any `git pull`.** It is idempotent, and it deliberately will not reseed a
+database that already holds workspaces — `pnpm db:seed` deletes before it inserts, so a script
+you are told to run routinely must not be one that silently wipes the board you were working
+on. Pass `--seed` to reseed anyway, or `--no-seed` to skip that step outright.
+
+The two build steps are most of why the script exists, because skipping either one fails in a
+way that reads like a broken checkout rather than a missing step. Without the shared-package
+build, `apps/web` reports `Failed to resolve entry for package "@kurul/shared-types"`,
+`apps/api` reports `TS2307: Cannot find module '@kurul/shared-types'`, and `pnpm db:seed` dies
+on `@kurul/auth-access/dist/cjs/index.js` before it ever reaches the database; `pnpm build` and
+`pnpm typecheck` do it for you, `pnpm dev`, `pnpm test`, `pnpm db:seed` and `pnpm lint` do not.
+Without `pnpm db:generate`, nothing that imports a Prisma-derived type typechecks or builds —
+the client is git-ignored and no `postinstall` hook creates it. That one also has to be re-run
+after pulling someone else's migrations: `pnpm db:migrate` applies them but does not regenerate
+the client (`pnpm db:migrate:dev`, the command for your _own_ schema edits, does both).
+
+### Both paths
+
+`POSTGRES_PASSWORD` has no default — compose refuses to start until it's set. Unlike
+`BETTER_AUTH_SECRET`, this value is embedded directly in a connection URL, so
 `openssl rand -base64 32` is the wrong generator here — its alphabet includes `/` and `+`,
 either of which breaks the URL if it lands in the password (`/` ends the authority section
 outright; roughly half of all base64-32 outputs contain at least one). Use
 `openssl rand -hex 32` instead, whose alphabet (`0-9a-f`) is always URL-safe; see
 [docs/development.md#database-and-cache-credentials](docs/development.md#database-and-cache-credentials).
+In the dev loop the password segment of `DATABASE_URL` a few lines above it in `.env.example`
+must match it by hand — that host-side string is what `pnpm dev` uses to reach `localhost:5432`,
+and compose does not keep the two in sync. `docker compose up` assembles its own connection
+string from `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` and never reads that line.
 
 The app boots without SMTP configured, but invitations cannot be accepted until it is — the
 dev compose file above already starts [Mailpit](https://mailpit.axllent.org/) so you can test
-that flow locally without a real mail provider; see
+that flow locally without a real mail provider (`SMTP_HOST=localhost`, `SMTP_PORT=1025`); see
 [docs/development.md#smtp-and-mailpit](docs/development.md#smtp-and-mailpit).
 
-Full stack in Docker, pull-based: `docker compose pull && docker compose up -d`, then open
-http://localhost. Every tagged release publishes `api`/`web` images to GHCR
-(`ghcr.io/dravcore/kurul-api`, `ghcr.io/dravcore/kurul-web`), so this installs and
-upgrades without a local build; set `TAG=vX.Y.Z` in `.env` to pin a release instead of
-`latest`. No image published yet for your `TAG` (or no network route to `ghcr.io`)?
-`docker compose up -d` still falls back to building from source automatically —
-`docker compose up --build` keeps working exactly as before, for building on purpose.
 Day-to-day details: [docs/development.md](docs/development.md).
-
-Both apps are served from one origin behind a bundled Caddy reverse proxy, so the **same
-published image runs on any domain with no rebuild** — put it on your own by setting
-`SITE_URL=https://kurul.example.com` in `.env`, which also turns on automatic HTTPS.
-The one-page walkthrough, SMTP included: [docs/self-hosting.md](docs/self-hosting.md).
 
 ## Stack
 
@@ -187,10 +244,38 @@ Kurul is issue-first: propose before you implement. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the process, and
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work together.
 
+## Community
+
+**[GitHub Discussions](https://github.com/dravcore/kurul/discussions) is the official channel.**
+Three categories carry the traffic:
+
+| Category                                                                                | For                                                                                                                                     |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Setup, self-hosting and usage questions — anything that is not a bug report                                                             |
+| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Roadmap feedback. Every [Beyond MVP](docs/roadmap.md#beyond-mvp) row has a discussion here — upvote the one you want, or open a new one |
+| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | What you built with it, and what your board looks like                                                                                  |
+
+Reproducible bugs are still [issues](https://github.com/dravcore/kurul/issues), and
+vulnerabilities go to [SECURITY.md](SECURITY.md) rather than either.
+
+**One thing to know before you invest time here, stated plainly rather than discovered later:
+outside pull requests are not accepted** — not code, not documentation, not translations, and
+this has no end date ([ADR 0015](docs/decisions/0015-no-external-contributions.md)). It is a
+deliberate choice about who maintains this codebase, not a judgement about any particular
+patch, and it is why the Ideas category exists: **describing** what you need is the
+contribution path that is open, and it is a real one. An idea with upvotes on it is the
+strongest signal this project takes.
+
 ## Security
 
 See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## License
 
-[AGPL-3.0](LICENSE).
+[AGPL-3.0](LICENSE) — the entire codebase, one tier, nothing held back.
+
+**A commercial license is available.** AGPL-3.0's terms do not suit every organization; the
+same code is also offered under a commercial license that exempts you from them. Write to
+**licensing@dravcore.com**. What that buys is different terms on the code you can already
+read — there is no paid edition, no feature held back for it, and no hosted SaaS
+([ADR 0014](docs/decisions/0014-dual-licensing-cla.md)).

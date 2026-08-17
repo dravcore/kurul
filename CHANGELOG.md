@@ -7,7 +7,61 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`pnpm bootstrap` — a fresh clone reaches a running dev loop in one command.**
+  [`scripts/bootstrap.mjs`](scripts/bootstrap.mjs) runs the five commands the dev loop already
+  documented, in the same order (shared-package build → `db:generate` → dev containers →
+  `db:migrate` → `db:seed`), and adds the two things a reader cannot add by replaying them:
+  a preflight that reads `.env` before anything is started, and a wait on the containers' own
+  healthchecks. It is the documented path rather than a second, faster one — if the script and
+  [development.md](docs/development.md) disagree, one of them is a bug.
+
+  The preflight exists because these failures otherwise arrive late and named after the wrong
+  thing: an empty `POSTGRES_PASSWORD`, an empty `BETTER_AUTH_SECRET`, or a `DATABASE_URL` still
+  carrying the `<POSTGRES_PASSWORD>` placeholder from `.env.example` each surface only once
+  something tries to connect, with an error that mentions neither `.env` nor the variable.
+
+  **Re-running it is safe, and that is a constraint rather than a convenience.** `pnpm db:seed`
+  deletes before it inserts, so a script anybody is told to run after a `git pull` must not be
+  one that quietly wipes the board they were working on: seeding happens only when the database
+  holds no `Workspace` row, `--seed` forces it anyway, `--no-seed` skips it, and a database it
+  cannot read is treated as "do not seed" rather than as consent. The script is named
+  `bootstrap` and not `setup` because `pnpm setup` is a built-in pnpm command that writes to
+  your shell profile.
+
+- **A Community section in both READMEs, and GitHub Discussions declared the official channel.**
+  Q&A for setup and usage, Ideas for roadmap feedback, Show and tell for what you built; bugs
+  stay [issues](https://github.com/dravcore/kurul/issues) and vulnerabilities stay
+  [SECURITY.md](SECURITY.md). The section restates, up front rather than as a discovery, that
+  outside pull requests are not accepted — code, documentation and translations alike, with no
+  end date ([ADR 0015](docs/decisions/0015-no-external-contributions.md)) — because a project
+  that asks for feedback owes people the shape of the door before they walk through it.
+
+- **Every Beyond-MVP row now links to a discussion that can be upvoted**
+  ([roadmap.md](docs/roadmap.md#beyond-mvp), thirteen rows). Votes do not order the list — an
+  unscheduled row stays unscheduled — but a row with people behind it and a concrete use case
+  attached is the only thing that moves one off it, and there was previously nowhere for that
+  to accumulate.
+
+- **A commercial license line in both READMEs** (`licensing@dravcore.com`), which is the model
+  [ADR 0014](docs/decisions/0014-dual-licensing-cla.md) already describes and had no published
+  way to reach. What it sells is different terms on the same AGPL-3.0 code: no paid edition,
+  no feature held back for it, and no hosted SaaS.
+
+### Changed
+
+- **The Quick start in both READMEs is split into "Run it" and "Develop it".** The pull-based
+  Docker path — the one for people who want to run Kurul rather than work on it — was
+  previously the fourth paragraph of a section that opened with a toolchain. Developing it now
+  also carries the prerequisite versions (Node ≥ 24, pnpm 9+, Compose v2, Git 2.30+), which
+  the README had never stated at all, and spells out what skipping the shared-package build or
+  `db:generate` actually looks like, since both fail as though the checkout were broken.
+
+  One correction came out of the split: the instruction to match `DATABASE_URL`'s password
+  segment to `POSTGRES_PASSWORD` was written as though it applied to every install. It applies
+  to the dev loop only — `docker-compose.yml` assembles its own connection string from
+  `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` and never reads that line.
 
 ## [0.2.0] - 2026-08-16
 
