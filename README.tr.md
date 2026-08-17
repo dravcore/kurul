@@ -107,50 +107,110 @@ MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadma
 
 ## Hızlı başlangıç
 
+İki yol var ve hangisini istediğiniz Kurul'u **çalıştırmak** mı yoksa üzerinde **geliştirme
+yapmak** mı istediğinize bağlı. İkisi de bir clone ve bir `.env` ile başlar; yalnızca ikincisi
+bir toolchain ister.
+
+### Çalıştırmak
+
+Tek ön koşul Docker Compose v2 — Node yok, pnpm yok, lokal build yok.
+
+```bash
+git clone https://github.com/dravcore/kurul.git
+cd kurul
+cp .env.example .env   # POSTGRES_PASSWORD ayarla (openssl rand -hex 32), BETTER_AUTH_SECRET ayarla (openssl rand -base64 32)
+docker compose pull && docker compose up -d
+```
+
+Ardından **http://localhost** adresini açın — `localhost:3000` değil. Pakete dahil Caddy
+reverse proxy'si stack'in tek yayınlanmış girişidir ve her iki uygulamayı tek origin'den
+sunar; `api` ve `web` kendi host portlarını yayınlamaz. İkisini tek origin'den sunduğu için
+**aynı yayınlanmış imaj her domain'de yeniden build edilmeden çalışır** — kendi domain'inize
+taşımak için `.env`'de `SITE_URL=https://kurul.example.com` ayarlamanız yeterli, bu aynı
+zamanda otomatik HTTPS'i de açar. SMTP dahil tek sayfalık rehber:
+[docs/tr/self-hosting.md](docs/tr/self-hosting.md).
+
+Her etiketli release, `api`/`web` imajlarını GHCR'a yayınlar (`ghcr.io/dravcore/kurul-api`,
+`ghcr.io/dravcore/kurul-web`) — bu sayede kurulum ve upgrade lokal build gerektirmez; `latest`
+yerine belirli bir sürümü sabitlemek için `.env`'de `TAG=vX.Y.Z` ayarlayın. `TAG`'iniz için
+henüz yayınlanmış bir imaj yoksa (veya `ghcr.io`'ya ağ erişimi yoksa) `docker compose up -d`
+otomatik olarak kaynaktan build'e döner — `docker compose up --build` de bilinçli olarak build
+etmek isteyenler için aynen çalışmaya devam eder.
+
+### Geliştirmek
+
+| Araç           | Sürüm    | Not                                                                |
+| -------------- | -------- | ------------------------------------------------------------------ |
+| Node.js        | **≥ 24** | `engines` tabanı. Desteklenen hat 24 LTS                           |
+| pnpm           | 9+       | `corepack enable && corepack prepare pnpm@latest --activate`       |
+| Docker Compose | v2       | Plugin biçimi (`docker compose`); v1 `docker-compose` desteklenmez |
+| Git            | 2.30+    |                                                                    |
+
+Lokal PostgreSQL veya Redis kurulumuna gerek yok — ikisi de Docker'da çalışır.
+
 ```bash
 git clone https://github.com/dravcore/kurul.git
 cd kurul
 cp .env.example .env   # BETTER_AUTH_SECRET ayarla (openssl rand -base64 32), POSTGRES_PASSWORD ayarla (openssl rand -hex 32)
 pnpm install
-pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build   # paylaşılan paketler, git-ignored dist/ üzerinden tüketilir
-pnpm db:generate        # Prisma client'ı üret (git-ignored, otomatik oluşmaz)
-docker compose -f docker-compose.dev.yml up -d
-pnpm db:migrate
-pnpm db:seed
+pnpm bootstrap         # paylaşılan paketler → Prisma client → container'lar → migration → demo veri
 pnpm dev
 ```
 
 - Web: http://localhost:3000
 - API health: http://localhost:4000/health
+- Mailpit (API'nin gönderdiği her mesaj): http://localhost:8025
 
-`POSTGRES_PASSWORD`'ün varsayılanı yoktur — ayarlanmadan compose başlamayı reddeder — ve
-`.env.example`'da birkaç satır üstündeki `DATABASE_URL`'in şifre kısmı bununla elle
-eşleştirilmelidir. `BETTER_AUTH_SECRET`'ten farklı olarak bu değer doğrudan bir bağlantı
-URL'ine gömülür, dolayısıyla `openssl rand -base64 32` burada yanlış üreticidir — alfabesi
-`/` ve `+` içerir, ikisi de parolaya düşerse URL'i bozar (`/` authority bölümünü doğrudan
-sonlandırır; base64-32 çıktılarının kabaca yarısı en az bir tane içerir). Bunun yerine
-alfabesi (`0-9a-f`) her zaman URL-güvenli olan `openssl rand -hex 32` kullanın; bkz.
+`pnpm bootstrap` ([`scripts/bootstrap.mjs`](scripts/bootstrap.mjs)), dev loop'un eskiden
+istediği beş komutun ta kendisi — aynı sırayla — artı `.env` üzerinde bir ön kontrol ve
+container'ların kendi healthcheck'lerine bir bekleme:
+
+```bash
+pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build
+pnpm db:generate
+docker compose -f docker-compose.dev.yml up -d
+pnpm db:migrate
+pnpm db:seed
+```
+
+**Her `git pull` sonrası yeniden koşturun.** Idempotent'tir ve halihazırda workspace tutan bir
+veritabanını bilinçli olarak yeniden seed'lemez — `pnpm db:seed` insert'ten önce siler, yani
+düzenli koşturmanız söylenen bir betik, üzerinde çalıştığınız board'u sessizce silen bir betik
+olmamalıdır. Yine de seed'lemek için `--seed`, o adımı tümüyle atlamak için `--no-seed`.
+
+Betiğin var olma sebebinin büyük kısmı o iki build adımıdır, çünkü ikisinden birinin atlanması
+eksik bir adımdan çok bozuk bir checkout gibi okunan hatalar üretir. Paylaşılan paket build'i
+olmadan `apps/web` `Failed to resolve entry for package "@kurul/shared-types"`, `apps/api`
+`TS2307: Cannot find module '@kurul/shared-types'` verir ve `pnpm db:seed` veritabanına hiç
+ulaşmadan `@kurul/auth-access/dist/cjs/index.js` üzerinde ölür; `pnpm build` ve `pnpm typecheck`
+bunu sizin yerinize yapar, `pnpm dev`, `pnpm test`, `pnpm db:seed` ve `pnpm lint` yapmaz.
+`pnpm db:generate` olmadan ise Prisma türevli bir tür import eden hiçbir şey typecheck'ten
+geçmez ve build olmaz — client git-ignored'dır ve onu üreten bir `postinstall` hook'u yoktur.
+O adımın başkasının migration'larını çektikten sonra da yeniden koşması gerekir:
+`pnpm db:migrate` onları uygular ama client'ı yeniden üretmez (_kendi_ şema düzenlemeleriniz
+için olan `pnpm db:migrate:dev` ikisini birden yapar).
+
+### Her iki yol için
+
+`POSTGRES_PASSWORD`'ün varsayılanı yoktur — ayarlanmadan compose başlamayı reddeder.
+`BETTER_AUTH_SECRET`'ten farklı olarak bu değer doğrudan bir bağlantı URL'ine gömülür,
+dolayısıyla `openssl rand -base64 32` burada yanlış üreticidir — alfabesi `/` ve `+` içerir,
+ikisi de parolaya düşerse URL'i bozar (`/` authority bölümünü doğrudan sonlandırır; base64-32
+çıktılarının kabaca yarısı en az bir tane içerir). Bunun yerine alfabesi (`0-9a-f`) her zaman
+URL-güvenli olan `openssl rand -hex 32` kullanın; bkz.
 [docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri](docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri).
+Dev loop'ta `.env.example`'da birkaç satır üstündeki `DATABASE_URL`'in şifre kısmı bununla elle
+eşleştirilmelidir — o host tarafındaki string, `pnpm dev`'in `localhost:5432`'ye ulaşmak için
+kullandığı şeydir ve compose ikisini senkronize tutmaz. `docker compose up` kendi bağlantı
+string'ini `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`'den kurar ve o satırı hiç okumaz.
 
 Uygulama SMTP yapılandırılmadan da ayağa kalkar, ama davetler yapılandırılana kadar kabul
 edilemez — yukarıdaki dev compose dosyası [Mailpit](https://mailpit.axllent.org/)'i zaten
-başlatır, böylece bu akışı gerçek bir mail sağlayıcısı olmadan lokal olarak test edebilirsiniz;
-bkz. [docs/tr/development.md#smtp-ve-mailpit](docs/tr/development.md#smtp-ve-mailpit).
+başlatır, böylece bu akışı gerçek bir mail sağlayıcısı olmadan lokal olarak test edebilirsiniz
+(`SMTP_HOST=localhost`, `SMTP_PORT=1025`); bkz.
+[docs/tr/development.md#smtp-ve-mailpit](docs/tr/development.md#smtp-ve-mailpit).
 
-Tam stack Docker, pull tabanlı: `docker compose pull && docker compose up -d`, ardından
-http://localhost adresini açın. Her etiketli release, `api`/`web` imajlarını GHCR'a yayınlar
-(`ghcr.io/dravcore/kurul-api`, `ghcr.io/dravcore/kurul-web`) — bu sayede kurulum ve
-upgrade lokal build gerektirmez; `latest` yerine belirli bir sürümü sabitlemek için `.env`'de
-`TAG=vX.Y.Z` ayarlayın. `TAG`'iniz için henüz yayınlanmış bir imaj yoksa (veya `ghcr.io`'ya ağ
-erişimi yoksa) `docker compose up -d` otomatik olarak kaynaktan build'e döner —
-`docker compose up --build` de bilinçli olarak build etmek isteyenler için aynen çalışmaya
-devam eder. Günlük detaylar: [docs/tr/development.md](docs/tr/development.md).
-
-Her iki uygulama da pakete dahil Caddy reverse proxy'sinin arkasında **tek origin**'den
-sunulur; bu sayede **aynı yayınlanmış imaj her domain'de yeniden build edilmeden çalışır** —
-kendi domain'inize taşımak için `.env`'de `SITE_URL=https://kurul.example.com` ayarlamanız
-yeterli, bu aynı zamanda otomatik HTTPS'i de açar. SMTP dahil tek sayfalık rehber:
-[docs/tr/self-hosting.md](docs/tr/self-hosting.md).
+Günlük detaylar: [docs/tr/development.md](docs/tr/development.md).
 
 ## Stack
 
@@ -192,10 +252,38 @@ Kurul issue-first çalışıyor: uygulamaya geçmeden önce öner. Süreç için
 [CONTRIBUTING.md](CONTRIBUTING.md)'ye, birlikte nasıl çalıştığımız için ise
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)'ye bakın.
 
+## Topluluk
+
+**Resmî kanal [GitHub Discussions](https://github.com/dravcore/kurul/discussions).**
+Trafiği üç kategori taşıyor:
+
+| Kategori                                                                                | Ne için                                                                                                                                                     |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Kurulum, self-hosting ve kullanım soruları — hata bildirimi olmayan her şey                                                                                 |
+| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Yol haritası geri bildirimi. Her [MVP ötesi](docs/tr/roadmap.md#mvp-ötesi) satırının burada bir discussion'ı var — istediğinizi oylayın ya da yenisini açın |
+| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | Onunla ne kurduğunuz ve board'unuzun neye benzediği                                                                                                         |
+
+Tekrarlanabilir hatalar yine [issue](https://github.com/dravcore/kurul/issues), güvenlik
+açıkları ise ikisi yerine [SECURITY.md](SECURITY.md).
+
+**Buraya vakit ayırmadan önce bilinmesi gereken tek şey, sonradan keşfedilmek yerine açıkça
+söyleniyor: dışarıdan gelen pull request'ler kabul edilmiyor** — kod değil, doküman değil,
+çeviri değil, ve bunun bir bitiş tarihi yok
+([ADR 0015](docs/tr/decisions/0015-no-external-contributions.md)). Bu, bu kod tabanını kimin
+sürdürdüğüne dair bilinçli bir tercih; herhangi bir yamaya dair bir yargı değil. Ideas
+kategorisi de tam bu yüzden var: ihtiyacınızı **tarif etmek** açık olan katkı yolu, ve bu
+gerçek bir yol. Üzerinde oy biriken bir fikir, bu projenin aldığı en güçlü sinyaldir.
+
 ## Güvenlik
 
 Bir güvenlik açığı bildirmek için [SECURITY.md](SECURITY.md)'ye bakın.
 
 ## Lisans
 
-[AGPL-3.0](LICENSE).
+[AGPL-3.0](LICENSE) — kod tabanının tamamı, tek katman, hiçbir şey saklı değil.
+
+**Ticari lisans mevcut.** AGPL-3.0'ın koşulları her kuruma uymaz; aynı kod, sizi bu
+koşullardan muaf tutan bir ticari lisansla da sunuluyor. **licensing@dravcore.com** adresine
+yazın. Bunun satın aldığı şey, zaten okuyabildiğiniz kod üzerinde farklı koşullar — ücretli
+bir sürüm yok, bunun için saklanan bir özellik yok, hosted SaaS yok
+([ADR 0014](docs/tr/decisions/0014-dual-licensing-cla.md)).

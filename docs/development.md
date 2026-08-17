@@ -52,9 +52,14 @@ No local PostgreSQL or Redis installation is needed — both run in Docker.
 ```bash
 git clone https://github.com/dravcore/kurul.git
 cd kurul
-pnpm install          # installs every workspace package
-pnpm db:generate       # generate the Prisma client from apps/api/prisma/schema.prisma
+cp .env.example .env   # fill it in — see Environment variables below
+pnpm install           # installs every workspace package
+pnpm bootstrap         # everything else on this page's setup path, in one command
 ```
+
+The rest of this section explains what `pnpm bootstrap` does and why each step is there, because
+the steps are the ones you will otherwise run individually while working — see
+[Run modes](#run-modes) for the script itself.
 
 The repository is a pnpm workspace (`apps/*`, `packages/*`). Always run `pnpm install` from
 the repository root — never inside `apps/api` or `apps/web`.
@@ -360,11 +365,29 @@ Postgres and Redis run in containers; `api` and `web` run on the host with hot r
 is the fast loop — no image rebuild between code changes.
 
 ```bash
-pnpm db:generate                                 # generate the Prisma client (skip if already done)
-docker compose -f docker-compose.dev.yml up -d   # postgres + redis only
-pnpm db:migrate                                  # apply migrations
-pnpm dev                                         # api + web in parallel, hot reload
+pnpm bootstrap   # shared packages, Prisma client, containers, migrations, demo data
+pnpm dev         # api + web in parallel, hot reload
 ```
+
+`pnpm bootstrap` ([`scripts/bootstrap.mjs`](../scripts/bootstrap.mjs)) runs exactly the
+commands below, in this order, and adds a preflight on `.env` plus a wait on the containers'
+own healthchecks — a `prisma migrate` fired at a Postgres that has accepted the TCP connection
+but not finished `initdb` is the failure that wait exists to prevent, and it is the one a first
+run hits. Run them by hand instead whenever you want only one of them:
+
+```bash
+pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build
+pnpm db:generate                                 # generate the Prisma client
+docker compose -f docker-compose.dev.yml up -d   # postgres + redis + mailpit
+pnpm db:migrate                                  # apply migrations
+pnpm db:seed                                     # demo workspace, board, columns, tasks
+```
+
+The script is idempotent and is meant to be re-run after a `git pull`, which is why it does not
+simply run `pnpm db:seed`: seeding **deletes before it inserts**, so it happens only when the
+database holds no `Workspace` row yet. `--seed` forces it anyway, `--no-seed` skips it. If it
+cannot read that table for any reason it also skips — the destructive branch is never the one
+taken on a guess.
 
 | URL                          | What                           |
 | ---------------------------- | ------------------------------ |
@@ -531,20 +554,21 @@ not bundled in here.
 
 Run from the repository root.
 
-| Script           | Command               | What it does                                                                                                                                                                                                                                            |
-| ---------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dev`            | `pnpm dev`            | Runs `apps/api` and `apps/web` in parallel with hot reload                                                                                                                                                                                              |
-| `build`          | `pnpm build`          | Builds every workspace package                                                                                                                                                                                                                          |
-| `lint`           | `pnpm lint`           | ESLint across all packages                                                                                                                                                                                                                              |
-| `format`         | `pnpm format`         | Prettier write across the repo                                                                                                                                                                                                                          |
-| `format:check`   | `pnpm format:check`   | Prettier check (CI gate)                                                                                                                                                                                                                                |
-| `typecheck`      | `pnpm typecheck`      | Builds `@kurul/shared-types` + `@kurul/auth-access`, then `tsc --noEmit` in every workspace                                                                                                                                                             |
-| `test`           | `pnpm test`           | Runs the test suites of every workspace package                                                                                                                                                                                                         |
-| `db:generate`    | `pnpm db:generate`    | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made                                                    |
-| `db:migrate`     | `pnpm db:migrate`     | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate` |
-| `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it                 |
-| `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                       |
-| `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                            |
+| Script           | Command               | What it does                                                                                                                                                                                                                                                                                                            |
+| ---------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bootstrap`      | `pnpm bootstrap`      | Fresh clone (or fresh pull) → running dev loop: shared packages, Prisma client, containers, migrations, demo data. Idempotent; will not reseed a database that already holds workspaces. `--seed` / `--no-seed` override that. **Not** `pnpm setup` — that is a built-in pnpm command that writes to your shell profile |
+| `dev`            | `pnpm dev`            | Runs `apps/api` and `apps/web` in parallel with hot reload                                                                                                                                                                                                                                                              |
+| `build`          | `pnpm build`          | Builds every workspace package                                                                                                                                                                                                                                                                                          |
+| `lint`           | `pnpm lint`           | ESLint across all packages                                                                                                                                                                                                                                                                                              |
+| `format`         | `pnpm format`         | Prettier write across the repo                                                                                                                                                                                                                                                                                          |
+| `format:check`   | `pnpm format:check`   | Prettier check (CI gate)                                                                                                                                                                                                                                                                                                |
+| `typecheck`      | `pnpm typecheck`      | Builds `@kurul/shared-types` + `@kurul/auth-access`, then `tsc --noEmit` in every workspace                                                                                                                                                                                                                             |
+| `test`           | `pnpm test`           | Runs the test suites of every workspace package                                                                                                                                                                                                                                                                         |
+| `db:generate`    | `pnpm db:generate`    | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made                                                                                                                    |
+| `db:migrate`     | `pnpm db:migrate`     | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate`                                                                 |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it                                                                                 |
+| `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                                                                                       |
+| `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                                                                                            |
 
 To target a single workspace, use pnpm's filter flag:
 

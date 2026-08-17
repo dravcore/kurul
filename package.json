@@ -9,6 +9,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "bootstrap": "node scripts/bootstrap.mjs",
     "dev": "pnpm -r --parallel --filter @kurul/api --filter @kurul/web dev",
     "build": "pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access --filter @kurul/api --filter @kurul/web build",
     "lint": "pnpm -r lint",
