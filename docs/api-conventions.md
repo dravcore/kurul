@@ -168,7 +168,7 @@ GET   /me                    # current user profile
 PATCH /me                    # own profile; interface language today
 GET   /me/deletion-preview   # what deleting this account would do
 DELETE /me                   # delete this account (anonymises it)
-GET   /instance/activation                     # activation funnel; INSTANCE_ADMIN_EMAILS only
+GET   /instance/activation                     # activation funnel; INSTANCE_ADMIN_EMAILS only (verified email required)
 GET   /instance/users/:userId/deletion-preview # same preview, for an operator
 DELETE /instance/users/:userId                 # execute an erasure request for somebody else
 ```
@@ -193,7 +193,7 @@ duplicated disposition is `409` and names the workspaces still undecided; a conf
 that does not match is `403`; a transfer target who is not in that workspace is `404`, the same
 opacity every workspace route gives. `GET /me/deletion-preview` is what a client reads to build
 that body. `DELETE /instance/users/:userId` is the same operation performed by an instance
-operator — `403` when `INSTANCE_ADMIN_EMAILS` does not name the caller, which is the default on
+operator — `403` when `INSTANCE_ADMIN_EMAILS` does not name the caller or their email is unverified, which is the default on
 a fresh install. The account row is anonymised rather than deleted; see
 [decisions/0026-account-deletion-anonymisation.md](decisions/0026-account-deletion-anonymisation.md).
 

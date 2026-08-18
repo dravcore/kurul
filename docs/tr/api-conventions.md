@@ -170,7 +170,7 @@ GET   /me                    # mevcut kullanıcı profili
 PATCH /me                    # kendi profili; bugün yalnızca arayüz dili
 GET   /me/deletion-preview   # bu hesabı silmek neye yol açar
 DELETE /me                   # bu hesabı sil (anonimleştirir)
-GET   /instance/activation                     # aktivasyon hunisi; yalnız INSTANCE_ADMIN_EMAILS
+GET   /instance/activation                     # aktivasyon hunisi; yalnız INSTANCE_ADMIN_EMAILS (doğrulanmış e-posta gerekli)
 GET   /instance/users/:userId/deletion-preview # aynı önizleme, operatör için
 DELETE /instance/users/:userId                 # bir başkası adına silme talebini uygula
 ```
@@ -197,7 +197,7 @@ reddederek karşılık veren tek route'tur. Gövde `confirmEmail` (hesabın kend
 `403`'tür; o workspace'te olmayan bir devir hedefi `404`'tür — her workspace route'unun verdiği
 aynı opaklık. `GET /me/deletion-preview`, istemcinin o gövdeyi kurmak için okuduğu şeydir.
 `DELETE /instance/users/:userId` aynı işlemin bir instance operatörü tarafından yapılan hâlidir —
-`INSTANCE_ADMIN_EMAILS` çağıranı adıyla saymıyorsa `403`, ki taze bir kurulumda varsayılan budur.
+`INSTANCE_ADMIN_EMAILS` çağıranı adıyla saymıyorsa ya da e-postası doğrulanmamışsa `403`, ki taze bir kurulumda varsayılan budur.
 Hesap satırı silinmez, anonimleştirilir; bkz.
 [decisions/0026-account-deletion-anonymisation.md](decisions/0026-account-deletion-anonymisation.md).
 
