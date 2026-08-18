@@ -14,6 +14,10 @@ export interface StorageConfig {
   disk: DiskStorageConfig | undefined;
   /** The API half of the two-layer size limit; the proxy half carries the same number. */
   maxBytes: number;
+  /** Ceiling on the summed size of a workspace's FILE attachments. `0` means unlimited. */
+  workspaceQuotaBytes: number;
+  /** Ceiling on the summed size of every FILE attachment on the instance. `0` means unlimited. */
+  instanceQuotaBytes: number;
 }
 
 /**
@@ -43,5 +47,28 @@ export function readStorageConfig(): StorageConfig {
     );
   }
 
-  return { disk: root === '' ? undefined : { root }, maxBytes };
+  return {
+    disk: root === '' ? undefined : { root },
+    maxBytes,
+    workspaceQuotaBytes: quotaBytes('ATTACHMENT_WORKSPACE_QUOTA_BYTES'),
+    instanceQuotaBytes: quotaBytes('ATTACHMENT_INSTANCE_QUOTA_BYTES'),
+  };
+}
+
+/**
+ * Reads a storage quota in bytes (ADR 0027).
+ *
+ * `0` is a supported value meaning "unlimited" — the same spelling the retention windows give
+ * it (`retentionDays`), and the value an upgrade lands on: an instance that never configures a
+ * quota behaves exactly as it did before quotas existed. A negative value is refused rather
+ * than clamped, for `retentionDays`'s reason — it would otherwise read as a quota that is
+ * always exceeded, which is a configuration error better raised at boot than answered with a
+ * 413 on every upload.
+ */
+function quotaBytes(name: string): number {
+  const bytes = envInt(name, 0);
+  if (bytes < 0) {
+    throw new Error(`Invalid ${name}: expected a non-negative byte count, received "${bytes}"`);
+  }
+  return bytes;
 }

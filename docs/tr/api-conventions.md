@@ -291,21 +291,21 @@ gerçekten operasyon olduğu yerde kullanılır (örneğin bir column'un tamamı
 sıralamak). Bir alanı atlayan bir `PATCH` onu dokunulmamış bırakır; açıkça `null` göndermek
 nullable bir alanı temizler.
 
-| Status                       | Ne zaman                                                                                                                             |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `200 OK`                     | Başarılı okuma, güncelleme veya aksiyon                                                                                              |
-| `201 Created`                | Kaynak oluşturuldu; body oluşturulan kaynaktır                                                                                       |
-| `204 No Content`             | Başarılı silme; boş body                                                                                                             |
-| `400 Bad Request`            | Bozuk request veya validation hatası                                                                                                 |
-| `401 Unauthorized`           | Eksik veya geçersiz session                                                                                                          |
-| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz                                                                                          |
-| `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                                        |
-| `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                                          |
-| `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, bir yükleme `ATTACHMENT_MAX_BYTES`'ı, ya da bir import `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor |
-| `415 Unsupported Media Type` | Dosyanın **magic byte**'ları allowlist'te değil. Beyan edilen `Content-Type` ve uzantı kanıt sayılmaz, hiç okunmaz                   |
-| `422 Unprocessable Entity`   | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak)                        |
-| `429 Too Many Requests`      | Rate limit uygulandı                                                                                                                 |
-| `500 Internal Server Error`  | Ele alınmamış hata. Asla bir stack trace sızdırmaz.                                                                                  |
+| Status                       | Ne zaman                                                                                                                                                                                                                                                                      |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200 OK`                     | Başarılı okuma, güncelleme veya aksiyon                                                                                                                                                                                                                                       |
+| `201 Created`                | Kaynak oluşturuldu; body oluşturulan kaynaktır                                                                                                                                                                                                                                |
+| `204 No Content`             | Başarılı silme; boş body                                                                                                                                                                                                                                                      |
+| `400 Bad Request`            | Bozuk request veya validation hatası                                                                                                                                                                                                                                          |
+| `401 Unauthorized`           | Eksik veya geçersiz session                                                                                                                                                                                                                                                   |
+| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz                                                                                                                                                                                                                                   |
+| `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                                                                                                                                                                                 |
+| `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                                                                                                                                                                                   |
+| `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, bir yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor ya da bir depolama kotasını aşacak (hangisi olduğunu `error` söyler — bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)), ya da bir import `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor |
+| `415 Unsupported Media Type` | Dosyanın **magic byte**'ları allowlist'te değil. Beyan edilen `Content-Type` ve uzantı kanıt sayılmaz, hiç okunmaz                                                                                                                                                            |
+| `422 Unprocessable Entity`   | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak)                                                                                                                                                                 |
+| `429 Too Many Requests`      | Rate limit uygulandı                                                                                                                                                                                                                                                          |
+| `500 Internal Server Error`  | Ele alınmamış hata. Asla bir stack trace sızdırmaz.                                                                                                                                                                                                                           |
 
 **Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
 doğrulardı, ki bu tenant sınırının ötesine bilgi sızdırır. `403`, rolü çok düşük meşru bir
@@ -427,6 +427,17 @@ multipart zarfı dosyanın üstüne birkaç yüz byte ekler. İkisi de `413` dö
 döndüğünü cevabın gövdesi söyler: API'nin `413`'ü yukarıdaki hata zarfıdır, proxy'ninki hiç JSON
 değildir. Hangi sayının değiştirileceği ve aralarındaki sıralama kuralı:
 [self-hosting.md](self-hosting.md#kendi-reverse-proxynizi-kullanmak).
+
+**Depolama kotaları da `413` döner, ama kendi `error`'larıyla.**
+`ATTACHMENT_WORKSPACE_QUOTA_BYTES` ya da `ATTACHMENT_INSTANCE_QUOTA_BYTES` ayarlıyken (ikisi de
+varsayılan olarak sınırsızdır — [ADR 0027](decisions/0027-attachment-quotas.md)), byte'ları
+saklanan FILE eklerinin toplam boyutunu tavanın ötesine itecek bir yükleme, hiçbir şey
+yazılmadan reddedilir. Zarf `error: "Attachment Quota Exceeded"` taşır; dosya başına limitinki
+ise `"Payload Too Large"` taşır — durum kodu tek başına dosyayı mı küçültmek yoksa yer mi açmak
+gerektiğini söyleyemez ve istemciler `statusCode` ile `error` üzerinden dallanır, asla `message`
+üzerinden değil (bkz. [Hatalar](#hatalar)). Kotayı tam dolduran dosya kabul edilir; tavan, dosya
+başına olan gibi kapsayıcıdır. LINK ekleri byte saklamaz: ne kotadan düşerler ne de dolu bir
+kota tarafından reddedilirler.
 
 **İndirme.** `GET .../attachments/:attachmentId/content` byte'ları **sniff edilmiş** medya tipiyle
 (asla istemcinin yüklemede beyan ettiğiyle değil), `Content-Length` ve `Content-Disposition` ile

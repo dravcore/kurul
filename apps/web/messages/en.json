@@ -521,6 +521,7 @@
           "count": "{count, plural, one {# attachment} other {# attachments}}",
           "storageOff": "This instance does not store files. You can still attach links.",
           "tooLarge": "That file is larger than this instance accepts.",
+          "quotaExceeded": "There isn't enough attachment storage left for that file.",
           "wrongType": "That file type is not accepted.",
           "saveError": "Could not attach that.",
           "forbidden": "You don't have access to change this task. Ask a workspace admin."

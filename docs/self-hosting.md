@@ -149,6 +149,22 @@ may want to change is `ATTACHMENT_MAX_BYTES` (default `26214400`, 25 MiB), and i
 [the proxy contract below](#bringing-your-own-reverse-proxy) first: the reverse proxy carries a
 separate, deliberately higher ceiling that has to move with it.
 
+**Attachment storage is unbounded until you cap it, and it shares Postgres's disk.** The
+per-file limit and the per-IP upload throttle bound each _request_, not the total: at the
+defaults an authenticated client can spend roughly 500 MiB of disk a minute for as long as it
+cares to, and the `attachment_data` volume lives on the same host filesystem as the database —
+a full disk stops Postgres, not just uploads. Two variables cap the total
+([ADR 0027](decisions/0027-attachment-quotas.md)): `ATTACHMENT_WORKSPACE_QUOTA_BYTES` (summed
+stored-file bytes per workspace) and `ATTACHMENT_INSTANCE_QUOTA_BYTES` (the whole instance).
+Both default to unlimited — set the instance one below your volume's real headroom on any
+machine whose disk you care about. When sizing, know that the quotas are **soft**
+(simultaneous uploads can each overshoot by at most one file, so leave a few
+`ATTACHMENT_MAX_BYTES` of slack) and that deleted files keep their bytes until the nightly
+orphan sweep's grace period passes, so disk usage briefly exceeds what the quota accounts for.
+Link attachments store no bytes and never count. A rejected upload is a `413` whose JSON body
+carries `error: "Attachment Quota Exceeded"` — see
+[Telling the 413s apart](#telling-the-413s-apart).
+
 **Trello import needs no line here either.** `TRELLO_IMPORT_MAX_BYTES` (default `20971520`,
 20 MiB) is the largest board export the importer will accept, and the bundled Compose file
 already passes it. Three things about it are worth knowing before you touch it. It is a
@@ -568,6 +584,7 @@ to do with uploads. **The response body is what says which one did it**:
 | `413` with a **JSON** body carrying `statusCode`   | the API         | working as designed — the file is over `ATTACHMENT_MAX_BYTES`    |
 | `413` with an **empty** body (`Content-Length: 0`) | the proxy       | the body was over the proxy's ceiling, which is the coarse cut   |
 | `413` JSON reading `Request body is too large`     | the API         | not an upload at all — a JSON body over `REQUEST_BODY_MAX_BYTES` |
+| `413` JSON, `error: "Attachment Quota Exceeded"`   | the API         | the file fits, the storage doesn't — a quota is full (see above) |
 
 The first row is the normal answer for an oversized attachment, and the one a user can act on:
 it names the limit. The second is the proxy refusing a body before the API ever saw it — correct
@@ -579,8 +596,13 @@ The third row is a different limit that happens to share the status code: `REQUE
 and no attachment ever passes through it. If you see it, nothing about your storage or your proxy
 is misconfigured — some request simply sent more JSON than the API accepts.
 
-There is a fourth, and only one endpoint can produce it: a `413` on
-`POST /workspaces/…/imports/trello` is `TRELLO_IMPORT_MAX_BYTES` (20 MiB), not any of the three
+The fourth row is a different failure again: the file is under `ATTACHMENT_MAX_BYTES`, but storing
+it would push a workspace or the instance over its quota. See "Attachment storage is unbounded
+until you cap it, and it shares Postgres's disk" above for sizing `ATTACHMENT_WORKSPACE_QUOTA_BYTES`
+and `ATTACHMENT_INSTANCE_QUOTA_BYTES`.
+
+There is a fifth, and only one endpoint can produce it: a `413` on
+`POST /workspaces/…/imports/trello` is `TRELLO_IMPORT_MAX_BYTES` (20 MiB), not any of the four
 above. The route in the response envelope's `path` is what tells it apart. If a user hits it on an
 export **under** 20 MiB, the proxy cut the body first and the ceiling to look at is the proxy's.
 

@@ -521,6 +521,7 @@
           "count": "{count, plural, other {# ek}}",
           "storageOff": "Bu instance dosya saklamıyor. Yine de bağlantı ekleyebilirsiniz.",
           "tooLarge": "Bu dosya, bu instance'ın kabul ettiğinden büyük.",
+          "quotaExceeded": "Bu dosya için yeterli ek depolama alanı kalmadı.",
           "wrongType": "Bu dosya türü kabul edilmiyor.",
           "saveError": "Bu eklenemedi.",
           "forbidden": "Bu task'ı değiştirme erişiminiz yok. Bir workspace yöneticisinden isteyin."

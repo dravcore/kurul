@@ -35,6 +35,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Attachment storage quotas — the total is finally bounded, not just each file** (audit
+  finding SEC-02, [ADR 0027](docs/decisions/0027-attachment-quotas.md)). Two new variables cap
+  the summed size of stored file attachments: `ATTACHMENT_WORKSPACE_QUOTA_BYTES` per workspace
+  and `ATTACHMENT_INSTANCE_QUOTA_BYTES` instance-wide. Until now the only ceilings were
+  per-file and per-minute, which the rate-limit code itself called the wrong unit: at the
+  defaults an authenticated client could spend ~500 MiB of disk a minute indefinitely, on a
+  volume the Compose stack shares with Postgres. Both quotas default to unset — unlimited,
+  exactly the pre-upgrade behaviour — and `0` means the same, matching the retention windows'
+  spelling. The quota counts live FILE rows only (link attachments store no bytes and never
+  count), is checked before anything touches the disk, and is deliberately soft: concurrent
+  uploads can each overshoot by at most one file. A rejected upload answers `413` with
+  `error: "Attachment Quota Exceeded"` in the envelope — distinguishable from the per-file
+  limit's `413` by that field, which is what the web now branches on to tell the user to free
+  up space rather than shrink the file.
+
 - **`pnpm bootstrap` — a fresh clone reaches a running dev loop in one command.**
   [`scripts/bootstrap.mjs`](scripts/bootstrap.mjs) runs the five commands the dev loop already
   documented, in the same order (shared-package build → `db:generate` → dev containers →

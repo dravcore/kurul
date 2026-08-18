@@ -151,11 +151,16 @@ export class AttachmentController {
   @ApiCreatedResponse({ type: AttachmentSchema })
   @ApiPayloadTooLargeResponse({
     description:
-      'The **file part** is over `ATTACHMENT_MAX_BYTES` (default `26214400` — 25 MiB), which ' +
-      'is a disk ceiling and is unrelated to `REQUEST_BODY_MAX_BYTES`: multipart bodies are ' +
-      'read by multer, which the JSON body limit never sees. A reverse proxy in front of this ' +
-      'API caps the whole request body separately and higher, and answers `413` with something ' +
-      'that is not JSON at all — the response body is what tells the two apart.',
+      "Two distinct ceilings answer with this status, told apart by the envelope's `error` " +
+      'field. `"Payload Too Large"`: the **file part** is over `ATTACHMENT_MAX_BYTES` (default ' +
+      '`26214400` — 25 MiB), which is a disk ceiling and is unrelated to ' +
+      '`REQUEST_BODY_MAX_BYTES`: multipart bodies are read by multer, which the JSON body ' +
+      'limit never sees. `"Attachment Quota Exceeded"`: the file fits on its own but would ' +
+      "push the workspace's or the instance's stored FILE bytes past a configured quota " +
+      '(`ATTACHMENT_WORKSPACE_QUOTA_BYTES` / `ATTACHMENT_INSTANCE_QUOTA_BYTES`, unset by ' +
+      'default — ADR 0027). A reverse proxy in front of this API caps the whole request body ' +
+      'separately and higher, and answers `413` with something that is not JSON at all — the ' +
+      'response body is what tells the layers apart.',
     type: ErrorEnvelopeSchema,
   })
   @ApiUnsupportedMediaTypeResponse({

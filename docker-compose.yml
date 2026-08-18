@@ -451,6 +451,13 @@ services:
       # produces a 413 logged as a successful proxied request in one direction and logged
       # nowhere at all in the other (ADR 0022, ADR 0024).
       ATTACHMENT_MAX_BYTES: ${ATTACHMENT_MAX_BYTES:-26214400}
+      # Storage quotas (docs/decisions/0027-attachment-quotas.md): summed FILE bytes per
+      # workspace and instance-wide. Blank = unlimited, the pre-quota behaviour. Passed through
+      # for the same reason every other limit here is — a ceiling that silently ignores its own
+      # variable is worse than one nobody can change. See .env.example for why the instance one
+      # is worth setting: this volume shares a disk budget with everything else on the host.
+      ATTACHMENT_WORKSPACE_QUOTA_BYTES: ${ATTACHMENT_WORKSPACE_QUOTA_BYTES:-}
+      ATTACHMENT_INSTANCE_QUOTA_BYTES: ${ATTACHMENT_INSTANCE_QUOTA_BYTES:-}
       # The Trello importer's own ceiling, passed through for the same reason
       # REQUEST_BODY_MAX_BYTES above is: a limit that silently ignores its own variable is worse
       # than one nobody can change. It measures heap rather than disk and is unrelated to
