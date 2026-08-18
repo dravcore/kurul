@@ -419,11 +419,11 @@ portlarını yayınlamaz. Tamamını bir domain'e taşımak için `.env`'de
 `SITE_URL=https://kurul.example.com` ayarlayın; bu aynı zamanda otomatik HTTPS'i de açar —
 SMTP ve yedekler dahil adım adım rehber: [Self-hosting](self-hosting.md).
 
-`docker-compose.yml`'de `api` ve `web`, hem `image:` hem `build:` bildirir. Her etiketli
-release ikisini de GHCR'a yayınlar (`.github/workflows/release-images.yml`, `linux/amd64` +
-`linux/arm64`), böylece `pull` hazır build edilmiş imajı çeker, ardından gelen `up -d` de
-onu başlatır — lokal build yok, `pnpm install` yok, Docker layer cache ısıtması yok. Belirli
-bir release'i `latest` yerine sabitlemek için `.env`'de `TAG` ayarlayın:
+`docker-compose.yml`'de `api`, `web` ve `migrate`, üçü de hem `image:` hem `build:` bildirir.
+Her etiketli release üçünü de GHCR'a yayınlar (`.github/workflows/release-images.yml`,
+`linux/amd64` + `linux/arm64`), böylece `pull` hazır build edilmiş imajı çeker, ardından gelen
+`up -d` de onu başlatır — lokal build yok, `pnpm install` yok, Docker layer cache ısıtması yok.
+Belirli bir release'i `latest` yerine sabitlemek için `.env`'de `TAG` ayarlayın:
 
 ```bash
 TAG=v0.2.0   # release-images.yml'in yayınladığı bir tag ile eşleşmeli; liste için `git tag -l`
@@ -438,11 +438,14 @@ aynı kaynak build'i. `docker compose up --build` (veya `up -d --build`) bilinç
 etmek için (örn. bir Dockerfile'ı düzenledikten sonra veya `api`/`web`'de yayınlanmamış bir
 değişikliği test ederken) değişmeden çalışmaya devam eder.
 
-Tek istisna `migrate`: `image:` eşleniği yok (neden olmadığı `docker-compose.yml`'de yanındaki
-yorumda açıklanıyor), dolayısıyla her zaman kaynaktan build eder — `api`/`web`'i GHCR'dan
-çeken bir `docker compose up -d` bile bu tek servisin build maliyetini bir kez öder. Kapsam
-gerekçesinin tamamı için bkz.
-[denetim bulgusu OPS-04](https://github.com/dravcore/kurul/issues/126).
+`migrate` eskiden tek istisnaydı: `image:` eşleniği yoktu, dolayısıyla her zaman kaynaktan
+build ediyordu — [denetim bulgusu OPS-04](https://github.com/dravcore/kurul/issues/126)'ün
+bilinçli seçtiği, ama build edilecek bir kaynak ağacı hiç indirmeyen
+[docs/self-hosting.md](self-hosting.md)'deki curl tabanlı kurulumu tamamen kırdığı ortaya
+çıkan bir kapsamdı (denetim bulgusu OPS-01). Artık `api`/`web` ile aynı `image:` + `build:`
+çiftini taşıyor ve `ghcr.io/dravcore/kurul-migrate`, v0.2.0'dan sonraki ilk sürümden itibaren
+yayınlanıyor — `TAG=v0.2.0` veya daha eskisinde çekilecek böyle bir imaj yoktur ve servis
+tam eskisi gibi kaynaktan build eder.
 
 ### İki API imajı ne kadar yer kaplıyor
 
