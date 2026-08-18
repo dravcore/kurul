@@ -592,9 +592,9 @@ olmayan üçüncü bir limit de öyle. **Hangisinin reddettiğini cevap gövdesi
 | Aldığınız cevap                                    | Reddeden | Anlamı                                                            |
 | -------------------------------------------------- | -------- | ----------------------------------------------------------------- |
 | `statusCode` taşıyan **JSON** gövdeli `413`        | API      | tasarlandığı gibi — dosya `ATTACHMENT_MAX_BYTES`'ı aşıyor         |
-| `error: "Attachment Quota Exceeded"` taşıyan `413` | API      | dosya sığıyor, depolama sığmıyor — bir kota dolu (yukarıya bakın) |
 | **Boş** gövdeli `413` (`Content-Length: 0`)        | proxy    | gövde proxy'nin tavanını aştı; bu kaba kesim                      |
 | `Request body is too large` yazan JSON `413`       | API      | yükleme bile değil — `REQUEST_BODY_MAX_BYTES`'ı aşan JSON gövde   |
+| `error: "Attachment Quota Exceeded"` taşıyan `413` | API      | dosya sığıyor, depolama sığmıyor — bir kota dolu (yukarıya bakın) |
 
 Birinci satır, boyutu aşan bir ek için normal cevaptır ve kullanıcının bir şey yapabileceği
 cevaptır: limiti adlandırır. İkincisi, proxy'nin gövdeyi API hiç görmeden reddetmesidir —
@@ -607,8 +607,13 @@ API'ninki neden 25" bölümüne bakın).
 sınırlar ve hiçbir attachment oradan geçmez. Bunu görüyorsanız ne storage'ınızda ne proxy'nizde
 yanlış bir şey var; bir istek yalnızca API'nin kabul ettiğinden fazla JSON göndermiştir.
 
-Bir dördüncüsü daha var ve onu yalnızca tek bir uç üretebilir:
-`POST /workspaces/…/imports/trello` üzerindeki bir `413`, yukarıdaki üçünden hiçbiri değil,
+Dördüncü satır ise başka bir başarısızlıktır: dosya `ATTACHMENT_MAX_BYTES`'ın altındadır, ama onu
+saklamak bir workspace'i ya da instance'ı kendi kotasının üzerine çıkarır. Boyutlandırma için
+yukarıdaki "Attachment depolaması siz sınırlamadıkça sınırsızdır ve Postgres'in diskini paylaşır"
+bölümüne bakın: `ATTACHMENT_WORKSPACE_QUOTA_BYTES` ve `ATTACHMENT_INSTANCE_QUOTA_BYTES`.
+
+Bir beşincisi daha var ve onu yalnızca tek bir uç üretebilir:
+`POST /workspaces/…/imports/trello` üzerindeki bir `413`, yukarıdaki dördünden hiçbiri değil,
 `TRELLO_IMPORT_MAX_BYTES`'tır (20 MiB). Ayırt eden şey cevap zarfındaki `path` alanıdır. Kullanıcı
 bunu 20 MiB'ın **altındaki** bir export'ta alıyorsa gövdeyi önce proxy kesmiştir ve bakılacak tavan
 proxy'ninkidir.

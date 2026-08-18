@@ -582,9 +582,9 @@ to do with uploads. **The response body is what says which one did it**:
 | What you get back                                  | Who rejected it | What it means                                                    |
 | -------------------------------------------------- | --------------- | ---------------------------------------------------------------- |
 | `413` with a **JSON** body carrying `statusCode`   | the API         | working as designed — the file is over `ATTACHMENT_MAX_BYTES`    |
-| `413` JSON, `error: "Attachment Quota Exceeded"`   | the API         | the file fits, the storage doesn't — a quota is full (see below) |
 | `413` with an **empty** body (`Content-Length: 0`) | the proxy       | the body was over the proxy's ceiling, which is the coarse cut   |
 | `413` JSON reading `Request body is too large`     | the API         | not an upload at all — a JSON body over `REQUEST_BODY_MAX_BYTES` |
+| `413` JSON, `error: "Attachment Quota Exceeded"`   | the API         | the file fits, the storage doesn't — a quota is full (see above) |
 
 The first row is the normal answer for an oversized attachment, and the one a user can act on:
 it names the limit. The second is the proxy refusing a body before the API ever saw it — correct
@@ -596,8 +596,13 @@ The third row is a different limit that happens to share the status code: `REQUE
 and no attachment ever passes through it. If you see it, nothing about your storage or your proxy
 is misconfigured — some request simply sent more JSON than the API accepts.
 
-There is a fourth, and only one endpoint can produce it: a `413` on
-`POST /workspaces/…/imports/trello` is `TRELLO_IMPORT_MAX_BYTES` (20 MiB), not any of the three
+The fourth row is a different failure again: the file is under `ATTACHMENT_MAX_BYTES`, but storing
+it would push a workspace or the instance over its quota. See "Attachment storage is unbounded
+until you cap it, and it shares Postgres's disk" above for sizing `ATTACHMENT_WORKSPACE_QUOTA_BYTES`
+and `ATTACHMENT_INSTANCE_QUOTA_BYTES`.
+
+There is a fifth, and only one endpoint can produce it: a `413` on
+`POST /workspaces/…/imports/trello` is `TRELLO_IMPORT_MAX_BYTES` (20 MiB), not any of the four
 above. The route in the response envelope's `path` is what tells it apart. If a user hits it on an
 export **under** 20 MiB, the proxy cut the body first and the ceiling to look at is the proxy's.
 
