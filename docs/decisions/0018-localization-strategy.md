@@ -119,9 +119,9 @@ There is no `[locale]` path segment and no i18n middleware. Alongside that:
   exists and matches English key for key. No data migration, and no `User.locale` backfill —
   the column stays nullable, and null keeps meaning "follow the browser".
 - `GET /me` reads `User.locale` from the database rather than from the session. Better Auth
-  caches the session user in a cookie for five minutes, and `/me` is what the web's chain
+  caches the session user in a cookie for 60 seconds, and `/me` is what the web's chain
   consults, so a session-carried locale would leave the interface in the old language for up to
-  five minutes after the user changed it.
+  60 seconds after the user changed it.
 - **§4's condition is met: Turkish ships.** The English interface was complete, so
   `messages/tr.json` was written against it — 486 keys, the same key set, the same ICU
   arguments. Seed column names gained a `tr` row (`Yapılacak / Devam Ediyor / Bitti`) and both

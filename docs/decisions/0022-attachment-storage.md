@@ -134,7 +134,7 @@ tenant isolation. Skipping it costs specifically: `@Public()` leaves `request.us
 makes `WorkspaceGuard` throw before it can check membership, so `@WorkspaceScoped()` becomes
 unusable and the tenant check becomes a hand-written copy of `workspaceMember.findUnique` —
 including the 404-not-403 rule that keeps attachment existence from leaking. It also has no
-revocation: a removed member's session stops working within the five-minute cookie cache, while
+revocation: a removed member's session stops working within the 60-second cookie cache, while
 a distributed signed URL stays valid until its TTL expires. In the published image's topology —
 one origin, `/api` path, `SameSite=Lax` — cookies ride along on `<img src="/api/…">` and
 `<a download>` without any of that, so the advantage a signed URL exists to provide is already

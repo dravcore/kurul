@@ -17,7 +17,7 @@ export class AuthService {
    * The signed-in user as the web sees them.
    *
    * `locale` costs a primary-key lookup rather than riding along on the session, because the
-   * session user is cached in a cookie for five minutes and this endpoint is what the web's
+   * session user is cached in a cookie for 60 seconds and this endpoint is what the web's
    * locale resolution chain reads — a stale value here means the interface does not change
    * language until the cache expires. See `LocaleService`.
    */

@@ -235,6 +235,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the new limits — the sizing is derived from the request/attachment ceilings already documented
   in `.env.example`, not measured under load.
 
+- **`session.cookieCache.maxAge` (`api/src/auth/auth.ts`) dropped from 5 minutes to 60
+  seconds**, shrinking the window in which a browser can keep presenting a session Better Auth
+  has already stopped considering valid in the database. That window is what lets a revoked
+  session outlive the action that revoked it: a password change, an instance administrator
+  force-deleting an account, or `Session` rows cleared to recover from a leaked `session_data`
+  cookie all stayed live for up to five minutes before this change (SEC-01, 2026-08-18 audit).
+  The cache itself stays on — it still saves the database read `session.cookieCache` was added
+  for on every authenticated request — just for a fifth as long: at self-host scale, one DB read
+  per user per minute is noise, while a 5× smaller revocation window matters on every one of
+  those flows. Not exposed as an env knob on purpose; the repo already resists knob
+  proliferation and nobody has asked to tune this — the trigger for adding one would be a
+  deployment where the per-minute read itself measurably hurts, not a guess that one might
+  exist. Every doc, comment and test that quoted the old five-minute figure — `docs/architecture.md`
+  §9.2 and its `docs/tr/` mirror, ADR 0018, ADR 0022, and a one-line dated update note on
+  [ADR 0026](docs/decisions/0026-account-deletion-anonymisation.md) (and their `docs/tr/`
+  mirrors), plus the API/e2e/web comments and tests that referenced it — is updated to 60
+  seconds alongside the code; ADR 0026's own historical narrative is left as written.
+
 ## [0.2.0] - 2026-08-16
 
 ### Changed

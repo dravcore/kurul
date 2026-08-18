@@ -412,13 +412,13 @@ contract, not a transient.** It means some code disconnected a client directly i
 registering it. Any future client that borrows the shared pool must call
 `registerPoolConsumer`.
 
-### 9.2 Session revocation lags by up to five minutes; role revocation does not
+### 9.2 Session revocation lags by up to 60 seconds; role revocation does not
 
-Better Auth is configured with `session.cookieCache` at `maxAge: 5 * 60`
+Better Auth is configured with `session.cookieCache` at `maxAge: 60`
 (`api/src/auth/auth.ts`). The signed session cookie is trusted without a database round trip
 until it expires, which removes one query from every authenticated request.
 
-The cost is precise: **revoking a session takes effect up to 300 seconds late.** Deleting the
+The cost is precise: **revoking a session takes effect up to 60 seconds late.** Deleting the
 session row does not invalidate a cookie already in a browser's possession; that cookie
 remains accepted until its cache window lapses.
 
@@ -426,14 +426,14 @@ What is _not_ affected is more important than what is:
 
 | Change                                 | Takes effect                                                                                    |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Session revoked / signed out elsewhere | Up to 5 minutes late — the cookie is trusted until its cache expires                            |
+| Session revoked / signed out elsewhere | Up to 60 seconds late — the cookie is trusted until its cache expires                           |
 | Role changed (e.g. ADMIN → GUEST)      | **Immediately** — `WorkspaceGuard` reads `WorkspaceMember` from the database on every request   |
 | Removed from a workspace               | **Immediately** — same guard, same read; the membership row is gone and the request 404s        |
 | Email verified                         | Immediately — `autoSignInAfterVerification` rewrites the cookie, which is why that option is on |
 
 So the window is a _session-identity_ window, not an _authorization_ window. A demoted or
-ejected member cannot act on their old role for five minutes; only a signed-out browser can
-keep reading for up to five minutes with a cookie it already held. That asymmetry is what
+ejected member cannot act on their old role for 60 seconds; only a signed-out browser can
+keep reading for up to 60 seconds with a cookie it already held. That asymmetry is what
 makes the trade acceptable at this scale, and it exists because the guard was deliberately
 not allowed to trust anything cached.
 
