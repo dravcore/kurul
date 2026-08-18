@@ -3,6 +3,8 @@
 Put Kurul on a server, on your domain, with HTTPS and working email. Everything below is
 one page on purpose; budget about an hour, most of it waiting for DNS.
 
+> 🌐 English (canonical) | [Türkçe](tr/self-hosting.md)
+
 There is no build step. `docker compose pull` fetches images published for every release, and
 the same image works on every domain — the API URL is not compiled into it (see
 [Why there is no rebuild](#why-there-is-no-rebuild) if you want the reasoning).
@@ -73,8 +75,11 @@ SMTP_SECURE=false                              # true only for port 465
 MAIL_FROM=Kurul <kurul@example.com>
 ```
 
-Generate the two secrets with `openssl rand -hex 32`. Use `-hex`, not `-base64`: a base64
-string can contain `/`, and both values end up inside a URL where a slash truncates it.
+Generate both secrets with `openssl rand -hex 32`. `POSTGRES_PASSWORD` is embedded directly in
+a connection URL, where a `/` from `-base64` output would truncate it — `-hex`'s alphabet
+(`0-9a-f`) has none. `BETTER_AUTH_SECRET` is only ever byte-compared, so it carries no such
+constraint, but generating it with `-hex` too means one generator to remember instead of a
+per-variable rule.
 
 `SITE_URL` carries the scheme because that is what decides whether Caddy serves plain HTTP or
 obtains a certificate. `https://…` switches automatic HTTPS on. `http://localhost` (the
