@@ -781,6 +781,9 @@ describe('Account deletion and anonymisation (e2e)', () => {
     it('lets a named instance administrator execute a request for somebody who cannot', async () => {
       const seed = await seedContentfulUser();
       process.env[INSTANCE_ADMIN_EMAILS_ENV] = seed.keeper.email;
+      // `InstanceAdminGuard` requires `emailVerified` as well as list membership — a real
+      // operator's account has been through mailbox verification (see the guard's doc comment).
+      await confirmEmail(app, prisma, seed.keeper);
 
       const previewResponse = await seed.keeper.agent
         .get(`/instance/users/${seed.departingId}/deletion-preview`)
@@ -808,6 +811,7 @@ describe('Account deletion and anonymisation (e2e)', () => {
     it('answers 404 for an account that has already been deleted', async () => {
       const seed = await seedContentfulUser();
       process.env[INSTANCE_ADMIN_EMAILS_ENV] = seed.keeper.email;
+      await confirmEmail(app, prisma, seed.keeper);
 
       await seed.keeper.agent
         .delete(`/instance/users/${seed.departingId}`)
