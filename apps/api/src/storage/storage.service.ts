@@ -31,6 +31,16 @@ export class StorageService implements OnModuleDestroy {
     return getStorageConfig().maxBytes;
   }
 
+  /** Per-workspace ceiling on stored FILE bytes; `0` means unlimited (ADR 0027). */
+  get workspaceQuotaBytes(): number {
+    return getStorageConfig().workspaceQuotaBytes;
+  }
+
+  /** Instance-wide ceiling on stored FILE bytes; `0` means unlimited (ADR 0027). */
+  get instanceQuotaBytes(): number {
+    return getStorageConfig().instanceQuotaBytes;
+  }
+
   /**
    * The configured backend, or the 503 that says this deployment stores nothing.
    *

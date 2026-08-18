@@ -38,6 +38,7 @@ Kurul, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğunluk
 | [0024](0024-attachment-kinds-and-serving-policy.md)    | Dosya Eki Tipleri ve Servis Politikası: FILE ya da LINK, İki Katmanda Tek Boyut Sayısı, Yalnız Görsellerde Inline | Kabul edildi                                          | 2026-08-15 |
 | [0025](0025-trello-import-mapping.md)                  | Trello Import Eşlemesi: Hiçbir Şey Tahmin Edilmez, Gelmeyen Her Şey Sayılır                                       | Kabul edildi                                          | 2026-08-15 |
 | [0026](0026-account-deletion-anonymisation.md)         | Hesap Silme: `User` Satırını Yerinde Anonimleştir, Sahip Olunan Workspace Kararını Akışın İçinde Sor              | Kabul edildi                                          | 2026-08-15 |
+| [0027](0027-attachment-quotas.md)                      | Dosya Eki Depolama Kotaları: Workspace Başına ve Instance Geneli Yumuşak Bayt Tavanları                           | Kabul edildi                                          | 2026-08-18 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 

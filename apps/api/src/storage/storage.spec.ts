@@ -14,7 +14,12 @@ import { DEFAULT_ATTACHMENT_MAX_BYTES, readStorageConfig } from './storage-confi
  * `STORAGE_PATH` after something has already read it would otherwise be reading a backend
  * built from the previous value.
  */
-const VARS = ['STORAGE_PATH', 'ATTACHMENT_MAX_BYTES'];
+const VARS = [
+  'STORAGE_PATH',
+  'ATTACHMENT_MAX_BYTES',
+  'ATTACHMENT_WORKSPACE_QUOTA_BYTES',
+  'ATTACHMENT_INSTANCE_QUOTA_BYTES',
+];
 
 describe('storage configuration', () => {
   const original = new Map(VARS.map((name) => [name, process.env[name]]));
@@ -92,8 +97,34 @@ describe('storage configuration', () => {
     const dir = await createTempStorageDir();
     dirs.push(dir);
 
-    expect(createStorageBackend({ disk: undefined, maxBytes: 1 })).toBeUndefined();
-    expect(createStorageBackend({ disk: { root: dir }, maxBytes: 1 })?.persistsFiles).toBe(true);
+    const quotas = { workspaceQuotaBytes: 0, instanceQuotaBytes: 0 };
+    expect(createStorageBackend({ disk: undefined, maxBytes: 1, ...quotas })).toBeUndefined();
+    expect(
+      createStorageBackend({ disk: { root: dir }, maxBytes: 1, ...quotas })?.persistsFiles,
+    ).toBe(true);
+  });
+
+  it('defaults both storage quotas to 0 — unlimited, the pre-quota behaviour', () => {
+    expect(getStorageConfig().workspaceQuotaBytes).toBe(0);
+    expect(getStorageConfig().instanceQuotaBytes).toBe(0);
+  });
+
+  it('reads both quotas from the environment', () => {
+    process.env.ATTACHMENT_WORKSPACE_QUOTA_BYTES = '1024';
+    process.env.ATTACHMENT_INSTANCE_QUOTA_BYTES = '4096';
+    expect(getStorageConfig().workspaceQuotaBytes).toBe(1024);
+    expect(getStorageConfig().instanceQuotaBytes).toBe(4096);
+  });
+
+  it('refuses a negative quota at boot, naming the variable', () => {
+    // `0` means unlimited (the retention windows' spelling); a negative value would read as a
+    // quota that is always exceeded, so it is a configuration error rather than a clamp.
+    process.env.ATTACHMENT_WORKSPACE_QUOTA_BYTES = '-1';
+    expect(() => getStorageConfig()).toThrow(/ATTACHMENT_WORKSPACE_QUOTA_BYTES/);
+
+    delete process.env.ATTACHMENT_WORKSPACE_QUOTA_BYTES;
+    process.env.ATTACHMENT_INSTANCE_QUOTA_BYTES = '-1';
+    expect(() => readStorageConfig()).toThrow(/ATTACHMENT_INSTANCE_QUOTA_BYTES/);
   });
 
   it('rebuilds after a reset, so a changed STORAGE_PATH is actually read again', async () => {

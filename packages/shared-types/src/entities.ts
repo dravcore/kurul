@@ -158,6 +158,17 @@ export const AttachmentKind = {
 export type AttachmentKind = (typeof AttachmentKind)[keyof typeof AttachmentKind];
 
 /**
+ * The `error` field of the 413 an upload answers when a storage quota would be exceeded
+ * (ADR 0027).
+ *
+ * The per-file size limit answers 413 too, so the status code alone cannot say which ceiling
+ * was hit — and `docs/api-conventions.md#errors` tells clients to branch on `statusCode` and
+ * `error`, never on `message`. This string is that branch, shared so the API that writes it and
+ * the web that reads it cannot drift.
+ */
+export const ATTACHMENT_QUOTA_ERROR = 'Attachment Quota Exceeded';
+
+/**
  * One attachment on a task.
  *
  * The three FILE-only fields are `null` on a `LINK` and `url` is `null` on a `FILE`; `kind` is

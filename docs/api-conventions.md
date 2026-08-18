@@ -285,21 +285,21 @@ Action segments are the exception and each one needs a reason. Do not invent
 genuinely the operation (reordering an entire column, for example). A `PATCH` that omits a
 field leaves it untouched; sending `null` explicitly clears a nullable field.
 
-| Status                       | When                                                                                                                                        |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `200 OK`                     | Successful read, update, or action                                                                                                          |
-| `201 Created`                | Resource created; body is the created resource                                                                                              |
-| `204 No Content`             | Successful delete; empty body                                                                                                               |
-| `400 Bad Request`            | Malformed request or validation failure                                                                                                     |
-| `401 Unauthorized`           | Missing or invalid session                                                                                                                  |
-| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient                                                                                   |
-| `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                                 |
-| `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                   |
-| `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, an upload is over `ATTACHMENT_MAX_BYTES`, or an import is over `TRELLO_IMPORT_MAX_BYTES` |
-| `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted   |
-| `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                   |
-| `429 Too Many Requests`      | Rate limited                                                                                                                                |
-| `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                               |
+| Status                       | When                                                                                                                                                                                                                                                                 |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200 OK`                     | Successful read, update, or action                                                                                                                                                                                                                                   |
+| `201 Created`                | Resource created; body is the created resource                                                                                                                                                                                                                       |
+| `204 No Content`             | Successful delete; empty body                                                                                                                                                                                                                                        |
+| `400 Bad Request`            | Malformed request or validation failure                                                                                                                                                                                                                              |
+| `401 Unauthorized`           | Missing or invalid session                                                                                                                                                                                                                                           |
+| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient                                                                                                                                                                                                            |
+| `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                                                                                                                                                          |
+| `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                                                                                                                                            |
+| `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, an upload is over `ATTACHMENT_MAX_BYTES` or would exceed a storage quota (its `error` says which — see [File uploads and downloads](#file-uploads-and-downloads)), or an import is over `TRELLO_IMPORT_MAX_BYTES` |
+| `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted                                                                                                                            |
+| `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                                                                                                                                            |
+| `429 Too Many Requests`      | Rate limited                                                                                                                                                                                                                                                         |
+| `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                                                                                                                                                        |
 
 **Cross-workspace access returns `404`, not `403`.** A `403` would confirm that the resource
 exists, which leaks information across the tenant boundary. `403` is reserved for a
@@ -418,6 +418,17 @@ a multipart envelope adds a few hundred bytes on top of the file. Both answer `4
 response body is what tells them apart: the API's `413` is the error envelope above, the
 proxy's is not JSON at all. Which number to change, and the ordering rule between them, are in
 [self-hosting.md](self-hosting.md#bringing-your-own-reverse-proxy).
+
+**Storage quotas answer `413` too, with their own `error`.** When
+`ATTACHMENT_WORKSPACE_QUOTA_BYTES` or `ATTACHMENT_INSTANCE_QUOTA_BYTES` is set (both default to
+unlimited — [ADR 0027](decisions/0027-attachment-quotas.md)), an upload whose bytes would push
+the summed size of stored FILE attachments past the ceiling is rejected before anything is
+written. The envelope carries `error: "Attachment Quota Exceeded"` where the per-file limit's
+carries `"Payload Too Large"` — the status alone cannot say whether to shrink the file or free
+up space, and clients branch on `statusCode` and `error`, never on `message` (see
+[Errors](#errors)). A file that fills the quota exactly is accepted; the ceiling is inclusive,
+like the per-file one. LINK attachments store no bytes: they neither count against a quota nor
+are refused by a full one.
 
 **Downloads.** `GET .../attachments/:attachmentId/content` streams the bytes with the **sniffed**
 media type (never the one the client declared at upload), `Content-Length`, and

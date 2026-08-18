@@ -156,6 +156,22 @@ döngüsü içindir. Değiştirmek isteyebileceğiniz tek değer `ATTACHMENT_MAX
 [aşağıdaki proxy sözleşmesini](#kendi-reverse-proxynizi-kullanmak) okuyun: ters proxy, onunla
 birlikte hareket etmesi gereken ayrı ve bilinçli olarak daha yüksek bir tavan taşıyor.
 
+**Attachment depolaması siz sınırlamadıkça sınırsızdır ve Postgres'in diskini paylaşır.** Dosya
+başına limit ve IP başına yükleme throttle'ı her _isteği_ sınırlar, toplamı değil:
+varsayılanlarla, kimliği doğrulanmış bir istemci istediği kadar süre boyunca dakikada yaklaşık
+500 MiB disk harcayabilir ve `attachment_data` volume'ü veritabanıyla aynı host dosya sisteminde
+yaşar — dolu bir disk yalnız yüklemeleri değil, Postgres'i durdurur. Toplamı iki değişken sınırlar
+([ADR 0027](decisions/0027-attachment-quotas.md)): `ATTACHMENT_WORKSPACE_QUOTA_BYTES` (workspace
+başına saklanan dosya baytlarının toplamı) ve `ATTACHMENT_INSTANCE_QUOTA_BYTES` (instance'ın
+tamamı). İkisi de varsayılan olarak sınırsızdır — diskini önemsediğiniz her makinede instance
+olanını volume'ün gerçek boş alanının altına ayarlayın. Boyutlandırırken bilin: kotalar
+**yumuşaktır** (eşzamanlı yüklemeler en fazla birer dosya aşabilir; birkaç
+`ATTACHMENT_MAX_BYTES` kadar pay bırakın) ve silinen dosyalar baytlarını gecelik orphan
+süpürmesinin bekleme süresi geçene kadar tutar; yani disk kullanımı, kota muhasebesini kısa süre
+aşabilir. Bağlantı ekleri bayt saklamaz ve hiç sayılmaz. Reddedilen yükleme, JSON gövdesi
+`error: "Attachment Quota Exceeded"` taşıyan bir `413`'tür — bkz.
+[413'leri birbirinden ayırmak](#413leri-birbirinden-ayırmak).
+
 **Trello import'u için de burada bir satır gerekmiyor.** `TRELLO_IMPORT_MAX_BYTES` (varsayılan
 `20971520`, 20 MiB) importer'ın kabul edeceği en büyük board export'udur ve pakete dahil Compose
 dosyası onu zaten geçiriyor. Dokunmadan önce bilmeye değer üç şey var. Bu bir **bellek** tavanıdır,
@@ -573,11 +589,12 @@ megabayttan büyük her eki reddeder.
 Her iki katman da boyutu aşan bir yüklemeye `413` ile cevap verir — ve yüklemelerle hiç ilgisi
 olmayan üçüncü bir limit de öyle. **Hangisinin reddettiğini cevap gövdesi söyler**:
 
-| Aldığınız cevap                              | Reddeden | Anlamı                                                          |
-| -------------------------------------------- | -------- | --------------------------------------------------------------- |
-| `statusCode` taşıyan **JSON** gövdeli `413`  | API      | tasarlandığı gibi — dosya `ATTACHMENT_MAX_BYTES`'ı aşıyor       |
-| **Boş** gövdeli `413` (`Content-Length: 0`)  | proxy    | gövde proxy'nin tavanını aştı; bu kaba kesim                    |
-| `Request body is too large` yazan JSON `413` | API      | yükleme bile değil — `REQUEST_BODY_MAX_BYTES`'ı aşan JSON gövde |
+| Aldığınız cevap                                    | Reddeden | Anlamı                                                            |
+| -------------------------------------------------- | -------- | ----------------------------------------------------------------- |
+| `statusCode` taşıyan **JSON** gövdeli `413`        | API      | tasarlandığı gibi — dosya `ATTACHMENT_MAX_BYTES`'ı aşıyor         |
+| `error: "Attachment Quota Exceeded"` taşıyan `413` | API      | dosya sığıyor, depolama sığmıyor — bir kota dolu (yukarıya bakın) |
+| **Boş** gövdeli `413` (`Content-Length: 0`)        | proxy    | gövde proxy'nin tavanını aştı; bu kaba kesim                      |
+| `Request body is too large` yazan JSON `413`       | API      | yükleme bile değil — `REQUEST_BODY_MAX_BYTES`'ı aşan JSON gövde   |
 
 Birinci satır, boyutu aşan bir ek için normal cevaptır ve kullanıcının bir şey yapabileceği
 cevaptır: limiti adlandırır. İkincisi, proxy'nin gövdeyi API hiç görmeden reddetmesidir —

@@ -46,8 +46,10 @@ export const TASK_SEARCH_RATE_LIMIT = 30;
  * This ceiling is named as insufficient rather than pretended to be enough (ADR 0022): the
  * throttler counts requests per IP per route, which is the wrong unit twice here — twenty
  * 25 MiB uploads and twenty 10 kB uploads spend the same budget, and an office behind one NAT
- * shares a bucket. The real ceiling is `limits.fileSize` plus a per-workspace quota that does
- * not exist yet. Overriding `ThrottlerGuard.getTracker` is deliberately not attempted.
+ * shares a bucket. The real ceiling is `limits.fileSize` plus the storage quotas
+ * (`ATTACHMENT_WORKSPACE_QUOTA_BYTES` / `ATTACHMENT_INSTANCE_QUOTA_BYTES`, ADR 0027) — which
+ * are unset by default, so on an unconfigured instance this per-IP number is still the only
+ * brake. Overriding `ThrottlerGuard.getTracker` is deliberately not attempted.
  */
 export const ATTACHMENT_UPLOAD_RATE_LIMIT = 20;
 
