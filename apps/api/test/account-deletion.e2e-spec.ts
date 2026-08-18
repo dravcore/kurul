@@ -686,6 +686,53 @@ describe('Account deletion and anonymisation (e2e)', () => {
       expect(survivor?.status).toBe('pending');
       expect(survivor?.workspaceId).toBe(otherWorkspace.id);
     });
+
+    /**
+     * The same wildcard risk as the invitation sweep above, on the other `contains` this flow
+     * runs: `Verification.identifier` is swept with plain `contains` (no `mode`), which Prisma
+     * compiles to the same unescaped `LIKE` on Postgres — confirmed empirically, see
+     * `escapeLikePattern`'s doc comment. A departing address containing `_` would otherwise
+     * delete a stranger's live verification row too.
+     */
+    it('matches the departing address literally in the Verification sweep — "_" is not a wildcard', async () => {
+      const seed = await seedContentfulUser({
+        departingEmail: `otpwild_${uniqueSuffix()}@test.example.com`,
+      });
+      const address = seed.departing.email;
+      expect(address).toContain('_');
+
+      // Under an unescaped `ILIKE`, `_` matches this row's `-`.
+      const stranger = address.replace('_', '-');
+      expect(stranger).not.toBe(address);
+
+      const [ownRow, strangerRow] = await Promise.all([
+        prisma.verification.create({
+          data: { identifier: address, value: 'own', expiresAt: new Date(Date.now() + 600_000) },
+          select: { id: true },
+        }),
+        prisma.verification.create({
+          data: {
+            identifier: stranger,
+            value: 'stranger',
+            expiresAt: new Date(Date.now() + 600_000),
+          },
+          select: { id: true },
+        }),
+      ]);
+
+      await seed.departing.agent
+        .delete('/me')
+        .send({ confirmEmail: seed.departing.email })
+        .expect(204);
+
+      expect(await prisma.verification.findUnique({ where: { id: ownRow.id } })).toBeNull();
+
+      // The assertion the unescaped predicate failed: a row that only matches the pattern, not
+      // the address, survives.
+      const survivor = await prisma.verification.findUnique({ where: { id: strangerRow.id } });
+      expect(survivor).not.toBeNull();
+      expect(survivor?.identifier).toBe(stranger);
+    });
   });
 
   describe('a workspace the user solely owns', () => {

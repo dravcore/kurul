@@ -11,6 +11,7 @@ import type {
   SoleOwnedWorkspaceDto,
 } from '@kurul/shared-types';
 import type { Prisma } from '../generated/prisma';
+import { escapeLikePattern } from '../common/escape-like';
 import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
 import { redactMentionsOf } from '../common/mentions/redact-mentions';
 import { PrismaService } from '../prisma/prisma.service';
@@ -487,8 +488,18 @@ export class AccountDeletionService {
         // row that does not. Those are covered by their own expiry, which ADR 0020's nightly
         // sweep already enforces — a `reset-password` token outlives its user by at most an
         // hour and carries no address to disclose in the meantime.
+        //
+        // `escapeLikePattern` for the same reason the comment two blocks up rules out
+        // `mode: 'insensitive'` on the invitation delete: plain `contains` compiles to the same
+        // unescaped `LIKE` (empirically confirmed — see `escapeLikePattern`'s doc comment), and
+        // an email local-part is free to contain `_`, a legal RFC 5321 character. Unescaped,
+        // deleting `john_doe@example.com`'s verification rows would also delete
+        // `johnXdoe@example.com`'s — someone else's live token, caught by a pattern that was
+        // never supposed to be a pattern.
         result.verificationsDeleted = (
-          await tx.verification.deleteMany({ where: { identifier: { contains: user.email } } })
+          await tx.verification.deleteMany({
+            where: { identifier: { contains: escapeLikePattern(user.email) } },
+          })
         ).count;
 
         result.membershipsRemoved = (
@@ -637,6 +648,10 @@ export class AccountDeletionService {
    * Paged by `id` rather than read whole: the count is bounded by how often one person was
    * mentioned, which is not bounded by anything in the schema. `contains` is a `LIKE '%…%'` and
    * therefore a scan — accepted, because this runs once per account, ever, off any hot path.
+   *
+   * `userId` is not run through `escapeLikePattern`, unlike the other `contains` calls this
+   * flow makes: it is a `uuid(7)` this service reads out of `User.id`, never text a person
+   * typed, and its alphabet (hex digits and hyphens) cannot contain `%` or `_` to begin with.
    */
   private async redactCommentMentions(
     tx: Prisma.TransactionClient,
