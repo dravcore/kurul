@@ -444,13 +444,25 @@ export class AccountDeletionService {
         // membership itself, which lives in `WorkspaceMember` and `Activity` and never carried
         // the address.
         //
-        // Case-insensitive for the same reason the `confirmEmail` check above is: Better Auth
-        // lower-cases what it stores in this column, `User.email` is whatever was registered,
-        // and a difference in case between the two is not a difference in address. An
-        // equality match would leave the row behind and report success.
+        // **Plain equality on the lower-cased address, and `mode: 'insensitive'` is not an
+        // option here.** Prisma compiles `equals` + `mode: 'insensitive'` on PostgreSQL to
+        // `ILIKE`, and it passes the operand through as a pattern rather than as a literal — so
+        // every `_` and `%` in the departing person's own address becomes a wildcard. Deleting
+        // `john_doe@example.com` would have matched `john.doe@example.com` and
+        // `johnXdoe@example.com` as well, in *every* workspace on the instance, including live
+        // pending grants belonging to people who have nothing to do with this request. A
+        // deletion that widens itself by the shape of the address it was given is worse than
+        // the leak it was closing.
+        //
+        // Lower-casing one side is the whole of the case question, because only one side can be
+        // mixed: this column is written on exactly one path — Better Auth's `create-invitation`
+        // route lower-cases `email` before the adapter writes it, and
+        // `WorkspaceInvitationService.createInvitation` lower-cases it again before calling
+        // that route, which is the same assumption `findPendingInvitations` already reads by.
+        // `User.email` is whatever was registered, so it is the side that gets `toLowerCase()`.
         result.invitationsReceivedDeleted = (
           await tx.workspaceInvitation.deleteMany({
-            where: { email: { equals: user.email, mode: 'insensitive' } },
+            where: { email: user.email.toLowerCase() },
           })
         ).count;
 

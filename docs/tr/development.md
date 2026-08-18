@@ -1143,7 +1143,21 @@ Geri kopyalanabilenler ve kopyalanamayanlar:
 | Mention'ları yeniden yazılmış `Comment` gövdeleri | Evet — eski gövde dump'ta                                                                          |
 | `Activity.payload.targetName`                     | Evet, aynı şekilde                                                                                 |
 | **Bir kararın sildiği workspace**                 | **Yalnızca dump'tan, toptan.** Cascade oldu — board'lar, task'lar, yorumlar, hepsi                 |
+| Adresi taşıyan `WorkspaceInvitation` satırları    | **Yalnızca dump'tan.** Hesaba gönderilmiş her davet silinir — her durumda, her workspace'te        |
 | `Session`                                         | Hayır, gereği de yok: kişi yeniden giriş yapar                                                     |
+
+**Davet satırları bu listedeki en yeni kalem ve silmenin anonimleştirmek yerine gerçekten sildiği
+tek şey.** Tablonun iki tarafına da dokunulur: hesabın _gönderdiği_ bekleyen davetler geri alınır
+(silinmiş bir hesap kimseye kefil olmaya devam edemez) ve hesaba _gönderilmiş_ her davet, hangi
+durumda olursa olsun doğrudan silinir — çünkü o satır, başkasının bir olaya dair kaydı değil,
+ayrılan kişinin kendi iletişim bilgisinin bir kopyasıdır
+([ADR 0026](decisions/0026-account-deletion-anonymisation.md)).
+
+Birini geri kopyalamak neredeyse hiçbir zaman istediğiniz şey değildir: adresi yeniden davet etmek
+taze bir son kullanma tarihiyle taze bir erişim izni üretir — yöneticinin zaten istediği şey budur.
+Dump yalnızca tarihsel soru için okunmaya değer: bu kişi o workspace'e hiç davet edilmiş miydi, kim
+tarafından. Ayrıca gecelik süpürmenin bitmiş davetleri kendi takvimiyle sildiğini unutmayın
+(`INVITATION_RETENTION_DAYS`); o pencereden eski bir dump'ta satır zaten olmayabilir.
 
 **Attachment baytları sağ çıkar** ve üzerlerinde bir saat işliyor. Bu akış dosya sistemine hiç
 dokunmaz, dolayısıyla dosyalar yerinde — ama gecelik orphan süpürmesi, hiçbir satır sahiplenmedi

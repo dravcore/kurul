@@ -465,6 +465,20 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
     // days rather than months. Adding a column to close a gap that size is not worth a
     // migration; an instance whose invitation expiry ever approaches this window is the case to
     // revisit it for.
+    //
+    // **No index for this predicate yet, and that is an open item rather than a precedent.**
+    // The precedent runs the other way: migration `20260814180000_retention_sweep_indexes`
+    // measured every sweep at production-like volume and *added* `Session_expiresAt_idx`,
+    // `Verification_expiresAt_idx` and `UsagePing_createdAt_idx` because those three were
+    // sequential scans paid nightly, forever; it left `Activity` and `Notification` alone only
+    // because their plans showed an existing composite already serving the sweep. The rule ADR
+    // 0020 and `20260814150000_drop_unused_indexes` (DB-07) established is "measure, then add or
+    // drop" — not "sweeps go unindexed". Nothing here has been measured, so what is claimed is
+    // only that `WorkspaceInvitation` is orders of magnitude smaller than those tables (one row
+    // per invitation ever sent, against one per event or per session) and that
+    // `@@index([workspaceId, email, status])` cannot serve this predicate anyway — it constrains
+    // neither `workspaceId` nor `email`, and `createdAt` is not in it. The same measurement is
+    // what should decide, on an instance where this table has grown enough to be worth taking.
     const invitations =
       settings.invitationDays === 0
         ? 0

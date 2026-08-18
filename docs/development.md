@@ -1118,15 +1118,29 @@ docker compose exec -T postgres psql -U kurul -d kurul_recovery \
 
 What can be copied back, and what cannot:
 
-| Row                                            | Recoverable                                                                                  |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `User` (email, name, avatarUrl, locale)        | Yes — `UPDATE "User" SET … WHERE id = …` on the live database, and clear `deletedAt`         |
-| `Account` (the password hash)                  | Yes — copy the row back, or have the person reset their password                             |
-| `WorkspaceMember`                              | Yes, if the workspaces still exist; re-add at the role the `account.deleted` payload records |
-| `Comment` bodies whose mentions were rewritten | Yes — the old body is in the dump                                                            |
-| `Activity.payload.targetName`                  | Yes, same way                                                                                |
-| **A workspace a disposition deleted**          | **Only from the dump, wholesale.** It cascaded — boards, tasks, comments and all             |
-| `Session`                                      | No, and no reason to: the person signs in again                                              |
+| Row                                             | Recoverable                                                                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `User` (email, name, avatarUrl, locale)         | Yes — `UPDATE "User" SET … WHERE id = …` on the live database, and clear `deletedAt`                    |
+| `Account` (the password hash)                   | Yes — copy the row back, or have the person reset their password                                        |
+| `WorkspaceMember`                               | Yes, if the workspaces still exist; re-add at the role the `account.deleted` payload records            |
+| `Comment` bodies whose mentions were rewritten  | Yes — the old body is in the dump                                                                       |
+| `Activity.payload.targetName`                   | Yes, same way                                                                                           |
+| **A workspace a disposition deleted**           | **Only from the dump, wholesale.** It cascaded — boards, tasks, comments and all                        |
+| `WorkspaceInvitation` rows carrying the address | **Only from the dump.** Every invitation addressed to the account is deleted — any state, any workspace |
+| `Session`                                       | No, and no reason to: the person signs in again                                                         |
+
+**The invitation rows are the newest thing on that list, and the only one where the erasure
+deletes rather than anonymises.** Both sides of the table are touched: the pending invitations the
+account had _sent_ are revoked (a deleted account cannot keep vouching for anybody), and every
+invitation _addressed to_ it is deleted outright in any state, because that row is a copy of the
+departing person's own contact details rather than somebody else's record of an event
+([ADR 0026](decisions/0026-account-deletion-anonymisation.md)).
+
+Copying one back is almost never what you want: re-inviting the address issues a fresh grant with
+a fresh expiry, which is what the admin wanted anyway, so the dump is worth reading only for the
+historical question — was this person ever invited to that workspace, and by whom. Note also that
+the nightly sweep deletes finished invitations on its own schedule (`INVITATION_RETENTION_DAYS`),
+so a dump older than that window may not carry the row either.
 
 **Attachment bytes survive**, and there is a clock on them. This flow never touches the
 filesystem, so the files are where they were — but the nightly orphan sweep deletes a stored file
