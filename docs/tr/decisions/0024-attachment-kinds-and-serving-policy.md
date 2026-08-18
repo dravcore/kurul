@@ -2,6 +2,7 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-15
+**Güncellendi:** 2026-08-18 — aşağıdaki kind/nullability değişmezi artık bir CHECK kısıtıyla, `Attachment_kind_fields_check` ile uygulanıyor (`migrations/20260818120000_attachment_kind_check`, ADR 0017'nin kuralı gereği `test/attachment-kind-check.e2e-spec.ts` ile korunuyor): enum böyle bir kısıt olmadan yayınlanmıştı, dolayısıyla "hem `url` hem `storageKey` taşıyan ya da ikisini de taşımayan bir satır" `AttachmentService`'i atlayan her yol için — bu ADR'nin adını andığı toplu içe aktarıcı dahil — hâlâ yazılabilirdi (denetim bulgusu DB-02).
 
 > 🌐 [English (kanonik)](../../decisions/0024-attachment-kinds-and-serving-policy.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 

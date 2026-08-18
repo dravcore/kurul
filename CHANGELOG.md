@@ -17,6 +17,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and moves focus to it on every mount, including a retry that fails with the exact same
   wording.
 
+- **An attachment can no longer be stored half-file and half-link.** `AttachmentKind` was
+  introduced so that `storageKey`, `mimeType`, `size` and `url` would be nullable *because of*
+  `kind` rather than in general ([ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md)),
+  and the schema comment promised that a row carrying both a URL and a storage key — or neither —
+  was unwritable. Nothing enforced it: the four columns were plainly nullable, and the promise
+  held only as long as every writer happened to be `AttachmentService`. The Trello importer is a
+  writer that is not — it bulk-inserts attachment rows with `createMany` — which is the exact
+  case the ADR predicted. A CHECK constraint, `Attachment_kind_fields_check`, now makes the two
+  shapes the only ones the table accepts (audit finding DB-02).
+
+  **The migration validates existing rows rather than grandfathering them**, so an instance that
+  somehow holds a half-written attachment fails the upgrade with the offending constraint named
+  instead of carrying the row forward under a constraint that only applies to future writes.
+  Every row the shipped code can have written satisfies the predicate, so no action is expected
+  on upgrade.
+
 ### Added
 
 - **`pnpm bootstrap` — a fresh clone reaches a running dev loop in one command.**
