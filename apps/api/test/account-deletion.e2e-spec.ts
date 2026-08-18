@@ -530,6 +530,78 @@ describe('Account deletion and anonymisation (e2e)', () => {
       const kept = await prisma.workspaceInvitation.findUnique({ where: { id: accepted.id } });
       expect(kept?.inviterId).toBe(seed.departingId);
     });
+
+    /**
+     * The invitee side of `WorkspaceInvitation`, and the half anonymisation cannot reach
+     * (audit finding DB-01).
+     *
+     * `email` is a literal address in a column of its own — nothing about it is derived from
+     * `User` — so rewriting the `User` row to `deleted-<id>@deleted.invalid` leaves every
+     * invitation ever *sent to* this person still spelling out where they can be reached. The
+     * inviter-side rule above ("pending only") is deliberately not the rule here: an accepted
+     * invitation addressed to the departing user is not somebody else's record of an event, it
+     * is a copy of the departing user's own contact details.
+     */
+    it('removes every invitation addressed to the departing user, in any state', async () => {
+      const seed = await seedContentfulUser();
+      const address = seed.departing.email;
+
+      const invitedRows = await Promise.all(
+        (
+          [
+            // The one they accepted to get here: a record whose only remaining content is the
+            // address.
+            { status: 'accepted', email: address },
+            // Still open — an offer nobody answered.
+            { status: 'pending', email: address },
+            // They said no — and the address is still sitting there.
+            { status: 'rejected', email: address },
+            // Same address, different case. Better Auth lower-cases what it writes here, so
+            // this is a claim about the delete's own predicate rather than about a row the app
+            // produces today: a case difference is not a difference in address.
+            { status: 'canceled', email: address.toUpperCase() },
+          ] as const
+        ).map((row) =>
+          prisma.workspaceInvitation.create({
+            data: {
+              email: row.email,
+              inviterId: seed.keeperId,
+              workspaceId: seed.workspaceId,
+              role: MemberRole.MEMBER,
+              status: row.status,
+              expiresAt: new Date(Date.now() + 86_400_000),
+            },
+            select: { id: true },
+          }),
+        ),
+      );
+      // Four rows in, or "none left afterwards" is a claim about an empty table.
+      expect(invitedRows).toHaveLength(4);
+      expect(
+        await prisma.workspaceInvitation.count({
+          where: { email: { equals: address, mode: 'insensitive' } },
+        }),
+      ).toBe(4);
+
+      await seed.departing.agent
+        .delete('/me')
+        .send({ confirmEmail: seed.departing.email })
+        .expect(204);
+
+      // The address is gone from the table, in every casing.
+      const survivors = await prisma.workspaceInvitation.findMany({
+        where: { email: { equals: address, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      expect(survivors).toHaveLength(0);
+
+      // ...and nothing anywhere else in the table carries it either — the assertion that would
+      // still catch a predicate narrowed to one workspace or one status.
+      const all = await prisma.workspaceInvitation.findMany({ select: { email: true } });
+      for (const row of all) {
+        expect(row.email.toLowerCase()).not.toBe(address.toLowerCase());
+      }
+    });
   });
 
   describe('a workspace the user solely owns', () => {

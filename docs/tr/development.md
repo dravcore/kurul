@@ -122,6 +122,7 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `CLEANUP_ENABLED`                     | `true`                                                            | Gecelik [veri saklama süpürmesi](#veri-saklama) ana anahtarı. Kapalıysa instance kendi saklama politikasını uygulamayı bırakır                                                                                                                                                                                                                                                                                                                                                                              |
 | `NOTIFICATION_RETENTION_DAYS`         | `90`                                                              | Bir bildirimin **okunduktan sonra** saklandığı gün sayısı. Okunmamış bildirimler hangi yaşta olursa olsun silinmez. `0` = sonsuza dek                                                                                                                                                                                                                                                                                                                                                                       |
 | `ACTIVITY_RETENTION_DAYS`             | `365`                                                             | Bir aktivite satırının yazıldıktan sonra saklandığı gün sayısı. `0` = sonsuza dek — yasal denetim izi yükümlülüğünüz varsa bunu kullanın                                                                                                                                                                                                                                                                                                                                                                    |
+| `INVITATION_RETENTION_DAYS`           | `90`                                                              | **Sonuçlanmış** bir davetin, oluşturulduğu andan itibaren saklandığı gün sayısı. Sonuçlanmış = yanıtlanmış (accepted/rejected/canceled) ya da süresi dolmuş; süresi dolmamış `pending` bir davet hangi yaşta olursa olsun silinmez. `0` = sonsuza dek                                                                                                                                                                                                                                                       |
 | `DATABASE_POOL_MAX`                   | `20`                                                              | Paylaşılan `pg` havuzunun Postgres'e açtığı azami eşzamanlı bağlantı sayısı — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                                                |
 | `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                           | Tüm `DATABASE_POOL_MAX` bağlantılar meşgulken bir isteğin havuzdan bağlantı için ne kadar bekleyeceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                      |
 | `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                           | Postgres'in tek bir SQL ifadesini öldürmeden önce ne kadar çalışmasına izin vereceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                                       |
@@ -671,18 +672,32 @@ içindeki column başına render bütçesi bu board'a karşı ölçüldü.
 ## Veri saklama
 
 Kurul artık saklamaya hakkı olmayan satırları siler. Bir BullMQ işi `REDIS_URL` üzerinde
-**günde bir kez** koşar — due-soon taramasıyla aynı mekanizma — ve beş tabloyu, artı attachment
+**günde bir kez** koşar — due-soon taramasıyla aynı mekanizma — ve altı tabloyu, artı attachment
 dizinini süpürür:
 
-| Tablo          | Ne zaman silinir                     | Ayar                                            |
-| -------------- | ------------------------------------ | ----------------------------------------------- |
-| `Session`      | `expiresAt` geçtiğinde               | yok — yapılandırılabilir değil                  |
-| `Verification` | `expiresAt` geçtiğinde               | yok — yapılandırılabilir değil                  |
-| `Notification` | okunmuşsa ve N günden önce okunmuşsa | `NOTIFICATION_RETENTION_DAYS` (varsayılan `90`) |
-| `Activity`     | N günden önce yazılmışsa             | `ACTIVITY_RETENTION_DAYS` (varsayılan `365`)    |
-| `UsagePing`    | N günden önce yazılmışsa             | `ACTIVITY_RETENTION_DAYS` (varsayılan `365`)    |
+| Tablo                 | Ne zaman silinir                              | Ayar                                            |
+| --------------------- | --------------------------------------------- | ----------------------------------------------- |
+| `Session`             | `expiresAt` geçtiğinde                        | yok — yapılandırılabilir değil                  |
+| `Verification`        | `expiresAt` geçtiğinde                        | yok — yapılandırılabilir değil                  |
+| `Notification`        | okunmuşsa ve N günden önce okunmuşsa          | `NOTIFICATION_RETENTION_DAYS` (varsayılan `90`) |
+| `Activity`            | N günden önce yazılmışsa                      | `ACTIVITY_RETENTION_DAYS` (varsayılan `365`)    |
+| `UsagePing`           | N günden önce yazılmışsa                      | `ACTIVITY_RETENTION_DAYS` (varsayılan `365`)    |
+| `WorkspaceInvitation` | sonuçlanmışsa ve N günden önce oluşturulmuşsa | `INVITATION_RETENTION_DAYS` (varsayılan `90`)   |
 
-Altıncı süpürmenin tablosu yok. **Hiçbir satırın sahiplenmediği attachment dosyaları silinir**;
+**Bir davetin "sonuçlanmış" olmasının iki yolu var ve ikisi de sayılır:** birileri yanıtlamıştır
+(`status`, `pending` dışında bir şeydir) ya da `expiresAt`'i geçmiştir. Süresi henüz dolmamış bir
+`pending` davet, birilerinin hâlâ kabul edebileceği canlı bir erişim hakkıdır; bu yüzden hangi
+yaşta olursa olsun silinmez. Pencere `createdAt`'ten ölçülür, çünkü bu tablonun sahip olduğu tek
+zaman damgası odur — `resolvedAt` diye bir alan yok. Bu, kaydı yanıt anından ölçmeye kıyasla bir
+miktar erken siler; fark, bir satırın `pending` kalabileceği süreyle sınırlıdır.
+
+Bu süpürme var, çünkü `WorkspaceInvitation.email` bu şemada kurulumun bir kullanıcısına ait
+olmak zorunda olmayan tek adrestir: hiç kayıt olmayan birini davet edin, silinecek bir hesap
+oluşmaz ve satır o adresi süresiz saklardı. Bir hesabın silinmesi artık o hesaba gönderilmiş her
+daveti de — hangi durumda olursa olsun — kaldırır; bkz.
+[ADR 0026](decisions/0026-account-deletion-anonymisation.md).
+
+Yedinci süpürmenin tablosu yok. **Hiçbir satırın sahiplenmediği attachment dosyaları silinir**;
 bunlar `Workspace → Board → Task → Attachment` zincirinin tümüyle Postgres içinde cascade
 etmesinden doğar: bir board silindiğinde binlerce attachment satırı tek satır uygulama kodu
 koşmadan kaybolabilir, yani byte'ları silecek hiçbir şey çalışmaz. `STORAGE_PATH` tanımsızsa
@@ -704,8 +719,8 @@ saklanmak yerine bir yıl sonra silindiği — [ADR 0020](decisions/0020-data-re
 Bunlardan birini değiştirmeden önce bilinmesi gereken iki şey:
 
 - **Okunmamış bildirimler hangi yaşta olursa olsun silinmez.** Pencere `createdAt`'ten değil,
-  `readAt`'ten ölçülür.
-- Her iki pencere için de **`0` "sonsuza dek sakla" demektir.** Yasal bir denetim izi
+  `readAt`'ten ölçülür. Süresi dolmamış `pending` davetler de aynı muafiyete sahiptir.
+- Her pencere için de **`0` "sonsuza dek sakla" demektir.** Yasal bir denetim izi
   yükümlülüğünüz varsa `ACTIVITY_RETENTION_DAYS=0` yapın. Negatif bir değer kırpılmaz,
   başlangıçta reddedilir — gelecekte bir kesim noktası olurdu ve canlı satırları silerdi.
 
@@ -722,7 +737,9 @@ başka hiçbir şey yok: kimlik yok, payload yok:
   "verifications": 9,
   "notifications": 2140,
   "activities": 0,
-  "usagePings": 0
+  "usagePings": 0,
+  "invitations": 4,
+  "orphanedFiles": 0
 }
 ```
 

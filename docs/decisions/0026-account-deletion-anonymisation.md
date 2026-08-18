@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-15
+**Updated:** 2026-08-18 — the deletion also removes every `WorkspaceInvitation` addressed to the departing user, in any state: `email` is a literal column anonymising the `User` row never touched, so the real address outlived the erasure request (audit finding DB-01).
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0026-account-deletion-anonymisation.md)
 

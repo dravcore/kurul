@@ -2,6 +2,7 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-15
+**Güncellendi:** 2026-08-18 — silme akışı artık ayrılan kullanıcıya gönderilmiş her `WorkspaceInvitation` satırını da — hangi durumda olursa olsun — kaldırıyor: `email` düz bir sütun ve `User` satırını anonimleştirmek ona hiç dokunmuyordu, yani gerçek adres silme talebinden sağ çıkıyordu (denetim bulgusu DB-01).
 
 > 🌐 [English (kanonik)](../../decisions/0026-account-deletion-anonymisation.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 

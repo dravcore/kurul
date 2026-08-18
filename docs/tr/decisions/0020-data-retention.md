@@ -2,6 +2,7 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-14
+**Güncellendi:** 2026-08-18 — `WorkspaceInvitation` altıncı bir pencereyle süpürmeye katıldı, `INVITATION_RETENTION_DAYS` (varsayılan `createdAt`'ten 90 gün, yalnızca sonuçlanmış satırlar): aşağıdaki tablo listesi, şemada bir kullanıcıya ait olmak zorunda olmayan tek adresi atlıyordu (denetim bulgusu DB-01).
 
 > 🌐 [English (kanonik)](../../decisions/0020-data-retention.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 

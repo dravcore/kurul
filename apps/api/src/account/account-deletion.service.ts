@@ -45,6 +45,14 @@ export interface AccountDeletionCounts {
   membershipsRemoved: number;
   assignmentsRemoved: number;
   invitationsRevoked: number;
+  /**
+   * Invitations addressed *to* the departing account, whatever their state.
+   *
+   * Counted apart from `invitationsRevoked` because they are a different claim: that one is
+   * "this account stops vouching for anybody", this one is "this account's address stops
+   * existing in the database".
+   */
+  invitationsReceivedDeleted: number;
   commentsRedacted: number;
   activitiesRedacted: number;
   sessionsDeleted: number;
@@ -338,6 +346,7 @@ export class AccountDeletionService {
           membershipsRemoved: 0,
           assignmentsRemoved: 0,
           invitationsRevoked: 0,
+          invitationsReceivedDeleted: 0,
           commentsRedacted: 0,
           activitiesRedacted: 0,
           sessionsDeleted: 0,
@@ -418,6 +427,30 @@ export class AccountDeletionService {
         result.invitationsRevoked = (
           await tx.workspaceInvitation.deleteMany({
             where: { inviterId: userId, status: 'pending' },
+          })
+        ).count;
+
+        // The other side of the same table, and the one anonymisation cannot reach.
+        // `WorkspaceInvitation.email` is a literal address in a column of its own — nothing
+        // about it is derived from `User`, so rewriting the `User` row to
+        // `deleted-<id>@deleted.invalid` leaves every invitation ever sent to this person still
+        // spelling out where they can be reached. An erasure request that leaves the address in
+        // the database has not erased it (audit finding DB-01).
+        //
+        // Every state, not only `pending`: unlike the inviter side above, the accepted row is
+        // not somebody else's record of something that happened *to them* — it is a copy of the
+        // departing person's own contact details, and there is no reading of Article 17 under
+        // which that survives the request. What is kept is the workspace's history of the
+        // membership itself, which lives in `WorkspaceMember` and `Activity` and never carried
+        // the address.
+        //
+        // Case-insensitive for the same reason the `confirmEmail` check above is: Better Auth
+        // lower-cases what it stores in this column, `User.email` is whatever was registered,
+        // and a difference in case between the two is not a difference in address. An
+        // equality match would leave the row behind and report success.
+        result.invitationsReceivedDeleted = (
+          await tx.workspaceInvitation.deleteMany({
+            where: { email: { equals: user.email, mode: 'insensitive' } },
           })
         ).count;
 
