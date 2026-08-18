@@ -453,13 +453,13 @@ değil, bu sözleşmenin ihlalidir.** Bir yerde bir kod, istemciyi kaydetmek yer
 kapatmıştır. Paylaşılan havuzdan ödünç alan her yeni istemci `registerPoolConsumer`
 çağırmalıdır.
 
-### 9.2 Oturum iptali beş dakikaya kadar gecikir; rol iptali gecikmez
+### 9.2 Oturum iptali 60 saniyeye kadar gecikir; rol iptali gecikmez
 
-Better Auth, `session.cookieCache` ile `maxAge: 5 * 60` olarak yapılandırılmıştır
+Better Auth, `session.cookieCache` ile `maxAge: 60` olarak yapılandırılmıştır
 (`api/src/auth/auth.ts`). İmzalı oturum çerezi, süresi dolana kadar veritabanına gidilmeden
 kabul edilir; bu da kimlik doğrulamalı her istekten bir sorgu düşürür.
 
-Bedeli net: **bir oturumu iptal etmek 300 saniyeye kadar geç etkili olur.** Session satırını
+Bedeli net: **bir oturumu iptal etmek 60 saniyeye kadar geç etkili olur.** Session satırını
 silmek, tarayıcının elinde zaten bulunan bir çerezi geçersiz kılmaz; o çerez, önbellek
 penceresi kapanana dek kabul edilmeye devam eder.
 
@@ -467,14 +467,14 @@ Etkilenmeyenler, etkilenenlerden daha önemlidir:
 
 | Değişiklik                                      | Ne zaman etkili olur                                                                         |
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Oturum iptal edildi / başka yerde çıkış yapıldı | 5 dakikaya kadar geç — çerez, önbelleği dolana kadar kabul edilir                            |
+| Oturum iptal edildi / başka yerde çıkış yapıldı | 60 saniyeye kadar geç — çerez, önbelleği dolana kadar kabul edilir                           |
 | Rol değişti (ör. ADMIN → GUEST)                 | **Anında** — `WorkspaceGuard`, her istekte `WorkspaceMember`'ı veritabanından okur           |
 | Workspace'ten çıkarıldı                         | **Anında** — aynı guard, aynı okuma; üyelik satırı yok ve istek 404 döner                    |
 | E-posta doğrulandı                              | Anında — `autoSignInAfterVerification` çerezi yeniden yazar, o seçenek zaten bunun için açık |
 
 Yani bu pencere bir _yetkilendirme_ penceresi değil, bir _oturum kimliği_ penceresidir. Rolü
-düşürülmüş veya atılmış bir üye beş dakika boyunca eski rolüyle işlem yapamaz; yalnızca çıkış
-yapmış bir tarayıcı, elinde tuttuğu çerezle beş dakikaya kadar okumaya devam edebilir. Bu
+düşürülmüş veya atılmış bir üye 60 saniye boyunca eski rolüyle işlem yapamaz; yalnızca çıkış
+yapmış bir tarayıcı, elinde tuttuğu çerezle 60 saniyeye kadar okumaya devam edebilir. Bu
 asimetri, takası bu ölçekte kabul edilebilir kılan şeydir ve guard'ın bilinçli olarak
 önbelleklenmiş hiçbir şeye güvenmesine izin verilmediği için vardır.
 

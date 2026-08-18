@@ -883,7 +883,7 @@ describe('Account deletion and anonymisation (e2e)', () => {
         .send({ confirmEmail: seed.departing.email })
         .expect(204);
 
-      // Better Auth's cookie cache can still present this session for up to five minutes, so
+      // Better Auth's cookie cache can still present this session for up to 60 seconds, so
       // the two writes that are not workspace-scoped refuse it explicitly (ADR 0026).
       await seed.departing.agent
         .post('/workspaces')

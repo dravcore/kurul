@@ -40,6 +40,19 @@ enum ColumnCategory {
 /// or with neither — is the failure this enum exists to make unwritable, including from a bulk
 /// importer that never runs the application's own create path.
 /// See docs/decisions/0024-attachment-kinds-and-serving-policy.md.
+///
+/// That "unwritable" is DDL now, not only prose. `Attachment` carries a CHECK constraint Prisma
+/// cannot express:
+///   ALTER TABLE "Attachment" ADD CONSTRAINT "Attachment_kind_fields_check" CHECK (
+///     (kind = 'FILE' AND "storageKey" IS NOT NULL AND "mimeType" IS NOT NULL
+///                    AND "size" IS NOT NULL AND "url" IS NULL)
+///     OR (kind = 'LINK' AND "url" IS NOT NULL AND "storageKey" IS NULL
+///                       AND "mimeType" IS NULL AND "size" IS NULL));
+/// It lives in migrations/20260818120000_attachment_kind_check/migration.sql and is guarded by
+/// test/attachment-kind-check.e2e-spec.ts, the ADR 0017 pattern the due-soon partial index
+/// already follows (Notification, below). Do not let a generated migration drop it — nothing
+/// else in this repository would notice, because every application write path already satisfies
+/// it and the constraint exists for the write paths that do not exist yet.
 enum AttachmentKind {
   FILE
   LINK
