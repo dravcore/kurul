@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-14
+**Updated:** 2026-08-18 — `WorkspaceInvitation` joins the sweep on a sixth window, `INVITATION_RETENTION_DAYS` (default 90 days from `createdAt`, finished rows only): the table list below omitted the one address in the schema that need not belong to a user (audit finding DB-01).
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0020-data-retention.md)
 

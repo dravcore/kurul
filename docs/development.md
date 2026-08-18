@@ -123,6 +123,7 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `CLEANUP_ENABLED`                     | `true`                                                        | Master switch for the nightly [data-retention sweep](#data-retention). Off means the instance stops enforcing its own retention policy                                                                                                                                                                                                                                                                                                                 |
 | `NOTIFICATION_RETENTION_DAYS`         | `90`                                                          | Days a notification is kept **after it was read**. Unread notifications are never deleted, at any age. `0` = keep forever                                                                                                                                                                                                                                                                                                                              |
 | `ACTIVITY_RETENTION_DAYS`             | `365`                                                         | Days an activity row is kept after it was written. `0` = keep forever — set this if you have a statutory audit-trail duty                                                                                                                                                                                                                                                                                                                              |
+| `INVITATION_RETENTION_DAYS`           | `90`                                                          | Days a **finished** invitation is kept, measured from when it was created. Finished = answered (accepted/rejected/canceled) or expired; a pending, unexpired invitation is never deleted, at any age. `0` = keep forever                                                                                                                                                                                                                               |
 | `DATABASE_POOL_MAX`                   | `20`                                                          | Max simultaneous connections the shared `pg` pool opens to Postgres — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                                                        |
 | `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                       | How long a request waits for a pool connection before failing, once all `DATABASE_POOL_MAX` are busy — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                       |
 | `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                       | How long a single SQL statement may run before Postgres kills it — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                                                           |
@@ -659,18 +660,32 @@ was measured against.
 ## Data retention
 
 Kurul deletes rows it is no longer entitled to keep. A BullMQ job runs **once a day** on
-`REDIS_URL` — the same mechanism as the due-soon scan — and sweeps five tables, plus the
+`REDIS_URL` — the same mechanism as the due-soon scan — and sweeps six tables, plus the
 attachment directory:
 
-| Table          | Deleted when                        | Setting                                      |
-| -------------- | ----------------------------------- | -------------------------------------------- |
-| `Session`      | `expiresAt` has passed              | none — not configurable                      |
-| `Verification` | `expiresAt` has passed              | none — not configurable                      |
-| `Notification` | read, and read more than N days ago | `NOTIFICATION_RETENTION_DAYS` (default `90`) |
-| `Activity`     | written more than N days ago        | `ACTIVITY_RETENTION_DAYS` (default `365`)    |
-| `UsagePing`    | written more than N days ago        | `ACTIVITY_RETENTION_DAYS` (default `365`)    |
+| Table                 | Deleted when                               | Setting                                      |
+| --------------------- | ------------------------------------------ | -------------------------------------------- |
+| `Session`             | `expiresAt` has passed                     | none — not configurable                      |
+| `Verification`        | `expiresAt` has passed                     | none — not configurable                      |
+| `Notification`        | read, and read more than N days ago        | `NOTIFICATION_RETENTION_DAYS` (default `90`) |
+| `Activity`            | written more than N days ago               | `ACTIVITY_RETENTION_DAYS` (default `365`)    |
+| `UsagePing`           | written more than N days ago               | `ACTIVITY_RETENTION_DAYS` (default `365`)    |
+| `WorkspaceInvitation` | finished, and created more than N days ago | `INVITATION_RETENTION_DAYS` (default `90`)   |
 
-The sixth sweep has no table. **Stored attachment files that no row claims are unlinked**, and
+**An invitation is "finished" in two ways, and both count:** somebody answered it (`status` is
+anything other than `pending`) or its `expiresAt` has passed. A `pending` invitation whose expiry
+is still ahead of it is a live grant of access somebody can still accept, so it is exempt at any
+age. The window is measured from `createdAt` because that is the only timestamp the table has —
+there is no `resolvedAt` — which deletes the record slightly earlier than measuring from the
+answer would, bounded by how long a row can stay pending.
+
+That sweep exists because `WorkspaceInvitation.email` is the one address in this schema that need
+not belong to a user of the instance: invite somebody who never signs up and there is no account
+for anyone to delete, so before this the row kept their address indefinitely. Deleting an account
+now also removes every invitation addressed to it, in any state — see
+[ADR 0026](decisions/0026-account-deletion-anonymisation.md).
+
+The seventh sweep has no table. **Stored attachment files that no row claims are unlinked**, and
 they exist because `Workspace → Board → Task → Attachment` cascades entirely inside Postgres:
 deleting a board can remove thousands of attachment rows without a line of application code
 running, so nothing is there to delete the bytes. The sweep is skipped outright when
@@ -692,8 +707,8 @@ archived or kept — is [ADR 0020](decisions/0020-data-retention.md).
 Two things worth knowing before you change any of this:
 
 - **Unread notifications are never deleted, at any age.** The window is measured from
-  `readAt`, not from `createdAt`.
-- **`0` means "keep forever"** for either window. Set `ACTIVITY_RETENTION_DAYS=0` if you have
+  `readAt`, not from `createdAt`. Pending, unexpired invitations get the same exemption.
+- **`0` means "keep forever"** for every window. Set `ACTIVITY_RETENTION_DAYS=0` if you have
   a statutory duty to retain an audit trail. A negative value is refused at startup rather
   than clamped — it would be a cutoff in the future, which would delete live rows.
 
@@ -710,7 +725,9 @@ else — no identifiers, no payloads:
   "verifications": 9,
   "notifications": 2140,
   "activities": 0,
-  "usagePings": 0
+  "usagePings": 0,
+  "invitations": 4,
+  "orphanedFiles": 0
 }
 ```
 
@@ -1101,15 +1118,29 @@ docker compose exec -T postgres psql -U kurul -d kurul_recovery \
 
 What can be copied back, and what cannot:
 
-| Row                                            | Recoverable                                                                                  |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `User` (email, name, avatarUrl, locale)        | Yes — `UPDATE "User" SET … WHERE id = …` on the live database, and clear `deletedAt`         |
-| `Account` (the password hash)                  | Yes — copy the row back, or have the person reset their password                             |
-| `WorkspaceMember`                              | Yes, if the workspaces still exist; re-add at the role the `account.deleted` payload records |
-| `Comment` bodies whose mentions were rewritten | Yes — the old body is in the dump                                                            |
-| `Activity.payload.targetName`                  | Yes, same way                                                                                |
-| **A workspace a disposition deleted**          | **Only from the dump, wholesale.** It cascaded — boards, tasks, comments and all             |
-| `Session`                                      | No, and no reason to: the person signs in again                                              |
+| Row                                             | Recoverable                                                                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `User` (email, name, avatarUrl, locale)         | Yes — `UPDATE "User" SET … WHERE id = …` on the live database, and clear `deletedAt`                    |
+| `Account` (the password hash)                   | Yes — copy the row back, or have the person reset their password                                        |
+| `WorkspaceMember`                               | Yes, if the workspaces still exist; re-add at the role the `account.deleted` payload records            |
+| `Comment` bodies whose mentions were rewritten  | Yes — the old body is in the dump                                                                       |
+| `Activity.payload.targetName`                   | Yes, same way                                                                                           |
+| **A workspace a disposition deleted**           | **Only from the dump, wholesale.** It cascaded — boards, tasks, comments and all                        |
+| `WorkspaceInvitation` rows carrying the address | **Only from the dump.** Every invitation addressed to the account is deleted — any state, any workspace |
+| `Session`                                       | No, and no reason to: the person signs in again                                                         |
+
+**The invitation rows are the newest thing on that list, and the only one where the erasure
+deletes rather than anonymises.** Both sides of the table are touched: the pending invitations the
+account had _sent_ are revoked (a deleted account cannot keep vouching for anybody), and every
+invitation _addressed to_ it is deleted outright in any state, because that row is a copy of the
+departing person's own contact details rather than somebody else's record of an event
+([ADR 0026](decisions/0026-account-deletion-anonymisation.md)).
+
+Copying one back is almost never what you want: re-inviting the address issues a fresh grant with
+a fresh expiry, which is what the admin wanted anyway, so the dump is worth reading only for the
+historical question — was this person ever invited to that workspace, and by whom. Note also that
+the nightly sweep deletes finished invitations on its own schedule (`INVITATION_RETENTION_DAYS`),
+so a dump older than that window may not carry the row either.
 
 **Attachment bytes survive**, and there is a clock on them. This flow never touches the
 filesystem, so the files are where they were — but the nightly orphan sweep deletes a stored file

@@ -59,6 +59,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   way to reach. What it sells is different terms on the same AGPL-3.0 code: no paid edition,
   no feature held back for it, and no hosted SaaS.
 
+- **`INVITATION_RETENTION_DAYS` (default `90`) — the nightly sweep now covers a sixth table,
+  `WorkspaceInvitation`.** It is the one address in the schema that need not belong to a user of
+  the instance: invite somebody who never signs up and there is no account for any deletion path
+  to reach, so before this the row kept a third party's e-mail address for the life of the
+  install. A row is deleted once it is **finished** — answered (accepted, rejected, canceled) or
+  past `expiresAt` — **and** older than the window; a `pending`, unexpired invitation is exempt
+  at any age, because it is a live grant of access somebody can still accept. `0` keeps them
+  forever, like the other windows.
+
+  The window is measured from `createdAt`, the only timestamp the table has, which deletes the
+  record slightly earlier than measuring from the answer would — bounded by how long a row can
+  stay pending. Ninety days rather than `ACTIVITY_RETENTION_DAYS`' year because nobody browses a
+  finished invitation (the settings screen lists `pending` rows only), so keeping it longer only
+  stores an address. Its own variable rather than a share of `NOTIFICATION_RETENTION_DAYS`
+  because shortening one is a decision about other people's data and shortening the other is
+  tidying an inbox. Operators who need the old behaviour set `INVITATION_RETENTION_DAYS=0`
+  before upgrading — the first nightly run after the upgrade deletes the accumulated backlog.
+
 ### Changed
 
 - **The Quick start in both READMEs is split into "Run it" and "Develop it".** The pull-based
@@ -72,6 +90,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   segment to `POSTGRES_PASSWORD` was written as though it applied to every install. It applies
   to the dev loop only — `docker-compose.yml` assembles its own connection string from
   `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` and never reads that line.
+
+- **Deleting an account now also deletes every invitation addressed to it, in any state.**
+  `DELETE /me` and `DELETE /instance/users/:userId` anonymise the `User` row and used to remove
+  only the invitations that account had *sent* and left pending. `WorkspaceInvitation.email` is a
+  literal address in a column of its own — nothing about it is derived from `User` — so rewriting
+  the row to `deleted-<id>@deleted.invalid` left every invitation ever sent *to* that person
+  still spelling out where they can be reached, and an erasure request that leaves the address in
+  the database has not erased it (audit finding DB-01).
+
+  Accepted and rejected rows go too, unlike on the inviter side: an invitation addressed to the
+  departing user is not somebody else's record of an event, it is a copy of that user's own
+  contact details. What the workspace keeps is the membership history itself, in
+  `WorkspaceMember` and `Activity`, which never carried the address. **For an operator this
+  narrows what a dump can restore**: the erasure-recovery runbook in
+  [development.md](docs/development.md#undoing-an-account-deletion) now lists invitee-side
+  invitation rows as recoverable only from a dump that predates the deletion.
 
 ### Fixed
 
