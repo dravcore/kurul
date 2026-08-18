@@ -41,7 +41,9 @@ export type UseBoardDataResult = {
   /**
    * Runs the initial load again from a failed state: clears the error, puts the skeleton back
    * and re-enters the effect below. Distinct from `reload`, which is the realtime resync path
-   * and must keep refreshing a *painted* board silently, without a skeleton or an error reset.
+   * and must keep refreshing a *painted* board silently, without a skeleton — though it clears
+   * the same error/unavailable flags on success, so a resync that lands behind a dead-end
+   * screen heals it too.
    */
   retry: () => void;
   /** The deep-linked task has not arrived yet — neither on the board nor from its own fetch. */
@@ -54,6 +56,7 @@ export type UseBoardDataResult = {
   tasksRef: React.MutableRefObject<TaskDto[]>;
   reloadBoardMeta: (signal?: AbortSignal) => Promise<void>;
   reloadTasks: (signal?: AbortSignal) => Promise<void>;
+  /** The realtime resync path. Clears `error`/`unavailable` on success; leaves them on failure. */
   reload: (signal?: AbortSignal) => Promise<void>;
   setBoard: Dispatch<SetStateAction<BoardDto | null>>;
   setColumns: Dispatch<SetStateAction<ColumnDto[]>>;
@@ -157,9 +160,25 @@ export function useBoardData(
     [drainTasks],
   );
 
+  /**
+   * The realtime resync path: refreshes a board that is already on screen, silently, without
+   * the skeleton or the `loadedBoardIdRef` reset `retry` does (see below).
+   *
+   * A successful resync still doubles as a heal path, though: the socket keeps running behind
+   * an error screen (it is wired above the `error` check in `BoardView`), so a board that
+   * failed to load and then recovers on its own — the API came back, the join happened to
+   * land after all — must not sit on the dead-end screen once fresher data has actually
+   * arrived. Clearing `error`/`unavailable` here, after the fetches resolve, is what lets that
+   * happen. A *failed* resync must not touch either: the `catch` below never runs on failure,
+   * so an existing error is left exactly as it was for the caller (who already swallows the
+   * rejection) to ask again later.
+   */
   const reload = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
       await Promise.all([reloadBoardMeta(signal), reloadTasks(signal)]);
+      if (signal?.aborted) return;
+      setError(null);
+      setUnavailable(false);
     },
     [reloadBoardMeta, reloadTasks],
   );
@@ -205,9 +224,10 @@ export function useBoardData(
   /**
    * The way back from the error screen.
    *
-   * `reload` deliberately does none of this: it is what the realtime resync calls behind a
-   * board that is already on screen, where putting the skeleton back on every reconnect would
-   * be the regression. So retrying is its own path — clear the failure, put the skeleton back,
+   * `reload` clears the same failure on success (see its own doc comment), but deliberately
+   * does nothing else here: it is what the realtime resync calls behind a board that is
+   * already on screen, where putting the skeleton back on every reconnect would be the
+   * regression. So retrying is its own path — clear the failure, put the skeleton back,
    * forget that this board ever loaded (so the effect takes the *initial* branch and re-reads
    * the frame, not just the tasks) and bump the token the effect is keyed on.
    *

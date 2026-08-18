@@ -221,6 +221,43 @@ describe('useBoardData task streaming', () => {
     expect(result.current.columns).toHaveLength(1);
   });
 
+  /**
+   * The realtime resync path (`reload`) is the socket's heal path: it keeps running behind
+   * the error screen (nothing gates it on `error`), so a board that recovers on its own — the
+   * API came back before the user clicked anything — must not sit on a dead end once fresher
+   * data has actually landed.
+   */
+  it('clears the error when a realtime resync succeeds', async () => {
+    drain.mockRejectedValueOnce(new Error('network'));
+
+    const { result } = renderBoardData();
+
+    await waitFor(() => expect(result.current.error).toBe("The board couldn't load."));
+
+    drain.mockImplementation(async (_ws, _board, _filters, options?: FetchBoardTasksOptions) => {
+      options?.onPage?.({ items: [task('a')], index: 0, hasMore: false });
+      return [task('a')];
+    });
+    await act(() => result.current.reload());
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.unavailable).toBe(false);
+  });
+
+  /** A resync that fails must leave an existing error exactly as it was — nothing got fresher. */
+  it('leaves the error in place when a realtime resync fails', async () => {
+    drain.mockRejectedValueOnce(new Error('network'));
+
+    const { result } = renderBoardData();
+
+    await waitFor(() => expect(result.current.error).toBe("The board couldn't load."));
+
+    drain.mockRejectedValueOnce(new Error('still down'));
+    await expect(act(() => result.current.reload())).rejects.toThrow();
+
+    expect(result.current.error).toBe("The board couldn't load.");
+  });
+
   /** 404 and 403 are answers, not outages — retrying re-asks a settled question. */
   it.each([404, 403])('offers no retry when the board answers %i', async (status) => {
     drain.mockResolvedValue([]);
