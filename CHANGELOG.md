@@ -268,6 +268,28 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   mirrors), plus the API/e2e/web comments and tests that referenced it — is updated to 60
   seconds alongside the code; ADR 0026's own historical narrative is left as written.
 
+- **The `/auth/*` rate limiter degrades instead of failing open when Redis errors mid-request**
+  (audit finding SEC-03). `createRedisRateLimitStorage`'s `consume()` previously answered every
+  request `{ allowed: true }` on any Redis error — the comment justified it as "a Redis blip must
+  not turn into nobody can sign in," but the same catch caught an outage of any length, and
+  Better Auth's built-in `/sign-in*`/`/sign-up*` rule (3 per 10s) backs onto exactly this storage.
+  A credential-stuffing run during a Redis outage ran completely unthrottled, at the moment an
+  operator is least likely to be watching.
+
+  Each API process now keeps a bounded, in-process fixed-window counter — mirroring the same
+  window/limit the Lua script enforces against Redis — and consults it only while Redis is
+  erroring; a successful call always goes back to Redis, clearing the fallback. This is a
+  per-process floor, not the shared limit: N replicas each enforce the rule independently during
+  an outage, so the effective ceiling across a fleet of N is the rule's limit times N rather than
+  the rule's limit — a bounded number in place of the previous unbounded one, and documented as
+  such rather than presented as equivalent to the Redis-backed limit. The fallback's own memory is
+  capped at 10,000 distinct keys (oldest evicted first) so a credential-stuffing run cannot turn
+  the fallback itself into unbounded growth, and it prunes lazily rather than running a timer.
+
+  The transition into and out of degraded mode is now logged at error level, once per transition
+  rather than once per request, and reported once to Sentry on the way down (when `SENTRY_DSN` is
+  set) — the previous warn-level, silent-per-request logging was the finding's other half.
+
 ## [0.2.0] - 2026-08-16
 
 ### Changed

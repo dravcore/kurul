@@ -705,6 +705,13 @@ yapar. Better Auth'un sayaçları `REDIS_URL` tanımlıysa Redis'te tutulur — 
 paylaşılır, restart'ı atlatır — değilse process belleğinde, ki bu da desteklenen tek-instance
 konfigürasyonudur. Nest throttler'ının sayaçları her zaman instance başınadır.
 
+Redis tanımlıyken bir çağrı ortasında başarısız olursa — `REDIS_URL` boş bırakılmış olması
+değil, bir outage — `/auth/*` limiter'ı sınırsız açılmaz. Her API process'i, Redis tekrar
+cevap verene kadar aynı kuralı uygulayan kendi in-memory sayacına düşer; iniş ve çıkış anları
+error seviyesinde loglanır. Bu fallback paylaşılan limit değil, process başına bir tabandır:
+N replica arkasında outage sırasındaki etkin tavan, kuralın limiti değil, kuralın limiti çarpı
+N'dir — yine de her isteğe izin vermekten farklı olarak sınırlıdır.
+
 İki limiter da aynı çözümlenmiş client IP'sini kullanır, tek bir ayarla sürülür:
 `TRUST_PROXY` (varsayılan boş/`false`). Kapalıyken uygulama, ham TCP bağlantısının ötesinde
 istek hakkında hiçbir şeye güvenmez — `req.ip` her zaman socket peer'ıdır ve bir client'ın

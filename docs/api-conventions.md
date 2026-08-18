@@ -692,6 +692,13 @@ it. Better Auth's counters live in Redis when `REDIS_URL` is set — shared acro
 surviving restarts — and in process memory otherwise, which is a supported single-instance
 configuration. The Nest throttler's counters are always per-instance.
 
+If Redis is configured but a call to it fails mid-operation — an outage, not an unset
+`REDIS_URL` — the `/auth/*` limiter does not open up. Each API process falls back to its own
+in-memory counter enforcing the same rule until Redis answers again, logged at error level on
+the way down and the way back. That fallback is a per-process floor, not the shared limit:
+behind N replicas the effective ceiling during the outage is the rule's limit times N, not the
+rule's limit — still bounded, unlike allowing every request through.
+
 Both limiters key on the same resolved client IP, driven by one setting: `TRUST_PROXY`
 (unset/`false` by default). Off, the app trusts nothing about a request beyond the raw TCP
 connection — `req.ip` is always the socket peer, and any `X-Forwarded-For` a client sends is

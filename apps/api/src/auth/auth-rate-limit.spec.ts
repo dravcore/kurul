@@ -4,7 +4,9 @@ import {
   AUTH_RATE_LIMIT_MAX,
   authRateLimitOptions,
   createRedisRateLimitStorage,
+  resetAuthRateLimitFallbackForTesting,
 } from './auth-rate-limit';
+import * as sentry from '../common/observability/sentry';
 import { RATE_LIMIT_WINDOW_SECONDS } from '../common/rate-limit/rate-limit';
 
 const evalMock = jest.fn();
@@ -118,10 +120,19 @@ describe('createRedisRateLimitStorage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    jest.spyOn(sentry, 'captureServerError').mockReturnValue(false);
+    // Every `describe.each` and every plain `it` below shares the module-level fallback
+    // state (`degraded`, the counters map) with every other one — the same reason
+    // `createRedisRateLimitStorage` keeps a single Redis `client` module-wide. Reset it
+    // before each test so "already reported" and stale counts from a previous test cannot
+    // leak into the next one's assertions.
+    resetAuthRateLimitFallbackForTesting();
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
+    resetAuthRateLimitFallbackForTesting();
   });
 
   it('namespaces its keys so they cannot collide with the Socket.io adapter or BullMQ', async () => {
@@ -165,15 +176,111 @@ describe('createRedisRateLimitStorage', () => {
     });
   });
 
-  it('fails open when Redis is unreachable, so an outage cannot lock everyone out of sign-in', async () => {
+  it('degrades to an in-memory limit when Redis is unreachable, rather than allowing every request', async () => {
     evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
-    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const error = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
+    // Still allowed: a single request is inside the fallback's own window too.
     await expect(storage.consume?.('key', rule)).resolves.toEqual({
       allowed: true,
       retryAfter: null,
     });
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ECONNREFUSED'));
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('ECONNREFUSED'));
+    expect(sentry.captureServerError).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks past the limit under the fallback — an outage no longer means unlimited attempts', async () => {
+    evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
+
+    for (let i = 0; i < rule.max; i++) {
+      await expect(storage.consume?.('flood', rule)).resolves.toMatchObject({ allowed: true });
+    }
+
+    await expect(storage.consume?.('flood', rule)).resolves.toMatchObject({
+      allowed: false,
+      retryAfter: expect.any(Number),
+    });
+  });
+
+  it('tracks distinct keys separately under the fallback', async () => {
+    evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
+
+    for (let i = 0; i < rule.max; i++) {
+      await storage.consume?.('a', rule);
+    }
+    // "a" is now at the limit; "b" has never been consumed and must not inherit its count.
+    await expect(storage.consume?.('a', rule)).resolves.toMatchObject({ allowed: false });
+    await expect(storage.consume?.('b', rule)).resolves.toMatchObject({ allowed: true });
+  });
+
+  it("frees a blocked key's fallback window once it expires", async () => {
+    jest.useFakeTimers();
+    try {
+      evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      for (let i = 0; i < rule.max; i++) {
+        await storage.consume?.('expiring', rule);
+      }
+      await expect(storage.consume?.('expiring', rule)).resolves.toMatchObject({
+        allowed: false,
+      });
+
+      jest.advanceTimersByTime((rule.window + 1) * 1000);
+
+      await expect(storage.consume?.('expiring', rule)).resolves.toEqual({
+        allowed: true,
+        retryAfter: null,
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('caps the fallback at a bounded number of distinct keys instead of growing without limit', async () => {
+    evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
+    // A single request per key is enough to prove the point at max: 1 — the second request
+    // for a still-tracked key is blocked, a fresh one is allowed.
+    const capRule = { window: RATE_LIMIT_WINDOW_SECONDS, max: 1 };
+    const overCap = 10_001;
+
+    await storage.consume?.('key-0', capRule);
+    for (let i = 1; i < overCap; i++) {
+      await storage.consume?.(`key-${i}`, capRule);
+    }
+
+    // If `key-0` were still tracked, this second request for it would be blocked (count 2 >
+    // max 1). It is allowed instead, which is only possible if it was evicted to make room —
+    // proof the map did not grow past its cap under `overCap` distinct keys.
+    await expect(storage.consume?.('key-0', capRule)).resolves.toMatchObject({ allowed: true });
+  }, 30_000);
+
+  it('goes back to Redis once it answers again, and logs the recovery once', async () => {
+    evalMock.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    const error = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+    await storage.consume?.('key', rule);
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('ECONNREFUSED'));
+
+    evalMock.mockResolvedValue([1, -1]);
+    await expect(storage.consume?.('key', rule)).resolves.toEqual({
+      allowed: true,
+      retryAfter: null,
+    });
+    expect(error).toHaveBeenCalledTimes(2);
+    expect(error).toHaveBeenLastCalledWith(expect.stringContaining('recovered'));
+  });
+
+  it('does not log or report a repeat outage once already degraded — no per-request spam', async () => {
+    evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
+    const error = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+    await storage.consume?.('key', rule);
+    await storage.consume?.('key', rule);
+    await storage.consume?.('key', rule);
+
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(sentry.captureServerError).toHaveBeenCalledTimes(1);
   });
 
   it('reads back the counter `consume` writes', async () => {
