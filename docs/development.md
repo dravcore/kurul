@@ -356,7 +356,9 @@ http://localhost:8025, click into the newest message, and open the verification 
 contains in your browser (or copy it — Mailpit renders the plain-text and HTML parts, and
 the link works the same either way). The invitee's account is now verified and
 `accept-invitation` succeeds. `docker compose -f docker-compose.dev.yml down -v` clears
-Mailpit's stored messages along with the Postgres/Redis volumes.
+Mailpit's stored messages along with the Postgres/Redis volumes — the dev loop's own
+`kurul-dev_*` volumes only, never the full stack's; see [Full stack in
+Docker](#full-stack-in-docker) below.
 
 ## Run modes
 
@@ -397,7 +399,7 @@ taken on a guess.
 | http://localhost:4000/health | Health check — must return 200 |
 
 Stop the containers with `docker compose -f docker-compose.dev.yml down` (add `-v` to also
-drop the database volume and start from a clean slate).
+drop the dev loop's own `postgres_data`/`redis_data` and start from a clean slate).
 
 ### Full stack in Docker
 
@@ -407,6 +409,16 @@ compose wiring, or when you just want to run Kurul rather than develop it.
 ```bash
 docker compose pull && docker compose up -d
 ```
+
+This runs as its own Compose project — the checkout's directory name, usually `kurul`, since
+`docker-compose.yml` declares no `name:` of its own — fully separate from the dev loop's
+`kurul-dev` project above (`docker-compose.dev.yml` declares `name: kurul-dev`). Every
+container and volume is namespaced by its project, so the two never collide: bringing the full
+stack up does not recreate or touch the dev loop's `postgres`/`redis`/`mailpit`, and
+`docker compose -f docker-compose.dev.yml down -v` does not touch the full stack's volumes
+either, even if you run both on the same machine at once. (OPS-04, 2026-08-18 audit — before
+this split, both files fell back to the same directory-derived project name, so they shared
+container and volume names and could recreate or drop each other's data.)
 
 Then open **http://localhost** — not `localhost:3000`. A `proxy` service (Caddy) is the stack's
 only published entrance: it serves the web app and the API from one origin, routing `/api/*`

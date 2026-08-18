@@ -72,6 +72,15 @@ services:
     # privilege via the setuid()/setgid() syscalls under an already-held capability, not by
     # exec'ing a setuid-bit binary, so there is nothing for no-new-privileges to block.
     cap_add: [CHOWN, FOWNER, SETUID, SETGID, DAC_OVERRIDE]
+    # OPS-05 (2026-08-18 audit): no service in this file carried a memory ceiling, so the
+    # *kernel* OOM killer — not this file — decided which process died when a host approached
+    # docs/self-hosting.md's "2 CPUs / 2 GB" budget, and it scores every process on the host, not
+    # just this stack's; it has no reason to spare postgres over whichever container actually
+    # grew. `mem_limit` puts that decision back where it belongs: this container is only ever
+    # killed for outgrowing its own 512m, and nothing another service does can take postgres down
+    # with it. See docs/self-hosting.md#server-sizing for how this and the other ceilings below
+    # add up against that budget.
+    mem_limit: 512m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kurul}
       # No baked-in default: compose fails loudly instead of initializing (or, on every later
@@ -125,6 +134,11 @@ services:
     # regression — `DB saved on disk` at shutdown, `Done loading RDB, keys loaded: 1` on the
     # next boot, value intact after `GET`, capability set never touching DAC_OVERRIDE.
     cap_add: [SETUID, SETGID]
+    # OPS-05 (2026-08-18 audit) — see postgres's mem_limit above for why a ceiling exists at all.
+    # 128m: this instance holds cache entries, sessions, rate-limit counters and the notification
+    # queue (see REDIS_PASSWORD below), never board data, so its working set is small and bounded
+    # by what the app puts in it rather than by request-sized client input the way api's is.
+    mem_limit: 128m
     environment:
       # Optional, unlike POSTGRES_PASSWORD above: this Redis instance holds cache entries,
       # sessions, rate-limit counters and the notification queue — no board data (see
@@ -184,6 +198,11 @@ services:
     # baseline. Verified by running the image standalone against a live postgres with
     # `cap_drop: [ALL]` and no `cap_add`: `backup.sh once` wrote a valid non-empty dump
     # file and exited 0.
+    # OPS-05 (2026-08-18 audit) — see postgres's mem_limit above for why a ceiling exists at all.
+    # 256m: `pg_dump -Fc` streams its output rather than buffering the whole archive in memory
+    # (see backup.sh), so this covers process overhead plus headroom for the `tar` this container
+    # also runs over attachment_data — not the size of either archive on disk.
+    mem_limit: 256m
     environment:
       # postgres:5432 is the in-network address, same as the api/migrate services above —
       # unrelated to the host .env DATABASE_URL used by the dev loop.
@@ -306,6 +325,11 @@ services:
     # reads files it does not own, so nothing about it ever needed root. Verified by bringing
     # the stack up with `cap_drop: [ALL]` and no `cap_add`: all 19 migrations applied and the
     # container exited 0.
+    # OPS-05 (2026-08-18 audit) — see postgres's mem_limit above for why a ceiling exists at all.
+    # 512m matches api's below: this reuses the same `build` stage and the same `prisma`
+    # machinery api's client is generated from, just once at startup rather than for the
+    # container's whole life, so there is no reason to size it any lower.
+    mem_limit: 512m
     environment:
       # postgres:5432 (not localhost) — this is the in-network address, unrelated to
       # whatever DATABASE_URL a developer has in their host .env for the dev loop.
@@ -341,7 +365,20 @@ services:
     # half) and never chowns, binds a privileged port, or otherwise needs a capability the
     # kernel doesn't hand every process by default. Verified: full stack up with `cap_drop:
     # [ALL]` and no `cap_add`, `/health/ready` → 200.
+    # OPS-05 (2026-08-18 audit) — see postgres's mem_limit above for why a ceiling exists at all.
+    # 512m: REQUEST_BODY_MAX_BYTES and ATTACHMENT_MAX_BYTES (.env.example) both buffer request
+    # data into this process's heap, so a burst of concurrent requests near those ceilings is the
+    # likeliest source of unbounded growth in this container. NODE_OPTIONS below pins V8's
+    # old-space heap to 384m (75% of this limit) instead of leaving it to Node's own
+    # container-memory heuristic, so the remaining 128m of headroom is there for everything a
+    # heap ceiling alone doesn't cover — thread stacks, native buffers, code space — and V8 hits
+    # its own catchable "JavaScript heap out of memory" before the cgroup's hard limit does,
+    # which shows up as a message in `docker compose logs api` rather than a bare SIGKILL.
+    mem_limit: 512m
     environment:
+      # See the mem_limit comment above for why this is set explicitly rather than left to
+      # Node's default container-memory heuristic.
+      NODE_OPTIONS: --max-old-space-size=384
       # postgres:5432 / redis:6379 are the in-network addresses; they're intentionally not
       # sourced from the host .env, whose DATABASE_URL/REDIS_URL point at localhost for the
       # dev-loop run mode (docs/development.md#run-modes) and would not resolve in-container.
@@ -496,7 +533,15 @@ services:
     # node` and the Next.js standalone server needs nothing beyond the default-safe
     # baseline. Verified: full stack up with `cap_drop: [ALL]` and no `cap_add`, web
     # healthcheck reports healthy.
+    # OPS-05 (2026-08-18 audit) — see postgres's and api's mem_limit comments above for the
+    # reasoning and the same 512m / 384m split. Next.js SSR does less request buffering than the
+    # API, but the same "Node's own container-memory heuristic isn't a ceiling anyone chose"
+    # problem applies equally, so it gets the same explicit one.
+    mem_limit: 512m
     environment:
+      # See the mem_limit comment above for why this is set explicitly rather than left to
+      # Node's default container-memory heuristic.
+      NODE_OPTIONS: --max-old-space-size=384
       # The one address the *server* half of Next.js uses — middleware's session probe and the
       # locale lookup during a render. It has to be absolute (a `/api` prefix has no origin to
       # resolve against inside Node) and it is deliberately the container-network address, not
@@ -554,6 +599,11 @@ services:
     # `docker top` (`root … caddy run --config /etc/caddy/Caddyfile`) rather than
     # `docker exec … id`, which reports the exec session's user and not PID 1's.
     cap_add: [NET_BIND_SERVICE]
+    # OPS-05 (2026-08-18 audit) — see postgres's mem_limit above for why a ceiling exists at all.
+    # 128m: Caddy terminates TLS and proxies to two backend services with no application logic of
+    # its own — request and attachment bodies pass through it rather than buffering into it the
+    # way api's do — so this is process overhead plus connection buffers, not request-sized.
+    mem_limit: 128m
     environment:
       # The public origin, scheme included — `http://localhost` (the default) for a local
       # stack with no domain, `https://kurul.example.com` to switch automatic HTTPS on.

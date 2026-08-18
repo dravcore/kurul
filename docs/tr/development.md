@@ -360,7 +360,9 @@ adresini açın, en yeni mesaja tıklayın ve içindeki doğrulama linkini taray
 kopyalayın — Mailpit hem plain-text hem HTML kısımları render eder, link her ikisinde de aynı
 şekilde çalışır). Davet edilenin hesabı artık doğrulanmıştır ve `accept-invitation` başarılı
 olur. `docker compose -f docker-compose.dev.yml down -v`, Postgres/Redis volume'leriyle
-birlikte Mailpit'in sakladığı mesajları da temizler.
+birlikte Mailpit'in sakladığı mesajları da temizler — yalnızca geliştirme döngüsünün kendi
+`kurul-dev_*` volume'leri, tam stack'inkiler asla değil; bkz. aşağıdaki
+[Docker'da tam stack](#dockerda-tam-stack).
 
 ## Çalışma modları
 
@@ -400,8 +402,9 @@ dayanarak seçilmez.
 | http://localhost:4000        | API (NestJS)                  |
 | http://localhost:4000/health | Health check — 200 dönmelidir |
 
-Container'ları `docker compose -f docker-compose.dev.yml down` ile durdurun (veritabanı
-volume'unu da düşürüp temiz bir sayfadan başlamak için `-v` ekleyin).
+Container'ları `docker compose -f docker-compose.dev.yml down` ile durdurun (geliştirme
+döngüsünün kendi `postgres_data`/`redis_data`'sını da düşürüp temiz bir sayfadan başlamak için
+`-v` ekleyin).
 
 ### Docker'da tam stack
 
@@ -411,6 +414,17 @@ doğrulamak için, veya Kurul'u geliştirmek değil sadece çalıştırmak isted
 ```bash
 docker compose pull && docker compose up -d
 ```
+
+Bu, kendi Compose project'inde çalışır — genelde `kurul` olan checkout dizininin adı,
+çünkü `docker-compose.yml` kendi `name:`'ini bildirmiyor — ve yukarıdaki geliştirme
+döngüsünün `kurul-dev` project'inden tamamen ayrıdır (`docker-compose.dev.yml`,
+`name: kurul-dev` bildirir). Her container ve volume kendi project'i tarafından
+namespace'lendiği için ikisi asla çakışmaz: tam stack'i ayağa kaldırmak geliştirme
+döngüsünün `postgres`/`redis`/`mailpit`'ini ne yeniden oluşturur ne de dokunur, ve
+`docker compose -f docker-compose.dev.yml down -v` da tam stack'in volume'lerine dokunmaz —
+ikisini aynı makinede aynı anda çalıştırsanız bile. (OPS-04, 2026-08-18 audit — bu ayrımdan
+önce iki dosya da aynı dizin-türevli project adına düşüyordu, dolayısıyla container ve volume
+adlarını paylaşıyor, birbirlerinin verisini yeniden oluşturabiliyor veya silebiliyordu.)
 
 Ardından **http://localhost** adresini açın — `localhost:3000` değil. Stack'in tek yayınlanmış
 girişi bir `proxy` (Caddy) servisidir: web uygulamasını ve API'yi tek origin'den sunar, `/api/*`

@@ -19,7 +19,8 @@ her domain'de çalışır — API URL'i imajın içine derlenmiş değildir (ger
 ## Gerekenler
 
 - Public IP'si olan, Docker Engine 24+ ve Compose eklentisi kurulu bir sunucu. Küçük bir ekip
-  için iki CPU ve 2 GB RAM yeterli.
+  için iki CPU ve 2 GB RAM yeterli — bu 2 GB'ın nasıl harcandığı için bkz.
+  [Sunucu boyutlandırma](#sunucu-boyutlandırma).
 - Kontrolünüzdeki bir domain ve o sunucuya **açık 80 ve 443 portları**. İkisi de zorunlu:
   Let's Encrypt doğrulamayı 80 üzerinden yapar, tarayıcılar 443'ü kullanır.
 - Bir SMTP hesabı. Kurul'da davetlerin kabul edilebilmesi için giden e-posta şart —
@@ -38,6 +39,53 @@ her domain'de çalışır — API URL'i imajın içine derlenmiş değildir (ger
   Postgres'e "geçici olarak" ulaşmak için bir `docker-compose.override.yml`'de — `ufw deny 5432`
   yazılı olsa bile internete açıktır. Firewall, Docker'ın yönetmediği şeyleri korur; geri kalanı
   koruyan şey `ports:` listesidir — bu stack'in o listeyi tek servise indirmesinin nedeni budur.
+
+## Sunucu boyutlandırma
+
+`docker-compose.yml`'deki her servis artık bir `mem_limit` taşıyor (OPS-05, 2026-08-18 audit).
+Bundan önce hiçbir şey bir container'ın alabileceği belleği sınırlamıyordu, dolayısıyla 2 GB
+bütçesine yaklaşan bir host'ta hangi process'in öleceğine _kernel_'in OOM killer'ı karar
+veriyordu — sadece bu stack'inkileri değil, host'taki her process'i puanlar ve gerçekte
+büyüyen container hangisiyse onun yerine Postgres'i esirgemek için hiçbir sebebi yoktur. Bir
+`mem_limit`, bu kararı ait olduğu yere geri koyar: bir container yalnızca kendi tavanını aştığı
+için öldürülür ve başka bir servisin yaptığı hiçbir şey Postgres'i onunla birlikte
+düşüremez.
+
+| Servis     | `mem_limit` | Bu sayının nedeni                                                                                |
+| ---------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| `postgres` | 512m        | Küçük bir ekibin board'u için cömert bir taban                                                   |
+| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) ikisi de heap'ine buffer'lar  |
+| `web`      | 512m        | Aynı Next.js SSR process'i, `api` ile aynı "seçilmemiş tavan" sorunu                             |
+| `migrate`  | 512m        | `api` ile aynı — aynı build stage, aynı Prisma CLI, yalnızca startup'ta bir kez                  |
+| `backup`   | 256m        | `pg_dump` buffer'lamak yerine stream eder; bu, process overhead'i ve attachment `tar`'ını kapsar |
+| `redis`    | 128m        | Yalnızca cache, session, rate limit, bildirim — asla board verisi, küçük ve sınırlı working set  |
+| `proxy`    | 128m        | TLS sonlandırır ve proxy'ler; gövdeler `api`'ninki gibi buffer'lanmak yerine Caddy'den geçer     |
+
+`api` ve `web`, 512m tavanlarının %75'i olan `NODE_OPTIONS=--max-old-space-size=384`'ü de
+ayarlar — böylece V8'in heap'i, Node'un kendi container-belleği sezgisine bırakılmak yerine
+açıkça sabitlenir. `mem_limit`'in altında kalan 128m'lik boşluk, tek başına bir heap tavanının
+kapsamadığı şeyler içindir (thread stack'leri, native buffer'lar, code space): V8, cgroup'un
+sert limitine varmadan önce kendi yakalanabilir "JavaScript heap out of memory" hatasına çarpar
+— bu da çıplak bir `SIGKILL` yerine `docker compose logs api` (ya da `web`) içinde bir satır
+olarak görünür.
+
+Bunlar birer tavan, rezervasyon değil — `mem_limit`'inden az kullanan bir container hiçbir ek
+maliyete yol açmaz, ve özellikle `migrate`, `api` ile `web` başlamayı bitirmeden önce (başarıyla)
+çıkar, dolayısıyla onlarla hiçbir zaman gerçekten eşzamanlı değildir. Uzun süre çalışan servisler
+— `postgres`, `api`, `web`, `redis`, `proxy` ve `backup` — tavanlarına aynı anda vurmuş gibi
+toplarsak (diğerleri ayaktayken zaten çıkmış olan `migrate` hariç), bu 512 + 512 + 512 + 128 +
+128 + 256 = 2048 MB eder, ki bu da bu sayfanın her zaman istediği 2 GB'a tam olarak denk gelir.
+Gerçek trafik altında bundan daha az boşluğu olan bir host, bu sayıları yükseltmek için bir
+sebeptir (`docker-compose.yml` düz bir düzenleme, ya da bunları bir
+`docker-compose.override.yml` içinde override edin) veya kutunun kendi RAM'ini artırmak için —
+tavanı kaldırmak için değil; bunun size ne kaybettireceği için yukarıdaki notu görün.
+
+**Ölçümle doğrulanmadı**: bu sayılar `.env.example`'da zaten belgelenmiş request/attachment
+tavanlarından ve V8'in kendi heap boyutlandırma kurallarından geliyor, stack'in her limitte
+yük altında çalıştırılmasından değil. Bir container gerçekte `mem_limit`'ine çarptığı için
+öldürülürse, `docker compose ps` onun çıktığını gösterir (genelde `137`), ve
+`docker compose logs <servis>` başlanacak yerdir — her servisin değil, o tek servisin limitini
+yükseltin.
 
 ## 1. DNS
 
