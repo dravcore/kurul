@@ -130,7 +130,7 @@ satırı atlar. Sağlıklı bir stack şöyle görünür:
 
 ```
 api        Up 27 seconds (healthy)
-backup     Up 28 seconds
+backup     Up 28 seconds (health: starting)
 migrate    Exited (0) 27 seconds ago
 postgres   Up 34 seconds (healthy)
 proxy      Up 16 seconds
@@ -140,8 +140,11 @@ web        Up 22 seconds (healthy)
 
 `migrate` satırındaki `Exited (0)` başarı demektir — migration'lar uygulandı, iş bitti. Peşine
 düşülmesi gereken, sıfırdan farklı bir çıkış kodudur (`docker compose logs migrate`); o durumda
-`api` zaten hiç başlamamış olur. `backup` ve `proxy` yanında `(healthy)` yazmaması, bir sorun
-olduğu için değil, ikisinin de healthcheck tanımlamamış olmasındandır.
+`api` zaten hiç başlamamış olur. `proxy` yanında `(healthy)` hiç yazmaz, çünkü hiç healthcheck
+tanımlamaz. `backup` bir healthcheck tanımlar — `/backups` içinde taze bir dump arar — ama
+`start_period`'ı geniştir (10 dakika), yani ilk `pg_dump`'ını henüz alan bir veritabanı
+unhealthy değil `(health: starting)` görünür; zaman tanıyıp `docker compose ps backup` ile
+tekrar bakın.
 
 `https://kurul.example.com` adresine ilk istek, Caddy ACME doğrulamasını tamamlarken birkaç
 saniye sürebilir. Sürmezse olan biteni izleyin:
@@ -223,6 +226,28 @@ Parametrelerin tamamı — 5 dakikalık aralık, alarmdan önce 2 ardışık ba�
 `200` kabul, 10 saniyelik timeout, "geri geldi" bildirimi açık bir e-posta kontağı —
 [Uptime izleme](development.md#uptime-izleme--kesintiyi-asıl-yakalayan-bu-kurun)
 bölümünde; internetten erişilemeyen bir örnek için push tabanlı alternatif de orada.
+
+**Yedek tazeliğini de izleyin — `/api/health/ready` bunu kapsamaz.** `backup` sidecar'ı,
+API'nin readiness probe'unun kontrol ettiği veritabanı bağlantısına hiç dokunmadan dump
+üretmeyi durdurabilir (sürekli başarısız olan bir `pg_dump`, dolan bir volume) — o zaman bu
+endpoint kesintinin tamamı boyunca yeşil kalır. Bunun yerine sinyal, `backup`'ın kendi Docker
+healthcheck'idir: unhealthy, `/backups/kurul-*.dump` içindeki en yeni dosyanın
+`2 × BACKUP_INTERVAL`'dan (varsayılan 24 saatlik aralıkta 48 saat) daha eski olduğu anlamına
+gelir — bu da API'nin kendi retention süpürmesinin artık yakın zamanlı bir dump'a
+güvenemeyeceği noktadır. Monitör aracınızın container-health kontrolünü (Docker'ı destekleyen
+çoğu uptime aracı, ya da host üzerinde bir cron `docker inspect`) buna yönlendirin, ya da en
+azından zaman zaman elle kontrol edin:
+
+```bash
+docker compose ps backup                                        # "(healthy)" veya "(unhealthy)"
+docker inspect --format '{{.State.Health.Status}}' kurul-backup-1
+```
+
+`(unhealthy)` bir `backup`'ın yeniden başlatılmaya ihtiyacı yoktur — `restart: unless-stopped`
+health durumuna göre hareket etmez, sidecar kendi kendine çalışmaya ve denemeye devam eder —
+ihtiyacı olan şey `docker compose logs backup` okumaktır, çünkü gerçekten bir şey (genellikle
+başarısız olan bir `pg_dump`) yanlış gitmiştir ve düzeltilmediği sürece bir sonraki
+zamanlanmış döngü aynı sorunu devralır.
 
 Sonra bilerek bir kez tetikleyin, çünkü hiç ateşlenmemiş bir alarm kurulumu bir güvence değil
 bir varsayımdır:

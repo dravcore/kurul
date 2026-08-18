@@ -91,6 +91,30 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of leaving that to be discovered from a pull failure.
 
   Audit finding OPS-01.
+- **The `backup` service now declares a healthcheck** (audit finding OPS-02). `scripts/backup.sh`'s
+  main loop runs `take_dump || true` / `take_files || true`, so a cycle that fails only logs and
+  keeps sleeping — the process never exits non-zero, and until now nothing about the container's
+  own state changed either, so a backup could silently stop being produced with `docker compose ps`
+  still reporting the service as simply "Up". RPO grew unbounded and invisibly, and the API's
+  retention sweep (`BACKUP_KEEP × BACKUP_INTERVAL` grace window, `cleanup.worker.ts`) silently
+  assumed dumps were actually landing.
+
+  Unhealthy now means: no `/backups/kurul-*.dump` modified in the last `2 × BACKUP_INTERVAL`
+  seconds (48h on the default 24h interval — 2× so one slow or skipped cycle doesn't flap the
+  status). The check reads `$BACKUP_INTERVAL` from the container's own environment, so it tracks
+  whatever an operator's `.env` sets rather than assuming the default. It uses `find -mmin`, not
+  GNU `find`'s `-newermt`: the image is `postgres:18-alpine`, whose `find` is BusyBox's and has
+  neither `-newermt` nor `-newermin` (confirmed with `docker run --rm postgres:18-alpine find
+  --help`). `start_period` (10 minutes) is sized to the first `pg_dump` completing, not to
+  `BACKUP_INTERVAL` — the first cycle starts at container boot, not after one interval elapses, so
+  tying it to a 24h default would hide a genuinely broken first cycle for most of a day.
+
+  `docs/self-hosting.md` (and its `docs/tr/` mirror) no longer says `backup` declares no
+  healthcheck, and now has a "watch backup freshness" bullet next to the existing
+  `/api/health/ready` monitoring guidance — that endpoint never touches the backup sidecar, so it
+  stays green through a backup outage. `scripts/bootstrap.mjs`'s comment on which dev-loop
+  containers declare healthchecks is updated to match (`docker-compose.dev.yml` has no `backup`
+  service of its own, so this doesn't change what that script waits on).
 
 ### Security
 
