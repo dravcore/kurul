@@ -314,6 +314,7 @@
       "listSubtitle": "İşi bölüştürmek için bir board açın.",
       "listError": "Board'larınız yüklenemedi.",
       "loadError": "Board yüklenemedi.",
+      "unavailable": "Bu board yok ya da erişim yetkiniz yok.",
       "loadingMore": "Task'ların geri kalanı yükleniyor…",
       "backToBoards": "Board'lara dön",
       "emptyTitle": "Henüz board yok",

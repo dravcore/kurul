@@ -192,6 +192,52 @@ describe('useBoardData task streaming', () => {
 
     await waitFor(() => expect(result.current.error).toBe("The board couldn't load."));
     expect(result.current.loading).toBe(false);
+    // A transient failure is worth another go, so the caller keeps its retry control.
+    expect(result.current.unavailable).toBe(false);
+  });
+
+  /**
+   * The error screen used to be a dead end: its button called `reload`, which re-ran the two
+   * fetches and never touched `error`, so a retry that *worked* left the failure on screen.
+   */
+  it('clears the error and paints the board when a retry succeeds', async () => {
+    drain.mockRejectedValueOnce(new Error('network'));
+
+    const { result } = renderBoardData();
+
+    await waitFor(() => expect(result.current.error).toBe("The board couldn't load."));
+
+    drain.mockImplementation(async (_ws, _board, _filters, options?: FetchBoardTasksOptions) => {
+      options?.onPage?.({ items: [task('a')], index: 0, hasMore: false });
+      return [task('a')];
+    });
+    act(() => result.current.retry());
+
+    await waitFor(() => expect(result.current.error).toBeNull());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.tasks.map((item) => item.id)).toEqual(['a']);
+    // The frame is re-read too, not just the tasks: a retry takes the *initial* branch.
+    expect(result.current.board).not.toBeNull();
+    expect(result.current.columns).toHaveLength(1);
+  });
+
+  /** 404 and 403 are answers, not outages — retrying re-asks a settled question. */
+  it.each([404, 403])('offers no retry when the board answers %i', async (status) => {
+    drain.mockResolvedValue([]);
+    apiGet.mockImplementation((path: string) => {
+      if (/\/boards\/[^/]+$/.test(path)) {
+        return Promise.reject(
+          new ApiError({ statusCode: status, error: 'Denied', message: 'No board' }),
+        ) as never;
+      }
+      return Promise.resolve(metaResponse(path)) as never;
+    });
+
+    const { result } = renderBoardData();
+
+    await waitFor(() => expect(result.current.unavailable).toBe(true));
+    expect(result.current.error).toBe("This board doesn't exist, or you don't have access to it.");
+    expect(result.current.loading).toBe(false);
   });
 });
 
