@@ -125,8 +125,9 @@ runs on any domain with no rebuild** — put it on your own by setting
 `SITE_URL=https://kurul.example.com` in `.env`, which also turns on automatic HTTPS. The
 one-page walkthrough, SMTP included: [docs/self-hosting.md](docs/self-hosting.md).
 
-Every tagged release publishes `api`/`web` images to GHCR (`ghcr.io/dravcore/kurul-api`,
-`ghcr.io/dravcore/kurul-web`), so this installs and upgrades without a local build; set
+Every tagged release publishes the service images to GHCR (`ghcr.io/dravcore/kurul-api`,
+`ghcr.io/dravcore/kurul-web`, and — from the first release after v0.2.0 — the one-shot
+`ghcr.io/dravcore/kurul-migrate`), so this installs and upgrades without a local build; set
 `TAG=vX.Y.Z` in `.env` to pin a release instead of `latest`. No image published yet for your
 `TAG` (or no network route to `ghcr.io`)? `docker compose up -d` still falls back to building
 from source automatically — `docker compose up --build` keeps working exactly as before, for

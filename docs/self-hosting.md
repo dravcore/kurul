@@ -7,6 +7,13 @@ There is no build step. `docker compose pull` fetches images published for every
 the same image works on every domain — the API URL is not compiled into it (see
 [Why there is no rebuild](#why-there-is-no-rebuild) if you want the reasoning).
 
+> **Installing v0.2.0? Use `git clone` instead.** Releases up to and including v0.2.0
+> published only the `api` and `web` images; the third one this page pulls, `kurul-migrate`,
+> exists from the first release after v0.2.0 onward. The download step below fetches no source
+> tree to build it from, so on v0.2.0 the steps on this page cannot start the stack — install
+> from a clone as shown in [Troubleshooting](#troubleshooting), and come back to this page
+> from the next release on.
+
 ## What you need
 
 - A server with a public IP, Docker Engine 24+ and the Compose plugin. Two CPUs and 2 GB of
@@ -53,8 +60,15 @@ mkdir -p /opt/kurul && cd /opt/kurul
 curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
 curl -fsSL --create-dirs -o docker/Caddyfile \
   https://raw.githubusercontent.com/dravcore/kurul/main/docker/Caddyfile
+curl -fsSL --create-dirs -o scripts/backup.sh \
+  https://raw.githubusercontent.com/dravcore/kurul/main/scripts/backup.sh
+chmod +x scripts/backup.sh
 curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/main/.env.example
 ```
+
+`scripts/backup.sh` is not optional: the `backup` service in `docker-compose.yml` bind-mounts
+that exact path into its container, and without the file the scheduled backups that service
+exists to take never run.
 
 Edit `.env`. For a Docker-only install these are the lines that matter — everything else in the
 file is either for the development loop or has a working default:
@@ -113,7 +127,7 @@ check. A healthy stack reads like this:
 
 ```
 api        Up 27 seconds (healthy)
-backup     Up 28 seconds
+backup     Up 28 seconds (health: starting)
 migrate    Exited (0) 27 seconds ago
 postgres   Up 34 seconds (healthy)
 proxy      Up 16 seconds
@@ -123,8 +137,10 @@ web        Up 22 seconds (healthy)
 
 `Exited (0)` on `migrate` is success — migrations applied, job done. A non-zero exit there is
 the one to chase (`docker compose logs migrate`), and `api` will not have started at all.
-`backup` and `proxy` show no `(healthy)` because neither declares a healthcheck, not because
-anything is wrong with them.
+`proxy` shows no `(healthy)` at all because it declares no healthcheck. `backup` does declare
+one — it watches for a fresh dump in `/backups` — but its `start_period` is generous (10
+minutes) so a database still taking its first `pg_dump` reads as `(health: starting)`, not
+unhealthy; give it time and check again with `docker compose ps backup`.
 
 The first request to `https://kurul.example.com` may take a few seconds while Caddy
 completes the ACME challenge. Watch it happen if it does not:
@@ -206,6 +222,26 @@ The full parameter list — 5-minute interval, 2 consecutive failures before ale
 `200`, 10-second timeout, e-mail contact with the "back up" notification enabled — is in
 [Uptime monitoring](development.md#uptime-monitoring--set-this-up-it-is-the-one-that-catches-an-outage),
 along with the push-based alternative for an instance that is not reachable from the internet.
+
+**Also watch backup freshness — `/api/health/ready` does not cover it.** The `backup` sidecar
+can stop producing dumps (a `pg_dump` that keeps failing, a volume that filled up) without ever
+touching the database connection the API's readiness probe checks, so that endpoint stays green
+through the whole outage. `backup`'s own Docker healthcheck is the signal instead: unhealthy
+means the newest `/backups/kurul-*.dump` is older than `2 × BACKUP_INTERVAL` (48 hours on the
+default 24h interval), which is the point at which the API's own retention sweep can no longer
+assume a recent dump exists to fall back on. Point your monitor's container-health check (most
+uptime tools that support Docker, or a cron `docker inspect` on the host) at it, or at minimum
+check it by hand periodically:
+
+```bash
+docker compose ps backup                                        # "(healthy)" or "(unhealthy)"
+docker inspect --format '{{.State.Health.Status}}' kurul-backup-1
+```
+
+An `(unhealthy)` `backup` does not need a restart — `restart: unless-stopped` does not act on
+health status, so the sidecar keeps running and retrying on its own — it needs
+`docker compose logs backup` read, because something (usually a failing `pg_dump`) is actually
+wrong and the next scheduled cycle inherits the same problem until that's fixed.
 
 Then fire it once on purpose, because an alerting setup that has never fired is a hypothesis:
 
@@ -345,9 +381,11 @@ cosign verify \
   ghcr.io/dravcore/kurul-api:v0.2.0
 ```
 
-Repeat it for `kurul-web`, and replace `v0.2.0` in both places when you verify another
-release. The version appears twice for two different reasons: once as the git ref the signing
-workflow ran on, and once as the image tag you are asking about.
+Repeat it for `kurul-web` — and, on releases after v0.2.0, for `kurul-migrate`, which is
+signed the same way from the release that first publishes it — and replace `v0.2.0` in both
+places when you verify another release. The version appears twice for two different reasons:
+once as the git ref the signing workflow ran on, and once as the image tag you are asking
+about.
 
 **The two `--certificate-*` flags are the entire check; do not drop them.** There is no signing
 key to guard here. The images are signed keylessly: the release workflow trades a GitHub OIDC
@@ -396,6 +434,8 @@ kurul-api-v0.2.0-linux-arm64.spdx.json
 kurul-web-v0.2.0-linux-amd64.spdx.json
 kurul-web-v0.2.0-linux-arm64.spdx.json
 ```
+
+Releases after v0.2.0 add the same pair for `kurul-migrate`.
 
 The format is SPDX 2.3 JSON, which is what `grype`, `trivy` and Dependency-Track all read
 without conversion:
@@ -570,16 +610,17 @@ deployment — which is the trade-off, not an oversight.
 
 ## Troubleshooting
 
-**`docker compose pull` ends in `denied`.** The `api` and `web` images are published by a
-workflow that runs on a release tag, so they exist for `v0.2.0` and later and not for anything
-older. Two things follow while you are on a release that predates them. `docker compose pull`
-exits non-zero after successfully pulling `postgres`, `redis` and `caddy` — read the tail of its
-output, not just the exit code, because the three that worked scroll the two that did not off
-the screen. And the files you fetch in step 2 come from the `main` branch, which only carries
-what the newest release carried: if `docker-compose.yml` has no `proxy:` service and there is no
-`docker/Caddyfile` to download, you are ahead of the release, and none of the HTTPS in this
-guide applies to what you just downloaded. Either wait for the release, or build from source
-instead of pulling:
+**`docker compose pull` ends in `denied`.** The images are published by a workflow that runs
+on a release tag, so each exists only from the release that first shipped it: `api` and `web`
+from `v0.2.0`, `kurul-migrate` from the first release after `v0.2.0` — on `v0.2.0` the pull
+fails for that one image even though the other two resolve. Two things follow while you are on
+a release that predates an image. `docker compose pull` exits non-zero after successfully
+pulling `postgres`, `redis` and `caddy` — read the tail of its output, not just the exit code,
+because the ones that worked scroll the ones that did not off the screen. And the files you
+fetch in step 2 come from the `main` branch, which only carries what the newest release
+carried: if `docker-compose.yml` has no `proxy:` service and there is no `docker/Caddyfile` to
+download, you are ahead of the release, and none of the HTTPS in this guide applies to what
+you just downloaded. Either wait for the release, or build from source instead of pulling:
 
 ```bash
 git clone https://github.com/dravcore/kurul.git && cd kurul
@@ -587,8 +628,9 @@ docker compose up -d --build
 ```
 
 That is slower — the api image is a minute or so of build — and it is the only difference.
-`docker-compose.yml` carries `image:` and `build:` for both services on purpose, so the same
-file installs from a published image when one is resolvable and from source when it is not.
+`docker-compose.yml` carries `image:` and `build:` for all three services on purpose, so the
+same file installs from a published image when one is resolvable and from source when it is
+not.
 
 **Certificate never issues.** Ports 80 and 443 must both reach the server from the public
 internet, and DNS must already resolve. `docker compose logs proxy` names the failure. Hitting
