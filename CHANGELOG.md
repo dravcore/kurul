@@ -268,6 +268,39 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   mirrors), plus the API/e2e/web comments and tests that referenced it — is updated to 60
   seconds alongside the code; ADR 0026's own historical narrative is left as written.
 
+- **The `/auth/*` rate limiter degrades instead of failing open when Redis errors mid-request**
+  (audit finding SEC-03). `createRedisRateLimitStorage`'s `consume()` previously answered every
+  request `{ allowed: true }` on any Redis error — the comment justified it as "a Redis blip must
+  not turn into nobody can sign in," but the same catch caught an outage of any length, and
+  Better Auth's built-in `/sign-in*`/`/sign-up*` rule (3 per 10s) backs onto exactly this storage.
+  A credential-stuffing run during a Redis outage ran completely unthrottled, at the moment an
+  operator is least likely to be watching.
+
+  Each API process now keeps a bounded, in-process fixed-window counter — mirroring the same
+  window/limit the Lua script enforces against Redis, `rule.max === 0` included — and consults it
+  only while Redis is erroring; a successful call goes back to Redis, but the fallback counters
+  are kept rather than cleared (see below). This is a per-process floor, not the shared limit: N
+  replicas each enforce the rule independently during an outage, so the effective ceiling across a
+  fleet of N is the rule's limit times N rather than the rule's limit — a bounded number in place
+  of the previous unbounded one, and documented as such rather than presented as equivalent to the
+  Redis-backed limit. The fallback's own memory is capped at 10,000 distinct keys, and it prunes
+  lazily rather than running a timer.
+
+  The transition into and out of degraded mode is logged at error level and reported once to
+  Sentry on the way down (when `SENTRY_DSN` is set), at most once per five minutes regardless of
+  how many times Redis flaps between erroring and answering in between — an intermittently
+  failing Redis previously logged and captured on every single flip. The fallback counters
+  themselves now survive a brief recovery instead of being cleared on every flap: clearing them
+  handed a flapping connection's attacker a clean slate each time it briefly recovered, which
+  defeated the floor this fallback exists for.
+
+  Eviction at the 10,000-key cap now prefers an already-expired entry over the oldest-inserted
+  one, and a key's window refresh re-inserts it rather than overwriting it in place — `Map#set` on
+  an existing key does not move it to the insertion-order tail, so without this a key hit
+  repeatedly (a currently-blocked attacker, worst case) could look like the *oldest* entry in the
+  map and be evicted ahead of keys nobody had touched in a while, handing that attacker a fresh
+  window under a high-cardinality flood.
+
 ## [0.2.0] - 2026-08-16
 
 ### Changed
