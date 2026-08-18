@@ -39,6 +39,9 @@ const EVENT_TIMEOUT_MS = 10_000;
 /** Failure budget for one request/ack round trip. */
 const ACK_TIMEOUT_MS = 5_000;
 
+/** Pause between `joinBoard` retries — enough to stop a hot loop, small next to the deadline. */
+const RETRY_DELAY_MS = 50;
+
 /** Signing up two users, seeding a board and driving two sockets outruns Jest's 5s default. */
 jest.setTimeout(60_000);
 
@@ -230,6 +233,11 @@ describe('Realtime socket handshake and eviction (e2e)', () => {
         .timeout(ACK_TIMEOUT_MS)
         .emitWithAck(SocketClientEvents.BOARD_JOIN, { boardId })) as RoomAck;
       if (ack.error !== 'unauthenticated' || Date.now() >= deadline) return ack;
+      // The handshake resolves the session on its own schedule; re-emitting the instant an
+      // unauthenticated ack lands would hot-loop hundreds of emits over the deadline for what
+      // is really a wait on one background promise. A short pause between attempts costs
+      // nothing against the deadline and keeps a real regression from flooding the socket.
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
     }
   }
 
@@ -288,7 +296,11 @@ describe('Realtime socket handshake and eviction (e2e)', () => {
       EVENT_TIMEOUT_MS,
     );
 
-    expect(typeof reason).toBe('string');
+    // `client.disconnect(true)` in `handleConnection` is what the client reports back as
+    // 'io server disconnect' — a transport-level drop (network blip, client-initiated close)
+    // would report a different reason, so pinning this value proves the *server* evicted the
+    // handshake rather than merely that some disconnect, of any origin, took place.
+    expect(reason).toBe('io server disconnect');
     expect(anonymous.socket.connected).toBe(false);
   });
 
