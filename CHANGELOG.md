@@ -7,6 +7,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dialog and auth submit errors are now announced to screen readers and receive focus (WCAG
+  4.1.3, audit finding UX-01). Login, register, confirm, form, delete-account,
+  delete-workspace and the Trello import dialog rendered their submit-level error as plain
+  text with no toast on this path, so assistive tech never heard it and sighted keyboard users
+  had no cue where it landed; the shared `SubmitError` component now marks it `role="alert"`
+  and moves focus to it on every mount, including a retry that fails with the exact same
+  wording.
+
 ### Added
 
 - **`pnpm bootstrap` — a fresh clone reaches a running dev loop in one command.**
