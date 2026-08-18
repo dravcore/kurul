@@ -314,6 +314,7 @@
       "listSubtitle": "Open a board to divide the work.",
       "listError": "Your boards couldn't load.",
       "loadError": "The board couldn't load.",
+      "unavailable": "This board doesn't exist, or you don't have access to it.",
       "loadingMore": "Loading the rest of the tasks…",
       "backToBoards": "Back to boards",
       "emptyTitle": "No boards yet",
