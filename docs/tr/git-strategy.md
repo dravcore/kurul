@@ -255,7 +255,18 @@ docker compose down -v                     # -v: sonraki koşuya volume bırakma
 # 5. main üzerindeki merge commit'ini tag'le. Container imajlarını yayınlayan şey
 #    de budur (.github/workflows/release-images.yml) — tag yoksa imaj da yok ve
 #    docs/self-hosting.md'yi izleyen herkes için `docker compose pull` başarısız olur.
-#    Aynı koşu iki imajı cosign ile imzalar ve SBOM'larını üretir.
+#    Aynı koşu üç imajın tamamını cosign ile imzalar ve SBOM'larını üretir.
+#
+#    Belirli bir imaj *adı* GHCR'a ilk kez push edildiğinde, oluşturduğu paket
+#    varsayılan olarak PRIVATE'tır — repo'nun kendi görünürlüğünden bağımsız
+#    olarak — ve anonim bir `docker compose pull` bu pakete karşı "denied"
+#    hatasıyla başarısız olur; tam olarak denetim bulgusu OPS-01'deki
+#    semptom. Bunun için API yoktur: release'i duyurmadan önce, bir kez, elle
+#    organizasyonun paket ayarlarından Public'e çevirin (org -> Packages ->
+#    yeni imaj -> Package settings -> Change visibility). `kurul-migrate`
+#    bunu v0.2.0'dan sonraki ilk release'de gerektirir — bu workflow'un onu
+#    ilk yayınladığı release — ve sonradan eklenen her yeni imaj adı da aynı
+#    şekilde, bir kez, buna ihtiyaç duyar.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
@@ -263,9 +274,10 @@ git push origin v0.2.0
 # 6. Release images workflow'unun bitmesini bekle, sonra v0.2.0 tag'i için GitHub
 #    Release'i yayınla, body = 0.2.0 için CHANGELOG bölümü.
 #
-#    Workflow oraya önce varır ve dört SBOM asset'i çoktan eklenmiş bir TASLAK
-#    release bırakır — yani 6. adım normalde "release oluştur" değil, "body'yi
-#    doldur ve Publish'e bas" olur. Workflow bitmeden elle yayınlamak da hata
+#    Workflow oraya önce varır ve altı SBOM asset'i (3 imaj × 2 platform)
+#    çoktan eklenmiş bir TASLAK release bırakır — yani 6. adım normalde
+#    "release oluştur" değil, "body'yi doldur ve Publish'e bas" olur.
+#    Workflow bitmeden elle yayınlamak da hata
 #    değildir: o durumda asset'ler bulduğu release'e yüklenir, body'ye, başlığa
 #    ve taslak bayrağına hiç dokunulmaz. Yine de beklemek daha doğru sıradır —
 #    asset'ler bir release'in parçasıdır.

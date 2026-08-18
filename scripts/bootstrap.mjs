@@ -184,9 +184,10 @@ run('docker', ['compose', ...DEV_COMPOSE, 'up', '-d']);
 // The service list is asked of compose rather than hardcoded, and `ps` is *restricted* to it,
 // for a reason that is easy to miss: both compose files belong to the same project, so a plain
 // `docker compose -f docker-compose.dev.yml ps` also lists `api`, `web`, `proxy` and `backup`
-// if the full stack happens to be up. `proxy` and `backup` declare no healthcheck at all, so
-// an unrestricted "every service is healthy" can never become true and this would wait out its
-// deadline against containers it has no business inspecting.
+// if the full stack happens to be up. `proxy` still declares no healthcheck at all (`backup`
+// gained one for OPS-02, but that's docker-compose.yml's service, not this file's — this file
+// has no `backup` service of its own), so an unrestricted "every service is healthy" could
+// still wait out its deadline against a container it has no business inspecting.
 heading('Waiting for the containers to report healthy');
 
 const devServices = (capture('docker', ['compose', ...DEV_COMPOSE, 'config', '--services']) ?? '')

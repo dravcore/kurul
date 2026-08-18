@@ -175,7 +175,7 @@ apps/web/
 │   ├── notification/      # NotificationBell, NotificationsList
 │   └── settings/          # LanguageSettings
 ├── i18n/                  # next-intl request config + the locale resolution chain
-├── messages/              # en.json — UI copy, one flat file per locale
+├── messages/              # en.json, tr.json — UI copy, one flat file per locale
 └── lib/
     ├── api.ts             # typed REST client
     ├── socket.ts          # Socket.io client (board realtime)
@@ -192,9 +192,11 @@ root layout, UI copy in `messages/en.json`) so every user-facing string already 
 ([ADR 0018](decisions/0018-localization-strategy.md)) — deliberately **no `[locale]` path
 segment and no i18n middleware**, because nothing here is indexed and a language prefix would
 invalidate every literal path comparison in `middleware.ts` at once. Settings → Language writes
-the preference; `en` is still the only catalog, so adding a language is a `SUPPORTED_LOCALES`
-entry plus a `messages/<tag>.json`, not a rewrite of the component tree. See
-[roadmap.md — Beyond MVP](roadmap.md#beyond-mvp) for additional UI language packs.
+the preference; `en` and `tr` ship today (`SUPPORTED_LOCALES = ['en', 'tr']`, `messages/tr.json`
+at parity with `en.json`), so adding a third language is a `SUPPORTED_LOCALES` entry plus a
+`messages/<tag>.json` — and the `Record<Locale, …>` seed and mail copy (`board-defaults.ts`,
+`mail-templates.ts`) failing to compile until it is filled in — not a rewrite of the component
+tree. See [roadmap.md — Beyond MVP](roadmap.md#beyond-mvp) for additional UI language packs.
 
 ---
 

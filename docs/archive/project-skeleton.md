@@ -169,7 +169,7 @@ Comment         id, taskId, userId, body, createdAt
 Activity        id, workspaceId, taskId?, userId, type, payload(Json), createdAt
 ```
 
-`Notification` was deferred from the Phase 1 schema to [roadmap Phase 8](archive/roadmap-mvp-phases.md#phase-8--activity-log-and-notifications) — not created in the first migration. Invitations are owned by Better Auth (organization plugin), not a Prisma model here; see [ADR 0004](../decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
+`Notification` was deferred from the Phase 1 schema to [roadmap Phase 8](roadmap-mvp-phases.md#phase-8--activity-log-and-notifications) — not created in the first migration. Invitations are owned by Better Auth (organization plugin), not a Prisma model here; see [ADR 0004](../decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
 
 **Critical details**
 
