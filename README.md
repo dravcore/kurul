@@ -12,7 +12,7 @@ Open-source, Kanban-focused project management tool.
 
 Kurul’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards) — auth/workspaces, boards and
 tasks, filtering, dashboard, activity/notifications, and realtime board sync. See
-[docs/roadmap.md](docs/roadmap.md). A six-scenario Playwright smoke pack covers the critical
+[docs/roadmap.md](docs/roadmap.md). A seven-scenario Playwright smoke pack covers the critical
 browser flows ([docs/testing.md](docs/testing.md#browser-end-to-end)). Beyond-MVP items (email
 notifications, presence, extra locales, …) remain listed under Beyond MVP.
 
@@ -114,7 +114,7 @@ Docker Compose v2 is the only prerequisite — no Node, no pnpm, no local build.
 ```bash
 git clone https://github.com/dravcore/kurul.git
 cd kurul
-cp .env.example .env   # set POSTGRES_PASSWORD (openssl rand -hex 32) and BETTER_AUTH_SECRET (openssl rand -base64 32)
+cp .env.example .env   # set POSTGRES_PASSWORD (openssl rand -hex 32) and BETTER_AUTH_SECRET (openssl rand -hex 32)
 docker compose pull && docker compose up -d
 ```
 
@@ -147,7 +147,7 @@ No local PostgreSQL or Redis installation is needed — both run in Docker.
 ```bash
 git clone https://github.com/dravcore/kurul.git
 cd kurul
-cp .env.example .env   # set BETTER_AUTH_SECRET (openssl rand -base64 32) and POSTGRES_PASSWORD (openssl rand -hex 32)
+cp .env.example .env   # set BETTER_AUTH_SECRET (openssl rand -hex 32) and POSTGRES_PASSWORD (openssl rand -hex 32)
 pnpm install
 pnpm bootstrap         # shared packages → Prisma client → containers → migrations → demo data
 pnpm dev

@@ -1,10 +1,10 @@
 # Documentation
 
 Five-minute map of Kurul docs. English is canonical; Turkish copies live under
-[`tr/`](tr/).
+[`tr/`](tr/README.md).
 
 > 🌐 English (canonical) · Turkish: start at [`../README.tr.md`](../README.tr.md) and
-> [`tr/`](tr/)
+> [`tr/README.md`](tr/README.md)
 
 ## Start here
 

@@ -12,7 +12,7 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı) — auth/workspace’ler, board ve
 task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Bkz.
-[docs/roadmap.md](docs/tr/roadmap.md). Kritik tarayıcı akışlarını altı senaryoluk bir
+[docs/roadmap.md](docs/tr/roadmap.md). Kritik tarayıcı akışlarını yedi senaryoluk bir
 Playwright smoke paketi kapsıyor ([docs/testing.md](docs/tr/testing.md#browser-uçtan-uca)).
 MVP ötesi maddeler (e-posta bildirimleri, presence, ek diller, …) hâlâ MVP ötesi altında
 listelenir.
@@ -118,7 +118,7 @@ Tek ön koşul Docker Compose v2 — Node yok, pnpm yok, lokal build yok.
 ```bash
 git clone https://github.com/dravcore/kurul.git
 cd kurul
-cp .env.example .env   # POSTGRES_PASSWORD ayarla (openssl rand -hex 32), BETTER_AUTH_SECRET ayarla (openssl rand -base64 32)
+cp .env.example .env   # POSTGRES_PASSWORD ayarla (openssl rand -hex 32), BETTER_AUTH_SECRET ayarla (openssl rand -hex 32)
 docker compose pull && docker compose up -d
 ```
 
@@ -152,7 +152,7 @@ Lokal PostgreSQL veya Redis kurulumuna gerek yok — ikisi de Docker'da çalış
 ```bash
 git clone https://github.com/dravcore/kurul.git
 cd kurul
-cp .env.example .env   # BETTER_AUTH_SECRET ayarla (openssl rand -base64 32), POSTGRES_PASSWORD ayarla (openssl rand -hex 32)
+cp .env.example .env   # BETTER_AUTH_SECRET ayarla (openssl rand -hex 32), POSTGRES_PASSWORD ayarla (openssl rand -hex 32)
 pnpm install
 pnpm bootstrap         # paylaşılan paketler → Prisma client → container'lar → migration → demo veri
 pnpm dev
@@ -230,8 +230,8 @@ Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
 
 ## Dokümantasyon
 
-Beş dakikalık harita (EN kanonik): **[docs/README.md](docs/README.md)**. Türkçe kopyalar
-`docs/tr/` altında.
+Beş dakikalık harita (EN kanonik): **[docs/README.md](docs/README.md)**. Türkçe harita:
+**[docs/tr/README.md](docs/tr/README.md)**.
 
 | Doküman                                                  | Kapsam                               |
 | -------------------------------------------------------- | ------------------------------------ |

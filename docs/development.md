@@ -31,7 +31,8 @@ The monorepo and MVP feature set (Phases 1–9; Phase 0 was docs/standards) **ex
 page are the day-to-day contract — if reality and this document diverge, one of the two is a
 bug and gets fixed in the same PR.
 
-- Layout, Prisma models, and early acceptance criteria: [project-skeleton.md](project-skeleton.md)
+- Layout and module map: [architecture.md](architecture.md#2-monorepo-layout)
+- Data model and critical field rules: [architecture.md](architecture.md#critical-field-rules)
 - Phase progress (MVP complete): [roadmap.md](roadmap.md)
 - Why each tool was chosen: [tech-stack.md](tech-stack.md)
 
@@ -609,8 +610,8 @@ Rules:
 - Schema changes go in their own PR, separate from the logic that uses them, whenever that
   split is practical.
 - `Task.position` and `Column.position` are `Float` (fractional indexing) — see
-  [project-skeleton.md](project-skeleton.md) for the model-level rules that must not be
-  changed casually.
+  [architecture.md](architecture.md#critical-field-rules) for the model-level rules that must
+  not be changed casually.
 
 Resetting a local database from scratch:
 
@@ -1457,7 +1458,7 @@ specified in [git-strategy.md](git-strategy.md).
 
 ## See also
 
-- [project-skeleton.md](project-skeleton.md) — the layout and acceptance criteria this
+- [architecture.md](architecture.md) — the module map and critical field rules this
   document is the contract for
 - [self-hosting.md](self-hosting.md) — putting a release on your own domain: DNS, HTTPS, SMTP
 - [roadmap.md](roadmap.md) — phase order

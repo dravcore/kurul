@@ -31,7 +31,8 @@ Monorepo ve MVP özellik seti (Faz 1–9; Faz 0 docs/standartlardı) repository�
 gündelik kontrattır — gerçeklik bu dokümandan sapıyorsa ikisinden biri buglıdır ve aynı
 PR’da düzeltilir.
 
-- Yerleşim, Prisma modelleri ve erken kabul kriterleri: [project-skeleton.md](project-skeleton.md)
+- Yerleşim ve modül haritası: [architecture.md](architecture.md#2-monorepo-yerleşimi)
+- Veri modeli ve kritik alan kuralları: [architecture.md](architecture.md#kritik-alan-kuralları)
 - Faz ilerlemesi (MVP tamam): [roadmap.md](roadmap.md)
 - Her aracın neden seçildiği: [tech-stack.md](tech-stack.md)
 
@@ -621,7 +622,7 @@ Kurallar:
 - Pratikte mümkün olduğunda, şema değişiklikleri onları kullanan logic'ten ayrı kendi
   PR'ında olur.
 - `Task.position` ve `Column.position` `Float`'tır (fractional indexing) — özensizce değiştirilmemesi gereken
-  model seviyesi kurallar için [project-skeleton.md](project-skeleton.md)'ye bakın.
+  model seviyesi kurallar için [architecture.md](architecture.md#kritik-alan-kuralları)'ye bakın.
 
 Yerel bir veritabanını sıfırdan sıfırlamak:
 
@@ -1480,8 +1481,8 @@ PR/release süreci [git-strategy.md](git-strategy.md)'de belirtilmiştir.
 
 ## Ayrıca bakınız
 
-- [project-skeleton.md](project-skeleton.md) — bu dokümanın kontratı olduğu yerleşim ve
-  kabul kriterleri
+- [architecture.md](architecture.md) — bu dokümanın kontratı olduğu modül haritası ve
+  kritik alan kuralları
 - [self-hosting.md](self-hosting.md) — bir release'i kendi domain'inize kurmak: DNS, HTTPS, SMTP
 - [roadmap.md](roadmap.md) — faz sırası
 - [git-strategy.md](git-strategy.md) — branch'ler, commit'ler, release'ler
