@@ -3,6 +3,8 @@
 **Status:** Accepted
 **Date:** 2026-08-15
 **Updated:** 2026-08-18 — the kind/nullability invariant below is now enforced by a CHECK constraint, `Attachment_kind_fields_check` (`migrations/20260818120000_attachment_kind_check`, guarded by `test/attachment-kind-check.e2e-spec.ts` under ADR 0017's rule): the enum shipped without one, so "a row with both a `url` and a `storageKey`, or with neither" was still writable by anything bypassing `AttachmentService` — the bulk importer this ADR names among them (audit finding DB-02).
+**Updated:** 2026-08-18 — the title's "One Size Number in Two Layers" no longer describes the shipped config: `docker/Caddyfile`'s `request_body { max_size 26MiB }` sits deliberately one MiB **above** `ATTACHMENT_MAX_BYTES` (25 MiB), not equal to it. `max_size` counts the whole multipart request body while `ATTACHMENT_MAX_BYTES` counts only the file part, so a file of exactly the published limit cleared the API's check and died at the proxy under the original equal-numbers config — measured on the real request shape and fixed in #216. The invariant the two layers now hold is an ordering, not an equality — **the proxy must never reject something the API would accept** — guarded by `apps/api/src/storage/two-layer-limit.spec.ts` and documented in [self-hosting.md](../self-hosting.md#why-the-proxys-number-is-26-mib-and-the-apis-is-25).
+**Updated:** 2026-08-18 — the citations to `audit/phase-3-plan.md` and `audit/ROADMAP.md` by line number are unresolvable to anyone without the gitignored `audit/` tree; each has been rewritten below to carry its load-bearing content inline (quoted where the surrounding text already carried it, paraphrased where it did not) instead of pointing at a file a clone does not have.
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0024-attachment-kinds-and-serving-policy.md)
 
@@ -17,9 +19,10 @@ questions the document either does not raise or raises without answering.
 **First, the record has no notion of an attachment that is not a file.** The words `noopener`,
 `noreferrer`, "external link", SSRF and `type` do not appear anywhere in 0022 — zero matches for
 each. That silence is not neutral, because a scope decision taken the same week says the opposite.
-`audit/phase-3-plan.md` §7 decision 4 (line 910) records that Trello import (P3-3) carries
-attachment **URLs**, not bytes: "Dosya taşınmıyor (Trello export vermiyor); URL tipi attachment
-kaydı oluşuyor". The plan then names the debt it just created, in its own words at lines 917-920 —
+The phase plan's own scope decision for the Trello importer (§7 decision 4) records that it
+carries attachment **URLs**, not bytes: "Dosya taşınmıyor (Trello export vermiyor); URL tipi
+attachment kaydı oluşuyor" — no file is moved, an attachment record of the URL kind is created.
+The plan then names the debt it just created, in its own words at lines 917-920 —
 the decision "adds a sixth decision point to P3-1's ADR: whether an attachment record is a _file_
 or a _URL_ has to be represented in the model, because the URL kind has no storage, no size, no
 MIME. If that distinction is not known while P3-1 is designed, P3-3 will force it through the
@@ -123,7 +126,7 @@ the list uses `added`.
 **`audit/phase-3-plan.md` §4.1b proposed both types for the audit subset, and that half of the
 proposal is rejected here.** Its line 333 reads "(Öneri: evet, ekleme+silme.)" — yes, both add and
 delete. This ADR takes the delete and declines the add. The proposal was written before two things
-that decide the question: §7 decision 4 (line 910), which gave P3-3 a bulk import that creates an
+that decide the question: §7 decision 4, which gave P3-3 a bulk import that creates an
 attachment record per imported URL, and the volume criterion `activity.ts:51-64` states for the
 subset. The narrowing is recorded rather than applied quietly, because a later reader comparing the
 plan to the code would otherwise find a silent discrepancy and have to guess which one was
@@ -169,9 +172,9 @@ that dropped every non-ASCII character would satisfy the same tests and would un
 **`uploadedById` is a real foreign key to `User`, with `onDelete: Restrict`.** The precedent is
 `Comment.user`, which is `Restrict` at `apps/api/prisma/schema.prisma:311`. The cost is stated
 rather than discovered later: this enlarges the surface P3-4 (account deletion and anonymization,
-finding DB-05) has to reason about, and `audit/ROADMAP.md:372` already describes today's position
-as one where "a GDPR/KVKK deletion request cannot be fulfilled even in psql because of `Restrict`
-FKs". ADR 0023 avoided a `User` FK on checklist items for exactly this reason. This ADR pays the
+finding DB-05) has to reason about — that finding already describes today's position as one where
+"a GDPR/KVKK deletion request cannot be fulfilled even in psql because of `Restrict` FKs". ADR
+0023 avoided a `User` FK on checklist items for exactly this reason. This ADR pays the
 cost anyway, and the Rationale says why the two cases differ.
 
 **Attachments get their own module, `apps/api/src/attachment/`.** The controller follows the
@@ -330,7 +333,8 @@ First, it would have to rest on uploads being low-volume, which would make an au
 depend on a rate limit whose value 0022 never set and this ADR deliberately does not set either —
 a decision resting on an unwritten number is the exact defect this ADR was opened to fix in 0022.
 Second, and decisively, P3-3's importer creates an attachment record per imported URL (§7 decision
-4, line 910), so one board import writes `attachment.created` rows in bulk. That is precisely the
+4, the same Trello-import scope decision the Context section quotes), so one board import writes
+`attachment.created` rows in bulk. That is precisely the
 volume behaviour `comment.created` is excluded for, and it would arrive through a code path no rate
 limit governs. Keeping the create side out means the importer can write as many rows as it likes
 and the incident-response query never sees them. The responder loses nothing they cannot get from
@@ -424,8 +428,8 @@ the only reason the board and label entries can be explained at all, since posit
 explained them.
 
 **P3-4 gets harder in a way this ADR chose.** One more `Restrict` FK to `User` is one more relation
-an anonymization design has to route around, and `audit/ROADMAP.md:372` already lists `Restrict`
-FKs as the reason a deletion request cannot be executed today. The mitigating fact is that
+an anonymization design has to route around, and finding DB-05 already lists `Restrict` FKs as the
+reason a deletion request cannot be executed today. The mitigating fact is that
 `Attachment.uploadedById` behaves identically to `Comment.userId`, so it adds volume to that design
 rather than a new case.
 

@@ -3,6 +3,20 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-15
 **Güncellendi:** 2026-08-18 — aşağıdaki kind/nullability değişmezi artık bir CHECK kısıtıyla, `Attachment_kind_fields_check` ile uygulanıyor (`migrations/20260818120000_attachment_kind_check`, ADR 0017'nin kuralı gereği `test/attachment-kind-check.e2e-spec.ts` ile korunuyor): enum böyle bir kısıt olmadan yayınlanmıştı, dolayısıyla "hem `url` hem `storageKey` taşıyan ya da ikisini de taşımayan bir satır" `AttachmentService`'i atlayan her yol için — bu ADR'nin adını andığı toplu içe aktarıcı dahil — hâlâ yazılabilirdi (denetim bulgusu DB-02).
+**Güncellendi:** 2026-08-18 — başlıktaki "İki Katmanda Tek Boyut Sayısı" artık yayınlanan
+yapılandırmayı tarif etmiyor: `docker/Caddyfile`'daki `request_body { max_size 26MiB }`,
+`ATTACHMENT_MAX_BYTES`'ın (25 MiB) kasıtlı olarak bir MiB **üzerinde** duruyor, ona eşit değil.
+`max_size` tüm multipart istek gövdesini sayarken `ATTACHMENT_MAX_BYTES` yalnızca dosya kısmını
+sayıyor, dolayısıyla eski eşit-sayı yapılandırmasında yayınlanan limitin tam sınırındaki bir dosya
+API'nin kontrolünü geçip proxy'de ölüyordu — gerçek istek şekli üzerinde ölçüldü ve #216'da
+düzeltildi. İki katmanın şimdi tuttuğu değişmez bir eşitlik değil bir sıralama —
+**proxy, API'nin kabul edeceği bir şeyi asla reddetmemeli** — `apps/api/src/storage/two-layer-limit.spec.ts`
+tarafından korunuyor ve [self-hosting.md](../self-hosting.md)'de belgeleniyor.
+**Güncellendi:** 2026-08-18 — `audit/phase-3-plan.md` ve `audit/ROADMAP.md`'ye satır numarasıyla
+yapılan atıflar, gitignore'lu `audit/` ağacı olmayan hiç kimse için çözülemez. Her biri, aşağıda
+(çevredeki metnin zaten taşıdığı yerde alıntılanarak, taşımadığı yerde ise açıklanarak) yerine
+getirdiği içeriği doğrudan taşıyacak şekilde yeniden yazıldı, bir kopyası olmayan bir dosyaya
+işaret etmek yerine.
 
 > 🌐 [English (kanonik)](../../decisions/0024-attachment-kinds-and-serving-policy.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
@@ -17,9 +31,10 @@ karşı denetimi, belgenin ya hiç sormadığı ya da sorup cevaplamadığı dö
 **Birincisi, kayıtta dosya olmayan bir ekin karşılığı yok.** `noopener`, `noreferrer`, "external
 link", SSRF ve `type` kelimelerinin hiçbiri 0022'de geçmiyor — her biri için sıfır eşleşme. Bu
 sessizlik nötr değil, çünkü aynı hafta alınmış bir kapsam kararı tersini söylüyor.
-`audit/phase-3-plan.md` §7 karar 4 (satır 910), Trello import'unun (P3-3) bayt değil attachment
-**URL'leri** taşıdığını kayda geçiriyor: "Dosya taşınmıyor (Trello export vermiyor); URL tipi
-attachment kaydı oluşuyor". Plan sonra yarattığı borcu kendi cümleleriyle adlandırıyor, satır
+Faz planının Trello içe aktarıcı için kendi kapsam kararı (§7 karar 4), Trello import'unun
+(P3-3) bayt değil attachment **URL'leri** taşıdığını kayda geçiriyor: "Dosya taşınmıyor (Trello
+export vermiyor); URL tipi attachment kaydı oluşuyor" — dosya taşınmaz, URL tipinde bir attachment
+kaydı oluşur. Plan sonra yarattığı borcu kendi cümleleriyle adlandırıyor, satır
 917-920: karar "P3-1'in ADR'ına **altıncı bir karar noktası** ekliyor: attachment kaydının bir
 _dosya_ mı yoksa bir _URL_ mi olduğu modelde temsil edilmeli (tip ayrımı), çünkü URL tipinde
 depolama yok, boyut yok, MIME yok. Bu ayrım P3-1 tasarlanırken bilinmezse P3-3 modeli zorlayarak
@@ -124,8 +139,8 @@ ve listedeki hiçbir isim `added` kullanmıyor.
 **`audit/phase-3-plan.md` §4.1b denetim alt kümesi için iki tipi birden önermişti ve önerinin o
 yarısı burada reddediliyor.** 333. satırı "(Öneri: evet, ekleme+silme.)" diyor — yani hem ekleme
 hem silme. Bu ADR silmeyi alıyor, eklemeyi reddediyor. Öneri, soruyu belirleyen iki şeyden önce
-yazılmıştı: §7 karar 4 (satır 910), ki P3-3'e içe aktarılan her URL için bir attachment kaydı
-oluşturan bir toplu import verdi; ve `activity.ts:51-64`'ün alt küme için koyduğu hacim ölçütü.
+yazılmıştı: §7 karar 4, ki P3-3'e içe aktarılan her URL için bir attachment kaydı oluşturan bir
+toplu import verdi; ve `activity.ts:51-64`'ün alt küme için koyduğu hacim ölçütü.
 Daraltma sessizce uygulanmıyor, kayda geçiriliyor: aksi hâlde planı kodla karşılaştıran ileriki bir
 okuyucu sessiz bir tutarsızlık bulur ve hangisinin kastedildiğini tahmin etmek zorunda kalır.
 
@@ -169,8 +184,8 @@ alırdı; bu yüzden iki yarının da bir kontrol testi var.
 **`uploadedById`, `onDelete: Restrict` ile `User`'a giden gerçek bir yabancı anahtardır.** Emsal,
 `apps/api/prisma/schema.prisma:311`'de `Restrict` olan `Comment.user`. Maliyet sonradan
 keşfedilmek yerine burada yazılır: bu, P3-4'ün (hesap silme ve anonimleştirme, bulgu DB-05) üzerinde
-düşünmesi gereken yüzeyi büyütür ve `audit/ROADMAP.md:372` bugünkü durumu zaten "Bugün `Restrict`
-FK'ler yüzünden bir GDPR/KVKK silme talebi psql'de bile yerine getirilemiyor" diye tarif ediyor.
+düşünmesi gereken yüzeyi büyütür — o bulgu bugünkü durumu zaten "Bugün `Restrict` FK'ler yüzünden
+bir GDPR/KVKK silme talebi psql'de bile yerine getirilemiyor" diye tarif ediyor.
 ADR 0023 checklist maddelerinde `User` FK'sinden tam da bu nedenle kaçınmıştı. Bu ADR maliyeti yine
 de ödüyor ve Gerekçe bölümü iki durumun neden farklı olduğunu söylüyor.
 
@@ -331,7 +346,8 @@ yüklemelerin düşük hacimli olmasına yaslanmak zorunda kalırdı; bu da bir 
 değerini ne 0022'nin koyduğu ne bu ADR'ın bilinçli olarak koyduğu bir rate limit'e bağlardı — ve
 yazılmamış bir sayıya yaslanan karar, bu ADR'ın 0022'de düzeltmek için açıldığı kusurun ta
 kendisi. İkincisi ve belirleyici olanı: P3-3'ün importer'ı içe aktarılan her URL için bir
-attachment kaydı oluşturuyor (§7 karar 4, satır 910), yani tek bir board import'u toplu hâlde
+attachment kaydı oluşturuyor (§7 karar 4, Bağlam bölümünde alıntılanan Trello import kapsam
+kararının aynısı), yani tek bir board import'u toplu hâlde
 `attachment.created` satırı yazıyor. Bu tam olarak `comment.created`'ın dışlanma sebebi olan hacim
 davranışı ve hiçbir rate limit'in yönetmediği bir kod yolundan geliyor. Yaratma tarafını dışarıda
 tutmak, importer'ın istediği kadar satır yazabilmesi ve olay-müdahale sorgusunun onları hiç
@@ -428,9 +444,9 @@ türetmeden yeni bir tip ekleyebilmesini sağlayan şey — ve board ile label g
 açıklanabilmesinin de tek yolu, çünkü konum onları hiçbir zaman açıklamıyordu.
 
 **P3-4, bu ADR'ın seçtiği bir biçimde zorlaşıyor.** `User`'a giden bir `Restrict` FK daha, bir
-anonimleştirme tasarımının etrafından dolaşması gereken bir ilişki daha demek ve
-`audit/ROADMAP.md:372` `Restrict` FK'leri zaten bugün bir silme talebinin yerine getirilememesinin
-sebebi olarak sayıyor. Hafifletici gerçek şu: `Attachment.uploadedById`, `Comment.userId` ile
+anonimleştirme tasarımının etrafından dolaşması gereken bir ilişki daha demek ve bulgu DB-05
+zaten `Restrict` FK'leri bugün bir silme talebinin yerine getirilememesinin sebebi olarak sayıyor.
+Hafifletici gerçek şu: `Attachment.uploadedById`, `Comment.userId` ile
 birebir aynı davranıyor, dolayısıyla o tasarıma yeni bir vaka değil hacim ekliyor.
 
 **Proxy sözleşmesi artık salt yönlendirmeyle ilgili değil.** Bugüne kadar üç `handle` kuralı ve
