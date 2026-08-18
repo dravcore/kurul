@@ -221,18 +221,19 @@ services:
   # One-shot: applies pending Prisma migrations, then exits. `api` waits for it to finish
   # successfully before starting, so the schema is never missing on first boot.
   #
-  # `build:` only, deliberately no `image:` fallback pair like api/web below: OPS-04
-  # (audit/findings/devops.md) scopes GHCR publishing to the two long-running services, and
-  # `.github/workflows/release-images.yml` only builds `runner` targets, not this Dockerfile's
-  # `migrate` stage. A source build still runs on every `docker compose up -d` for this one
-  # service — it reuses the same `build` stage the `api` image already paid for above it in
-  # the Dockerfile, ~45-50s uncached, so it does not fully deliver a build-free install on its
-  # own. It does not block the ≤5-minute pull-based install target either (that budget has
-  # headroom for one 45-50s build), and the `migrate` container's own logs make it obvious
-  # when this is what's happening, unlike a silent full rebuild of api or web would be. A
-  # published `kurul-migrate` image is a reasonable next step if this ever needs to shrink
-  # further, not something this fix requires.
+  # `image:` + `build:` fallback pair, same as api/web below. This service used to be
+  # `build:`-only (OPS-04 scoped GHCR publishing to the two long-running services), and that
+  # scoping broke the curl-based install in docs/self-hosting.md outright: that path downloads
+  # no source tree, so a service that can only build never starts, and `api`
+  # (`service_completed_successfully` below) never comes up with it — audit finding OPS-01.
+  # `ghcr.io/dravcore/kurul-migrate` is published by `.github/workflows/release-images.yml`
+  # starting with the first release *after* v0.2.0: on v0.2.0 and older tags the pull fails
+  # for this image, and the git-clone install path (docs/self-hosting.md#troubleshooting) is
+  # the one that works. `build:` stays so a source checkout keeps working exactly as before —
+  # an explicit `docker compose build` (or an unresolvable tag) still builds this Dockerfile's
+  # `migrate` stage locally.
   migrate:
+    image: ghcr.io/dravcore/kurul-migrate:${TAG:-latest}
     build:
       context: .
       dockerfile: apps/api/Dockerfile

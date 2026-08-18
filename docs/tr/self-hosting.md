@@ -7,6 +7,13 @@ Build adımı yok. `docker compose pull` her sürüm için yayınlanan imajları
 her domain'de çalışır — API URL'i imajın içine derlenmiş değildir (gerekçesi için bkz.
 [Neden yeniden build gerekmiyor](#neden-yeniden-build-gerekmiyor)).
 
+> **v0.2.0 mu kuruyorsunuz? Bunun yerine `git clone` kullanın.** v0.2.0 ve öncesi sürümler
+> yalnızca `api` ve `web` imajlarını yayınladı; bu sayfanın çektiği üçüncü imaj olan
+> `kurul-migrate`, v0.2.0'dan sonraki ilk sürümden itibaren var. Aşağıdaki indirme adımı build
+> edilecek bir kaynak ağacı getirmediği için v0.2.0'da bu sayfadaki adımlar stack'i
+> başlatamaz — [Sorun giderme](#sorun-giderme) bölümünde gösterildiği gibi clone'dan kurun ve
+> bir sonraki sürümden itibaren bu sayfaya dönün.
+
 ## Gerekenler
 
 - Public IP'si olan, Docker Engine 24+ ve Compose eklentisi kurulu bir sunucu. Küçük bir ekip
@@ -54,8 +61,15 @@ mkdir -p /opt/kurul && cd /opt/kurul
 curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
 curl -fsSL --create-dirs -o docker/Caddyfile \
   https://raw.githubusercontent.com/dravcore/kurul/main/docker/Caddyfile
+curl -fsSL --create-dirs -o scripts/backup.sh \
+  https://raw.githubusercontent.com/dravcore/kurul/main/scripts/backup.sh
+chmod +x scripts/backup.sh
 curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/main/.env.example
 ```
+
+`scripts/backup.sh` isteğe bağlı değil: `docker-compose.yml` içindeki `backup` servisi tam
+olarak o yolu container'ına bind-mount eder ve dosya yoksa o servisin var olma amacı olan
+zamanlanmış yedekler hiç alınmaz.
 
 `.env`'i düzenleyin. Yalnızca Docker ile kurulumda önemli olan satırlar şunlar — dosyadaki geri
 kalan her şey ya geliştirme döngüsü için ya da çalışan bir varsayılana sahip:
@@ -348,8 +362,10 @@ cosign verify \
   ghcr.io/dravcore/kurul-api:v0.2.0
 ```
 
-Aynısını `kurul-web` için tekrarlayın; başka bir sürümü doğrularken `v0.2.0`'ı iki yerde de
-değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi anlatıyor: biri imzalayan workflow'un
+Aynısını `kurul-web` için — ve v0.2.0'dan sonraki sürümlerde, kendisini ilk yayınlayan
+sürümden itibaren aynı şekilde imzalanan `kurul-migrate` için — tekrarlayın; başka bir sürümü
+doğrularken `v0.2.0`'ı iki yerde de değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi
+anlatıyor: biri imzalayan workflow'un
 üzerinde çalıştığı git ref'i, diğeri sorduğunuz imaj tag'i.
 
 **Bütün kontrol bu iki `--certificate-*` bayrağıdır; onları atmayın.** Burada korunacak bir
@@ -398,6 +414,8 @@ kurul-api-v0.2.0-linux-arm64.spdx.json
 kurul-web-v0.2.0-linux-amd64.spdx.json
 kurul-web-v0.2.0-linux-arm64.spdx.json
 ```
+
+v0.2.0'dan sonraki sürümler aynı çifti `kurul-migrate` için de ekler.
 
 Format SPDX 2.3 JSON; `grype`, `trivy` ve Dependency-Track'in üçü de dönüştürmeden okur:
 
@@ -573,13 +591,15 @@ dönersiniz — bu bir eksiklik değil, bilinçli takastır.
 
 ## Sorun giderme
 
-**`docker compose pull` `denied` ile bitiyor.** `api` ve `web` imajlarını, bir release tag'inde
-çalışan bir workflow yayınlar; dolayısıyla `v0.2.0` ve sonrası için varlar, daha eskisi için
-yoklar. Bunlardan önceki bir sürümdeyken iki sonuç doğar. `docker compose pull`, `postgres`,
-`redis` ve `caddy`'yi başarıyla indirdikten sonra sıfırdan farklı bir kodla çıkar — yalnızca
-çıkış koduna değil çıktının sonuna bakın, çünkü başarılı olan üçü, olmayan ikisini ekrandan
-yukarı kaydırır. Bir de 2. adımda indirdiğiniz dosyalar `main` dalından gelir ve `main` yalnızca
-en son release'in taşıdığını taşır: `docker-compose.yml` içinde `proxy:` servisi yoksa ve
+**`docker compose pull` `denied` ile bitiyor.** İmajları, bir release tag'inde çalışan bir
+workflow yayınlar; dolayısıyla her biri yalnızca kendisini ilk taşıyan sürümden itibaren var:
+`api` ve `web` `v0.2.0`'dan, `kurul-migrate` ise `v0.2.0`'dan sonraki ilk sürümden itibaren —
+`v0.2.0`'da diğer ikisi çözülse bile o tek imaj için pull başarısız olur. Bir imajdan önceki
+bir sürümdeyken iki sonuç doğar. `docker compose pull`, `postgres`, `redis` ve `caddy`'yi
+başarıyla indirdikten sonra sıfırdan farklı bir kodla çıkar — yalnızca çıkış koduna değil
+çıktının sonuna bakın, çünkü başarılı olanlar, olmayanları ekrandan yukarı kaydırır. Bir de 2.
+adımda indirdiğiniz dosyalar `main` dalından gelir ve `main` yalnızca en son release'in
+taşıdığını taşır: `docker-compose.yml` içinde `proxy:` servisi yoksa ve
 indirilecek bir `docker/Caddyfile` yoksa release'in ilerisindesiniz demektir ve bu rehberdeki
 HTTPS'in hiçbiri az önce indirdiğiniz şey için geçerli değildir. Ya release'i bekleyin ya da
 çekmek yerine kaynaktan build edin:
@@ -590,8 +610,8 @@ docker compose up -d --build
 ```
 
 Tek fark bunun daha yavaş olmasıdır — api imajı bir dakika kadar build alır.
-`docker-compose.yml` her iki servis için bilinçli olarak hem `image:` hem `build:` taşır; böylece
-aynı dosya, çözülebilen bir yayınlanmış imaj varsa ondan, yoksa kaynaktan kurar.
+`docker-compose.yml` üç servisin üçü için de bilinçli olarak hem `image:` hem `build:` taşır;
+böylece aynı dosya, çözülebilen bir yayınlanmış imaj varsa ondan, yoksa kaynaktan kurar.
 
 **Sertifika bir türlü alınmıyor.** 80 ve 443 portlarının ikisi de public internetten sunucuya
 ulaşabilmeli ve DNS çoktan çözülüyor olmalı. `docker compose logs proxy` hatanın adını verir.
