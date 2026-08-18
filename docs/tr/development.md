@@ -418,11 +418,11 @@ portlarını yayınlamaz. Tamamını bir domain'e taşımak için `.env`'de
 `SITE_URL=https://kurul.example.com` ayarlayın; bu aynı zamanda otomatik HTTPS'i de açar —
 SMTP ve yedekler dahil adım adım rehber: [Self-hosting](self-hosting.md).
 
-`docker-compose.yml`'de `api` ve `web`, hem `image:` hem `build:` bildirir. Her etiketli
-release ikisini de GHCR'a yayınlar (`.github/workflows/release-images.yml`, `linux/amd64` +
-`linux/arm64`), böylece `pull` hazır build edilmiş imajı çeker, ardından gelen `up -d` de
-onu başlatır — lokal build yok, `pnpm install` yok, Docker layer cache ısıtması yok. Belirli
-bir release'i `latest` yerine sabitlemek için `.env`'de `TAG` ayarlayın:
+`docker-compose.yml`'de `api`, `web` ve `migrate`, üçü de hem `image:` hem `build:` bildirir.
+Her etiketli release üçünü de GHCR'a yayınlar (`.github/workflows/release-images.yml`,
+`linux/amd64` + `linux/arm64`), böylece `pull` hazır build edilmiş imajı çeker, ardından gelen
+`up -d` de onu başlatır — lokal build yok, `pnpm install` yok, Docker layer cache ısıtması yok.
+Belirli bir release'i `latest` yerine sabitlemek için `.env`'de `TAG` ayarlayın:
 
 ```bash
 TAG=v0.2.0   # release-images.yml'in yayınladığı bir tag ile eşleşmeli; liste için `git tag -l`

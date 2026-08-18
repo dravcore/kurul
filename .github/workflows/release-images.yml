@@ -90,10 +90,14 @@ jobs:
       # `merge` job creates, and that is what carries the signature.
       packages: write
     strategy:
-      # The legs share no build cache: api and web have independent Dockerfiles, migrate builds
-      # the api Dockerfile's mid-file `migrate` stage in a cache scope of its own, and neither
-      # architecture shares with the other — so there is nothing to serialize for, and a
-      # failure in any one leg should not abort the other five.
+      # No architecture ever shares a cache with the other — an arm64 scope is useless to an
+      # amd64 build — so there is nothing to serialize across platforms, and a failure in any
+      # one leg should not abort the rest. Within a platform, web builds an independent
+      # Dockerfile and shares no cache with anything. api and migrate do share: both build
+      # apps/api/Dockerfile (the `runner` target vs. its mid-file `migrate` stage), so each
+      # migrate leg's `cache_from` also reads the same-platform kurul-api scope below — every
+      # layer before the two targets diverge (deps install, `prisma generate`, `nest build`) is
+      # one BuildKit already has from the api leg's own push, not a re-run.
       fail-fast: false
       matrix:
         include:
@@ -102,34 +106,46 @@ jobs:
             target: runner
             platform: amd64
             runner: ubuntu-latest
+            cache_from: type=gha,scope=kurul-api-amd64
           - image: kurul-api
             dockerfile: apps/api/Dockerfile
             target: runner
             platform: arm64
             runner: ubuntu-24.04-arm
+            cache_from: type=gha,scope=kurul-api-arm64
           - image: kurul-web
             dockerfile: apps/web/Dockerfile
             target: runner
             platform: amd64
             runner: ubuntu-latest
+            cache_from: type=gha,scope=kurul-web-amd64
           - image: kurul-web
             dockerfile: apps/web/Dockerfile
             target: runner
             platform: arm64
             runner: ubuntu-24.04-arm
+            cache_from: type=gha,scope=kurul-web-arm64
           # OPS-01: the one-shot migration runner, so the compose migrate service can pull
           # instead of requiring a source tree the curl-based install never downloads. Same
-          # Dockerfile as kurul-api, different stage.
+          # Dockerfile as kurul-api, different stage — cache_from lists the kurul-api scope of
+          # the same platform second, so the shared prefix of the two stages is a cache hit
+          # from whichever of the pair's two legs (api, migrate) ran first in this workflow.
           - image: kurul-migrate
             dockerfile: apps/api/Dockerfile
             target: migrate
             platform: amd64
             runner: ubuntu-latest
+            cache_from: |
+              type=gha,scope=kurul-migrate-amd64
+              type=gha,scope=kurul-api-amd64
           - image: kurul-migrate
             dockerfile: apps/api/Dockerfile
             target: migrate
             platform: arm64
             runner: ubuntu-24.04-arm
+            cache_from: |
+              type=gha,scope=kurul-migrate-arm64
+              type=gha,scope=kurul-api-arm64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -174,9 +190,13 @@ jobs:
           # are produced below, after the merge, over the artifact a user actually pulls.
           provenance: false
           sbom: false
-          # Scope is per image *and* per platform: an arm64 cache is useless to an amd64 build
-          # and sharing one scope between them means each eviction costs the other.
-          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }}
+          # cache-to stays scoped to this leg's own image *and* platform: an arm64 cache is
+          # useless to an amd64 build, and sharing one scope between them means each eviction
+          # costs the other. cache-from reads further — `matrix.cache_from` (defined per leg
+          # above) adds the same-platform kurul-api scope for the two migrate legs, since they
+          # share every layer of apps/api/Dockerfile up to where the `migrate` and `runner`
+          # targets diverge.
+          cache-from: ${{ matrix.cache_from }}
           cache-to: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }},mode=max
 
       # The digest is the whole output of this job. It travels as a filename rather than as
@@ -441,7 +461,7 @@ jobs:
       - name: Attach the SBOMs to the GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # This job deliberately has no `actions/checkout` — it needs four JSON files from the
+          # This job deliberately has no `actions/checkout` — it needs six JSON files from the
           # previous job, not the source tree. But `gh` normally works out which repository it
           # is talking about from the git remote in the working directory, and there is no git
           # repository here for it to read. `GH_REPO` is what replaces that, and without it

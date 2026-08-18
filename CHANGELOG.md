@@ -63,6 +63,35 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   to the dev loop only — `docker-compose.yml` assembles its own connection string from
   `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` and never reads that line.
 
+### Fixed
+
+- **The curl-based self-host install could never finish, and scheduled backups silently never
+  ran.** [self-hosting.md](docs/self-hosting.md) downloads only `docker-compose.yml`,
+  `docker/Caddyfile` and `.env.example` — no source tree — but the `migrate` service was
+  `build:`-only, so `docker compose up -d` had nothing to build it from and `api`
+  (`depends_on migrate: service_completed_successfully`) could never start: the guide's "no
+  build step" promise was unfulfillable on the path it documents. A third published image,
+  `ghcr.io/dravcore/kurul-migrate`, fixes that — built from `apps/api/Dockerfile`'s `migrate`
+  stage on `linux/amd64` + `linux/arm64`, following the same per-arch build, digest merge,
+  cosign signature and SBOM pattern already applied to `kurul-api` and `kurul-web`
+  ([release-images.yml](.github/workflows/release-images.yml)). `docker-compose.yml`'s
+  `migrate` service now carries `image: ghcr.io/dravcore/kurul-migrate:${TAG:-latest}`
+  alongside its existing `build:`, the same fallback pair `api`/`web` already had.
+
+  Independently, the same download step never fetched `scripts/backup.sh` either, which the
+  `backup` service bind-mounts — so on a fresh curl-based install, scheduled backups silently
+  never ran, with nothing in the logs to say why.
+  [self-hosting.md](docs/self-hosting.md) (+ [tr mirror](docs/tr/self-hosting.md)) now
+  downloads it alongside the compose file.
+
+  **`kurul-migrate` exists from the first release after v0.2.0 onward, not on v0.2.0 itself** —
+  the workflow that publishes it is new in this change. An operator following the curl-based
+  guide against a `v0.2.0` install still hits the original failure; `git clone` is the
+  documented workaround until the next tag ships, and the guide now says so up front instead
+  of leaving that to be discovered from a pull failure.
+
+  Audit finding OPS-01.
+
 ### Security
 
 - **Pinned `deepmerge-ts` to `^8.0.1` through a pnpm override**, closing

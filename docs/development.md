@@ -414,11 +414,11 @@ their own. Point the whole thing at a domain by setting `SITE_URL=https://kurul.
 in `.env`, which also switches automatic HTTPS on — the walkthrough for that, SMTP and backups
 included, is [Self-hosting](self-hosting.md).
 
-`api` and `web` in `docker-compose.yml` declare both `image:` and `build:`. Every tagged
-release publishes both to GHCR (`.github/workflows/release-images.yml`, `linux/amd64` +
-`linux/arm64`), so `pull` fetches a ready-built image and the following `up -d` starts it —
-no local build, no `pnpm install`, no Docker layer cache warm-up. Set `TAG` in `.env` to pin
-a specific release instead of the default `latest`:
+`api`, `web` and `migrate` in `docker-compose.yml` all declare both `image:` and `build:`.
+Every tagged release publishes all three to GHCR (`.github/workflows/release-images.yml`,
+`linux/amd64` + `linux/arm64`), so `pull` fetches a ready-built image and the following `up -d`
+starts it — no local build, no `pnpm install`, no Docker layer cache warm-up. Set `TAG` in
+`.env` to pin a specific release instead of the default `latest`:
 
 ```bash
 TAG=v0.2.0   # matches a tag published by release-images.yml; see `git tag -l` for the list
