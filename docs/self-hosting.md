@@ -127,7 +127,7 @@ check. A healthy stack reads like this:
 
 ```
 api        Up 27 seconds (healthy)
-backup     Up 28 seconds
+backup     Up 28 seconds (health: starting)
 migrate    Exited (0) 27 seconds ago
 postgres   Up 34 seconds (healthy)
 proxy      Up 16 seconds
@@ -137,8 +137,10 @@ web        Up 22 seconds (healthy)
 
 `Exited (0)` on `migrate` is success — migrations applied, job done. A non-zero exit there is
 the one to chase (`docker compose logs migrate`), and `api` will not have started at all.
-`backup` and `proxy` show no `(healthy)` because neither declares a healthcheck, not because
-anything is wrong with them.
+`proxy` shows no `(healthy)` at all because it declares no healthcheck. `backup` does declare
+one — it watches for a fresh dump in `/backups` — but its `start_period` is generous (10
+minutes) so a database still taking its first `pg_dump` reads as `(health: starting)`, not
+unhealthy; give it time and check again with `docker compose ps backup`.
 
 The first request to `https://kurul.example.com` may take a few seconds while Caddy
 completes the ACME challenge. Watch it happen if it does not:
@@ -220,6 +222,26 @@ The full parameter list — 5-minute interval, 2 consecutive failures before ale
 `200`, 10-second timeout, e-mail contact with the "back up" notification enabled — is in
 [Uptime monitoring](development.md#uptime-monitoring--set-this-up-it-is-the-one-that-catches-an-outage),
 along with the push-based alternative for an instance that is not reachable from the internet.
+
+**Also watch backup freshness — `/api/health/ready` does not cover it.** The `backup` sidecar
+can stop producing dumps (a `pg_dump` that keeps failing, a volume that filled up) without ever
+touching the database connection the API's readiness probe checks, so that endpoint stays green
+through the whole outage. `backup`'s own Docker healthcheck is the signal instead: unhealthy
+means the newest `/backups/kurul-*.dump` is older than `2 × BACKUP_INTERVAL` (48 hours on the
+default 24h interval), which is the point at which the API's own retention sweep can no longer
+assume a recent dump exists to fall back on. Point your monitor's container-health check (most
+uptime tools that support Docker, or a cron `docker inspect` on the host) at it, or at minimum
+check it by hand periodically:
+
+```bash
+docker compose ps backup                                        # "(healthy)" or "(unhealthy)"
+docker inspect --format '{{.State.Health.Status}}' kurul-backup-1
+```
+
+An `(unhealthy)` `backup` does not need a restart — `restart: unless-stopped` does not act on
+health status, so the sidecar keeps running and retrying on its own — it needs
+`docker compose logs backup` read, because something (usually a failing `pg_dump`) is actually
+wrong and the next scheduled cycle inherits the same problem until that's fixed.
 
 Then fire it once on purpose, because an alerting setup that has never fired is a hypothesis:
 

@@ -217,6 +217,62 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # OPS-02 (audit/findings/devops.md, 2026-08-18 audit): backup.sh's main loop runs
+    # `take_dump || true` / `take_files || true` (see there) so ONE failing cycle only logs
+    # and keeps sleeping — the process itself never exits non-zero, and without this block
+    # nothing about the container's state changed either. A dump could stop being produced
+    # entirely and `docker compose ps` would carry on reporting this service as simply "Up".
+    # RPO grows unbounded and nothing outside the container's own logs says so — exactly the
+    # gap the retention sweep's grace window (`BACKUP_KEEP × BACKUP_INTERVAL`,
+    # apps/api/src/retention/cleanup.worker.ts) quietly assumes never happens.
+    #
+    # "Healthy" = a `kurul-*.dump` in /backups modified within the last 2×BACKUP_INTERVAL
+    # seconds. 2×, not 1×, so one slow or skipped cycle (a big `pg_dump`, or postgres
+    # restarting underneath it — both already survived by the `|| true` above) doesn't flap
+    # this healthy → unhealthy → healthy every single interval; it takes a SECOND missed
+    # cycle in a row to actually mean something is stuck.
+    #
+    # `find -mmin`, not GNU `find -newermt`: this image is postgres:18-alpine, whose `find`
+    # is BusyBox's and has no `-newermt`/`-newermin` at all — confirmed with
+    # `docker run --rm postgres:18-alpine find --help`. `-mmin` (BusyBox has this one) takes
+    # whole minutes, hence the `* 2 + 59) / 60` ceiling and the `-lt 1` floor so a small
+    # BACKUP_INTERVAL (e.g. an integration test running this service with BACKUP_INTERVAL=5)
+    # can never round down to `-mmin -0`, which BusyBox reads as "modified in the last zero
+    # minutes" and would never match anything, ever.
+    #
+    # $BACKUP_INTERVAL is this container's own environment variable, set two keys above from
+    # `${BACKUP_INTERVAL:-86400}` — Compose bakes that default in at `docker compose config`
+    # time regardless of whether an operator's `.env` sets it, so the value this check reads
+    # at runtime always matches what backup.sh itself is sleeping for. Every `$` below is
+    # doubled (`$$`) because this whole command is interpreted by the CONTAINER's shell, not
+    # by Compose's interpolation of this file — the same escaping `redis`'s healthcheck above
+    # uses for `$REDIS_PASSWORD`, for the identical reason.
+    #
+    # Pruning (`prune()` in backup.sh, keeps the newest BACKUP_KEEP of each series) cannot
+    # make a healthy instance look unhealthy: it only ever deletes the OLDEST matching files,
+    # never the newest, so the one file `-mmin` looks at survives every prune pass right up
+    # until the whole series has actually gone stale — which is exactly the condition this
+    # check exists to surface.
+    #
+    # `start_period` is deliberately NOT scaled to BACKUP_INTERVAL. The very first dump
+    # starts immediately at container boot (see backup.sh's main loop below `mkdir -p
+    # "$BACKUP_DIR"`), not after one BACKUP_INTERVAL has elapsed, so how long it takes is a
+    # function of database size, not of the configured cadence — sizing it off a 24h default
+    # would hide a genuinely broken first cycle for most of a day. 10 minutes is generous for
+    # the databases a single-host Compose install runs (this file's whole premise, and
+    # self-hosting.md's); an instance with an unusually large first dump that still needs
+    # longer can raise `start_period` with a compose override file, same as any other
+    # deployment-specific tuning in this project, rather than a knob added here pre-emptively.
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mmin=$$(( ($$BACKUP_INTERVAL * 2 + 59) / 60 )); [ "$$mmin" -lt 1 ] && mmin=1; find /backups -maxdepth 1 -name "kurul-*.dump" -mmin "-$$mmin" 2>/dev/null | grep -q .',
+        ]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 10m
 
   # One-shot: applies pending Prisma migrations, then exits. `api` waits for it to finish
   # successfully before starting, so the schema is never missing on first boot.
