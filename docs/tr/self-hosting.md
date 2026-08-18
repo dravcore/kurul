@@ -3,9 +3,18 @@
 Kurul'u bir sunucuya, kendi domain'inize, HTTPS ve çalışan e-posta ile kurun. Aşağıdakilerin
 tamamı bilinçli olarak tek sayfa; çoğu DNS beklemekle geçen yaklaşık bir saat ayırın.
 
+> 🌐 [English (canonical)](../self-hosting.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+
 Build adımı yok. `docker compose pull` her sürüm için yayınlanan imajları indirir ve aynı imaj
 her domain'de çalışır — API URL'i imajın içine derlenmiş değildir (gerekçesi için bkz.
 [Neden yeniden build gerekmiyor](#neden-yeniden-build-gerekmiyor)).
+
+> **v0.2.0 mu kuruyorsunuz? Bunun yerine `git clone` kullanın.** v0.2.0 ve öncesi sürümler
+> yalnızca `api` ve `web` imajlarını yayınladı; bu sayfanın çektiği üçüncü imaj olan
+> `kurul-migrate`, v0.2.0'dan sonraki ilk sürümden itibaren var. Aşağıdaki indirme adımı build
+> edilecek bir kaynak ağacı getirmediği için v0.2.0'da bu sayfadaki adımlar stack'i
+> başlatamaz — [Sorun giderme](#sorun-giderme) bölümünde gösterildiği gibi clone'dan kurun ve
+> bir sonraki sürümden itibaren bu sayfaya dönün.
 
 ## Gerekenler
 
@@ -54,8 +63,15 @@ mkdir -p /opt/kurul && cd /opt/kurul
 curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
 curl -fsSL --create-dirs -o docker/Caddyfile \
   https://raw.githubusercontent.com/dravcore/kurul/main/docker/Caddyfile
+curl -fsSL --create-dirs -o scripts/backup.sh \
+  https://raw.githubusercontent.com/dravcore/kurul/main/scripts/backup.sh
+chmod +x scripts/backup.sh
 curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/main/.env.example
 ```
+
+`scripts/backup.sh` isteğe bağlı değil: `docker-compose.yml` içindeki `backup` servisi tam
+olarak o yolu container'ına bind-mount eder ve dosya yoksa o servisin var olma amacı olan
+zamanlanmış yedekler hiç alınmaz.
 
 `.env`'i düzenleyin. Yalnızca Docker ile kurulumda önemli olan satırlar şunlar — dosyadaki geri
 kalan her şey ya geliştirme döngüsü için ya da çalışan bir varsayılana sahip:
@@ -74,8 +90,11 @@ SMTP_SECURE=false                              # yalnızca 465 portu için true
 MAIL_FROM=Kurul <kurul@example.com>
 ```
 
-İki gizli değeri `openssl rand -hex 32` ile üretin. `-base64` değil `-hex`: base64 çıktısı `/`
-içerebilir ve her iki değer de bir URL'in içine giriyor — orada bir slash URL'i keser.
+İki gizli değeri de `openssl rand -hex 32` ile üretin. `POSTGRES_PASSWORD` doğrudan bir bağlantı
+URL'inin içine giriyor; `-base64` çıktısındaki bir `/` orada URL'i keser — `-hex`'in alfabesinde
+(`0-9a-f`) böyle bir karakter yok. `BETTER_AUTH_SECRET` yalnızca byte byte karşılaştırılıyor,
+yani bu kısıtı taşımıyor, ama onu da `-hex` ile üretmek, değişken başına ayrı bir kural yerine
+tek bir üreticiyi akılda tutmak demek.
 
 `SITE_URL` şemayı taşır, çünkü Caddy'nin düz HTTP mi sunacağına yoksa sertifika mı alacağına
 karar veren şey odur. `https://…` otomatik HTTPS'i açar. `http://localhost` (varsayılan) ise
@@ -116,7 +135,7 @@ satırı atlar. Sağlıklı bir stack şöyle görünür:
 
 ```
 api        Up 27 seconds (healthy)
-backup     Up 28 seconds
+backup     Up 28 seconds (health: starting)
 migrate    Exited (0) 27 seconds ago
 postgres   Up 34 seconds (healthy)
 proxy      Up 16 seconds
@@ -126,8 +145,11 @@ web        Up 22 seconds (healthy)
 
 `migrate` satırındaki `Exited (0)` başarı demektir — migration'lar uygulandı, iş bitti. Peşine
 düşülmesi gereken, sıfırdan farklı bir çıkış kodudur (`docker compose logs migrate`); o durumda
-`api` zaten hiç başlamamış olur. `backup` ve `proxy` yanında `(healthy)` yazmaması, bir sorun
-olduğu için değil, ikisinin de healthcheck tanımlamamış olmasındandır.
+`api` zaten hiç başlamamış olur. `proxy` yanında `(healthy)` hiç yazmaz, çünkü hiç healthcheck
+tanımlamaz. `backup` bir healthcheck tanımlar — `/backups` içinde taze bir dump arar — ama
+`start_period`'ı geniştir (10 dakika), yani ilk `pg_dump`'ını henüz alan bir veritabanı
+unhealthy değil `(health: starting)` görünür; zaman tanıyıp `docker compose ps backup` ile
+tekrar bakın.
 
 `https://kurul.example.com` adresine ilk istek, Caddy ACME doğrulamasını tamamlarken birkaç
 saniye sürebilir. Sürmezse olan biteni izleyin:
@@ -209,6 +231,28 @@ Parametrelerin tamamı — 5 dakikalık aralık, alarmdan önce 2 ardışık ba�
 `200` kabul, 10 saniyelik timeout, "geri geldi" bildirimi açık bir e-posta kontağı —
 [Uptime izleme](development.md#uptime-izleme--kesintiyi-asıl-yakalayan-bu-kurun)
 bölümünde; internetten erişilemeyen bir örnek için push tabanlı alternatif de orada.
+
+**Yedek tazeliğini de izleyin — `/api/health/ready` bunu kapsamaz.** `backup` sidecar'ı,
+API'nin readiness probe'unun kontrol ettiği veritabanı bağlantısına hiç dokunmadan dump
+üretmeyi durdurabilir (sürekli başarısız olan bir `pg_dump`, dolan bir volume) — o zaman bu
+endpoint kesintinin tamamı boyunca yeşil kalır. Bunun yerine sinyal, `backup`'ın kendi Docker
+healthcheck'idir: unhealthy, `/backups/kurul-*.dump` içindeki en yeni dosyanın
+`2 × BACKUP_INTERVAL`'dan (varsayılan 24 saatlik aralıkta 48 saat) daha eski olduğu anlamına
+gelir — bu da API'nin kendi retention süpürmesinin artık yakın zamanlı bir dump'a
+güvenemeyeceği noktadır. Monitör aracınızın container-health kontrolünü (Docker'ı destekleyen
+çoğu uptime aracı, ya da host üzerinde bir cron `docker inspect`) buna yönlendirin, ya da en
+azından zaman zaman elle kontrol edin:
+
+```bash
+docker compose ps backup                                        # "(healthy)" veya "(unhealthy)"
+docker inspect --format '{{.State.Health.Status}}' kurul-backup-1
+```
+
+`(unhealthy)` bir `backup`'ın yeniden başlatılmaya ihtiyacı yoktur — `restart: unless-stopped`
+health durumuna göre hareket etmez, sidecar kendi kendine çalışmaya ve denemeye devam eder —
+ihtiyacı olan şey `docker compose logs backup` okumaktır, çünkü gerçekten bir şey (genellikle
+başarısız olan bir `pg_dump`) yanlış gitmiştir ve düzeltilmediği sürece bir sonraki
+zamanlanmış döngü aynı sorunu devralır.
 
 Sonra bilerek bir kez tetikleyin, çünkü hiç ateşlenmemiş bir alarm kurulumu bir güvence değil
 bir varsayımdır:
@@ -348,8 +392,10 @@ cosign verify \
   ghcr.io/dravcore/kurul-api:v0.2.0
 ```
 
-Aynısını `kurul-web` için tekrarlayın; başka bir sürümü doğrularken `v0.2.0`'ı iki yerde de
-değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi anlatıyor: biri imzalayan workflow'un
+Aynısını `kurul-web` için — ve v0.2.0'dan sonraki sürümlerde, kendisini ilk yayınlayan
+sürümden itibaren aynı şekilde imzalanan `kurul-migrate` için — tekrarlayın; başka bir sürümü
+doğrularken `v0.2.0`'ı iki yerde de değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi
+anlatıyor: biri imzalayan workflow'un
 üzerinde çalıştığı git ref'i, diğeri sorduğunuz imaj tag'i.
 
 **Bütün kontrol bu iki `--certificate-*` bayrağıdır; onları atmayın.** Burada korunacak bir
@@ -398,6 +444,8 @@ kurul-api-v0.2.0-linux-arm64.spdx.json
 kurul-web-v0.2.0-linux-amd64.spdx.json
 kurul-web-v0.2.0-linux-arm64.spdx.json
 ```
+
+v0.2.0'dan sonraki sürümler aynı çifti `kurul-migrate` için de ekler.
 
 Format SPDX 2.3 JSON; `grype`, `trivy` ve Dependency-Track'in üçü de dönüştürmeden okur:
 
@@ -573,13 +621,15 @@ dönersiniz — bu bir eksiklik değil, bilinçli takastır.
 
 ## Sorun giderme
 
-**`docker compose pull` `denied` ile bitiyor.** `api` ve `web` imajlarını, bir release tag'inde
-çalışan bir workflow yayınlar; dolayısıyla `v0.2.0` ve sonrası için varlar, daha eskisi için
-yoklar. Bunlardan önceki bir sürümdeyken iki sonuç doğar. `docker compose pull`, `postgres`,
-`redis` ve `caddy`'yi başarıyla indirdikten sonra sıfırdan farklı bir kodla çıkar — yalnızca
-çıkış koduna değil çıktının sonuna bakın, çünkü başarılı olan üçü, olmayan ikisini ekrandan
-yukarı kaydırır. Bir de 2. adımda indirdiğiniz dosyalar `main` dalından gelir ve `main` yalnızca
-en son release'in taşıdığını taşır: `docker-compose.yml` içinde `proxy:` servisi yoksa ve
+**`docker compose pull` `denied` ile bitiyor.** İmajları, bir release tag'inde çalışan bir
+workflow yayınlar; dolayısıyla her biri yalnızca kendisini ilk taşıyan sürümden itibaren var:
+`api` ve `web` `v0.2.0`'dan, `kurul-migrate` ise `v0.2.0`'dan sonraki ilk sürümden itibaren —
+`v0.2.0`'da diğer ikisi çözülse bile o tek imaj için pull başarısız olur. Bir imajdan önceki
+bir sürümdeyken iki sonuç doğar. `docker compose pull`, `postgres`, `redis` ve `caddy`'yi
+başarıyla indirdikten sonra sıfırdan farklı bir kodla çıkar — yalnızca çıkış koduna değil
+çıktının sonuna bakın, çünkü başarılı olanlar, olmayanları ekrandan yukarı kaydırır. Bir de 2.
+adımda indirdiğiniz dosyalar `main` dalından gelir ve `main` yalnızca en son release'in
+taşıdığını taşır: `docker-compose.yml` içinde `proxy:` servisi yoksa ve
 indirilecek bir `docker/Caddyfile` yoksa release'in ilerisindesiniz demektir ve bu rehberdeki
 HTTPS'in hiçbiri az önce indirdiğiniz şey için geçerli değildir. Ya release'i bekleyin ya da
 çekmek yerine kaynaktan build edin:
@@ -590,8 +640,8 @@ docker compose up -d --build
 ```
 
 Tek fark bunun daha yavaş olmasıdır — api imajı bir dakika kadar build alır.
-`docker-compose.yml` her iki servis için bilinçli olarak hem `image:` hem `build:` taşır; böylece
-aynı dosya, çözülebilen bir yayınlanmış imaj varsa ondan, yoksa kaynaktan kurar.
+`docker-compose.yml` üç servisin üçü için de bilinçli olarak hem `image:` hem `build:` taşır;
+böylece aynı dosya, çözülebilen bir yayınlanmış imaj varsa ondan, yoksa kaynaktan kurar.
 
 **Sertifika bir türlü alınmıyor.** 80 ve 443 portlarının ikisi de public internetten sunucuya
 ulaşabilmeli ve DNS çoktan çözülüyor olmalı. `docker compose logs proxy` hatanın adını verir.

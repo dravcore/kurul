@@ -31,7 +31,8 @@ The monorepo and MVP feature set (Phases 1–9; Phase 0 was docs/standards) **ex
 page are the day-to-day contract — if reality and this document diverge, one of the two is a
 bug and gets fixed in the same PR.
 
-- Layout, Prisma models, and early acceptance criteria: [project-skeleton.md](project-skeleton.md)
+- Layout and module map: [architecture.md](architecture.md#2-monorepo-layout)
+- Data model and critical field rules: [architecture.md](architecture.md#critical-field-rules)
 - Phase progress (MVP complete): [roadmap.md](roadmap.md)
 - Why each tool was chosen: [tech-stack.md](tech-stack.md)
 
@@ -414,11 +415,11 @@ their own. Point the whole thing at a domain by setting `SITE_URL=https://kurul.
 in `.env`, which also switches automatic HTTPS on — the walkthrough for that, SMTP and backups
 included, is [Self-hosting](self-hosting.md).
 
-`api` and `web` in `docker-compose.yml` declare both `image:` and `build:`. Every tagged
-release publishes both to GHCR (`.github/workflows/release-images.yml`, `linux/amd64` +
-`linux/arm64`), so `pull` fetches a ready-built image and the following `up -d` starts it —
-no local build, no `pnpm install`, no Docker layer cache warm-up. Set `TAG` in `.env` to pin
-a specific release instead of the default `latest`:
+`api`, `web` and `migrate` in `docker-compose.yml` all declare both `image:` and `build:`.
+Every tagged release publishes all three to GHCR (`.github/workflows/release-images.yml`,
+`linux/amd64` + `linux/arm64`), so `pull` fetches a ready-built image and the following `up -d`
+starts it — no local build, no `pnpm install`, no Docker layer cache warm-up. Set `TAG` in
+`.env` to pin a specific release instead of the default `latest`:
 
 ```bash
 TAG=v0.2.0   # matches a tag published by release-images.yml; see `git tag -l` for the list
@@ -432,11 +433,14 @@ exact same source build this repo has always done — when there's no image for 
 up --build` (or `up -d --build`) keeps working unchanged for building on purpose, e.g. after
 editing a Dockerfile or testing an unreleased change to `api`/`web`.
 
-The one exception is `migrate`: it has no `image:` pair (see the comment beside it in
-`docker-compose.yml` for why), so it always builds from source — a `docker compose up -d`
-that pulls `api`/`web` from GHCR still pays that one service's build cost once. See
-[audit finding OPS-04](https://github.com/dravcore/kurul/issues/126) for the full scoping
-rationale.
+`migrate` used to be the one exception: it had no `image:` pair, so it always built from
+source — a scoping [audit finding OPS-04](https://github.com/dravcore/kurul/issues/126) chose
+deliberately, and one that turned out to break the curl-based install in
+[docs/self-hosting.md](self-hosting.md), which downloads no source tree to build from (audit
+finding OPS-01). It now carries the same `image:` + `build:` pair as `api`/`web`, with
+`ghcr.io/dravcore/kurul-migrate` published from the first release after v0.2.0 onward — on
+`TAG=v0.2.0` or older there is no such image to pull and the service builds from source
+exactly as before.
 
 ### What the two API images weigh
 
@@ -606,8 +610,8 @@ Rules:
 - Schema changes go in their own PR, separate from the logic that uses them, whenever that
   split is practical.
 - `Task.position` and `Column.position` are `Float` (fractional indexing) — see
-  [project-skeleton.md](project-skeleton.md) for the model-level rules that must not be
-  changed casually.
+  [architecture.md](architecture.md#critical-field-rules) for the model-level rules that must
+  not be changed casually.
 
 Resetting a local database from scratch:
 
@@ -1454,7 +1458,7 @@ specified in [git-strategy.md](git-strategy.md).
 
 ## See also
 
-- [project-skeleton.md](project-skeleton.md) — the layout and acceptance criteria this
+- [architecture.md](architecture.md) — the module map and critical field rules this
   document is the contract for
 - [self-hosting.md](self-hosting.md) — putting a release on your own domain: DNS, HTTPS, SMTP
 - [roadmap.md](roadmap.md) — phase order
