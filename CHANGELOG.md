@@ -9,6 +9,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The task search box treated `%` and `_` as SQL wildcards instead of the characters a user
+  typed.** `q` reached Postgres through Prisma's `contains`, which — confirmed empirically
+  against Postgres 18 — compiles to `ILIKE`/`LIKE` with the search string bound as a *pattern*,
+  not a literal: searching `50%` also matched `"50X done"`, and `a_b` also matched `"aXb"`. A
+  shared `escapeLikePattern` helper now escapes `%`, `_` and the backslash that escapes them
+  before the string reaches `contains`, so the search box matches only what it looks like it
+  matches. The same unescaped `contains` was also used to sweep a departing account's
+  `Verification` rows during account deletion — an email local-part is free to contain `_`, so
+  an erased `john_doe@example.com` could have deleted a stranger's live `johnXdoe@example.com`
+  verification token too; that call site is escaped the same way (audit follow-up to DB-01).
+
 - Dialog and auth submit errors are now announced to screen readers and receive focus (WCAG
   4.1.3, audit finding UX-01). Login, register, confirm, form, delete-account,
   delete-workspace and the Trello import dialog rendered their submit-level error as plain
