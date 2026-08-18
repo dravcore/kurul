@@ -153,8 +153,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   CI gate, not a deployment. The override should be dropped once Prisma ships a release that
   depends on `deepmerge-ts >= 8`.
 
-- **Fixed:** `docker-compose.dev.yml` and `docker-compose.yml` shared the same implicit Compose
-  project name — the checkout's directory, usually `kurul`, since neither file declared its own
+- **`docker-compose.dev.yml` and `docker-compose.yml` shared the same implicit Compose project name** — the checkout's directory, usually `kurul`, since neither file declared its own
   — and therefore the same container and volume names for every service both define:
   `postgres`, `redis`, `postgres_data`, `redis_data`. Two failure modes came from that:
   `docker compose -f docker-compose.dev.yml down -v` (the documented way to reset a local
