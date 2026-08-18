@@ -11,7 +11,7 @@ sayıyor, dolayısıyla eski eşit-sayı yapılandırmasında yayınlanan limiti
 API'nin kontrolünü geçip proxy'de ölüyordu — gerçek istek şekli üzerinde ölçüldü ve #216'da
 düzeltildi. İki katmanın şimdi tuttuğu değişmez bir eşitlik değil bir sıralama —
 **proxy, API'nin kabul edeceği bir şeyi asla reddetmemeli** — `apps/api/src/storage/two-layer-limit.spec.ts`
-tarafından korunuyor ve [self-hosting.md](../self-hosting.md#why-the-proxys-number-is-26-mib-and-the-apis-is-25)'de belgeleniyor.
+tarafından korunuyor ve [self-hosting.md](../self-hosting.md)'de belgeleniyor.
 **Güncellendi:** 2026-08-18 — `audit/phase-3-plan.md` ve `audit/ROADMAP.md`'ye satır numarasıyla
 yapılan atıflar, gitignore'lu `audit/` ağacı olmayan hiç kimse için çözülemez. Her biri, aşağıda
 (çevredeki metnin zaten taşıdığı yerde alıntılanarak, taşımadığı yerde ise açıklanarak) yerine
