@@ -182,11 +182,17 @@ run('docker', ['compose', ...DEV_COMPOSE, 'up', '-d']);
 // wait exists to prevent, and it is the one a first run hits.
 //
 // The service list is asked of compose rather than hardcoded, and `ps` is *restricted* to it,
-// for a reason that is easy to miss: both compose files belong to the same project, so a plain
-// `docker compose -f docker-compose.dev.yml ps` also lists `api`, `web`, `proxy` and `backup`
-// if the full stack happens to be up. `proxy` and `backup` declare no healthcheck at all, so
-// an unrestricted "every service is healthy" can never become true and this would wait out its
-// deadline against containers it has no business inspecting.
+// for a reason that used to be load-bearing and is now defense-in-depth: before OPS-04
+// (2026-08-18 audit), docker-compose.dev.yml had no `name:` of its own, so it fell back to the
+// same project as docker-compose.yml (the checkout's directory) and a plain
+// `docker compose -f docker-compose.dev.yml ps` could also list `api`, `web`, `proxy` and
+// `backup` if the full stack happened to be up under the same directory. `proxy` still
+// declares no healthcheck at all (`backup` gained one for OPS-02), so an unrestricted
+// "every service is healthy" could never become true and this would have waited out its
+// deadline against containers it had no business inspecting. docker-compose.dev.yml now
+// declares `name: kurul-dev`, so `ps` here only ever sees this file's own services regardless
+// of what else is running — the explicit service list stays anyway as the cheaper,
+// still-correct thing to ask for.
 heading('Waiting for the containers to report healthy');
 
 const devServices = (capture('docker', ['compose', ...DEV_COMPOSE, 'config', '--services']) ?? '')

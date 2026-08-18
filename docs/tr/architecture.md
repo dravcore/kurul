@@ -193,7 +193,7 @@ apps/web/
 │   ├── notification/      # NotificationBell, NotificationsList
 │   └── settings/          # LanguageSettings
 ├── i18n/                  # next-intl request config + locale çözümleme zinciri
-├── messages/              # en.json — UI metni, locale başına tek düz dosya
+├── messages/              # en.json, tr.json — UI metni, locale başına tek düz dosya
 └── lib/
     ├── api.ts             # typed REST client
     ├── socket.ts          # Socket.io client (board realtime)
@@ -215,9 +215,11 @@ zaten hardcode edilmek yerine `useTranslations()` üzerinden geçiyor. Locale he
 ([ADR 0018](decisions/0018-localization-strategy.md)) — bilinçli olarak **`[locale]` yol parçası
 ve i18n middleware'i yok**, çünkü burada indekslenen bir şey yok ve bir dil öneki
 `middleware.ts`'teki tüm literal yol karşılaştırmalarını tek seferde geçersiz kılardı.
-Ayarlar → Dil ekranı tercihi yazıyor; tek katalog hâlâ `en`, yani bir dil eklemek component
-ağacını yeniden yazmak değil, bir `SUPPORTED_LOCALES` girdisi artı bir `messages/<tag>.json`
-eklemektir. Ek UI dil paketleri için bkz.
+Ayarlar → Dil ekranı tercihi yazıyor; bugün `en` ve `tr` sevkediliyor
+(`SUPPORTED_LOCALES = ['en', 'tr']`, `messages/tr.json` `en.json` ile eşit), yani üçüncü bir
+dil eklemek component ağacını yeniden yazmak değil, bir `SUPPORTED_LOCALES` girdisi artı bir
+`messages/<tag>.json` — ve doldurulana kadar derlenmeyecek `Record<Locale, …>` seed ve mail
+metni (`board-defaults.ts`, `mail-templates.ts`) — eklemektir. Ek UI dil paketleri için bkz.
 [roadmap.md — MVP ötesi](roadmap.md#mvp-ötesi).
 
 ---

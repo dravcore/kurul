@@ -184,6 +184,9 @@ importers:
       prisma:
         specifier: ^7.0.0
         version: 7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
+      socket.io-client:
+        specifier: ^4.8.1
+        version: 4.8.3
       supertest:
         specifier: ^7.0.0
         version: 7.2.2

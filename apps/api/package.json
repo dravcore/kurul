@@ -61,6 +61,7 @@
     "jest": "^30.4.2",
     "prettier": "^3.5.3",
     "prisma": "^7.0.0",
+    "socket.io-client": "^4.8.1",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.6",
     "tsx": "^4.23.12",
