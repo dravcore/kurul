@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-15
+**Updated:** 2026-08-18 — the kind/nullability invariant below is now enforced by a CHECK constraint, `Attachment_kind_fields_check` (`migrations/20260818120000_attachment_kind_check`, guarded by `test/attachment-kind-check.e2e-spec.ts` under ADR 0017's rule): the enum shipped without one, so "a row with both a `url` and a `storageKey`, or with neither" was still writable by anything bypassing `AttachmentService` — the bulk importer this ADR names among them (audit finding DB-02).
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0024-attachment-kinds-and-serving-policy.md)
 
