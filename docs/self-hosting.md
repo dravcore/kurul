@@ -19,7 +19,8 @@ the same image works on every domain — the API URL is not compiled into it (se
 ## What you need
 
 - A server with a public IP, Docker Engine 24+ and the Compose plugin. Two CPUs and 2 GB of
-  RAM is enough for a small team.
+  RAM is enough for a small team — see [Server sizing](#server-sizing) for how that 2 GB is
+  actually spent.
 - A domain you control, with **ports 80 and 443 open** to that server. Both are required:
   Let's Encrypt validates over port 80, browsers use 443.
 - An SMTP account. Kurul needs outgoing mail before anyone can accept an invitation — see
@@ -37,6 +38,48 @@ the same image works on every domain — the API URL is not compiled into it (se
   "temporarily" reach Postgres — is exposed to the internet even with `ufw deny 5432` in place.
   The firewall protects the things Docker is not managing; the `ports:` list is what protects
   the rest, which is why this stack keeps it to one service.
+
+## Server sizing
+
+Every service in `docker-compose.yml` carries a `mem_limit` (OPS-05, 2026-08-18 audit). Before
+this, nothing capped how much memory any one container could take, so on a host near its 2 GB
+budget the _kernel_ OOM killer picked which process died — it scores every process on the host,
+not just this stack's, and has no reason to spare Postgres over whichever container actually
+grew. A `mem_limit` puts that decision back where it belongs: a container is only ever killed
+for outgrowing its own ceiling, and nothing another service does can take Postgres down with it.
+
+| Service    | `mem_limit` | Why this number                                                                                 |
+| ---------- | ----------- | ----------------------------------------------------------------------------------------------- |
+| `postgres` | 512m        | Generous baseline for a small-team board's working set                                          |
+| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) both buffer into its heap    |
+| `web`      | 512m        | Same Next.js SSR process, same "no ceiling chosen" problem as `api`                             |
+| `migrate`  | 512m        | Matches `api` — same build stage, same Prisma CLI, just once at startup                         |
+| `backup`   | 256m        | `pg_dump` streams rather than buffering; this covers process overhead and the attachments `tar` |
+| `redis`    | 128m        | Cache, sessions, rate limits, notifications only — never board data, small bounded working set  |
+| `proxy`    | 128m        | Terminates TLS and proxies; bodies pass through Caddy rather than buffering into it             |
+
+`api` and `web` also set `NODE_OPTIONS=--max-old-space-size=384` — 75% of their 512m ceiling —
+so V8's heap is pinned explicitly rather than left to Node's own container-memory heuristic. The
+remaining 128m of headroom below `mem_limit` is for what a heap ceiling alone doesn't cover
+(thread stacks, native buffers, code space): V8 hits its own catchable "JavaScript heap out of
+memory" before the cgroup's hard limit does, which shows up as a line in `docker compose logs
+api` (or `web`) instead of a bare `SIGKILL`.
+
+These are ceilings, not reservations — a container using less than its `mem_limit` costs nothing
+extra, and `migrate` in particular exits (successfully) before `api` and `web` finish starting,
+so it is never actually concurrent with them. Summed as if every long-running service hit its
+ceiling at once — `postgres` + `api` + `web` + `redis` + `proxy` + `backup`, excluding `migrate`,
+which by the time the others are up has already exited — that is 512 + 512 + 512 + 128 + 128 +
+256 = 2048 MB, which is exactly the 2 GB this page has always asked for. A host with less
+headroom than that under real traffic is a reason to raise these numbers (`docker-compose.yml`
+is a plain edit, or override them in a `docker-compose.override.yml`) or the box's own RAM, not
+to remove the ceiling — see the note above for what removing it gets you back.
+
+**Not verified by measurement**: these numbers come from the request/attachment ceilings already
+documented in `.env.example` and from V8's own heap-sizing conventions, not from running the
+stack under load at each limit. If a container is killed for hitting its `mem_limit` in
+practice, `docker compose ps` shows it exited (often `137`), and `docker compose logs <service>`
+is the place to start — raise that one service's limit rather than every service's.
 
 ## 1. DNS
 
