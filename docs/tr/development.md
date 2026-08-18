@@ -31,7 +31,8 @@ Monorepo ve MVP özellik seti (Faz 1–9; Faz 0 docs/standartlardı) repository�
 gündelik kontrattır — gerçeklik bu dokümandan sapıyorsa ikisinden biri buglıdır ve aynı
 PR’da düzeltilir.
 
-- Yerleşim, Prisma modelleri ve erken kabul kriterleri: [project-skeleton.md](project-skeleton.md)
+- Yerleşim ve modül haritası: [architecture.md](architecture.md#2-monorepo-yerleşimi)
+- Veri modeli ve kritik alan kuralları: [architecture.md](architecture.md#kritik-alan-kuralları)
 - Faz ilerlemesi (MVP tamam): [roadmap.md](roadmap.md)
 - Her aracın neden seçildiği: [tech-stack.md](tech-stack.md)
 
@@ -131,7 +132,7 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(boş)_ / `production`                                            | `SENTRY_ENVIRONMENT`'ın web karşılığı, o da build zamanlı                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `NEXT_PUBLIC_SENTRY_RELEASE`          | _(boş)_ / `v0.2.0`                                                | `SENTRY_RELEASE`'in web karşılığı, o da build zamanlı                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `SEED_LARGE_BOARD_TASKS`              | _(boş)_ / `1000`                                                  | Yalnızca `pnpm db:seed` okur. Demo board'un yanına bu kadar task taşıyan sentetik bir board ekler. Boş ya da `0` atlar — bkz. [Büyük board seed'lemek](#büyük-board-seedlemek)                                                                                                                                                                                                                                                                                                                              |
-| `INSTANCE_ADMIN_EMAILS`               | _(boş)_                                                           | Kurulum genelindeki [aktivasyon hunisini](#aktivasyon-hunisi-ve-telemetri) okumasına izin verilen, virgülle ayrılmış adresler. **Boş, hiç kimse demektir** — makinedeki her workspace'in sahibi olan hesap dahil                                                                                                                                                                                                                                                                                            |
+| `INSTANCE_ADMIN_EMAILS`               | _(boş)_                                                           | Kurulum genelindeki [aktivasyon hunisini](#aktivasyon-hunisi-ve-telemetri) okumasına izin verilen, virgülle ayrılmış adresler. **Boş, hiç kimse demektir** — makinedeki her workspace'in sahibi olan hesap dahil. Listelenen bir adres, yalnızca o hesabın e-postası doğrulanmışsa erişim kazanır                                                                                                                                                                                                           |
 | `TELEMETRY_ENABLED`                   | `false`                                                           | Dışa telemetri. **Varsayılan kapalı; bu `false` iken hiçbir şey gönderilmez** — bkz. [Aktivasyon hunisi ve telemetri](#aktivasyon-hunisi-ve-telemetri)                                                                                                                                                                                                                                                                                                                                                      |
 | `TELEMETRY_ENDPOINT`                  | _(boş)_                                                           | Opt-in ping'in POST edileceği adres. **Varsayılanı yok**; `TELEMETRY_ENABLED=true` iken bu boşsa hata loglanır ve hiçbir şey gönderilmez                                                                                                                                                                                                                                                                                                                                                                    |
 | `TELEMETRY_TIMEOUT_MS`                | `5000`                                                            | Açılıştaki tek ping'in terk edilmeden önce sürebileceği süre. Başarısızlık tek bir uyarı satırıdır, başka hiçbir şey değil                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -359,7 +360,9 @@ adresini açın, en yeni mesaja tıklayın ve içindeki doğrulama linkini taray
 kopyalayın — Mailpit hem plain-text hem HTML kısımları render eder, link her ikisinde de aynı
 şekilde çalışır). Davet edilenin hesabı artık doğrulanmıştır ve `accept-invitation` başarılı
 olur. `docker compose -f docker-compose.dev.yml down -v`, Postgres/Redis volume'leriyle
-birlikte Mailpit'in sakladığı mesajları da temizler.
+birlikte Mailpit'in sakladığı mesajları da temizler — yalnızca geliştirme döngüsünün kendi
+`kurul-dev_*` volume'leri, tam stack'inkiler asla değil; bkz. aşağıdaki
+[Docker'da tam stack](#dockerda-tam-stack).
 
 ## Çalışma modları
 
@@ -399,8 +402,9 @@ dayanarak seçilmez.
 | http://localhost:4000        | API (NestJS)                  |
 | http://localhost:4000/health | Health check — 200 dönmelidir |
 
-Container'ları `docker compose -f docker-compose.dev.yml down` ile durdurun (veritabanı
-volume'unu da düşürüp temiz bir sayfadan başlamak için `-v` ekleyin).
+Container'ları `docker compose -f docker-compose.dev.yml down` ile durdurun (geliştirme
+döngüsünün kendi `postgres_data`/`redis_data`'sını da düşürüp temiz bir sayfadan başlamak için
+`-v` ekleyin).
 
 ### Docker'da tam stack
 
@@ -411,6 +415,17 @@ doğrulamak için, veya Kurul'u geliştirmek değil sadece çalıştırmak isted
 docker compose pull && docker compose up -d
 ```
 
+Bu, kendi Compose project'inde çalışır — genelde `kurul` olan checkout dizininin adı,
+çünkü `docker-compose.yml` kendi `name:`'ini bildirmiyor — ve yukarıdaki geliştirme
+döngüsünün `kurul-dev` project'inden tamamen ayrıdır (`docker-compose.dev.yml`,
+`name: kurul-dev` bildirir). Her container ve volume kendi project'i tarafından
+namespace'lendiği için ikisi asla çakışmaz: tam stack'i ayağa kaldırmak geliştirme
+döngüsünün `postgres`/`redis`/`mailpit`'ini ne yeniden oluşturur ne de dokunur, ve
+`docker compose -f docker-compose.dev.yml down -v` da tam stack'in volume'lerine dokunmaz —
+ikisini aynı makinede aynı anda çalıştırsanız bile. (OPS-04, 2026-08-18 audit — bu ayrımdan
+önce iki dosya da aynı dizin-türevli project adına düşüyordu, dolayısıyla container ve volume
+adlarını paylaşıyor, birbirlerinin verisini yeniden oluşturabiliyor veya silebiliyordu.)
+
 Ardından **http://localhost** adresini açın — `localhost:3000` değil. Stack'in tek yayınlanmış
 girişi bir `proxy` (Caddy) servisidir: web uygulamasını ve API'yi tek origin'den sunar, `/api/*`
 ile `/auth/*`'ı `api`'ye, geri kalan her şeyi `web`'e yönlendirir. `api` ve `web` kendi host
@@ -418,11 +433,11 @@ portlarını yayınlamaz. Tamamını bir domain'e taşımak için `.env`'de
 `SITE_URL=https://kurul.example.com` ayarlayın; bu aynı zamanda otomatik HTTPS'i de açar —
 SMTP ve yedekler dahil adım adım rehber: [Self-hosting](self-hosting.md).
 
-`docker-compose.yml`'de `api` ve `web`, hem `image:` hem `build:` bildirir. Her etiketli
-release ikisini de GHCR'a yayınlar (`.github/workflows/release-images.yml`, `linux/amd64` +
-`linux/arm64`), böylece `pull` hazır build edilmiş imajı çeker, ardından gelen `up -d` de
-onu başlatır — lokal build yok, `pnpm install` yok, Docker layer cache ısıtması yok. Belirli
-bir release'i `latest` yerine sabitlemek için `.env`'de `TAG` ayarlayın:
+`docker-compose.yml`'de `api`, `web` ve `migrate`, üçü de hem `image:` hem `build:` bildirir.
+Her etiketli release üçünü de GHCR'a yayınlar (`.github/workflows/release-images.yml`,
+`linux/amd64` + `linux/arm64`), böylece `pull` hazır build edilmiş imajı çeker, ardından gelen
+`up -d` de onu başlatır — lokal build yok, `pnpm install` yok, Docker layer cache ısıtması yok.
+Belirli bir release'i `latest` yerine sabitlemek için `.env`'de `TAG` ayarlayın:
 
 ```bash
 TAG=v0.2.0   # release-images.yml'in yayınladığı bir tag ile eşleşmeli; liste için `git tag -l`
@@ -437,11 +452,14 @@ aynı kaynak build'i. `docker compose up --build` (veya `up -d --build`) bilinç
 etmek için (örn. bir Dockerfile'ı düzenledikten sonra veya `api`/`web`'de yayınlanmamış bir
 değişikliği test ederken) değişmeden çalışmaya devam eder.
 
-Tek istisna `migrate`: `image:` eşleniği yok (neden olmadığı `docker-compose.yml`'de yanındaki
-yorumda açıklanıyor), dolayısıyla her zaman kaynaktan build eder — `api`/`web`'i GHCR'dan
-çeken bir `docker compose up -d` bile bu tek servisin build maliyetini bir kez öder. Kapsam
-gerekçesinin tamamı için bkz.
-[denetim bulgusu OPS-04](https://github.com/dravcore/kurul/issues/126).
+`migrate` eskiden tek istisnaydı: `image:` eşleniği yoktu, dolayısıyla her zaman kaynaktan
+build ediyordu — [denetim bulgusu OPS-04](https://github.com/dravcore/kurul/issues/126)'ün
+bilinçli seçtiği, ama build edilecek bir kaynak ağacı hiç indirmeyen
+[docs/self-hosting.md](self-hosting.md)'deki curl tabanlı kurulumu tamamen kırdığı ortaya
+çıkan bir kapsamdı (denetim bulgusu OPS-01). Artık `api`/`web` ile aynı `image:` + `build:`
+çiftini taşıyor ve `ghcr.io/dravcore/kurul-migrate`, v0.2.0'dan sonraki ilk sürümden itibaren
+yayınlanıyor — `TAG=v0.2.0` veya daha eskisinde çekilecek böyle bir imaj yoktur ve servis
+tam eskisi gibi kaynaktan build eder.
 
 ### İki API imajı ne kadar yer kaplıyor
 
@@ -618,7 +636,7 @@ Kurallar:
 - Pratikte mümkün olduğunda, şema değişiklikleri onları kullanan logic'ten ayrı kendi
   PR'ında olur.
 - `Task.position` ve `Column.position` `Float`'tır (fractional indexing) — özensizce değiştirilmemesi gereken
-  model seviyesi kurallar için [project-skeleton.md](project-skeleton.md)'ye bakın.
+  model seviyesi kurallar için [architecture.md](architecture.md#kritik-alan-kuralları)'ye bakın.
 
 Yerel bir veritabanını sıfırdan sıfırlamak:
 
@@ -774,6 +792,11 @@ dahil — `403` yanıtı vermesi demektir. Vermek zorunda: kaydın açık olduğ
 "workspace sahibi" her ziyaretçinin bir workspace oluşturarak kendine verebileceği bir roldür,
 yani hiçbir workspace rolü sınır olamazdı. Adresler büyük/küçük harf duyarsız eşleşir; listeyi
 değiştirmek için yeniden başlatma gerekir.
+
+Listelenen bir adres, yalnızca o hesabın kendi e-postası doğrulanmışsa erişim kazanır. Kurul
+oturum açmak için e-posta doğrulaması istemez ve silinen bir hesabın adresi yeni bir kayıt için
+serbest bırakılır — yani bir adresi buraya yazmak, tek başına onu korumaz: posta kutusunun
+sahipliğini ilk kanıtlayan kişi, bu listenin kabul ettiği kişidir.
 
 Ayarlandıktan sonra huni, o hesaplar için **Ayarlar** ekranının altında görünür; başka kimse için
 görünmez. Uygulama içinden yetki vermenin bir yolu yoktur.
@@ -1477,8 +1500,8 @@ PR/release süreci [git-strategy.md](git-strategy.md)'de belirtilmiştir.
 
 ## Ayrıca bakınız
 
-- [project-skeleton.md](project-skeleton.md) — bu dokümanın kontratı olduğu yerleşim ve
-  kabul kriterleri
+- [architecture.md](architecture.md) — bu dokümanın kontratı olduğu modül haritası ve
+  kritik alan kuralları
 - [self-hosting.md](self-hosting.md) — bir release'i kendi domain'inize kurmak: DNS, HTTPS, SMTP
 - [roadmap.md](roadmap.md) — faz sırası
 - [git-strategy.md](git-strategy.md) — branch'ler, commit'ler, release'ler

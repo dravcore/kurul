@@ -87,28 +87,28 @@ Every module has the same skeleton: `*.module.ts`, `*.controller.ts`, `*.service
 **Current vs planned:** after Phase 9, feature modules including `realtime` are implemented.
 Treat the table below as the module map.
 
-| Module         | Responsibility                                                                                                                                                                                                                    |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth`         | Better Auth integration, session handling, request user resolution                                                                                                                                                                |
-| `account`      | Account erasure: `DELETE /me` and the instance operator's `DELETE /instance/users/:userId`, over one engine that anonymises the `User` row rather than deleting it ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)) |
-| `workspace`    | Workspace CRUD, membership, invitations, roles                                                                                                                                                                                    |
-| `board`        | Board and column management, column ordering                                                                                                                                                                                      |
-| `task`         | Task CRUD, moving between columns, fractional-index reordering                                                                                                                                                                    |
-| `label`        | Board-scoped labels and task-label assignment                                                                                                                                                                                     |
-| `comment`      | Task comments                                                                                                                                                                                                                     |
-| `attachment`   | Files and links on a task: upload, list, download stream, detach                                                                                                                                                                  |
-| `import`       | One-way Trello board import: read an export, plan the rows, write them once                                                                                                                                                       |
-| `activity`     | Append-only activity log (`payload` is Json)                                                                                                                                                                                      |
-| `dashboard`    | Aggregation queries feeding the charts                                                                                                                                                                                            |
-| `notification` | Notification fan-out, Redis-backed queue                                                                                                                                                                                          |
-| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                                                                                                                                                                    |
-| `retention`    | Nightly data-retention sweep; no controller, no exported provider                                                                                                                                                                 |
-| `mail`         | SMTP delivery (`nodemailer`); logs instead of sending when unconfigured                                                                                                                                                           |
-| `locale`       | Stored interface language: reads/writes `User.locale`, resolves it for a request                                                                                                                                                  |
-| `config`       | `GET /config` — the two capability flags the UI branches on (`mailEnabled`, `attachmentsEnabled`), unauthenticated                                                                                                                |
-| `activation`   | Instance-local activation funnel and North Star, computed on demand from existing rows; readable only by `INSTANCE_ADMIN_EMAILS` ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                           |
-| `telemetry`    | Opt-in, default-off outbound ping at boot; sends nothing unless `TELEMETRY_ENABLED` and `TELEMETRY_ENDPOINT` are both set ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                                  |
-| `health`       | Liveness probe (`GET /health`) and readiness probe (`GET /health/ready`, which probes DB and Redis and answers `503` with a diagnostic body), both unauthenticated                                                                |
+| Module         | Responsibility                                                                                                                                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `auth`         | Better Auth integration, session handling, request user resolution                                                                                                                                                                               |
+| `account`      | Account erasure: `DELETE /me` and the instance operator's `DELETE /instance/users/:userId`, over one engine that anonymises the `User` row rather than deleting it ([ADR 0026](decisions/0026-account-deletion-anonymisation.md))                |
+| `workspace`    | Workspace CRUD, membership, invitations, roles                                                                                                                                                                                                   |
+| `board`        | Board and column management, column ordering                                                                                                                                                                                                     |
+| `task`         | Task CRUD, moving between columns, fractional-index reordering                                                                                                                                                                                   |
+| `label`        | Board-scoped labels and task-label assignment                                                                                                                                                                                                    |
+| `comment`      | Task comments                                                                                                                                                                                                                                    |
+| `attachment`   | Files and links on a task: upload, list, download stream, detach                                                                                                                                                                                 |
+| `import`       | One-way Trello board import: read an export, plan the rows, write them once                                                                                                                                                                      |
+| `activity`     | Append-only activity log (`payload` is Json)                                                                                                                                                                                                     |
+| `dashboard`    | Aggregation queries feeding the charts                                                                                                                                                                                                           |
+| `notification` | Notification fan-out, Redis-backed queue                                                                                                                                                                                                         |
+| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                                                                                                                                                                                   |
+| `retention`    | Nightly data-retention sweep; no controller, no exported provider                                                                                                                                                                                |
+| `mail`         | SMTP delivery (`nodemailer`); logs instead of sending when unconfigured                                                                                                                                                                          |
+| `locale`       | Stored interface language: reads/writes `User.locale`, resolves it for a request                                                                                                                                                                 |
+| `config`       | `GET /config` — the two capability flags the UI branches on (`mailEnabled`, `attachmentsEnabled`), unauthenticated                                                                                                                               |
+| `activation`   | Instance-local activation funnel and North Star, computed on demand from existing rows; readable only by `INSTANCE_ADMIN_EMAILS` once those accounts' emails are verified ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md)) |
+| `telemetry`    | Opt-in, default-off outbound ping at boot; sends nothing unless `TELEMETRY_ENABLED` and `TELEMETRY_ENDPOINT` are both set ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                                                 |
+| `health`       | Liveness probe (`GET /health`) and readiness probe (`GET /health/ready`, which probes DB and Redis and answers `503` with a diagnostic body), both unauthenticated                                                                               |
 
 Cross-cutting infrastructure:
 
@@ -175,7 +175,7 @@ apps/web/
 │   ├── notification/      # NotificationBell, NotificationsList
 │   └── settings/          # LanguageSettings
 ├── i18n/                  # next-intl request config + the locale resolution chain
-├── messages/              # en.json — UI copy, one flat file per locale
+├── messages/              # en.json, tr.json — UI copy, one flat file per locale
 └── lib/
     ├── api.ts             # typed REST client
     ├── socket.ts          # Socket.io client (board realtime)
@@ -192,9 +192,11 @@ root layout, UI copy in `messages/en.json`) so every user-facing string already 
 ([ADR 0018](decisions/0018-localization-strategy.md)) — deliberately **no `[locale]` path
 segment and no i18n middleware**, because nothing here is indexed and a language prefix would
 invalidate every literal path comparison in `middleware.ts` at once. Settings → Language writes
-the preference; `en` is still the only catalog, so adding a language is a `SUPPORTED_LOCALES`
-entry plus a `messages/<tag>.json`, not a rewrite of the component tree. See
-[roadmap.md — Beyond MVP](roadmap.md#beyond-mvp) for additional UI language packs.
+the preference; `en` and `tr` ship today (`SUPPORTED_LOCALES = ['en', 'tr']`, `messages/tr.json`
+at parity with `en.json`), so adding a third language is a `SUPPORTED_LOCALES` entry plus a
+`messages/<tag>.json` — and the `Record<Locale, …>` seed and mail copy (`board-defaults.ts`,
+`mail-templates.ts`) failing to compile until it is filled in — not a rewrite of the component
+tree. See [roadmap.md — Beyond MVP](roadmap.md#beyond-mvp) for additional UI language packs.
 
 ---
 

@@ -31,7 +31,8 @@ The monorepo and MVP feature set (Phases 1–9; Phase 0 was docs/standards) **ex
 page are the day-to-day contract — if reality and this document diverge, one of the two is a
 bug and gets fixed in the same PR.
 
-- Layout, Prisma models, and early acceptance criteria: [project-skeleton.md](project-skeleton.md)
+- Layout and module map: [architecture.md](architecture.md#2-monorepo-layout)
+- Data model and critical field rules: [architecture.md](architecture.md#critical-field-rules)
 - Phase progress (MVP complete): [roadmap.md](roadmap.md)
 - Why each tool was chosen: [tech-stack.md](tech-stack.md)
 
@@ -132,7 +133,7 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(blank)_ / `production`                                      | `SENTRY_ENVIRONMENT`'s web counterpart, also build-time                                                                                                                                                                                                                                                                                                                                                                                                |
 | `NEXT_PUBLIC_SENTRY_RELEASE`          | _(blank)_ / `v0.2.0`                                          | `SENTRY_RELEASE`'s web counterpart, also build-time                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `SEED_LARGE_BOARD_TASKS`              | _(blank)_ / `1000`                                            | Read only by `pnpm db:seed`. Adds a synthetic board of this many tasks next to the demo one. Blank or `0` skips it — see [Seeding a large board](#seeding-a-large-board)                                                                                                                                                                                                                                                                               |
-| `INSTANCE_ADMIN_EMAILS`               | _(blank)_                                                     | Comma-separated addresses allowed to read the instance-wide [activation funnel](#activation-funnel-and-telemetry). **Blank means nobody**, including the account that owns every workspace                                                                                                                                                                                                                                                             |
+| `INSTANCE_ADMIN_EMAILS`               | _(blank)_                                                     | Comma-separated addresses allowed to read the instance-wide [activation funnel](#activation-funnel-and-telemetry). **Blank means nobody**, including the account that owns every workspace. A listed address grants access only once that account's own email is verified                                                                                                                                                                              |
 | `TELEMETRY_ENABLED`                   | `false`                                                       | Outbound telemetry. **Off by default; nothing is sent while this is `false`** — see [Activation funnel and telemetry](#activation-funnel-and-telemetry)                                                                                                                                                                                                                                                                                                |
 | `TELEMETRY_ENDPOINT`                  | _(blank)_                                                     | Where the opt-in ping is POSTed. **No default**; `TELEMETRY_ENABLED=true` with this blank logs an error and sends nothing                                                                                                                                                                                                                                                                                                                              |
 | `TELEMETRY_TIMEOUT_MS`                | `5000`                                                        | How long the single boot-time ping may take before it is abandoned. Failure is a warning line and nothing else                                                                                                                                                                                                                                                                                                                                         |
@@ -355,7 +356,9 @@ http://localhost:8025, click into the newest message, and open the verification 
 contains in your browser (or copy it — Mailpit renders the plain-text and HTML parts, and
 the link works the same either way). The invitee's account is now verified and
 `accept-invitation` succeeds. `docker compose -f docker-compose.dev.yml down -v` clears
-Mailpit's stored messages along with the Postgres/Redis volumes.
+Mailpit's stored messages along with the Postgres/Redis volumes — the dev loop's own
+`kurul-dev_*` volumes only, never the full stack's; see [Full stack in
+Docker](#full-stack-in-docker) below.
 
 ## Run modes
 
@@ -396,7 +399,7 @@ taken on a guess.
 | http://localhost:4000/health | Health check — must return 200 |
 
 Stop the containers with `docker compose -f docker-compose.dev.yml down` (add `-v` to also
-drop the database volume and start from a clean slate).
+drop the dev loop's own `postgres_data`/`redis_data` and start from a clean slate).
 
 ### Full stack in Docker
 
@@ -407,6 +410,16 @@ compose wiring, or when you just want to run Kurul rather than develop it.
 docker compose pull && docker compose up -d
 ```
 
+This runs as its own Compose project — the checkout's directory name, usually `kurul`, since
+`docker-compose.yml` declares no `name:` of its own — fully separate from the dev loop's
+`kurul-dev` project above (`docker-compose.dev.yml` declares `name: kurul-dev`). Every
+container and volume is namespaced by its project, so the two never collide: bringing the full
+stack up does not recreate or touch the dev loop's `postgres`/`redis`/`mailpit`, and
+`docker compose -f docker-compose.dev.yml down -v` does not touch the full stack's volumes
+either, even if you run both on the same machine at once. (OPS-04, 2026-08-18 audit — before
+this split, both files fell back to the same directory-derived project name, so they shared
+container and volume names and could recreate or drop each other's data.)
+
 Then open **http://localhost** — not `localhost:3000`. A `proxy` service (Caddy) is the stack's
 only published entrance: it serves the web app and the API from one origin, routing `/api/*`
 and `/auth/*` to `api` and everything else to `web`. `api` and `web` publish no host ports of
@@ -414,11 +427,11 @@ their own. Point the whole thing at a domain by setting `SITE_URL=https://kurul.
 in `.env`, which also switches automatic HTTPS on — the walkthrough for that, SMTP and backups
 included, is [Self-hosting](self-hosting.md).
 
-`api` and `web` in `docker-compose.yml` declare both `image:` and `build:`. Every tagged
-release publishes both to GHCR (`.github/workflows/release-images.yml`, `linux/amd64` +
-`linux/arm64`), so `pull` fetches a ready-built image and the following `up -d` starts it —
-no local build, no `pnpm install`, no Docker layer cache warm-up. Set `TAG` in `.env` to pin
-a specific release instead of the default `latest`:
+`api`, `web` and `migrate` in `docker-compose.yml` all declare both `image:` and `build:`.
+Every tagged release publishes all three to GHCR (`.github/workflows/release-images.yml`,
+`linux/amd64` + `linux/arm64`), so `pull` fetches a ready-built image and the following `up -d`
+starts it — no local build, no `pnpm install`, no Docker layer cache warm-up. Set `TAG` in
+`.env` to pin a specific release instead of the default `latest`:
 
 ```bash
 TAG=v0.2.0   # matches a tag published by release-images.yml; see `git tag -l` for the list
@@ -432,11 +445,14 @@ exact same source build this repo has always done — when there's no image for 
 up --build` (or `up -d --build`) keeps working unchanged for building on purpose, e.g. after
 editing a Dockerfile or testing an unreleased change to `api`/`web`.
 
-The one exception is `migrate`: it has no `image:` pair (see the comment beside it in
-`docker-compose.yml` for why), so it always builds from source — a `docker compose up -d`
-that pulls `api`/`web` from GHCR still pays that one service's build cost once. See
-[audit finding OPS-04](https://github.com/dravcore/kurul/issues/126) for the full scoping
-rationale.
+`migrate` used to be the one exception: it had no `image:` pair, so it always built from
+source — a scoping [audit finding OPS-04](https://github.com/dravcore/kurul/issues/126) chose
+deliberately, and one that turned out to break the curl-based install in
+[docs/self-hosting.md](self-hosting.md), which downloads no source tree to build from (audit
+finding OPS-01). It now carries the same `image:` + `build:` pair as `api`/`web`, with
+`ghcr.io/dravcore/kurul-migrate` published from the first release after v0.2.0 onward — on
+`TAG=v0.2.0` or older there is no such image to pull and the service builds from source
+exactly as before.
 
 ### What the two API images weigh
 
@@ -606,8 +622,8 @@ Rules:
 - Schema changes go in their own PR, separate from the logic that uses them, whenever that
   split is practical.
 - `Task.position` and `Column.position` are `Float` (fractional indexing) — see
-  [project-skeleton.md](project-skeleton.md) for the model-level rules that must not be
-  changed casually.
+  [architecture.md](architecture.md#critical-field-rules) for the model-level rules that must
+  not be changed casually.
 
 Resetting a local database from scratch:
 
@@ -765,6 +781,11 @@ owns every workspace on the box. It has to: on an install with open registration
 workspace" is a role any visitor can grant themselves by creating one, so no workspace role
 could be the boundary. Addresses are matched case-insensitively and a restart is needed to
 change the list.
+
+A listed address only grants access once that account's own email is verified. Kurul does not
+require email verification to sign in, and a deleted account's address is freed for a fresh
+sign-up — so listing an address here does not, by itself, protect it: whoever proves ownership
+of the mailbox first is who this list admits.
 
 Once set, the funnel appears at the bottom of **Settings** for those accounts, and for nobody
 else. There is no in-app way to grant it.
@@ -1454,7 +1475,7 @@ specified in [git-strategy.md](git-strategy.md).
 
 ## See also
 
-- [project-skeleton.md](project-skeleton.md) — the layout and acceptance criteria this
+- [architecture.md](architecture.md) — the module map and critical field rules this
   document is the contract for
 - [self-hosting.md](self-hosting.md) — putting a release on your own domain: DNS, HTTPS, SMTP
 - [roadmap.md](roadmap.md) — phase order
