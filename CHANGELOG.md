@@ -277,18 +277,29 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   operator is least likely to be watching.
 
   Each API process now keeps a bounded, in-process fixed-window counter — mirroring the same
-  window/limit the Lua script enforces against Redis — and consults it only while Redis is
-  erroring; a successful call always goes back to Redis, clearing the fallback. This is a
-  per-process floor, not the shared limit: N replicas each enforce the rule independently during
-  an outage, so the effective ceiling across a fleet of N is the rule's limit times N rather than
-  the rule's limit — a bounded number in place of the previous unbounded one, and documented as
-  such rather than presented as equivalent to the Redis-backed limit. The fallback's own memory is
-  capped at 10,000 distinct keys (oldest evicted first) so a credential-stuffing run cannot turn
-  the fallback itself into unbounded growth, and it prunes lazily rather than running a timer.
+  window/limit the Lua script enforces against Redis, `rule.max === 0` included — and consults it
+  only while Redis is erroring; a successful call goes back to Redis, but the fallback counters
+  are kept rather than cleared (see below). This is a per-process floor, not the shared limit: N
+  replicas each enforce the rule independently during an outage, so the effective ceiling across a
+  fleet of N is the rule's limit times N rather than the rule's limit — a bounded number in place
+  of the previous unbounded one, and documented as such rather than presented as equivalent to the
+  Redis-backed limit. The fallback's own memory is capped at 10,000 distinct keys, and it prunes
+  lazily rather than running a timer.
 
-  The transition into and out of degraded mode is now logged at error level, once per transition
-  rather than once per request, and reported once to Sentry on the way down (when `SENTRY_DSN` is
-  set) — the previous warn-level, silent-per-request logging was the finding's other half.
+  The transition into and out of degraded mode is logged at error level and reported once to
+  Sentry on the way down (when `SENTRY_DSN` is set), at most once per five minutes regardless of
+  how many times Redis flaps between erroring and answering in between — an intermittently
+  failing Redis previously logged and captured on every single flip. The fallback counters
+  themselves now survive a brief recovery instead of being cleared on every flap: clearing them
+  handed a flapping connection's attacker a clean slate each time it briefly recovered, which
+  defeated the floor this fallback exists for.
+
+  Eviction at the 10,000-key cap now prefers an already-expired entry over the oldest-inserted
+  one, and a key's window refresh re-inserts it rather than overwriting it in place — `Map#set` on
+  an existing key does not move it to the insertion-order tail, so without this a key hit
+  repeatedly (a currently-blocked attacker, worst case) could look like the *oldest* entry in the
+  map and be evicted ahead of keys nobody had touched in a while, handing that attacker a fresh
+  window under a high-cardinality flood.
 
 ## [0.2.0] - 2026-08-16
 

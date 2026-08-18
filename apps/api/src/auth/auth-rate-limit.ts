@@ -51,6 +51,19 @@ return {1, -1}
  */
 const FALLBACK_MAX_ENTRIES = 10_000;
 
+/**
+ * Minimum time between degraded/recovered transition *reports* (the ERROR log + Sentry
+ * capture pair in `consume` below).
+ *
+ * An intermittently failing Redis flips `degraded` on every call during the bad stretch —
+ * without this, each flip logged, captured to Sentry, and (previously) discarded the fallback
+ * counters, turning one flaky connection into per-call spam. The true degraded/ok state is
+ * still tracked and acted on for every single call (routing to `consumeInMemory` is never
+ * dampened); only the noisy report of a transition is rate-limited, to at most one per window
+ * regardless of how many transitions happen inside it.
+ */
+export const AUTH_RATE_LIMIT_REPORT_DAMPEN_MS = 5 * 60 * 1000;
+
 interface FallbackEntry {
   count: number;
   expiresAt: number;
@@ -73,10 +86,62 @@ const fallbackCounters = new Map<string, FallbackEntry>();
 let degraded = false;
 
 /**
+ * Wall-clock time of the last degraded/recovered transition that was actually reported (log +
+ * Sentry). Read only by `shouldReportTransition` — see `AUTH_RATE_LIMIT_REPORT_DAMPEN_MS`.
+ */
+let lastReportedAt = 0;
+
+/**
+ * Whether the degraded/recovered transition happening right now should be reported (log +
+ * Sentry), given `AUTH_RATE_LIMIT_REPORT_DAMPEN_MS`. Side-effecting: a `true` result claims
+ * the report slot immediately, so two transitions arriving in the same tick cannot both pass.
+ */
+function shouldReportTransition(now: number): boolean {
+  if (now - lastReportedAt < AUTH_RATE_LIMIT_REPORT_DAMPEN_MS) {
+    return false;
+  }
+  lastReportedAt = now;
+  return true;
+}
+
+/**
+ * Frees one slot in `fallbackCounters` for a brand-new key, preferring an already-expired
+ * entry over a live one.
+ *
+ * `Map` iterates in insertion order, and `consumeInMemory` deletes-then-re-inserts a key on
+ * every window refresh (see below), so a key is not "oldest" just because it was first seen
+ * long ago — only a key nobody has touched since its window lapsed is. Scanning from the
+ * front finds one of those in one step whenever any exist, which is the common case under a
+ * high-cardinality flood (most of the flood's own earlier keys have already expired by the
+ * time the map fills up). Only when every entry is still inside a live window — no expired
+ * entry to give up for free — does this fall back to the oldest-inserted key, same behaviour
+ * as before this fix. Either way memory stays bounded at `FALLBACK_MAX_ENTRIES`; the point is
+ * that a currently-blocked key is no longer evicted ahead of an expired one just because the
+ * expired one happened to be refreshed more recently.
+ */
+function evictOneFallbackEntry(now: number): void {
+  let oldestKey: string | undefined;
+  for (const [candidateKey, entry] of fallbackCounters) {
+    if (entry.expiresAt <= now) {
+      fallbackCounters.delete(candidateKey);
+      return;
+    }
+    if (oldestKey === undefined) {
+      oldestKey = candidateKey;
+    }
+  }
+  if (oldestKey !== undefined) {
+    fallbackCounters.delete(oldestKey);
+  }
+}
+
+/**
  * In-process fixed-window counter, evaluated while Redis is unreachable. Mirrors
- * `CONSUME_SCRIPT`'s semantics on purpose — same fixed window, same "over `rule.max` blocks"
- * rule, same `retryAfter` in whole seconds — so a rule's behaviour does not visibly change
- * the moment Redis drops out from under it.
+ * `CONSUME_SCRIPT`'s semantics exactly — same fixed window, same "count over `rule.max`
+ * blocks" rule applied to the same freshly-seeded count of 1 a brand-new window starts at,
+ * same `retryAfter` in whole seconds — so a rule's behaviour does not visibly change the
+ * moment Redis drops out from under it (`rule.max === 0` included, though no rule is
+ * configured that low today).
  *
  * **This is a floor, not the shared limit.** Each replica keeps its own map, so N replicas
  * behind a load balancer each enforce `rule.max` independently: the effective ceiling across
@@ -87,7 +152,7 @@ let degraded = false;
  * Bounded memory, no timers: expired entries are only ever noticed and replaced lazily, on
  * the next `consume` call for that exact key — there is no sweep. What keeps the map's *size*
  * bounded under many distinct keys (rather than just each key's *lifetime*) is the
- * `FALLBACK_MAX_ENTRIES` eviction below, independent of expiry.
+ * `FALLBACK_MAX_ENTRIES` eviction in `evictOneFallbackEntry`, independent of expiry.
  */
 function consumeInMemory(
   fallbackKey: string,
@@ -109,16 +174,23 @@ function consumeInMemory(
 
   // Fresh window: either this key has never been seen, or its previous window expired — both
   // are "start counting from 1" the same way `INCR` on an absent key is in `CONSUME_SCRIPT`.
-  if (existing === undefined && fallbackCounters.size >= FALLBACK_MAX_ENTRIES) {
-    // `Map` iterates in insertion order, so the first key found is the oldest — evicted to
-    // make room rather than left to grow the map past its cap.
-    const oldestKey = fallbackCounters.keys().next().value;
-    if (oldestKey !== undefined) {
-      fallbackCounters.delete(oldestKey);
-    }
+  if (existing !== undefined) {
+    // Expired, not new. Delete before the re-insert below so the key lands at the
+    // insertion-order tail instead of keeping its stale position — `Map#set` on a key already
+    // present does NOT move it, so without this a key that keeps cycling through windows
+    // would look permanently "oldest" and be first in line for eviction despite being in
+    // active use. Deleting and re-inserting nets zero change in size, so this never needs the
+    // eviction below.
+    fallbackCounters.delete(fallbackKey);
+  } else if (fallbackCounters.size >= FALLBACK_MAX_ENTRIES) {
+    evictOneFallbackEntry(now);
   }
 
-  fallbackCounters.set(fallbackKey, { count: 1, expiresAt: now + rule.window * 1000 });
+  const count = 1;
+  fallbackCounters.set(fallbackKey, { count, expiresAt: now + rule.window * 1000 });
+  if (count > rule.max) {
+    return { allowed: false, retryAfter: rule.window };
+  }
   return { allowed: true, retryAfter: null };
 }
 
@@ -160,6 +232,7 @@ export async function closeAuthRateLimitStorage(): Promise<void> {
  */
 export function resetAuthRateLimitFallbackForTesting(): void {
   degraded = false;
+  lastReportedAt = 0;
   fallbackCounters.clear();
 }
 
@@ -200,12 +273,19 @@ export function createRedisRateLimitStorage(redisUrl: string): AuthRateLimitStor
         )) as [number, number];
 
         if (degraded) {
-          // Recovered: the next request goes back to being counted by the shared Redis
-          // counter, so the process's private view of it is not just stale but wrong —
-          // dropped rather than left to seed a window a fresh `INCR` will re-open anyway.
+          // Recovered. `fallbackCounters` is deliberately left alone rather than cleared: an
+          // intermittently failing Redis would otherwise hand every fallback key a clean
+          // slate on each brief recovery — exactly the reset a flapping connection needs to
+          // defeat the floor this fallback exists for. The counters are inert while Redis is
+          // answering (only `consumeInMemory`, reached from the catch branch below, ever
+          // reads them) and simply pick up where they left off if this process degrades
+          // again: a stale entry has either already expired (harmless) or is still a true
+          // count of this process's recent traffic for that key (useful).
           degraded = false;
-          fallbackCounters.clear();
-          logger.error('Auth rate-limit storage recovered — back to Redis-backed counters');
+          const now = Date.now();
+          if (shouldReportTransition(now)) {
+            logger.error('Auth rate-limit storage recovered — back to Redis-backed counters');
+          }
         }
 
         const [allowed, retryAfter] = result;
@@ -223,14 +303,22 @@ export function createRedisRateLimitStorage(redisUrl: string): AuthRateLimitStor
         // Reported once per transition, not once per request: an outage lasting the length of
         // a Redis restart must not turn into one log line — and, since this is an operational
         // failure rather than a single request's — one Sentry event (`captureServerError` is a
-        // no-op unless `SENTRY_DSN` is set) per blocked sign-in attempt in between.
+        // no-op unless `SENTRY_DSN` is set) per blocked sign-in attempt in between. The `!degraded`
+        // check alone only dampens *repeat* calls within one sustained outage; an intermittently
+        // failing Redis still flips `degraded` on every call, so `shouldReportTransition` further
+        // caps the reports themselves at one per `AUTH_RATE_LIMIT_REPORT_DAMPEN_MS` regardless of
+        // how many times it flaps in between. Routing to `consumeInMemory` below is unaffected —
+        // only the report is dampened, never the enforcement.
         if (!degraded) {
           degraded = true;
-          const message = error instanceof Error ? error.message : String(error);
-          logger.error(
-            `Auth rate-limit storage unavailable — falling back to a per-process in-memory limit until Redis recovers: ${message}`,
-          );
-          captureServerError(error, { path: 'auth-rate-limit.consume' });
+          const now = Date.now();
+          if (shouldReportTransition(now)) {
+            const message = error instanceof Error ? error.message : String(error);
+            logger.error(
+              `Auth rate-limit storage unavailable — falling back to a per-process in-memory limit until Redis recovers: ${message}`,
+            );
+            captureServerError(error, { path: 'auth-rate-limit.consume' });
+          }
         }
         return consumeInMemory(key(raw), rule);
       }
