@@ -1757,7 +1757,7 @@
             }
           }
         },
-        "summary": "Deletes the caller's account: `204`, and the session it was sent with is over.\n\nThe cookies are cleared on the way out because Better Auth's `session.cookieCache` answers\nfrom a signed cookie for up to five minutes without consulting the database, so deleting\nthe `Session` rows does not by itself stop this browser presenting a valid session. Clearing\nthem here closes that window for the browser that asked — which is every browser on this\npath (ADR 0026 §\"Consequences\" covers the administrator path, where it cannot be closed).",
+        "summary": "Deletes the caller's account: `204`, and the session it was sent with is over.\n\nThe cookies are cleared on the way out because Better Auth's `session.cookieCache` answers\nfrom a signed cookie for up to 60 seconds without consulting the database, so deleting\nthe `Session` rows does not by itself stop this browser presenting a valid session. Clearing\nthem here closes that window for the browser that asked — which is every browser on this\npath (ADR 0026 §\"Consequences\" covers the administrator path, where it cannot be closed).",
         "tags": ["Account"],
         "security": [
           {
