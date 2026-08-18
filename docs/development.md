@@ -432,11 +432,14 @@ exact same source build this repo has always done — when there's no image for 
 up --build` (or `up -d --build`) keeps working unchanged for building on purpose, e.g. after
 editing a Dockerfile or testing an unreleased change to `api`/`web`.
 
-The one exception is `migrate`: it has no `image:` pair (see the comment beside it in
-`docker-compose.yml` for why), so it always builds from source — a `docker compose up -d`
-that pulls `api`/`web` from GHCR still pays that one service's build cost once. See
-[audit finding OPS-04](https://github.com/dravcore/kurul/issues/126) for the full scoping
-rationale.
+`migrate` used to be the one exception: it had no `image:` pair, so it always built from
+source — a scoping [audit finding OPS-04](https://github.com/dravcore/kurul/issues/126) chose
+deliberately, and one that turned out to break the curl-based install in
+[docs/self-hosting.md](self-hosting.md), which downloads no source tree to build from (audit
+finding OPS-01). It now carries the same `image:` + `build:` pair as `api`/`web`, with
+`ghcr.io/dravcore/kurul-migrate` published from the first release after v0.2.0 onward — on
+`TAG=v0.2.0` or older there is no such image to pull and the service builds from source
+exactly as before.
 
 ### What the two API images weigh
 

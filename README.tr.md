@@ -130,9 +130,10 @@ taşımak için `.env`'de `SITE_URL=https://kurul.example.com` ayarlamanız yete
 zamanda otomatik HTTPS'i de açar. SMTP dahil tek sayfalık rehber:
 [docs/tr/self-hosting.md](docs/tr/self-hosting.md).
 
-Her etiketli release, `api`/`web` imajlarını GHCR'a yayınlar (`ghcr.io/dravcore/kurul-api`,
-`ghcr.io/dravcore/kurul-web`) — bu sayede kurulum ve upgrade lokal build gerektirmez; `latest`
-yerine belirli bir sürümü sabitlemek için `.env`'de `TAG=vX.Y.Z` ayarlayın. `TAG`'iniz için
+Her etiketli release, servis imajlarını GHCR'a yayınlar (`ghcr.io/dravcore/kurul-api`,
+`ghcr.io/dravcore/kurul-web` ve — v0.2.0'dan sonraki ilk sürümden itibaren — tek seferlik
+`ghcr.io/dravcore/kurul-migrate`) — bu sayede kurulum ve upgrade lokal build gerektirmez;
+`latest` yerine belirli bir sürümü sabitlemek için `.env`'de `TAG=vX.Y.Z` ayarlayın. `TAG`'iniz için
 henüz yayınlanmış bir imaj yoksa (veya `ghcr.io`'ya ağ erişimi yoksa) `docker compose up -d`
 otomatik olarak kaynaktan build'e döner — `docker compose up --build` de bilinçli olarak build
 etmek isteyenler için aynen çalışmaya devam eder.
