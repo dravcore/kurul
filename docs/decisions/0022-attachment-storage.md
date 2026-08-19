@@ -9,7 +9,7 @@
 
 Kurul has been telling people it cannot do this, and telling them why. `README.md` lists "no
 task attachments" among the things the product is not at `v0.1.0` and points at
-[roadmap.md — Beyond MVP](../roadmap.md#beyond-mvp), where the entry reads `Task attachments —
+[ROADMAP.md — Beyond MVP](../../ROADMAP.md#beyond-mvp), where the entry reads `Task attachments —
 Needs an object-storage decision (ADR)`. [tech-stack.md](../tech-stack.md) says the same thing
 from the other side: "File attachments are out of MVP scope. When added, pick an S3-compatible
 store." This document is the decision both of them are waiting on.

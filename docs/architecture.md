@@ -197,7 +197,7 @@ the preference; `en` and `tr` ship today (`SUPPORTED_LOCALES = ['en', 'tr']`, `m
 at parity with `en.json`), so adding a third language is a `SUPPORTED_LOCALES` entry plus a
 `messages/<tag>.json` — and the `Record<Locale, …>` seed and mail copy (`board-defaults.ts`,
 `mail-templates.ts`) failing to compile until it is filled in — not a rewrite of the component
-tree. See [roadmap.md — Beyond MVP](roadmap.md#beyond-mvp) for additional UI language packs.
+tree. See [ROADMAP.md — Beyond MVP](../ROADMAP.md#beyond-mvp) for additional UI language packs.
 
 ---
 

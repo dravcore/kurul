@@ -19,7 +19,7 @@ Five-minute map of Kurul docs. English is canonical; Turkish copies live under
 | Tests and CI gates                | [testing.md](testing.md)                                                              |
 | Branches, PRs, releases           | [git-strategy.md](git-strategy.md)                                                    |
 | Why a stack or policy choice      | [tech-stack.md](tech-stack.md) · [decisions/](decisions/)                             |
-| What’s done / what’s deferred     | [roadmap.md](roadmap.md)                                                              |
+| What’s done / what’s deferred     | [../ROADMAP.md](../ROADMAP.md)                                                        |
 
 Root community files (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, …)
 sit outside `docs/` because GitHub treats them specially.
@@ -44,7 +44,7 @@ sit outside `docs/` because GitHub treats them specially.
 | [testing.md](testing.md)                   | Test layers and expectations                                                                                |
 | [api-conventions.md](api-conventions.md)   | REST naming, errors, pagination, and where the generated OpenAPI document lives                             |
 | [cla.md](cla.md)                           | Contributor License Agreement (**draft**, unused — [ADR 0015](decisions/0015-no-external-contributions.md)) |
-| [roadmap.md](roadmap.md)                   | MVP status and beyond-MVP backlog                                                                           |
+| [../ROADMAP.md](../ROADMAP.md)             | Roadmap: hardening + feature tracks, beyond-MVP backlog                                                     |
 | [decisions/](decisions/)                   | Architecture decision records (ADRs)                                                                        |
 
 ## Historical
@@ -61,6 +61,6 @@ is needed). Do not grow a parallel `docs/specs/` tree for routine work.
 
 ## Archive policy
 
-`docs/archive/` is not day-to-day reading. Prefer [roadmap.md](roadmap.md) and
+`docs/archive/` is not day-to-day reading. Prefer [../ROADMAP.md](../ROADMAP.md) and
 [architecture.md](architecture.md). When moving a CHANGELOG-linked path, update every
 `CHANGELOG.md` link in the same PR.

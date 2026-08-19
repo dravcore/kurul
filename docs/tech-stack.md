@@ -89,7 +89,7 @@ Kurul sends one class of transactional email so far: the verification link an in
 `messages/<locale>.json` rather than being hardcoded. Locale resolution is
 `User.locale → locale cookie → Accept-Language → 'en'` ([ADR 0018](decisions/0018-localization-strategy.md));
 **Settings → Language** can set a preference or “Match my browser”. English is still the only
-catalog on offer — additional UI language packs remain [Beyond MVP](roadmap.md#beyond-mvp).
+catalog on offer — additional UI language packs remain [Beyond MVP](../ROADMAP.md#beyond-mvp).
 
 ### File uploads — `multer` + `file-type`
 

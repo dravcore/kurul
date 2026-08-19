@@ -12,7 +12,7 @@ Open-source, Kanban-focused project management tool.
 
 Kurul’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards) — auth/workspaces, boards and
 tasks, filtering, dashboard, activity/notifications, and realtime board sync. See
-[docs/roadmap.md](docs/roadmap.md). A seven-scenario Playwright smoke pack covers the critical
+[ROADMAP.md](ROADMAP.md). A seven-scenario Playwright smoke pack covers the critical
 browser flows ([docs/testing.md](docs/testing.md#browser-end-to-end)). Beyond-MVP items (email
 notifications, presence, extra locales, …) remain listed under Beyond MVP.
 
@@ -58,13 +58,13 @@ And what it is not, at `v0.2.0`: no subtasks, no time tracking, no public API to
 webhooks. The UI speaks English and Turkish — every interface string, the columns a new board
 is seeded with, and the email we send you — and a third language is a catalog away. API tokens,
 webhooks and further language packs are listed under
-[Beyond MVP](docs/roadmap.md#beyond-mvp), each with the open question holding it up; subtasks
+[Beyond MVP](ROADMAP.md#beyond-mvp), each with the open question holding it up; subtasks
 and time tracking are not on that list at all. If you need them today, one of the more mature
 projects above is the better choice.
 
 ## Features
 
-Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
+Shipped in the MVP — sequencing history in [ROADMAP.md](ROADMAP.md):
 
 - **Boards and columns** — classic Kanban layout with drag-and-drop reordering
 - **Tasks** — multi-assignee, labels, priority (kept independent of labels), due date and
@@ -232,7 +232,7 @@ product, coding, API, releases, roadmap).
 | [docs/design.md](docs/design.md)                   | UI/UX language                            |
 | [docs/development.md](docs/development.md)         | Local setup and daily commands            |
 | [docs/api-conventions.md](docs/api-conventions.md) | REST, errors, pagination                  |
-| [docs/roadmap.md](docs/roadmap.md)                 | MVP done; beyond-MVP backlog              |
+| [ROADMAP.md](ROADMAP.md)                           | MVP done; beyond-MVP backlog              |
 | [docs/decisions/](docs/decisions/)                 | ADRs                                      |
 | [docs/archive/](docs/archive/)                     | Historical specs, plans, phase checklists |
 
@@ -250,11 +250,11 @@ Kurul is issue-first: propose before you implement. See
 **[GitHub Discussions](https://github.com/dravcore/kurul/discussions) is the official channel.**
 Three categories carry the traffic:
 
-| Category                                                                                | For                                                                                                                                     |
-| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Setup, self-hosting and usage questions — anything that is not a bug report                                                             |
-| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Roadmap feedback. Every [Beyond MVP](docs/roadmap.md#beyond-mvp) row has a discussion here — upvote the one you want, or open a new one |
-| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | What you built with it, and what your board looks like                                                                                  |
+| Category                                                                                | For                                                                                                                                |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Setup, self-hosting and usage questions — anything that is not a bug report                                                        |
+| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Roadmap feedback. Every [Beyond MVP](ROADMAP.md#beyond-mvp) row has a discussion here — upvote the one you want, or open a new one |
+| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | What you built with it, and what your board looks like                                                                             |
 
 Reproducible bugs are still [issues](https://github.com/dravcore/kurul/issues), and
 vulnerabilities go to [SECURITY.md](SECURITY.md) rather than either.

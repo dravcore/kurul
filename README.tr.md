@@ -12,7 +12,7 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı) — auth/workspace’ler, board ve
 task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Bkz.
-[docs/roadmap.md](docs/tr/roadmap.md). Kritik tarayıcı akışlarını yedi senaryoluk bir
+[ROADMAP.md](ROADMAP.md). Kritik tarayıcı akışlarını yedi senaryoluk bir
 Playwright smoke paketi kapsıyor ([docs/testing.md](docs/tr/testing.md#browser-uçtan-uca)).
 MVP ötesi maddeler (e-posta bildirimleri, presence, ek diller, …) hâlâ MVP ötesi altında
 listelenir.
@@ -60,13 +60,13 @@ Ve `v0.2.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, public API to
 webhook'lar yok. UI hem İngilizce hem Türkçe konuşuyor — her arayüz metni, yeni bir board'un
 başladığı column adları ve size gönderdiğimiz e-posta dahil — ve üçüncü bir dil bir katalog
 uzakta. API token'ları, webhook'lar ve ek dil paketleri
-[MVP ötesi](docs/tr/roadmap.md#mvp-ötesi) altında, her biri kendisini bekleten açık soruyla
+[MVP ötesi](ROADMAP.md#beyond-mvp) altında, her biri kendisini bekleten açık soruyla
 listeli; subtask ve zaman takibi ise o listede hiç yok. Bunlara bugün ihtiyacınız varsa
 yukarıdaki daha olgun projelerden biri daha iyi bir seçim.
 
 ## Özellikler
 
-MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadmap.md):
+MVP’de gelenler — sıralama geçmişi için [ROADMAP.md](ROADMAP.md):
 
 - **Board'lar ve kolonlar** — sürükle-bırakla yeniden sıralanabilen klasik Kanban düzeni
 - **Task'lar** — çoklu atanan kişi, label'lar, (label'lardan bağımsız tutulan) priority,
@@ -239,7 +239,7 @@ Beş dakikalık harita (EN kanonik): **[docs/README.md](docs/README.md)**. Türk
 | [docs/tr/design.md](docs/tr/design.md)                   | UI/UX dili                           |
 | [docs/tr/development.md](docs/tr/development.md)         | Yerel kurulum ve günlük komutlar     |
 | [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST, hatalar, pagination            |
-| [docs/tr/roadmap.md](docs/tr/roadmap.md)                 | MVP bitti; Beyond MVP listesi        |
+| [ROADMAP.md](ROADMAP.md) (İngilizce)                     | MVP bitti; Beyond MVP listesi        |
 | [docs/tr/decisions/](docs/tr/decisions/)                 | ADR’ler                              |
 | [docs/archive/](docs/archive/)                           | Tarihsel spec / plan / faz checklist |
 
@@ -258,11 +258,11 @@ Kurul issue-first çalışıyor: uygulamaya geçmeden önce öner. Süreç için
 **Resmî kanal [GitHub Discussions](https://github.com/dravcore/kurul/discussions).**
 Trafiği üç kategori taşıyor:
 
-| Kategori                                                                                | Ne için                                                                                                                                                     |
-| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Kurulum, self-hosting ve kullanım soruları — hata bildirimi olmayan her şey                                                                                 |
-| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Yol haritası geri bildirimi. Her [MVP ötesi](docs/tr/roadmap.md#mvp-ötesi) satırının burada bir discussion'ı var — istediğinizi oylayın ya da yenisini açın |
-| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | Onunla ne kurduğunuz ve board'unuzun neye benzediği                                                                                                         |
+| Kategori                                                                                | Ne için                                                                                                                                              |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Kurulum, self-hosting ve kullanım soruları — hata bildirimi olmayan her şey                                                                          |
+| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Yol haritası geri bildirimi. Her [MVP ötesi](ROADMAP.md#beyond-mvp) satırının burada bir discussion'ı var — istediğinizi oylayın ya da yenisini açın |
+| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | Onunla ne kurduğunuz ve board'unuzun neye benzediği                                                                                                  |
 
 Tekrarlanabilir hatalar yine [issue](https://github.com/dravcore/kurul/issues), güvenlik
 açıkları ise ikisi yerine [SECURITY.md](SECURITY.md).

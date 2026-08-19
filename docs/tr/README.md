@@ -18,7 +18,7 @@ Kurul dokümanlarının beş dakikalık haritası. İngilizce kanoniktir; Türk�
 | Test'ler ve CI kapıları                   | [testing.md](testing.md)                                                                                 |
 | Branch'ler, PR'lar, release'ler           | [git-strategy.md](git-strategy.md)                                                                       |
 | Bir stack ya da politika kararının nedeni | [tech-stack.md](tech-stack.md) · [decisions/](decisions/)                                                |
-| Ne bitti / ne ertelendi                   | [roadmap.md](roadmap.md)                                                                                 |
+| Ne bitti / ne ertelendi                   | [../../ROADMAP.md](../../ROADMAP.md)                                                                     |
 
 Kök topluluk dosyaları (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, …)
 `docs/` dışında durur, çünkü GitHub bunlara özel davranır.
@@ -32,20 +32,20 @@ Kök topluluk dosyaları (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGE
 
 ## Aktif dokümanlar
 
-| Doküman                                    | Kapsam                                                                                                                 |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| [architecture.md](architecture.md)         | Modül haritası, veri modeli, runtime evrimi                                                                            |
-| [tech-stack.md](tech-stack.md)             | Stack seçimleri ve gerekçesi (pin'ler: kök / app `package.json`'a bakın)                                               |
-| [development.md](development.md)           | Env kurulumu, Compose, pnpm script'leri, günden güne, upgrade & rollback                                               |
-| [self-hosting.md](self-hosting.md)         | Bir release'i kendi domain'inize deploy etmek: DNS, Caddy ile HTTPS, SMTP, backup'lar, kendi reverse proxy'niz         |
-| [coding-standards.md](coding-standards.md) | TS / NestJS / Next.js konvansiyonları                                                                                  |
-| [design.md](design.md)                     | UI/UX dili                                                                                                             |
-| [git-strategy.md](git-strategy.md)         | Git Flow, Conventional Commits, release'ler                                                                            |
-| [testing.md](testing.md)                   | Test katmanları ve beklentiler                                                                                         |
-| [api-conventions.md](api-conventions.md)   | REST adlandırma, hatalar, pagination ve üretilen OpenAPI dokümanının nerede olduğu                                     |
-| [cla.md](cla.md)                           | Katkıda Bulunan Lisans Anlaşması (**taslak**, kullanılmıyor — [ADR 0015](decisions/0015-no-external-contributions.md)) |
-| [roadmap.md](roadmap.md)                   | MVP durumu ve beyond-MVP backlog'u                                                                                     |
-| [decisions/](decisions/)                   | Mimari karar kayıtları (ADR'ler)                                                                                       |
+| Doküman                                          | Kapsam                                                                                                                 |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| [architecture.md](architecture.md)               | Modül haritası, veri modeli, runtime evrimi                                                                            |
+| [tech-stack.md](tech-stack.md)                   | Stack seçimleri ve gerekçesi (pin'ler: kök / app `package.json`'a bakın)                                               |
+| [development.md](development.md)                 | Env kurulumu, Compose, pnpm script'leri, günden güne, upgrade & rollback                                               |
+| [self-hosting.md](self-hosting.md)               | Bir release'i kendi domain'inize deploy etmek: DNS, Caddy ile HTTPS, SMTP, backup'lar, kendi reverse proxy'niz         |
+| [coding-standards.md](coding-standards.md)       | TS / NestJS / Next.js konvansiyonları                                                                                  |
+| [design.md](design.md)                           | UI/UX dili                                                                                                             |
+| [git-strategy.md](git-strategy.md)               | Git Flow, Conventional Commits, release'ler                                                                            |
+| [testing.md](testing.md)                         | Test katmanları ve beklentiler                                                                                         |
+| [api-conventions.md](api-conventions.md)         | REST adlandırma, hatalar, pagination ve üretilen OpenAPI dokümanının nerede olduğu                                     |
+| [cla.md](cla.md)                                 | Katkıda Bulunan Lisans Anlaşması (**taslak**, kullanılmıyor — [ADR 0015](decisions/0015-no-external-contributions.md)) |
+| [../../ROADMAP.md](../../ROADMAP.md) (İngilizce) | Yol haritası: sağlamlaştırma + özellik hatları, beyond-MVP backlog'u                                                   |
+| [decisions/](decisions/)                         | Mimari karar kayıtları (ADR'ler)                                                                                       |
 
 ## Tarihsel
 
@@ -63,5 +63,5 @@ büyütülmez.
 ## Arşiv politikası
 
 `docs/archive/` günlük okuma için değildir; İngilizce kalır ve çevrilmez. Onun yerine
-[roadmap.md](roadmap.md) ve [architecture.md](architecture.md) tercih edilir. CHANGELOG'a
+[../../ROADMAP.md](../../ROADMAP.md) ve [architecture.md](architecture.md) tercih edilir. CHANGELOG'a
 bağlı bir yol taşındığında, aynı PR'da her `CHANGELOG.md` linki güncellenir.

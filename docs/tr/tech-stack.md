@@ -167,7 +167,7 @@ asla gerçek mail göndermemesi için lokal bir SMTP catch-all olarak
 `User.locale → locale cookie → Accept-Language → 'en'`
 ([ADR 0018](decisions/0018-localization-strategy.md)); **Ayarlar → Dil** tercih veya
 “Tarayıcımı izle” seçebilir. Katalog hâlâ yalnızca İngilizce — ek UI dil paketleri
-[MVP ötesi](roadmap.md#mvp-ötesi).
+[MVP ötesi](../../ROADMAP.md#beyond-mvp).
 
 ### Dosya yükleme — `multer` + `file-type`
 

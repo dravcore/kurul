@@ -221,7 +221,7 @@ Ayarlar → Dil ekranı tercihi yazıyor; bugün `en` ve `tr` sevkediliyor
 dil eklemek component ağacını yeniden yazmak değil, bir `SUPPORTED_LOCALES` girdisi artı bir
 `messages/<tag>.json` — ve doldurulana kadar derlenmeyecek `Record<Locale, …>` seed ve mail
 metni (`board-defaults.ts`, `mail-templates.ts`) — eklemektir. Ek UI dil paketleri için bkz.
-[roadmap.md — MVP ötesi](roadmap.md#mvp-ötesi).
+[ROADMAP.md — MVP ötesi](../../ROADMAP.md#beyond-mvp).
 
 ---
 

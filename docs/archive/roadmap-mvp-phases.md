@@ -1,11 +1,10 @@
 # MVP phase checklist (historical)
 
 > **Archived.** Shipped Phases 0–9 and post-MVP hardening checklists as of `v0.1.0`.
-> Day-to-day status lives in [../roadmap.md](../roadmap.md). Specs for these phases are under
+> Day-to-day status lives in [../../ROADMAP.md](../../ROADMAP.md). Specs for these phases are under
 > [specs/](specs/).
 
-> 🌐 English (canonical). Turkish readers: use [../tr/roadmap.md](../tr/roadmap.md) for the
-> live summary; this archive is EN-only.
+> 🌐 English (canonical). Live summary: [../../ROADMAP.md](../../ROADMAP.md); this archive is EN-only.
 
 **Snapshot date:** 2026-08-12
 

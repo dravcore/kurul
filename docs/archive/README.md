@@ -2,7 +2,7 @@
 
 Finished plans, shipped design specs, and the detailed MVP phase checklist. Prefer
 [docs/README.md](../README.md) for the active documentation map and
-[roadmap.md](../roadmap.md) for current status.
+[ROADMAP.md](../../ROADMAP.md) for current status.
 
 | Path                                           | Contents                                               |
 | ---------------------------------------------- | ------------------------------------------------------ |

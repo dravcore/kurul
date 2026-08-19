@@ -33,7 +33,7 @@ bug and gets fixed in the same PR.
 
 - Layout and module map: [architecture.md](architecture.md#2-monorepo-layout)
 - Data model and critical field rules: [architecture.md](architecture.md#critical-field-rules)
-- Phase progress (MVP complete): [roadmap.md](roadmap.md)
+- Phase progress (MVP complete): [ROADMAP.md](../ROADMAP.md)
 - Why each tool was chosen: [tech-stack.md](tech-stack.md)
 
 ## Prerequisites
@@ -1511,7 +1511,7 @@ specified in [git-strategy.md](git-strategy.md).
 - [architecture.md](architecture.md) — the module map and critical field rules this
   document is the contract for
 - [self-hosting.md](self-hosting.md) — putting a release on your own domain: DNS, HTTPS, SMTP
-- [roadmap.md](roadmap.md) — phase order
+- [../ROADMAP.md](../ROADMAP.md) — phase order
 - [git-strategy.md](git-strategy.md) — branches, commits, releases
 - [coding-standards.md](coding-standards.md) — how the code inside these apps is written
 - [testing.md](testing.md) — how to run and write tests

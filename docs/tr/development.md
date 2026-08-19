@@ -33,7 +33,7 @@ PR’da düzeltilir.
 
 - Yerleşim ve modül haritası: [architecture.md](architecture.md#2-monorepo-yerleşimi)
 - Veri modeli ve kritik alan kuralları: [architecture.md](architecture.md#kritik-alan-kuralları)
-- Faz ilerlemesi (MVP tamam): [roadmap.md](roadmap.md)
+- Faz ilerlemesi (MVP tamam): [ROADMAP.md](../../ROADMAP.md)
 - Her aracın neden seçildiği: [tech-stack.md](tech-stack.md)
 
 ## Ön koşullar
@@ -1536,7 +1536,7 @@ PR/release süreci [git-strategy.md](git-strategy.md)'de belirtilmiştir.
 - [architecture.md](architecture.md) — bu dokümanın kontratı olduğu modül haritası ve
   kritik alan kuralları
 - [self-hosting.md](self-hosting.md) — bir release'i kendi domain'inize kurmak: DNS, HTTPS, SMTP
-- [roadmap.md](roadmap.md) — faz sırası
+- [../../ROADMAP.md](../../ROADMAP.md) — faz sırası
 - [git-strategy.md](git-strategy.md) — branch'ler, commit'ler, release'ler
 - [coding-standards.md](coding-standards.md) — bu uygulamaların içindeki kodun nasıl
   yazıldığı
