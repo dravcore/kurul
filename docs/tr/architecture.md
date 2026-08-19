@@ -83,9 +83,10 @@ kurul/
 └── .env.example
 ```
 
-Canlı yerleşim bu doküman ve repo ağacıdır. [project-skeleton.md](project-skeleton.md)
-**tarihsel Faz 1 iskeletidir** (monorepo’nun ilk nasıl kurulduğu); gündelik doğruluk
-kaynağı değildir. Teknoloji seçimleri: [tech-stack.md](tech-stack.md).
+Canlı yerleşim bu doküman ve repo ağacıdır.
+[../archive/project-skeleton.md](../archive/project-skeleton.md) **tarihsel Faz 1
+iskeletidir** (monorepo’nun ilk nasıl kurulduğu); gündelik doğruluk kaynağı değildir.
+Teknoloji seçimleri: [tech-stack.md](tech-stack.md).
 
 ---
 
@@ -546,5 +547,6 @@ bir yayınlanmış imajın her domain'de çalışmasını sağlayan şey budur (
 mekanizması yerinde kalır: geliştirme döngüsü iki uygulamayı hâlâ ayrı portlarda çalıştırır ve
 bir dağıtım API'yi hâlâ kendi hostname'ine koyabilir.
 
-İlgili: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
-(tarihsel Faz 1 iskeleti) · [docs/README.md](../README.md) (docs haritası)
+İlgili: [tech-stack.md](tech-stack.md) ·
+[../archive/project-skeleton.md](../archive/project-skeleton.md) (tarihsel Faz 1 iskeleti) ·
+[docs/README.md](../README.md) (docs haritası)

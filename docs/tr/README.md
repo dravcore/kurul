@@ -49,12 +49,12 @@ Kök topluluk dosyaları (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGE
 
 ## Tarihsel
 
-| Doküman                                                                          | Durum                                                                                                                                   |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| [project-skeleton.md](project-skeleton.md)                                       | Stub → [../archive/project-skeleton.md](../archive/project-skeleton.md) (İngilizce); güncel yerleşim [architecture.md](architecture.md) |
-| [../archive/roadmap-mvp-phases.md](../archive/roadmap-mvp-phases.md) (İngilizce) | Tam Faz 0–9 + hardening checklist'leri (`v0.1.0` öncesi detay)                                                                          |
-| [../archive/specs/](../archive/specs/) (İngilizce)                               | Sevkedilmiş faz / visual-debt tasarım spec'leri                                                                                         |
-| [../archive/plans/](../archive/plans/) (İngilizce)                               | Bitmiş implementasyon planları                                                                                                          |
+| Doküman                                                                          | Durum                                                                              |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [../archive/project-skeleton.md](../archive/project-skeleton.md) (İngilizce)     | Tarihsel Faz 1 iskelet rehberi; güncel yerleşim [architecture.md](architecture.md) |
+| [../archive/roadmap-mvp-phases.md](../archive/roadmap-mvp-phases.md) (İngilizce) | Tam Faz 0–9 + hardening checklist'leri (`v0.1.0` öncesi detay)                     |
+| [../archive/specs/](../archive/specs/) (İngilizce)                               | Sevkedilmiş faz / visual-debt tasarım spec'leri                                    |
+| [../archive/plans/](../archive/plans/) (İngilizce)                               | Bitmiş implementasyon planları                                                     |
 
 MVP sonrası yeni özellik tasarımı bir **GitHub Issue** olarak açılır (kalıcı bir karar
 gerektiğinde bir ADR ile birlikte). Rutin işler için paralel bir `docs/specs/` ağacı

@@ -74,9 +74,10 @@ kurul/
 └── .env.example
 ```
 
-Live layout is this document and the repo tree. [project-skeleton.md](project-skeleton.md)
-is the **historical Phase 1 scaffold** (how the monorepo was first built); it is not the
-day-to-day source of truth. Technology choices: [tech-stack.md](tech-stack.md).
+Live layout is this document and the repo tree.
+[archive/project-skeleton.md](archive/project-skeleton.md) is the **historical Phase 1
+scaffold** (how the monorepo was first built); it is not the day-to-day source of truth.
+Technology choices: [tech-stack.md](tech-stack.md).
 
 ---
 
@@ -504,5 +505,6 @@ one published image run on any domain (audit finding PM-02, `apps/web/lib/api-ur
 loop still runs the two apps on separate ports, and a deployment may still put the API on its
 own hostname.
 
-Related: [tech-stack.md](tech-stack.md) · [project-skeleton.md](project-skeleton.md)
-(historical Phase 1 scaffold) · [docs/README.md](README.md) (docs map)
+Related: [tech-stack.md](tech-stack.md) ·
+[archive/project-skeleton.md](archive/project-skeleton.md) (historical Phase 1 scaffold) ·
+[docs/README.md](README.md) (docs map)

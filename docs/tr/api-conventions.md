@@ -951,8 +951,7 @@ ihtiyaç duyulduğunda karar verilecektir.
 
 ## Ayrıca bakınız
 
-- [architecture.md](architecture.md) — modül haritası, socket kontratı
+- [architecture.md](architecture.md) — modül haritası, veri modeli, socket kontratı
 - [coding-standards.md](coding-standards.md) — DTO'lar, validation, modül sınırları
 - [testing.md](testing.md) — endpoint testlerinin neyi assert ettiği
 - [git-strategy.md](git-strategy.md) — SemVer ve changelog politikası
-- [project-skeleton.md](project-skeleton.md) — bu kaynakların eşlendiği veri modeli
