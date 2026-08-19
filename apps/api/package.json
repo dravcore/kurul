@@ -13,7 +13,6 @@
     "test:watch": "jest --config jest.config.cjs --watch",
     "test:cov": "jest --config jest.config.cjs --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.config.cjs --runInBand",
-    "prisma": "prisma",
     "openapi": "node dist/openapi/generate-openapi.js",
     "openapi:check": "node dist/openapi/generate-openapi.js --check"
   },
@@ -64,7 +63,6 @@
     "socket.io-client": "^4.8.1",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.6",
-    "tsx": "^4.23.12",
     "typescript": "^5.8.2"
   }
 }
