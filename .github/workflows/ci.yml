@@ -94,6 +94,10 @@ jobs:
       # still builds them, because `pnpm typecheck` resolves the packages through `dist`.
       - name: Unit tests (shared packages)
         run: pnpm --filter "./packages/*" test
+      # `scripts/` has no dependencies and is not a workspace package, so nothing under
+      # `pnpm -r` reaches it; its tests run on `node:test`.
+      - name: Unit tests (scripts)
+        run: pnpm test:scripts
       - name: Unit tests with coverage
         run: |
           pnpm --filter @kurul/api test:cov

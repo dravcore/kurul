@@ -15,6 +15,7 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r --filter @kurul/api --filter @kurul/web --filter @kurul/shared-types --filter @kurul/auth-access test",
     "test:browser": "node e2e/build-stack.mjs && pnpm --filter @kurul/e2e exec playwright test",
+    "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "typecheck": "pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build && pnpm -r typecheck",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
