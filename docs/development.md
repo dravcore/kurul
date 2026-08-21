@@ -71,22 +71,28 @@ fresh clone. Code that imports `@prisma/client`-derived types will not typecheck
 until you've run it at least once.
 
 `packages/shared-types` and `packages/auth-access` are consumed from their built `dist/`,
-which is git-ignored for the same reason, so a fresh clone needs them built before anything
-that imports a shared type will run:
+which is git-ignored for the same reason, so a fresh clone needs them built before `pnpm dev`,
+`pnpm db:seed`, `nest build` or `next build` will run:
 
 ```bash
 pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build
 ```
 
-Skipping this does not produce a helpful error. `pnpm test` fails in `apps/web` with
-`Failed to resolve entry for package "@kurul/shared-types"` across every file that imports
-a shared type, `pnpm dev` fails in `apps/api` with `TS2307: Cannot find module
-'@kurul/shared-types'`, and `pnpm db:seed` dies with `Cannot find module
-'.../@kurul/auth-access/dist/cjs/index.js'` before it ever reaches the database — all of
-which read like a broken checkout rather than a missing build. `pnpm build` and
-`pnpm typecheck` both do this for you as a side effect; `pnpm dev`, `pnpm db:seed`,
-`pnpm test`, and `pnpm lint` do not. CI builds them explicitly before both the lint and test
-jobs.
+Skipping this does not produce a helpful error. `pnpm dev` fails in `apps/api` with
+`TS2307: Cannot find module '@kurul/shared-types'`, and `pnpm db:seed` dies with
+`Cannot find module '.../@kurul/auth-access/dist/cjs/index.js'` before it ever reaches the
+database, both of which read like a broken checkout rather than a missing build. `pnpm build`
+and `pnpm typecheck` both do this for you as a side effect; `pnpm dev`, `pnpm db:seed` and
+`pnpm lint` do not. CI builds them explicitly before the lint job, which is where
+`pnpm typecheck` runs.
+
+The test suites are the exception. Jest (`apps/api`, unit and integration) and Vitest
+(`apps/web`, `packages/auth-access`) map both packages to their `src/index.ts`, so `pnpm test`
+passes on a checkout with no `dist` at all and never runs against a stale one; the CI test job
+deliberately skips the build for that reason. A stale build is the worse of the two failures,
+because it resolves: an enum added since the last build reads back as `undefined` in every
+consumer. `pnpm dev` and `pnpm db:seed` still go through `dist`, so rebuild after pulling a
+change to either package.
 
 ## Environment variables
 

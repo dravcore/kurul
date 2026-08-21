@@ -182,10 +182,10 @@ olmamalıdır. Yine de seed'lemek için `--seed`, o adımı tümüyle atlamak i�
 
 Betiğin var olma sebebinin büyük kısmı o iki build adımıdır, çünkü ikisinden birinin atlanması
 eksik bir adımdan çok bozuk bir checkout gibi okunan hatalar üretir. Paylaşılan paket build'i
-olmadan `apps/web` `Failed to resolve entry for package "@kurul/shared-types"`, `apps/api`
-`TS2307: Cannot find module '@kurul/shared-types'` verir ve `pnpm db:seed` veritabanına hiç
-ulaşmadan `@kurul/auth-access/dist/cjs/index.js` üzerinde ölür; `pnpm build` ve `pnpm typecheck`
-bunu sizin yerinize yapar, `pnpm dev`, `pnpm test`, `pnpm db:seed` ve `pnpm lint` yapmaz.
+olmadan `apps/api` `TS2307: Cannot find module '@kurul/shared-types'` verir ve `pnpm db:seed`
+veritabanına hiç ulaşmadan `@kurul/auth-access/dist/cjs/index.js` üzerinde ölür; `pnpm build` ve
+`pnpm typecheck` bunu sizin yerinize yapar, `pnpm dev`, `pnpm db:seed` ve `pnpm lint` yapmaz.
+Test suite'leri paketlerin `src` dizinini doğrudan okur ve build olmadan da koşar.
 `pnpm db:generate` olmadan ise Prisma türevli bir tür import eden hiçbir şey typecheck'ten
 geçmez ve build olmaz — client git-ignored'dır ve onu üreten bir `postinstall` hook'u yoktur.
 O adımın başkasının migration'larını çektikten sonra da yeniden koşması gerekir:

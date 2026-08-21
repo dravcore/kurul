@@ -14,6 +14,19 @@ the 2026-08-18 "atlas" audit. See
 
 ### Fixed
 
+- **The test suites no longer read `packages/*/dist`.** `@kurul/shared-types` and
+  `@kurul/auth-access` resolve through their `package.json` to a git-ignored build, so a fresh
+  checkout failed `pnpm test` with `Cannot find module '@kurul/shared-types'` (Jest) and
+  `Failed to resolve entry for package "@kurul/shared-types"` (Vitest), and a checkout with an
+  old build passed against last week's enums. Both Jest configs (`moduleNameMapper` plus a
+  matching `paths` entry for ts-jest, and a mapper that lets the packages' NodeNext `.js`
+  imports resolve to `.ts`) and both Vitest configs (`resolve.alias`) now point the two
+  specifiers at `src/index.ts`; `packages/auth-access`'s own suite, which imports
+  `@kurul/shared-types`, gets the same alias. A spec in each runner asserts the mapping holds,
+  and the CI test job no longer builds the packages, so it runs the way a fresh clone does.
+  The build is still needed for `pnpm typecheck`, `nest build`, `next build`, `pnpm dev` and
+  `pnpm db:seed`.
+
 - **The task search box treated `%` and `_` as SQL wildcards instead of the characters a user
   typed.** `q` reached Postgres through Prisma's `contains`, which — confirmed empirically
   against Postgres 18 — compiles to `ILIKE`/`LIKE` with the search string bound as a *pattern*,

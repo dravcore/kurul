@@ -153,10 +153,11 @@ note('`.env` looks complete, Docker Compose v2 is available.');
 // ---------------------------------------------------------------------------------------
 // 2. Shared packages
 // ---------------------------------------------------------------------------------------
-// Both are consumed from a git-ignored `dist/`. Rebuilt unconditionally rather than only when
-// missing: a *stale* dist is the worse failure of the two, because it resolves — an enum added
-// since the last build reads back as `undefined` in every consumer, which surfaces as dozens
-// of unrelated-looking test failures rather than a module-not-found error.
+// Both are consumed from a git-ignored `dist/` by `pnpm dev`, `pnpm db:seed` and the app
+// builds (the test suites read the packages' `src` directly and do not need this step).
+// Rebuilt unconditionally rather than only when missing: a *stale* dist is the worse failure
+// of the two, because it resolves, and an enum added since the last build reads back as
+// `undefined` in every consumer rather than as a module-not-found error.
 
 heading('Building shared packages (@kurul/shared-types, @kurul/auth-access)');
 run('pnpm', ['-r', '--filter', '@kurul/shared-types', '--filter', '@kurul/auth-access', 'build']);

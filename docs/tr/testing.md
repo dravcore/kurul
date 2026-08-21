@@ -268,6 +268,14 @@ Integration testler, test setup'ı tarafından oluşturulan ve migrate edilen **
 veritabanına** (`kurul_test`) karşı çalışır. Geliştirme veritabanına asla dokunmazlar.
 Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#izolasyon).
 
+Bu komutların hiçbiri `packages/*/dist` gerektirmez. İki Jest config'i ve Vitest config'leri
+`@kurul/shared-types` ile `@kurul/auth-access` paketlerini `src/index.ts` dosyalarına eşler;
+böylece suite'ler `pnpm typecheck`'in okuduğu kaynağı derler ve bayat bir build'e karşı
+geçemez. `apps/api/src/workspace-packages.spec.ts`, `apps/api/test/harness.e2e-spec.ts` ve
+`apps/web/workspace-packages.test.ts` bu eşleme kaldırılırsa kırmızıya döner. Build hâlâ
+`pnpm typecheck`, `nest build`, `next build` ve `pnpm dev` için gereklidir, bkz.
+[development.md](development.md#klonlama-ve-kurulum).
+
 ## Test yazma
 
 - **Arrange–Act–Assert**, üç kısım arasında boş satırlarla.

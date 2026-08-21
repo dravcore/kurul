@@ -176,10 +176,10 @@ on. Pass `--seed` to reseed anyway, or `--no-seed` to skip that step outright.
 
 The two build steps are most of why the script exists, because skipping either one fails in a
 way that reads like a broken checkout rather than a missing step. Without the shared-package
-build, `apps/web` reports `Failed to resolve entry for package "@kurul/shared-types"`,
-`apps/api` reports `TS2307: Cannot find module '@kurul/shared-types'`, and `pnpm db:seed` dies
-on `@kurul/auth-access/dist/cjs/index.js` before it ever reaches the database; `pnpm build` and
-`pnpm typecheck` do it for you, `pnpm dev`, `pnpm test`, `pnpm db:seed` and `pnpm lint` do not.
+build, `apps/api` reports `TS2307: Cannot find module '@kurul/shared-types'` and `pnpm db:seed`
+dies on `@kurul/auth-access/dist/cjs/index.js` before it ever reaches the database; `pnpm build`
+and `pnpm typecheck` do it for you, `pnpm dev`, `pnpm db:seed` and `pnpm lint` do not. The test
+suites read the packages' `src` directly and run without it.
 Without `pnpm db:generate`, nothing that imports a Prisma-derived type typechecks or builds —
 the client is git-ignored and no `postinstall` hook creates it. That one also has to be re-run
 after pulling someone else's migrations: `pnpm db:migrate` applies them but does not regenerate

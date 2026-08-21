@@ -87,8 +87,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma client
         run: pnpm db:generate
-      - name: Build shared packages
-        run: pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build
+      # No shared-package build here, on purpose. Jest and Vitest map `@kurul/shared-types` and
+      # `@kurul/auth-access` to the packages' `src`, and this job running without a `dist` is
+      # what keeps that true: a test that quietly started reading the build again would fail
+      # here with "Cannot find module" instead of passing against stale output. The lint job
+      # still builds them, because `pnpm typecheck` resolves the packages through `dist`.
       - name: Unit tests (shared packages)
         run: pnpm --filter "./packages/*" test
       - name: Unit tests with coverage

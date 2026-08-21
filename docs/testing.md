@@ -265,6 +265,14 @@ Integration tests run against a **separate database** (`kurul_test`), created an
 migrated by the test setup. They never touch the development database. The browser suite
 uses a third one — see [Isolation](#isolation).
 
+None of these commands needs `packages/*/dist`. Both Jest configs and the Vitest configs map
+`@kurul/shared-types` and `@kurul/auth-access` to the packages' `src/index.ts`, so the suites
+compile the same source `pnpm typecheck` reads and cannot pass against a stale build;
+`apps/api/src/workspace-packages.spec.ts`, `apps/api/test/harness.e2e-spec.ts` and
+`apps/web/workspace-packages.test.ts` fail if that mapping is ever removed. The build is still
+required for `pnpm typecheck`, `nest build`, `next build` and `pnpm dev`, see
+[development.md](development.md#clone-and-install).
+
 ## Writing tests
 
 - **Arrange–Act–Assert**, with blank lines between the three parts.
