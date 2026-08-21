@@ -139,8 +139,13 @@ the 2026-08-18 "atlas" audit. See
   deterministic, seeded pseudonyms of the same length and shape, while keeping the structure the
   importer reads byte for byte: keys and their order, array lengths, nulls, booleans, numbers,
   dates, colours, `closed` flags, and every id relationship (Trello ids are remapped consistently,
-  keeping their timestamp prefix and sort order). It prints a count summary and lists every
-  top-level key and string-carrying key path it did not recognise, in the spirit of ADR 0025.
+  keeping their timestamp prefix and sort order). A URL that also looks like an e-mail address
+  (`mailto:`, userinfo, an `@` in the path) stays a URL with its scheme, a file extension is
+  kept only on an attachment's name and only from a known list, so a `first.last` handle or an
+  honorific never survives as a tail, and the output is written the way the input was formatted,
+  so Trello's minified export stays minified and the import size limit applies to both alike. It
+  prints a count summary and lists every top-level key and string-carrying key path it did not
+  recognise, in the spirit of ADR 0025.
   `apps/api/test/fixtures/trello/real/` is where the output goes;
   `apps/api/test/trello-import-real.e2e-spec.ts` imports every file found there through the real
   endpoint and checks the report and the database against counts derived from the file, and while

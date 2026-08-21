@@ -6,6 +6,7 @@
  * lives in `apps/api/test/trello-import-real.e2e-spec.ts` and drives the CLI.
  */
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -215,6 +216,64 @@ describe('anonymiseTrelloExport', () => {
     assert.notEqual(output.cards[0].shortLink, input.cards[0].shortLink);
   });
 
+  it('keeps a URL that also matches the e-mail shape a URL, under a URL key and in text', () => {
+    const input = loadFixture();
+    const card = input.cards[1];
+    const attachment = (id, url) => ({ ...card.attachments[0], id, name: 'x', url });
+    card.attachments.push(
+      attachment('6512a1b7c3d4e5f601020373', 'mailto:someone@corp.example'),
+      attachment('6512a1b7c3d4e5f601020374', 'https://user:pw@intranet.corp.example/report.pdf'),
+      attachment('6512a1b7c3d4e5f601020375', 'https://github.com/org/repo/blob/main/@types/x.d.ts'),
+      attachment('6512a1b7c3d4e5f601020376', 'ftp://backup@files.corp.example/dump.zip'),
+      // Not a URL at all: the importer calls it malformed, and must still be able to.
+      attachment('6512a1b7c3d4e5f601020377', 'someone@corp.example'),
+    );
+    card.desc = 'mailto:ada@corp.example';
+    input.members[0].email = 'ada@corp.example';
+
+    const { output } = anonymiseTrelloExport(input, { seed: 'email-shaped urls' });
+
+    const urls = output.cards[1].attachments.slice(3).map((entry) => entry.url);
+    assert.match(urls[0], /^mailto:[0-9a-f]{16}@example\.invalid$/);
+    assert.match(urls[1], /^https:\/\/example\.invalid\/[0-9a-f]{16}\.pdf$/);
+    assert.match(urls[2], /^https:\/\/example\.invalid\/[0-9a-f]{16}\.ts$/);
+    assert.match(urls[3], /^ftp:\/\/example\.invalid\/[0-9a-f]{16}\.zip$/);
+    assert.match(urls[4], /^[0-9a-f]{12}@example\.invalid$/);
+    assert.match(output.cards[1].desc, /^mailto:[0-9a-f]{16}@example\.invalid$/);
+    assert.match(output.members[0].email, /^[0-9a-f]{12}@example\.invalid$/);
+    const json = JSON.stringify(output);
+    for (const leak of ['corp.example', 'github.com', 'user:pw', '@types', 'someone', 'ada@']) {
+      assert.equal(json.includes(leak), false, `leaked: ${leak}`);
+    }
+  });
+
+  it('keeps a file extension only on an attachment name, never on prose', () => {
+    const input = loadFixture();
+    input.cards[0].name = 'Review PR from k.smith';
+    input.cards[0].desc = 'Notes:\nCall Mrs.Johnson\n- mail j.doe';
+    input.actions[0].data.text = 'Ping a.kowalski';
+    input.lists[0].name = 'Dr.Smith';
+    input.checklists[0].checkItems[0].name = 'ask m.brown.md';
+    const attachments = input.cards[1].attachments;
+    attachments[0].name = 'k.smith';
+    attachments[1].name = 'wireframe-v2.png';
+    attachments[1].fileName = 'wireframe-v2.png';
+
+    const { output } = anonymiseTrelloExport(input, { seed: 'tails' });
+
+    assert.equal(output.cards[0].name.length, 'Review PR from k.smith'.length);
+    assert.equal(output.cards[0].desc.split('\n').length, 3);
+    assert.match(output.cards[1].attachments[1].name, /^[a-z-]+\.png$/);
+    assert.match(output.cards[1].attachments[1].fileName, /^[a-z-]+\.png$/);
+    assert.equal(output.cards[1].attachments[0].name.length, 'k.smith'.length);
+    // A checklist item is prose even when it ends like a file name.
+    assert.doesNotMatch(output.checklists[0].checkItems[0].name, /\.md$/);
+    const json = JSON.stringify(output);
+    for (const tail of ['smith', 'Smith', 'Johnson', '.doe', 'kowalski', 'brown']) {
+      assert.equal(json.includes(tail), false, `leaked: ${tail}`);
+    }
+  });
+
   it('pseudonymises members but keeps their ids and member types', () => {
     const input = loadFixture();
     input.members[0].email = 'ada@company.example';
@@ -408,14 +467,40 @@ describe('pseudonymText', () => {
     assert.equal(pseudonymText('\n\n', 's'), '\n\n');
   });
 
-  it('keeps a file extension, and keeps a one-token file name one token', () => {
-    const spaced = pseudonymText('quarterly report final.pdf', 's');
-    const single = pseudonymText('wireframe-v2.png', 's');
+  it('keeps a file extension on request, and keeps a one-token file name one token', () => {
+    const keep = { keepExtension: true };
+    const spaced = pseudonymText('quarterly report final.pdf', 's', keep);
+    const single = pseudonymText('wireframe-v2.png', 's', keep);
+    const upper = pseudonymText('SCAN.PDF', 's', keep);
 
     assert.match(spaced, /^[a-z ]+\.pdf$/);
     assert.equal(spaced.length, 'quarterly report final.pdf'.length);
     assert.match(single, /^[a-z-]+\.png$/);
     assert.equal(single.length, 'wireframe-v2.png'.length);
+    assert.match(upper, /^[A-Za-z-]+\.PDF$/);
+  });
+
+  it('does not keep the tail of a first.last handle or an honorific, even as a file name', () => {
+    // Every one of these matches the `stem.ext` shape that a file name has.
+    const lines = [
+      'Review PR from k.smith',
+      'Talk to Dr.Smith',
+      'Ping a.kowalski',
+      'Notes:\nCall Mrs.Johnson\n- mail j.doe',
+      'k.smith',
+    ];
+    for (const original of lines) {
+      for (const options of [undefined, { keepExtension: true }]) {
+        const out = pseudonymText(original, 's', options);
+
+        assert.equal(out.length, original.length, original);
+        for (const tail of ['smith', 'Smith', 'kowalski', 'Johnson', '.doe']) {
+          assert.equal(out.includes(tail), false, `${JSON.stringify(original)} leaked ${tail}`);
+        }
+      }
+    }
+    // Without the option a real file name loses its extension too: prose never keeps a tail.
+    assert.doesNotMatch(pseudonymText('wireframe-v2.png', 's'), /\.png$/);
   });
 
   it('keeps a leading capital and the exact length of a one-line name', () => {
@@ -441,6 +526,17 @@ describe('pseudonymUrl', () => {
     assert.match(
       pseudonymUrl('http://intranet.local/x.docx', 's'),
       /^http:\/\/example\.invalid\/[0-9a-f]{16}\.docx$/,
+    );
+  });
+
+  it('keeps only a known file extension from the path, so a handle in a URL is not a tail', () => {
+    assert.match(
+      pseudonymUrl('https://github.com/j.smith', 's'),
+      /^https:\/\/example\.invalid\/[0-9a-f]{16}$/,
+    );
+    assert.match(
+      pseudonymUrl('https://files.example/a/b/Report.PDF', 's'),
+      /^https:\/\/example\.invalid\/[0-9a-f]{16}\.PDF$/,
     );
   });
 });
@@ -475,12 +571,37 @@ describe('the CLI', () => {
 
       const stdout = run([FIXTURE, out, '--seed', 'cli']);
 
-      const written = JSON.parse(readFileSync(out, 'utf8'));
+      const text = readFileSync(out, 'utf8');
+      const written = JSON.parse(text);
       assert.deepEqual(written, anonymiseTrelloExport(loadFixture(), { seed: 'cli' }).output);
+      // The fixture is indented by two spaces and ends in a newline; so does its anonymisation.
+      assert.match(text, /^\{\n {2}"id": /);
+      assert.equal(text.endsWith('}\n'), true);
       assert.match(stdout, /lists 4 \(1 archived\), cards 6 \(1 archived\), labels 5/);
       assert.match(stdout, /checklists 3, checkItems 5, attachments 3/);
       assert.match(stdout, /members 2, comments 2, customFields 0/);
       assert.match(stdout, /unrecognised top-level keys: none/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('writes a minified export back minified, as Trello exports it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kurul-anonymise-'));
+    try {
+      const input = join(dir, 'in.json');
+      const out = join(dir, 'out.json');
+      writeFileSync(input, JSON.stringify(loadFixture()));
+
+      const stdout = run([input, out, '--seed', 'cli']);
+
+      const text = readFileSync(out, 'utf8');
+      assert.equal(text.includes('\n'), false);
+      assert.deepEqual(
+        JSON.parse(text),
+        anonymiseTrelloExport(loadFixture(), { seed: 'cli' }).output,
+      );
+      assert.match(stdout, new RegExp(`\\(${Buffer.byteLength(text, 'utf8')} bytes\\)`));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

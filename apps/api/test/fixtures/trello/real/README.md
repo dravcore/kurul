@@ -34,7 +34,9 @@ reads is unchanged; what a person wrote is gone.
 Keep the file under `TRELLO_IMPORT_MAX_BYTES` (20 MiB by default): the harness imports it
 through the real endpoint with the production limit and does not raise it, because a real
 export that does not fit is a finding, not a test-setup problem. A board with a few hundred
-cards is a few megabytes.
+cards is a few megabytes. The script writes the output the way the input was formatted, so
+Trello's minified single line stays a single line; do not pretty-print the export first, that
+alone grows it by half.
 
 ## What reads it
 

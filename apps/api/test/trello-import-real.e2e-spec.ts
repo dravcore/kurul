@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -49,7 +49,8 @@ import { resetDatabase } from './helpers/db';
  *
  * The anonymiser is what makes committing a real export possible, so its one promise, that the
  * importer cannot tell an anonymised export from the original, is proven here on the fixture
- * this repository does have: `synthetic-full-board.json` is anonymised through the CLI (a child
+ * this repository does have: `synthetic-full-board.json`, with a few strings added that once
+ * tripped the anonymiser (see `withAnonymiserTraps`), is anonymised through the CLI (a child
  * process, because `scripts/` is ESM and Jest runs CommonJS; a shim would test the shim), both
  * files are imported, and the reports and the resulting boards are compared shape for shape.
  */
@@ -231,6 +232,45 @@ function skippedInScope(report: TrelloImportReportDto, scope: TrelloImportScope)
 }
 
 /** The skip groups with the sample *names* replaced by how many there were. */
+/**
+ * The synthetic board plus the strings that once tripped the anonymiser: attachment URLs that
+ * also match the e-mail shape (`mailto:`, userinfo, an `@` in the path) and a `first.last`
+ * handle in a card name. The importer has a verdict on each (unsupported scheme, link, link; a
+ * title of the same length) that it must reach on the original and on the anonymisation alike,
+ * which is a stronger check than the transform's own unit tests can make.
+ */
+function withAnonymiserTraps(raw: unknown): RawRecord {
+  if (!isRecord(raw)) throw new Error('synthetic-full-board.json is not an object');
+  const card = records(raw.cards).find((entry) => records(entry.attachments).length > 0);
+  const template = card === undefined ? undefined : records(card.attachments)[0];
+  if (card === undefined || template === undefined) {
+    throw new Error('synthetic-full-board.json has no card with an attachment');
+  }
+  card.name = 'Review PR from k.smith';
+  card.attachments = [
+    ...records(card.attachments),
+    {
+      ...template,
+      id: '6512a1b7c3d4e5f601020373',
+      name: 'Mail the owner',
+      url: 'mailto:owner@corp.example',
+    },
+    {
+      ...template,
+      id: '6512a1b7c3d4e5f601020374',
+      name: 'report.pdf',
+      url: 'https://user:pw@intranet.corp.example/report.pdf',
+    },
+    {
+      ...template,
+      id: '6512a1b7c3d4e5f601020375',
+      name: 'x.d.ts',
+      url: 'https://github.com/org/repo/blob/main/@types/x.d.ts',
+    },
+  ];
+  return raw;
+}
+
 function skippedShape(report: TrelloImportReportDto) {
   return report.skipped.map((group) => ({
     scope: group.scope,
@@ -338,9 +378,13 @@ describe('Trello import against real exports (e2e)', () => {
     });
 
     it('changes nothing the importer reads: the anonymised synthetic board imports identically', async () => {
-      const originalPath = join(FIXTURES, 'synthetic-full-board.json');
       tempDir = await mkdtemp(join(tmpdir(), 'kurul-trello-anonymised-'));
+      const originalPath = join(tempDir, 'synthetic-full-board.json');
       const anonymisedPath = join(tempDir, 'synthetic-full-board.anonymised.json');
+      const fixture: unknown = JSON.parse(
+        readFileSync(join(FIXTURES, 'synthetic-full-board.json'), 'utf8'),
+      );
+      writeFileSync(originalPath, JSON.stringify(withAnonymiserTraps(fixture), null, 2));
 
       // The real CLI, the way the maintainer will run it. `stdio: 'pipe'` keeps its summary out
       // of the test output while still surfacing stderr in the thrown error if it fails.
@@ -356,7 +400,17 @@ describe('Trello import against real exports (e2e)', () => {
       // copied its input, which is the one failure this guard must not be blind to.
       const anonymisedText = readFileSync(anonymisedPath, 'utf8');
       const originalText = readFileSync(originalPath, 'utf8');
-      for (const leak of ['Product Roadmap', 'Ada Placeholder', 'Old Sprint', 'trello.com']) {
+      for (const leak of [
+        'Product Roadmap',
+        'Ada Placeholder',
+        'Old Sprint',
+        'trello.com',
+        'k.smith',
+        'owner@corp.example',
+        'user:pw',
+        'intranet.corp.example',
+        'github.com',
+      ]) {
         expect(originalText).toContain(leak);
         expect(anonymisedText).not.toContain(leak);
       }
@@ -376,9 +430,24 @@ describe('Trello import against real exports (e2e)', () => {
       const shape = await boardShape(original.boardId);
       expect(shape.columns).toHaveLength(3);
       expect(shape.columns.flatMap((column) => column.tasks)).toHaveLength(4);
+      // Two links from the fixture, two from the traps (userinfo and an `@` in the path).
       expect(
         shape.columns.flatMap((column) => column.tasks.flatMap((task) => task.attachments)),
-      ).toHaveLength(2);
+      ).toHaveLength(4);
+      // And both e-mail-shaped non-links were refused for their scheme, not as malformed.
+      expect(skippedShape(anonymised)).toContainEqual({
+        scope: TrelloImportScope.Attachment,
+        reason: TrelloImportSkipReason.UnsupportedScheme,
+        count: 2,
+        samples: 2,
+      });
+      expect(
+        anonymised.skipped.some(
+          (group) =>
+            group.scope === TrelloImportScope.Attachment &&
+            group.reason === TrelloImportSkipReason.Malformed,
+        ),
+      ).toBe(false);
       expect(
         shape.columns.flatMap((column) => column.tasks.flatMap((task) => task.checklists)),
       ).toHaveLength(3);

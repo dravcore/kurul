@@ -50,6 +50,20 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SPECIAL_SCHEME_RE = /^(?:https?|ftp|file|mailto|data|javascript|wss?):/i;
 const NUMERIC_RE = /^[+-]?\d+(?:\.\d+)?$/;
 const FILENAME_RE = /^[^/\\]+(\.[a-z0-9]{1,8})$/i;
+/**
+ * Extensions a kept file name may end in. A `.smith` or `.doe` is not on this list, so a handle
+ * that happens to sit under a file-name key loses its tail like any other text.
+ */
+const FILE_EXTENSIONS = new Set(
+  (
+    'png jpg jpeg gif webp svg bmp tif tiff heic ico psd ai sketch fig eps ' +
+    'pdf doc docx xls xlsx ppt pptx odt ods odp rtf txt md csv tsv log key numbers pages ' +
+    'zip gz tgz tar bz2 7z rar dmg iso ' +
+    'json xml yaml yml toml ini html htm css js mjs cjs ts tsx jsx py rb go rs java kt sh sql ' +
+    'mp3 mp4 mov avi mkv wav m4a ogg webm ' +
+    'ttf otf woff woff2 ics eml msg'
+  ).split(' '),
+);
 const FENCE_OR_RULE_RE = /^\s*(?:```|~~~|(?:[-*_]\s*){3,}$)/;
 /** Indent, an optional list/heading/quote marker, an optional task checkbox; then the text. */
 const LINE_RE = /^(\s*(?:(?:[-*+]|\d{1,3}[.)]|#{1,6}|>+)\s+)?(?:\[[ xX]\]\s+)?)(.*?)(\s*)$/;
@@ -166,6 +180,14 @@ function isUrlKey(key) {
   return /url$/i.test(key) || key === 'backgroundImage' || key === 'sharedSourceUrl';
 }
 
+/**
+ * A key whose value names a file, so its extension may stay: an attachment's `fileName`, and
+ * its `name`, which Trello fills with the uploaded file's name. A card or list `name` is prose.
+ */
+function isFileNameKey(key, parentKey) {
+  return key === 'fileName' || (key === 'name' && parentKey === 'attachments');
+}
+
 const LOREM = [
   'lorem',
   'ipsum',
@@ -265,11 +287,16 @@ function loremOfLength(length, seed, original) {
   return out;
 }
 
-/** The text part of one line, same length, same leading capital, same file extension. */
-function pseudonymContent(content, seed) {
+/**
+ * The text part of one line, same length, same leading capital. Only a file name keeps its
+ * extension, and only one from `FILE_EXTENSIONS`: the rule is opt-in because "Review PR from
+ * k.smith" and "Call Dr.Smith" match the same `stem.ext` shape, and a trailing token kept
+ * verbatim in a card name or a comment is a name leaked into a public fixture.
+ */
+function pseudonymContent(content, seed, keepExtension) {
   if (content === '') return '';
-  const filename = FILENAME_RE.exec(content);
-  if (filename !== null) {
+  const filename = keepExtension ? FILENAME_RE.exec(content) : null;
+  if (filename !== null && FILE_EXTENSIONS.has(filename[1].slice(1).toLowerCase())) {
     const extension = filename[1];
     const stem = content.slice(0, content.length - extension.length);
     const lorem = loremOfLength(stem.length, seed, stem);
@@ -289,8 +316,11 @@ function pseudonymContent(content, seed) {
  * its task checkbox and its trailing whitespace; only the words change. Code fences and
  * horizontal rules are kept whole. The line count is therefore the same, and so is the length
  * of every line.
+ *
+ * With `keepExtension` a line that looks like `stem.ext` keeps its extension; the caller sets it
+ * only for values that name a file (an attachment's `name` or `fileName`), never for prose.
  */
-export function pseudonymText(original, seed) {
+export function pseudonymText(original, seed, { keepExtension = false } = {}) {
   if (original === '') return '';
   return original
     .split('\n')
@@ -299,15 +329,17 @@ export function pseudonymText(original, seed) {
       const match = LINE_RE.exec(line);
       if (match === null) return loremOfLength(line.length, seed, line);
       const [, prefix, content, suffix] = match;
-      return `${prefix}${pseudonymContent(content, seed)}${suffix}`;
+      return `${prefix}${pseudonymContent(content, seed, keepExtension)}${suffix}`;
     })
     .join('\n');
 }
 
+/** The last path segment's extension, if it is one from `FILE_EXTENSIONS`; `/u/j.smith` has none. */
 function extensionOf(pathname) {
   const last = pathname.split('/').pop() ?? '';
   const match = /(\.[a-z0-9]{1,8})$/i.exec(last);
-  return match === null ? '' : match[1];
+  if (match === null || !FILE_EXTENSIONS.has(match[1].slice(1).toLowerCase())) return '';
+  return match[1];
 }
 
 /**
@@ -397,23 +429,28 @@ function isRecord(value) {
  *   1. a 24-hex id: the id map (relationships survive);
  *   2. a `#rrggbb` colour or an ISO 8601 date: kept;
  *   3. a key in `KEEP_KEYS`: kept (Trello's own vocabulary, `state`, `type`, ...);
- *   4. an e-mail address: a hash at `example.invalid`;
- *   5. a URL: same scheme, same extension, `example.invalid` (under a URL key anything that
- *      parses counts; elsewhere only the well-known schemes do, so "Bug: fix login" stays text);
+ *   4. a URL: same scheme, same extension, `example.invalid` (under a URL key anything that
+ *      parses counts; elsewhere only the well-known schemes do, so "Bug: fix login" stays text).
+ *      This runs before the e-mail rule on purpose: `mailto:a@b.example`, a URL with userinfo
+ *      and a URL with an `@` in its path all match the e-mail shape too, and rewriting one of
+ *      them to a bare address would turn a URL into a non-URL and change what the importer
+ *      makes of the attachment;
+ *   5. an e-mail address: a hash at `example.invalid`;
  *   6. a numeric string: other digits, same count;
  *   7. `initials`, `username`, `avatarHash`, `shortLink`: same character class, same length;
- *   8. everything else: lorem text of the same shape. If the key was not one this file knows to
- *      carry text, its path is recorded so the summary can show it.
+ *   8. everything else: lorem text of the same shape (an attachment's `name` or `fileName` also
+ *      keeps its file extension). If the key was not one this file knows to carry text, its
+ *      path is recorded so the summary can show it.
  */
 function anonymiseString(value, key, parentKey, path, context) {
   if (ID_RE.test(value)) return context.mapId(value);
   if (HEX_COLOR_RE.test(value) || ISO_DATE_RE.test(value)) return value;
   if (KEEP_KEYS.has(key)) return value;
-  if (EMAIL_RE.test(value)) return pseudonymEmail(value, context.seed);
   if (isUrlKey(key) || SPECIAL_SCHEME_RE.test(value)) {
     const url = pseudonymUrl(value, context.seed);
     if (url !== null) return url;
   }
+  if (EMAIL_RE.test(value)) return pseudonymEmail(value, context.seed);
   if (NUMERIC_RE.test(value)) return pseudonymNumeric(value, context.seed);
 
   if (!TEXT_KEYS.has(key) && !TEXT_PARENT_KEYS.has(parentKey) && !isUrlKey(key)) {
@@ -430,7 +467,9 @@ function anonymiseString(value, key, parentKey, path, context) {
     case 'shortLink':
       return charsOfLength(value.length, ALNUM, context.seed, key, value);
     default:
-      return pseudonymText(value, context.seed);
+      return pseudonymText(value, context.seed, {
+        keepExtension: isFileNameKey(key, parentKey),
+      });
   }
 }
 

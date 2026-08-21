@@ -24,6 +24,10 @@
  * original if the rules change. The seed defaults to `kurul`; pass your own if you would rather
  * the pseudonyms in the committed file could not be reproduced by anyone holding the original.
  *
+ * The output is written the way the input was: Trello's minified single line stays a single line
+ * (a pretty-printed copy would be half as large again, and the import size limit is the same for
+ * both), and a file that was indented is written back with the same indent.
+ *
  * The summary printed at the end counts what the export contains and lists every top-level key
  * and every string-carrying key path the script did not recognise. Read that list before
  * committing the output: an unknown key was anonymised as text, which is the safe default, but
@@ -89,12 +93,24 @@ function formatSummary(summary, outputPath, bytes) {
   return `${lines.join('\n')}\n`;
 }
 
+/**
+ * The indentation the input was written with, so the output is formatted the same way. Trello
+ * exports are minified, and pretty-printing one grows it by half: a board that fits under
+ * `TRELLO_IMPORT_MAX_BYTES` as exported must not stop fitting because of this script.
+ */
+function indentOf(text) {
+  const match = /^\s*[[{]\r?\n([ \t]+)\S/.exec(text);
+  return match === null ? undefined : match[1];
+}
+
 function main(argv) {
   const { input, output, seed } = parseArgs(argv);
 
+  let text;
   let parsed;
   try {
-    parsed = JSON.parse(readFileSync(input, 'utf8'));
+    text = readFileSync(input, 'utf8');
+    parsed = JSON.parse(text);
   } catch (error) {
     throw new Error(`Could not read ${input} as JSON: ${error.message}`, { cause: error });
   }
@@ -103,7 +119,8 @@ function main(argv) {
     parsed,
     seed === undefined ? {} : { seed },
   );
-  const json = `${JSON.stringify(anonymised, null, 2)}\n`;
+  const trailingNewline = text.endsWith('\n') ? '\n' : '';
+  const json = `${JSON.stringify(anonymised, null, indentOf(text))}${trailingNewline}`;
   writeFileSync(output, json, 'utf8');
   return formatSummary(summary, output, Buffer.byteLength(json, 'utf8'));
 }
