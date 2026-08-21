@@ -15,7 +15,8 @@ imagination and then labelled the result "validated".
 The roadmap metric that asks for validation against three real Trello exports therefore closes
 as **partial**, with that reason stated. It reopens the first time a real export arrives — from
 the maintainer or from a community bug report — at which point every field name below is checked
-against it and **the export wins, not this repository**.
+against it and **the export wins, not this repository**. The place for that export, once
+anonymised, is [`real/`](real/README.md); see [Real exports](#real-exports) below.
 
 ## What the importer does about that
 
@@ -89,3 +90,45 @@ each row below is a bug the suite could not previously see.
 on purpose and `prettier --check` would otherwise fail on it. That entry is load-bearing: if
 someone "fixes" the file so the formatter is happy, the test that proves a half-downloaded export
 answers 400 instead of crashing starts passing for the wrong reason.
+
+## Real exports
+
+The `v0.3.0` gate asks for at least two anonymised real exports importing end to end
+(`ROADMAP.md`, Hardening track). The harness for that is in place; the exports are not.
+
+**Where they go.** [`real/`](real/README.md). `trello-import-real.e2e-spec.ts` reads every `*.json`
+in that directory at module load and imports each one through `POST /workspaces/:id/imports/trello`
+as an admin, deriving the expected counts from the file by ADR 0025's rules and comparing them with
+the report and with the database. While the directory is empty the spec reports exactly one skipped
+test, `no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, so CI shows the
+gate is open.
+
+**How to produce one.**
+
+1. In Trello, open the board menu: **More**, **Print and export**, **Export as JSON**.
+2. `node scripts/anonymise-trello-export.mjs ~/Downloads/board.json apps/api/test/fixtures/trello/real/<name>.json --seed <anything>`.
+   The script keeps the export's structure byte for byte (keys, order, lengths, nulls, numbers,
+   dates, colours, `closed` flags, id relationships) and replaces every piece of text with a
+   deterministic pseudonym of the same length and shape. Trello ids keep their eight-character
+   timestamp prefix and their sort order, because the planner ties on them.
+3. Read the summary it prints: unrecognised top-level keys and strings replaced under keys the
+   script did not know to carry text were anonymised as text, which is safe but may have changed a
+   non-text value's shape. Skim the file once before pushing it; it is public from then on.
+4. Run `pnpm --filter @kurul/api test:e2e`, read what fails, and record it below.
+
+`real/*.json` is listed in `.prettierignore` on purpose: those files are the script's output, byte
+for byte, and reformatting them would make "the file the script wrote" and "the file in the repo"
+two different things.
+
+The guard that the anonymiser changes nothing the importer reads runs on every CI run regardless:
+the same spec anonymises `synthetic-full-board.json` through the CLI and asserts the two imports
+produce the same report and the same board, shape for shape.
+
+### Field-mapping diffs
+
+One row per place where a real export disagreed with what the synthetic fixtures assume. Filled in
+as the exports arrive; the first row is the instruction.
+
+| Field                | Synthetic fixture assumption                                                                            | What the real export showed                                                                         | Importer change needed                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| _(replace this row)_ | Quote the assumption: the key name, type or value the synthetic fixtures and `trello-export.ts` rely on | What the anonymised export actually carries, with the file name and the path (`cards[].badges.due`) | `none` when the reader already coped, otherwise the PR that fixed it |

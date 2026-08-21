@@ -247,6 +247,17 @@ Nest'in generator'ı integration testlerini `*.e2e-spec.ts` olarak adlandırıyo
 browser e2e değil API integration testleri olsa da bu isim tooling uyumluluğu için
 korunuyor.
 
+**Gerçek Trello export'ları.** `apps/api/test/fixtures/trello/real/` dizininde
+`scripts/anonymise-trello-export.mjs` betiğinden geçmiş gerçek export'lar durur (yapı bayt bayt
+korunur, her metin parçası aynı uzunlukta bir takma adla değiştirilir).
+`trello-import-real.e2e-spec.ts` oradaki her `*.json` dosyasını gerçek endpoint üzerinden import
+eder ve raporu ile veritabanını dosyadan türetilen sayılarla karşılaştırır; dizin boşken tam olarak
+bir atlanmış test bildirir,
+`no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, böylece açık kapı
+CI'da görünür kalır. Anonimleştiricinin kendi unit testleri `pnpm test:scripts` ile `node:test`
+üzerinde çalışır, çünkü `scripts/` dizininin bağımlılığı yoktur; aynı spec, anonimleştirilmiş bir
+export'un orijinaliyle birebir aynı şekilde import edildiğini sentetik fixture üzerinde de kanıtlar.
+
 ## Testleri çalıştırma
 
 ```bash
@@ -260,6 +271,8 @@ pnpm --filter @kurul/api test:cov      # api coverage raporu
 
 pnpm --filter @kurul/web test          # web unit (Vitest)
 pnpm --filter @kurul/web test:watch    # web unit, watch modu
+
+pnpm test:scripts                         # scripts/ (node:test, bağımlılık yok)
 
 pnpm test:browser                         # browser e2e (Mailpit de gerekir)
 ```
@@ -360,19 +373,20 @@ yayımlar (`api-coverage`, `web-coverage`).
 
 Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalıştırır:
 
-| Adım                | Komut                                                                                                 |
-| ------------------- | ----------------------------------------------------------------------------------------------------- |
-| Shared paket build  | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                   |
-| Lint                | `pnpm lint`                                                                                           |
-| Format kontrolü     | `pnpm format:check`                                                                                   |
-| Typecheck           | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                             |
-| Audit               | `pnpm audit --audit-level high`                                                                       |
-| Unit testler (api)  | `pnpm --filter @kurul/api test:cov`                                                                   |
-| Unit testler (web)  | `pnpm --filter @kurul/web exec vitest run --coverage`                                                 |
-| Unit testler (pkgs) | `pnpm --filter "./packages/*" test`                                                                   |
-| Integration testler | Postgres ve Redis service container'larına karşı `pnpm --filter @kurul/api test:e2e`                  |
-| Build               | `pnpm build`                                                                                          |
-| **Kapı** (zorunlu)  | `ci-ok` — tüm upstream job'lar (`lint`, `test`, `build`) başarıysa geçer (atlanmamış/iptal edilmemiş) |
+| Adım                   | Komut                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| Shared paket build     | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                   |
+| Lint                   | `pnpm lint`                                                                                           |
+| Format kontrolü        | `pnpm format:check`                                                                                   |
+| Typecheck              | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                             |
+| Audit                  | `pnpm audit --audit-level high`                                                                       |
+| Unit testler (api)     | `pnpm --filter @kurul/api test:cov`                                                                   |
+| Unit testler (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                                 |
+| Unit testler (pkgs)    | `pnpm --filter "./packages/*" test`                                                                   |
+| Unit testler (scripts) | `pnpm test:scripts`                                                                                   |
+| Integration testler    | Postgres ve Redis service container'larına karşı `pnpm --filter @kurul/api test:e2e`                  |
+| Build                  | `pnpm build`                                                                                          |
+| **Kapı** (zorunlu)     | `ci-ok` — tüm upstream job'lar (`lint`, `test`, `build`) başarıysa geçer (atlanmamış/iptal edilmemiş) |
 
 **Merge öncesi tüm adımlar geçmelidir.** Kapı job'ı (`ci-ok`) branch korumasında yapılandırılan
 tek zorunlu status kontrol — eğer herhangi bir upstream job başarısızsa, atlanırsa ya da iptal

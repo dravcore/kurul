@@ -244,6 +244,16 @@ makes that impossible rather than unlikely.
 Nest's generator calls integration tests `*.e2e-spec.ts`; that name is kept for tooling
 compatibility even though these are API integration tests, not browser e2e.
 
+**Real Trello exports.** `apps/api/test/fixtures/trello/real/` holds real exports that went
+through `scripts/anonymise-trello-export.mjs` (structure kept byte for byte, every piece of text
+replaced by a same-length pseudonym). `trello-import-real.e2e-spec.ts` imports every `*.json` in
+it through the real endpoint and checks the report and the database against counts derived from
+the file; while the directory is empty it reports exactly one skipped test,
+`no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, so the open gate
+stays visible in CI. The anonymiser's own unit tests run on `node:test` via `pnpm test:scripts`,
+because `scripts/` has no dependencies; the same spec also proves, on the synthetic fixture, that
+an anonymised export imports identically to its original.
+
 ## Running tests
 
 ```bash
@@ -257,6 +267,8 @@ pnpm --filter @kurul/api test:cov      # api coverage report
 
 pnpm --filter @kurul/web test          # web unit (Vitest)
 pnpm --filter @kurul/web test:watch    # web unit, watch mode
+
+pnpm test:scripts                         # scripts/ (node:test, no dependencies)
 
 pnpm test:browser                         # browser e2e (needs Mailpit too)
 ```
@@ -356,19 +368,20 @@ on every run, passing or failing.
 
 Every pull request runs, on `develop` and `main` as well:
 
-| Step                | Command                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------- |
-| Build shared pkgs   | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`         |
-| Lint                | `pnpm lint`                                                                                 |
-| Format check        | `pnpm format:check`                                                                         |
-| Typecheck           | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                         |
-| Audit               | `pnpm audit --audit-level high`                                                             |
-| Unit tests (api)    | `pnpm --filter @kurul/api test:cov`                                                         |
-| Unit tests (web)    | `pnpm --filter @kurul/web exec vitest run --coverage`                                       |
-| Unit tests (pkgs)   | `pnpm --filter "./packages/*" test`                                                         |
-| Integration tests   | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers           |
-| Build               | `pnpm build`                                                                                |
-| **Gate** (required) | `ci-ok` — passes only if `lint`, `test`, and `build` all succeed (not skipped or cancelled) |
+| Step                 | Command                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| Build shared pkgs    | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`         |
+| Lint                 | `pnpm lint`                                                                                 |
+| Format check         | `pnpm format:check`                                                                         |
+| Typecheck            | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                         |
+| Audit                | `pnpm audit --audit-level high`                                                             |
+| Unit tests (api)     | `pnpm --filter @kurul/api test:cov`                                                         |
+| Unit tests (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                       |
+| Unit tests (pkgs)    | `pnpm --filter "./packages/*" test`                                                         |
+| Unit tests (scripts) | `pnpm test:scripts`                                                                         |
+| Integration tests    | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers           |
+| Build                | `pnpm build`                                                                                |
+| **Gate** (required)  | `ci-ok` — passes only if `lint`, `test`, and `build` all succeed (not skipped or cancelled) |
 
 **All steps must pass before merge.** The gate job (`ci-ok`) is the single required status check
 configured in branch protection — if any upstream job fails, is skipped, or is cancelled, the

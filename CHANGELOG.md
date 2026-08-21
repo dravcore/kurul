@@ -131,6 +131,24 @@ the 2026-08-18 "atlas" audit. See
   per-process counter on Redis errors, the same shape as the SEC-03 fix for the `/auth/*`
   limiter rather than failing open. It honours `RATE_LIMIT_ENABLED` and `TRUST_PROXY` like
   every other limit, and the upload route's OpenAPI `429` now describes both budgets.
+- **A harness for verifying the Trello importer against real exports, and the anonymiser that
+  makes committing one possible.** `scripts/anonymise-trello-export.mjs` (node built-ins only)
+  takes a board's JSON export and rewrites every piece of personal or proprietary text (board,
+  list, card, checklist and label names, descriptions, comments, member details, attachment names
+  and URLs, custom field names and values, e-mail addresses and URLs wherever they appear) into
+  deterministic, seeded pseudonyms of the same length and shape, while keeping the structure the
+  importer reads byte for byte: keys and their order, array lengths, nulls, booleans, numbers,
+  dates, colours, `closed` flags, and every id relationship (Trello ids are remapped consistently,
+  keeping their timestamp prefix and sort order). It prints a count summary and lists every
+  top-level key and string-carrying key path it did not recognise, in the spirit of ADR 0025.
+  `apps/api/test/fixtures/trello/real/` is where the output goes;
+  `apps/api/test/trello-import-real.e2e-spec.ts` imports every file found there through the real
+  endpoint and checks the report and the database against counts derived from the file, and while
+  the directory is empty it reports one visibly skipped test naming the open `v0.3.0` gate. A
+  guard that runs regardless proves the anonymised synthetic fixture imports identically to the
+  original. The anonymiser's unit tests run on `node:test` (`pnpm test:scripts`, also in CI). The
+  gate itself stays open until two anonymised real exports are in the directory and the
+  field-mapping diffs are recorded in the fixtures README.
 
 - **Attachment storage quotas — the total is finally bounded, not just each file** (audit
   finding SEC-02, [ADR 0027](docs/decisions/0027-attachment-quotas.md)). Two new variables cap
