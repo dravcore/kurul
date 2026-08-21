@@ -468,7 +468,7 @@
             }
           },
           "413": {
-            "description": "Two distinct ceilings answer with this status, told apart by the envelope's `error` field. `\"Payload Too Large\"`: the **file part** is over `ATTACHMENT_MAX_BYTES` (default `26214400` — 25 MiB), which is a disk ceiling and is unrelated to `REQUEST_BODY_MAX_BYTES`: multipart bodies are read by multer, which the JSON body limit never sees. `\"Attachment Quota Exceeded\"`: the file fits on its own but would push the workspace's or the instance's stored FILE bytes past a configured quota (`ATTACHMENT_WORKSPACE_QUOTA_BYTES` / `ATTACHMENT_INSTANCE_QUOTA_BYTES`, unset by default — ADR 0027). A reverse proxy in front of this API caps the whole request body separately and higher, and answers `413` with something that is not JSON at all — the response body is what tells the layers apart.",
+            "description": "Two distinct ceilings answer with this status, told apart by the envelope's `error` field. `\"Payload Too Large\"`: the **file part** is over `ATTACHMENT_MAX_BYTES` (default `26214400` — 25 MiB), which is a disk ceiling and is unrelated to `REQUEST_BODY_MAX_BYTES`: multipart bodies are read by multer, which the JSON body limit never sees. `\"Attachment Quota Exceeded\"`: the file fits on its own but would push the workspace's or the instance's stored FILE bytes past its quota (`ATTACHMENT_WORKSPACE_QUOTA_BYTES`, default 2 GiB, or `ATTACHMENT_INSTANCE_QUOTA_BYTES`, default 20 GiB; `0` lifts one; ADR 0027). A reverse proxy in front of this API caps the whole request body separately and higher, and answers `413` with something that is not JSON at all — the response body is what tells the layers apart.",
             "content": {
               "application/json": {
                 "schema": {
@@ -540,8 +540,32 @@
             }
           },
           "429": {
-            "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
+            "description": "Two budgets answer with this status, told apart by the envelope's `error` field. `\"Too Many Requests\"`: more than 20 requests from this IP in the current minute, like any other throttled route. `\"Upload Budget Exceeded\"`: the bytes this IP has submitted to this route in the current minute, counted by `Content-Length` before the body is read, would pass `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE` (default `268435456`, 256 MiB; `0` turns the budget off). A multipart request without `Content-Length` is charged `ATTACHMENT_MAX_BYTES`. Both carry `Retry-After` with the seconds to wait.",
             "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
               "Retry-After": {
                 "description": "Seconds to wait before retrying.",
                 "schema": {

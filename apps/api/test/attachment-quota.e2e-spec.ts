@@ -7,6 +7,10 @@ import { ATTACHMENT_QUOTA_ERROR, AttachmentKind } from '@kurul/shared-types';
 import type { AttachmentDto } from '@kurul/shared-types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { closeStorageBackend } from '../src/storage/storage';
+import {
+  DEFAULT_ATTACHMENT_INSTANCE_QUOTA_BYTES,
+  DEFAULT_ATTACHMENT_WORKSPACE_QUOTA_BYTES,
+} from '../src/storage/storage-config';
 import { createTestApp } from './helpers/app';
 import { createWorkspace, signUp, TestUser } from './helpers/auth';
 import { resetDatabase } from './helpers/db';
@@ -28,6 +32,14 @@ import { createTempStorageDir, removeTempStorageDir } from './helpers/storage';
  * test sets the variable and drops the config singleton (`closeStorageBackend()`) without
  * rebuilding the app. `STORAGE_PATH` stays set for the whole file, so the rebuilt backend is the
  * same directory every time.
+ *
+ * ## The defaults are measured with the variables genuinely unset
+ *
+ * ADR 0027's 2026-08-21 update gives an unconfigured instance finite ceilings (2 GiB per
+ * workspace, 20 GiB per instance). Nobody is going to upload two gibibytes in a test, so the
+ * "already stored" side is seeded straight into `Attachment` through Prisma: FILE rows with
+ * `size` values and no bytes on disk, which is all the quota's `SUM(size)` ever looks at. The
+ * upload that then crosses the line is a real one through the route.
  */
 
 const MAX_BYTES = 64 * 1024;
@@ -110,7 +122,8 @@ describe('Attachment storage quotas (e2e)', () => {
     for (const entry of await readdir(storageRoot)) {
       await removeTempStorageDir(join(storageRoot, entry));
     }
-    // Every test starts unlimited and configures its own ceilings through `setQuotas`.
+    // Every test starts on the defaults (both variables unset) and configures its own ceilings
+    // through `setQuotas`; `0` is the explicit opt-out.
     await setQuotas({});
   });
 
@@ -161,6 +174,29 @@ describe('Attachment storage quotas (e2e)', () => {
     return entries.filter((entry) => entry.isFile()).length;
   }
 
+  /**
+   * Writes FILE rows that together claim `totalBytes` of quota without a byte on disk. Rows are
+   * split so each `size` stays inside the column's `Int` range; the sum is what the quota reads.
+   */
+  async function seedStoredBytes(where: Seed, totalBytes: number): Promise<number> {
+    const uploader = await prisma.user.findUniqueOrThrow({ where: { email: where.user.email } });
+    const chunk = 2 ** 31 - 1;
+    const sizes: number[] = [];
+    for (let left = totalBytes; left > 0; left -= chunk) sizes.push(Math.min(chunk, left));
+    await prisma.attachment.createMany({
+      data: sizes.map((size, index) => ({
+        taskId: where.taskId,
+        uploadedById: uploader.id,
+        kind: AttachmentKind.File,
+        filename: `seeded-${index}.bin`,
+        storageKey: `seeded/${where.taskId}/${index}`,
+        mimeType: 'application/octet-stream',
+        size,
+      })),
+    });
+    return sizes.length;
+  }
+
   it('rejects the upload that would cross the workspace quota, in the documented shape, and spares the neighbour', async () => {
     await setQuotas({ workspace: QUOTA });
     const mine = await seed('quota-mine');
@@ -199,7 +235,7 @@ describe('Attachment storage quotas (e2e)', () => {
     expect(refused.body.error).not.toBe(ATTACHMENT_QUOTA_ERROR);
   });
 
-  it('is unlimited again when the variable is unset — the 0/unset default costs nothing', async () => {
+  it('is unlimited when the variable is 0, the explicit opt-out', async () => {
     await setQuotas({ workspace: PNG.length });
     const where = await seed('quota-lifted');
 
@@ -207,11 +243,51 @@ describe('Attachment storage quotas (e2e)', () => {
     await upload(where, PNG);
     await tryUpload(where, PNG).expect(413);
 
-    // Unset: the same upload sails through. This is the upgrade behaviour — an instance that
-    // never configures a quota keeps the pre-quota upload path.
-    await setQuotas({});
+    // `0`: the same upload sails through, and so does one behind a workspace already holding
+    // more than the 2 GiB default. An operator who writes 0 has opted out, not blanked a line.
+    await setQuotas({ workspace: 0 });
+    const seeded = await seedStoredBytes(where, DEFAULT_ATTACHMENT_WORKSPACE_QUOTA_BYTES);
     await upload(where, PNG);
-    await expect(prisma.attachment.count()).resolves.toBe(2);
+    await expect(prisma.attachment.count()).resolves.toBe(2 + seeded);
+    await expect(storedFileCount()).resolves.toBe(2);
+  });
+
+  it('refuses the upload that would cross the 2 GiB workspace default with no quota variable set', async () => {
+    for (const name of QUOTA_VARS) expect(process.env[name]).toBeUndefined();
+    const where = await seed('default-workspace');
+    // Just under the default: exactly one more PNG fits.
+    await seedStoredBytes(where, DEFAULT_ATTACHMENT_WORKSPACE_QUOTA_BYTES - PNG.length);
+
+    // The ceiling is inclusive, so the file that fills it to the byte lands...
+    await upload(where, PNG);
+    // ...and the next one is the 413 an unconfigured instance now answers.
+    const refused = await tryUpload(where, PNG).expect(413);
+
+    expect(refused.body.error).toBe(ATTACHMENT_QUOTA_ERROR);
+    expect(refused.body.statusCode).toBe(413);
+    // Only the one accepted upload reached the disk; the seeded rows never had bytes.
+    await expect(storedFileCount()).resolves.toBe(1);
+  });
+
+  it('refuses the upload that would cross the 20 GiB instance default, summed across workspaces', async () => {
+    // The instance default is ten workspace defaults, so two workspaces held to their own
+    // default can never reach it; the workspace ceiling is opted out (0) to isolate the
+    // instance one, which stays unset and therefore on its default.
+    await setQuotas({ workspace: 0 });
+    expect(process.env.ATTACHMENT_INSTANCE_QUOTA_BYTES).toBeUndefined();
+    const first = await seed('default-instance-a');
+    const second = await seed('default-instance-b');
+    const half = DEFAULT_ATTACHMENT_INSTANCE_QUOTA_BYTES / 2;
+    await seedStoredBytes(first, half);
+    await seedStoredBytes(second, half - PNG.length);
+
+    // Fills the instance exactly; what refuses the next one is the sum over both workspaces,
+    // neither of which has a ceiling of its own any more.
+    await upload(second, PNG);
+    const refused = await tryUpload(first, PNG).expect(413);
+
+    expect(refused.body.error).toBe(ATTACHMENT_QUOTA_ERROR);
+    await expect(storedFileCount()).resolves.toBe(1);
   });
 
   it('enforces the instance quota across workspaces that are each within their own', async () => {

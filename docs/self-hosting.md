@@ -149,21 +149,34 @@ may want to change is `ATTACHMENT_MAX_BYTES` (default `26214400`, 25 MiB), and i
 [the proxy contract below](#bringing-your-own-reverse-proxy) first: the reverse proxy carries a
 separate, deliberately higher ceiling that has to move with it.
 
-**Attachment storage is unbounded until you cap it, and it shares Postgres's disk.** The
-per-file limit and the per-IP upload throttle bound each _request_, not the total: at the
-defaults an authenticated client can spend roughly 500 MiB of disk a minute for as long as it
-cares to, and the `attachment_data` volume lives on the same host filesystem as the database —
-a full disk stops Postgres, not just uploads. Two variables cap the total
-([ADR 0027](decisions/0027-attachment-quotas.md)): `ATTACHMENT_WORKSPACE_QUOTA_BYTES` (summed
-stored-file bytes per workspace) and `ATTACHMENT_INSTANCE_QUOTA_BYTES` (the whole instance).
-Both default to unlimited — set the instance one below your volume's real headroom on any
-machine whose disk you care about. When sizing, know that the quotas are **soft**
-(simultaneous uploads can each overshoot by at most one file, so leave a few
-`ATTACHMENT_MAX_BYTES` of slack) and that deleted files keep their bytes until the nightly
-orphan sweep's grace period passes, so disk usage briefly exceeds what the quota accounts for.
-Link attachments store no bytes and never count. A rejected upload is a `413` whose JSON body
-carries `error: "Attachment Quota Exceeded"` — see
+**Attachment storage is capped by default, and it shares Postgres's disk.** The
+`attachment_data` volume lives on the same host filesystem as the database, so a full disk
+stops Postgres, not just uploads. Two variables cap the total
+([ADR 0027](decisions/0027-attachment-quotas.md), updated 2026-08-21):
+`ATTACHMENT_WORKSPACE_QUOTA_BYTES` (summed stored-file bytes per workspace) and
+`ATTACHMENT_INSTANCE_QUOTA_BYTES` (the whole instance). Unset, they are **2 GiB per workspace
+(`2147483648`) and 20 GiB per instance (`21474836480`)**; a written `0` lifts one entirely, and
+a negative value refuses to boot. Set the instance one below your volume's real headroom on
+any machine whose disk you care about. The API logs the effective numbers at start
+(`Attachment ceilings: … (default)` / `(env)` in `docker compose logs api`), and warns, rather
+than refusing, if the workspace quota is set above the instance quota. When sizing, know that
+the quotas are **soft** (simultaneous uploads can each overshoot by at most one file, so leave
+a few `ATTACHMENT_MAX_BYTES` of slack) and that deleted files keep their bytes until the
+nightly orphan sweep's grace period passes, so disk usage briefly exceeds what the quota
+accounts for. Link attachments store no bytes and never count. A rejected upload is a `413`
+whose JSON body carries `error: "Attachment Quota Exceeded"`, see
 [Telling the 413s apart](#telling-the-413s-apart).
+
+**Uploads are also budgeted in bytes per minute.** `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`
+(default `268435456`, 256 MiB, about ten max-size uploads) is the most one client IP may submit
+to the upload route in a fixed minute, charged from each request's `Content-Length` before the
+body is read (a multipart request without one is charged `ATTACHMENT_MAX_BYTES`). It exists
+because the per-route request throttle counts requests, which is the wrong unit for disk. `0`
+switches it off. It is keyed by the same client IP as every other limit, so it needs the
+`TRUST_PROXY` setting the bundled Compose file already carries to see through the proxy; the
+counters live in Redis and fall back to process memory while Redis is erroring. Over budget is
+a `429` whose JSON body carries `error: "Upload Budget Exceeded"` and a `Retry-After` header
+([api-conventions.md](api-conventions.md#rate-limiting)).
 
 **Trello import needs no line here either.** `TRELLO_IMPORT_MAX_BYTES` (default `20971520`,
 20 MiB) is the largest board export the importer will accept, and the bundled Compose file
@@ -377,6 +390,26 @@ docker compose pull && docker compose up -d
 Migrations run automatically: the one-shot `migrate` service applies them before `api` starts.
 Pin a release with `TAG=v0.2.0` in `.env` if you would rather upgrade deliberately than track
 `latest`.
+
+### Attachment quotas now have defaults
+
+Releases after `v0.2.0` cap attachment storage at 2 GiB per workspace and 20 GiB per instance
+when `ATTACHMENT_WORKSPACE_QUOTA_BYTES` / `ATTACHMENT_INSTANCE_QUOTA_BYTES` are unset (they
+used to mean unlimited). **A workspace already holding more than 2 GiB of files will get a
+`413` on its next upload** unless you set a higher number, or `0` for unlimited, before you
+upgrade. One query says where you stand; the first line is the instance, the second is per
+workspace:
+
+```bash
+docker compose exec postgres psql -U kurul -d kurul -c \
+  "SELECT COALESCE(SUM(size), 0) AS instance_bytes FROM \"Attachment\" WHERE kind = 'FILE';"
+docker compose exec postgres psql -U kurul -d kurul -c \
+  "SELECT w.slug, SUM(a.size) AS bytes FROM \"Attachment\" a JOIN \"Task\" t ON t.id = a.\"taskId\" JOIN \"Board\" b ON b.id = t.\"boardId\" JOIN \"Workspace\" w ON w.id = b.\"workspaceId\" WHERE a.kind = 'FILE' GROUP BY w.slug ORDER BY bytes DESC;"
+```
+
+Compare the numbers against `2147483648` and `21474836480`. The same upgrade adds a per-IP
+upload byte budget (`ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`, 256 MiB a minute by default), which
+only matters to a client that uploads more than ten max-size files a minute from one address.
 
 ### Coming from Kurultay (v0.1.0)
 

@@ -115,6 +115,23 @@ the 2026-08-18 "atlas" audit. See
 
 ### Added
 
+- **A per-IP byte budget on the upload route** (audit finding SEC-02 follow-up,
+  [ADR 0027](docs/decisions/0027-attachment-quotas.md)'s 2026-08-21 update). The route's
+  request throttle counts requests, which `rate-limit.ts` has called the wrong unit for disk
+  since it shipped: twenty 25 MiB uploads and twenty 10 kB uploads spent the same allowance.
+  `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE` (default `268435456`, 256 MiB a minute, about ten
+  max-size uploads; `0` switches it off, negative refuses to boot) is now charged per client IP
+  over a fixed minute by a guard that runs before multer touches the body, so a refused request
+  costs the API no heap. The charge is the request's `Content-Length`; a multipart request that
+  declares none is charged `ATTACHMENT_MAX_BYTES`, and a JSON body (a LINK, which stores
+  nothing) is not charged. Over budget answers `429` with `error: "Upload Budget Exceeded"`, a
+  new constant in `@kurul/shared-types` beside the quota's, plus `Retry-After`; the request
+  throttle's `429` keeps `"Too Many Requests"`, so a client can tell the two apart without
+  reading `message`. Counters live in Redis when `REDIS_URL` is set and degrade to a bounded
+  per-process counter on Redis errors, the same shape as the SEC-03 fix for the `/auth/*`
+  limiter rather than failing open. It honours `RATE_LIMIT_ENABLED` and `TRUST_PROXY` like
+  every other limit, and the upload route's OpenAPI `429` now describes both budgets.
+
 - **Attachment storage quotas — the total is finally bounded, not just each file** (audit
   finding SEC-02, [ADR 0027](docs/decisions/0027-attachment-quotas.md)). Two new variables cap
   the summed size of stored file attachments: `ATTACHMENT_WORKSPACE_QUOTA_BYTES` per workspace
@@ -185,6 +202,24 @@ the 2026-08-18 "atlas" audit. See
   before upgrading — the first nightly run after the upgrade deletes the accumulated backlog.
 
 ### Changed
+
+- **Attachment quotas have finite defaults: an instance nobody configured is capped at 2 GiB
+  per workspace and 20 GiB in total** (audit finding SEC-02,
+  [ADR 0027](docs/decisions/0027-attachment-quotas.md), updated 2026-08-21). The quota engine
+  shipped with "unset means unlimited", which left the audit's finding, unbounded disk
+  consumption on a volume the Compose stack shares with Postgres, open for exactly the operator
+  who never reads the quota section. Unset `ATTACHMENT_WORKSPACE_QUOTA_BYTES` now means
+  `2147483648` and unset `ATTACHMENT_INSTANCE_QUOTA_BYTES` means `21474836480`; a written `0`
+  is still the opt-out and a negative value is still refused at boot. The API logs the effective
+  ceilings at start, marking each as `(default)` or `(env)`, and warns, rather than refusing,
+  when the workspace quota is set above the instance quota or the upload byte budget is smaller
+  than one max-size file. The 413 with `error: "Attachment Quota Exceeded"` is now proven by an
+  integration test with the variables genuinely unset, against a real Postgres sum.
+
+  **Upgrade note:** a workspace already holding more than 2 GiB of files, or an instance
+  holding more than 20 GiB, gets a `413` on its next upload unless a higher number (or `0`) is
+  set first. `docs/self-hosting.md` carries the one-line `SUM(size)` queries to check before
+  upgrading. `.env.example` and `docker-compose.yml` ship the new numbers written in.
 
 - **The Quick start in both READMEs is split into "Run it" and "Develop it".** The pull-based
   Docker path — the one for people who want to run Kurul rather than work on it — was

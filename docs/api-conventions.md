@@ -298,7 +298,7 @@ field leaves it untouched; sending `null` explicitly clears a nullable field.
 | `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, an upload is over `ATTACHMENT_MAX_BYTES` or would exceed a storage quota (its `error` says which — see [File uploads and downloads](#file-uploads-and-downloads)), or an import is over `TRELLO_IMPORT_MAX_BYTES` |
 | `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted                                                                                                                            |
 | `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                                                                                                                                            |
-| `429 Too Many Requests`      | Rate limited                                                                                                                                                                                                                                                         |
+| `429 Too Many Requests`      | Rate limited: over a route's request budget, or over the upload route's per-IP byte budget (its `error` says which, see [Rate limiting](#rate-limiting))                                                                                                             |
 | `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                                                                                                                                                        |
 
 **Cross-workspace access returns `404`, not `403`.** A `403` would confirm that the resource
@@ -419,11 +419,11 @@ response body is what tells them apart: the API's `413` is the error envelope ab
 proxy's is not JSON at all. Which number to change, and the ordering rule between them, are in
 [self-hosting.md](self-hosting.md#bringing-your-own-reverse-proxy).
 
-**Storage quotas answer `413` too, with their own `error`.** When
-`ATTACHMENT_WORKSPACE_QUOTA_BYTES` or `ATTACHMENT_INSTANCE_QUOTA_BYTES` is set (both default to
-unlimited — [ADR 0027](decisions/0027-attachment-quotas.md)), an upload whose bytes would push
-the summed size of stored FILE attachments past the ceiling is rejected before anything is
-written. The envelope carries `error: "Attachment Quota Exceeded"` where the per-file limit's
+**Storage quotas answer `413` too, with their own `error`.** `ATTACHMENT_WORKSPACE_QUOTA_BYTES`
+and `ATTACHMENT_INSTANCE_QUOTA_BYTES` cap the summed size of stored FILE attachments; unset they
+are 2 GiB and 20 GiB, and a written `0` lifts one
+([ADR 0027](decisions/0027-attachment-quotas.md), updated 2026-08-21). An upload whose bytes
+would push the sum past a ceiling is rejected before anything is written. The envelope carries `error: "Attachment Quota Exceeded"` where the per-file limit's
 carries `"Payload Too Large"` — the status alone cannot say whether to shrink the file or free
 up space, and clients branch on `statusCode` and `error`, never on `message` (see
 [Errors](#errors)). A file that fills the quota exactly is accepted; the ceiling is inclusive,
@@ -665,23 +665,35 @@ with a `Retry-After` header giving the seconds to wait. Requests still under bud
 Budgets are counted **per client IP and per route** over a rolling minute — one endpoint
 running hot never spends another endpoint's allowance.
 
-| Endpoint                                       | Budget    | Why                                                                                 |
-| ---------------------------------------------- | --------- | ----------------------------------------------------------------------------------- |
-| Any endpoint, unless listed below              | 100 / min | Well clear of what a person generates; caps a script                                |
-| `POST /workspaces/:workspaceId/invitations`    | 10 / min  | Each call hands a message to the SMTP relay, addressed by the caller                |
-| `GET .../boards/:boardId/tasks?q=`             | 30 / min  | `q=` is a trigram scan; the same route without `q=` keeps the default               |
-| `POST .../tasks/:taskId/attachments`           | 20 / min  | The one endpoint where a single request can cost `ATTACHMENT_MAX_BYTES` of disk     |
-| `POST /workspaces/:workspaceId/imports/trello` | 3 / min   | A 20 MiB body parsed into heap, then thousands of rows in one transaction           |
-| `GET .../attachments/:attachmentId/content`    | 300 / min | _Above_ the default: a panel with ten image attachments issues ten requests on open |
-| `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10s   | Better Auth's built-in rule for credential endpoints                                |
-| `/auth/*` otherwise                            | 100 / min | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004)           |
-| `GET /health`, `GET /health/ready`             | exempt    | A throttled probe would report a healthy API as down                                |
+| Endpoint                                       | Budget        | Why                                                                                    |
+| ---------------------------------------------- | ------------- | -------------------------------------------------------------------------------------- |
+| Any endpoint, unless listed below              | 100 / min     | Well clear of what a person generates; caps a script                                   |
+| `POST /workspaces/:workspaceId/invitations`    | 10 / min      | Each call hands a message to the SMTP relay, addressed by the caller                   |
+| `GET .../boards/:boardId/tasks?q=`             | 30 / min      | `q=` is a trigram scan; the same route without `q=` keeps the default                  |
+| `POST .../tasks/:taskId/attachments`           | 20 / min      | The one endpoint where a single request can cost `ATTACHMENT_MAX_BYTES` of disk        |
+| `POST .../tasks/:taskId/attachments` (bytes)   | 256 MiB / min | `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`: the same route also has a byte budget, see below |
+| `POST /workspaces/:workspaceId/imports/trello` | 3 / min       | A 20 MiB body parsed into heap, then thousands of rows in one transaction              |
+| `GET .../attachments/:attachmentId/content`    | 300 / min     | _Above_ the default: a panel with ten image attachments issues ten requests on open    |
+| `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10s       | Better Auth's built-in rule for credential endpoints                                   |
+| `/auth/*` otherwise                            | 100 / min     | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004)              |
+| `GET /health`, `GET /health/ready`             | exempt        | A throttled probe would report a healthy API as down                                   |
 
-**The upload budget is named as insufficient rather than presented as enough.** The throttler
-counts requests per IP per route, which is the wrong unit twice for an upload: twenty 25 MiB
-requests and twenty 10 kB requests spend the same allowance, and an office behind one NAT
-shares a single bucket. The real ceiling is the per-file size limit, plus the per-workspace
-and per-instance quotas described under
+**The upload request budget is named as insufficient rather than presented as enough.** The
+throttler counts requests per IP per route, which is the wrong unit twice for an upload: twenty
+25 MiB requests and twenty 10 kB requests spend the same allowance, and an office behind one NAT
+shares a single bucket. The unit that was missing is bytes, and since 2026-08-21 the route
+charges them too: `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE` (default `268435456`, 256 MiB, about ten
+max-size uploads; `0` switches it off) is the most one client IP may submit to the route in a
+fixed minute. The charge is the request's `Content-Length`, taken before the body is read, so a
+refused request costs the API no heap; a multipart request that declares no length is charged
+`ATTACHMENT_MAX_BYTES`, and a JSON body (a LINK, which stores nothing) is not charged at all.
+Over budget is `429` with `error: "Upload Budget Exceeded"` where the request throttle's `429`
+carries `"Too Many Requests"`, plus `Retry-After` with the rest of the minute; clients branch on
+`statusCode` and `error`, never on `message` ([Errors](#errors)). The budget keys on the same
+client IP as the request throttle, honours `RATE_LIMIT_ENABLED`, keeps its counters in Redis
+when `REDIS_URL` is set and degrades to a per-process counter on Redis errors, exactly as the
+`/auth/*` limiter below does. The NAT caveat still applies. What bounds the total is the
+per-file size limit plus the per-workspace and per-instance quotas described under
 [File uploads and downloads](#file-uploads-and-downloads) ([ADR 0027](decisions/0027-attachment-quotas.md)).
 **The import budget is under the same honest caveat and set
 lower for it:** three requests is well below the upload budget because one import request costs a
@@ -718,9 +730,9 @@ overwriting anything a client sent. `TRUST_PROXY=true` trusts the entire forward
 no verification and must only be used when the API is unreachable except through the proxy —
 on a directly-exposed instance it hands every attacker an unlimited budget.
 
-`RATE_LIMIT_ENABLED=false` turns both limiters off. It exists for the integration suite,
-which drives hundreds of requests per route from one address; a deployment that sets it has
-no brute-force ceiling.
+`RATE_LIMIT_ENABLED=false` turns both limiters and the upload byte budget off. It exists for the
+integration suite, which drives hundreds of requests per route from one address; a deployment
+that sets it has no brute-force ceiling.
 
 ## Pagination
 

@@ -5,6 +5,22 @@
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0027-attachment-quotas.md)
 
+> **Updated (2026-08-21):** the "unset means unlimited" half of the decision below is
+> reversed. An unset `ATTACHMENT_WORKSPACE_QUOTA_BYTES` now means 2 GiB and an unset
+> `ATTACHMENT_INSTANCE_QUOTA_BYTES` means 20 GiB; a written `0` is still the opt-out and a
+> negative value is still refused at boot. The "a default quota number" row under Alternatives
+> considered is therefore no longer rejected. What changed the answer: the finding this ADR
+> exists for (SEC-02, 2026-08-18 audit) is _unbounded_ consumption, and on the published Compose
+> topology an unconfigured instance shares its disk with Postgres, so the operator who never
+> reads the quota section is exactly the operator whose database a full disk takes down. A
+> default that is wrong for a 2 TB volume costs that operator one line in `.env`; a default that
+> is wrong for a 20 GB volume costs the instance. The same change gives the upload route the byte
+> budget the third deferral below pointed at (`ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`, 256 MiB per
+> client IP per minute, `UploadBudgetGuard`), so the per-request throttle is no longer the only
+> brake on an unconfigured instance. Upgrade consequence and the usage query are in
+> [self-hosting.md](../self-hosting.md#attachment-quotas-now-have-defaults). The body below is
+> left as written.
+
 ## Context
 
 The attachment upload path has a per-file ceiling (`ATTACHMENT_MAX_BYTES`, [ADR 0024](0024-attachment-kinds-and-serving-policy.md))
