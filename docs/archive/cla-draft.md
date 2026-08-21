@@ -1,6 +1,12 @@
 # Contributor License Agreement (CLA)
 
-> 🌐 English (canonical) | [Türkçe](tr/cla.md)
+> **Archived, never enacted.** This is a draft that was never in force. The dual-licensing model
+> it belongs to was abandoned on 2026-08-21 by
+> [ADR 0028](../decisions/0028-open-contributions-hosted-service.md): Kurul accepts contributions
+> under plain AGPL-3.0, with no CLA and nothing to sign. No signature was ever asked for or
+> collected against this text, and none ever will be. The document is kept only as a record of
+> what was considered. Its Turkish translation was deleted with the move, because
+> `docs/archive/` is not translated.
 
 ---
 
@@ -15,7 +21,7 @@
 > **This document is currently unused.** Kurul does not accept external contributions and
 > the CLA check is disabled, so nobody signs this and no signature is collected. It is kept
 > ready in case legal review ever happens — see
-> [ADR 0015](decisions/0015-no-external-contributions.md).
+> [ADR 0015](../decisions/0015-no-external-contributions.md).
 >
 > # ⚠️ TASLAK — HUKUKÇU ONAYI BEKLİYOR, YÜRÜRLÜKTE DEĞİL
 >
@@ -29,13 +35,13 @@
 > **Bu belge şu anda kullanılmıyor.** Kurul dış katkı kabul etmiyor ve CLA kontrolü devre
 > dışı; dolayısıyla bunu kimse imzalamıyor ve hiçbir imza toplanmıyor. Hukuki inceleme bir gün
 > gerçekleşirse diye hazır tutuluyor — bkz.
-> [ADR 0015](decisions/0015-no-external-contributions.md).
+> [ADR 0015](../decisions/0015-no-external-contributions.md).
 
 ---
 
 ## Why Kurul asks for a CLA
 
-Kurul is released under [AGPL-3.0](../LICENSE). The plan is to fund the project through
+Kurul is released under [AGPL-3.0](../../LICENSE). The plan is to fund the project through
 **dual licensing**: the same single codebase stays fully AGPL-3.0 for everyone, and
 organizations that cannot live with AGPL's obligations can buy a separate commercial license
 for the same code from the project owner.
@@ -53,7 +59,7 @@ and that you keep every right to your own code that you had before signing (Sect
 you can reuse it, relicense it, or publish it elsewhere, exactly as if you had never signed.
 
 The reasoning behind the model — and its honest downsides — is recorded in
-[ADR 0014](decisions/0014-dual-licensing-cla.md).
+[ADR 0014](../decisions/0014-dual-licensing-cla.md).
 
 ## How to sign
 
@@ -250,7 +256,7 @@ for the Material on the Submission Date.
 
 For the avoidance of doubt: the license We are using for the Material on the Submission Date
 is **GNU Affero General Public License version 3.0 (AGPL-3.0)**, as recorded in
-[LICENSE](../LICENSE). Your Contribution therefore remains available to the public under
+[LICENSE](../../LICENSE). Your Contribution therefore remains available to the public under
 AGPL-3.0 regardless of any other license We grant.
 
 ### 2.4 Moral Rights
@@ -429,5 +435,5 @@ can be handed over at once.
 19. **Data protection.** The public signature ledger records a GitHub username and id — data
     already public on the pull request. If a lawyer requires legal names or email addresses in
     the ledger instead, storage has to move to a private repository; see
-    [ADR 0014](decisions/0014-dual-licensing-cla.md). Does a public ledger of who signed
+    [ADR 0014](../decisions/0014-dual-licensing-cla.md). Does a public ledger of who signed
     require a KVKK/GDPR basis and a retention statement of its own?

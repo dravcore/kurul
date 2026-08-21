@@ -9,8 +9,8 @@
 
 Kurul kendi kullanımı hakkında hiçbir şey ölçmüyordu. `apps/` ve `docs/` altında
 `telemetry`, `analytics`, `posthog`, `plausible`, `umami` araması kaynak kodda sıfır eşleşme
-veriyordu; `docs/roadmap.md`'nin "Beyond MVP" listesinde metrik maddesi yoktu. Dolayısıyla her
-ürün sorusu sezgiyle yanıtlanıyordu:
+veriyordu; roadmap'in (bugünkü [ROADMAP.md](../../../ROADMAP.md)) "Beyond MVP" listesinde metrik
+maddesi yoktu. Dolayısıyla her ürün sorusu sezgiyle yanıtlanıyordu:
 
 - Onboarding nerede kopuyor — kayıt, workspace, board, ilk kart, ilk davet?
 - Davetler dönüşüyor mu; dönüşmüyorsa suç davet akışında mı, yoksa SMTP aktarımı olmayan bir

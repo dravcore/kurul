@@ -32,29 +32,29 @@ Kök topluluk dosyaları (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGE
 
 ## Aktif dokümanlar
 
-| Doküman                                          | Kapsam                                                                                                                 |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| [architecture.md](architecture.md)               | Modül haritası, veri modeli, runtime evrimi                                                                            |
-| [tech-stack.md](tech-stack.md)                   | Stack seçimleri ve gerekçesi (pin'ler: kök / app `package.json`'a bakın)                                               |
-| [development.md](development.md)                 | Env kurulumu, Compose, pnpm script'leri, günden güne, upgrade & rollback                                               |
-| [self-hosting.md](self-hosting.md)               | Bir release'i kendi domain'inize deploy etmek: DNS, Caddy ile HTTPS, SMTP, backup'lar, kendi reverse proxy'niz         |
-| [coding-standards.md](coding-standards.md)       | TS / NestJS / Next.js konvansiyonları                                                                                  |
-| [design.md](design.md)                           | UI/UX dili                                                                                                             |
-| [git-strategy.md](git-strategy.md)               | Git Flow, Conventional Commits, release'ler                                                                            |
-| [testing.md](testing.md)                         | Test katmanları ve beklentiler                                                                                         |
-| [api-conventions.md](api-conventions.md)         | REST adlandırma, hatalar, pagination ve üretilen OpenAPI dokümanının nerede olduğu                                     |
-| [cla.md](cla.md)                                 | Katkıda Bulunan Lisans Anlaşması (**taslak**, kullanılmıyor — [ADR 0015](decisions/0015-no-external-contributions.md)) |
-| [../../ROADMAP.md](../../ROADMAP.md) (İngilizce) | Yol haritası: sağlamlaştırma + özellik hatları, beyond-MVP backlog'u                                                   |
-| [decisions/](decisions/)                         | Mimari karar kayıtları (ADR'ler)                                                                                       |
+| Doküman                                          | Kapsam                                                                                                         |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| [architecture.md](architecture.md)               | Modül haritası, veri modeli, runtime evrimi                                                                    |
+| [tech-stack.md](tech-stack.md)                   | Stack seçimleri ve gerekçesi (pin'ler: kök / app `package.json`'a bakın)                                       |
+| [development.md](development.md)                 | Env kurulumu, Compose, pnpm script'leri, günden güne, upgrade & rollback                                       |
+| [self-hosting.md](self-hosting.md)               | Bir release'i kendi domain'inize deploy etmek: DNS, Caddy ile HTTPS, SMTP, backup'lar, kendi reverse proxy'niz |
+| [coding-standards.md](coding-standards.md)       | TS / NestJS / Next.js konvansiyonları                                                                          |
+| [design.md](design.md)                           | UI/UX dili                                                                                                     |
+| [git-strategy.md](git-strategy.md)               | Git Flow, Conventional Commits, release'ler                                                                    |
+| [testing.md](testing.md)                         | Test katmanları ve beklentiler                                                                                 |
+| [api-conventions.md](api-conventions.md)         | REST adlandırma, hatalar, pagination ve üretilen OpenAPI dokümanının nerede olduğu                             |
+| [../../ROADMAP.md](../../ROADMAP.md) (İngilizce) | Yol haritası: sağlamlaştırma + özellik hatları, beyond-MVP backlog'u                                           |
+| [decisions/](decisions/)                         | Mimari karar kayıtları (ADR'ler)                                                                               |
 
 ## Tarihsel
 
-| Doküman                                                                          | Durum                                                                              |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [../archive/project-skeleton.md](../archive/project-skeleton.md) (İngilizce)     | Tarihsel Faz 1 iskelet rehberi; güncel yerleşim [architecture.md](architecture.md) |
-| [../archive/roadmap-mvp-phases.md](../archive/roadmap-mvp-phases.md) (İngilizce) | Tam Faz 0–9 + hardening checklist'leri (`v0.1.0` öncesi detay)                     |
-| [../archive/specs/](../archive/specs/) (İngilizce)                               | Sevkedilmiş faz / visual-debt tasarım spec'leri                                    |
-| [../archive/plans/](../archive/plans/) (İngilizce)                               | Bitmiş implementasyon planları                                                     |
+| Doküman                                                                          | Durum                                                                                                               |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| [../archive/project-skeleton.md](../archive/project-skeleton.md) (İngilizce)     | Tarihsel Faz 1 iskelet rehberi; güncel yerleşim [architecture.md](architecture.md)                                  |
+| [../archive/roadmap-mvp-phases.md](../archive/roadmap-mvp-phases.md) (İngilizce) | Tam Faz 0–9 + hardening checklist'leri (`v0.1.0` öncesi detay)                                                      |
+| [../archive/specs/](../archive/specs/) (İngilizce)                               | Sevkedilmiş faz / visual-debt tasarım spec'leri                                                                     |
+| [../archive/plans/](../archive/plans/) (İngilizce)                               | Bitmiş implementasyon planları                                                                                      |
+| [../archive/cla-draft.md](../archive/cla-draft.md) (İngilizce)                   | Yürürlüğe hiç girmemiş CLA taslağı; [ADR 0028](decisions/0028-open-contributions-hosted-service.md) ile terk edildi |
 
 MVP sonrası yeni özellik tasarımı bir **GitHub Issue** olarak açılır (kalıcı bir karar
 gerektiğinde bir ADR ile birlikte). Rutin işler için paralel bir `docs/specs/` ağacı

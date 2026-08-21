@@ -1,6 +1,6 @@
 # Phase 8 — Activity and notifications — Implementation Plan
 
-> **Historical plan — shipped. Do not re-execute.** Checkboxes are a frozen record. Ignore any AI attribution footers in this file.
+> **Historical plan (the phase shipped, see [docs/archive/roadmap-mvp-phases.md](../roadmap-mvp-phases.md)). Do not re-execute.** The checkboxes below were never ticked during execution, so they do not reflect completion. Ignore any AI attribution footers in this file.
 
 > **For agentic workers:** Use executing-plans or subagent-driven-development. Spec:
 > [docs/archive/specs/2026-08-09-phase-8-activity-notifications-design.md](../specs/2026-08-09-phase-8-activity-notifications-design.md).

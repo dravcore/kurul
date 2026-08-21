@@ -1,6 +1,6 @@
 # Phase 7 — Dashboard — Implementation Plan
 
-> **Historical plan — shipped. Do not re-execute.** Checkboxes are a frozen record. Ignore any AI attribution footers in this file.
+> **Historical plan (the phase shipped, see [docs/archive/roadmap-mvp-phases.md](../roadmap-mvp-phases.md)). Do not re-execute.** The checkboxes below were never ticked during execution, so they do not reflect completion. Ignore any AI attribution footers in this file.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

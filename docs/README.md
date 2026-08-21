@@ -32,29 +32,29 @@ sit outside `docs/` because GitHub treats them specially.
 
 ## Active docs
 
-| Doc                                        | Covers                                                                                                      |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| [architecture.md](architecture.md)         | Module map, data model, runtime evolution                                                                   |
-| [tech-stack.md](tech-stack.md)             | Stack choices and rationale (pins: see root / app `package.json`)                                           |
-| [development.md](development.md)           | Env setup, Compose, pnpm scripts, day-to-day, upgrade & rollback                                            |
-| [self-hosting.md](self-hosting.md)         | Deploying a release to your own domain: DNS, HTTPS via Caddy, SMTP, backups, bring-your-own proxy           |
-| [coding-standards.md](coding-standards.md) | TS / NestJS / Next.js conventions                                                                           |
-| [design.md](design.md)                     | UI/UX language                                                                                              |
-| [git-strategy.md](git-strategy.md)         | Git Flow, Conventional Commits, releases                                                                    |
-| [testing.md](testing.md)                   | Test layers and expectations                                                                                |
-| [api-conventions.md](api-conventions.md)   | REST naming, errors, pagination, and where the generated OpenAPI document lives                             |
-| [cla.md](cla.md)                           | Contributor License Agreement (**draft**, unused — [ADR 0015](decisions/0015-no-external-contributions.md)) |
-| [../ROADMAP.md](../ROADMAP.md)             | Roadmap: hardening + feature tracks, beyond-MVP backlog                                                     |
-| [decisions/](decisions/)                   | Architecture decision records (ADRs)                                                                        |
+| Doc                                        | Covers                                                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| [architecture.md](architecture.md)         | Module map, data model, runtime evolution                                                         |
+| [tech-stack.md](tech-stack.md)             | Stack choices and rationale (pins: see root / app `package.json`)                                 |
+| [development.md](development.md)           | Env setup, Compose, pnpm scripts, day-to-day, upgrade & rollback                                  |
+| [self-hosting.md](self-hosting.md)         | Deploying a release to your own domain: DNS, HTTPS via Caddy, SMTP, backups, bring-your-own proxy |
+| [coding-standards.md](coding-standards.md) | TS / NestJS / Next.js conventions                                                                 |
+| [design.md](design.md)                     | UI/UX language                                                                                    |
+| [git-strategy.md](git-strategy.md)         | Git Flow, Conventional Commits, releases                                                          |
+| [testing.md](testing.md)                   | Test layers and expectations                                                                      |
+| [api-conventions.md](api-conventions.md)   | REST naming, errors, pagination, and where the generated OpenAPI document lives                   |
+| [../ROADMAP.md](../ROADMAP.md)             | Roadmap: hardening + feature tracks, beyond-MVP backlog                                           |
+| [decisions/](decisions/)                   | Architecture decision records (ADRs)                                                              |
 
 ## Historical
 
-| Doc                                                            | Status                                                                                |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| [archive/project-skeleton.md](archive/project-skeleton.md)     | Historical Phase 1 scaffold how-to; live layout is [architecture.md](architecture.md) |
-| [archive/roadmap-mvp-phases.md](archive/roadmap-mvp-phases.md) | Full Phase 0–9 + hardening checklists (pre-`v0.1.0` detail)                           |
-| [archive/specs/](archive/specs/)                               | Shipped phase / visual-debt design specs                                              |
-| [archive/plans/](archive/plans/)                               | Finished implementation plans                                                         |
+| Doc                                                            | Status                                                                                              |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [archive/project-skeleton.md](archive/project-skeleton.md)     | Historical Phase 1 scaffold how-to; live layout is [architecture.md](architecture.md)               |
+| [archive/roadmap-mvp-phases.md](archive/roadmap-mvp-phases.md) | Full Phase 0–9 + hardening checklists (pre-`v0.1.0` detail)                                         |
+| [archive/specs/](archive/specs/)                               | Shipped phase / visual-debt design specs                                                            |
+| [archive/plans/](archive/plans/)                               | Finished implementation plans                                                                       |
+| [archive/cla-draft.md](archive/cla-draft.md)                   | Never-enacted CLA draft, dropped by [ADR 0028](decisions/0028-open-contributions-hosted-service.md) |
 
 New feature design after MVP opens as a **GitHub Issue** (and an ADR when a lasting decision
 is needed). Do not grow a parallel `docs/specs/` tree for routine work.

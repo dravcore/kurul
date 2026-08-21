@@ -8,9 +8,9 @@
 ## Context
 
 Kurul measured nothing about its own use. A grep for `telemetry`, `analytics`, `posthog`,
-`plausible` or `umami` across `apps/` and `docs/` returned zero matches in source, and
-`docs/roadmap.md` listed no metrics item under "Beyond MVP". So every product question was
-answered by intuition:
+`plausible` or `umami` across `apps/` and `docs/` returned zero matches in source, and the
+roadmap (now [ROADMAP.md](../../ROADMAP.md)) listed no metrics item under "Beyond MVP". So every
+product question was answered by intuition:
 
 - Where does onboarding break — sign-up, workspace, board, first card, first invite?
 - Do invitations convert, and when they do not, is that the invite flow or an instance with no

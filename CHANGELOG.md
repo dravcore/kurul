@@ -7,6 +7,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that
+produced them: the same ID means different things in the 0.1.0 audit, the 0.2.0 audit and
+the 2026-08-18 "atlas" audit. See
+[ROADMAP.md](ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit)._
+
 ### Fixed
 
 - **The task search box treated `%` and `_` as SQL wildcards instead of the characters a user
@@ -43,113 +48,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   instead of carrying the row forward under a constraint that only applies to future writes.
   Every row the shipped code can have written satisfies the predicate, so no action is expected
   on upgrade.
-
-### Added
-
-- **Attachment storage quotas — the total is finally bounded, not just each file** (audit
-  finding SEC-02, [ADR 0027](docs/decisions/0027-attachment-quotas.md)). Two new variables cap
-  the summed size of stored file attachments: `ATTACHMENT_WORKSPACE_QUOTA_BYTES` per workspace
-  and `ATTACHMENT_INSTANCE_QUOTA_BYTES` instance-wide. Until now the only ceilings were
-  per-file and per-minute, which the rate-limit code itself called the wrong unit: at the
-  defaults an authenticated client could spend ~500 MiB of disk a minute indefinitely, on a
-  volume the Compose stack shares with Postgres. Both quotas default to unset — unlimited,
-  exactly the pre-upgrade behaviour — and `0` means the same, matching the retention windows'
-  spelling. The quota counts live FILE rows only (link attachments store no bytes and never
-  count), is checked before anything touches the disk, and is deliberately soft: concurrent
-  uploads can each overshoot by at most one file. A rejected upload answers `413` with
-  `error: "Attachment Quota Exceeded"` in the envelope — distinguishable from the per-file
-  limit's `413` by that field, which is what the web now branches on to tell the user to free
-  up space rather than shrink the file.
-
-- **`pnpm bootstrap` — a fresh clone reaches a running dev loop in one command.**
-  [`scripts/bootstrap.mjs`](scripts/bootstrap.mjs) runs the five commands the dev loop already
-  documented, in the same order (shared-package build → `db:generate` → dev containers →
-  `db:migrate` → `db:seed`), and adds the two things a reader cannot add by replaying them:
-  a preflight that reads `.env` before anything is started, and a wait on the containers' own
-  healthchecks. It is the documented path rather than a second, faster one — if the script and
-  [development.md](docs/development.md) disagree, one of them is a bug.
-
-  The preflight exists because these failures otherwise arrive late and named after the wrong
-  thing: an empty `POSTGRES_PASSWORD`, an empty `BETTER_AUTH_SECRET`, or a `DATABASE_URL` still
-  carrying the `<POSTGRES_PASSWORD>` placeholder from `.env.example` each surface only once
-  something tries to connect, with an error that mentions neither `.env` nor the variable.
-
-  **Re-running it is safe, and that is a constraint rather than a convenience.** `pnpm db:seed`
-  deletes before it inserts, so a script anybody is told to run after a `git pull` must not be
-  one that quietly wipes the board they were working on: seeding happens only when the database
-  holds no `Workspace` row, `--seed` forces it anyway, `--no-seed` skips it, and a database it
-  cannot read is treated as "do not seed" rather than as consent. The script is named
-  `bootstrap` and not `setup` because `pnpm setup` is a built-in pnpm command that writes to
-  your shell profile.
-
-- **A Community section in both READMEs, and GitHub Discussions declared the official channel.**
-  Q&A for setup and usage, Ideas for roadmap feedback, Show and tell for what you built; bugs
-  stay [issues](https://github.com/dravcore/kurul/issues) and vulnerabilities stay
-  [SECURITY.md](SECURITY.md). The section restates, up front rather than as a discovery, that
-  outside pull requests are not accepted — code, documentation and translations alike, with no
-  end date ([ADR 0015](docs/decisions/0015-no-external-contributions.md)) — because a project
-  that asks for feedback owes people the shape of the door before they walk through it.
-
-- **Every Beyond-MVP row now links to a discussion that can be upvoted**
-  ([roadmap.md](docs/roadmap.md#beyond-mvp), thirteen rows). Votes do not order the list — an
-  unscheduled row stays unscheduled — but a row with people behind it and a concrete use case
-  attached is the only thing that moves one off it, and there was previously nowhere for that
-  to accumulate.
-
-- **A commercial license line in both READMEs** (`licensing@dravcore.com`), which is the model
-  [ADR 0014](docs/decisions/0014-dual-licensing-cla.md) already describes and had no published
-  way to reach. What it sells is different terms on the same AGPL-3.0 code: no paid edition,
-  no feature held back for it, and no hosted SaaS.
-
-- **`INVITATION_RETENTION_DAYS` (default `90`) — the nightly sweep now covers a sixth table,
-  `WorkspaceInvitation`.** It is the one address in the schema that need not belong to a user of
-  the instance: invite somebody who never signs up and there is no account for any deletion path
-  to reach, so before this the row kept a third party's e-mail address for the life of the
-  install. A row is deleted once it is **finished** — answered (accepted, rejected, canceled) or
-  past `expiresAt` — **and** older than the window; a `pending`, unexpired invitation is exempt
-  at any age, because it is a live grant of access somebody can still accept. `0` keeps them
-  forever, like the other windows.
-
-  The window is measured from `createdAt`, the only timestamp the table has, which deletes the
-  record slightly earlier than measuring from the answer would — bounded by how long a row can
-  stay pending. Ninety days rather than `ACTIVITY_RETENTION_DAYS`' year because nobody browses a
-  finished invitation (the settings screen lists `pending` rows only), so keeping it longer only
-  stores an address. Its own variable rather than a share of `NOTIFICATION_RETENTION_DAYS`
-  because shortening one is a decision about other people's data and shortening the other is
-  tidying an inbox. Operators who need the old behaviour set `INVITATION_RETENTION_DAYS=0`
-  before upgrading — the first nightly run after the upgrade deletes the accumulated backlog.
-
-### Changed
-
-- **The Quick start in both READMEs is split into "Run it" and "Develop it".** The pull-based
-  Docker path — the one for people who want to run Kurul rather than work on it — was
-  previously the fourth paragraph of a section that opened with a toolchain. Developing it now
-  also carries the prerequisite versions (Node ≥ 24, pnpm 9+, Compose v2, Git 2.30+), which
-  the README had never stated at all, and spells out what skipping the shared-package build or
-  `db:generate` actually looks like, since both fail as though the checkout were broken.
-
-  One correction came out of the split: the instruction to match `DATABASE_URL`'s password
-  segment to `POSTGRES_PASSWORD` was written as though it applied to every install. It applies
-  to the dev loop only — `docker-compose.yml` assembles its own connection string from
-  `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` and never reads that line.
-
-- **Deleting an account now also deletes every invitation addressed to it, in any state.**
-  `DELETE /me` and `DELETE /instance/users/:userId` anonymise the `User` row and used to remove
-  only the invitations that account had *sent* and left pending. `WorkspaceInvitation.email` is a
-  literal address in a column of its own — nothing about it is derived from `User` — so rewriting
-  the row to `deleted-<id>@deleted.invalid` left every invitation ever sent *to* that person
-  still spelling out where they can be reached, and an erasure request that leaves the address in
-  the database has not erased it (audit finding DB-01).
-
-  Accepted and rejected rows go too, unlike on the inviter side: an invitation addressed to the
-  departing user is not somebody else's record of an event, it is a copy of that user's own
-  contact details. What the workspace keeps is the membership history itself, in
-  `WorkspaceMember` and `Activity`, which never carried the address. **For an operator this
-  narrows what a dump can restore**: the erasure-recovery runbook in
-  [development.md](docs/development.md#undoing-an-account-deletion) now lists invitee-side
-  invitation rows as recoverable only from a dump that predates the deletion.
-
-### Fixed
 
 - **The curl-based self-host install could never finish, and scheduled backups silently never
   ran.** [self-hosting.md](docs/self-hosting.md) downloads only `docker-compose.yml`,
@@ -201,6 +99,143 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   stays green through a backup outage. `scripts/bootstrap.mjs`'s comment on which dev-loop
   containers declare healthchecks is updated to match (`docker-compose.dev.yml` has no `backup`
   service of its own, so this doesn't change what that script waits on).
+
+### Added
+
+- **Attachment storage quotas — the total is finally bounded, not just each file** (audit
+  finding SEC-02, [ADR 0027](docs/decisions/0027-attachment-quotas.md)). Two new variables cap
+  the summed size of stored file attachments: `ATTACHMENT_WORKSPACE_QUOTA_BYTES` per workspace
+  and `ATTACHMENT_INSTANCE_QUOTA_BYTES` instance-wide. Until now the only ceilings were
+  per-file and per-minute, which the rate-limit code itself called the wrong unit: at the
+  defaults an authenticated client could spend ~500 MiB of disk a minute indefinitely, on a
+  volume the Compose stack shares with Postgres. Both quotas default to unset — unlimited,
+  exactly the pre-upgrade behaviour — and `0` means the same, matching the retention windows'
+  spelling. The quota counts live FILE rows only (link attachments store no bytes and never
+  count), is checked before anything touches the disk, and is deliberately soft: concurrent
+  uploads can each overshoot by at most one file. A rejected upload answers `413` with
+  `error: "Attachment Quota Exceeded"` in the envelope — distinguishable from the per-file
+  limit's `413` by that field, which is what the web now branches on to tell the user to free
+  up space rather than shrink the file.
+
+- **`pnpm bootstrap` — a fresh clone reaches a running dev loop in one command.**
+  [`scripts/bootstrap.mjs`](scripts/bootstrap.mjs) runs the five commands the dev loop already
+  documented, in the same order (shared-package build → `db:generate` → dev containers →
+  `db:migrate` → `db:seed`), and adds the two things a reader cannot add by replaying them:
+  a preflight that reads `.env` before anything is started, and a wait on the containers' own
+  healthchecks. It is the documented path rather than a second, faster one — if the script and
+  [development.md](docs/development.md) disagree, one of them is a bug.
+
+  The preflight exists because these failures otherwise arrive late and named after the wrong
+  thing: an empty `POSTGRES_PASSWORD`, an empty `BETTER_AUTH_SECRET`, or a `DATABASE_URL` still
+  carrying the `<POSTGRES_PASSWORD>` placeholder from `.env.example` each surface only once
+  something tries to connect, with an error that mentions neither `.env` nor the variable.
+
+  **Re-running it is safe, and that is a constraint rather than a convenience.** `pnpm db:seed`
+  deletes before it inserts, so a script anybody is told to run after a `git pull` must not be
+  one that quietly wipes the board they were working on: seeding happens only when the database
+  holds no `Workspace` row, `--seed` forces it anyway, `--no-seed` skips it, and a database it
+  cannot read is treated as "do not seed" rather than as consent. The script is named
+  `bootstrap` and not `setup` because `pnpm setup` is a built-in pnpm command that writes to
+  your shell profile.
+
+- **A Community section in both READMEs, and GitHub Discussions declared the official channel.**
+  Q&A for setup and usage, Ideas for roadmap feedback, Show and tell for what you built; bugs
+  stay [issues](https://github.com/dravcore/kurul/issues) and vulnerabilities stay
+  [SECURITY.md](SECURITY.md). The section also states, up front rather than as a discovery,
+  how a contribution is accepted: code, documentation and translations are all welcome under
+  plain AGPL-3.0 with nothing to sign
+  ([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md)), because a project
+  that asks for feedback owes people the shape of the door before they walk through it.
+
+- **Every Beyond-MVP row now links to a discussion that can be upvoted**
+  ([ROADMAP.md](ROADMAP.md#beyond-mvp), thirteen rows). Votes do not order the list — an
+  unscheduled row stays unscheduled — but a row with people behind it and a concrete use case
+  attached is the only thing that moves one off it, and there was previously nowhere for that
+  to accumulate.
+
+- **`INVITATION_RETENTION_DAYS` (default `90`) — the nightly sweep now covers a sixth table,
+  `WorkspaceInvitation`.** It is the one address in the schema that need not belong to a user of
+  the instance: invite somebody who never signs up and there is no account for any deletion path
+  to reach, so before this the row kept a third party's e-mail address for the life of the
+  install. A row is deleted once it is **finished** — answered (accepted, rejected, canceled) or
+  past `expiresAt` — **and** older than the window; a `pending`, unexpired invitation is exempt
+  at any age, because it is a live grant of access somebody can still accept. `0` keeps them
+  forever, like the other windows.
+
+  The window is measured from `createdAt`, the only timestamp the table has, which deletes the
+  record slightly earlier than measuring from the answer would — bounded by how long a row can
+  stay pending. Ninety days rather than `ACTIVITY_RETENTION_DAYS`' year because nobody browses a
+  finished invitation (the settings screen lists `pending` rows only), so keeping it longer only
+  stores an address. Its own variable rather than a share of `NOTIFICATION_RETENTION_DAYS`
+  because shortening one is a decision about other people's data and shortening the other is
+  tidying an inbox. Operators who need the old behaviour set `INVITATION_RETENTION_DAYS=0`
+  before upgrading — the first nightly run after the upgrade deletes the accumulated backlog.
+
+### Changed
+
+- **The Quick start in both READMEs is split into "Run it" and "Develop it".** The pull-based
+  Docker path — the one for people who want to run Kurul rather than work on it — was
+  previously the fourth paragraph of a section that opened with a toolchain. Developing it now
+  also carries the prerequisite versions (Node ≥ 24, pnpm 9+, Compose v2, Git 2.30+), which
+  the README had never stated at all, and spells out what skipping the shared-package build or
+  `db:generate` actually looks like, since both fail as though the checkout were broken.
+
+  One correction came out of the split: the instruction to match `DATABASE_URL`'s password
+  segment to `POSTGRES_PASSWORD` was written as though it applied to every install. It applies
+  to the dev loop only — `docker-compose.yml` assembles its own connection string from
+  `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` and never reads that line.
+
+- **Deleting an account now also deletes every invitation addressed to it, in any state.**
+  `DELETE /me` and `DELETE /instance/users/:userId` anonymise the `User` row and used to remove
+  only the invitations that account had *sent* and left pending. `WorkspaceInvitation.email` is a
+  literal address in a column of its own — nothing about it is derived from `User` — so rewriting
+  the row to `deleted-<id>@deleted.invalid` left every invitation ever sent *to* that person
+  still spelling out where they can be reached, and an erasure request that leaves the address in
+  the database has not erased it (audit finding DB-01).
+
+  Accepted and rejected rows go too, unlike on the inviter side: an invitation addressed to the
+  departing user is not somebody else's record of an event, it is a copy of that user's own
+  contact details. What the workspace keeps is the membership history itself, in
+  `WorkspaceMember` and `Activity`, which never carried the address. **For an operator this
+  narrows what a dump can restore**: the erasure-recovery runbook in
+  [development.md](docs/development.md#undoing-an-account-deletion) now lists invitee-side
+  invitation rows as recoverable only from a dump that predates the deletion.
+
+- **Outside contributions are accepted again, under plain AGPL-3.0 and with nothing to
+  sign.** Code, documentation and translations are all welcome; the terms are inbound =
+  outbound, so a contribution is licensed under the project's own AGPL-3.0 and its author
+  keeps their copyright. There is no CLA, and no DCO for now
+  ([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md), which supersedes
+  [ADR 0014](docs/decisions/0014-dual-licensing-cla.md) and
+  [ADR 0015](docs/decisions/0015-no-external-contributions.md) in full). What does not
+  change: an issue first for anything non-trivial, the ~500-line pull request guideline, and
+  review on every PR. CONTRIBUTING.md, the pull request template and both READMEs are
+  rewritten around that.
+
+- **Revenue comes from an optional hosted service instead of a commercial license.**
+  Dravcore runs an instance anybody can have an account on, free within a published set of
+  limits (seats, boards, storage and similar operational quantities) and paid above them.
+  Self-hosting stays free forever with nothing held back: no open core, no paid edition, and
+  no feature that exists only on our servers. The hosted service runs the same AGPL-3.0 code
+  as this repository, the plan-limit and billing code included, which a self-hoster
+  configures to taste or leaves switched off
+  ([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md)).
+
+- **The CLA draft moved to [docs/archive/cla-draft.md](docs/archive/cla-draft.md)**, its
+  not-in-force banner intact. An agreement that was never enacted, and that nobody will now
+  be asked to sign, is a historical record rather than a policy.
+
+### Removed
+
+- **The `CLA` workflow.** `.github/workflows/cla.yml` had been disabled since
+  [ADR 0015](docs/decisions/0015-no-external-contributions.md) (manual trigger only, plus an
+  `if: false` job guard); with no agreement for anybody to sign, there is nothing left for it
+  to check, so it is deleted. Its last version stays in git history, which is where a DCO
+  check would start from if contribution volume ever justifies one.
+
+- **The commercial-license line and the `licensing@dravcore.com` address, from both
+  READMEs.** Neither ever reached a release, but this section advertised them until today,
+  so the removal is recorded here rather than left as a silent edit.
 
 ### Security
 
@@ -385,7 +420,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   in this API that is not JSON, with the five headers it writes. `/auth/*` and the Socket.io
   contract are absent and say so — neither is a Nest route.
 
-  `docs/roadmap.md` gains an **API 1.0** heading declaring the scope a compatibility promise
+  `ROADMAP.md` gains an **API 1.0** heading declaring the scope a compatibility promise
   would cover: a `/v1` prefix, personal access tokens, and three webhook events
   (`task.created`, `task.moved`, `task.completed`). All three are explicitly post-1.0 and none
   is implemented here.
@@ -1131,7 +1166,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Docs consistency pass: Node ≥24, i18n status, squash policy, archive links,
   project-skeleton archived, TR design status synced.
 - Documentation map sharpened for post-MVP: `docs/README.md` is a five-minute reading guide;
-  `docs/roadmap.md` is status + Beyond MVP only; Phase 0–9 checklists moved to
+  `ROADMAP.md` is status + Beyond MVP only; Phase 0–9 checklists moved to
   `docs/archive/roadmap-mvp-phases.md`; shipped phase design specs moved to
   `docs/archive/specs/` (CHANGELOG links updated).
 
@@ -1471,7 +1506,7 @@ commit; this is the point it becomes a version.
   applies to columns still called Done.
 - Contributor License Agreement scaffolding for the dual-licensing model
   ([ADR 0014](docs/decisions/0014-dual-licensing-cla.md)): Harmony-derived CLA draft
-  ([docs/cla.md](docs/cla.md), EN/TR) — **not in force, pending legal review** — plus a
+  ([docs/cla.md](docs/archive/cla-draft.md), EN/TR; archived by ADR 0028) — **not in force, pending legal review** — plus a
   merge-blocking `CLA` workflow, a CONTRIBUTING section, and a PR-template checkbox.
 - `GET /workspaces/:workspaceId/members/me` returns the caller's own membership, so the app
   shell resolves the active role from one indexed row instead of `/me` plus the full roster.
@@ -1484,7 +1519,7 @@ commit; this is the point it becomes a version.
   View all from the bell) and dashboard created-vs-completed throughput (14 UTC days;
   `task.moved` payloads include column names). See
   [deferred notes](docs/archive/specs/2026-08-09-phase-8-deferred.md) (archived; open items
-  moved to [roadmap.md](docs/roadmap.md#beyond-mvp)).
+  moved to [roadmap.md](ROADMAP.md#beyond-mvp)).
 - Phase 8 activity log and notifications
   ([spec](docs/archive/specs/2026-08-09-phase-8-activity-notifications-design.md)): activity writes
   on task create/update/move/delete/assign/comment; workspace and task feeds; `Notification`
@@ -1574,7 +1609,7 @@ commit; this is the point it becomes a version.
   rule by [ADR 0012](docs/decisions/0012-comment-delete-authorship.md) (author OR OWNER/ADMIN,
   not any MEMBER); `docs/archive/specs/2026-08-09-phase-8-deferred.md` archived to
   `docs/archive/specs/` with its remaining open follow-ups folded into
-  [roadmap Beyond MVP](docs/roadmap.md#beyond-mvp); api-conventions, tech-stack, testing, and
+  [roadmap Beyond MVP](ROADMAP.md#beyond-mvp); api-conventions, tech-stack, testing, and
   architecture docs refreshed to match the shipped activity/dashboard/notification routes, ADRs
   0009–0012, web Vitest in CI, next-intl, and the develop merge-commit practice actually in use.
 - Tooling: type-aware ESLint (floating-promise, React hooks rules), Husky pre-commit, Dependabot,
