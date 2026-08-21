@@ -156,21 +156,35 @@ döngüsü içindir. Değiştirmek isteyebileceğiniz tek değer `ATTACHMENT_MAX
 [aşağıdaki proxy sözleşmesini](#kendi-reverse-proxynizi-kullanmak) okuyun: ters proxy, onunla
 birlikte hareket etmesi gereken ayrı ve bilinçli olarak daha yüksek bir tavan taşıyor.
 
-**Attachment depolaması siz sınırlamadıkça sınırsızdır ve Postgres'in diskini paylaşır.** Dosya
-başına limit ve IP başına yükleme throttle'ı her _isteği_ sınırlar, toplamı değil:
-varsayılanlarla, kimliği doğrulanmış bir istemci istediği kadar süre boyunca dakikada yaklaşık
-500 MiB disk harcayabilir ve `attachment_data` volume'ü veritabanıyla aynı host dosya sisteminde
-yaşar — dolu bir disk yalnız yüklemeleri değil, Postgres'i durdurur. Toplamı iki değişken sınırlar
-([ADR 0027](decisions/0027-attachment-quotas.md)): `ATTACHMENT_WORKSPACE_QUOTA_BYTES` (workspace
-başına saklanan dosya baytlarının toplamı) ve `ATTACHMENT_INSTANCE_QUOTA_BYTES` (instance'ın
-tamamı). İkisi de varsayılan olarak sınırsızdır — diskini önemsediğiniz her makinede instance
-olanını volume'ün gerçek boş alanının altına ayarlayın. Boyutlandırırken bilin: kotalar
-**yumuşaktır** (eşzamanlı yüklemeler en fazla birer dosya aşabilir; birkaç
-`ATTACHMENT_MAX_BYTES` kadar pay bırakın) ve silinen dosyalar baytlarını gecelik orphan
-süpürmesinin bekleme süresi geçene kadar tutar; yani disk kullanımı, kota muhasebesini kısa süre
-aşabilir. Bağlantı ekleri bayt saklamaz ve hiç sayılmaz. Reddedilen yükleme, JSON gövdesi
-`error: "Attachment Quota Exceeded"` taşıyan bir `413`'tür — bkz.
+**Attachment depolaması varsayılan olarak sınırlıdır ve Postgres'in diskini paylaşır.**
+`attachment_data` volume'ü veritabanıyla aynı host dosya sisteminde yaşar; dolu bir disk yalnız
+yüklemeleri değil, Postgres'i durdurur. Toplamı iki değişken sınırlar
+([ADR 0027](decisions/0027-attachment-quotas.md), 2026-08-21'de güncellendi):
+`ATTACHMENT_WORKSPACE_QUOTA_BYTES` (workspace başına saklanan dosya baytlarının toplamı) ve
+`ATTACHMENT_INSTANCE_QUOTA_BYTES` (instance'ın tamamı). Ayarlanmadıklarında **workspace başına
+2 GiB (`2147483648`), instance başına 20 GiB (`21474836480`)** geçerlidir; yazılı bir `0` ilgili
+tavanı tamamen kaldırır, negatif değer açılışta reddedilir. Diskini önemsediğiniz her makinede
+instance olanını volume'ün gerçek boş alanının altına ayarlayın. API geçerli sayıları açılışta
+loglar (`docker compose logs api` içinde `Attachment ceilings: … (default)` / `(env)`) ve
+workspace kotası instance kotasının üstüne ayarlanmışsa reddetmek yerine uyarır.
+Boyutlandırırken bilin: kotalar **yumuşaktır** (eşzamanlı yüklemeler en fazla birer dosya
+aşabilir; birkaç `ATTACHMENT_MAX_BYTES` kadar pay bırakın) ve silinen dosyalar baytlarını gecelik
+orphan süpürmesinin bekleme süresi geçene kadar tutar; yani disk kullanımı, kota muhasebesini
+kısa süre aşabilir. Bağlantı ekleri bayt saklamaz ve hiç sayılmaz. Reddedilen yükleme, JSON
+gövdesi `error: "Attachment Quota Exceeded"` taşıyan bir `413`'tür, bkz.
 [413'leri birbirinden ayırmak](#413leri-birbirinden-ayırmak).
+
+**Yüklemelerin dakikada bayt bütçesi de var.** `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE` (varsayılan
+`268435456`, 256 MiB, yaklaşık on tam boy yükleme) bir istemci IP'sinin sabit bir dakika içinde
+yükleme rotasına gönderebileceği en fazla bayttır; her isteğin `Content-Length`'i gövde
+okunmadan önce bütçeden düşülür (`Content-Length` taşımayan bir multipart istek
+`ATTACHMENT_MAX_BYTES` kadar düşülür). Var olma nedeni, rota başına istek throttle'ının istek
+saymasıdır; disk için yanlış birim budur. `0` kapatır. Diğer bütün limitlerle aynı istemci
+IP'sine göre anahtarlanır, dolayısıyla proxy'nin arkasını görmesi için pakete dahil Compose
+dosyasının zaten taşıdığı `TRUST_PROXY` ayarına ihtiyaç duyar; sayaçlar Redis'te yaşar, Redis
+hata verdiği sürece süreç belleğine düşer. Bütçe aşımı, JSON gövdesi
+`error: "Upload Budget Exceeded"` ve `Retry-After` başlığı taşıyan bir `429`'dur
+([api-conventions.md](api-conventions.md#rate-limiting)).
 
 **Trello import'u için de burada bir satır gerekmiyor.** `TRELLO_IMPORT_MAX_BYTES` (varsayılan
 `20971520`, 20 MiB) importer'ın kabul edeceği en büyük board export'udur ve pakete dahil Compose
@@ -390,6 +404,26 @@ docker compose pull && docker compose up -d
 Migration'lar otomatik çalışır: tek seferlik `migrate` servisi, `api` başlamadan önce bekleyen
 migration'ları uygular. `latest`'i takip etmek yerine bilinçli upgrade etmeyi tercih
 ediyorsanız `.env`'de `TAG=v0.2.0` ile bir sürümü sabitleyin.
+
+### Attachment kotalarının artık varsayılanı var
+
+`v0.2.0` sonrası sürümler, `ATTACHMENT_WORKSPACE_QUOTA_BYTES` / `ATTACHMENT_INSTANCE_QUOTA_BYTES`
+ayarlanmadığında attachment depolamasını workspace başına 2 GiB, instance başına 20 GiB ile
+sınırlar (eskiden sınırsız demekti). **Halihazırda 2 GiB'den fazla dosya tutan bir workspace,
+bir sonraki yüklemesinde `413` alır**; bunu istemiyorsanız upgrade'den önce daha yüksek bir sayı
+ya da sınırsız için `0` yazın. Nerede durduğunuzu tek sorgu söyler; ilki instance'ın, ikincisi
+workspace başına toplam:
+
+```bash
+docker compose exec postgres psql -U kurul -d kurul -c \
+  "SELECT COALESCE(SUM(size), 0) AS instance_bytes FROM \"Attachment\" WHERE kind = 'FILE';"
+docker compose exec postgres psql -U kurul -d kurul -c \
+  "SELECT w.slug, SUM(a.size) AS bytes FROM \"Attachment\" a JOIN \"Task\" t ON t.id = a.\"taskId\" JOIN \"Board\" b ON b.id = t.\"boardId\" JOIN \"Workspace\" w ON w.id = b.\"workspaceId\" WHERE a.kind = 'FILE' GROUP BY w.slug ORDER BY bytes DESC;"
+```
+
+Sayıları `2147483648` ve `21474836480` ile karşılaştırın. Aynı upgrade, IP başına bir yükleme
+bayt bütçesi de getiriyor (`ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`, varsayılan dakikada 256 MiB);
+bu yalnızca tek adresten dakikada ondan fazla tam boy dosya yükleyen bir istemciyi ilgilendirir.
 
 ### Kurultay'dan geliyorsanız (v0.1.0)
 

@@ -5,6 +5,23 @@
 
 > 🌐 [English (kanonik)](../../decisions/0027-attachment-quotas.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
 
+> **Güncellendi (2026-08-21):** aşağıdaki kararın "ayarlanmamış = sınırsız" yarısı tersine
+> çevrildi. Ayarlanmamış `ATTACHMENT_WORKSPACE_QUOTA_BYTES` artık 2 GiB, ayarlanmamış
+> `ATTACHMENT_INSTANCE_QUOTA_BYTES` 20 GiB demek; yazılı bir `0` hâlâ vazgeçme seçeneği, negatif
+> değer hâlâ açılışta reddediliyor. Dolayısıyla "Değerlendirilen alternatifler" tablosundaki
+> "varsayılan bir kota sayısı" satırı artık reddedilmiş değil. Cevabı değiştiren şey: bu ADR'nin
+> var olma nedeni olan bulgu (SEC-02, 2026-08-18 denetimi) _sınırsız_ tüketimdir ve yayınlanan
+> Compose topolojisinde yapılandırılmamış bir instance diskini Postgres'le paylaşır; kota
+> bölümünü hiç okumayan operatör, tam da dolu bir diskin veritabanını düşüreceği operatördür.
+> 2 TB'lık bir volume için yanlış olan bir varsayılan o operatöre `.env`'de bir satıra mal olur;
+> 20 GB'lık bir volume için yanlış olan bir varsayılan ise instance'a mal olur. Aynı değişiklik,
+> aşağıdaki üçüncü ertelemenin işaret ettiği bayt bütçesini de yükleme route'una veriyor
+> (`ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`, istemci IP'si başına dakikada 256 MiB,
+> `UploadBudgetGuard`); böylece istek başına throttle, yapılandırılmamış bir instance'taki tek
+> fren olmaktan çıkıyor. Upgrade sonucu ve kullanım sorgusu
+> [self-hosting.md](../self-hosting.md#attachment-kotalarının-artık-varsayılanı-var)'de.
+> Aşağıdaki gövde yazıldığı gibi bırakıldı.
+
 ## Bağlam
 
 Attachment yükleme yolunun dosya başına bir tavanı (`ATTACHMENT_MAX_BYTES`,

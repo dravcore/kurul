@@ -169,6 +169,16 @@ export type AttachmentKind = (typeof AttachmentKind)[keyof typeof AttachmentKind
 export const ATTACHMENT_QUOTA_ERROR = 'Attachment Quota Exceeded';
 
 /**
+ * The `error` field of the 429 the upload route answers when a client IP has submitted more
+ * bytes in the current minute than `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE` allows.
+ *
+ * The per-route request throttle answers 429 too, with the stock `"Too Many Requests"`; the
+ * two ask for different waits (the budget's `Retry-After` is the rest of a fixed minute), and
+ * clients branch on `statusCode` and `error`, never on `message`.
+ */
+export const UPLOAD_BUDGET_ERROR = 'Upload Budget Exceeded';
+
+/**
  * One attachment on a task.
  *
  * The three FILE-only fields are `null` on a `LINK` and `url` is `null` on a `FILE`; `kind` is

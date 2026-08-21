@@ -267,8 +267,9 @@ export class AttachmentService {
    * is bounded.
    *
    * The ceiling is inclusive — a file that fills the quota exactly is accepted — and only FILE
-   * rows count: a LINK stores no bytes, so it spends nothing. `0` (the default) disables a
-   * ceiling entirely, in which case this method issues no query at all.
+   * rows count: a LINK stores no bytes, so it spends nothing. `0` (the explicit opt-out; the
+   * defaults are finite since ADR 0027's 2026-08-21 update) disables a ceiling entirely, in
+   * which case this method issues no query at all.
    *
    * The 413 carries `error: ATTACHMENT_QUOTA_ERROR` so a client can tell it from the per-file
    * size limit's 413 without reading `message` — the field `docs/api-conventions.md#errors`

@@ -478,9 +478,9 @@ describe('AttachmentService.createFile', () => {
       });
     });
 
-    it('issues no aggregate query at all when neither quota is configured', async () => {
-      // `0` (the default) must cost nothing: an unconfigured instance keeps its pre-quota
-      // upload path, query for query.
+    it('issues no aggregate query at all when both quotas are opted out with 0', async () => {
+      // `0` must cost nothing: an instance that lifts both ceilings keeps the pre-quota upload
+      // path, query for query.
       const { service, prisma } = build();
       (prisma.attachment.create as jest.Mock).mockResolvedValue(fileRow());
 

@@ -304,7 +304,7 @@ nullable bir alanı temizler.
 | `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, bir yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor ya da bir depolama kotasını aşacak (hangisi olduğunu `error` söyler — bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)), ya da bir import `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor |
 | `415 Unsupported Media Type` | Dosyanın **magic byte**'ları allowlist'te değil. Beyan edilen `Content-Type` ve uzantı kanıt sayılmaz, hiç okunmaz                                                                                                                                                            |
 | `422 Unprocessable Entity`   | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak)                                                                                                                                                                 |
-| `429 Too Many Requests`      | Rate limit uygulandı                                                                                                                                                                                                                                                          |
+| `429 Too Many Requests`      | Rate limit uygulandı: bir route'un istek bütçesi ya da yükleme route'unun IP başına bayt bütçesi aşıldı (hangisi olduğunu `error` söyler, bkz. [Rate limiting](#rate-limiting))                                                                                               |
 | `500 Internal Server Error`  | Ele alınmamış hata. Asla bir stack trace sızdırmaz.                                                                                                                                                                                                                           |
 
 **Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
@@ -429,10 +429,10 @@ değildir. Hangi sayının değiştirileceği ve aralarındaki sıralama kuralı
 [self-hosting.md](self-hosting.md#kendi-reverse-proxynizi-kullanmak).
 
 **Depolama kotaları da `413` döner, ama kendi `error`'larıyla.**
-`ATTACHMENT_WORKSPACE_QUOTA_BYTES` ya da `ATTACHMENT_INSTANCE_QUOTA_BYTES` ayarlıyken (ikisi de
-varsayılan olarak sınırsızdır — [ADR 0027](decisions/0027-attachment-quotas.md)), byte'ları
-saklanan FILE eklerinin toplam boyutunu tavanın ötesine itecek bir yükleme, hiçbir şey
-yazılmadan reddedilir. Zarf `error: "Attachment Quota Exceeded"` taşır; dosya başına limitinki
+`ATTACHMENT_WORKSPACE_QUOTA_BYTES` ve `ATTACHMENT_INSTANCE_QUOTA_BYTES`, saklanan FILE eklerinin
+toplam boyutuna tavan koyar; ayarlanmadıklarında 2 GiB ve 20 GiB'dir, yazılı bir `0` ilgili
+tavanı kaldırır ([ADR 0027](decisions/0027-attachment-quotas.md), 2026-08-21'de güncellendi).
+Byte'ları toplamı tavanın ötesine itecek bir yükleme, hiçbir şey yazılmadan reddedilir. Zarf `error: "Attachment Quota Exceeded"` taşır; dosya başına limitinki
 ise `"Payload Too Large"` taşır — durum kodu tek başına dosyayı mı küçültmek yoksa yer mi açmak
 gerektiğini söyleyemez ve istemciler `statusCode` ile `error` üzerinden dallanır, asla `message`
 üzerinden değil (bkz. [Hatalar](#hatalar)). Kotayı tam dolduran dosya kabul edilir; tavan, dosya
@@ -678,22 +678,35 @@ istekler `X-RateLimit-Limit`, `X-RateLimit-Remaining` ve `X-RateLimit-Reset` ta�
 Bütçeler **client IP'si ve route başına**, kayan bir dakikalık pencerede sayılır — yoğun
 çalışan bir endpoint asla başka bir endpoint'in payını harcamaz.
 
-| Endpoint                                       | Bütçe    | Neden                                                                            |
-| ---------------------------------------------- | -------- | -------------------------------------------------------------------------------- |
-| Aşağıda sayılmayan her endpoint                | 100 / dk | Bir insanın üreteceğinin çok üstünde; script'i sınırlar                          |
-| `POST /workspaces/:workspaceId/invitations`    | 10 / dk  | Her çağrı, adresini çağıranın seçtiği bir mesajı SMTP relay'ine verir            |
-| `GET .../boards/:boardId/tasks?q=`             | 30 / dk  | `q=` bir trigram taramasıdır; aynı route `q=` olmadan varsayılanda kalır         |
-| `POST .../tasks/:taskId/attachments`           | 20 / dk  | Tek bir isteğin `ATTACHMENT_MAX_BYTES` kadar diske mal olabildiği tek uç         |
-| `POST /workspaces/:workspaceId/imports/trello` | 3 / dk   | Heap'e ayrıştırılan 20 MiB'lık gövde, ardından tek transaction'da binlerce satır |
-| `GET .../attachments/:attachmentId/content`    | 300 / dk | Varsayılanın _üstünde_: on görsel ekli bir panel açılışta on istek üretir        |
-| `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10sn | Better Auth'un kimlik endpoint'leri için yerleşik kuralı                         |
-| Diğer `/auth/*`                                | 100 / dk | Better Auth'un kendi limiter'ı — `/auth/*` Nest router'ını atlar (ADR 0004)      |
-| `GET /health`, `GET /health/ready`             | muaf     | Throttle edilen bir probe, sağlıklı bir API'yi çökmüş gösterir                   |
+| Endpoint                                       | Bütçe        | Neden                                                                                |
+| ---------------------------------------------- | ------------ | ------------------------------------------------------------------------------------ |
+| Aşağıda sayılmayan her endpoint                | 100 / dk     | Bir insanın üreteceğinin çok üstünde; script'i sınırlar                              |
+| `POST /workspaces/:workspaceId/invitations`    | 10 / dk      | Her çağrı, adresini çağıranın seçtiği bir mesajı SMTP relay'ine verir                |
+| `GET .../boards/:boardId/tasks?q=`             | 30 / dk      | `q=` bir trigram taramasıdır; aynı route `q=` olmadan varsayılanda kalır             |
+| `POST .../tasks/:taskId/attachments`           | 20 / dk      | Tek bir isteğin `ATTACHMENT_MAX_BYTES` kadar diske mal olabildiği tek uç             |
+| `POST .../tasks/:taskId/attachments` (bayt)    | 256 MiB / dk | `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`: aynı route'un bir de bayt bütçesi var, aşağıda |
+| `POST /workspaces/:workspaceId/imports/trello` | 3 / dk       | Heap'e ayrıştırılan 20 MiB'lık gövde, ardından tek transaction'da binlerce satır     |
+| `GET .../attachments/:attachmentId/content`    | 300 / dk     | Varsayılanın _üstünde_: on görsel ekli bir panel açılışta on istek üretir            |
+| `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10sn     | Better Auth'un kimlik endpoint'leri için yerleşik kuralı                             |
+| Diğer `/auth/*`                                | 100 / dk     | Better Auth'un kendi limiter'ı — `/auth/*` Nest router'ını atlar (ADR 0004)          |
+| `GET /health`, `GET /health/ready`             | muaf         | Throttle edilen bir probe, sağlıklı bir API'yi çökmüş gösterir                       |
 
-**Yükleme bütçesi yeterliymiş gibi sunulmuyor, yetersiz diye adlandırılıyor.** Throttler IP
-başına, route başına istek sayar; bu bir yükleme için iki kez yanlış birimdir: yirmi 25 MiB'lık
-istek ile yirmi 10 kB'lık istek aynı bütçeyi harcar, ve tek bir NAT arkasındaki ofis tek bir
-kovayı paylaşır. Gerçek tavan, dosya başına boyut limiti artı [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)
+**Yükleme istek bütçesi yeterliymiş gibi sunulmuyor, yetersiz diye adlandırılıyor.** Throttler
+IP başına, route başına istek sayar; bu bir yükleme için iki kez yanlış birimdir: yirmi 25
+MiB'lık istek ile yirmi 10 kB'lık istek aynı bütçeyi harcar, ve tek bir NAT arkasındaki ofis tek
+bir kovayı paylaşır. Eksik olan birim bayttı ve 2026-08-21'den beri route onu da düşüyor:
+`ATTACHMENT_UPLOAD_BYTES_PER_MINUTE` (varsayılan `268435456`, 256 MiB, yaklaşık on tam boy
+yükleme; `0` kapatır) bir istemci IP'sinin sabit bir dakikada route'a gönderebileceği en fazla
+bayttır. Düşülen miktar isteğin `Content-Length`'idir ve gövde okunmadan önce alınır; reddedilen
+istek API'ye heap'e mal olmaz. Uzunluk bildirmeyen bir multipart istek `ATTACHMENT_MAX_BYTES`
+kadar düşülür; JSON gövde (hiçbir şey saklamayan bir LINK) hiç düşülmez. Bütçe aşımı, istek
+throttle'ının `429`'u `"Too Many Requests"` taşırken `error: "Upload Budget Exceeded"` taşıyan
+bir `429`'dur; yanında dakikanın kalanını söyleyen `Retry-After` vardır. İstemciler `statusCode`
+ile `error` üzerinden dallanır, asla `message` üzerinden değil ([Hatalar](#hatalar)). Bütçe,
+istek throttle'ıyla aynı istemci IP'sine göre anahtarlanır, `RATE_LIMIT_ENABLED`'a uyar,
+sayaçlarını `REDIS_URL` ayarlıyken Redis'te tutar ve Redis hatasında tıpkı aşağıdaki `/auth/*`
+limiter'ı gibi süreç başına sayaca düşer. NAT şerhi hâlâ geçerlidir. Toplamı sınırlayan şey ise
+dosya başına boyut limiti artı [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)
 bölümünde anlatılan workspace başına ve instance başına kotalardır ([ADR 0027](decisions/0027-attachment-quotas.md)).
 **Import bütçesi de aynı dürüstlük şerhi altında ve tam da bu yüzden daha
 düşük ayarlı:** üç istek, yükleme bütçesinin epey altında, çünkü tek bir import isteği 20 MiB'lık
@@ -732,9 +745,9 @@ bir header'a yönlendirir. `TRUST_PROXY=true`, hiçbir doğrulama yapmadan ileti
 tamamına güvenir ve yalnızca API proxy dışında erişilemezken kullanılmalıdır — doğrudan
 expose edilen bir kurulumda her saldırgana sınırsız bütçe verir.
 
-`RATE_LIMIT_ENABLED=false` her iki limiter'ı da kapatır. Tek bir adresten route başına
-yüzlerce istek süren entegrasyon testleri için vardır; bunu ayarlayan bir deployment'ın
-brute-force tavanı yoktur.
+`RATE_LIMIT_ENABLED=false` her iki limiter'ı ve yükleme bayt bütçesini kapatır. Tek bir adresten
+route başına yüzlerce istek süren entegrasyon testleri için vardır; bunu ayarlayan bir
+deployment'ın brute-force tavanı yoktur.
 
 ## Pagination
 
