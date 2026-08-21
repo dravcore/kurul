@@ -16,19 +16,18 @@ items of the 2026-08-13 local audit dashboard (now deleted). Task-level work liv
 
 ## Next 2 weeks
 
-Three P0 items **gate the `v0.3.0` tag**, one row each in the
+Two P0 items **gate the `v0.3.0` tag**, one row each in the
 [Hardening track](#hardening-track); the announcement wave waits for Phase 1 (demo +
 templates) on purpose. Email notifications are a target, not a gate: if they slip, they
 ship in `v0.3.1`.
 
 | #   | Item                                                                                                                           | Gate?          |
 | --- | ------------------------------------------------------------------------------------------------------------------------------ | -------------- |
-| 1   | Stale `shared-types/dist` trap: alias `@kurul/*` to `src` in vitest/jest so tests never read stale build output                | gates `v0.3.0` |
-| 2   | Attachment quotas: finite defaults with **no** env set (proven by a 413 API test) + byte-based upload throttling               | gates `v0.3.0` |
-| 3   | Trello import validated against ≥2 **real** (anonymised) Trello exports — fixtures are synthetic today                         | gates `v0.3.0` |
-| 4   | PR-time Docker image build + Trivy CVE scan in CI; pin `mailpit` by digest                                                     | —              |
-| 5   | Email notifications ([#255](https://github.com/dravcore/kurul/discussions/255)): route Notification rows to the mail transport | target         |
-| 6   | Cut the `v0.3.0` tag once the three gates are green; hold the announcement for Phase 1                                         | —              |
+| 1   | Attachment quotas: finite defaults with **no** env set (proven by a 413 API test) + byte-based upload throttling               | gates `v0.3.0` |
+| 2   | Trello import validated against ≥2 **real** (anonymised) Trello exports — fixtures are synthetic today                         | gates `v0.3.0` |
+| 3   | PR-time Docker image build + Trivy CVE scan in CI; pin `mailpit` by digest                                                     | —              |
+| 4   | Email notifications ([#255](https://github.com/dravcore/kurul/discussions/255)): route Notification rows to the mail transport | target         |
+| 5   | Cut the `v0.3.0` tag once the two gates are green; hold the announcement for Phase 1                                           | —              |
 
 **Policy, from 2026-08-21:** external contributions are accepted again under plain AGPL-3.0
 with nothing to sign, and revenue comes from an optional hosted service rather than a
@@ -38,7 +37,6 @@ commercial license ([ADR 0028](docs/decisions/0028-open-contributions-hosted-ser
 
 | Item                                                                                                                                                                                                                                                                                                                                                                       | Prio | Effort | Depends on                 | Acceptance criterion                                                                                                                                                                                     |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Alias `@kurul/shared-types` / `@kurul/auth-access` to `src` in vitest + jest                                                                                                                                                                                                                                                                                               | P0   | S      | —                          | `pnpm test` leaves the full api and web suites green on a fresh checkout with `packages/*/dist` deleted, and needs no manual build step                                                                  |
 | Attachment quota safe defaults + byte-budget upload throttling                                                                                                                                                                                                                                                                                                             | P0   | S      | SEC-02 quota engine (#279) | Unset envs still yield a finite instance/workspace quota (413 proven by API test); one client cannot exceed the documented byte/min budget; defaults written in [self-hosting.md](docs/self-hosting.md)  |
 | Trello import verified against ≥2 real (anonymised) Trello exports                                                                                                                                                                                                                                                                                                         | P0   | M      | ADR 0025 mapping           | At least two anonymised real Trello exports import end to end in an integration test; the field-mapping diffs against the synthetic fixtures are recorded in `apps/api/test/fixtures/trello/README.md`   |
 | PR-time image build + Trivy scan; `mailpit` pinned by digest                                                                                                                                                                                                                                                                                                               | P1   | M      | watch OPS-10 trigger       | Every `develop` PR builds api+web images; HIGH/CRITICAL findings fail the job; e2e mailpit pinned to a sha256 digest                                                                                     |

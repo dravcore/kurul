@@ -71,21 +71,27 @@ repository kökünden çalıştırın — asla `apps/api` veya `apps/web` içind
 typecheck'ten geçmez ve build olmaz.
 
 `packages/shared-types` ve `packages/auth-access` build edilmiş `dist/` dizinlerinden tüketilir
-ve o dizinler de aynı sebeple git-ignore'ludur; dolayısıyla temiz bir klonda, paylaşılan bir
-tipi import eden herhangi bir şey koşmadan önce bunların build edilmesi gerekir:
+ve o dizinler de aynı sebeple git-ignore'ludur; dolayısıyla temiz bir klonda `pnpm dev`,
+`pnpm db:seed`, `nest build` veya `next build` koşmadan önce bunların build edilmesi gerekir:
 
 ```bash
 pnpm -r --filter @kurul/shared-types --filter @kurul/auth-access build
 ```
 
-Bu adımı atlamak yardımcı bir hata üretmez. `pnpm test`, paylaşılan bir tipi import eden her
-dosyada `Failed to resolve entry for package "@kurul/shared-types"` ile düşer; `pnpm dev`,
-`apps/api` içinde `TS2307: Cannot find module '@kurul/shared-types'` ile düşer; `pnpm
-db:seed` ise veritabanına hiç ulaşamadan `Cannot find module
-'.../@kurul/auth-access/dist/cjs/index.js'` ile ölür — hepsi eksik bir build'den çok bozuk
-bir checkout gibi okunur. `pnpm build` ve `pnpm typecheck` bunu yan etki olarak zaten yapar;
-`pnpm dev`, `pnpm db:seed`, `pnpm test` ve `pnpm lint` yapmaz. CI bunları hem lint hem test
-job'ından önce açıkça build eder.
+Bu adımı atlamak yardımcı bir hata üretmez. `pnpm dev`, `apps/api` içinde `TS2307: Cannot
+find module '@kurul/shared-types'` ile düşer; `pnpm db:seed` ise veritabanına hiç ulaşamadan
+`Cannot find module '.../@kurul/auth-access/dist/cjs/index.js'` ile ölür; ikisi de eksik bir
+build'den çok bozuk bir checkout gibi okunur. `pnpm build` ve `pnpm typecheck` bunu yan etki
+olarak zaten yapar; `pnpm dev`, `pnpm db:seed` ve `pnpm lint` yapmaz. CI bunları lint
+job'ından önce açıkça build eder, çünkü `pnpm typecheck` orada koşar.
+
+Test suite'leri bunun istisnasıdır. Jest (`apps/api`, unit ve integration) ve Vitest
+(`apps/web`, `packages/auth-access`) iki paketi de `src/index.ts` dosyalarına eşler; bu yüzden
+`pnpm test` hiç `dist` olmayan bir checkout'ta geçer ve asla bayat bir build'e karşı koşmaz.
+CI'daki test job'ı da bu sebeple build adımını bilerek atlar. Bayat build iki arızanın kötü
+olanıdır, çünkü çözümlenir: son build'den sonra eklenen bir enum her tüketicide `undefined`
+olarak okunur. `pnpm dev` ve `pnpm db:seed` hâlâ `dist` üzerinden gider; bu yüzden iki
+paketten birine gelen bir değişikliği çektikten sonra yeniden build edin.
 
 ## Ortam değişkenleri
 
