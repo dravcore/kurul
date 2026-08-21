@@ -87,7 +87,8 @@ kaçıran ilk silmede sapar ve burada her toplu silme onu yapısal olarak kaçı
 `Workspace → Board → Task` cascade'i tamamen Postgres içinde, hiçbir uygulama kodu çalışmadan
 iner (orphan süpürmesini zaten zorunlu kılan aynı özellik, ADR 0022). Canlı satırlar üzerindeki
 toplam, her cascade'den sonra tanım gereği doğrudur. Bunun için indeks eklenmedi — önce-ölç
-emsali ([ADR 0017](0017-partial-indexes-outside-prisma-schema.md)): aggregate mevcut ilişki
+emsali ([ADR 0020](0020-data-retention.md)'nin #187 güncellemesi ve ondan önceki
+`drop_unused_indexes` migration'ı): aggregate mevcut ilişki
 join'ine biner, yüklemeler 20/dk/IP ile sınırlıdır ve denetim yapılandırılmamış instance'larda
 hiç çalışmaz. Bir indeks yerini korkuyla değil ölçümle kazanır.
 

@@ -417,4 +417,4 @@ edilebilir kılan da budur.
 - [coding-standards.md](coding-standards.md) — testlerin varsaydığı kod konvansiyonları
 - [api-conventions.md](api-conventions.md) — assert edilecek status kodları ve hata şekilleri
 - [git-strategy.md](git-strategy.md) — PR gereksinimleri
-- [roadmap.md](roadmap.md) — MVP durumu ve Beyond MVP
+- [../../ROADMAP.md](../../ROADMAP.md) — MVP durumu ve Beyond MVP

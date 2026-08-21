@@ -89,7 +89,7 @@ Kurul sends one class of transactional email so far: the verification link an in
 `messages/<locale>.json` rather than being hardcoded. Locale resolution is
 `User.locale → locale cookie → Accept-Language → 'en'` ([ADR 0018](decisions/0018-localization-strategy.md));
 **Settings → Language** can set a preference or “Match my browser”. English is still the only
-catalog on offer — additional UI language packs remain [Beyond MVP](roadmap.md#beyond-mvp).
+catalog on offer — additional UI language packs remain [Beyond MVP](../ROADMAP.md#beyond-mvp).
 
 ### File uploads — `multer` + `file-type`
 
@@ -130,7 +130,7 @@ Projects worth studying for architecture and data modelling:
 
 ## 5. Decision records
 
-Stack and product ADRs are indexed in [decisions/README.md](decisions/README.md) (0001–0019).
+Stack and product ADRs are indexed in [decisions/README.md](decisions/README.md) (0001-0028).
 Start there rather than duplicating the table here.
 
 Related: [architecture.md](architecture.md) · [archive/project-skeleton.md](archive/project-skeleton.md) (historical Phase 1 scaffold)

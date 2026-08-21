@@ -12,8 +12,8 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı) — auth/workspace’ler, board ve
 task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Bkz.
-[docs/roadmap.md](docs/tr/roadmap.md). Kritik tarayıcı akışlarını yedi senaryoluk bir
-Playwright smoke paketi kapsıyor ([docs/testing.md](docs/tr/testing.md#browser-uçtan-uca)).
+[ROADMAP.md](ROADMAP.md). Kritik tarayıcı akışlarını yedi senaryoluk bir
+Playwright smoke paketi kapsıyor ([docs/tr/testing.md](docs/tr/testing.md#browser-uçtan-uca)).
 MVP ötesi maddeler (e-posta bildirimleri, presence, ek diller, …) hâlâ MVP ötesi altında
 listelenir.
 
@@ -48,8 +48,9 @@ self-host seçenekleriyle kıyaslar. Bugün o alanın durumu:
 Kurul'un cevabı bilinçli olarak dar:
 
 - **Tek lisans, tek katman.** Kod tabanının tamamı AGPL-3.0, hiçbir şey saklı değil. Ticari
-  model, aynı kodun ikili lisanslanması; ücretli bir özellik sürümü değil
-  ([ADR 0014](docs/tr/decisions/0014-dual-licensing-cla.md)).
+  model isteğe bağlı bir barındırma servisi; ücretli bir özellik sürümü değil. Kendi sunucunuzda
+  çalıştırmak ücretsiz ve eksiksiz
+  ([ADR 0028](docs/tr/decisions/0028-open-contributions-hosted-service.md)).
 - **Güncel stack, tek compose dosyası.** Next.js 16 / NestJS 11 / PostgreSQL 18, uçtan uca
   TypeScript, tamamı için `docker compose pull && docker compose up -d` — yayınlanmış
   image'lar, lokal build gerekmiyor.
@@ -60,13 +61,13 @@ Ve `v0.2.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, public API to
 webhook'lar yok. UI hem İngilizce hem Türkçe konuşuyor — her arayüz metni, yeni bir board'un
 başladığı column adları ve size gönderdiğimiz e-posta dahil — ve üçüncü bir dil bir katalog
 uzakta. API token'ları, webhook'lar ve ek dil paketleri
-[MVP ötesi](docs/tr/roadmap.md#mvp-ötesi) altında, her biri kendisini bekleten açık soruyla
+[MVP ötesi](ROADMAP.md#beyond-mvp) altında, her biri kendisini bekleten açık soruyla
 listeli; subtask ve zaman takibi ise o listede hiç yok. Bunlara bugün ihtiyacınız varsa
 yukarıdaki daha olgun projelerden biri daha iyi bir seçim.
 
 ## Özellikler
 
-MVP’de gelenler — sıralama geçmişi için [docs/roadmap.md](docs/tr/roadmap.md):
+MVP’de gelenler — sıralama geçmişi için [ROADMAP.md](ROADMAP.md):
 
 - **Board'lar ve kolonlar** — sürükle-bırakla yeniden sıralanabilen klasik Kanban düzeni
 - **Task'lar** — çoklu atanan kişi, label'lar, (label'lardan bağımsız tutulan) priority,
@@ -239,18 +240,16 @@ Beş dakikalık harita (EN kanonik): **[docs/README.md](docs/README.md)**. Türk
 | [docs/tr/design.md](docs/tr/design.md)                   | UI/UX dili                           |
 | [docs/tr/development.md](docs/tr/development.md)         | Yerel kurulum ve günlük komutlar     |
 | [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST, hatalar, pagination            |
-| [docs/tr/roadmap.md](docs/tr/roadmap.md)                 | MVP bitti; Beyond MVP listesi        |
+| [ROADMAP.md](ROADMAP.md) (İngilizce)                     | MVP bitti; Beyond MVP listesi        |
 | [docs/tr/decisions/](docs/tr/decisions/)                 | ADR’ler                              |
 | [docs/archive/](docs/archive/)                           | Tarihsel spec / plan / faz checklist |
 
 ## Katkıda bulunma
 
-Hata bildirimleri, özellik fikirleri ve tasarım geri bildirimi hoş karşılanıyor ve gerçekten
-faydalı. **Dışarıdan gelen kod, doküman ve çeviri pull request'leri kabul edilmiyor** — kod
-tabanı belirsiz süreyle tek yazarlı kalıyor
-([ADR 0015](docs/tr/decisions/0015-no-external-contributions.md)).
-Kurul issue-first çalışıyor: uygulamaya geçmeden önce öner. Süreç için
-[CONTRIBUTING.md](CONTRIBUTING.md)'ye, birlikte nasıl çalıştığımız için ise
+Hata bildirimleri, özellik fikirleri ve pull request'ler hoş karşılanıyor: kod, doküman ve
+çeviri, hepsi. Kurul issue-first çalışıyor; önemsiz olmayan bir işe başlamadan önce bir issue
+açın ya da mevcut olanı bulun ve onaylanmasını bekleyin. Süreç için
+[CONTRIBUTING.md](CONTRIBUTING.md)'ye (İngilizce), birlikte nasıl çalıştığımız için ise
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)'ye bakın.
 
 ## Topluluk
@@ -258,22 +257,14 @@ Kurul issue-first çalışıyor: uygulamaya geçmeden önce öner. Süreç için
 **Resmî kanal [GitHub Discussions](https://github.com/dravcore/kurul/discussions).**
 Trafiği üç kategori taşıyor:
 
-| Kategori                                                                                | Ne için                                                                                                                                                     |
-| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Kurulum, self-hosting ve kullanım soruları — hata bildirimi olmayan her şey                                                                                 |
-| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Yol haritası geri bildirimi. Her [MVP ötesi](docs/tr/roadmap.md#mvp-ötesi) satırının burada bir discussion'ı var — istediğinizi oylayın ya da yenisini açın |
-| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | Onunla ne kurduğunuz ve board'unuzun neye benzediği                                                                                                         |
+| Kategori                                                                                | Ne için                                                                                                                                              |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Kurulum, self-hosting ve kullanım soruları — hata bildirimi olmayan her şey                                                                          |
+| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Yol haritası geri bildirimi. Her [MVP ötesi](ROADMAP.md#beyond-mvp) satırının burada bir discussion'ı var — istediğinizi oylayın ya da yenisini açın |
+| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | Onunla ne kurduğunuz ve board'unuzun neye benzediği                                                                                                  |
 
 Tekrarlanabilir hatalar yine [issue](https://github.com/dravcore/kurul/issues), güvenlik
 açıkları ise ikisi yerine [SECURITY.md](SECURITY.md).
-
-**Buraya vakit ayırmadan önce bilinmesi gereken tek şey, sonradan keşfedilmek yerine açıkça
-söyleniyor: dışarıdan gelen pull request'ler kabul edilmiyor** — kod değil, doküman değil,
-çeviri değil, ve bunun bir bitiş tarihi yok
-([ADR 0015](docs/tr/decisions/0015-no-external-contributions.md)). Bu, bu kod tabanını kimin
-sürdürdüğüne dair bilinçli bir tercih; herhangi bir yamaya dair bir yargı değil. Ideas
-kategorisi de tam bu yüzden var: ihtiyacınızı **tarif etmek** açık olan katkı yolu, ve bu
-gerçek bir yol. Üzerinde oy biriken bir fikir, bu projenin aldığı en güçlü sinyaldir.
 
 ## Güvenlik
 
@@ -283,8 +274,10 @@ Bir güvenlik açığı bildirmek için [SECURITY.md](SECURITY.md)'ye bakın.
 
 [AGPL-3.0](LICENSE) — kod tabanının tamamı, tek katman, hiçbir şey saklı değil.
 
-**Ticari lisans mevcut.** AGPL-3.0'ın koşulları her kuruma uymaz; aynı kod, sizi bu
-koşullardan muaf tutan bir ticari lisansla da sunuluyor. **licensing@dravcore.com** adresine
-yazın. Bunun satın aldığı şey, zaten okuyabildiğiniz kod üzerinde farklı koşullar — ücretli
-bir sürüm yok, bunun için saklanan bir özellik yok, hosted SaaS yok
-([ADR 0014](docs/tr/decisions/0014-dual-licensing-cla.md)).
+Kurul'u kendi sunucunuzda çalıştırmak sonsuza kadar ücretsiz. Kendi kurduğunuz bir instance'tan
+hiçbir şey esirgenmiyor, open core yok, ayrıca satılan bir sürüm de yok. Dravcore'un para
+istediği tek şey isteğe bağlı bir barındırma servisi: bizim sunucularımızda bir hesap,
+yayınlanmış limitlerin (koltuk, board, depolama) içinde ücretsiz, üzerinde ücretli. O servis de
+bu depodaki aynı AGPL-3.0 kodunu çalıştırıyor, plan limitleri ve faturalama dahil; yani kendi
+instance'ını çalıştıran herkes o limitleri kendi belirleyebilir ya da tümüyle kapatabilir
+([ADR 0028](docs/tr/decisions/0028-open-contributions-hosted-service.md)).

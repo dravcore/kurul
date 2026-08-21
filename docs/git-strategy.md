@@ -385,7 +385,7 @@ that SemVer's guarantees are weaker before 1.0.
 - MINOR: backwards-compatible feature.
 - PATCH: backwards-compatible fix.
 
-1.0.0 is cut when the MVP feature set in [roadmap.md](roadmap.md) is complete and the REST
+1.0.0 is cut when the MVP feature set in [ROADMAP.md](../ROADMAP.md) is complete and the REST
 API is considered stable enough to promise compatibility.
 
 API versioning stance (no `/v1` prefix before 1.0) is covered in
@@ -410,6 +410,6 @@ API versioning stance (no `/v1` prefix before 1.0) is covered in
 - [development.md](development.md) — environment setup and the day-to-day loop
 - [coding-standards.md](coding-standards.md) — what reviewers check in a PR
 - [testing.md](testing.md) — what CI runs on every PR
-- [roadmap.md](roadmap.md) — what a release contains
+- [../ROADMAP.md](../ROADMAP.md) — what a release contains
 - [decisions/0008-git-flow-semver.md](decisions/0008-git-flow-semver.md) — why Git Flow and
   SemVer were chosen

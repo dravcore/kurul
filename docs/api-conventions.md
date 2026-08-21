@@ -680,8 +680,10 @@ running hot never spends another endpoint's allowance.
 **The upload budget is named as insufficient rather than presented as enough.** The throttler
 counts requests per IP per route, which is the wrong unit twice for an upload: twenty 25 MiB
 requests and twenty 10 kB requests spend the same allowance, and an office behind one NAT
-shares a single bucket. The real ceiling is the per-file size limit, plus a per-workspace quota
-that does not exist yet (ADR 0022). **The import budget is under the same honest caveat and set
+shares a single bucket. The real ceiling is the per-file size limit, plus the per-workspace
+and per-instance quotas described under
+[File uploads and downloads](#file-uploads-and-downloads) ([ADR 0027](decisions/0027-attachment-quotas.md)).
+**The import budget is under the same honest caveat and set
 lower for it:** three requests is well below the upload budget because one import request costs a
 20 MiB parse plus the longest-lived write transaction in this API, and a throttler that counts
 requests cannot tell a four-card board from a five-hundred-card one.
@@ -928,8 +930,7 @@ needed rather than pre-emptively.
 
 ## See also
 
-- [architecture.md](architecture.md) — module map, socket contract
+- [architecture.md](architecture.md) — module map, data model, socket contract
 - [coding-standards.md](coding-standards.md) — DTOs, validation, module boundaries
 - [testing.md](testing.md) — what endpoint tests assert
 - [git-strategy.md](git-strategy.md) — SemVer and changelog policy
-- [project-skeleton.md](project-skeleton.md) — data model these resources map to

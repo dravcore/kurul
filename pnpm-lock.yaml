@@ -193,9 +193,6 @@ importers:
       ts-jest:
         specifier: ^29.2.6
         version: 29.4.12(@babel/core@7.29.7)(@jest/transform@30.4.1)(@jest/types@30.4.1)(babel-jest@30.4.1(@babel/core@7.29.7))(jest-util@30.4.1)(jest@30.4.2(@types/node@26.2.0)(ts-node@10.9.2(@swc/core@1.16.0)(@types/node@26.2.0)(typescript@5.9.3)))(typescript@5.9.3)
-      tsx:
-        specifier: ^4.23.12
-        version: 4.23.12
       typescript:
         specifier: ^5.8.2
         version: 5.9.3

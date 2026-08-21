@@ -413,4 +413,4 @@ failure diagnosable the next morning without reproducing it.
 - [coding-standards.md](coding-standards.md) — code conventions tests assume
 - [api-conventions.md](api-conventions.md) — status codes and error shapes to assert on
 - [git-strategy.md](git-strategy.md) — PR requirements
-- [roadmap.md](roadmap.md) — MVP status and Beyond MVP
+- [../ROADMAP.md](../ROADMAP.md) — MVP status and Beyond MVP

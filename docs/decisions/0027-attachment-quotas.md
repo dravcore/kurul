@@ -85,9 +85,10 @@ the first time a delete misses it, and here every bulk delete misses it by const
 `Workspace → Board → Task` cascades entirely inside Postgres with no application code running
 (the exact property that already forces the orphan sweep, ADR 0022). The sum over live rows is
 correct by definition after any cascade. No index is added for it — the measure-first precedent
-([ADR 0017](0017-partial-indexes-outside-prisma-schema.md)): the aggregate rides the existing
-relation join, uploads are throttled to 20/min/IP, and the check does not run at all on
-unconfigured instances. An index earns its place with a measurement, not a fear.
+([ADR 0020](0020-data-retention.md)'s #187 update and the `drop_unused_indexes` migration before
+it): the aggregate rides the existing relation join, uploads are throttled to 20/min/IP, and the
+check does not run at all on unconfigured instances. An index earns its place with a measurement,
+not a fear.
 
 **Why the quota counts rows, not disk.** The database is authoritative; the disk lags it in
 both directions (bytes written before the row commits, orphans waiting out the sweep's grace

@@ -2,6 +2,9 @@
 
 **Status:** Accepted
 **Date:** 2026-08-12
+**Updated:** 2026-08-21: both key counts below are snapshots from different moments and have
+since moved together: `en.json` and `tr.json` each carry 514 leaf keys today, still equal to each
+other as the catalogue-parity gate requires.
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0018-localization-strategy.md)
 

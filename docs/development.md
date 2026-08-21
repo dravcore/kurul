@@ -33,7 +33,7 @@ bug and gets fixed in the same PR.
 
 - Layout and module map: [architecture.md](architecture.md#2-monorepo-layout)
 - Data model and critical field rules: [architecture.md](architecture.md#critical-field-rules)
-- Phase progress (MVP complete): [roadmap.md](roadmap.md)
+- Phase progress (MVP complete): [ROADMAP.md](../ROADMAP.md)
 - Why each tool was chosen: [tech-stack.md](tech-stack.md)
 
 ## Prerequisites
@@ -524,9 +524,10 @@ Every service in both compose files runs with the full Linux capability set drop
 the top of each file. A default container capability set — `CAP_NET_RAW`, `CAP_SYS_PTRACE`,
 `CAP_CHOWN`, and a dozen others — is attack surface regardless of which OS user the process
 runs as: a code-execution bug inherits whatever the kernel handed the container, not
-whatever the application dropped on its own initiative. This is the second half of SEC-02
-(`audit/findings/security.md`); the first half — `USER node` in both Dockerfiles' runner
-stages, so `api`/`web` don't run as root in the first place — landed in PR #109.
+whatever the application dropped on its own initiative. This is the second half of the
+2026-08-13 audit's SEC-02 finding, since folded into [ROADMAP.md](../ROADMAP.md#hardening-track);
+the first half — `USER node` in both Dockerfiles' runner stages, so `api`/`web` don't run as
+root in the first place — landed in PR #109.
 
 A capability is re-added only where a service was actually run with just the drop and
 observed to fail, never because it "seems like it might need it." The comments beside each
@@ -566,8 +567,8 @@ no-password cases.
 
 Out of scope for this hardening pass: a read-only root filesystem (`read_only: true`) and
 seccomp profiles. Both are stricter constraints that need a per-service audit of which
-paths must stay writable (temp dirs, node's own `/tmp` use, etc.) — tracked as a follow-up,
-not bundled in here.
+paths must stay writable (temp dirs, node's own `/tmp` use, etc.); tracked as a follow-up
+in [ROADMAP.md](../ROADMAP.md#hardening-track), not bundled in here.
 
 ## pnpm scripts
 
@@ -738,7 +739,7 @@ stopped running.
 
 `CLEANUP_ENABLED=false` disables the sweep completely, at the point of deletion rather than
 only at startup — a job definition left in Redis by an earlier deployment cannot outlive the
-switch. The integration suite runs with it off (`test/setup-e2e.ts`) and turns it on around
+switch. The integration suite runs with it off (`apps/api/test/setup-e2e.ts`) and turns it on around
 its own assertions; a global scheduled `DELETE` is not something you want running in the
 background of a suite whose fixtures are backdated rows.
 
@@ -1511,7 +1512,7 @@ specified in [git-strategy.md](git-strategy.md).
 - [architecture.md](architecture.md) — the module map and critical field rules this
   document is the contract for
 - [self-hosting.md](self-hosting.md) — putting a release on your own domain: DNS, HTTPS, SMTP
-- [roadmap.md](roadmap.md) — phase order
+- [../ROADMAP.md](../ROADMAP.md) — phase order
 - [git-strategy.md](git-strategy.md) — branches, commits, releases
 - [coding-standards.md](coding-standards.md) — how the code inside these apps is written
 - [testing.md](testing.md) — how to run and write tests

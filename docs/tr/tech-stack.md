@@ -167,7 +167,7 @@ asla gerçek mail göndermemesi için lokal bir SMTP catch-all olarak
 `User.locale → locale cookie → Accept-Language → 'en'`
 ([ADR 0018](decisions/0018-localization-strategy.md)); **Ayarlar → Dil** tercih veya
 “Tarayıcımı izle” seçebilir. Katalog hâlâ yalnızca İngilizce — ek UI dil paketleri
-[MVP ötesi](roadmap.md#mvp-ötesi).
+[MVP ötesi](../../ROADMAP.md#beyond-mvp).
 
 ### Dosya yükleme — `multer` + `file-type`
 
@@ -221,7 +221,7 @@ Mimari ve veri modelleme için incelemeye değer projeler:
 
 ## 5. Karar kayıtları
 
-Stack ve ürün ADR'leri [decisions/README.md](decisions/README.md) indeksinde (0001–0019).
+Stack ve ürün ADR'leri [decisions/README.md](decisions/README.md) indeksinde (0001-0028).
 Tabloyu burada çoğaltmak yerine oradan başlayın.
 
 İlgili: [architecture.md](architecture.md) · [../archive/project-skeleton.md](../archive/project-skeleton.md) (tarihsel Faz 1 iskeleti)

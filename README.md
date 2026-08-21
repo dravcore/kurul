@@ -12,7 +12,7 @@ Open-source, Kanban-focused project management tool.
 
 Kurul’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards) — auth/workspaces, boards and
 tasks, filtering, dashboard, activity/notifications, and realtime board sync. See
-[docs/roadmap.md](docs/roadmap.md). A seven-scenario Playwright smoke pack covers the critical
+[ROADMAP.md](ROADMAP.md). A seven-scenario Playwright smoke pack covers the critical
 browser flows ([docs/testing.md](docs/testing.md#browser-end-to-end)). Beyond-MVP items (email
 notifications, presence, extra locales, …) remain listed under Beyond MVP.
 
@@ -46,8 +46,8 @@ self-hostable options. Where that field stands today:
 Kurul's answer is deliberately narrow:
 
 - **One license, one tier.** AGPL-3.0 for the whole codebase, nothing held back. The commercial
-  model is dual licensing of that same code, not a paid feature build
-  ([ADR 0014](docs/decisions/0014-dual-licensing-cla.md)).
+  model is an optional hosted service, not a paid feature build: self-hosting stays free and
+  complete ([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md)).
 - **Current stack, one compose file.** Next.js 16 / NestJS 11 / PostgreSQL 18, TypeScript end to
   end, `docker compose pull && docker compose up -d` for the whole thing — published images, no
   local build required.
@@ -58,13 +58,13 @@ And what it is not, at `v0.2.0`: no subtasks, no time tracking, no public API to
 webhooks. The UI speaks English and Turkish — every interface string, the columns a new board
 is seeded with, and the email we send you — and a third language is a catalog away. API tokens,
 webhooks and further language packs are listed under
-[Beyond MVP](docs/roadmap.md#beyond-mvp), each with the open question holding it up; subtasks
+[Beyond MVP](ROADMAP.md#beyond-mvp), each with the open question holding it up; subtasks
 and time tracking are not on that list at all. If you need them today, one of the more mature
 projects above is the better choice.
 
 ## Features
 
-Shipped in the MVP — sequencing history in [docs/roadmap.md](docs/roadmap.md):
+Shipped in the MVP — sequencing history in [ROADMAP.md](ROADMAP.md):
 
 - **Boards and columns** — classic Kanban layout with drag-and-drop reordering
 - **Tasks** — multi-assignee, labels, priority (kept independent of labels), due date and
@@ -232,40 +232,30 @@ product, coding, API, releases, roadmap).
 | [docs/design.md](docs/design.md)                   | UI/UX language                            |
 | [docs/development.md](docs/development.md)         | Local setup and daily commands            |
 | [docs/api-conventions.md](docs/api-conventions.md) | REST, errors, pagination                  |
-| [docs/roadmap.md](docs/roadmap.md)                 | MVP done; beyond-MVP backlog              |
+| [ROADMAP.md](ROADMAP.md)                           | MVP done; beyond-MVP backlog              |
 | [docs/decisions/](docs/decisions/)                 | ADRs                                      |
 | [docs/archive/](docs/archive/)                     | Historical specs, plans, phase checklists |
 
 ## Contributing
 
-Bug reports, feature ideas, and design feedback are welcome and genuinely useful. **Outside
-code, documentation, and translation pull requests are not accepted** — the codebase stays
-single-authored, indefinitely ([ADR 0015](docs/decisions/0015-no-external-contributions.md)).
-Kurul is issue-first: propose before you implement. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for the process, and
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work together.
+Bug reports, feature ideas, and pull requests are all welcome: code, documentation and
+translations alike. Kurul is issue-first, so propose before you implement and get the issue
+acknowledged before you start non-trivial work. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+process, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work together.
 
 ## Community
 
 **[GitHub Discussions](https://github.com/dravcore/kurul/discussions) is the official channel.**
 Three categories carry the traffic:
 
-| Category                                                                                | For                                                                                                                                     |
-| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Setup, self-hosting and usage questions — anything that is not a bug report                                                             |
-| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Roadmap feedback. Every [Beyond MVP](docs/roadmap.md#beyond-mvp) row has a discussion here — upvote the one you want, or open a new one |
-| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | What you built with it, and what your board looks like                                                                                  |
+| Category                                                                                | For                                                                                                                                |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Setup, self-hosting and usage questions — anything that is not a bug report                                                        |
+| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Roadmap feedback. Every [Beyond MVP](ROADMAP.md#beyond-mvp) row has a discussion here — upvote the one you want, or open a new one |
+| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | What you built with it, and what your board looks like                                                                             |
 
 Reproducible bugs are still [issues](https://github.com/dravcore/kurul/issues), and
 vulnerabilities go to [SECURITY.md](SECURITY.md) rather than either.
-
-**One thing to know before you invest time here, stated plainly rather than discovered later:
-outside pull requests are not accepted** — not code, not documentation, not translations, and
-this has no end date ([ADR 0015](docs/decisions/0015-no-external-contributions.md)). It is a
-deliberate choice about who maintains this codebase, not a judgement about any particular
-patch, and it is why the Ideas category exists: **describing** what you need is the
-contribution path that is open, and it is a real one. An idea with upvotes on it is the
-strongest signal this project takes.
 
 ## Security
 
@@ -275,8 +265,10 @@ See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 [AGPL-3.0](LICENSE) — the entire codebase, one tier, nothing held back.
 
-**A commercial license is available.** AGPL-3.0's terms do not suit every organization; the
-same code is also offered under a commercial license that exempts you from them. Write to
-**licensing@dravcore.com**. What that buys is different terms on the code you can already
-read — there is no paid edition, no feature held back for it, and no hosted SaaS
-([ADR 0014](docs/decisions/0014-dual-licensing-cla.md)).
+Kurul is free to self-host, forever. Nothing is withheld from a self-hosted instance, there is
+no open core, and no edition is sold on the side. The one thing Dravcore ever charges for is an
+optional hosted service: an account on our servers, free within published limits (seats,
+boards, storage) and paid above them. That service runs the same AGPL-3.0 code that sits in
+this repository, plan limits and billing included, so anyone running their own instance can set
+those limits or switch them off entirely
+([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md)).

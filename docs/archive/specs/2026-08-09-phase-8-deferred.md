@@ -4,7 +4,7 @@
 [phase-8 design](./2026-08-09-phase-8-activity-notifications-design.md)
 
 > **Archived.** The MVP shipped and every still-open row below has been folded into
-> [roadmap.md — Beyond MVP](../../roadmap.md#beyond-mvp) (due-soon delivery alternatives,
+> [ROADMAP.md — Beyond MVP](../../../ROADMAP.md#beyond-mvp) (due-soon delivery alternatives,
 > mentions without the picker, realtime push of notifications/activity). This file is kept for
 > the historical record and for the `CHANGELOG.md` links that point at it; do not add new rows
 > here — open an issue or extend the roadmap table instead.
@@ -51,4 +51,4 @@ re-litigated mid-implementation. Pick these up only when the MVP is shipped and 
 
 This file is archived — see the banner at the top. It is kept for historical context and
 stable `CHANGELOG.md` links, not as a place to track new follow-up work; use
-[roadmap.md — Beyond MVP](../../roadmap.md#beyond-mvp) or a GitHub issue instead.
+[ROADMAP.md — Beyond MVP](../../../ROADMAP.md#beyond-mvp) or a GitHub issue instead.

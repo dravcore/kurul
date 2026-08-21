@@ -33,7 +33,7 @@ PR’da düzeltilir.
 
 - Yerleşim ve modül haritası: [architecture.md](architecture.md#2-monorepo-yerleşimi)
 - Veri modeli ve kritik alan kuralları: [architecture.md](architecture.md#kritik-alan-kuralları)
-- Faz ilerlemesi (MVP tamam): [roadmap.md](roadmap.md)
+- Faz ilerlemesi (MVP tamam): [ROADMAP.md](../../ROADMAP.md)
 - Her aracın neden seçildiği: [tech-stack.md](tech-stack.md)
 
 ## Ön koşullar
@@ -536,9 +536,10 @@ Her iki compose dosyasındaki her servis, dosyaların başındaki `x-hardened` Y
 seti — `CAP_NET_RAW`, `CAP_SYS_PTRACE`, `CAP_CHOWN` ve bir düzine daha fazlası — hangi işletim
 sistemi kullanıcısıyla çalıştığından bağımsız olarak saldırı yüzeyidir: bir kod-çalıştırma
 açığı, uygulamanın kendi inisiyatifiyle düşürdüğü değil, kernel'in container'a verdiği her
-şeyi devralır. Bu, SEC-02'nin ikinci yarısıdır (`audit/findings/security.md`); birinci
-yarı — her iki Dockerfile'ın runner stage'inde `USER node`, yani `api`/`web`'in baştan root
-olarak çalışmaması — PR #109'da tamamlandı.
+şeyi devralır. Bu, 2026-08-13 denetiminin SEC-02 bulgusunun ikinci yarısıdır; artık
+[ROADMAP.md](../../ROADMAP.md#hardening-track)'a katıldı. Birinci yarı — her iki Dockerfile'ın
+runner stage'inde `USER node`, yani `api`/`web`'in baştan root olarak çalışmaması — PR #109'da
+tamamlandı.
 
 Bir capability yalnızca bir servis düşürülmüş haliyle gerçekten çalıştırılıp başarısız
 olduğu gözlemlendiğinde geri eklenir, "muhtemelen gerekir" diye değil. Compose
@@ -581,7 +582,8 @@ durumda değerin sağlam kaldığı bir `SET` → restart döngüsüyle doğrula
 Bu sertleştirme turunun kapsamı dışında: salt-okunur kök dosya sistemi (`read_only: true`)
 ve seccomp profilleri. İkisi de hangi yolların yazılabilir kalması gerektiğine dair
 servis-bazlı bir denetim isteyen daha katı kısıtlar (geçici dizinler, node'un kendi `/tmp`
-kullanımı vb.) — takip işi olarak izleniyor, buraya dahil edilmedi.
+kullanımı vb.); [ROADMAP.md](../../ROADMAP.md#hardening-track)'ın Hardening hattında takip
+işi olarak izleniyor, buraya dahil edilmedi.
 
 ## pnpm script'leri
 
@@ -750,7 +752,7 @@ işareti olur.
 
 `CLEANUP_ENABLED=false` süpürmeyi tamamen kapatır ve bunu yalnızca başlangıçta değil, silme
 anında yapar — daha eski bir deployment'ın Redis'te bıraktığı bir iş tanımı anahtarı
-aşamaz. Entegrasyon suite'i bu anahtar kapalı koşar (`test/setup-e2e.ts`) ve yalnızca kendi
+aşamaz. Entegrasyon suite'i bu anahtar kapalı koşar (`apps/api/test/setup-e2e.ts`) ve yalnızca kendi
 doğrulamalarının çevresinde açar; global ve zamanlanmış bir `DELETE`, fixture'ları geçmişe
 tarihlenmiş bir suite'in arka planında koşmasını isteyeceğiniz bir şey değil.
 
@@ -1536,7 +1538,7 @@ PR/release süreci [git-strategy.md](git-strategy.md)'de belirtilmiştir.
 - [architecture.md](architecture.md) — bu dokümanın kontratı olduğu modül haritası ve
   kritik alan kuralları
 - [self-hosting.md](self-hosting.md) — bir release'i kendi domain'inize kurmak: DNS, HTTPS, SMTP
-- [roadmap.md](roadmap.md) — faz sırası
+- [../../ROADMAP.md](../../ROADMAP.md) — faz sırası
 - [git-strategy.md](git-strategy.md) — branch'ler, commit'ler, release'ler
 - [coding-standards.md](coding-standards.md) — bu uygulamaların içindeki kodun nasıl
   yazıldığı

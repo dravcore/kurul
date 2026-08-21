@@ -693,8 +693,9 @@ Bütçeler **client IP'si ve route başına**, kayan bir dakikalık pencerede sa
 **Yükleme bütçesi yeterliymiş gibi sunulmuyor, yetersiz diye adlandırılıyor.** Throttler IP
 başına, route başına istek sayar; bu bir yükleme için iki kez yanlış birimdir: yirmi 25 MiB'lık
 istek ile yirmi 10 kB'lık istek aynı bütçeyi harcar, ve tek bir NAT arkasındaki ofis tek bir
-kovayı paylaşır. Gerçek tavan, dosya başına boyut limiti artı henüz var olmayan bir workspace
-kotasıdır (ADR 0022). **Import bütçesi de aynı dürüstlük şerhi altında ve tam da bu yüzden daha
+kovayı paylaşır. Gerçek tavan, dosya başına boyut limiti artı [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)
+bölümünde anlatılan workspace başına ve instance başına kotalardır ([ADR 0027](decisions/0027-attachment-quotas.md)).
+**Import bütçesi de aynı dürüstlük şerhi altında ve tam da bu yüzden daha
 düşük ayarlı:** üç istek, yükleme bütçesinin epey altında, çünkü tek bir import isteği 20 MiB'lık
 bir ayrıştırma artı bu API'nin açtığı en uzun ömürlü yazma transaction'ı demek — ve istek sayan
 bir throttler dört kartlık bir board ile beş yüz kartlık bir board'u ayırt edemez.
@@ -951,8 +952,7 @@ ihtiyaç duyulduğunda karar verilecektir.
 
 ## Ayrıca bakınız
 
-- [architecture.md](architecture.md) — modül haritası, socket kontratı
+- [architecture.md](architecture.md) — modül haritası, veri modeli, socket kontratı
 - [coding-standards.md](coding-standards.md) — DTO'lar, validation, modül sınırları
 - [testing.md](testing.md) — endpoint testlerinin neyi assert ettiği
 - [git-strategy.md](git-strategy.md) — SemVer ve changelog politikası
-- [project-skeleton.md](project-skeleton.md) — bu kaynakların eşlendiği veri modeli
