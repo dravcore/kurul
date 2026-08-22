@@ -212,6 +212,14 @@ içinde kapsanıyor.
 - **Reload'dan önceki bir drop assertion'ı hiçbir şey kanıtlamaz.** Board taşımayı optimistik
   uygular, yani bir şey kalıcılaşsa da kalıcılaşmasa da ekrandaki sıra değişir. Test,
   reload'un kendisidir.
+- **Bir Content-Security-Policy ihlali, onu gören senaryoyu kırmızıya döndürür.**
+  `e2e/support/fixtures.ts` içindeki bir `auto` fixture, her context'e bir toplayıcı takar —
+  yerleşik `page` context'ine ve `openAs`'in oluşturduğu her context'e — hem
+  `securitypolicyviolation` event'lerini hem de Chromium'un CSP konsol hatalarını okur ve
+  teardown'da listenin boş olduğunu doğrular. Bu kendi başına bir senaryo değil, çünkü bir CSP
+  hatası da öyle değil: politika script'i engeller, sayfa yine render edilir, tıklama yine
+  yerini bulur ve hiçbir senaryonun assertion'ı bunu göremez. Bu kontrol, `'unsafe-inline'`'in
+  fark edilmeden `script-src`'e geri dönmesini engelleyen şeydir (`apps/web/proxy.ts`).
 
 ### Testin kırmızıya dönebildiğini kanıtlayın
 

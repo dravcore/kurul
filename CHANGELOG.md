@@ -7,6 +7,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- **The web app's `script-src` no longer allows `'unsafe-inline'`.** Inline script is admitted
+  by a per-request nonce instead: `apps/web/proxy.ts` — Next 16's replacement for the
+  `middleware.ts` convention, which is where the old file moved — draws 16 bytes from the
+  platform CSPRNG on every request and sets the resulting `Content-Security-Policy` on the
+  *forwarded request* as well as on the response. The request copy is the load-bearing half:
+  Next reads the nonce back out of that header and stamps it onto the scripts it emits itself
+  (the streamed RSC hydration payload, the framework and page bundles). The one inline script
+  Next does not own, `next-themes`'s pre-paint theme setter, is nonced by hand in
+  `app/layout.tsx`. Nothing had to become dynamic for this: every route already renders per
+  request, because `i18n/request.ts` reads `cookies()` and `headers()` on each one.
+
+  `Content-Security-Policy` is the only header that moved out of `next.config.ts`'s
+  `headers()`; the five constant ones stay there, where they also cover the `_next/static` and
+  `_next/image` routes the proxy's matcher skips. `'strict-dynamic'` was tried and dropped —
+  the whole suite passes with it, but `script-src` names no host for it to neutralise, and it
+  would turn a bundle tag Next forgot to nonce from "loads" into "blocked".
+
+  `style-src` keeps `'unsafe-inline'`, unchanged and out of scope: Radix and `@dnd-kit`
+  position elements through the inline `style` *attribute*, which a nonce cannot cover at all.
+
+  The browser suite now fails any scenario in which the browser refused content, collecting
+  both `securitypolicyviolation` events and Chromium's CSP console errors from every page in
+  every context (`e2e/support/fixtures.ts`). That check was verified against a build with the
+  nonce removed, where it failed on `script-src-elem blocked inline` rather than passing
+  quietly — which is how the old `'unsafe-inline'` would otherwise come back unnoticed.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that

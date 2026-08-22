@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getLocale: vi.fn<() => Promise<string>>(),
   getMessages: vi.fn<() => Promise<Record<string, unknown>>>(),
   getTranslations: vi.fn<(ns: string) => Promise<(key: string) => string>>(),
+  headers: vi.fn<() => Promise<Headers>>(),
 }));
 
 // `next/font/google` is a build-time transform, not a runtime module — the loaders are
@@ -21,6 +22,12 @@ vi.mock('next-intl/server', () => ({
   getTranslations: mocks.getTranslations,
 }));
 
+// `headers()` needs a request scope Next only provides during a real render, so the layout
+// cannot be called at all without this stub.
+vi.mock('next/headers', () => ({
+  headers: mocks.headers,
+}));
+
 vi.mock('@/components/layout/theme-provider', () => ({
   ThemeProvider: ({ children }: Readonly<{ children: React.ReactNode }>) => children,
 }));
@@ -34,11 +41,11 @@ vi.mock('./globals.css', () => ({}));
 import RootLayout, { generateMetadata } from './layout';
 import messages from '@/messages/en.json';
 
-/** Depth-first search for the first element whose props carry `messages`. */
-function findWithMessages(node: unknown): ReactElement | undefined {
+/** Depth-first search for the first element whose props carry `prop`. */
+function findWithProp(node: unknown, prop: string): ReactElement | undefined {
   if (Array.isArray(node)) {
     for (const child of node) {
-      const hit = findWithMessages(child);
+      const hit = findWithProp(child, prop);
       if (hit) {
         return hit;
       }
@@ -51,11 +58,11 @@ function findWithMessages(node: unknown): ReactElement | undefined {
   }
 
   const props = node.props as Record<string, unknown>;
-  if ('messages' in props) {
+  if (prop in props) {
     return node;
   }
 
-  return findWithMessages(props.children);
+  return findWithProp(props.children, prop);
 }
 
 beforeEach(() => {
@@ -64,6 +71,7 @@ beforeEach(() => {
   mocks.getTranslations
     .mockReset()
     .mockResolvedValue((key: string) => `${key} in the negotiated locale`);
+  mocks.headers.mockReset().mockResolvedValue(new Headers({ 'x-nonce': 'nonce-from-the-proxy' }));
 });
 
 describe('RootLayout', () => {
@@ -79,11 +87,24 @@ describe('RootLayout', () => {
     // passed down, every `useTranslations` call renders its own key path instead.
     const tree = await RootLayout({ children: null });
 
-    const provider = findWithMessages(tree);
+    const provider = findWithProp(tree, 'messages');
     expect(provider).toBeDefined();
     expect((provider?.props as { messages: unknown }).messages).toEqual({
       app: { dashboard: { title: 'Panel' } },
     });
+  });
+
+  it('passes the request nonce to the theme provider, whose inline script needs it', async () => {
+    // `next-themes` writes a `<script>` into `<head>` to set the theme class before first
+    // paint, and `script-src` carries no `'unsafe-inline'` (`lib/security-headers.ts`). Drop
+    // this prop and the script is refused: the page paints in the wrong theme and React fails
+    // hydration on the `<html>` class that never arrived — a browser-only failure that every
+    // other test in this file would stay green through.
+    const tree = await RootLayout({ children: null });
+
+    expect((findWithProp(tree, 'nonce')?.props as { nonce: unknown }).nonce).toBe(
+      'nonce-from-the-proxy',
+    );
   });
 
   it('names the app in the document title', async () => {
