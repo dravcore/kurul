@@ -233,15 +233,15 @@ yokluğu assert etmek de bunu olası değil, imkânsız kılar.
 
 ## Dosya konvansiyonları
 
-| Tür                          | Konum                               | Desen                                                                                                                                                                                                                                            |
-| ---------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Unit                         | Kaynak dosyayla yerinde (colocated) | `apps/api/src/task/task.service.spec.ts`                                                                                                                                                                                                         |
-| Integration                  | Ayrı bir test kökü                  | `apps/api/test/task.e2e-spec.ts`                                                                                                                                                                                                                 |
-| Test helper'ları/factory'ler | Test kökü altında paylaşılır        | `apps/api/test/helpers/`, `apps/api/test/factories/`                                                                                                                                                                                             |
-| Geçici depolama kökü         | Veritabanı helper'ının yanında      | `apps/api/test/helpers/storage.ts`                                                                                                                                                                                                               |
-| Girdi fixture'ları           | Test kökünde, kaynağına göre        | `apps/api/test/fixtures/trello/` — elle yazılmış Trello export'ları; hem unit hem entegrasyon testleri okur, dizinin kendi README'si hiçbirinin gerçek bir export olmadığını kayda geçirir ([ADR 0025](decisions/0025-trello-import-mapping.md)) |
-| Browser e2e                  | Repository seviyesinde paket        | `e2e/tests/board-realtime.spec.ts`                                                                                                                                                                                                               |
-| Browser e2e helper'ları      | Onların yanında                     | `e2e/support/`, `e2e/stack-env.ts`                                                                                                                                                                                                               |
+| Tür                          | Konum                               | Desen                                                                                                                                                                                                                                                                                            |
+| ---------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit                         | Kaynak dosyayla yerinde (colocated) | `apps/api/src/task/task.service.spec.ts`                                                                                                                                                                                                                                                         |
+| Integration                  | Ayrı bir test kökü                  | `apps/api/test/task.e2e-spec.ts`                                                                                                                                                                                                                                                                 |
+| Test helper'ları/factory'ler | Test kökü altında paylaşılır        | `apps/api/test/helpers/`, `apps/api/test/factories/`                                                                                                                                                                                                                                             |
+| Geçici depolama kökü         | Veritabanı helper'ının yanında      | `apps/api/test/helpers/storage.ts`                                                                                                                                                                                                                                                               |
+| Girdi fixture'ları           | Test kökünde, kaynağına göre        | `apps/api/test/fixtures/trello/` — elle yazılmış Trello export'ları; hem unit hem entegrasyon testleri okur, ayrıca `real/` altında iki anonimleştirilmiş gerçek export; dizinin kendi README'si hangisinin hangisi olduğunu kayda geçirir ([ADR 0025](decisions/0025-trello-import-mapping.md)) |
+| Browser e2e                  | Repository seviyesinde paket        | `e2e/tests/board-realtime.spec.ts`                                                                                                                                                                                                                                                               |
+| Browser e2e helper'ları      | Onların yanında                     | `e2e/support/`, `e2e/stack-env.ts`                                                                                                                                                                                                                                                               |
 
 Nest'in generator'ı integration testlerini `*.e2e-spec.ts` olarak adlandırıyor; bunlar
 browser e2e değil API integration testleri olsa da bu isim tooling uyumluluğu için
@@ -249,10 +249,13 @@ korunuyor.
 
 **Gerçek Trello export'ları.** `apps/api/test/fixtures/trello/real/` dizininde
 `scripts/anonymise-trello-export.mjs` betiğinden geçmiş gerçek export'lar durur (yapı bayt bayt
-korunur, her metin parçası aynı uzunlukta bir takma adla değiştirilir).
+korunur, her metin parçası aynı uzunlukta bir takma adla değiştirilir) — 2026-08-22 itibarıyla iki
+tane: Trello'nun kendi varsayılan "Starter Guide" panosu ve on bir listeli bir pano.
 `trello-import-real.e2e-spec.ts` oradaki her `*.json` dosyasını gerçek endpoint üzerinden import
-eder ve raporu ile veritabanını dosyadan türetilen sayılarla karşılaştırır; dizin boşken tam olarak
-bir atlanmış test bildirir,
+eder ve raporu ile veritabanını dosyadan türetilen sayılarla karşılaştırır; ikisi de temiz şekilde
+import ediliyor, okuyucunun kullandığı hiçbir alanda sentetik fixture'larla fark çıkmadı
+([`fixtures/trello/README.md#field-mapping-diffs`](../../apps/api/test/fixtures/trello/README.md#field-mapping-diffs)).
+Dizin bir gün yeniden boşalırsa spec tam olarak bir atlanmış test bildirir,
 `no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, böylece açık kapı
 CI'da görünür kalır. Anonimleştiricinin kendi unit testleri `pnpm test:scripts` ile `node:test`
 üzerinde çalışır, çünkü `scripts/` dizininin bağımlılığı yoktur; aynı spec, anonimleştirilmiş bir

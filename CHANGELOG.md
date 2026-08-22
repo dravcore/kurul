@@ -166,6 +166,16 @@ the 2026-08-18 "atlas" audit. See
   gate itself stays open until two anonymised real exports are in the directory and the
   field-mapping diffs are recorded in the fixtures README.
 
+- **The `v0.3.0` Trello real-export gate closed.** Two anonymised real Trello exports —
+  Trello's own default "Starter Guide" board and an eleven-list board, both exported and
+  anonymised on 2026-08-22 — are now in `apps/api/test/fixtures/trello/real/`, and
+  `trello-import-real.e2e-spec.ts` imports both end to end with no reader-level field-mapping
+  diff against the synthetic fixtures: every field `trello-export.ts` reads matched the type
+  ADR 0025 already assumed, including a fractional `lists[].pos`, the `purple_light`
+  `_light` colour suffix alongside the already-covered `_dark`, and Trello's own empty-name
+  default labels. No importer change was needed. The findings are recorded in
+  `apps/api/test/fixtures/trello/README.md#field-mapping-diffs`.
+
 - **Attachment storage quotas — the total is finally bounded, not just each file** (audit
   finding SEC-02, [ADR 0027](docs/decisions/0027-attachment-quotas.md)). Two new variables cap
   the summed size of stored file attachments: `ATTACHMENT_WORKSPACE_QUOTA_BYTES` per workspace

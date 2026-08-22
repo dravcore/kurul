@@ -231,28 +231,31 @@ makes that impossible rather than unlikely.
 
 ## File conventions
 
-| Kind                   | Location                       | Pattern                                                                                                                                                                                                                             |
-| ---------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit                   | Colocated with the source file | `apps/api/src/task/task.service.spec.ts`                                                                                                                                                                                            |
-| Integration            | Separate test root             | `apps/api/test/task.e2e-spec.ts`                                                                                                                                                                                                    |
-| Test helpers/factories | Shared under the test root     | `apps/api/test/helpers/`, `apps/api/test/factories/`                                                                                                                                                                                |
-| Temporary storage root | Beside the database helper     | `apps/api/test/helpers/storage.ts`                                                                                                                                                                                                  |
-| Input fixtures         | Under the test root, by source | `apps/api/test/fixtures/trello/` — hand-written Trello exports read by both unit and integration tests; the directory's own README records that none of them is a real export ([ADR 0025](decisions/0025-trello-import-mapping.md)) |
-| Browser e2e            | Repository-level package       | `e2e/tests/board-realtime.spec.ts`                                                                                                                                                                                                  |
-| Browser e2e helpers    | Beside them                    | `e2e/support/`, `e2e/stack-env.ts`                                                                                                                                                                                                  |
+| Kind                   | Location                       | Pattern                                                                                                                                                                                                                                                         |
+| ---------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit                   | Colocated with the source file | `apps/api/src/task/task.service.spec.ts`                                                                                                                                                                                                                        |
+| Integration            | Separate test root             | `apps/api/test/task.e2e-spec.ts`                                                                                                                                                                                                                                |
+| Test helpers/factories | Shared under the test root     | `apps/api/test/helpers/`, `apps/api/test/factories/`                                                                                                                                                                                                            |
+| Temporary storage root | Beside the database helper     | `apps/api/test/helpers/storage.ts`                                                                                                                                                                                                                              |
+| Input fixtures         | Under the test root, by source | `apps/api/test/fixtures/trello/` — hand-written Trello exports read by both unit and integration tests, plus two anonymised real exports under `real/`; the directory's own README records which is which ([ADR 0025](decisions/0025-trello-import-mapping.md)) |
+| Browser e2e            | Repository-level package       | `e2e/tests/board-realtime.spec.ts`                                                                                                                                                                                                                              |
+| Browser e2e helpers    | Beside them                    | `e2e/support/`, `e2e/stack-env.ts`                                                                                                                                                                                                                              |
 
 Nest's generator calls integration tests `*.e2e-spec.ts`; that name is kept for tooling
 compatibility even though these are API integration tests, not browser e2e.
 
 **Real Trello exports.** `apps/api/test/fixtures/trello/real/` holds real exports that went
 through `scripts/anonymise-trello-export.mjs` (structure kept byte for byte, every piece of text
-replaced by a same-length pseudonym). `trello-import-real.e2e-spec.ts` imports every `*.json` in
-it through the real endpoint and checks the report and the database against counts derived from
-the file; while the directory is empty it reports exactly one skipped test,
-`no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, so the open gate
-stays visible in CI. The anonymiser's own unit tests run on `node:test` via `pnpm test:scripts`,
-because `scripts/` has no dependencies; the same spec also proves, on the synthetic fixture, that
-an anonymised export imports identically to its original.
+replaced by a same-length pseudonym) — as of 2026-08-22, two of them, Trello's own default
+"Starter Guide" board and an eleven-list board. `trello-import-real.e2e-spec.ts` imports every
+`*.json` in it through the real endpoint and checks the report and the database against counts
+derived from the file; both import cleanly, with no reader-level field-mapping diff against the
+synthetic fixtures ([`fixtures/trello/README.md#field-mapping-diffs`](../apps/api/test/fixtures/trello/README.md#field-mapping-diffs)).
+Were the directory ever empty, the spec would report exactly one skipped test,
+`no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, so an open gate
+would stay visible in CI. The anonymiser's own unit tests run on `node:test` via
+`pnpm test:scripts`, because `scripts/` has no dependencies; the same spec also proves, on the
+synthetic fixture, that an anonymised export imports identically to its original.
 
 ## Running tests
 
