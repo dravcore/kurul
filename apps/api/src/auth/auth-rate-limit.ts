@@ -248,20 +248,11 @@ export function createRedisRateLimitStorage(redisUrl: string): AuthRateLimitStor
   const key = (raw: string): string => `${AUTH_RATE_LIMIT_KEY_PREFIX}${raw}`;
 
   return {
-    // Better Auth only calls `get`/`set` when the storage has no `consume` (see its
-    // `legacyConsume` fallback). Both are implemented because the interface requires them,
-    // and both read the same counter `consume` writes so they cannot drift.
-    get: async (raw) => {
-      const stored = await connection(redisUrl).get(key(raw));
-      if (stored === null) {
-        return null;
-      }
-      const count = Number(stored);
-      return Number.isFinite(count) ? { key: raw, count, lastRequest: Date.now() } : null;
-    },
-    set: async (raw, value) => {
-      await connection(redisUrl).set(key(raw), value.count, 'EX', RATE_LIMIT_WINDOW_SECONDS);
-    },
+    // `consume` is the whole interface as of better-auth 1.7: the optional `get`/`set` pair and
+    // the non-atomic `legacyConsume` path that used them are gone, because that shape cannot
+    // enforce a distributed limit under concurrent requests. This storage never relied on them
+    // (`CONSUME_SCRIPT` has always done the check and the increment in one round trip), so
+    // dropping them changes nothing about how a counter behaves.
     consume: async (raw, rule) => {
       try {
         const result = (await connection(redisUrl).eval(
