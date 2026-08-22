@@ -115,6 +115,17 @@ the 2026-08-18 "atlas" audit. See
 
 ### Added
 
+- **`pnpm db:drift` checks the configured database against `schema.prisma` for migration
+  drift** (roadmap Hardening: "migration drift check"). It runs `prisma migrate diff
+  --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`, printing
+  "No difference detected." and exiting `0` when they agree, or naming the mismatch and
+  exiting non-zero otherwise. CI's "Check for migration drift" step, which already ran this
+  command right after `db:migrate`, now calls `pnpm db:drift` instead of repeating the raw
+  invocation, so a local pass and a CI pass mean the same thing. No `kurul_shadow` database was
+  added: Prisma 7.9.1 has no CLI flag for a shadow database on this command, and setting
+  `datasource.shadowDatabaseUrl` in `prisma.config.ts` changes `migrate dev` behaviour too,
+  which this change did not need.
+
 - **A per-IP byte budget on the upload route** (audit finding SEC-02 follow-up,
   [ADR 0027](docs/decisions/0027-attachment-quotas.md)'s 2026-08-21 update). The route's
   request throttle counts requests, which `rate-limit.ts` has called the wrong unit for disk
@@ -328,6 +339,44 @@ the 2026-08-18 "atlas" audit. See
   turned into plain text; the released entries below keep their old paths as text only.
 
 ### Security
+
+- **Every pull request now builds the images this project ships and scans them for CVEs.**
+  `.github/workflows/ci.yml` gains an `image-scan` job: three parallel legs build `kurul-api`
+  at its `runner` and `migrate` targets and `kurul-web` (`push: false`, `load: true`, buildx
+  with a `type=gha` layer cache scoped per image), then run Trivy over each. A HIGH or CRITICAL
+  finding **that has a fix available** fails the leg and, through the `ci-ok` gate, the pull
+  request. Until now the only workflow that ever built a Dockerfile was `release-images.yml`,
+  which runs on a tag push, so a broken image or a vulnerable base was discovered by the
+  workflow whose job is to publish it.
+
+  The job hangs off nothing (`needs:` is absent) and runs beside `lint` and `test` rather than
+  after `build`: the PR pipeline on `develop` measures 4m56s-5m18s against the five-minute
+  trigger `ROADMAP.md` records for OPS-10, so this had to cost runner minutes and not wall
+  time. Unfixed advisories are ignored (`ignore-unfixed: true`) because a base-image CVE with
+  no fixed version fails every pull request for something no pull request can act on, and a
+  check that is always red is a check nobody reads.
+
+- **Removed the npm and yarn CLIs from all three runtime images.** Nothing in them ever ran
+  either: every `CMD` is `node`, over dependencies that were resolved at build time. Beyond the
+  ordinary case for not shipping a tool that fetches and executes code into a production
+  container, this is what the first run of the scan above turned up: npm's own bundled
+  dependencies (`tar`, `brace-expansion`, `ip-address`, `undici`) held **all eight** fixable
+  HIGH/CRITICAL findings across the three images, and none of them is closable from this
+  repository: they are fixed when the Node project cuts a `node:24-alpine` with a newer bundled
+  npm. All three images now scan clean at HIGH/CRITICAL. `corepack` stays, as the shim the
+  build stages go through. This does not change image size, since the files come from the base
+  image's own layer.
+
+- **`mailpit` is pinned by digest instead of `:latest`, in both `docker-compose.dev.yml` and
+  the e2e workflow's `mailpit` service** — `axllent/mailpit:v1.31.0@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24`
+  (roadmap Hardening: "mailpit pinned by digest"). A floating `:latest` on an image used in CI
+  and the local dev loop is the same class of finding as the workflow-action SHA pinning done
+  earlier (SEC-06) applied to a service that had not yet been covered. `.github/dependabot.yml`
+  gets a new `docker` ecosystem tracking the `docker-compose.dev.yml` pin (it also covers
+  `docker-compose.yml`, which shares the same directory); the e2e workflow's own `services:`
+  image sits outside what that ecosystem reads, so it stays a manual bump, with a comment at
+  the call site saying so. PR-time image build + Trivy scan for `api`/`web` is a separate,
+  still-open part of the same roadmap row.
 
 - **Pinned `deepmerge-ts` to `^8.0.1` through a pnpm override**, closing
   [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) (high: stack

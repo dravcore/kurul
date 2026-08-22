@@ -371,20 +371,21 @@ on every run, passing or failing.
 
 Every pull request runs, on `develop` and `main` as well:
 
-| Step                 | Command                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| Build shared pkgs    | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`         |
-| Lint                 | `pnpm lint`                                                                                 |
-| Format check         | `pnpm format:check`                                                                         |
-| Typecheck            | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                         |
-| Audit                | `pnpm audit --audit-level high`                                                             |
-| Unit tests (api)     | `pnpm --filter @kurul/api test:cov`                                                         |
-| Unit tests (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                       |
-| Unit tests (pkgs)    | `pnpm --filter "./packages/*" test`                                                         |
-| Unit tests (scripts) | `pnpm test:scripts`                                                                         |
-| Integration tests    | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers           |
-| Build                | `pnpm build`                                                                                |
-| **Gate** (required)  | `ci-ok` — passes only if `lint`, `test`, and `build` all succeed (not skipped or cancelled) |
+| Step                 | Command                                                                                                  |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
+| Build shared pkgs    | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                      |
+| Lint                 | `pnpm lint`                                                                                              |
+| Format check         | `pnpm format:check`                                                                                      |
+| Typecheck            | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                                      |
+| Audit                | `pnpm audit --audit-level high`                                                                          |
+| Unit tests (api)     | `pnpm --filter @kurul/api test:cov`                                                                      |
+| Unit tests (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                                    |
+| Unit tests (pkgs)    | `pnpm --filter "./packages/*" test`                                                                      |
+| Unit tests (scripts) | `pnpm test:scripts`                                                                                      |
+| Integration tests    | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers                        |
+| Build                | `pnpm build`                                                                                             |
+| Image build + scan   | The three shipped images, then Trivy over each (see below)                                               |
+| **Gate** (required)  | `ci-ok` — passes only if `lint`, `test`, `build` and `image-scan` all succeed (not skipped or cancelled) |
 
 **All steps must pass before merge.** The gate job (`ci-ok`) is the single required status check
 configured in branch protection — if any upstream job fails, is skipped, or is cancelled, the
@@ -406,6 +407,28 @@ CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on 
 `develop` and `main`. See [git-strategy.md](git-strategy.md#pull-request-process).
 
 The workflow file is [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+
+### Image build and CVE scan
+
+`image-scan` builds the three images this project ships (`kurul-api` at its `runner` and
+`migrate` targets, and `kurul-web`) and runs Trivy over each one. A HIGH or CRITICAL
+vulnerability **that has a fix available** fails the leg, and with it the gate. Before this
+job existed the only thing that ever built a Dockerfile was `release-images.yml`, which runs
+on a tag push, so a broken image or a vulnerable base was found by the workflow whose job is
+to publish it.
+
+Two choices are worth knowing about:
+
+- **Unfixed advisories are ignored** (`ignore-unfixed: true`). A base-image CVE with no fixed
+  version anywhere would fail every pull request for something no pull request can do, and a
+  check that is always red is a check nobody reads. What is left is the actionable set: a base
+  image bump or a dependency bump.
+- **It runs beside `lint` and `test`, not after `build`.** The job is off the critical path on
+  purpose, so it costs runner minutes rather than pipeline wall time, and it reads a buildx
+  layer cache (`type=gha`) that the `develop` runs of this same workflow write.
+
+Nothing is pushed: `push: false` with `load: true` keeps each image inside its own runner.
+Publishing stays in `release-images.yml`, behind a tag.
 
 ### Browser e2e in CI
 
