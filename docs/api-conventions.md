@@ -63,8 +63,9 @@ GET    /workspaces/:workspaceId/invitations     # cursor page of pending invitat
 POST   /workspaces/:workspaceId/invitations
 DELETE /workspaces/:workspaceId/invitations/:invitationId
 
+GET    /workspaces/:workspaceId/board-templates  # the starting shapes a create can name
 GET    /workspaces/:workspaceId/boards
-POST   /workspaces/:workspaceId/boards
+POST   /workspaces/:workspaceId/boards            # `template` seeds its columns and labels
 GET    /workspaces/:workspaceId/boards/:boardId
 PATCH  /workspaces/:workspaceId/boards/:boardId
 DELETE /workspaces/:workspaceId/boards/:boardId

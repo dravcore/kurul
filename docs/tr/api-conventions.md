@@ -65,8 +65,9 @@ GET    /workspaces/:workspaceId/invitations     # bekleyen davetlerin cursor say
 POST   /workspaces/:workspaceId/invitations
 DELETE /workspaces/:workspaceId/invitations/:invitationId
 
+GET    /workspaces/:workspaceId/board-templates  # bir create'in adlandırabileceği başlangıç şekilleri
 GET    /workspaces/:workspaceId/boards
-POST   /workspaces/:workspaceId/boards
+POST   /workspaces/:workspaceId/boards            # `template` onun kolonlarını ve etiketlerini tohumlar
 GET    /workspaces/:workspaceId/boards/:boardId
 PATCH  /workspaces/:workspaceId/boards/:boardId
 DELETE /workspaces/:workspaceId/boards/:boardId

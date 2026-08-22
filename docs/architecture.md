@@ -146,7 +146,9 @@ one component that deletes across module and tenant boundaries by design — `Se
 It is also the single sanctioned exception to §7: it runs with no caller, so there is nothing
 to isolate. See the ADR.
 
-`locale` is a module rather than a `common/` helper because `auth` and `board` both need it and the boundary rule says they depend on the module, not on each other. It is the only locale awareness the API has, and it is confined to the two cases [ADR 0018](decisions/0018-localization-strategy.md) allows: content written into the database on the user's behalf (a new board's seed columns) and outbound email. Interface translation stays entirely on the web.
+`locale` is a module rather than a `common/` helper because `auth` and `board` both need it and the boundary rule says they depend on the module, not on each other. It is the only locale awareness the API has, and it is confined to the two cases [ADR 0018](decisions/0018-localization-strategy.md) allows: content written into the database on the user's behalf (a new board's seed columns and, since board templates, its seed labels) and outbound email. Interface translation stays entirely on the web.
+
+**Board templates are code, not rows.** `common/board-templates.ts` is the catalogue: four starting shapes (`kanban`, `scrum-sprint`, `bug-triage`, `content-pipeline`), each a column list with a `ColumnCategory` per stage and a label preset painted from `slot-1`…`slot-8`. Nobody edits a template and nothing points at one after the board exists, so a table would buy a migration in exchange for a list that ships with the release anyway; the cost to accept is that adding a template is a deploy, the same cost as adding a locale and for the same reason. `POST boards` takes a `template` slug and writes its columns and labels in the one nested create the board already needed, and `GET board-templates` returns the catalogue so no client carries a second copy of it. An omitted slug still seeds the default columns and no labels, which is what that route did before templates existed.
 
 ---
 
@@ -193,8 +195,9 @@ segment and no i18n middleware**, because nothing here is indexed and a language
 invalidate every literal path comparison in `proxy.ts` at once. Settings → Language writes
 the preference; `en` and `tr` ship today (`SUPPORTED_LOCALES = ['en', 'tr']`, `messages/tr.json`
 at parity with `en.json`), so adding a third language is a `SUPPORTED_LOCALES` entry plus a
-`messages/<tag>.json` — and the `Record<Locale, …>` seed and mail copy (`board-defaults.ts`,
-`mail-templates.ts`) failing to compile until it is filled in — not a rewrite of the component
+`messages/<tag>.json` — and the `Record<Locale, …>` seed, template catalogue and mail copy
+(`board-defaults.ts`, `board-templates.ts`, `mail-templates.ts`) failing to compile until it is
+filled in — not a rewrite of the component
 tree. See [ROADMAP.md — Beyond MVP](../ROADMAP.md#beyond-mvp) for additional UI language packs.
 
 ---

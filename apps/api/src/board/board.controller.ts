@@ -43,17 +43,19 @@ export class BoardController {
   }
 
   /**
-   * `Accept-Language` is read here and nowhere else in the board routes: the default columns
-   * are written into the database in the creator's language, and the header is the fallback
-   * for a user who has not set a preference (ADR 0018 §2).
+   * `Accept-Language` is read here and on `GET board-templates`, and nowhere else in the board
+   * routes: the seeded columns and labels are written into the database in the creator's
+   * language, and the header is the fallback for a user who has not set a preference
+   * (ADR 0018 §2).
    */
   @Post()
   @ApiOperation({
     summary: 'Create a board',
     description:
-      'The board arrives with no columns. `Accept-Language` is read only as the fallback for a ' +
-      'creator who has set no locale, because the default column names are written into the ' +
-      'database rather than rendered.',
+      'Seeded with the columns of the named `template`, and its label preset. Omit `template` ' +
+      'and the board gets the default columns and no labels. `Accept-Language` is read only as ' +
+      'the fallback for a creator who has set no locale, because the seeded names are written ' +
+      'into the database rather than rendered.',
   })
   @ApiCreatedResponse({ type: BoardSchema })
   @WorkspaceRoles(...CONTENT_ROLES)
