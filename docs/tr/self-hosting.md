@@ -353,7 +353,9 @@ SMTP olmadan sert biçimde bozulan tek özellik davetlerdir: bir daveti kabul et
 bir e-posta adresi gerektirir, doğrulama da iletilmiş bir mesaj
 ([ADR 0013](decisions/0013-invitation-email-verification.md)). `SMTP_HOST` boşken API yine
 açılır ve mesajı göndermek yerine log'a yazar; yani tek kişilik kurulum sorunsuz çalışır — ama
-kimse workspace'inize katılamaz. Üyeler ekranı bunu üründe de söyler.
+kimse workspace'inize katılamaz. Üyeler ekranı bunu üründe de söyler. Bildirim e-postaları
+(atama, mention, due-soon) aynı ayarları kullanır ve onlar olmadan yalnızca kapalı kalır; SMTP
+çalıştığında her kullanıcı bunları Ayarlar'dan kendisi için kapatabilir.
 
 Her SMTP sağlayıcısı çalışır. En sık iki şey ters gider:
 

@@ -325,11 +325,13 @@ taşır.
 
 ## SMTP ve Mailpit
 
-Kurul bugün tek bir akış için e-posta gönderiyor: `accept-invitation`'ın bir davet
-edilenin workspace'e katılmasına izin vermeden önce ihtiyaç duyduğu doğrulama linki (bkz.
-[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
+Kurul iki şey için e-posta gönderiyor: `accept-invitation`'ın bir davet edilenin
+workspace'e katılmasına izin vermeden önce ihtiyaç duyduğu doğrulama linki (bkz.
+[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md))
+ve her kullanıcının Ayarlar'dan kapatabildiği bildirim e-postaları (atama, mention, due-soon).
 `SMTP_HOST`'u boş bırakmak geçerli bir seçenek — API yine ayağa kalkar ve mail modülü mesajı
-göndermek yerine loglar — ama bu doğru olduğu sürece **hiçbir davet kabul edilemez**.
+göndermek yerine loglar — ama bu doğru olduğu sürece **hiçbir davet kabul edilemez** ve hiçbir
+bildirim e-postası çıkmaz.
 
 Bu durum yalnızca burada değil, üründe de görünür. `GET /config`
 `{ "mailEnabled": false }` döner ve web uygulaması bunu **Ayarlar → Üyeler** ekranında,

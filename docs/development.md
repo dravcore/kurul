@@ -321,11 +321,13 @@ not fix that, it just moves the exhaustion from this app to whatever else shares
 
 ## SMTP and Mailpit
 
-Kurul sends email for one flow today: the verification link an invitee needs before
+Kurul sends email for two things: the verification link an invitee needs before
 `accept-invitation` will let them join a workspace (see
-[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
-Leaving `SMTP_HOST` unset is a valid choice — the API still boots, and the mail module logs
-the message instead of sending it — but while that's true, **no invitation can be accepted**.
+[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)),
+and notification email (assignment, mention, due-soon), which each user can switch off under
+Settings. Leaving `SMTP_HOST` unset is a valid choice — the API still boots, and the mail
+module logs the message instead of sending it — but while that's true, **no invitation can be
+accepted** and no notification email goes out.
 
 That state is visible in the product, not only here. `GET /config` reports
 `{ "mailEnabled": false }`, and the web app turns that into a standing notice on **Settings →

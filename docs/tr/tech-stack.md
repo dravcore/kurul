@@ -142,10 +142,13 @@ register UI'ının bizim yazmamız gerektiğini unutma.
 
 ### E-posta — SMTP üzerinden nodemailer
 
-Kurul bugüne kadar tek bir sınıf e-posta gönderiyor: `better-auth`'un sağlamlaştırılmış
+Kurul iki sınıf e-posta gönderiyor: işlemsel olanlar (`better-auth`'un sağlamlaştırılmış
 davet-kabul kontrolünün bir davet edilenin workspace'e katılmasına izin vermeden önce
-ihtiyaç duyduğu doğrulama linki (bkz.
-[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)).
+ihtiyaç duyduğu doğrulama linki, bkz.
+[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md),
+ve davetin kendisi) ve bildirim e-postaları (atama, mention ve due-soon; her `Notification`
+satırı için bir mesaj, `/me` üzerindeki kullanıcı başına anahtarın arkasında). İkisi de aynı
+modülden ve aynı değişkenlerden geçer.
 `nodemailer` düz SMTP konuşur, yalnızca `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` /
 `SMTP_PASSWORD` / `SMTP_SECURE` / `MAIL_FROM` üzerinden yapılandırılır — sağlayıcı SDK'sı yok,
 dolayısıyla self-hoster'lar yeni bir vendor hesabı oluşturmak yerine zaten çalıştırdıkları

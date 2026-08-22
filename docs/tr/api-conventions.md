@@ -167,7 +167,7 @@ GET   /health/ready          # readiness, kimliksiz
 GET   /config                # instance yetenekleri; oturum açmış her çağıran
 POST  /auth/*                # Better Auth handler'ları
 GET   /me                    # mevcut kullanıcı profili
-PATCH /me                    # kendi profili; bugün yalnızca arayüz dili
+PATCH /me                    # kendi profili; arayüz dili ve bildirim e-postası anahtarı
 GET   /me/deletion-preview   # bu hesabı silmek neye yol açar
 DELETE /me                   # bu hesabı sil (anonimleştirir)
 GET   /instance/activation                     # aktivasyon hunisi; yalnız INSTANCE_ADMIN_EMAILS (doğrulanmış e-posta gerekli)
@@ -187,7 +187,10 @@ healthcheck'tir, bir istemci değil.
 `PATCH /me` workspace'e scope'lu değildir ve rol kontrolü yoktur: özne çağıranın kendisidir,
 dolayısıyla yetkilendirmenin tamamı session guard'ıdır. `User.locale`'in yazıldığı tek yer de
 burasıdır — bkz.
-[decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md).
+[decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md) — ve
+`User.emailNotifications`'ın da: yeni hesapta `true` olan tek bir boolean, atama, mention ve
+due-soon e-postalarını birlikte kapatır. Uygulama içi bildirimler etkilenmez; `mailEnabled`'ı
+`false` olan bir instance'ta bu bayrak hiçbir şeyi değiştirmez.
 
 `DELETE /me` çağıranın hesabını siler ve bu API'de eksik bir isteğe varsayılan seçerek değil,
 reddederek karşılık veren tek route'tur. Gövde `confirmEmail` (hesabın kendi adresi) ve
@@ -215,10 +218,10 @@ burada gizlenecek bir şey yok — route, AGPL bir projenin kaynak kodunda duruy
 { "mailEnabled": true, "attachmentsEnabled": true }
 ```
 
-| Alan                 | Anlamı                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `mailEnabled`        | SMTP host'u yapılandırılmamışsa `false` — her mesaj API log'una yazılır ve hiçbir yere teslim edilmez; kimse adresini doğrulayamaz, dolayısıyla daveti kabul edemez                        |
-| `attachmentsEnabled` | `STORAGE_PATH` tanımsızsa `false` — bu deployment hiç dosya saklamaz ve web arayüzü yükleme kontrolünü gizler. **Bağlantı ekleri buna bağlı değildir** — bir bağlantı hiç depolama istemez |
+| Alan                 | Anlamı                                                                                                                                                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mailEnabled`        | SMTP host'u yapılandırılmamışsa `false` — her mesaj API log'una yazılır ve hiçbir yere teslim edilmez; kimse adresini doğrulayamaz, dolayısıyla daveti kabul edemez, ve `User.emailNotifications` ne derse desin bildirim e-postası kapalıdır |
+| `attachmentsEnabled` | `STORAGE_PATH` tanımsızsa `false` — bu deployment hiç dosya saklamaz ve web arayüzü yükleme kontrolünü gizler. **Bağlantı ekleri buna bağlı değildir** — bir bağlantı hiç depolama istemez                                                    |
 
 Bu ucun biçimini üç kural tutar ve her biri başka türlü de karar verilebilecek bir seçimdir:
 
