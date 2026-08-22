@@ -347,6 +347,8 @@
       "cancel": "Cancel",
       "name": "Name",
       "description": "Description",
+      "template": "Start from",
+      "templateError": "Templates couldn't load. This board will start with the default columns.",
       "boardMenu": "Board actions",
       "import": {
         "action": "Import from Trello",

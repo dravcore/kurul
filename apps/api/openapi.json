@@ -4345,7 +4345,7 @@
         ]
       },
       "post": {
-        "description": "The board arrives with no columns. `Accept-Language` is read only as the fallback for a creator who has set no locale, because the default column names are written into the database rather than rendered.",
+        "description": "Seeded with the columns of the named `template`, and its label preset. Omit `template` and the board gets the default columns and no labels. `Accept-Language` is read only as the fallback for a creator who has set no locale, because the seeded names are written into the database rather than rendered.",
         "operationId": "BoardController_create",
         "parameters": [
           {
@@ -5038,6 +5038,154 @@
           }
         },
         "summary": "Delete a board",
+        "tags": ["Boards"],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/workspaces/{workspaceId}/board-templates": {
+      "get": {
+        "description": "Not paginated, and not workspace data: the catalog is fixed at build time and identical in every workspace. It is nested under one anyway, because every resource-bearing route is. Names come back in the creator’s language — these are the exact rows a create would write, not interface text.",
+        "operationId": "BoardTemplateController_list",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUIDv7. Opaque — never parsed, sorted or generated client-side."
+          },
+          {
+            "name": "accept-language",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoardTemplateSchema"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or one the server no longer recognises.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The workspace does not exist, or the caller is not a member of it, or the addressed resource belongs to another workspace. All three answer `404` — a `403` would confirm that something exists across the tenant boundary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled failure. Never carries a stack trace, and never the raw exception message under `NODE_ENV=production`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the board templates",
         "tags": ["Boards"],
         "security": [
           {
@@ -12641,6 +12789,11 @@
           "description": {
             "type": "string",
             "maxLength": 2000
+          },
+          "template": {
+            "type": "string",
+            "description": "Which starting shape to write, by slug. Omit and the board gets the default seed columns\nand no labels — the pre-template behaviour, which is what every existing client relies on.\n\nValidated against the catalog itself rather than a list repeated here, so a template can\nnever exist and be rejected (or the reverse). An unknown slug is a `400` in the standard\nenvelope with `constraint: \"isIn\"`, not a silently ignored field: a client that asked for\na triage board and got a plain one has no way to notice.",
+            "enum": ["kanban", "scrum-sprint", "bug-triage", "content-pipeline"]
           }
         },
         "required": ["name"]
@@ -12659,6 +12812,64 @@
             "maxLength": 2000
           }
         }
+      },
+      "BoardTemplateColumnSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number",
+            "description": "Fractional index — a `Float`, spaced so a column fits between any two neighbours."
+          },
+          "category": {
+            "type": "string",
+            "enum": ["BACKLOG", "UNSTARTED", "STARTED", "COMPLETED", "CANCELED"]
+          }
+        },
+        "required": ["name", "position", "category"]
+      },
+      "BoardTemplateLabelSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "enum": ["slot-1", "slot-2", "slot-3", "slot-4", "slot-5", "slot-6", "slot-7", "slot-8"]
+          }
+        },
+        "required": ["name", "color"]
+      },
+      "BoardTemplateSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "Stable identifier; send it back as `template` when creating a board."
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardTemplateColumnSchema"
+            }
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardTemplateLabelSchema"
+            }
+          }
+        },
+        "required": ["slug", "name", "description", "columns", "labels"]
       },
       "ColumnSchema": {
         "type": "object",

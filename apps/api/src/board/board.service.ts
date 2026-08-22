@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ActivityType } from '@kurul/shared-types';
-import type { BoardDto } from '@kurul/shared-types';
+import type { BoardDto, BoardTemplateDto, Locale } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
-import { defaultColumnsFor } from '../common/board-defaults';
+import { defaultColumnsFor, type DefaultColumn } from '../common/board-defaults';
+import { type DefaultLabel, boardTemplateFor, boardTemplatesFor } from '../common/board-templates';
 import { assertBoard } from '../common/board-access';
 import { fieldChanges } from '../common/field-changes';
 import { LocaleService } from '../locale/locale.service';
@@ -43,12 +44,42 @@ export class BoardService {
   }
 
   /**
-   * Creates a board with its starting columns, named in the creator's language.
+   * The catalog of starting shapes, named in the reader's language.
+   *
+   * A read of code, not of rows, so it takes no workspace: the same four templates exist in
+   * every workspace of every deployment. It is still mounted under `:workspaceId` because
+   * `docs/api-conventions.md` allows no resource-bearing route outside the tenant scope, and
+   * an unscoped route is one nobody can gate later without breaking clients.
+   */
+  async listTemplates(actorId: string, acceptLanguage?: string): Promise<BoardTemplateDto[]> {
+    const locale = await this.localeService.resolve(actorId, acceptLanguage);
+    return boardTemplatesFor(locale).map((template) => ({
+      slug: template.slug,
+      name: template.name,
+      description: template.description,
+      columns: template.columns.map(({ name, position, category }) => ({
+        name,
+        position,
+        category,
+      })),
+      labels: template.labels.map(({ name, color }) => ({ name, color })),
+    }));
+  }
+
+  /**
+   * Creates a board with its starting columns and labels, named in the creator's language.
    *
    * The seed names are user data, not interface text (ADR 0018 §3): they are written once, in
    * whatever language the person creating the board reads, and belong to the board from then
    * on — a later viewer sees them as typed, not re-translated. `category` is what carries the
    * meaning across languages, so translating the labels cannot disturb the metrics (ADR 0019).
+   *
+   * **An omitted `template` is not the Kanban template.** It seeds Kanban's columns and no
+   * labels, which is exactly what this endpoint did before templates existed. Making the two
+   * identical was the tempting simplification and it is the wrong one: every client that has
+   * ever called this route would start receiving labels it never asked for, on a board whose
+   * label list it may well render as "the labels this team uses". A caller opts into the
+   * preset by naming a template, and the picker names one on every create.
    */
   async create(
     workspaceId: string,
@@ -57,14 +88,19 @@ export class BoardService {
     acceptLanguage?: string,
   ): Promise<BoardDto> {
     const locale = await this.localeService.resolve(actorId, acceptLanguage);
-    const seeded = defaultColumnsFor(locale);
+    const { columns, labels } = this.seedFor(dto, locale);
     const board = await this.prisma.$transaction(async (tx) => {
+      // Columns and labels in the one nested create the board already needed. A template that
+      // wrote its labels afterwards could leave a board standing with half a preset if the
+      // second write failed, and "half a preset" is indistinguishable from a team that deleted
+      // the labels it did not want.
       const created = await tx.board.create({
         data: {
           workspaceId,
           name: dto.name,
           description: dto.description,
-          columns: { create: seeded },
+          columns: { create: columns },
+          ...(labels.length > 0 ? { labels: { create: labels } } : {}),
         },
       });
 
@@ -76,6 +112,11 @@ export class BoardService {
       // create above does not return the column ids, so recording them individually would cost
       // a re-read on the hottest board write for rows nobody chose. The columns an operator
       // *did* choose (`POST .../columns`, `POST .../columns/defaults`) each get their own row.
+      //
+      // `template` is the slug and not the resolved names, because the names are already in
+      // `seededColumns`: what the slug adds is *which shape was asked for*, which is the only
+      // part a later reader cannot reconstruct from the rows. It is absent, not `null`, when
+      // no template was named — the audit trail should not claim a choice nobody made.
       await this.activityService.record(tx, {
         workspaceId,
         userId: actorId,
@@ -83,13 +124,25 @@ export class BoardService {
         payload: {
           boardId: created.id,
           name: created.name,
-          seededColumns: seeded.map((column) => column.name),
+          seededColumns: columns.map((column) => column.name),
+          ...(dto.template === undefined ? {} : { template: dto.template }),
+          ...(labels.length > 0 ? { seededLabels: labels.map((label) => label.name) } : {}),
         },
       });
 
       return created;
     });
     return this.toDto(board);
+  }
+
+  /** The rows a create writes: a named template in full, or the default columns alone. */
+  private seedFor(
+    dto: CreateBoardDto,
+    locale: Locale,
+  ): { columns: DefaultColumn[]; labels: DefaultLabel[] } {
+    if (dto.template === undefined) return { columns: defaultColumnsFor(locale), labels: [] };
+    const template = boardTemplateFor(dto.template, locale);
+    return { columns: template.columns, labels: template.labels };
   }
 
   async get(workspaceId: string, boardId: string): Promise<BoardDto> {
