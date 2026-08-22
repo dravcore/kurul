@@ -111,8 +111,8 @@
 		reverse_proxy api:4000
 	}
 
-	# Everything else is the Next.js app, including its `_next/*` assets and the auth
-	# middleware. Last, and unconditional, so a path that matched neither rule above can never
+	# Everything else is the Next.js app, including its `_next/*` assets and the auth proxy
+	# (`apps/web/proxy.ts`). Last, and unconditional, so a path that matched neither rule can never
 	# 404 here.
 	handle {
 		reverse_proxy web:3000

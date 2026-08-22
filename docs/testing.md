@@ -210,6 +210,13 @@ where it belongs, against a live server, in `apps/api/test/redis-database-index.
 - **A drop assertion before a reload proves nothing.** The board applies moves optimistically,
   so the order changes on screen whether or not anything was persisted. The reload is the
   test.
+- **A Content-Security-Policy violation fails the scenario that saw it.** An `auto` fixture in
+  `e2e/support/fixtures.ts` puts a collector on every context — the built-in `page` one and
+  every context `openAs` creates — reading both `securitypolicyviolation` events and Chromium's
+  CSP console errors, and asserts the list is empty at teardown. This is not a scenario of its
+  own because a CSP failure is not one: the policy blocks a script, the page still renders, the
+  click still lands, and no assertion any scenario makes can see it. The check is what keeps
+  `'unsafe-inline'` from coming back into `script-src` unnoticed (`apps/web/proxy.ts`).
 
 ### Prove the test can fail
 

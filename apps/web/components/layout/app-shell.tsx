@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { AppSidebar } from './app-sidebar';
+import { DemoBanner } from './demo-banner';
 import { useWorkspaceContext, WorkspaceProvider } from './workspace-provider';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -76,22 +77,32 @@ function AppShellFrame({
      * so every page owns its own scroll container. The three non-board pages already did
      * (`flex-1 overflow-y-auto` on dashboard, settings and notifications) — they were written
      * for a bounded shell that had not been built yet.
+     *
+     * `DemoBanner` is the one thing allowed above the sidebar, and it is why this is now a
+     * column: the strip takes its natural height (`shrink-0`, and it renders `null` on every
+     * instance that is not a demo, which is all of them by default), and the row below it is
+     * `min-h-0 flex-1`, which hands the bounded-height chain described above straight through
+     * unchanged. Nesting it inside `main` instead would have put it below the sidebar and
+     * scrolled it away with the page, which is not what a standing notice is.
      */
-    <div className="flex h-dvh overflow-hidden bg-background">
-      <AppSidebar />
-      {/* Skip-link target (see app/(app)/layout.tsx): tabIndex={-1} lets the fragment
-          navigation move keyboard focus here without adding a tab stop.
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
+      <DemoBanner />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <AppSidebar />
+        {/* Skip-link target (see app/(app)/layout.tsx): tabIndex={-1} lets the fragment
+            navigation move keyboard focus here without adding a tab stop.
 
-          `min-h-0` is what passes the bound on: a flex child's default `min-height: auto`
-          refuses to shrink below its content, which would have let the board push `main`
-          taller than the shell and re-opened the chain one level down. */}
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className="flex min-h-0 min-w-0 flex-1 flex-col outline-none"
-      >
-        {children}
-      </main>
+            `min-h-0` is what passes the bound on: a flex child's default `min-height: auto`
+            refuses to shrink below its content, which would have let the board push `main`
+            taller than the shell and re-opened the chain one level down. */}
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex min-h-0 min-w-0 flex-1 flex-col outline-none"
+        >
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

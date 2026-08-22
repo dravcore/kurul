@@ -115,9 +115,14 @@ request for document preview; the cost is a scoped CSP relaxation, argued separa
 
 ## Rationale
 
-**Why the API origin and not the web origin.** The web app's CSP carries
-`script-src 'self' 'unsafe-inline'`, so a markup injection there can already run inline script;
-adding attacker-supplied content to that origin compounds an existing weakness. The API's CSP is
+**Why the API origin and not the web origin.** The web app is a browser surface that executes
+script; the API is not, and that asymmetry is the point. At the time of this decision the web
+CSP carried `script-src 'self' 'unsafe-inline'`, so a markup injection there could already run
+inline script. That has since been tightened to a per-request nonce with no `'unsafe-inline'`,
+which narrows the gap but does not close the argument: the web origin still runs script, still
+carries the session cookie, and `style-src` still allows inline styles — so attacker-supplied
+bytes served from it are worth strictly more to an attacker than the same bytes from an origin
+that renders nothing. The API's CSP is
 `default-src 'none'`, so a user-uploaded HTML file opened as a document from there can load
 nothing at all. `security-headers.ts` names this exact vector in the comment above
 `X-Content-Type-Options` — "a user-uploaded file served as `text/plain` that a browser decides to
@@ -259,7 +264,7 @@ to `connect-src` only. The same-origin default is unaffected.
 | Require S3/MinIO from the start                    | Breaks the five-minute Compose install for the majority to serve the minority who already run object storage                                                                                                        |
 | Ship disk and S3 together in the first release     | Two code paths and two test matrices for a backend no reported deployment needs yet; the port makes it an added file later                                                                                          |
 | Signed URLs for download                           | Cannot move authorization to a proxy the operator is invited to replace, so it buys only the loss of the guard chain, plus a revocation problem the cookie does not have                                            |
-| Serve files from the web origin                    | That origin already carries `'unsafe-inline'` in `script-src`; the API's `default-src 'none'` is strictly stronger for attacker-supplied content                                                                    |
+| Serve files from the web origin                    | That origin executes script and carries the session cookie; the API's `default-src 'none'` is strictly stronger for attacker-supplied content                                                                       |
 | Delete files inline on the delete path             | `Workspace → Board → Task` cascades inside Postgres without calling application code, so the path would miss every bulk delete                                                                                      |
 | Sweep orphans with no grace period                 | Deletes every file uploaded after the most recent dump the first night following a restore                                                                                                                          |
 | Trust the declared `Content-Type` or the extension | Both are caller-supplied; neither is evidence of anything                                                                                                                                                           |

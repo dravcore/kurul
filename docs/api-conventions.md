@@ -63,8 +63,9 @@ GET    /workspaces/:workspaceId/invitations     # cursor page of pending invitat
 POST   /workspaces/:workspaceId/invitations
 DELETE /workspaces/:workspaceId/invitations/:invitationId
 
+GET    /workspaces/:workspaceId/board-templates  # the starting shapes a create can name
 GET    /workspaces/:workspaceId/boards
-POST   /workspaces/:workspaceId/boards
+POST   /workspaces/:workspaceId/boards            # `template` seeds its columns and labels
 GET    /workspaces/:workspaceId/boards/:boardId
 PATCH  /workspaces/:workspaceId/boards/:boardId
 DELETE /workspaces/:workspaceId/boards/:boardId
@@ -639,7 +640,7 @@ an oversight: browsers are required to send `Origin` on every request whose meth
 `GET`/`HEAD`, `fetch`, XHR and form submissions alike, so there is no cross-site request
 shape that carries a victim's cookie _and_ omits the header. Everything left in the
 header-less case — `curl`, a CI script, a native client, the web app's own server-side
-session lookup in `apps/web/middleware.ts` — cannot be induced by a hostile page to replay
+session lookup in `apps/web/proxy.ts` — cannot be induced by a hostile page to replay
 someone else's ambient credentials, which is the entire mechanism the rule defends against.
 Rejecting it would break every non-browser caller and close nothing.
 

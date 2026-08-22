@@ -7,7 +7,7 @@ import { resolveRequestLocale } from './user-locale';
  * Resolves the interface language for every server render.
  *
  * No `[locale]` path segment and no i18n middleware — see `resolveRequestLocale` and
- * ADR 0018. `apps/web/middleware.ts` matches routes literally (`/login`, `/invite/…`,
+ * ADR 0018. `apps/web/proxy.ts` matches routes literally (`/login`, `/invite/…`,
  * `pathname === '/'`), and a language prefix would invalidate every one of those comparisons
  * at once, on the one file where a mistake signs users out.
  */

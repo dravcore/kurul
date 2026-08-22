@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { InstanceConfigDto } from '@kurul/shared-types';
 import { InstanceConfigSchema } from '../openapi/schemas/instance.schema';
+import { demoConfig } from '../demo/demo-mode';
 import { MailService } from '../mail/mail.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -59,6 +60,10 @@ export class InstanceConfigController {
    * reads a field off a transport that is built once per process, and `attachmentsEnabled`
    * reads the capability bit off a storage backend built the same way — and a cache would only
    * add a second copy of the truth that can disagree with the transport actually in use.
+   *
+   * `demo` is the one field that is not constant for the life of the process: `nextResetAt`
+   * moves to the following boundary every interval. That is another reason not to memoize:
+   * a cached document would pin the banner's countdown to whenever the first caller asked.
    */
   @ApiOperation({
     summary: 'Read what this deployment is configured to do',
@@ -74,6 +79,7 @@ export class InstanceConfigController {
     return {
       mailEnabled: this.mail.isEnabled(),
       attachmentsEnabled: this.storage.persistsFiles,
+      demo: demoConfig(),
     };
   }
 }
