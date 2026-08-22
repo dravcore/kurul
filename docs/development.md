@@ -402,6 +402,10 @@ database holds no `Workspace` row yet. `--seed` forces it anyway, `--no-seed` sk
 cannot read that table for any reason it also skips — the destructive branch is never the one
 taken on a guess.
 
+Run `pnpm db:drift` against a database that is already on the latest migration to confirm
+`schema.prisma` and the committed migrations still agree — see [Checking for migration
+drift](#checking-for-migration-drift) below.
+
 | URL                          | What                           |
 | ---------------------------- | ------------------------------ |
 | http://localhost:3000        | Web app (Next.js)              |
@@ -596,6 +600,7 @@ Run from the repository root.
 | `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it                                                                                 |
 | `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                                                                                       |
 | `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                                                                                            |
+| `db:drift`       | `pnpm db:drift`       | Runs `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`: compares the configured database against `schema.prisma` and exits non-zero on any difference. Same command CI runs after `db:migrate` — see [Checking for migration drift](#checking-for-migration-drift)   |
 
 To target a single workspace, use pnpm's filter flag:
 
@@ -635,6 +640,25 @@ Rules:
 - `Task.position` and `Column.position` are `Float` (fractional indexing) — see
   [architecture.md](architecture.md#critical-field-rules) for the model-level rules that must
   not be changed casually.
+
+### Checking for migration drift
+
+A schema edit that never got a matching migration is silent by nature: nothing breaks locally,
+and the mismatch only surfaces as unrelated statements the next `prisma migrate dev` wants to
+emit. `pnpm db:drift` catches it directly instead of waiting for that:
+
+```bash
+pnpm db:migrate   # bring the database to the latest committed migration first
+pnpm db:drift     # compare it against schema.prisma
+```
+
+It runs `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma
+--exit-code`, prints "No difference detected." and exits 0 when they agree, and otherwise
+prints the mismatch and exits non-zero. There is no separate shadow database: `--from-config-datasource`
+diffs the datasource in `prisma.config.ts` (i.e. `DATABASE_URL`) directly against the schema,
+which is what CI runs too, right after `db:migrate` in the same job — see
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — so a local pass and a CI pass mean
+the same thing.
 
 Resetting a local database from scratch:
 
