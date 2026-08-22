@@ -198,7 +198,7 @@ export default defineConfig({
       // which resolves to an address Playwright is not polling.
       command: 'node ../apps/web/.next/standalone/apps/web/server.js',
       env: { ...webEnv(), HOSTNAME: '127.0.0.1' },
-      // `/login` rather than `/`: `/` is a middleware redirect, and a redirect answering
+      // `/login` rather than `/`: `/` is a redirect from `proxy.ts`, and a redirect answering
       // does not prove the app can render a page.
       url: `${WEB_URL}/login`,
       reuseExistingServer: !process.env.CI,
