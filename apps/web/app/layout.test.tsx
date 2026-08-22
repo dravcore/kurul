@@ -107,6 +107,22 @@ describe('RootLayout', () => {
     );
   });
 
+  it('renders without a nonce rather than a literal "null" one when the header is absent', async () => {
+    // `proxy.ts` sets `x-nonce` on every request that reaches a render, so in the app this is
+    // unreachable. It is asserted because of what the missing branch would do if it ever
+    // became reachable: `headers().get()` answers `null`, and `nonce={null}` reaches
+    // `next-themes` as an attribute — `<script nonce="null">`, which matches no policy and is
+    // refused exactly like an un-nonced one, while looking in the markup as though it worked.
+    // `undefined` omits the attribute instead, which is the honest failure.
+    mocks.headers.mockResolvedValue(new Headers());
+
+    const tree = await RootLayout({ children: null });
+
+    const provider = findWithProp(tree, 'nonce');
+    expect(provider).toBeDefined();
+    expect((provider?.props as { nonce: unknown }).nonce).toBeUndefined();
+  });
+
   it('names the app in the document title', async () => {
     // A static `metadata` export would pin the tab title and share description to English
     // for every locale, so both are resolved per request through the catalogue instead.
