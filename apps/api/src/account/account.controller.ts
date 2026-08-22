@@ -14,6 +14,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { SessionAuthGuard } from '../common/guards/session-auth.guard';
 import type { AuthenticatedUser } from '../common/types/request-context';
 import { sessionCookieNames } from '../auth/session-cookie-names';
+import { DemoRestrictedGuard } from '../demo/demo-restricted.guard';
 import { AccountDeletionService } from './account-deletion.service';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 
@@ -50,8 +51,13 @@ export class AccountController {
    * the `Session` rows does not by itself stop this browser presenting a valid session. Clearing
    * them here closes that window for the browser that asked — which is every browser on this
    * path (ADR 0026 §"Consequences" covers the administrator path, where it cannot be closed).
+   *
+   * `403` on a demo instance: the demo is one shared account, and deleting it empties the demo
+   * for every other visitor until the next reset. `DemoRestrictedGuard` carries the full list
+   * of what a demo refuses and why.
    */
   @Delete()
+  @UseGuards(DemoRestrictedGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
     @CurrentUser() user: AuthenticatedUser,

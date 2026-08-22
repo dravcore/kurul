@@ -1,4 +1,3 @@
-import { getApiBaseUrl } from './api';
 import { isSameOriginApiBaseUrl } from './api-url';
 
 /**
@@ -11,6 +10,40 @@ import { isSameOriginApiBaseUrl } from './api-url';
 export interface SecurityHeader {
   key: string;
   value: string;
+}
+
+/**
+ * The request header `proxy.ts` writes the per-request nonce into, so a server component can
+ * read it back with `headers()`.
+ *
+ * `x-nonce` is the name Next's own CSP guide uses, and matching it means a reader who arrives
+ * from those docs finds what they expect. It is deliberately *not* also a response header:
+ * the value is already public in the `Content-Security-Policy` response header, so a second
+ * copy would add a name to grep for and nothing else.
+ *
+ * Next does not read this header — it parses the nonce out of the `Content-Security-Policy`
+ * header on the *request* to nonce its own framework and bundle `<script>` tags. This one
+ * exists for the inline script `next-themes` writes, which Next has no way to know about.
+ */
+export const CSP_NONCE_HEADER = 'x-nonce';
+
+/**
+ * A fresh nonce for one response.
+ *
+ * 16 bytes from the platform CSPRNG, base64-encoded. The entropy is the whole point of a
+ * nonce, and 128 bits is the figure CSP Level 3 asks for
+ * (https://www.w3.org/TR/CSP3/#security-nonces); anything a page render could *derive*
+ * (a request id, a timestamp, a hash of the path) would be a nonce an attacker can predict,
+ * which is a nonce that defends nothing.
+ *
+ * `crypto.getRandomValues` + `btoa` rather than Node's `randomBytes`, because this runs in
+ * the edge runtime `proxy.ts` is compiled for, where `node:crypto` is not available. `+`, `/`
+ * and `=` all belong to CSP's `base64-value` grammar, so the encoded output needs no further
+ * escaping inside `'nonce-…'`.
+ */
+export function createCspNonce(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...bytes));
 }
 
 /**
@@ -62,7 +95,11 @@ function connectSources(apiBaseUrl: string): string[] {
 }
 
 /**
- * Builds the CSP directive string for every route the web app serves.
+ * Builds the CSP directive string for one response.
+ *
+ * Pure, and both arguments are required, so the only way to get a policy is to have already
+ * decided what nonce it names — there is no default that silently produces a policy no inline
+ * script can satisfy. `proxy.ts` is the sole caller; see {@link createCspNonce}.
  *
  * This is a real browser application — the API's `default-src 'none'` stance
  * (`apps/api/src/common/configure-app.ts`) does not transfer here; a page that loads no
@@ -72,29 +109,37 @@ function connectSources(apiBaseUrl: string): string[] {
  * is nothing in the app that needs them yet, and adding them ahead of a real need only widens
  * the injection surface a future XSS could exploit:
  *
- * - `script-src 'self' 'unsafe-inline'` — Next's App Router streams the RSC payload into the
- *   initial HTML as inline `<script>self.__next_f.push(...)</script>` tags (hydration data,
- *   not attacker-controlled markup), and `next-themes` injects a small inline script in
- *   `<head>` to apply the stored theme class before first paint and avoid a flash of the wrong
- *   theme. Both are same-origin, build-time-authored scripts, but neither carries a nonce:
- *   Next only threads a nonce through its own injected scripts when the CSP header is minted
- *   per-request in middleware, and this app's headers are static config, evaluated once at
- *   build/start rather than per request (see `next.config.ts` for why that path was scoped
- *   out here). A hardcoded nonce in a static header would be the same string on every
- *   response — indistinguishable from `'unsafe-inline'` to an attacker, since it never
- *   rotates, but harder to reason about. This was verified empirically, not assumed: a
- *   production build (`next build && next start`) with `script-src 'self'` and no
- *   `'unsafe-inline'` was loaded in a real browser against `/login` and `/register`. The
- *   blocked inline scripts broke the page exactly as expected — `next-themes`'s inline script
- *   never ran, so
- *   the page rendered in the light theme instead of the stored/system dark theme, and React
- *   logged a hydration-failure exception (minified error #412) because the server-rendered
- *   `<html>` class the blocked script should have added before hydration never arrived. Putting
- *   `'unsafe-inline'` back removed both symptoms. `'unsafe-inline'` here does not open up
- *   arbitrary remote script loading — `script-src` still omits any external host, so a
- *   reflected-markup XSS still cannot pull in an attacker-hosted `<script src>`; it can only
- *   run inline, which is
- *   the residual risk this trade-off accepts.
+ * - `script-src 'self' 'nonce-…'` — there are exactly two kinds of inline script in a rendered
+ *   page, and the nonce is what lets both run without `'unsafe-inline'` letting *everything*
+ *   run. Next's App Router streams the RSC payload into the initial HTML as inline
+ *   `<script>self.__next_f.push(...)</script>` tags (hydration data, not attacker-controlled
+ *   markup), and `next-themes` injects a small inline script in `<head>` to apply the stored
+ *   theme class before first paint and avoid a flash of the wrong theme. Next stamps the
+ *   nonce onto the first kind by itself — it parses the value out of the
+ *   `Content-Security-Policy` header on the *request*, which is why `proxy.ts` sets that
+ *   header on the forwarded request and not only on the response. The second kind is nonced
+ *   by hand: `app/layout.tsx` reads {@link CSP_NONCE_HEADER} and passes it to `next-themes`.
+ *
+ *   The value has to be different on every response to mean anything, which is why this
+ *   header is minted in `proxy.ts` rather than returned from `next.config.ts`'s `headers()` —
+ *   that runs once at build/start, so a "nonce" from there would be one fixed string, weaker
+ *   than `'unsafe-inline'` in practice because it looks like a defence. Every route in this
+ *   app is already server-rendered on demand (`i18n/request.ts` reads `cookies()` and
+ *   `headers()` on every render, so nothing is statically prerendered), which is the
+ *   precondition Next's CSP guide names for nonces: a page baked at build time has no request
+ *   to take a nonce from, and its inline scripts would be blocked.
+ *
+ *   **No `'strict-dynamic'`.** Next's guide includes it, and it was tried and then dropped
+ *   because it buys nothing here and costs a fallback. `'strict-dynamic'` makes a browser
+ *   *ignore* `'self'` and every host source, trusting only what an already-trusted script
+ *   inserts — which works, since Next nonces its own `<script src>` bundle tags and the
+ *   webpack chunk loader inherits trust from them. But `script-src` here names no host to
+ *   begin with, so there is nothing for `'strict-dynamic'` to neutralise; what it would
+ *   change is that any bundle tag Next ever forgets to nonce goes from "loads, because it is
+ *   same-origin" to "blocked". That is a worse failure mode for a directive whose only job
+ *   here is to stop *inline* injection, and `'self'` is not the weak link — a markup
+ *   injection cannot add a same-origin script this app does not already serve. Verified both
+ *   ways against a production build; the pages load identically with and without it.
  * - `style-src 'self' 'unsafe-inline'` — Radix primitives (via shadcn/ui) position popovers,
  *   dropdowns and tooltips with a computed inline `style` attribute, and `@dnd-kit` writes the
  *   drag transform the same way every animation frame. Nonces do not apply to `style="..."`
@@ -130,10 +175,10 @@ function connectSources(apiBaseUrl: string): string[] {
  *   markup-injection pivot — smuggling in a `<base href="https://evil">` or a form that posts
  *   credentials elsewhere — without disabling anything the app uses.
  */
-export function buildContentSecurityPolicy(apiBaseUrl: string): string {
+export function buildContentSecurityPolicy(apiBaseUrl: string, nonce: string): string {
   const directives: [string, string[]][] = [
     ['default-src', ["'self'"]],
-    ['script-src', ["'self'", "'unsafe-inline'"]],
+    ['script-src', ["'self'", `'nonce-${nonce}'`]],
     ['style-src', ["'self'", "'unsafe-inline'"]],
     ['img-src', ["'self'", 'blob:']],
     ['font-src', ["'self'"]],
@@ -174,15 +219,16 @@ function buildPermissionsPolicy(): string {
 }
 
 /**
- * The security headers `next.config.ts` attaches to every route via `headers()`.
+ * The *static* security headers `next.config.ts` attaches to every route via `headers()`.
  *
- * `apiBaseUrl` defaults to {@link getApiBaseUrl}, i.e. `NEXT_PUBLIC_API_URL`, but takes an
- * explicit parameter so a test can assert on a fixed origin without depending on the process
- * environment at import time.
+ * Content-Security-Policy is deliberately not among them: it is the one header here whose
+ * value differs per response (the nonce), so `proxy.ts` sets it instead. The five below are
+ * constants — the same bytes on every response, for every deployment — and `headers()` is the
+ * right place for a constant: it covers `_next/static` and every other asset route the proxy's
+ * matcher skips, and it costs nothing per request.
  */
-export function getSecurityHeaders(apiBaseUrl: string = getApiBaseUrl()): SecurityHeader[] {
+export function getSecurityHeaders(): SecurityHeader[] {
   return [
-    { key: 'Content-Security-Policy', value: buildContentSecurityPolicy(apiBaseUrl) },
     // Matches the API's HSTS (`configure-app.ts`) for the same reason: browsers ignore
     // Strict-Transport-Security on plain-HTTP responses, so this is inert in local/dev over
     // http and only takes effect once the deployment terminates TLS in front of `web`.

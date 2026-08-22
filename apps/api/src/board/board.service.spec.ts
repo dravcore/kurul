@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { ActivityType, ColumnCategory, type Locale } from '@kurul/shared-types';
+import { ActivityType, ColumnCategory, LabelColorSlot, type Locale } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { LocaleService } from '../locale/locale.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -104,6 +104,152 @@ describe('BoardService', () => {
         name: 'Roadmap',
         seededColumns: ['To Do', 'In Progress', 'Done'],
       },
+    });
+  });
+
+  describe('templates', () => {
+    it('writes the named template’s columns and labels in the one nested create', async () => {
+      const { service, prisma } = buildService();
+      const create = jest.fn().mockResolvedValue(boardRow());
+      prisma.$transaction.mockImplementation((callback) => callback({ board: { create } }));
+
+      await service.create(WORKSPACE_ID, ACTOR_ID, { name: 'Triage', template: 'bug-triage' });
+
+      // Spelled out rather than asserted against the catalog: a test that reuses the list it is
+      // checking would pass just as happily if "Won't Fix" stopped being CANCELED.
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            columns: {
+              create: [
+                { name: 'Reported', position: 1000, category: ColumnCategory.BACKLOG },
+                { name: 'Triaged', position: 2000, category: ColumnCategory.UNSTARTED },
+                { name: 'Fixing', position: 3000, category: ColumnCategory.STARTED },
+                { name: 'Verifying', position: 4000, category: ColumnCategory.STARTED },
+                { name: 'Closed', position: 5000, category: ColumnCategory.COMPLETED },
+                { name: 'Won’t Fix', position: 6000, category: ColumnCategory.CANCELED },
+              ],
+            },
+            labels: {
+              create: [
+                { name: 'Critical', color: LabelColorSlot['slot-1'] },
+                { name: 'Major', color: LabelColorSlot['slot-2'] },
+                { name: 'Minor', color: LabelColorSlot['slot-3'] },
+                { name: 'Regression', color: LabelColorSlot['slot-4'] },
+                { name: 'Needs Info', color: LabelColorSlot['slot-5'] },
+              ],
+            },
+          }),
+        }),
+      );
+      // One write, not a board followed by a label pass: a failed second write would leave a
+      // board standing with half a preset, which reads exactly like a team that deleted the
+      // labels it did not want.
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    it('seeds a template in the language the creator reads', async () => {
+      const { service, prisma } = buildService('tr');
+      const create = jest.fn().mockResolvedValue(boardRow());
+      prisma.$transaction.mockImplementation((callback) => callback({ board: { create } }));
+
+      await service.create(WORKSPACE_ID, ACTOR_ID, { name: 'Akış', template: 'content-pipeline' });
+
+      const { data } = create.mock.calls[0]![0] as {
+        data: {
+          columns: { create: { name: string }[] };
+          labels: { create: { name: string }[] };
+        };
+      };
+      expect(data.columns.create.map((column) => column.name)).toStrictEqual([
+        'Fikirler',
+        'Onaylandı',
+        'Yazılıyor',
+        'Düzenleniyor',
+        'Yayında',
+      ]);
+      expect(data.labels.create.map((label) => label.name)).toStrictEqual([
+        'Blog',
+        'Sosyal Medya',
+        'Video',
+        'Bülten',
+      ]);
+    });
+
+    it('writes no labels at all when no template is named', async () => {
+      const { service, prisma } = buildService();
+      const create = jest.fn().mockResolvedValue(boardRow());
+      prisma.$transaction.mockImplementation((callback) => callback({ board: { create } }));
+
+      await service.create(WORKSPACE_ID, ACTOR_ID, { name: 'Plain' });
+
+      // Not an empty `labels.create` either. Every client that predates templates calls this
+      // route without one, and a board that arrives carrying labels nobody asked for is a
+      // behaviour change to all of them.
+      const { data } = create.mock.calls[0]![0] as { data: Record<string, unknown> };
+      expect(data).not.toHaveProperty('labels');
+    });
+
+    it('records which template was chosen, not only what it wrote', async () => {
+      const { service, prisma, activityService } = buildService();
+      const create = jest.fn().mockResolvedValue(boardRow());
+      const tx = { board: { create } };
+      prisma.$transaction.mockImplementation((callback) => callback(tx));
+
+      await service.create(WORKSPACE_ID, ACTOR_ID, { name: 'Roadmap', template: 'scrum-sprint' });
+
+      // The slug is the one part of the choice the seeded rows cannot be reverse-engineered
+      // into: two templates could share a column list, and a team that later renames every
+      // stage erases the only other evidence.
+      expect(activityService.record).toHaveBeenCalledWith(tx, {
+        workspaceId: WORKSPACE_ID,
+        userId: ACTOR_ID,
+        type: ActivityType.BoardCreated,
+        payload: {
+          boardId: BOARD_ID,
+          name: 'Roadmap',
+          seededColumns: ['Backlog', 'Sprint Backlog', 'In Progress', 'Review', 'Done'],
+          template: 'scrum-sprint',
+          seededLabels: ['Story', 'Bug', 'Spike', 'Tech Debt', 'Blocked'],
+        },
+      });
+    });
+
+    it('claims no template in the audit trail when none was chosen', async () => {
+      const { service, prisma, activityService } = buildService();
+      const create = jest.fn().mockResolvedValue(boardRow());
+      prisma.$transaction.mockImplementation((callback) => callback({ board: { create } }));
+
+      await service.create(WORKSPACE_ID, ACTOR_ID, { name: 'Roadmap' });
+
+      // Absent, not `null` and not the default slug: the trail must not report a decision
+      // nobody made.
+      const [, entry] = activityService.record.mock.calls[0] as [unknown, { payload: object }];
+      expect(entry.payload).not.toHaveProperty('template');
+      expect(entry.payload).not.toHaveProperty('seededLabels');
+    });
+
+    it('lists the catalog in the reader’s language without touching the database', async () => {
+      const { service, prisma, localeService } = buildService('tr');
+
+      const templates = await service.listTemplates(ACTOR_ID, 'tr-TR');
+
+      expect(localeService.resolve).toHaveBeenCalledWith(ACTOR_ID, 'tr-TR');
+      expect(templates.map((template) => template.slug)).toStrictEqual([
+        'kanban',
+        'scrum-sprint',
+        'bug-triage',
+        'content-pipeline',
+      ]);
+      expect(templates[2]).toMatchObject({ slug: 'bug-triage', name: 'Hata Triyajı' });
+      expect(templates[0]?.labels).toContainEqual({
+        name: 'Hata',
+        color: LabelColorSlot['slot-1'],
+      });
+      // A read of code, not of rows. If this ever starts querying, it has become a per-tenant
+      // catalog and the route it hangs on is the wrong shape for one.
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.board.findMany).not.toHaveBeenCalled();
     });
   });
 

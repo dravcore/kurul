@@ -7,6 +7,93 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Demo mode, and everything a live demo instance needs except the host.** `DEMO_MODE=true` is
+  the whole switch: the app shows a standing, dismissible banner naming how often the data
+  disappears; all outbound email goes to the log transport whatever `SMTP_HOST` says, so a
+  demo anyone can sign up to cannot be made to mail an address a stranger typed in; account
+  deletion and workspace deletion answer `403` (a demo is one shared workspace, and deleting it
+  empties the demo for every other visitor until the next reset); and `GET /config` publishes
+  `demo: { enabled, resetIntervalMinutes, nextResetAt }` so the banner names the same cadence
+  the reset actually runs on. Nothing else is disabled: sign-up stays open, invitations can
+  still be created and their links copied, and uploads stay bounded by the ordinary attachment
+  quotas ([ADR 0027](docs/decisions/0027-attachment-quotas.md)).
+
+  The reset itself is `node dist/demo/reset.js`, compiled into the API image with everything
+  else and run on a loop by a new `demo-reset` service behind the `demo` compose profile. It
+  wipes every tenant and auth table and restores a golden dataset: two boards with work in
+  every column, labels, assignees, comments, checklists, due dates relative to the reset, a
+  published `demo@kurul.dev` account whose password comes from `DEMO_PASSWORD` (no default,
+  ever), and a second person with no credentials at all. It refuses to run unless `DEMO_MODE`
+  is true **and** the database is named like a demo, so pointing it at a real deployment takes
+  two independent mistakes rather than one. It is deliberately not the development seed: that
+  runs through `tsx` and a pnpm workspace the production image does not have, and refuses under
+  the `NODE_ENV=production` the image bakes in.
+
+  The sidecar sleeps to wall-clock boundaries rather than a flat interval, so the API and the
+  reset agree on `nextResetAt` without sharing state and a restart does not shift the schedule.
+  Its healthcheck goes unhealthy when no reset has succeeded for twice the interval, in the
+  same shape as the `backup` sidecar's freshness check: a reset loop that had silently stopped
+  resetting would otherwise report as "Up" while a launch-day link served whatever the last
+  visitor left behind. Setup is in
+  [Self-hosting → Demo instance](docs/self-hosting.md#demo-instance).
+
+### Security
+
+- **The web app's `script-src` no longer allows `'unsafe-inline'`.** Inline script is admitted
+  by a per-request nonce instead: `apps/web/proxy.ts` — Next 16's replacement for the
+  `middleware.ts` convention, which is where the old file moved — draws 16 bytes from the
+  platform CSPRNG on every request and sets the resulting `Content-Security-Policy` on the
+  *forwarded request* as well as on the response. The request copy is the load-bearing half:
+  Next reads the nonce back out of that header and stamps it onto the scripts it emits itself
+  (the streamed RSC hydration payload, the framework and page bundles). The one inline script
+  Next does not own, `next-themes`'s pre-paint theme setter, is nonced by hand in
+  `app/layout.tsx`. Nothing had to become dynamic for this: every route already renders per
+  request, because `i18n/request.ts` reads `cookies()` and `headers()` on each one.
+
+  `Content-Security-Policy` is the only header that moved out of `next.config.ts`'s
+  `headers()`; the five constant ones stay there, where they also cover the `_next/static` and
+  `_next/image` routes the proxy's matcher skips. `'strict-dynamic'` was tried and dropped —
+  the whole suite passes with it, but `script-src` names no host for it to neutralise, and it
+  would turn a bundle tag Next forgot to nonce from "loads" into "blocked".
+
+  `style-src` keeps `'unsafe-inline'`, unchanged and out of scope: Radix and `@dnd-kit`
+  position elements through the inline `style` *attribute*, which a nonce cannot cover at all.
+
+  The browser suite now fails any scenario in which the browser refused content, collecting
+  both `securitypolicyviolation` events and Chromium's CSP console errors from every page in
+  every context (`e2e/support/fixtures.ts`). That check was verified against a build with the
+  nonce removed, where it failed on `script-src-elem blocked inline` rather than passing
+  quietly — which is how the old `'unsafe-inline'` would otherwise come back unnoticed.
+
+### Added
+
+- **Board templates.** Creating a board now starts from one of four shapes instead of always
+  the same three columns: **Kanban** (To Do / In Progress / Done), **Scrum Sprint** (a backlog
+  feeding a sprint, with a review stage), **Bug Triage** (reported through fixing and
+  verification, plus a `CANCELED` "Won't Fix" column) and **Content Pipeline** (ideas through
+  drafting and editing to published). Each one seeds its columns _and_ a label preset painted
+  from the theme's `slot-1`…`slot-8` tokens, in one transaction with the board, in the
+  creator's language. Names for both languages live in `apps/api/src/common/board-templates.ts`
+  as `Record<Locale, …>`, so a missing translation is a compile error rather than a board that
+  comes out half in English, and the structural half (position, `ColumnCategory`, colour slot)
+  is held apart from the names so a translation cannot move a stage or repaint a chip.
+  - `GET /workspaces/:workspaceId/board-templates` returns the catalogue with localised names
+    and column/label previews. The web renders the picker from that response and echoes back a
+    slug, so neither app carries a second copy of the list and adding a template is an API
+    change alone.
+  - `POST /workspaces/:workspaceId/boards` takes an optional `template` slug, validated against
+    the catalogue; an unknown slug is a `400` with `constraint: "isIn"` and writes nothing,
+    rather than quietly handing back a board that is not the one that was asked for. The
+    `board.created` activity row records which slug was chosen, which is the one part of the
+    choice the seeded rows cannot be reverse-engineered into.
+  - **Omitting `template` is unchanged behaviour**: the default seed columns and no labels. The
+    Kanban template is the same column list, and a test asserts the two cannot drift, so every
+    client that predates this release creates exactly the board it did before.
+
+## [0.3.0] - 2026-08-22
+
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that
 produced them: the same ID means different things in the 0.1.0 audit, the 0.2.0 audit and
 the 2026-08-18 "atlas" audit. See
@@ -1849,6 +1936,7 @@ commit; this is the point it becomes a version.
   session cookie cache, batch due-soon scans and rebalance SQL, paginate comments, and add
   `pg_trgm` search indexes.
 
-[unreleased]: https://github.com/dravcore/kurul/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/dravcore/kurul/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/dravcore/kurul/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dravcore/kurul/releases/tag/v0.2.0
 [0.1.0]: https://github.com/dravcore/kurul/releases/tag/v0.1.0

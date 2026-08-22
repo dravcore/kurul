@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { Archivo, Fraunces, JetBrains_Mono } from 'next/font/google';
+import { headers } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
+import { CSP_NONCE_HEADER } from '@/lib/security-headers';
 import './globals.css';
 
 const archivo = Archivo({
@@ -42,11 +44,17 @@ export default async function RootLayout({
 }>): Promise<React.ReactElement> {
   const locale = await getLocale();
   const messages = await getMessages();
+  // `next-themes` writes an inline `<script>` into `<head>` that applies the stored theme
+  // class before first paint. Next nonces the scripts *it* emits by itself, but it has no way
+  // to know about this one, so the nonce `proxy.ts` minted is handed over explicitly. Without
+  // it the script is blocked, the page paints in the wrong theme, and React fails hydration
+  // over the `<html>` class that never arrived (minified error #412).
+  const nonce = (await headers()).get(CSP_NONCE_HEADER) ?? undefined;
 
   return (
     <html lang={locale} suppressHydrationWarning>
       <body className={`${archivo.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}>
-        <ThemeProvider>
+        <ThemeProvider nonce={nonce}>
           <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
           <Toaster />
         </ThemeProvider>

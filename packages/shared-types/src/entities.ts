@@ -36,6 +36,37 @@ export interface InstanceConfigDto {
    * attach links.
    */
   attachmentsEnabled: boolean;
+  /**
+   * Whether this deployment is a public demo whose data is wiped on a schedule.
+   *
+   * A nested object rather than three sibling booleans, because the two schedule fields are
+   * meaningless without `enabled` and a client that reads them in isolation would be reading
+   * a lie. The web renders a standing banner from it and nothing else branches on it: the
+   * actions a demo refuses are refused by the API, not hidden by the client.
+   */
+  demo: DemoConfigDto;
+}
+
+/** The demo-instance section of {@link InstanceConfigDto}. */
+export interface DemoConfigDto {
+  /** `true` only when the deployment sets `DEMO_MODE=true`. Off on every self-hosted install. */
+  enabled: boolean;
+  /**
+   * How often the demo data is wiped and re-seeded, in minutes, or `null` when `enabled` is
+   * `false`.
+   *
+   * `null` and not `0`: an ordinary instance has no reset schedule at all, and a number would
+   * be a plausible-looking value for a client to render.
+   */
+  resetIntervalMinutes: number | null;
+  /**
+   * ISO 8601 UTC instant of the next wipe, or `null` when `enabled` is `false`.
+   *
+   * Derived from a fixed grid of `resetIntervalMinutes` boundaries anchored at the Unix epoch,
+   * which is the same arithmetic the reset sidecar sleeps against: the API and the container
+   * that does the wiping agree on the instant without sharing any state.
+   */
+  nextResetAt: string | null;
 }
 
 export interface UserDto {
@@ -105,6 +136,41 @@ export interface BoardDto {
   name: string;
   description: string | null;
   createdAt: string;
+}
+
+/**
+ * One starting shape offered at board creation, already resolved into the creator's language.
+ *
+ * The catalog is code in the API (`apps/api/src/common/board-templates.ts`), not rows and not
+ * a second copy in the browser bundle: a client renders whatever
+ * `GET /workspaces/:workspaceId/board-templates` returns and sends `slug` back. That is what
+ * keeps a template from being added in one place and missing in the other.
+ *
+ * The names are localised server-side, which is the exception ADR 0018 §3 already carves out
+ * for content the API writes on the user's behalf — a card here is a preview of the exact rows
+ * a board create is about to write, so it has to speak the language they will be written in.
+ */
+export interface BoardTemplateDto {
+  /** Stable identifier, sent back as `CreateBoardRequest.template`. Never a display name. */
+  slug: string;
+  name: string;
+  description: string;
+  columns: BoardTemplateColumnDto[];
+  labels: BoardTemplateLabelDto[];
+}
+
+/** A column a template will create. Not a `ColumnDto`: nothing exists yet, so there is no id. */
+export interface BoardTemplateColumnDto {
+  name: string;
+  position: number;
+  /** What the stage means, independent of what it is called (ADR 0019). */
+  category: ColumnCategory;
+}
+
+/** A label a template will create. Slot, never hex, for the same reason `LabelDto` is. */
+export interface BoardTemplateLabelDto {
+  name: string;
+  color: LabelColorSlot;
 }
 
 export interface ColumnDto {

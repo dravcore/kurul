@@ -65,8 +65,9 @@ GET    /workspaces/:workspaceId/invitations     # bekleyen davetlerin cursor say
 POST   /workspaces/:workspaceId/invitations
 DELETE /workspaces/:workspaceId/invitations/:invitationId
 
+GET    /workspaces/:workspaceId/board-templates  # bir create'in adlandırabileceği başlangıç şekilleri
 GET    /workspaces/:workspaceId/boards
-POST   /workspaces/:workspaceId/boards
+POST   /workspaces/:workspaceId/boards            # `template` onun kolonlarını ve etiketlerini tohumlar
 GET    /workspaces/:workspaceId/boards/:boardId
 PATCH  /workspaces/:workspaceId/boards/:boardId
 DELETE /workspaces/:workspaceId/boards/:boardId
@@ -651,7 +652,7 @@ sınırdır: tarayıcılar metodu `GET`/`HEAD` olmayan her istekte `Origin` gön
 zorundadır — `fetch`, XHR ve form gönderimleri dahil — yani kurbanın cookie'sini taşıyıp
 _aynı zamanda_ header'ı atlayan bir cross-site istek şekli yoktur. Header'sız durumda geriye
 kalan her şey — `curl`, bir CI script'i, native bir istemci, web uygulamasının
-`apps/web/middleware.ts` içindeki kendi sunucu tarafı session sorgusu — düşmanca bir sayfa
+`apps/web/proxy.ts` içindeki kendi sunucu tarafı session sorgusu — düşmanca bir sayfa
 tarafından başkasının ambient kimlik bilgilerini tekrar oynatmaya ikna edilemez; kuralın
 savunduğu mekanizma tam olarak budur. Bu durumu reddetmek her tarayıcı-dışı çağıranı kırar
 ve hiçbir şeyi kapatmaz.

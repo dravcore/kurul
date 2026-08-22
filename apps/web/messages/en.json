@@ -119,6 +119,11 @@
       "openNavigation": "Open navigation",
       "closeNavigation": "Close navigation"
     },
+    "demo": {
+      "bannerHourly": "This is a demo. Everything you create here is deleted every hour.",
+      "banner": "This is a demo. Everything you create here is deleted every {minutes} minutes.",
+      "dismiss": "Hide this notice"
+    },
     "settings": {
       "title": "Settings",
       "language": {
@@ -342,6 +347,8 @@
       "cancel": "Cancel",
       "name": "Name",
       "description": "Description",
+      "template": "Start from",
+      "templateError": "Templates couldn't load. This board will start with the default columns.",
       "boardMenu": "Board actions",
       "import": {
         "action": "Import from Trello",

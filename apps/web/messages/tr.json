@@ -119,6 +119,11 @@
       "openNavigation": "Gezinmeyi aç",
       "closeNavigation": "Gezinmeyi kapat"
     },
+    "demo": {
+      "bannerHourly": "Burası bir demo. Burada oluşturduğunuz her şey saat başı silinir.",
+      "banner": "Burası bir demo. Burada oluşturduğunuz her şey {minutes} dakikada bir silinir.",
+      "dismiss": "Bu bildirimi gizle"
+    },
     "settings": {
       "title": "Ayarlar",
       "language": {
@@ -342,6 +347,8 @@
       "cancel": "Vazgeç",
       "name": "Ad",
       "description": "Açıklama",
+      "template": "Şununla başla",
+      "templateError": "Şablonlar yüklenemedi. Bu board varsayılan column'larla başlayacak.",
       "boardMenu": "Board işlemleri",
       "import": {
         "action": "Trello'dan içe aktar",

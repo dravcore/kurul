@@ -383,6 +383,105 @@ drill in [Restoring from a backup](development.md#restoring-from-a-backup) check
 
 Restore steps are in [Upgrading and backups](development.md#upgrading-and-backups).
 
+## Demo instance
+
+This section is for one job: running a **public demo** that anyone can sign into and that
+throws its contents away on a schedule. If you are self-hosting Kurul for your own team, skip
+it. Nothing here is on by default and none of it changes an ordinary install.
+
+Two things make a demo: `DEMO_MODE=true`, which changes how the API behaves, and the `demo`
+compose profile, which starts the sidecar that does the wiping. Both, or neither.
+
+```bash
+# .env
+DEMO_MODE=true
+DEMO_PASSWORD=pick-something-and-publish-it   # at least 8 characters
+DEMO_RESET_INTERVAL_MINUTES=60                # the default
+POSTGRES_DB=kurul_demo                        # see "the two locks" below
+REDIS_PASSWORD=...                            # recommended, see below
+```
+
+```bash
+docker compose --profile demo up -d
+```
+
+The profile adds one container, `demo-reset`. It runs from the same `kurul-api` image as the
+API, so there is nothing extra to build or pull.
+
+### What `DEMO_MODE=true` changes
+
+| Behaviour                                       | Why                                                                                                                                       |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| A standing banner in the app naming the cadence | It is the only warning a visitor gets before an hour of their typing disappears. Dismissible for the browser tab, back on the next visit  |
+| All outbound email goes to the log              | Whatever `SMTP_HOST` says. A demo anyone can sign up to must not be able to send mail to an address a stranger typed in                   |
+| Account deletion and workspace deletion `403`   | The demo is one shared workspace. Deleting it, or the account that owns it, empties the demo for every other visitor until the next reset |
+| `GET /config` publishes the reset schedule      | So the banner names the same cadence the sidecar sleeps for, rather than a number somebody typed twice                                    |
+
+Everything else is the product. Sign-up stays open (rate limits, not a switch, are the answer
+to abuse there), invitations can still be created and their links copied by hand, and uploads
+are bounded by the ordinary attachment quotas
+([ADR 0027](decisions/0027-attachment-quotas.md)). Set those low on a demo host rather than
+reaching for another switch.
+
+### The account
+
+The reset creates one account, `demo@kurul.dev`, with the password you put in `DEMO_PASSWORD`.
+Publish both wherever you publish the demo link. There is no default password and there will
+not be one: a default baked into an open-source image is the same password on every demo host
+on the internet. Alongside it the dataset seeds a second person who has **no credentials at
+all**: they exist so the boards have comments and assignments that are not all the visitor's
+own, and there is no password for them to leak.
+
+### The two locks on the reset
+
+`node dist/demo/reset.js` deletes every row in the database before it writes anything. It
+refuses to run unless **both** of these hold:
+
+1. `DEMO_MODE=true` is set in its own environment, and
+2. the database named in `DATABASE_URL` has `demo` in its name.
+
+That is why `POSTGRES_DB=kurul_demo` is in the snippet above. Two independent checks, from two
+different sources, so that pointing this at a real deployment takes two mistakes rather than
+one. `kurul`, `kurul_prod` and `postgres` all refuse.
+
+### Sessions, and the minute after a reset
+
+A reset deletes every session, so everyone signed in is signed out. The app handles that: the
+next navigation lands on the sign-in page with the page you were on kept as the return URL.
+
+For up to 60 seconds after a reset, a browser that was mid-session can still be recognised from
+its signed session cookie, which Kurul caches for that long to avoid a database read per
+request. In that window reads come back empty and a write can fail. It clears itself, it is the
+same window a deleted account has
+([ADR 0026](decisions/0026-account-deletion-anonymisation.md)), and on a demo the cost is the
+last thing somebody typed in the minute their hour ran out.
+
+### Watching it
+
+`docker compose ps` is the check that matters. `demo-reset` reports **unhealthy** once no reset
+has succeeded for twice the interval, i.e. two missed cycles in a row, so one slow or skipped
+run does not flap it. Without that, a reset loop that had stopped resetting would report as simply
+"Up" while a launch-day link served whatever the last visitor left behind.
+
+```bash
+docker compose --profile demo logs demo-reset
+```
+
+Point an uptime monitor at `https://your-domain/api/health/ready` as well, per
+[5. Point a monitor at it](#5-point-a-monitor-at-it). It is the same advice every install gets,
+and it is the thing that tells you the demo is down before someone on the internet does.
+
+### Also worth doing on a public demo
+
+- **Set `REDIS_PASSWORD`.** It is optional everywhere else because Redis is not published
+  outside the compose network. A host that strangers are pointed at is the one where the
+  defence-in-depth is worth the one line.
+- **Keep the attachment quotas low.** `ATTACHMENT_WORKSPACE_QUOTA_BYTES` and
+  `ATTACHMENT_INSTANCE_QUOTA_BYTES` are what bound how much a demo can be made to store between
+  resets; the reset deletes the rows, and the nightly sweep reclaims the bytes.
+- **Do not put anything real in it.** It is not a staging environment. It is a database that is
+  emptied every hour by a container that is designed to empty it.
+
 ## Upgrading
 
 ```bash

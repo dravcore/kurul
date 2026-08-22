@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiCreatedResponse,
   ApiNoContentResponse,
@@ -23,6 +34,7 @@ import {
   WorkspaceScoped,
 } from '../common/decorators/workspace-roles.decorator';
 import { ThrottleInvitations } from '../common/rate-limit/rate-limit';
+import { DemoRestrictedGuard } from '../demo/demo-restricted.guard';
 import type { AuthenticatedUser, WorkspaceMembership } from '../common/types/request-context';
 import {
   InvitationPageSchema,
@@ -102,10 +114,12 @@ export class WorkspaceController {
     summary: 'Delete a workspace',
     description:
       'OWNER only \u2014 the one route in the API gated on a single role rather than a role set. ' +
-      'Cascades to every board, task and file in it.',
+      'Cascades to every board, task and file in it. Answers `403` on a demo instance, where ' +
+      'the one shared workspace is what every other visitor is currently looking at.',
   })
   @ApiNoContentResponse({ description: 'Deleted. Empty body.' })
   @HttpCode(204)
+  @UseGuards(DemoRestrictedGuard)
   @WorkspaceRoles(MemberRole.OWNER)
   async remove(
     @UuidParam('workspaceId') workspaceId: string,
