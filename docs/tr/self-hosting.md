@@ -397,6 +397,106 @@ dosyayı geride bırakır — üstelik attachment'lardan önce yazılmış her d
 
 Geri yükleme adımları: [Yükseltme ve yedekleme](development.md#yükseltme-ve-yedekleme).
 
+## Demo instance
+
+Bu bölüm tek bir iş için: herkesin giriş yapabildiği ve içeriğini belirli aralıklarla çöpe atan
+bir **herkese açık demo** çalıştırmak. Kurul'u kendi ekibiniz için barındırıyorsanız burayı
+atlayın. Buradaki hiçbir şey varsayılan olarak açık değil ve hiçbiri sıradan bir kurulumu
+değiştirmiyor.
+
+Bir demoyu iki şey oluşturur: API'nin davranışını değiştiren `DEMO_MODE=true` ve silme işini
+yapan sidecar'ı başlatan `demo` compose profile'ı. Ya ikisi birden, ya hiçbiri.
+
+```bash
+# .env
+DEMO_MODE=true
+DEMO_PASSWORD=birsey-secin-ve-yayinlayin      # en az 8 karakter
+DEMO_RESET_INTERVAL_MINUTES=60                # varsayılan
+POSTGRES_DB=kurul_demo                        # aşağıdaki "iki kilit" bölümüne bakın
+REDIS_PASSWORD=...                            # önerilir, aşağıya bakın
+```
+
+```bash
+docker compose --profile demo up -d
+```
+
+Profile tek bir container ekler: `demo-reset`. API ile aynı `kurul-api` imajından çalışır, yani
+ayrıca build edilecek veya çekilecek bir şey yok.
+
+### `DEMO_MODE=true` neyi değiştirir
+
+| Davranış                                               | Neden                                                                                                                                          |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Uygulamada sıklığı söyleyen kalıcı bir bildirim şeridi | Bir ziyaretçinin, bir saatlik emeğinin silineceğine dair aldığı tek uyarı budur. Sekme boyunca kapatılabilir, sonraki ziyarette geri gelir     |
+| Giden tüm e-posta log'a yazılır                        | `SMTP_HOST` ne derse desin. Herkesin kayıt olabildiği bir demo, bir yabancının yazdığı adrese posta gönderebiliyor olmamalı                    |
+| Hesap silme ve workspace silme `403` döner             | Demo tek bir paylaşılan workspace'tir. Onu ya da sahibi hesabı silmek, bir sonraki reset'e kadar demoyu diğer bütün ziyaretçiler için boşaltır |
+| `GET /config` reset takvimini yayınlar                 | Böylece bildirim şeridi, sidecar'ın gerçekten uyuduğu süreyi söyler; iki kez yazılmış bir sayıyı değil                                         |
+
+Geri kalan her şey ürünün kendisidir. Kayıt açık kalır (oradaki kötüye kullanımın cevabı bir
+anahtar değil, rate limit'tir), davetler yine oluşturulabilir ve bağlantıları elle
+kopyalanabilir, yüklemeler ise olağan attachment kotalarıyla sınırlıdır
+([ADR 0027](decisions/0027-attachment-quotas.md)). Bir demo host'ta başka bir anahtara uzanmak
+yerine bu kotaları düşük tutun.
+
+### Hesap
+
+Reset tek bir hesap oluşturur: `demo@kurul.dev`, şifresi `DEMO_PASSWORD`'e yazdığınız değer.
+Demo bağlantısını nerede yayınlıyorsanız ikisini de orada yayınlayın. Varsayılan bir şifre yok
+ve olmayacak: açık kaynak bir imaja gömülü varsayılan, internetteki her demo host'unda aynı
+şifre demektir. Yanında dataset, **hiçbir kimlik bilgisi olmayan** ikinci bir kişi de yaratır:
+board'larda yorum ve atamaların hepsi ziyaretçinin kendisine ait olmasın diye vardır ve sızacak
+bir şifresi yoktur.
+
+### Reset'in üzerindeki iki kilit
+
+`node dist/demo/reset.js` bir şey yazmadan önce veritabanındaki her satırı siler. **İkisi
+birden** doğru değilse çalışmayı reddeder:
+
+1. Kendi ortamında `DEMO_MODE=true` ayarlı olmalı ve
+2. `DATABASE_URL`'in işaret ettiği veritabanının adında `demo` geçmeli.
+
+Yukarıdaki örnekte `POSTGRES_DB=kurul_demo` bu yüzden var. İki farklı kaynaktan gelen iki
+bağımsız kontrol; böylece bunu gerçek bir kuruluma çevirmek bir değil iki hata gerektirir.
+`kurul`, `kurul_prod` ve `postgres` reddedilir.
+
+### Oturumlar ve reset'ten sonraki bir dakika
+
+Reset her oturumu siler, yani giriş yapmış herkesin oturumu kapanır. Uygulama bunu karşılar:
+sonraki gezinme, bulunduğunuz sayfa dönüş adresi olarak korunarak giriş ekranına düşer.
+
+Reset'ten sonraki 60 saniyeye kadar, oturumu açık olan bir tarayıcı imzalı oturum çerezinden
+tanınmaya devam edebilir; Kurul her istekte bir veritabanı okuması yapmamak için bu çerezi o
+kadar süre önbellekler. Bu aralıkta okumalar boş döner ve bir yazma başarısız olabilir. Kendi
+kendine geçer, silinmiş bir hesabın da aynı aralığı vardır
+([ADR 0026](decisions/0026-account-deletion-anonymisation.md)) ve bir demoda bedeli, birinin
+saati dolarken son bir dakikada yazdığı şeydir.
+
+### İzleme
+
+Asıl kontrol `docker compose ps`. Aralığın iki katı boyunca başarılı bir reset olmazsa
+`demo-reset` **unhealthy** raporlar; yani üst üste iki kaçırılmış döngü, yani yavaş ya da
+atlanmış tek bir çalıştırma onu oynatmaz. Bu olmasa, reset üretmeyi bırakmış bir döngü sadece "Up"
+görünürken lansman günü bağlantısı son ziyaretçinin bıraktığı şeyi servis ederdi.
+
+```bash
+docker compose --profile demo logs demo-reset
+```
+
+Ayrıca `https://alan-adiniz/api/health/ready` adresine bir uptime monitörü koyun;
+[5. Üzerine bir monitör koyun](#5-üzerine-bir-monitör-koyun) bölümüne bakın. Bu, her kurulumun
+aldığı aynı tavsiye ve demonun düştüğünü internetteki birinden önce size söyleyen şey.
+
+### Herkese açık bir demoda ayrıca yapılması iyi olanlar
+
+- **`REDIS_PASSWORD` ayarlayın.** Redis compose ağının dışına açılmadığı için başka her yerde
+  isteğe bağlı. Yabancıların yönlendirildiği bir host, bu tek satırlık ek savunmanın değdiği
+  yerdir.
+- **Attachment kotalarını düşük tutun.** `ATTACHMENT_WORKSPACE_QUOTA_BYTES` ve
+  `ATTACHMENT_INSTANCE_QUOTA_BYTES`, iki reset arasında bir demoya ne kadar veri
+  depolatılabileceğini sınırlar; reset satırları siler, gecelik süpürme baytları geri kazanır.
+- **İçine gerçek hiçbir şey koymayın.** Burası bir staging ortamı değil. Boşaltmak üzere
+  tasarlanmış bir container tarafından her saat boşaltılan bir veritabanı.
+
 ## Upgrade
 
 ```bash

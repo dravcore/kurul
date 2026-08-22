@@ -7,6 +7,38 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Demo mode, and everything a live demo instance needs except the host.** `DEMO_MODE=true` is
+  the whole switch: the app shows a standing, dismissible banner naming how often the data
+  disappears; all outbound email goes to the log transport whatever `SMTP_HOST` says, so a
+  demo anyone can sign up to cannot be made to mail an address a stranger typed in; account
+  deletion and workspace deletion answer `403` (a demo is one shared workspace, and deleting it
+  empties the demo for every other visitor until the next reset); and `GET /config` publishes
+  `demo: { enabled, resetIntervalMinutes, nextResetAt }` so the banner names the same cadence
+  the reset actually runs on. Nothing else is disabled: sign-up stays open, invitations can
+  still be created and their links copied, and uploads stay bounded by the ordinary attachment
+  quotas ([ADR 0027](docs/decisions/0027-attachment-quotas.md)).
+
+  The reset itself is `node dist/demo/reset.js`, compiled into the API image with everything
+  else and run on a loop by a new `demo-reset` service behind the `demo` compose profile. It
+  wipes every tenant and auth table and restores a golden dataset: two boards with work in
+  every column, labels, assignees, comments, checklists, due dates relative to the reset, a
+  published `demo@kurul.dev` account whose password comes from `DEMO_PASSWORD` (no default,
+  ever), and a second person with no credentials at all. It refuses to run unless `DEMO_MODE`
+  is true **and** the database is named like a demo, so pointing it at a real deployment takes
+  two independent mistakes rather than one. It is deliberately not the development seed: that
+  runs through `tsx` and a pnpm workspace the production image does not have, and refuses under
+  the `NODE_ENV=production` the image bakes in.
+
+  The sidecar sleeps to wall-clock boundaries rather than a flat interval, so the API and the
+  reset agree on `nextResetAt` without sharing state and a restart does not shift the schedule.
+  Its healthcheck goes unhealthy when no reset has succeeded for twice the interval, in the
+  same shape as the `backup` sidecar's freshness check: a reset loop that had silently stopped
+  resetting would otherwise report as "Up" while a launch-day link served whatever the last
+  visitor left behind. Setup is in
+  [Self-hosting → Demo instance](docs/self-hosting.md#demo-instance).
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that

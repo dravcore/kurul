@@ -7,6 +7,12 @@ vi.mock('./app-sidebar', () => ({
   AppSidebar: (): React.ReactElement => <div data-testid="app-sidebar" />,
 }));
 
+// Stubbed rather than left to run: the real one fetches `GET /config` on mount, which this
+// suite has no server for. Its own behaviour is covered in `demo-banner.test.tsx`.
+vi.mock('./demo-banner', () => ({
+  DemoBanner: (): null => null,
+}));
+
 const context = vi.hoisted(() => ({
   value: {
     sessionPending: false,

@@ -477,6 +477,16 @@ services:
       # are passed here rather than defaulted in code.
       BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
+      # The demo instance. Off everywhere by default, and one variable rather than a set of
+      # them so an operator cannot get half of it: `true` shows the "this data disappears"
+      # banner, routes all outbound mail to the log whatever SMTP says, refuses account and
+      # workspace deletion with 403, and publishes the reset schedule on `GET /config`.
+      # The interval is passed here too, because the banner has to name the same cadence the
+      # `demo-reset` service below sleeps for. Both sides derive the next reset from the same
+      # epoch-anchored grid, so they agree without sharing any state; two different numbers
+      # would make the countdown a lie. See docs/self-hosting.md#demo-instance.
+      DEMO_MODE: ${DEMO_MODE:-false}
+      DEMO_RESET_INTERVAL_MINUTES: ${DEMO_RESET_INTERVAL_MINUTES:-60}
     # The first `volumes:` this service has ever had, and with it the first deployment
     # constraint naming which host a replica may run on (ADR 0022). The directory is created in
     # the image already owned by `node` (apps/api/Dockerfile), so nothing chowns at runtime and
@@ -504,6 +514,118 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # The public demo's reset loop. The first service in this file behind a profile, so it starts
+  # only for `docker compose --profile demo up -d` and every ordinary self-hosted install is
+  # unaffected by its existence.
+  #
+  # Same image as `api` above, deliberately: the reset is compiled into `dist` with the rest of
+  # the API (`apps/api/src/demo/reset.ts`), so this adds a container and not a second artefact
+  # to build, publish, scan and keep in step with the schema. It is *not* `pnpm db:seed` on a
+  # timer: the runner image has no pnpm workspace and no tsx for `prisma.config.ts` to invoke,
+  # and `assertSeedAllowed` refuses under the `NODE_ENV=production` the image bakes in. The
+  # replacement for that refusal is in `reset-guard.ts`: this script runs only when DEMO_MODE is
+  # true *and* the database is named like a demo, so pointing it at a real deployment by
+  # copy-pasting this block takes two independent mistakes rather than one.
+  demo-reset:
+    profiles: ['demo']
+    image: ghcr.io/dravcore/kurul-api:${TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    # `unless-stopped` for the same reason `backup` has it: a reset sidecar that stays down
+    # after a host reboot leaves a public demo full of whatever the last visitor typed.
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # 256m: this process writes a few hundred rows and holds none of them, so the ceiling is
+    # process overhead plus the Prisma client. Same reasoning as `backup` above, and the same
+    # explicit V8 heap so a runaway hits a catchable JS error rather than a bare SIGKILL.
+    mem_limit: 256m
+    environment:
+      NODE_OPTIONS: --max-old-space-size=192
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kurul}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}@postgres:5432/${POSTGRES_DB:-kurul}
+      # Better Auth is constructed at module load and refuses to build without it: the reset
+      # creates the demo account through `signUpEmail` rather than writing a password hash by
+      # hand, so the same secret the API signs sessions with has to be here too.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env — see docs/development.md#environment-variables}
+      BETTER_AUTH_URL: ${SITE_URL:-http://localhost}
+      WEB_URL: ${SITE_URL:-http://localhost}
+      # Both checks the reset makes before deleting anything. `DEMO_MODE` has no default here
+      # on purpose: every other service in this file defaults it to `false`, and a container
+      # whose whole job is to empty a database should not inherit a default either way.
+      DEMO_MODE: ${DEMO_MODE:?set DEMO_MODE=true in .env to run the demo profile, see docs/self-hosting.md#demo-instance}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:?set DEMO_PASSWORD in .env, it is the published password for the demo account, see docs/self-hosting.md#demo-instance}
+      DEMO_RESET_INTERVAL_MINUTES: ${DEMO_RESET_INTERVAL_MINUTES:-60}
+      # No REDIS_URL, and that is the decision rather than an omission: nothing this script does
+      # touches Redis, and Better Auth would build a rate-limit client at module load for a
+      # process that never serves a request.
+    # `sh -c` with the loop inline rather than a mounted script: `scripts/backup.sh` is mounted
+    # into a stock `postgres:18-alpine`, which carries none of this project's code, whereas this
+    # image already carries all of it. A file bind-mounted from the host would also mean an
+    # operator running `docker compose pull` gets a new image and their old loop.
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        set -eu
+        STAMP=/tmp/kurul-demo-reset.stamp
+        INTERVAL=$$(( $$DEMO_RESET_INTERVAL_MINUTES * 60 ))
+        trap 'echo "demo-reset: stopping"; exit 0' INT TERM
+        # `if`, not a bare call: `set -e` would take the container down on the first failed
+        # cycle, and a demo that stops resetting because Postgres was restarting once is worse
+        # than one that logs it and tries again. The stamp is touched only on success, which is
+        # what the healthcheck below reads, the same shape as `backup`'s newest-dump mtime check.
+        run() {
+          if node dist/demo/reset.js; then
+            touch "$$STAMP"
+          else
+            echo "demo-reset: ERROR reset failed, retrying at the next interval"
+          fi
+        }
+        # Once at boot, so a freshly started stack has data before the first boundary.
+        run
+        while true; do
+          NOW=$$(date +%s)
+          # Sleep to the next boundary of the interval grid rather than a flat INTERVAL, so the
+          # instant matches what `GET /config` publishes as `demo.nextResetAt` (see
+          # apps/api/src/demo/demo-mode.ts) and so restarting this container does not shift the
+          # schedule the banner is promising. Backgrounded + `wait`, like backup.sh, so the
+          # trap above can interrupt it.
+          sleep $$(( INTERVAL - NOW % INTERVAL )) &
+          wait $$!
+          run
+        done
+    # "Healthy" = a successful reset within the last 2 × the interval. 2×, not 1×, for the
+    # reason `backup`'s check states: one slow or skipped cycle must not flap this
+    # healthy → unhealthy → healthy every interval; it takes a second missed cycle in a row to
+    # mean something is stuck. Without it, a reset loop that had stopped producing resets would
+    # report as simply "Up", and on a public demo the failure that matters is exactly the
+    # silent one, where a launch-day link keeps serving whatever a stranger left behind.
+    #
+    # `-mmin` takes whole minutes and the interval is already in minutes, so no rounding is
+    # needed; the `-lt 1` floor is there so an operator experimenting with a sub-minute cadence
+    # cannot produce `-mmin -0`, which BusyBox reads as "modified in the last zero minutes" and
+    # never matches. Every `$` is doubled because the container's shell interprets this, not
+    # Compose's interpolation of this file.
+    #
+    # `start_period` covers the boot reset (a wipe and a few hundred inserts, seconds) plus the
+    # `depends_on` wait, not a whole interval: the first run starts immediately, so sizing this
+    # off the cadence would hide a genuinely broken first cycle for an hour.
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mmin=$$(( $$DEMO_RESET_INTERVAL_MINUTES * 2 )); [ "$$mmin" -lt 1 ] && mmin=1; find /tmp -maxdepth 1 -name kurul-demo-reset.stamp -mmin "-$$mmin" 2>/dev/null | grep -q .',
+        ]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 3m
+    depends_on:
+      postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
