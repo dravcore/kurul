@@ -74,10 +74,8 @@ kurul/
 └── .env.example
 ```
 
-Live layout is this document and the repo tree.
-[archive/project-skeleton.md](archive/project-skeleton.md) is the **historical Phase 1
-scaffold** (how the monorepo was first built); it is not the day-to-day source of truth.
-Technology choices: [tech-stack.md](tech-stack.md).
+Live layout is this document and the repo tree. Technology choices:
+[tech-stack.md](tech-stack.md).
 
 ---
 
@@ -236,7 +234,7 @@ Enums and DTOs are **hand-maintained** to match the Prisma schema today; a mecha
 | `ChecklistItem`   | `id`, `checklistId`, `content`, `isDone`, `position`, `createdAt`, `updatedAt`                                                                       | Completion percentage is counted at read time from whichever checklist items are loaded, never stored ([ADR 0023](decisions/0023-checklist-data-model.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `Attachment`      | `id`, `taskId`, `uploadedById`, `kind`, `filename`, `storageKey` (nullable), `mimeType` (nullable), `size` (nullable), `url` (nullable), `createdAt` | `kind` is `AttachmentKind` — `FILE` or `LINK` — and it is what says which of the nullable columns are populated; it is never inferred from them. A `FILE` carries `storageKey`/`mimeType`/`size`, a `LINK` carries `url`. `mimeType` is what the magic bytes said, never what the client declared. `storageKey` is derived from the row's own `id` on the server, so the user's filename is a display field that never reaches a path. No `position`: attachments are not user-ordered and come back newest-first by `id` ([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Per-workspace and per-instance byte quotas apply on top of the per-file size limit ([ADR 0027](decisions/0027-attachment-quotas.md)) |
 | `Activity`        | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt`                                                            | Append-only log. `workspaceId` is required and `taskId` is optional so that workspace-level events with no task — "board renamed", "member joined" — are representable, which is what the Phase 8 feed promises. `taskId` uses `ON DELETE SET NULL` so history survives task deletion.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `Notification`    | `id`, `workspaceId`, `userId`, `type`, `taskId` (nullable), `activityId` (nullable), `payload` (Json), `readAt` (nullable), `createdAt`              | In-app alerts (assignment, mention, due-soon). Fan-out from activity writes; due-soon via BullMQ on `REDIS_URL`. See [roadmap Phase 8](archive/roadmap-mvp-phases.md#phase-8--activity-log-and-notifications)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `Notification`    | `id`, `workspaceId`, `userId`, `type`, `taskId` (nullable), `activityId` (nullable), `payload` (Json), `readAt` (nullable), `createdAt`              | In-app alerts (assignment, mention, due-soon). Fan-out from activity writes; due-soon via BullMQ on `REDIS_URL`. See Phase 8 of the MVP ([ROADMAP.md](../ROADMAP.md#shipped-mvp-summary))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 Invitations persist as `WorkspaceInvitation`, mapped from Better Auth's organization
 plugin tables (Kurul names, plugin `schema` config). Product language and REST
@@ -513,6 +511,4 @@ one published image run on any domain (audit finding PM-02, `apps/web/lib/api-ur
 loop still runs the two apps on separate ports, and a deployment may still put the API on its
 own hostname.
 
-Related: [tech-stack.md](tech-stack.md) ·
-[archive/project-skeleton.md](archive/project-skeleton.md) (historical Phase 1 scaffold) ·
-[docs/README.md](README.md) (docs map)
+Related: [tech-stack.md](tech-stack.md) · [docs/README.md](README.md) (docs map)

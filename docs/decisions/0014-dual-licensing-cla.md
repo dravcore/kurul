@@ -43,7 +43,7 @@ feature. Organizations that cannot accept AGPL's obligations buy a separate comm
 to that same code from the maintainer.
 
 To make the second half legally possible, every external contributor signs a CLA
-([docs/cla.md](../archive/cla-draft.md)) granting the maintainer a non-exclusive, worldwide, perpetual,
+(`docs/cla.md` (deleted 2026-08-22, in git history)) granting the maintainer a non-exclusive, worldwide, perpetual,
 irrevocable, sublicensable license including the right to distribute the contribution under
 **any** license terms, while the contributor keeps copyright and every right to reuse their own
 code. The agreement is derived from the **Harmony** Individual CLA (HA-CLA-I, "any license"
@@ -121,7 +121,7 @@ unchanged; 0014 replaces its open-core aside with a settled model.
 - **The legal work is not done.** The document is a draft with open questions — who "Us" is
   once a company exists, whether a PR comment is a valid signature, whether FSEK's form
   requirements reach a license grant, which law governs. Those are listed in
-  [docs/cla.md](../archive/cla-draft.md#questions-for-a-lawyer) and have to be answered before the CLA binds
+  `docs/cla.md` (deleted 2026-08-22, in git history) and had to be answered before the CLA binds
   anyone. Until then the check is scaffolding, not enforcement.
 - **A corporate contributor has no path yet.** There is no Entity CLA. A company that wants to
   contribute has to wait for one, or its employee signs individually with employer approval,

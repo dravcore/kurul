@@ -103,7 +103,8 @@ point the repo homepage at `kurul.dev` when it answers; close issues
 Product Phases **1–9** (plus Phase **0** docs/standards) and the post-MVP hardening pass
 shipped in [`v0.1.0`](CHANGELOG.md#010---2026-08-12); `v0.2.0` added Turkish UI, account
 deletion, attachments, checklists, Trello import and the signed multi-arch release path.
-Full phase checklists: [docs/archive/roadmap-mvp-phases.md](docs/archive/roadmap-mvp-phases.md).
+The per-phase checklists were retired with the rest of `docs/archive/` on 2026-08-22; git
+history before that date has them.
 
 | Phase | Capability                                          |
 | ----- | --------------------------------------------------- |
@@ -179,7 +180,6 @@ Three things this section deliberately does **not** promise:
 
 ## See also
 
-- [docs/archive/roadmap-mvp-phases.md](docs/archive/roadmap-mvp-phases.md) — full phase checklists
 - [docs/architecture.md](docs/architecture.md) — how the modules fit together
 - [docs/git-strategy.md](docs/git-strategy.md) — how work becomes a release
 - [ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md) - contributions and the hosted service

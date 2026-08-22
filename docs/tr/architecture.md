@@ -83,10 +83,8 @@ kurul/
 └── .env.example
 ```
 
-Canlı yerleşim bu doküman ve repo ağacıdır.
-[../archive/project-skeleton.md](../archive/project-skeleton.md) **tarihsel Faz 1
-iskeletidir** (monorepo’nun ilk nasıl kurulduğu); gündelik doğruluk kaynağı değildir.
-Teknoloji seçimleri: [tech-stack.md](tech-stack.md).
+Canlı yerleşim bu doküman ve repo ağacıdır. Teknoloji seçimleri:
+[tech-stack.md](tech-stack.md).
 
 ---
 
@@ -264,7 +262,7 @@ client hâlâ Nest ve Better Auth adapter için `apps/api/src/generated/prisma`'
 | `Comment`         | `id`, `taskId`, `userId`, `body`, `createdAt`                                                                                                        |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `Attachment`      | `id`, `taskId`, `uploadedById`, `kind`, `filename`, `storageKey` (nullable), `mimeType` (nullable), `size` (nullable), `url` (nullable), `createdAt` | `kind` bir `AttachmentKind` — `FILE` ya da `LINK` — ve nullable kolonlardan hangilerinin dolu olduğunu söyleyen odur; asla onlardan türetilmez. `FILE` `storageKey`/`mimeType`/`size` taşır, `LINK` `url` taşır. `mimeType` magic byte'ların söylediğidir, asla istemcinin beyan ettiği değil. `storageKey` sunucuda satırın kendi `id`'sinden türetilir, böylece kullanıcının dosya adı hiçbir yola girmeyen bir görüntüleme alanı olarak kalır. `position` yok: attachment'lar kullanıcı tarafından sıralanmaz ve `id`'ye göre en yeni önce döner ([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Dosya başına boyut limitinin üstüne workspace başına ve instance başına bayt kotaları da uygulanır ([ADR 0027](decisions/0027-attachment-quotas.md)) |
 | `Activity`        | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt`                                                            | Yalnızca-ekleme log. `workspaceId` zorunlu ve `taskId` opsiyonel, böylece task'ı olmayan workspace seviyesi olaylar — "board yeniden adlandırıldı", "üye katıldı" — temsil edilebilir; Faz 8 feed'inin vaat ettiği de bu. `taskId` için `ON DELETE SET NULL` — geçmiş task silinince korunur.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `Notification`    | `id`, `workspaceId`, `userId`, `type`, `taskId` (nullable), `activityId` (nullable), `payload` (Json), `readAt` (nullable), `createdAt`              | Uygulama içi bildirimler (atama, mention, due-soon). Activity yazımlarından fan-out; due-soon BullMQ ile `REDIS_URL` üzerinde. Bkz. [roadmap Faz 8](../archive/roadmap-mvp-phases.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `Notification`    | `id`, `workspaceId`, `userId`, `type`, `taskId` (nullable), `activityId` (nullable), `payload` (Json), `readAt` (nullable), `createdAt`              | Uygulama içi bildirimler (atama, mention, due-soon). Activity yazımlarından fan-out; due-soon BullMQ ile `REDIS_URL` üzerinde. Bkz. MVP'nin Faz 8'i ([ROADMAP.md](../../ROADMAP.md#shipped-mvp-summary))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 Davetler `WorkspaceInvitation` olarak saklanır; Better Auth organization plugin
 tablolarından Kurul adlarına map edilir. Ürün dili ve REST path'leri
@@ -555,6 +553,4 @@ bir yayınlanmış imajın her domain'de çalışmasını sağlayan şey budur (
 mekanizması yerinde kalır: geliştirme döngüsü iki uygulamayı hâlâ ayrı portlarda çalıştırır ve
 bir dağıtım API'yi hâlâ kendi hostname'ine koyabilir.
 
-İlgili: [tech-stack.md](tech-stack.md) ·
-[../archive/project-skeleton.md](../archive/project-skeleton.md) (tarihsel Faz 1 iskeleti) ·
-[docs/README.md](../README.md) (docs haritası)
+İlgili: [tech-stack.md](tech-stack.md) · [docs/README.md](../README.md) (docs haritası)

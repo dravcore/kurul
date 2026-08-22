@@ -234,15 +234,14 @@ Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
 Beş dakikalık harita (EN kanonik): **[docs/README.md](docs/README.md)**. Türkçe harita:
 **[docs/tr/README.md](docs/tr/README.md)**.
 
-| Doküman                                                  | Kapsam                               |
-| -------------------------------------------------------- | ------------------------------------ |
-| [docs/tr/architecture.md](docs/tr/architecture.md)       | Modül haritası, veri modeli          |
-| [docs/tr/design.md](docs/tr/design.md)                   | UI/UX dili                           |
-| [docs/tr/development.md](docs/tr/development.md)         | Yerel kurulum ve günlük komutlar     |
-| [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST, hatalar, pagination            |
-| [ROADMAP.md](ROADMAP.md) (İngilizce)                     | MVP bitti; Beyond MVP listesi        |
-| [docs/tr/decisions/](docs/tr/decisions/)                 | ADR’ler                              |
-| [docs/archive/](docs/archive/)                           | Tarihsel spec / plan / faz checklist |
+| Doküman                                                  | Kapsam                           |
+| -------------------------------------------------------- | -------------------------------- |
+| [docs/tr/architecture.md](docs/tr/architecture.md)       | Modül haritası, veri modeli      |
+| [docs/tr/design.md](docs/tr/design.md)                   | UI/UX dili                       |
+| [docs/tr/development.md](docs/tr/development.md)         | Yerel kurulum ve günlük komutlar |
+| [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST, hatalar, pagination        |
+| [ROADMAP.md](ROADMAP.md) (İngilizce)                     | MVP bitti; Beyond MVP listesi    |
+| [docs/tr/decisions/](docs/tr/decisions/)                 | ADR’ler                          |
 
 ## Katkıda bulunma
 

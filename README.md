@@ -226,15 +226,14 @@ Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 Start with the five-minute map: **[docs/README.md](docs/README.md)** (what to read for
 product, coding, API, releases, roadmap).
 
-| Doc                                                | Covers                                    |
-| -------------------------------------------------- | ----------------------------------------- |
-| [docs/architecture.md](docs/architecture.md)       | Module map, data model                    |
-| [docs/design.md](docs/design.md)                   | UI/UX language                            |
-| [docs/development.md](docs/development.md)         | Local setup and daily commands            |
-| [docs/api-conventions.md](docs/api-conventions.md) | REST, errors, pagination                  |
-| [ROADMAP.md](ROADMAP.md)                           | MVP done; beyond-MVP backlog              |
-| [docs/decisions/](docs/decisions/)                 | ADRs                                      |
-| [docs/archive/](docs/archive/)                     | Historical specs, plans, phase checklists |
+| Doc                                                | Covers                         |
+| -------------------------------------------------- | ------------------------------ |
+| [docs/architecture.md](docs/architecture.md)       | Module map, data model         |
+| [docs/design.md](docs/design.md)                   | UI/UX language                 |
+| [docs/development.md](docs/development.md)         | Local setup and daily commands |
+| [docs/api-conventions.md](docs/api-conventions.md) | REST, errors, pagination       |
+| [ROADMAP.md](ROADMAP.md)                           | MVP done; beyond-MVP backlog   |
+| [docs/decisions/](docs/decisions/)                 | ADRs                           |
 
 ## Contributing
 

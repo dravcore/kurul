@@ -6,6 +6,10 @@
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0028-open-contributions-hosted-service.md)
 
+> **Updated (2026-08-22):** `docs/archive/` was removed in full, the CLA draft with it. The
+> consequence below that moves `docs/cla.md` to `docs/archive/cla-draft.md` was carried out and
+> then overtaken a day later; the draft now exists only in git history.
+
 ## Context
 
 [ADR 0007](0007-license-agpl.md) chose AGPL-3.0. [ADR 0014](0014-dual-licensing-cla.md) built a

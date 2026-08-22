@@ -224,4 +224,4 @@ Mimari ve veri modelleme için incelemeye değer projeler:
 Stack ve ürün ADR'leri [decisions/README.md](decisions/README.md) indeksinde (0001-0028).
 Tabloyu burada çoğaltmak yerine oradan başlayın.
 
-İlgili: [architecture.md](architecture.md) · [../archive/project-skeleton.md](../archive/project-skeleton.md) (tarihsel Faz 1 iskeleti)
+İlgili: [architecture.md](architecture.md)
