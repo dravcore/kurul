@@ -340,7 +340,9 @@ Invitations are the one feature that hard-fails without SMTP: accepting an invit
 a verified email address, and verification needs a delivered message
 ([ADR 0013](decisions/0013-invitation-email-verification.md)). With `SMTP_HOST` unset the API
 still boots and logs the message instead of sending it, so a solo install works fine — but
-nobody can join your workspace. The Members screen says so in the product, too.
+nobody can join your workspace. The Members screen says so in the product, too. Notification
+email (assignment, mention, due-soon) uses the same settings and simply stays off without
+them; once SMTP works, each user can switch it off for themselves under Settings.
 
 Any SMTP provider works. Two things go wrong most often:
 

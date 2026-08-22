@@ -1602,7 +1602,7 @@
         ]
       },
       "patch": {
-        "description": "Not workspace-scoped and deliberately not role-gated: the subject is the caller, so the session guard is the whole authorization story. Interface language is the only field today, and `null` is a distinct state from `\"en\"` — it means \"follow the browser\".",
+        "description": "Not workspace-scoped and deliberately not role-gated: the subject is the caller, so the session guard is the whole authorization story. Two fields: the interface language, where `null` is a distinct state from `\"en\"` (it means \"follow the browser\"), and `emailNotifications`, the per-user switch for notification email.",
         "operationId": "AuthController_updateMe",
         "parameters": [],
         "requestBody": {
@@ -12331,12 +12331,24 @@
             "enum": ["en", "tr"],
             "type": "string"
           },
+          "emailNotifications": {
+            "type": "boolean",
+            "description": "Whether assignment, mention and due-soon notifications are also sent by email. One switch\nfor every kind. Has no effect while `InstanceConfigDto.mailEnabled` is `false`."
+          },
           "createdAt": {
             "type": "string",
             "description": "ISO 8601 UTC."
           }
         },
-        "required": ["id", "email", "name", "avatarUrl", "locale", "createdAt"]
+        "required": [
+          "id",
+          "email",
+          "name",
+          "avatarUrl",
+          "locale",
+          "emailNotifications",
+          "createdAt"
+        ]
       },
       "UpdateMeDto": {
         "type": "object",
@@ -12346,6 +12358,10 @@
             "nullable": true,
             "description": "Nullable on purpose: clearing the preference puts the user back on their browser's\n`Accept-Language`, which a user who set a language on someone else's machine should be\nable to undo. Omitting the key leaves the stored value alone.\n\nValidated against `SUPPORTED_LOCALES` rather than a loose IETF-tag pattern, so the column\ncan only ever hold a tag the app actually ships a catalog for.",
             "enum": ["en", "tr"]
+          },
+          "emailNotifications": {
+            "type": "boolean",
+            "description": "Not nullable: the column has a default and \"no preference\" is not a state it can hold.\nOmitting the key leaves the stored value alone."
           }
         }
       },

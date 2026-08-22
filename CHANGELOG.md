@@ -115,6 +115,20 @@ the 2026-08-18 "atlas" audit. See
 
 ### Added
 
+- **Email notifications** ([#255](https://github.com/dravcore/kurul/discussions/255)). An
+  assignment, a mention in a comment and a due-soon reminder now also arrive by email, in the
+  recipient's stored language (`User.locale`, falling back to English), with a link to the
+  card. One message per stored `Notification` row, sent after the transaction commits through
+  the transport the invitation email already uses; a failed send is logged and never fails the
+  request that caused it, and an instance without `SMTP_HOST` sends nothing and changes
+  nothing. The switch is `User.emailNotifications` (default `true`), one boolean for every kind,
+  read and written through `GET /me` / `PATCH /me` and shown as a checkbox under
+  Settings > Notifications in both languages. There is no digest: the existing per-comment and
+  per-24h dedupe in the notification paths is the only batching, and that is recorded as an
+  open question on the roadmap row rather than built. Covered by template, mailer and worker
+  unit tests, a settings component test, and an e2e scenario that captures the message for a
+  Turkish assignee and checks that nothing goes out after they opt out.
+
 - **`pnpm db:drift` checks the configured database against `schema.prisma` for migration
   drift** (roadmap Hardening: "migration drift check"). It runs `prisma migrate diff
   --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`, printing

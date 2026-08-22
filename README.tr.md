@@ -98,7 +98,7 @@ MVP’de gelenler — sıralama geçmişi için [ROADMAP.md](ROADMAP.md):
 - **Workspace'ler** — temelden itibaren multi-tenant; her sorgu workspace'e göre scope'lanır
 - **Filtreleme ve arama** — board task filtreleri, cursor pagination
 - **Dashboard** — agregasyon görünümleri ve grafikler (created vs completed dahil)
-- **Aktivite log'u ve bildirimler** — uygulama içi atama, mention, due-soon; `/notifications`
+- **Aktivite log'u ve bildirimler** — atama, mention, due-soon; uygulama içi ve e-postayla (kullanıcı başına anahtar); `/notifications`
 - **Realtime senkronizasyon** — board değişiklikleri Socket.io üzerinden canlı yayılır
 - **İngilizce ve Türkçe** — workspace başına değil, kullanıcı başına bir tercih; böylece tek bir
   workspace farklı diller okuyan insanları bir arada tutabilir. Giriş yaptığınız her cihaza

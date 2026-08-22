@@ -94,7 +94,7 @@ Shipped in the MVP — sequencing history in [ROADMAP.md](ROADMAP.md):
 - **Workspaces** — multi-tenant from the ground up, every query scoped by workspace
 - **Filtering and search** — board task filters with cursor pagination
 - **Dashboard** — aggregation views and charts (including created vs completed)
-- **Activity log and notifications** — in-app assignment, mention, due-soon; `/notifications`
+- **Activity log and notifications** — assignment, mention, due-soon, in-app and by email (per-user switch); `/notifications`
 - **Realtime sync** — board changes propagate live via Socket.io
 - **English and Turkish** — a per-user preference, not a per-workspace one, so one workspace
   can hold people who read different languages. It follows you to every device you sign in on,

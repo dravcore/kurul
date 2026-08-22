@@ -165,7 +165,7 @@ GET   /health/ready          # readiness, unauthenticated
 GET   /config                # instance capabilities; any signed-in caller
 POST  /auth/*                # Better Auth handlers
 GET   /me                    # current user profile
-PATCH /me                    # own profile; interface language today
+PATCH /me                    # own profile; interface language and the notification-email switch
 GET   /me/deletion-preview   # what deleting this account would do
 DELETE /me                   # delete this account (anonymises it)
 GET   /instance/activation                     # activation funnel; INSTANCE_ADMIN_EMAILS only (verified email required)
@@ -183,7 +183,10 @@ document rather than the error envelope below — the caller is a healthcheck, n
 
 `PATCH /me` is not workspace-scoped and not role-gated: the subject is the caller, so the
 session guard is the whole authorization story. It is also the only place `User.locale` is
-written — see [decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md).
+written — see [decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md) —
+and the only place `User.emailNotifications` is: one boolean, `true` for a new account, that
+switches the assignment, mention and due-soon emails off together. In-app notifications are
+not affected, and the flag changes nothing on an instance whose `mailEnabled` is `false`.
 
 `DELETE /me` deletes the caller's account, and it is the one route in this API that refuses to
 act on an incomplete request rather than picking a default. The body carries `confirmEmail` (the
@@ -210,10 +213,10 @@ here there is nothing to hide — the route is in the source of an AGPL project.
 { "mailEnabled": true, "attachmentsEnabled": true }
 ```
 
-| Field                | Meaning                                                                                                                                                                                      |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mailEnabled`        | `false` when no SMTP host is configured, so every message is written to the API log and delivered nowhere — nobody can confirm an address or accept an invite                                |
-| `attachmentsEnabled` | `false` when `STORAGE_PATH` is unset, so this deployment stores no files and the web app hides the upload control. **Link attachments do not depend on it** — a link needs no storage at all |
+| Field                | Meaning                                                                                                                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mailEnabled`        | `false` when no SMTP host is configured, so every message is written to the API log and delivered nowhere — nobody can confirm an address or accept an invite, and notification email is off whatever `User.emailNotifications` says |
+| `attachmentsEnabled` | `false` when `STORAGE_PATH` is unset, so this deployment stores no files and the web app hides the upload control. **Link attachments do not depend on it** — a link needs no storage at all                                         |
 
 Three rules hold this endpoint's shape, and each one is a decision that was available to make
 differently:
