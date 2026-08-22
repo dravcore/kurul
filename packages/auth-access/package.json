@@ -27,6 +27,6 @@
     "@kurul/shared-types": "workspace:*",
     "better-auth": "1.6.27",
     "typescript": "^5.8.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

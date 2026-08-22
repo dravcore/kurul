@@ -55,7 +55,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^26.2.0",
     "@types/nodemailer": "^8.0.1",
-    "@types/pg": "^8.11.11",
+    "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
     "jest": "^30.4.2",
     "prettier": "^3.5.3",
