@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-22
+
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that
 produced them: the same ID means different things in the 0.1.0 audit, the 0.2.0 audit and
 the 2026-08-18 "atlas" audit. See
@@ -1849,6 +1851,7 @@ commit; this is the point it becomes a version.
   session cookie cache, batch due-soon scans and rebalance SQL, paginate comments, and add
   `pg_trgm` search indexes.
 
-[unreleased]: https://github.com/dravcore/kurul/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/dravcore/kurul/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/dravcore/kurul/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dravcore/kurul/releases/tag/v0.2.0
 [0.1.0]: https://github.com/dravcore/kurul/releases/tag/v0.1.0
