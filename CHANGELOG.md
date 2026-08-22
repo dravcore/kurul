@@ -115,6 +115,17 @@ the 2026-08-18 "atlas" audit. See
 
 ### Added
 
+- **`pnpm db:drift` checks the configured database against `schema.prisma` for migration
+  drift** (roadmap Hardening: "migration drift check"). It runs `prisma migrate diff
+  --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`, printing
+  "No difference detected." and exiting `0` when they agree, or naming the mismatch and
+  exiting non-zero otherwise. CI's "Check for migration drift" step, which already ran this
+  command right after `db:migrate`, now calls `pnpm db:drift` instead of repeating the raw
+  invocation, so a local pass and a CI pass mean the same thing. No `kurul_shadow` database was
+  added: Prisma 7.9.1 has no CLI flag for a shadow database on this command, and setting
+  `datasource.shadowDatabaseUrl` in `prisma.config.ts` changes `migrate dev` behaviour too,
+  which this change did not need.
+
 - **A per-IP byte budget on the upload route** (audit finding SEC-02 follow-up,
   [ADR 0027](docs/decisions/0027-attachment-quotas.md)'s 2026-08-21 update). The route's
   request throttle counts requests, which `rate-limit.ts` has called the wrong unit for disk
@@ -318,6 +329,17 @@ the 2026-08-18 "atlas" audit. See
   turned into plain text; the released entries below keep their old paths as text only.
 
 ### Security
+
+- **`mailpit` is pinned by digest instead of `:latest`, in both `docker-compose.dev.yml` and
+  the e2e workflow's `mailpit` service** — `axllent/mailpit:v1.31.0@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24`
+  (roadmap Hardening: "mailpit pinned by digest"). A floating `:latest` on an image used in CI
+  and the local dev loop is the same class of finding as the workflow-action SHA pinning done
+  earlier (SEC-06) applied to a service that had not yet been covered. `.github/dependabot.yml`
+  gets a new `docker` ecosystem tracking the `docker-compose.dev.yml` pin (it also covers
+  `docker-compose.yml`, which shares the same directory); the e2e workflow's own `services:`
+  image sits outside what that ecosystem reads, so it stays a manual bump, with a comment at
+  the call site saying so. PR-time image build + Trivy scan for `api`/`web` is a separate,
+  still-open part of the same roadmap row.
 
 - **Pinned `deepmerge-ts` to `^8.0.1` through a pnpm override**, closing
   [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) (high: stack
