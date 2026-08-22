@@ -219,6 +219,27 @@ module.exports = {
   //
   // The floor still does not move. Margins are 1.11 / 1.89 / 1.11 / 1.13, and they are now
   // margins over a measurement that includes every file, which is the only kind worth having.
+  //
+  //   2026-08-22  75.94 / 68.79 / 77.69 / 76.81  after demo mode (`src/demo/`) — three
+  //                                              consecutive runs, identical to four digits
+  //
+  // **Down on three of four, recorded rather than accommodated**, per the asymmetry above. The
+  // cause is named and bounded: `src/demo/reset.ts` and `src/demo/demo-dataset.ts`. The reset
+  // deletes every row in a database and then writes a few hundred, which is not a thing a unit
+  // test can exercise: it is covered end to end by `test/demo-reset.e2e-spec.ts` running the
+  // real function against `kurul_test`, and the dataset beside it is a literal with no
+  // behaviour at all. Neither is excluded from the denominator, for the reason the OpenAPI
+  // entry above settled: an excluded file is an invisible one. The parts of the module where
+  // being wrong changes what happens to somebody's data are covered where they live:
+  // `reset-guard.ts` and `demo-restricted.guard.ts` are 100% across the board, and
+  // `demo-mode.ts` is 100% statements / functions / lines (its one uncovered branch is the
+  // `now = new Date()` default, which every test supplies on purpose so the schedule assertions
+  // are not about the clock).
+  //
+  // Branches went *up* (67.89 → 68.79), which is the shape to expect: the code that was added
+  // with branches in it is the code that was tested. Margins are 0.94 / 2.79 / 0.69 / 0.81.
+  // Three of those are under a point, and that is the signal to read next time this file is
+  // opened, not something to restore by moving the floor.
   coverageThreshold: {
     global: {
       statements: 75,

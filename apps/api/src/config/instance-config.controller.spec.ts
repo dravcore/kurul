@@ -2,6 +2,14 @@ import { MailService } from '../mail/mail.service';
 import { StorageService } from '../storage/storage.service';
 import { InstanceConfigController } from './instance-config.controller';
 
+/**
+ * `DEMO_MODE` is unset in this suite, so every document carries the off shape. Spelled out
+ * rather than matched loosely: the nulls are the contract (`demo-mode.ts` refuses to publish a
+ * plausible-looking schedule on an instance that has none), and the schedule's own arithmetic
+ * is tested in `src/demo/demo-mode.spec.ts`.
+ */
+const NO_DEMO = { enabled: false, resetIntervalMinutes: null, nextResetAt: null } as const;
+
 function buildController(
   mailEnabled: boolean,
   attachmentsEnabled = false,
@@ -29,19 +37,31 @@ describe('InstanceConfigController', () => {
   it('reports mail as enabled when the mail module has a delivering transport', () => {
     const { controller } = buildController(true);
 
-    expect(controller.config()).toEqual({ mailEnabled: true, attachmentsEnabled: false });
+    expect(controller.config()).toEqual({
+      mailEnabled: true,
+      attachmentsEnabled: false,
+      demo: NO_DEMO,
+    });
   });
 
   it('reports mail as disabled when it does not', () => {
     const { controller } = buildController(false);
 
-    expect(controller.config()).toEqual({ mailEnabled: false, attachmentsEnabled: false });
+    expect(controller.config()).toEqual({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      demo: NO_DEMO,
+    });
   });
 
   it('reports attachments as enabled when the storage module persists files', () => {
     const { controller } = buildController(false, true);
 
-    expect(controller.config()).toEqual({ mailEnabled: false, attachmentsEnabled: true });
+    expect(controller.config()).toEqual({
+      mailEnabled: false,
+      attachmentsEnabled: true,
+      demo: NO_DEMO,
+    });
   });
 
   /**
@@ -69,7 +89,15 @@ describe('InstanceConfigController', () => {
     isEnabled.mockReturnValueOnce(true).mockReturnValueOnce(false);
     persistsFiles.mockReturnValueOnce(true).mockReturnValueOnce(false);
 
-    expect(controller.config()).toEqual({ mailEnabled: true, attachmentsEnabled: true });
-    expect(controller.config()).toEqual({ mailEnabled: false, attachmentsEnabled: false });
+    expect(controller.config()).toEqual({
+      mailEnabled: true,
+      attachmentsEnabled: true,
+      demo: NO_DEMO,
+    });
+    expect(controller.config()).toEqual({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      demo: NO_DEMO,
+    });
   });
 });

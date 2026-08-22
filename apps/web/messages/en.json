@@ -119,6 +119,11 @@
       "openNavigation": "Open navigation",
       "closeNavigation": "Close navigation"
     },
+    "demo": {
+      "bannerHourly": "This is a demo. Everything you create here is deleted every hour.",
+      "banner": "This is a demo. Everything you create here is deleted every {minutes} minutes.",
+      "dismiss": "Hide this notice"
+    },
     "settings": {
       "title": "Settings",
       "language": {

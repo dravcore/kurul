@@ -5,9 +5,33 @@ import type {
   ActivationStepDto,
   ActivationUnit,
   ActivationWindow,
+  DemoConfigDto,
   InstanceConfigDto,
 } from '@kurul/shared-types';
 import type { DependencyStatus, ReadinessReport } from '../../health/health.service';
+
+/**
+ * Whether this deployment is a public demo, and when its data next disappears.
+ *
+ * `resetIntervalMinutes` and `nextResetAt` are `null` on every instance that is not a demo:
+ * there is no schedule to describe, and a number there would be a value a client could render.
+ */
+export class DemoConfigSchema implements DemoConfigDto {
+  /** `true` only under `DEMO_MODE=true`. */
+  enabled!: boolean;
+
+  /**
+   * How often the demo data is wiped and re-seeded, in minutes. `null` when `enabled` is false.
+   * @example 60
+   */
+  resetIntervalMinutes!: number | null;
+
+  /**
+   * ISO 8601 UTC instant of the next wipe. `null` when `enabled` is false.
+   * @example 2026-08-22T15:00:00.000Z
+   */
+  nextResetAt!: string | null;
+}
 
 /** What this deployment is configured to do. Capability, never tenant state. */
 export class InstanceConfigSchema implements InstanceConfigDto {
@@ -20,6 +44,12 @@ export class InstanceConfigSchema implements InstanceConfigDto {
    * Link attachments do not depend on it — a `LINK` needs no storage at all.
    */
   attachmentsEnabled!: boolean;
+
+  /**
+   * The demo-instance section. `enabled` is `false` on every ordinary self-hosted install, and
+   * the web renders a standing "data resets every hour" banner from it when it is not.
+   */
+  demo!: DemoConfigSchema;
 }
 
 /** Liveness — the process is up. Touches no dependency. */

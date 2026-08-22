@@ -14,6 +14,9 @@ import { SMTP_SETUP_DOCS_URL, fetchInstanceConfig } from '@/lib/instance-config'
 import { fetchAllWorkspaceMembers, fetchPendingInvitations } from '@/lib/member-query';
 import { MembersSettings } from './members-settings';
 
+/** Every instance in this suite is an ordinary one; the demo section is off on all of them. */
+const NO_DEMO = { enabled: false, resetIntervalMinutes: null, nextResetAt: null } as const;
+
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00';
 const ME_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51';
 const BORA_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d52';
@@ -144,7 +147,9 @@ beforeEach(() => {
   loadMembers.mockReset().mockResolvedValue(ROSTER);
   loadInvitations.mockReset().mockResolvedValue([]);
   // The configured deployment is the default, so the warning cases have to say so explicitly.
-  loadConfig.mockReset().mockResolvedValue({ mailEnabled: true, attachmentsEnabled: false });
+  loadConfig
+    .mockReset()
+    .mockResolvedValue({ mailEnabled: true, attachmentsEnabled: false, demo: NO_DEMO });
   apiPost.mockReset();
   apiPatch.mockReset();
   apiDelete.mockReset();
@@ -367,7 +372,7 @@ describe('MembersSettings — what a MEMBER sees', () => {
  */
 describe('MembersSettings — a deployment that cannot send email', () => {
   it('says so, permanently, above the invite control', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
+    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo: NO_DEMO });
     renderSection();
 
     expect(await screen.findByText(copy.mailDisabledTitle)).toBeTruthy();
@@ -375,7 +380,7 @@ describe('MembersSettings — a deployment that cannot send email', () => {
   });
 
   it('carries a link to the setup docs', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
+    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo: NO_DEMO });
     renderSection();
 
     const link = await screen.findByRole('link', { name: copy.mailDisabledDocs });
@@ -389,7 +394,7 @@ describe('MembersSettings — a deployment that cannot send email', () => {
    * really there (docs/design.md §7).
    */
   it('points at the copy-link way out, and the control it names exists', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
+    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo: NO_DEMO });
     loadInvitations.mockResolvedValue([invitation('inv-1', 'bekleyen@kurul.test')]);
     renderSection();
 
@@ -399,7 +404,7 @@ describe('MembersSettings — a deployment that cannot send email', () => {
   });
 
   it('cannot be dismissed, because nothing the admin does here would make it untrue', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
+    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo: NO_DEMO });
     renderSection();
 
     const notice = (await screen.findByText(copy.mailDisabledTitle)).closest('div')?.parentElement;
@@ -420,7 +425,7 @@ describe('MembersSettings — a deployment that cannot send email', () => {
    */
   it('is neither shown to nor fetched for someone who cannot invite', async () => {
     workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.MEMBER };
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
+    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo: NO_DEMO });
     renderSection();
 
     expect(await screen.findByText('Bora')).toBeTruthy();
