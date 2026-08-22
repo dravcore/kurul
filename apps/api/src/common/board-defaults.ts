@@ -16,10 +16,17 @@
  * What stays shared is which locales exist (`SUPPORTED_LOCALES`), because that genuinely
  * crosses the boundary: the web renders the picker from it and the API validates against it.
  *
+ * **Where the names actually live now.** `board-templates.ts` holds the catalog, and this
+ * module is the one entry it still has a separate name for: the default seed. The structure
+ * and name tables this file used to own are the Kanban template's two halves, and keeping a
+ * second copy of them here would let the board every client already creates drift from the
+ * template the picker calls by the same name.
+ *
  * See docs/decisions/0018-localization-strategy.md and
  * docs/decisions/0019-column-category.md.
  */
-import { ColumnCategory, type Locale } from '@kurul/shared-types';
+import type { ColumnCategory, Locale } from '@kurul/shared-types';
+import { DEFAULT_BOARD_TEMPLATE, boardTemplateFor } from './board-templates';
 
 /**
  * Seed column for a new board; `position` is Float (fractional indexing), never Int.
@@ -35,49 +42,18 @@ export interface DefaultColumn {
 }
 
 /**
- * The locale-independent half: order, spacing and meaning.
- *
- * Held apart from the names so a translation cannot accidentally move a column or change what
- * it means. `board-defaults.spec.ts` asserts every locale produces this same structure.
- */
-const SEED_COLUMNS = [
-  { key: 'todo', position: 1000, category: ColumnCategory.UNSTARTED },
-  { key: 'inProgress', position: 2000, category: ColumnCategory.STARTED },
-  { key: 'done', position: 3000, category: ColumnCategory.COMPLETED },
-] as const;
-
-type SeedColumnKey = (typeof SEED_COLUMNS)[number]['key'];
-
-/**
- * The locale-dependent half: what each column is called.
- *
- * Typed `Record<Locale, …>` deliberately. Adding a language to `SUPPORTED_LOCALES` makes this
- * object fail to compile until its names are supplied, so a new locale cannot ship seeding
- * boards in English by accident. That is the whole reason the two halves are separate tables
- * rather than one list per language: a second language is a list change here, not a change to
- * anything the resolution chain or the metrics layer reads.
- */
-const SEED_COLUMN_NAMES: Record<Locale, Record<SeedColumnKey, string>> = {
-  en: { todo: 'To Do', inProgress: 'In Progress', done: 'Done' },
-  // `Bitti` is the case ADR 0019 was written around: it never matches `'done'`, and nothing
-  // here tries to — the category on the row above carries the meaning, so a board seeded in
-  // Turkish reports throughput exactly like one seeded in English. Short forms on purpose;
-  // these render as column headers, the tightest slot in the product.
-  tr: { todo: 'Yapılacak', inProgress: 'Devam Ediyor', done: 'Bitti' },
-};
-
-/**
  * The columns a board is seeded with, named in `locale`.
+ *
+ * These are the Kanban template's columns, and nothing else: a board created with no template
+ * named is a Kanban board that was not asked for by name. What it is *not* is the whole
+ * template — the label preset is only written when a client picks a template explicitly, so
+ * that every board every existing client has ever created still comes out with an empty label
+ * list (`BoardService.create` states the same thing from the other side).
  *
  * Returns a fresh array of fresh objects: callers hand these straight to Prisma's nested
  * create, and a shared mutable catalog would let one request's edit leak into the next board
  * anyone creates.
  */
 export function defaultColumnsFor(locale: Locale): DefaultColumn[] {
-  const names = SEED_COLUMN_NAMES[locale];
-  return SEED_COLUMNS.map(({ key, position, category }) => ({
-    name: names[key],
-    position,
-    category,
-  }));
+  return boardTemplateFor(DEFAULT_BOARD_TEMPLATE, locale).columns;
 }

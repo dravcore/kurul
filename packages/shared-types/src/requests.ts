@@ -122,6 +122,17 @@ export interface CreateAttachmentLinkRequest {
 export interface CreateBoardRequest {
   name: string;
   description?: string | null;
+  /**
+   * A `BoardTemplateDto.slug` from `GET /workspaces/:workspaceId/board-templates`.
+   *
+   * Typed `string` rather than a union on purpose: the catalog lives in the API, and a union
+   * here would be a second list of which templates exist — the one thing this endpoint is
+   * shaped to avoid. An unknown slug is a `400`, never a silently plain board.
+   *
+   * Omit and the board gets the default seed columns and no labels, which is what this
+   * endpoint did before templates existed.
+   */
+  template?: string;
 }
 
 /** `PATCH /workspaces/:workspaceId/boards/:boardId` */

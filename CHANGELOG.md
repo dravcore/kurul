@@ -7,6 +7,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Board templates.** Creating a board now starts from one of four shapes instead of always
+  the same three columns: **Kanban** (To Do / In Progress / Done), **Scrum Sprint** (a backlog
+  feeding a sprint, with a review stage), **Bug Triage** (reported through fixing and
+  verification, plus a `CANCELED` "Won't Fix" column) and **Content Pipeline** (ideas through
+  drafting and editing to published). Each one seeds its columns _and_ a label preset painted
+  from the theme's `slot-1`…`slot-8` tokens, in one transaction with the board, in the
+  creator's language. Names for both languages live in `apps/api/src/common/board-templates.ts`
+  as `Record<Locale, …>`, so a missing translation is a compile error rather than a board that
+  comes out half in English, and the structural half (position, `ColumnCategory`, colour slot)
+  is held apart from the names so a translation cannot move a stage or repaint a chip.
+  - `GET /workspaces/:workspaceId/board-templates` returns the catalogue with localised names
+    and column/label previews. The web renders the picker from that response and echoes back a
+    slug, so neither app carries a second copy of the list and adding a template is an API
+    change alone.
+  - `POST /workspaces/:workspaceId/boards` takes an optional `template` slug, validated against
+    the catalogue; an unknown slug is a `400` with `constraint: "isIn"` and writes nothing,
+    rather than quietly handing back a board that is not the one that was asked for. The
+    `board.created` activity row records which slug was chosen, which is the one part of the
+    choice the seeded rows cannot be reverse-engineered into.
+  - **Omitting `template` is unchanged behaviour**: the default seed columns and no labels. The
+    Kanban template is the same column list, and a test asserts the two cannot drift, so every
+    client that predates this release creates exactly the board it did before.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that

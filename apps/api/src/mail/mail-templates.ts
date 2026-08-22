@@ -57,10 +57,10 @@ function actionHtml(label: string, url: string, linkFallback: string): string {
 /**
  * Every sentence either transactional email puts in front of a person, in one language.
  *
- * Held as data rather than as branches inside the builders for the same reason
- * `SEED_COLUMN_NAMES` is: the structure of an email — which paragraphs it has, in what order,
- * with which link — is not a translator's decision, and a missing sentence should be a
- * compile error rather than a blank paragraph in one language.
+ * Held as data rather than as branches inside the builders for the same reason the board
+ * template catalog's copy table is (`common/board-templates.ts`): the structure of an email —
+ * which paragraphs it has, in what order, with which link — is not a translator's decision, and
+ * a missing sentence should be a compile error rather than a blank paragraph in one language.
  *
  * Interpolation is done with functions, not with `{placeholder}` strings, because word order
  * is exactly what differs between these two languages: Turkish puts the workspace name before
