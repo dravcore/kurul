@@ -51,6 +51,12 @@ export interface UserDto {
    * apart (docs/decisions/0018-localization-strategy.md).
    */
   locale: Locale | null;
+  /**
+   * Whether assignment, mention and due-soon notifications are also emailed. One switch for
+   * every kind; `true` for a new account. Has no effect on an instance without SMTP
+   * (`InstanceConfigDto.mailEnabled`).
+   */
+  emailNotifications: boolean;
   createdAt: string;
 }
 

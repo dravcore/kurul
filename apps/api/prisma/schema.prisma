@@ -72,6 +72,14 @@ model User {
   /// email has to know the recipient's language with no request in flight
   /// (docs/decisions/0018-localization-strategy.md).
   locale        String?
+  /// Whether assignment, mention and due-soon notifications are also sent by email.
+  ///
+  /// One boolean for every kind on purpose: the first request was "stop emailing me", not
+  /// "email me about mentions but not due dates". The name leaves room for a per-kind enum or
+  /// JSON column next to it if that second request ever arrives. Read by primary key only, so
+  /// it carries no index. Mail that is disabled instance-wide (no `SMTP_HOST`) is off whatever
+  /// this says; see `notification/notification-mailer.ts`.
+  emailNotifications Boolean @default(true)
   /// When this account was anonymised on request, or null for a live account.
   ///
   /// The row itself is the tombstone: a user who has ever created a card cannot be deleted —
