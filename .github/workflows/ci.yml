@@ -125,11 +125,7 @@ jobs:
       # migration. `--exit-code` returns 2 when the diff is non-empty, so the gate is the
       # command's own answer rather than a grep over its prose.
       - name: Check for migration drift
-        run: >
-          pnpm exec prisma migrate diff
-          --from-config-datasource
-          --to-schema apps/api/prisma/schema.prisma
-          --exit-code
+        run: pnpm db:drift
       - name: Integration tests
         run: pnpm --filter @kurul/api test:e2e
 
