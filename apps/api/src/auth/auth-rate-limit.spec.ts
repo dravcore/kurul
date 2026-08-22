@@ -11,14 +11,10 @@ import * as sentry from '../common/observability/sentry';
 import { RATE_LIMIT_WINDOW_SECONDS } from '../common/rate-limit/rate-limit';
 
 const evalMock = jest.fn();
-const getMock = jest.fn();
-const setMock = jest.fn();
 
 jest.mock('ioredis', () => ({
   Redis: jest.fn().mockImplementation(() => ({
     eval: (...args: unknown[]) => evalMock(...args) as unknown,
-    get: (...args: unknown[]) => getMock(...args) as unknown,
-    set: (...args: unknown[]) => setMock(...args) as unknown,
     on: jest.fn(),
     quit: jest.fn().mockResolvedValue('OK'),
   })),
@@ -139,7 +135,7 @@ describe('createRedisRateLimitStorage', () => {
   it('namespaces its keys so they cannot collide with the Socket.io adapter or BullMQ', async () => {
     evalMock.mockResolvedValue([1, -1]);
 
-    await storage.consume?.('127.0.0.1-/sign-in/email', rule);
+    await storage.consume('127.0.0.1-/sign-in/email', rule);
 
     expect(evalMock).toHaveBeenCalledWith(
       expect.stringContaining('INCR'),
@@ -153,7 +149,7 @@ describe('createRedisRateLimitStorage', () => {
   it('allows a request that lands inside the window', async () => {
     evalMock.mockResolvedValue([1, -1]);
 
-    await expect(storage.consume?.('key', rule)).resolves.toEqual({
+    await expect(storage.consume('key', rule)).resolves.toEqual({
       allowed: true,
       retryAfter: null,
     });
@@ -162,7 +158,7 @@ describe('createRedisRateLimitStorage', () => {
   it('reports how long the caller has to wait once the window is full', async () => {
     evalMock.mockResolvedValue([0, 42]);
 
-    await expect(storage.consume?.('key', rule)).resolves.toEqual({
+    await expect(storage.consume('key', rule)).resolves.toEqual({
       allowed: false,
       retryAfter: 42,
     });
@@ -171,7 +167,7 @@ describe('createRedisRateLimitStorage', () => {
   it('falls back to the whole window when Redis reports no usable TTL', async () => {
     evalMock.mockResolvedValue([0, -1]);
 
-    await expect(storage.consume?.('key', rule)).resolves.toEqual({
+    await expect(storage.consume('key', rule)).resolves.toEqual({
       allowed: false,
       retryAfter: rule.window,
     });
@@ -182,7 +178,7 @@ describe('createRedisRateLimitStorage', () => {
     const error = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
     // Still allowed: a single request is inside the fallback's own window too.
-    await expect(storage.consume?.('key', rule)).resolves.toEqual({
+    await expect(storage.consume('key', rule)).resolves.toEqual({
       allowed: true,
       retryAfter: null,
     });
@@ -194,10 +190,10 @@ describe('createRedisRateLimitStorage', () => {
     evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
 
     for (let i = 0; i < rule.max; i++) {
-      await expect(storage.consume?.('flood', rule)).resolves.toMatchObject({ allowed: true });
+      await expect(storage.consume('flood', rule)).resolves.toMatchObject({ allowed: true });
     }
 
-    await expect(storage.consume?.('flood', rule)).resolves.toMatchObject({
+    await expect(storage.consume('flood', rule)).resolves.toMatchObject({
       allowed: false,
       retryAfter: expect.any(Number),
     });
@@ -207,11 +203,11 @@ describe('createRedisRateLimitStorage', () => {
     evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
 
     for (let i = 0; i < rule.max; i++) {
-      await storage.consume?.('a', rule);
+      await storage.consume('a', rule);
     }
     // "a" is now at the limit; "b" has never been consumed and must not inherit its count.
-    await expect(storage.consume?.('a', rule)).resolves.toMatchObject({ allowed: false });
-    await expect(storage.consume?.('b', rule)).resolves.toMatchObject({ allowed: true });
+    await expect(storage.consume('a', rule)).resolves.toMatchObject({ allowed: false });
+    await expect(storage.consume('b', rule)).resolves.toMatchObject({ allowed: true });
   });
 
   it("frees a blocked key's fallback window once it expires", async () => {
@@ -220,15 +216,15 @@ describe('createRedisRateLimitStorage', () => {
       evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
 
       for (let i = 0; i < rule.max; i++) {
-        await storage.consume?.('expiring', rule);
+        await storage.consume('expiring', rule);
       }
-      await expect(storage.consume?.('expiring', rule)).resolves.toMatchObject({
+      await expect(storage.consume('expiring', rule)).resolves.toMatchObject({
         allowed: false,
       });
 
       jest.advanceTimersByTime((rule.window + 1) * 1000);
 
-      await expect(storage.consume?.('expiring', rule)).resolves.toEqual({
+      await expect(storage.consume('expiring', rule)).resolves.toEqual({
         allowed: true,
         retryAfter: null,
       });
@@ -244,15 +240,15 @@ describe('createRedisRateLimitStorage', () => {
     const capRule = { window: RATE_LIMIT_WINDOW_SECONDS, max: 1 };
     const overCap = 10_001;
 
-    await storage.consume?.('key-0', capRule);
+    await storage.consume('key-0', capRule);
     for (let i = 1; i < overCap; i++) {
-      await storage.consume?.(`key-${i}`, capRule);
+      await storage.consume(`key-${i}`, capRule);
     }
 
     // If `key-0` were still tracked, this second request for it would be blocked (count 2 >
     // max 1). It is allowed instead, which is only possible if it was evicted to make room —
     // proof the map did not grow past its cap under `overCap` distinct keys.
-    await expect(storage.consume?.('key-0', capRule)).resolves.toMatchObject({ allowed: true });
+    await expect(storage.consume('key-0', capRule)).resolves.toMatchObject({ allowed: true });
   }, 30_000);
 
   it('goes back to Redis once it answers again, and logs the recovery once', async () => {
@@ -261,7 +257,7 @@ describe('createRedisRateLimitStorage', () => {
       evalMock.mockRejectedValueOnce(new Error('ECONNREFUSED'));
       const error = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
-      await storage.consume?.('key', rule);
+      await storage.consume('key', rule);
       expect(error).toHaveBeenCalledTimes(1);
       expect(error).toHaveBeenCalledWith(expect.stringContaining('ECONNREFUSED'));
 
@@ -269,7 +265,7 @@ describe('createRedisRateLimitStorage', () => {
       // that behaviour (a flap producing at most one report) is covered separately below.
       jest.advanceTimersByTime(AUTH_RATE_LIMIT_REPORT_DAMPEN_MS + 1);
       evalMock.mockResolvedValue([1, -1]);
-      await expect(storage.consume?.('key', rule)).resolves.toEqual({
+      await expect(storage.consume('key', rule)).resolves.toEqual({
         allowed: true,
         retryAfter: null,
       });
@@ -284,9 +280,9 @@ describe('createRedisRateLimitStorage', () => {
     evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
     const error = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
-    await storage.consume?.('key', rule);
-    await storage.consume?.('key', rule);
-    await storage.consume?.('key', rule);
+    await storage.consume('key', rule);
+    await storage.consume('key', rule);
+    await storage.consume('key', rule);
 
     expect(error).toHaveBeenCalledTimes(1);
     expect(sentry.captureServerError).toHaveBeenCalledTimes(1);
@@ -298,7 +294,7 @@ describe('createRedisRateLimitStorage', () => {
       const error = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
       evalMock.mockRejectedValueOnce(new Error('ECONNREFUSED'));
-      await storage.consume?.('key', rule);
+      await storage.consume('key', rule);
       expect(error).toHaveBeenCalledTimes(1);
       expect(sentry.captureServerError).toHaveBeenCalledTimes(1);
 
@@ -306,9 +302,9 @@ describe('createRedisRateLimitStorage', () => {
       // recovered, degraded... None of these transitions should add another report.
       for (let i = 0; i < 5; i++) {
         evalMock.mockResolvedValueOnce([1, -1]);
-        await storage.consume?.('key', rule);
+        await storage.consume('key', rule);
         evalMock.mockRejectedValueOnce(new Error('ECONNREFUSED'));
-        await storage.consume?.('key', rule);
+        await storage.consume('key', rule);
       }
 
       expect(error).toHaveBeenCalledTimes(1);
@@ -317,7 +313,7 @@ describe('createRedisRateLimitStorage', () => {
       // Once the window has fully elapsed, the next transition is reported again.
       jest.advanceTimersByTime(AUTH_RATE_LIMIT_REPORT_DAMPEN_MS + 1);
       evalMock.mockResolvedValueOnce([1, -1]);
-      await storage.consume?.('key', rule);
+      await storage.consume('key', rule);
 
       expect(error).toHaveBeenCalledTimes(2);
       expect(error).toHaveBeenLastCalledWith(expect.stringContaining('recovered'));
@@ -331,14 +327,14 @@ describe('createRedisRateLimitStorage', () => {
 
     // Degrades: count 1, allowed.
     evalMock.mockRejectedValueOnce(new Error('ECONNREFUSED'));
-    await expect(storage.consume?.('recur', floodRule)).resolves.toMatchObject({
+    await expect(storage.consume('recur', floodRule)).resolves.toMatchObject({
       allowed: true,
     });
 
     // Recovers, briefly. If this cleared `fallbackCounters`, the next failure would restart
     // "recur" at count 1 instead of continuing from 1.
     evalMock.mockResolvedValueOnce([1, -1]);
-    await expect(storage.consume?.('recur', floodRule)).resolves.toEqual({
+    await expect(storage.consume('recur', floodRule)).resolves.toEqual({
       allowed: true,
       retryAfter: null,
     });
@@ -346,14 +342,14 @@ describe('createRedisRateLimitStorage', () => {
     // Flaps back down: count 2, still allowed at max 2 — only possible if the count survived
     // the recovery above instead of being reset to 1.
     evalMock.mockRejectedValueOnce(new Error('ECONNREFUSED'));
-    await expect(storage.consume?.('recur', floodRule)).resolves.toMatchObject({
+    await expect(storage.consume('recur', floodRule)).resolves.toMatchObject({
       allowed: true,
     });
 
     // Count 3 > max 2: blocked. Proof the floor held across the flap instead of the attacker
     // getting a clean slate on each brief recovery.
     evalMock.mockRejectedValueOnce(new Error('ECONNREFUSED'));
-    await expect(storage.consume?.('recur', floodRule)).resolves.toMatchObject({
+    await expect(storage.consume('recur', floodRule)).resolves.toMatchObject({
       allowed: false,
     });
   });
@@ -378,12 +374,12 @@ describe('createRedisRateLimitStorage', () => {
 
       // t=0: the attacker's key is inserted first — the oldest entry in the map by pure
       // insertion order, before any filler exists.
-      await storage.consume?.('attacker', attackerRule);
+      await storage.consume('attacker', attackerRule);
 
       // Still t=0: fillers inserted after it, so by insertion order alone they are all
       // *younger* than the attacker's key.
       for (let i = 0; i < fillerCount; i++) {
-        await storage.consume?.(`filler-${i}`, fillerRule);
+        await storage.consume(`filler-${i}`, fillerRule);
       }
 
       // t=2s: past the attacker's 1s window, but nowhere near the fillers' 1000s one.
@@ -392,9 +388,9 @@ describe('createRedisRateLimitStorage', () => {
       // Window refresh: fixed code deletes the stale entry and re-inserts it, moving it past
       // every filler to the tail. Unfixed code overwrites it in place and leaves it at the
       // front, i.e. still "oldest".
-      await storage.consume?.('attacker', attackerRule);
+      await storage.consume('attacker', attackerRule);
       // Immediately blocked again, still inside this (live) refreshed window.
-      await expect(storage.consume?.('attacker', attackerRule)).resolves.toMatchObject({
+      await expect(storage.consume('attacker', attackerRule)).resolves.toMatchObject({
         allowed: false,
       });
 
@@ -402,14 +398,14 @@ describe('createRedisRateLimitStorage', () => {
       // expired at this point, so every eviction this triggers must fall back to "oldest by
       // position" exactly like the pre-fix code always did.
       for (let i = 0; i < floodCount; i++) {
-        await storage.consume?.(`flood-${i}`, fillerRule);
+        await storage.consume(`flood-${i}`, fillerRule);
       }
 
       // Fixed: the attacker's key was moved off the "oldest" position by its window refresh,
       // so the flood evicted fillers instead — still blocked.
       // Unfixed: the attacker's key never moved, so it was the very first entry evicted —
       // this would come back `allowed: true` on a brand-new window.
-      await expect(storage.consume?.('attacker', attackerRule)).resolves.toMatchObject({
+      await expect(storage.consume('attacker', attackerRule)).resolves.toMatchObject({
         allowed: false,
       });
     } finally {
@@ -421,35 +417,17 @@ describe('createRedisRateLimitStorage', () => {
     evalMock.mockRejectedValue(new Error('ECONNREFUSED'));
     const zeroRule = { window: RATE_LIMIT_WINDOW_SECONDS, max: 0 };
 
-    await expect(storage.consume?.('zero', zeroRule)).resolves.toEqual({
+    await expect(storage.consume('zero', zeroRule)).resolves.toEqual({
       allowed: false,
       retryAfter: zeroRule.window,
     });
   });
 
-  it('reads back the counter `consume` writes', async () => {
-    getMock.mockResolvedValue('7');
-
-    await expect(storage.get('key')).resolves.toMatchObject({ key: 'key', count: 7 });
-    expect(getMock).toHaveBeenCalledWith(`${AUTH_RATE_LIMIT_KEY_PREFIX}key`);
-  });
-
-  it('reports an unknown key as absent rather than as a zero count', async () => {
-    getMock.mockResolvedValue(null);
-
-    await expect(storage.get('key')).resolves.toBeNull();
-  });
-
-  it('writes with an expiry, so a counter can never outlive its window', async () => {
-    setMock.mockResolvedValue('OK');
-
-    await storage.set('key', { key: 'key', count: 3, lastRequest: Date.now() });
-
-    expect(setMock).toHaveBeenCalledWith(
-      `${AUTH_RATE_LIMIT_KEY_PREFIX}key`,
-      3,
-      'EX',
-      RATE_LIMIT_WINDOW_SECONDS,
-    );
+  // Better Auth 1.7 dropped the optional `get`/`set` pair and the non-atomic `legacyConsume`
+  // path that fell back to them, leaving `consume` as the whole interface. Asserted rather than
+  // assumed: re-adding a `get`/`set` shortcut would put a read-then-write path back in front of
+  // the counters that `CONSUME_SCRIPT` exists to keep atomic, and nothing else would notice.
+  it('exposes exactly one operation, the atomic `consume`', () => {
+    expect(Object.keys(storage)).toEqual(['consume']);
   });
 });

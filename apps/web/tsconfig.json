@@ -6,6 +6,16 @@
     "moduleResolution": "Bundler",
     "jsx": "preserve",
     "noEmit": true,
+    // Off for the same reason `apps/api` turns it off: this is an application, not a published
+    // package, so nothing ever consumes a `.d.ts` from it. Inheriting the base config's `true`
+    // did nothing but keep declaration-*emit checking* switched on under `noEmit`, and that
+    // check is what made `better-auth` 1.7 fail the build: `createAuthClient`'s inferred type
+    // names types living in `better-auth/dist/client/query.mjs` and
+    // `better-auth/dist/plugins/organization/organization.mjs`, neither of which the package's
+    // `exports` map reaches, so TypeScript could only write them as a non-portable
+    // `@/node_modules/...` path and raised TS2742. There is no declaration file to be portable.
+    "declaration": false,
+    "declarationMap": false,
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./*"]

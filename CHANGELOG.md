@@ -92,6 +92,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     Kanban template is the same column list, and a test asserts the two cannot drift, so every
     client that predates this release creates exactly the board it did before.
 
+### Changed
+
+- **Better Auth upgraded to 1.7.1, which needs a database migration before the API starts.**
+  `Account` gains a required `issuer` column and a unique `(issuer, accountId)` index: identity
+  is now keyed on the pair rather than on `accountId` alone, so two providers handing out the
+  same subject string can no longer be made to collide. Migration
+  `20260823090000_account_issuer` adds the column, backfills every existing row to
+  `local:` + its provider id (`local:credential` for every account Kurul creates today) and
+  only then makes it `NOT NULL`. The backfill is the whole point of the migration: sign-in
+  looks the credential account up by issuer, so rows left without one would match nothing and
+  every account that predates the upgrade would be unable to log in. `pnpm db:migrate` applies
+  it like any other; upgrading past this release without running it is what would lock people
+  out, not the upgrade itself.
+
+  Nothing about how a session, a workspace or an invitation behaves changes, and no
+  configuration moves. Internally the auth rate limiter's Redis storage
+  (`apps/api/src/auth/auth-rate-limit.ts`) dropped its `get`/`set` pair, which 1.7 removed
+  along with the non-atomic fallback path that used them; `consume` is the whole interface now,
+  and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
+  Redis outage fallback and the degraded-mode reporting are all unchanged.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that

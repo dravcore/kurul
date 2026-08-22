@@ -132,8 +132,16 @@ model Session {
 }
 
 model Account {
-  id                    String    @id @default(uuid(7))
-  userId                String
+  id     String @id @default(uuid(7))
+  userId String
+
+  /// Which authority vouched for `accountId`, required by Better Auth since 1.7.
+  ///
+  /// Identity is keyed on the pair, not on `accountId` alone: two providers can hand out the
+  /// same subject string, and before this column one of them could be made to collide with the
+  /// other. Providers with no issuer of their own get a synthetic one, and Kurul has only
+  /// email/password, so every row here reads `local:credential`.
+  issuer                String
   accountId             String
   providerId            String
   accessToken           String?
@@ -148,6 +156,7 @@ model Account {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([issuer, accountId])
   @@index([userId])
 }
 

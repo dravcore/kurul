@@ -140,7 +140,10 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
     const key = `${AUTH_RATE_LIMIT_KEY_PREFIX}${probe}`;
     const storage = createRedisRateLimitStorage(urlWithDb(TEST_DB));
 
-    await storage.set(probe, { key: probe, count: 1, lastRequest: Date.now() });
+    // `consume` is the storage's only operation as of better-auth 1.7, and the counter it
+    // increments is the same key the removed `set` used to write, so this still exercises the
+    // shortest path from `REDIS_URL` to a key. One consume of a fresh key leaves it at 1.
+    await storage.consume(probe, { window: 60, max: 10 });
 
     expect(await onTestDb.get(key)).toBe('1');
     expect(await onDbZero.get(key)).toBeNull();
