@@ -57,7 +57,7 @@ Kurul'un cevabı bilinçli olarak dar:
 - **Realtime ve çok-kiracılılık çekirdekte.** Socket.io board senkronu ve workspace'e
   scope'lanmış sorgular sonradan eklenmedi, baştan tasarlandı.
 
-Ve `v0.2.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, public API token'ları ve
+Ve `v0.3.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, public API token'ları ve
 webhook'lar yok. UI hem İngilizce hem Türkçe konuşuyor — her arayüz metni, yeni bir board'un
 başladığı column adları ve size gönderdiğimiz e-posta dahil — ve üçüncü bir dil bir katalog
 uzakta. API token'ları, webhook'lar ve ek dil paketleri
