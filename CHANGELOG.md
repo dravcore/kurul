@@ -330,6 +330,33 @@ the 2026-08-18 "atlas" audit. See
 
 ### Security
 
+- **Every pull request now builds the images this project ships and scans them for CVEs.**
+  `.github/workflows/ci.yml` gains an `image-scan` job: three parallel legs build `kurul-api`
+  at its `runner` and `migrate` targets and `kurul-web` (`push: false`, `load: true`, buildx
+  with a `type=gha` layer cache scoped per image), then run Trivy over each. A HIGH or CRITICAL
+  finding **that has a fix available** fails the leg and, through the `ci-ok` gate, the pull
+  request. Until now the only workflow that ever built a Dockerfile was `release-images.yml`,
+  which runs on a tag push, so a broken image or a vulnerable base was discovered by the
+  workflow whose job is to publish it.
+
+  The job hangs off nothing (`needs:` is absent) and runs beside `lint` and `test` rather than
+  after `build`: the PR pipeline on `develop` measures 4m56s-5m18s against the five-minute
+  trigger `ROADMAP.md` records for OPS-10, so this had to cost runner minutes and not wall
+  time. Unfixed advisories are ignored (`ignore-unfixed: true`) because a base-image CVE with
+  no fixed version fails every pull request for something no pull request can act on, and a
+  check that is always red is a check nobody reads.
+
+- **Removed the npm and yarn CLIs from all three runtime images.** Nothing in them ever ran
+  either: every `CMD` is `node`, over dependencies that were resolved at build time. Beyond the
+  ordinary case for not shipping a tool that fetches and executes code into a production
+  container, this is what the first run of the scan above turned up: npm's own bundled
+  dependencies (`tar`, `brace-expansion`, `ip-address`, `undici`) held **all eight** fixable
+  HIGH/CRITICAL findings across the three images, and none of them is closable from this
+  repository: they are fixed when the Node project cuts a `node:24-alpine` with a newer bundled
+  npm. All three images now scan clean at HIGH/CRITICAL. `corepack` stays, as the shim the
+  build stages go through. This does not change image size, since the files come from the base
+  image's own layer.
+
 - **`mailpit` is pinned by digest instead of `:latest`, in both `docker-compose.dev.yml` and
   the e2e workflow's `mailpit` service** — `axllent/mailpit:v1.31.0@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24`
   (roadmap Hardening: "mailpit pinned by digest"). A floating `:latest` on an image used in CI
