@@ -9,7 +9,7 @@
 
 ## Bağlam
 
-[ADR 0014](0014-dual-licensing-cla.md) iş modelini karara bağladı — çift lisanslama ve bunu hukuken mümkün kılan bir Katkıda Bulunan Lisans Sözleşmesi — ve [docs/cla.md](../../archive/cla-draft.md)'yi Harmony türevi bir taslak olarak, merge'ü bloklayan bir GitHub Actions kontrolüyle birlikte yayımladı. Aynı ADR, hukuki işin bitmediğini de dürüstçe kaydetti: belgede çözülmemiş `[FILL: …]` ve `[HUKUKÇUYA SOR: …]` işaretleri ve öne çıkan bir "yürürlükte değil" uyarısı var.
+[ADR 0014](0014-dual-licensing-cla.md) iş modelini karara bağladı — çift lisanslama ve bunu hukuken mümkün kılan bir Katkıda Bulunan Lisans Sözleşmesi — ve `docs/cla.md` (2026-08-22'de silindi, git geçmişinde)'yi Harmony türevi bir taslak olarak, merge'ü bloklayan bir GitHub Actions kontrolüyle birlikte yayımladı. Aynı ADR, hukuki işin bitmediğini de dürüstçe kaydetti: belgede çözülmemiş `[FILL: …]` ve `[HUKUKÇUYA SOR: …]` işaretleri ve öne çıkan bir "yürürlükte değil" uyarısı var.
 
 Bu açık soruların en zoru yüzeysel bir eksiklik değil. Sahip, Türkiye mukimi bir gerçek kişi; dolayısıyla FSEK (5846 sayılı Kanun) uygulanıyor ve FSEK, bir eser üzerindeki mali haklara ilişkin sözleşmelerin **yazılı** olmasını şart koşuyor. Bir GitHub pull request yorumunun bu şekil şartını karşılayıp karşılamadığı — ve şartın alt lisans verilebilir bir lisans vermeye uzanıp uzanmadığı, yoksa yalnızca tam bir devri mi kapsadığı — dokümantasyondan akıl yürüterek çözülebilecek bir şey değil. Hukukçu gerektiriyor ve cevap, o güne kadar toplanmış her imzanın bir işe yarayıp yaramadığını belirliyor.
 
@@ -19,7 +19,7 @@ Sahip bu görüşmeyi şimdi yapmayacak ve aklında bir tarih de yok. Bu da CLA'
 
 **Kurul dış katkı kabul etmiyor.** Dışarıdan gelen hiçbir kod, doküman veya çeviri pull request'i merge edilmiyor. Kod tabanı tek yazarlı kalıyor: sahip kodu kendisi yazıyor ve kodun tamamının telifi tek elde kalıyor — [SQLite](https://www.sqlite.org/copyright.html)'ın onlarca yıldır yürüttüğü model. Hata bildirimleri, özellik fikirleri, tasarım geri bildirimi ve tartışma her zamanki kadar isteniyor; tek satırlık bir yazım hatası veya kırık bağlantı düzeltmesi hâlâ tartışmaya değer bir telif taşımıyor ve hâlâ hoş karşılanıyor.
 
-**CLA taslağı korunuyor, yürürlüğe konmuyor.** [docs/cla.md](../../archive/cla-draft.md) "yürürlükte değil" uyarısı yerinde kalmak üzere depoda duruyor ve CLA workflow'u (`.github/workflows/cla.yml`, 0028 ile silindi, son hali git geçmişinde) silinmek yerine devre dışı bırakılıyor — tetikleyiciler `workflow_dispatch`'e indirildi ve job `if: ${{ false }}` ile korumaya alındı. İş yapılmış ve hazır bekliyor; hukuki inceleme bir gün gerçekleşirse etkinleştirmek küçük bir değişiklik, yeniden yazım değil.
+**CLA taslağı korunuyor, yürürlüğe konmuyor.** `docs/cla.md` (2026-08-22'de silindi, git geçmişinde) "yürürlükte değil" uyarısı yerinde kalmak üzere depoda duruyor ve CLA workflow'u (`.github/workflows/cla.yml`, 0028 ile silindi, son hali git geçmişinde) silinmek yerine devre dışı bırakılıyor — tetikleyiciler `workflow_dispatch`'e indirildi ve job `if: ${{ false }}` ile korumaya alındı. İş yapılmış ve hazır bekliyor; hukuki inceleme bir gün gerçekleşirse etkinleştirmek küçük bir değişiklik, yeniden yazım değil.
 
 **Hukuk masrafı ilk ticari satışa erteleniyor.** Bu projenin asıl ihtiyaç duyduğu hukukçu CLA için değil, ticari lisans sözleşmesi için; o belge de ancak imzalayacak ödeme yapan bir müşteri olduğunda gerekiyor. O noktada gelir ücreti gerekçelendiriyor ve müşterinin kendi hukukçusu da metni inceliyor — tek masrafa iki okuma.
 

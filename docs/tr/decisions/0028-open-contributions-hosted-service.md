@@ -6,6 +6,10 @@
 
 > 🌐 [English (kanonik)](../../decisions/0028-open-contributions-hosted-service.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
+> **Güncellendi (2026-08-22):** `docs/archive/` CLA taslağıyla birlikte tamamen kaldırıldı. Aşağıda
+> `docs/cla.md`'yi `docs/archive/cla-draft.md`'ye taşıyan sonuç uygulandı ve bir gün sonra geçersiz
+> kaldı; taslak artık yalnızca git geçmişinde.
+
 ## Bağlam
 
 [ADR 0007](0007-license-agpl.md) AGPL-3.0'ı seçti. [ADR 0014](0014-dual-licensing-cla.md) bunun

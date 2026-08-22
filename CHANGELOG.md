@@ -292,7 +292,7 @@ the 2026-08-18 "atlas" audit. See
   configures to taste or leaves switched off
   ([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md)).
 
-- **The CLA draft moved to [docs/archive/cla-draft.md](docs/archive/cla-draft.md)**, its
+- **The CLA draft moved to `docs/archive/cla-draft.md`** (and was deleted with the whole archive a day later, see Removed), its
   not-in-force banner intact. An agreement that was never enacted, and that nobody will now
   be asked to sign, is a historical record rather than a policy.
 
@@ -307,6 +307,15 @@ the 2026-08-18 "atlas" audit. See
 - **The commercial-license line and the `licensing@dravcore.com` address, from both
   READMEs.** Neither ever reached a release, but this section advertised them until today,
   so the removal is recorded here rather than left as a silent edit.
+
+- **`docs/archive/` in full:** the Phase 0-9 checklists (`roadmap-mvp-phases.md`), the Phase 1
+  scaffold how-to (`project-skeleton.md`), the shipped phase and visual-debt design specs, the
+  finished implementation plans, and the never-enacted CLA draft that had been moved there a day
+  earlier. A finished plan has nothing left to say that `ROADMAP.md`, an ADR or the code does not
+  say better, and a second tree of historical markdown was a place for stale links to collect.
+  Git history keeps every file; `CLAUDE.md`'s docs policy now says delete rather than archive.
+  Links from `docs/`, both READMEs and the ADRs that pointed into the archive are rewritten or
+  turned into plain text; the released entries below keep their old paths as text only.
 
 ### Security
 
@@ -1577,49 +1586,49 @@ commit; this is the point it becomes a version.
   applies to columns still called Done.
 - Contributor License Agreement scaffolding for the dual-licensing model
   ([ADR 0014](docs/decisions/0014-dual-licensing-cla.md)): Harmony-derived CLA draft
-  ([docs/cla.md](docs/archive/cla-draft.md), EN/TR; archived by ADR 0028) — **not in force, pending legal review** — plus a
+  (`docs/cla.md`, EN/TR; deleted 2026-08-22 with `docs/archive/`) — **not in force, pending legal review** — plus a
   merge-blocking `CLA` workflow, a CONTRIBUTING section, and a PR-template checkbox.
 - `GET /workspaces/:workspaceId/members/me` returns the caller's own membership, so the app
   shell resolves the active role from one indexed row instead of `/me` plus the full roster.
 - Phase 9 realtime board sync
-  ([spec](docs/archive/specs/2026-08-09-phase-9-realtime-design.md)): Socket.io gateway with Redis
+  (spec, `docs/archive/specs/2026-08-09-phase-9-realtime-design.md`): Socket.io gateway with Redis
   adapter, session-cookie auth, `board:{id}` rooms, thin ID event contract (`actorId`),
   emit-after-commit from task/column/comment mutations, web `useBoardSocket` with reconnect
   resync and mid-drag cancel. Presence remains out of MVP; notification unread push shipped separately, above.
 - Deferred follow-ups: `/notifications` page (unread + type filters, cursor Load more,
   View all from the bell) and dashboard created-vs-completed throughput (14 UTC days;
   `task.moved` payloads include column names). See
-  [deferred notes](docs/archive/specs/2026-08-09-phase-8-deferred.md) (archived; open items
+  deferred notes, `docs/archive/specs/2026-08-09-phase-8-deferred.md` (archived; open items
   moved to [roadmap.md](ROADMAP.md#beyond-mvp)).
 - Phase 8 activity log and notifications
-  ([spec](docs/archive/specs/2026-08-09-phase-8-activity-notifications-design.md)): activity writes
+  (spec, `docs/archive/specs/2026-08-09-phase-8-activity-notifications-design.md`): activity writes
   on task create/update/move/delete/assign/comment; workspace and task feeds; `Notification`
   model (assignment, mention, due-soon via BullMQ); shell bell + task History; comment
   `@[Name](userId)` mentions. Email deferred
-  ([notes](docs/archive/specs/2026-08-09-phase-8-deferred.md), archived).
+  (notes, `docs/archive/specs/2026-08-09-phase-8-deferred.md`, archived).
 - Phase 7 dashboard
-  ([spec](docs/archive/specs/2026-08-09-phase-7-dashboard-design.md)):
+  (spec, `docs/archive/specs/2026-08-09-phase-7-dashboard-design.md`):
   `GET .../dashboard/summary?boardId?` with total/overdue tiles, priority and assignee
   charts, optional per-board column chart (Recharts), empty/loading states; completion
   over time now on `throughput` (Activity-backed).
 - Phase 6 filtering and search
-  ([spec](docs/archive/specs/2026-08-09-phase-6-filtering-design.md)): whitelisted `TaskQueryDto`
+  (spec, `docs/archive/specs/2026-08-09-phase-6-filtering-design.md`): whitelisted `TaskQueryDto`
   on `GET .../boards/:boardId/tasks` (`q`, priority, assignee, label, due-date null/range,
   sort), cursor pagination (`CursorPage<TaskDto>`), filter indexes, and a URL-synced board
   filter bar with chips, `/` search focus, and empty state.
 - Phase 5 task metadata
-  ([spec](docs/archive/specs/2026-08-09-phase-5-task-metadata-design.md)): board label CRUD with
+  (spec, `docs/archive/specs/2026-08-09-phase-5-task-metadata-design.md`): board label CRUD with
   `LabelColorSlot` colors, task assignees/labels, priority/`dueDate`/`estimatedMinutes`
   on `PATCH` tasks, comments, [ADR 0011](docs/decisions/0011-label-task-metadata-permissions.md),
   enriched `TaskDto`/`CommentDto`/`WorkspaceMemberDto`, and panel/card UI for metadata.
 - Phase 4 tasks and drag-and-drop
-  ([spec](docs/archive/specs/2026-08-09-phase-4-tasks-design.md)): workspace-scoped task CRUD,
+  (spec, `docs/archive/specs/2026-08-09-phase-4-tasks-design.md`): workspace-scoped task CRUD,
   fractional `Task.position` moves with on-demand rebalance,
   [ADR 0010](docs/decisions/0010-task-permissions.md) (MEMBER+ mutate), `@dnd-kit`
   multi-column board with optimistic move + toast rollback, and a title/description
   detail panel at `/board/[boardId]/task/[taskId]`.
 - Visual debt closure and Phase 4 groundwork
-  ([spec](docs/archive/specs/2026-08-09-visual-debt-design.md)): design.md type-scale tokens,
+  (spec, `docs/archive/specs/2026-08-09-visual-debt-design.md`): design.md type-scale tokens,
   reduced-motion policy that keeps color/opacity, shared `DamgaMark`, token-themed sonner
   toasts with retry actions, elevation tokens, shared 48px topbar, workspace switcher
   dropdown (usable from the collapsed rail), sliding sancak rail, shell loading skeleton,

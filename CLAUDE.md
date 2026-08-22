@@ -36,14 +36,14 @@ Open-source Kanban-focused project management tool. `dravcore/kurul` — AGPL-3.
 - Architecture/stack details: `docs/architecture.md`, `docs/tech-stack.md`, `docs/design.md` (UI/UX language)
 - Process: `docs/git-strategy.md`, `docs/coding-standards.md`, `docs/testing.md`, `docs/api-conventions.md`
 - Docs map: `docs/README.md` · Decisions: `docs/decisions/` · Progress: `ROADMAP.md`
-  (MVP phase checklists: `docs/archive/roadmap-mvp-phases.md`)
 
 ## Docs policy
 
 - Update the existing canonical file before creating any new `.md`; a new file is only for a
-  new _kind_ of record (a new ADR, a plan/spec moving to `docs/archive/`)
+  new _kind_ of record (in practice: a new ADR)
 - One fact lives in one canonical file — link to it from elsewhere, never copy it
-- Roadmap has a single source: root `ROADMAP.md`. Finished plans/specs move to `docs/archive/`
+- Roadmap has a single source: root `ROADMAP.md`. There is no archive: a finished plan or spec
+  is deleted, git history keeps it, and its lasting outcome lives in `ROADMAP.md` or an ADR
 - Working notes and audit dashboards stay out of the repo; distill lasting outcomes into
   `ROADMAP.md` items instead
 - A PR that changes a `docs/` file updates its `docs/tr/` mirror in the same PR

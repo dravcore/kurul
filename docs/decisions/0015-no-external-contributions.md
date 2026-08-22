@@ -15,7 +15,7 @@
 
 [ADR 0014](0014-dual-licensing-cla.md) settled the business model — dual licensing, with a
 Contributor License Agreement making it legally possible — and shipped
-[docs/cla.md](../archive/cla-draft.md) as a Harmony-derived draft plus a merge-blocking GitHub Actions
+`docs/cla.md` (deleted 2026-08-22, in git history) as a Harmony-derived draft plus a merge-blocking GitHub Actions
 check. It also recorded, honestly, that the legal work was not finished: the document carries
 unresolved `[FILL: …]` and `[ASK A LAWYER: …]` markers and a prominent not-in-force banner.
 
@@ -41,7 +41,7 @@ has run on for decades. Bug reports, feature ideas, design feedback and discussi
 as much as ever; a one-line typo or dead-link fix still carries no copyright worth arguing
 about and is still welcome.
 
-**The CLA draft is kept, not enacted.** [docs/cla.md](../archive/cla-draft.md) stays in the repository with
+**The CLA draft is kept, not enacted.** `docs/cla.md` (deleted 2026-08-22, in git history) stays in the repository with
 its not-in-force banner intact, and the CLA workflow
 (`.github/workflows/cla.yml`, deleted by 0028, last version in git history) is disabled — triggers cut
 back to `workflow_dispatch` and the job guarded with `if: ${{ false }}` — rather than deleted.

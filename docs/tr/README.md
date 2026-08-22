@@ -46,22 +46,6 @@ Kök topluluk dosyaları (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGE
 | [../../ROADMAP.md](../../ROADMAP.md) (İngilizce) | Yol haritası: sağlamlaştırma + özellik hatları, beyond-MVP backlog'u                                           |
 | [decisions/](decisions/)                         | Mimari karar kayıtları (ADR'ler)                                                                               |
 
-## Tarihsel
-
-| Doküman                                                                          | Durum                                                                                                               |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| [../archive/project-skeleton.md](../archive/project-skeleton.md) (İngilizce)     | Tarihsel Faz 1 iskelet rehberi; güncel yerleşim [architecture.md](architecture.md)                                  |
-| [../archive/roadmap-mvp-phases.md](../archive/roadmap-mvp-phases.md) (İngilizce) | Tam Faz 0–9 + hardening checklist'leri (`v0.1.0` öncesi detay)                                                      |
-| [../archive/specs/](../archive/specs/) (İngilizce)                               | Sevkedilmiş faz / visual-debt tasarım spec'leri                                                                     |
-| [../archive/plans/](../archive/plans/) (İngilizce)                               | Bitmiş implementasyon planları                                                                                      |
-| [../archive/cla-draft.md](../archive/cla-draft.md) (İngilizce)                   | Yürürlüğe hiç girmemiş CLA taslağı; [ADR 0028](decisions/0028-open-contributions-hosted-service.md) ile terk edildi |
-
 MVP sonrası yeni özellik tasarımı bir **GitHub Issue** olarak açılır (kalıcı bir karar
 gerektiğinde bir ADR ile birlikte). Rutin işler için paralel bir `docs/specs/` ağacı
 büyütülmez.
-
-## Arşiv politikası
-
-`docs/archive/` günlük okuma için değildir; İngilizce kalır ve çevrilmez. Onun yerine
-[../../ROADMAP.md](../../ROADMAP.md) ve [architecture.md](architecture.md) tercih edilir. CHANGELOG'a
-bağlı bir yol taşındığında, aynı PR'da her `CHANGELOG.md` linki güncellenir.
