@@ -11,6 +11,17 @@ booleans, numbers, dates, colours, `closed` flags, every id relationship) and re
 piece of text with deterministic pseudonyms of the same length and shape. What the importer
 reads is unchanged; what a person wrote is gone.
 
+## Fixtures
+
+| Fixture                    | Board                                                                  | Seed    | Exported   | Counts                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------- | ------- | ---------- | ---------------------------------------------------------------------------------------- |
+| `starter-guide-board.json` | Trello's own default "Starter Guide" board                             | `kurul` | 2026-08-22 | 4 lists, 7 cards, 6 labels, 7 checklists / 22 items, 6 attachments, 1 member, 0 comments |
+| `eleven-list-board.json`   | An eleven-list board, exported the same day to widen the shape covered | —       | 2026-08-22 | 11 lists, 11 cards, 6 labels, 0 checklists, 14 actions                                   |
+
+Both import cleanly end to end through `trello-import-real.e2e-spec.ts`; the field-mapping diffs
+they turned up (none on a field the reader uses) are recorded in
+[`../README.md`](../README.md#field-mapping-diffs).
+
 ## Adding one
 
 1. In Trello: board menu, **More**, **Print and export**, **Export as JSON**. Save the file.
@@ -49,6 +60,7 @@ import report and the rows in the database. A failure is not necessarily a bug i
 is the first place a difference between Trello's schema and this repository's idea of it shows
 up, and the export wins. Record what you found in the diffs table and fix the importer.
 
-While this directory holds no `*.json`, that spec reports exactly one skipped test named
-`no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, so the open
-gate stays visible in every CI run.
+If this directory ever holds no `*.json` again, that spec reports exactly one skipped test named
+`no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, so an open gate
+stays visible in every CI run rather than showing nothing at all. With the two files above in
+place, it runs one test per file instead.

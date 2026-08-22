@@ -22,6 +22,7 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
+    "db:drift": "prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code",
     "openapi": "pnpm --filter @kurul/api build && pnpm --filter @kurul/api openapi",
     "openapi:check": "pnpm --filter @kurul/api openapi:check",
     "format": "prettier --write .",

@@ -408,6 +408,10 @@ yalnız veritabanında hiç `Workspace` satırı yokken çalışır. `--seed` yi
 atlar. Betik o tabloyu herhangi bir sebeple okuyamazsa da atlar — yıkıcı dal asla tahmine
 dayanarak seçilmez.
 
+`schema.prisma`'nın ve commit edilmiş migration'ların hâlâ uyuştuğunu doğrulamak için, en son
+migration'a alınmış bir veritabanına karşı `pnpm db:drift` çalıştırın — aşağıdaki [Migration
+sapmasını kontrol etme](#migration-sapmasını-kontrol-etme) bölümüne bakın.
+
 | URL                          | Ne                            |
 | ---------------------------- | ----------------------------- |
 | http://localhost:3000        | Web uygulaması (Next.js)      |
@@ -598,21 +602,22 @@ işi olarak izleniyor, buraya dahil edilmedi.
 
 Repository kökünden çalıştırın.
 
-| Script           | Komut                 | Ne yapar                                                                                                                                                                                                                                                                                                                              |
-| ---------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bootstrap`      | `pnpm bootstrap`      | Taze clone (veya taze pull) → çalışan dev loop: paylaşılan paketler, Prisma client, container'lar, migration'lar, demo veri. Idempotent; halihazırda workspace tutan bir veritabanını yeniden seed'lemez. `--seed` / `--no-seed` bunu geçersiz kılar. `pnpm setup` **değil** — o, shell profilinize yazan yerleşik bir pnpm komutudur |
-| `dev`            | `pnpm dev`            | `apps/api` ve `apps/web`'i hot reload ile paralel çalıştırır                                                                                                                                                                                                                                                                          |
-| `build`          | `pnpm build`          | Her workspace paketini build eder                                                                                                                                                                                                                                                                                                     |
-| `lint`           | `pnpm lint`           | Tüm paketlerde ESLint                                                                                                                                                                                                                                                                                                                 |
-| `format`         | `pnpm format`         | Repo genelinde Prettier write                                                                                                                                                                                                                                                                                                         |
-| `format:check`   | `pnpm format:check`   | Prettier check (CI kapısı)                                                                                                                                                                                                                                                                                                            |
-| `typecheck`      | `pnpm typecheck`      | `@kurul/shared-types` + `@kurul/auth-access` build, ardından her workspace'te `tsc --noEmit`                                                                                                                                                                                                                                          |
-| `test`           | `pnpm test`           | Tüm workspace paketlerinin test suite'lerini çalıştırır                                                                                                                                                                                                                                                                               |
-| `db:generate`    | `pnpm db:generate`    | `prisma generate`'i çalıştırır: Prisma client'ı şemadan (yeniden) üretir. Migration'lara veya veritabanına dokunmaz. Klonlama sonrasında ve başkasının yaptığı şema/migration değişikliklerini pull'ladıktan sonra gereklidir                                                                                                         |
-| `db:migrate`     | `pnpm db:migrate`     | `prisma migrate deploy`'u çalıştırır: var olan, zaten commit edilmiş migration'ları uygular. Asla migration oluşturmaz ve client'ı asla yeniden üretmez — CI/production için güvenlidir. Bunu yalnızca yeni migration'ları pull'ladıktan sonra çalıştırdıysanız, ardından `pnpm db:generate` çalıştırın                               |
-| `db:migrate:dev` | `pnpm db:migrate:dev` | `prisma migrate dev`'i çalıştırır: yerel şemanızı diff'ler, **yeni bir migration dosyası oluşturur**, uygular ve client'ı yeniden üretir. `schema.prisma`'yı düzenledikten sonra yerelde çalıştırmanız gereken komut budur — `db:migrate` tek başına onu oluşturmaz                                                                   |
-| `db:seed`        | `pnpm db:seed`        | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır                                                                                                       |
-| `db:studio`      | `pnpm db:studio`      | http://localhost:5555 adresinde Prisma Studio'yu açar                                                                                                                                                                                                                                                                                 |
+| Script           | Komut                 | Ne yapar                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bootstrap`      | `pnpm bootstrap`      | Taze clone (veya taze pull) → çalışan dev loop: paylaşılan paketler, Prisma client, container'lar, migration'lar, demo veri. Idempotent; halihazırda workspace tutan bir veritabanını yeniden seed'lemez. `--seed` / `--no-seed` bunu geçersiz kılar. `pnpm setup` **değil** — o, shell profilinize yazan yerleşik bir pnpm komutudur                                              |
+| `dev`            | `pnpm dev`            | `apps/api` ve `apps/web`'i hot reload ile paralel çalıştırır                                                                                                                                                                                                                                                                                                                       |
+| `build`          | `pnpm build`          | Her workspace paketini build eder                                                                                                                                                                                                                                                                                                                                                  |
+| `lint`           | `pnpm lint`           | Tüm paketlerde ESLint                                                                                                                                                                                                                                                                                                                                                              |
+| `format`         | `pnpm format`         | Repo genelinde Prettier write                                                                                                                                                                                                                                                                                                                                                      |
+| `format:check`   | `pnpm format:check`   | Prettier check (CI kapısı)                                                                                                                                                                                                                                                                                                                                                         |
+| `typecheck`      | `pnpm typecheck`      | `@kurul/shared-types` + `@kurul/auth-access` build, ardından her workspace'te `tsc --noEmit`                                                                                                                                                                                                                                                                                       |
+| `test`           | `pnpm test`           | Tüm workspace paketlerinin test suite'lerini çalıştırır                                                                                                                                                                                                                                                                                                                            |
+| `db:generate`    | `pnpm db:generate`    | `prisma generate`'i çalıştırır: Prisma client'ı şemadan (yeniden) üretir. Migration'lara veya veritabanına dokunmaz. Klonlama sonrasında ve başkasının yaptığı şema/migration değişikliklerini pull'ladıktan sonra gereklidir                                                                                                                                                      |
+| `db:migrate`     | `pnpm db:migrate`     | `prisma migrate deploy`'u çalıştırır: var olan, zaten commit edilmiş migration'ları uygular. Asla migration oluşturmaz ve client'ı asla yeniden üretmez — CI/production için güvenlidir. Bunu yalnızca yeni migration'ları pull'ladıktan sonra çalıştırdıysanız, ardından `pnpm db:generate` çalıştırın                                                                            |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | `prisma migrate dev`'i çalıştırır: yerel şemanızı diff'ler, **yeni bir migration dosyası oluşturur**, uygular ve client'ı yeniden üretir. `schema.prisma`'yı düzenledikten sonra yerelde çalıştırmanız gereken komut budur — `db:migrate` tek başına onu oluşturmaz                                                                                                                |
+| `db:seed`        | `pnpm db:seed`        | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır                                                                                                                                                    |
+| `db:studio`      | `pnpm db:studio`      | http://localhost:5555 adresinde Prisma Studio'yu açar                                                                                                                                                                                                                                                                                                                              |
+| `db:drift`       | `pnpm db:drift`       | `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`'u çalıştırır: yapılandırılmış veritabanını `schema.prisma` ile karşılaştırır ve herhangi bir farkta sıfırdan farklı çıkışla sonlanır. CI'nin `db:migrate`'ten sonra çalıştırdığı komutla aynıdır — bkz. [Migration sapmasını kontrol etme](#migration-sapmasını-kontrol-etme) |
 
 Tek bir workspace'i hedeflemek için pnpm'in filter flag'ini kullanın:
 
@@ -651,6 +656,25 @@ Kurallar:
   PR'ında olur.
 - `Task.position` ve `Column.position` `Float`'tır (fractional indexing) — özensizce değiştirilmemesi gereken
   model seviyesi kurallar için [architecture.md](architecture.md#kritik-alan-kuralları)'ye bakın.
+
+### Migration sapmasını kontrol etme
+
+Karşılığında migration'ı hiç almamış bir şema değişikliği doğası gereği sessizdir: yerelde hiçbir
+şey bozulmaz, uyuşmazlık ancak bir sonraki `prisma migrate dev`'in çıkarmak istediği ilgisiz
+statement'lar olarak yüzeye çıkar. `pnpm db:drift` bunu beklemeden doğrudan yakalar:
+
+```bash
+pnpm db:migrate   # önce veritabanını en son commit edilmiş migration'a getir
+pnpm db:drift     # sonra schema.prisma ile karşılaştır
+```
+
+`prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma
+--exit-code`'u çalıştırır; uyuştuklarında "No difference detected." yazar ve 0 ile çıkar, aksi
+halde uyuşmazlığı yazıp sıfırdan farklı bir kodla çıkar. Ayrı bir shadow veritabanı yoktur:
+`--from-config-datasource`, `prisma.config.ts`'teki datasource'u (yani `DATABASE_URL`'i)
+doğrudan şemayla karşılaştırır — CI'nin de aynı job içinde `db:migrate`'ten hemen sonra
+çalıştırdığı şey budur, bkz. [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) —
+dolayısıyla yerelde geçmesiyle CI'de geçmesi aynı anlama gelir.
 
 Yerel bir veritabanını sıfırdan sıfırlamak:
 
