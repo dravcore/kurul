@@ -107,6 +107,41 @@ export interface BoardDto {
   createdAt: string;
 }
 
+/**
+ * One starting shape offered at board creation, already resolved into the creator's language.
+ *
+ * The catalog is code in the API (`apps/api/src/common/board-templates.ts`), not rows and not
+ * a second copy in the browser bundle: a client renders whatever
+ * `GET /workspaces/:workspaceId/board-templates` returns and sends `slug` back. That is what
+ * keeps a template from being added in one place and missing in the other.
+ *
+ * The names are localised server-side, which is the exception ADR 0018 §3 already carves out
+ * for content the API writes on the user's behalf — a card here is a preview of the exact rows
+ * a board create is about to write, so it has to speak the language they will be written in.
+ */
+export interface BoardTemplateDto {
+  /** Stable identifier, sent back as `CreateBoardRequest.template`. Never a display name. */
+  slug: string;
+  name: string;
+  description: string;
+  columns: BoardTemplateColumnDto[];
+  labels: BoardTemplateLabelDto[];
+}
+
+/** A column a template will create. Not a `ColumnDto`: nothing exists yet, so there is no id. */
+export interface BoardTemplateColumnDto {
+  name: string;
+  position: number;
+  /** What the stage means, independent of what it is called (ADR 0019). */
+  category: ColumnCategory;
+}
+
+/** A label a template will create. Slot, never hex, for the same reason `LabelDto` is. */
+export interface BoardTemplateLabelDto {
+  name: string;
+  color: LabelColorSlot;
+}
+
 export interface ColumnDto {
   id: string;
   boardId: string;

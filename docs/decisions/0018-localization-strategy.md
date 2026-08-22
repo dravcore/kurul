@@ -116,6 +116,18 @@ There is no `[locale]` path segment and no i18n middleware. Alongside that:
   genuinely crosses the boundary: the web renders the picker from it, the API validates
   `PATCH /me` against it. The structural half of the seed list (position, `ColumnCategory`) is
   held apart from the names so a translation cannot move a column or change what it means.
+- **Board templates extend that ruling by one step, and the step is deliberate.** The catalogue
+  in `apps/api/src/common/board-templates.ts` holds each template's columns _and_ its label
+  preset under the same `Record<Locale, …>` discipline, which §3 already covers: both are rows
+  the API writes on the user's behalf. What is new is that a template also has a **name and a
+  description of its own**, and those are returned localised by
+  `GET /workspaces/:workspaceId/board-templates` rather than rendered from `messages/<tag>.json`.
+  That is an interface string by §3's renameability test, and it is served from the API anyway,
+  because a picker card is a promise about the rows a create is about to write. Splitting it
+  would render the title in the browser's language and the columns beneath it in the creator's
+  stored one, which are not always the same language. One card, one language, one source.
+  `defaultColumnsFor` is a call into this catalogue, so the board every client already creates
+  and the template the picker calls by the same name cannot drift apart.
 - Adding a language is a change to `SUPPORTED_LOCALES` plus the three things that then fail on
   their own: the API's `Record<Locale, …>` of seed names and its `Record<Locale, …>` of mail
   copy both stop compiling, and `messages/<tag>.json` fails the catalogue parity test until it

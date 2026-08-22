@@ -8,8 +8,9 @@
  * exist" is how a value the picker offers becomes a value the API rejects.
  *
  * What is *not* here: the message catalogs (`apps/web/messages/<tag>.json`, web-only), the
- * seed column names and the mail copy (`apps/api/src/common/board-defaults.ts` and
- * `apps/api/src/mail/mail-templates.ts`, API-only). See
+ * board template catalog with its seed column and label names, and the mail copy
+ * (`apps/api/src/common/board-templates.ts` and `apps/api/src/mail/mail-templates.ts`,
+ * API-only). See
  * [ADR 0018](../../../docs/decisions/0018-localization-strategy.md).
  */
 
@@ -18,7 +19,8 @@
  *
  * Adding a language is a change to this list — nothing else in the resolution chain is
  * keyed to a specific tag. The places that must grow with it fail to compile or fail a test
- * until they do: `SEED_COLUMN_NAMES` and `MAIL_COPY` in the API are both `Record<Locale, …>`,
+ * until they do: the board template catalog's copy table and `MAIL_COPY` in the API are both
+ * `Record<Locale, …>`,
  * and `apps/web/messages/<tag>.json` has to exist for the catalog import to resolve — and to
  * carry exactly the keys `en.json` carries, which `messages/catalog.test.ts` gates.
  */

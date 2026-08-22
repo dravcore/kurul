@@ -115,6 +115,18 @@ User.locale  →  locale çerezi  →  Accept-Language  →  'en'
   `SUPPORTED_LOCALES`'tir; o gerçekten sınırı geçer: web seçiciyi ondan üretir, API `PATCH /me`'yi
   ona karşı doğrular. Tohum listesinin yapısal yarısı (position, `ColumnCategory`) adlardan ayrı
   tutulur, böylece bir çeviri bir kolonu yerinden oynatamaz veya anlamını değiştiremez.
+- **Board şablonları bu kararı bir adım ileri taşır ve bu adım bilinçlidir.**
+  `apps/api/src/common/board-templates.ts`'teki katalog, her şablonun kolonlarını _ve_ etiket ön
+  ayarını aynı `Record<Locale, …>` disiplini altında tutar; §3 bunu zaten kapsıyor, çünkü ikisi
+  de API'nin kullanıcı adına yazdığı satırlardır. Yeni olan şu: bir şablonun **kendi adı ve
+  açıklaması** da var ve bunlar `messages/<tag>.json`'dan render edilmek yerine
+  `GET /workspaces/:workspaceId/board-templates` tarafından yerelleştirilmiş olarak döndürülür.
+  §3'ün yeniden adlandırılabilirlik testine göre bu bir arayüz metnidir ve yine de API'den
+  sunulur, çünkü bir seçici kartı, bir create'in birazdan yazacağı satırlar hakkında verilmiş bir
+  sözdür. Ayırmak, başlığı tarayıcının dilinde, altındaki kolonları ise oluşturanın kayıtlı
+  dilinde render ederdi; bu ikisi her zaman aynı dil değildir. Tek kart, tek dil, tek kaynak.
+  `defaultColumnsFor` bu kataloğa yapılan bir çağrıdır, böylece her istemcinin zaten oluşturduğu
+  board ile seçicinin aynı adla andığı şablon birbirinden ayrışamaz.
 - Bir dil eklemek `SUPPORTED_LOCALES`'e yapılan bir değişiklik, artı ardından kendiliğinden
   patlayan üç yerdir: API'nin tohum adları `Record<Locale, …>`'ı ve mail metinleri
   `Record<Locale, …>`'ı derlenmeyi bırakır, `messages/<tag>.json` ise var olup İngilizce ile

@@ -163,8 +163,19 @@ istisnasıdır: arkasında çağıran olmadığı için izole edilecek bir şey 
 duyar ve sınır kuralı, birbirlerine değil modüle bağımlı olmalarını söyler. API'nin sahip olduğu
 tek locale farkındalığı budur ve
 [ADR 0018](decisions/0018-localization-strategy.md)'in izin verdiği iki duruma sınırlıdır:
-kullanıcı adına veritabanına yazılan içerik (yeni bir board'un tohum kolonları) ve giden e-posta.
-Arayüz çevirisi tamamen web'de kalır.
+kullanıcı adına veritabanına yazılan içerik (yeni bir board'un tohum kolonları ve board
+şablonlarından beri tohum etiketleri) ve giden e-posta. Arayüz çevirisi tamamen web'de kalır.
+
+**Board şablonları satır değil koddur.** Katalog `common/board-templates.ts`: dört başlangıç
+şekli (`kanban`, `scrum-sprint`, `bug-triage`, `content-pipeline`), her biri aşama başına bir
+`ColumnCategory` taşıyan bir kolon listesi ve `slot-1`…`slot-8` ile boyanmış bir etiket ön ayarı.
+Kimse bir şablonu düzenlemiyor ve board oluştuktan sonra hiçbir şey ona işaret etmiyor; tablo
+yapmak, zaten sürümle birlikte gelen bir liste karşılığında bir migration satın almak olurdu.
+Kabul edilen bedel şu: yeni bir şablon eklemek bir dağıtım gerektirir, tıpkı yeni bir dil eklemek
+gibi ve aynı sebeple. `POST boards` bir `template` slug'ı alır ve onun kolonlarını ve etiketlerini
+board'un zaten ihtiyaç duyduğu tek iç içe create içinde yazar; `GET board-templates` kataloğu
+döndürür, böylece hiçbir istemci ikinci bir kopya taşımaz. Slug verilmezse board yine varsayılan
+kolonlarla ve etiketsiz tohumlanır, yani şablonlardan önceki davranışla.
 
 ---
 
@@ -217,8 +228,9 @@ ve i18n middleware'i yok**, çünkü burada indekslenen bir şey yok ve bir dil 
 Ayarlar → Dil ekranı tercihi yazıyor; bugün `en` ve `tr` sevkediliyor
 (`SUPPORTED_LOCALES = ['en', 'tr']`, `messages/tr.json` `en.json` ile eşit), yani üçüncü bir
 dil eklemek component ağacını yeniden yazmak değil, bir `SUPPORTED_LOCALES` girdisi artı bir
-`messages/<tag>.json` — ve doldurulana kadar derlenmeyecek `Record<Locale, …>` seed ve mail
-metni (`board-defaults.ts`, `mail-templates.ts`) — eklemektir. Ek UI dil paketleri için bkz.
+`messages/<tag>.json` — ve doldurulana kadar derlenmeyecek `Record<Locale, …>` seed, şablon
+kataloğu ve mail metni (`board-defaults.ts`, `board-templates.ts`, `mail-templates.ts`) —
+eklemektir. Ek UI dil paketleri için bkz.
 [ROADMAP.md — MVP ötesi](../../ROADMAP.md#beyond-mvp).
 
 ---
