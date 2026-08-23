@@ -14,7 +14,7 @@
       // Manual CLI tools invoked as `node scripts/<name>.mjs` (see docs/development.md,
       // docs/testing.md, apps/api/Dockerfile) — never through a package.json script, so knip's
       // default entry detection misses them.
-      "entry": ["scripts/*.mjs"]
+      "entry": ["scripts/*.mjs"],
     },
     "apps/api": {
       // `generate-openapi.ts` is run compiled, as `node dist/openapi/generate-openapi.js`
@@ -33,12 +33,12 @@
       // Jest mocks `PrismaService` rather than loading the real generated runtime — but the
       // compiled server crashed on boot with `Cannot find module '@prisma/client-runtime-utils'`
       // the moment a real request touched Prisma. Keep it direct.
-      "ignoreDependencies": ["@prisma/client-runtime-utils"]
+      "ignoreDependencies": ["@prisma/client-runtime-utils"],
     },
     "e2e": {
       // The performance measurement rig: deliberately not part of the smoke suite, run by hand
       // via `playwright test -c measure.config.ts` (see measure.config.ts's own header).
-      "entry": ["measure.config.ts", "measure/*.measure.ts"]
-    }
-  }
+      "entry": ["measure.config.ts", "measure/*.measure.ts"],
+    },
+  },
 }
