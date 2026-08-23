@@ -12,9 +12,9 @@ const QUEUE_NAME = 'due-soon';
 const JOB_NAME = 'scan-due-soon';
 const JOB_ID = 'due-soon-scan';
 const REPEAT_EVERY_MS = 15 * 60 * 1000;
-export const DUE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DUE_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Page size for the due-task scan — bounds memory/row-count per query instead of loading the whole window at once. */
-export const SCAN_BATCH_SIZE = 500;
+const SCAN_BATCH_SIZE = 500;
 /**
  * Attempts BullMQ makes at one scheduled run before giving up on it (the first try plus
  * two retries). Without this the queue default is a single attempt, so a scan that lands on

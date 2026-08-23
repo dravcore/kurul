@@ -55,6 +55,20 @@ export async function expectCardOrder(
 }
 
 /**
+ * Longer than `playwright.config.ts`'s global 10s `expect.timeout` on purpose: that ceiling is
+ * sized for the realtime path's worst *steady-state* case (a debounce plus a refetch), not for
+ * the handshake this precondition waits on. On a cold CI runner the socket's first connect can
+ * still be mid-flight — TLS plus the Socket.io handshake plus the `board:join` round trip,
+ * queued behind whatever else is starting up — well past 10s without the join having failed or
+ * even backed off once (`lib/socket.ts`'s reconnection backoff only engages after a failed
+ * attempt). Failing this precondition on a slow-but-live socket was never the regression this
+ * suite is watching for; every scenario's own assertions after `waitForBoardReady` still run
+ * under the tighter global timeout, so a genuinely hung join is still caught, just given room
+ * to be slow rather than merely wrong.
+ */
+const BOARD_READY_TIMEOUT_MS = 25_000;
+
+/**
  * Waits until the board has painted and its socket has joined the board room.
  *
  * The room join matters even for the tests that never assert on realtime: joining acks with a
@@ -63,8 +77,8 @@ export async function expectCardOrder(
  * room is not joined yet" — it is rendered until the `board:join` ack comes back `ok`.
  */
 export async function waitForBoardReady(page: Page): Promise<void> {
-  await expect(column(page, 'To Do')).toBeVisible();
-  await expect(page.getByText('Reconnecting…')).toBeHidden();
+  await expect(column(page, 'To Do')).toBeVisible({ timeout: BOARD_READY_TIMEOUT_MS });
+  await expect(page.getByText('Reconnecting…')).toBeHidden({ timeout: BOARD_READY_TIMEOUT_MS });
 }
 
 /**

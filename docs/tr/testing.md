@@ -354,16 +354,20 @@ Zaten kapsanmış kodun geri kaymasını mandallar engeller. Hepsi CI'ı kırar.
 | `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78 | `apps/web/vitest.config.ts` |
 | `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93 | `apps/web/vitest.config.ts` |
 | `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92 | `apps/web/vitest.config.ts` |
+| `apps/web` `components/auth/**`         | statements 94 / branches 91 / functions 95 / lines 94 | `apps/web/vitest.config.ts` |
+| `apps/web` `components/settings/**`     | statements 85 / branches 86 / functions 80 / lines 86 | `apps/web/vitest.config.ts` |
+| `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88 | `apps/web/vitest.config.ts` |
 
 Hepsi konuldukları anda alınan ölçümün birkaç puan altındadır — rutin bir refactor'ın
 takılmayacağı kadar pay bırakan, ama bir testin silinmesini yakalayacak kadar dar.
 
 `apps/web`'in **global bir taban değeri yoktur**, bilinçli olarak. Genel web coverage son
-koşularda instrumented statement'ların ~%83'ü civarındadır ama bu ortalama hâlâ yoğun testli
+koşularda instrumented statement'ların ~%85'i civarındadır ama bu ortalama hâlâ yoğun testli
 hook'ları ince sayfa kabuklarıyla karıştırır; ortalamada bir global taban az şey yakalar.
 Klasör tabanları anlamlı unit testleri olan yüzeyleri kapsar: route girişleri (`app/**`),
-etkileşimli board / task / layout / notification bileşenleri ve onların arkasındaki `lib/**`
-yardımcıları. `apps/web/vitest.config.ts` tam gerekçeyi satır içinde taşır.
+etkileşimli board / task / layout / notification / auth / settings / dashboard bileşenleri ve
+onların arkasındaki `lib/**` yardımcıları. `apps/web/vitest.config.ts` tam gerekçeyi satır
+içinde taşır.
 
 **Bir klasör tabanının yakalamadığı şey.** Coverage, diskteki her dosya için değil, bir testin
 _import ettiği_ dosyalar için raporlanır. Bir modülü import eden son testi silmek bu yüzden

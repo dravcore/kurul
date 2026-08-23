@@ -51,7 +51,7 @@ function toTaskCore(row: TaskRowBase): Omit<TaskDto, 'checklistSummary' | 'check
  * read and the detail read compute the badge from the same function and cannot disagree
  * about it.
  */
-export function summarizeChecklists(
+function summarizeChecklists(
   checklists: Array<{ items: Array<{ isDone: boolean }> }>,
 ): ChecklistSummaryDto {
   let total = 0;

@@ -5,7 +5,7 @@ import { parseRedisUrl } from '../common/redis-url';
 import { PROBE_TIMEOUT_MS } from './probe-timeout';
 
 /** The slice of a Redis client readiness needs, so a spec can hand in a stub instead of a socket. */
-export interface RedisProbe {
+interface RedisProbe {
   isConfigured(): boolean;
   ping(): Promise<unknown>;
 }

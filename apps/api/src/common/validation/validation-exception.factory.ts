@@ -27,7 +27,7 @@ function joinPath(parentPath: string, property: string): string {
  * message }` entries, with dotted paths for nested objects (`assignee.email`) and bracketed
  * indexes for arrays (`labels[0].name`).
  */
-export function flattenValidationErrors(
+function flattenValidationErrors(
   errors: readonly ValidationError[],
   parentPath = '',
 ): ValidationDetail[] {

@@ -27,9 +27,9 @@ export const DEFAULT_ATTACHMENT_INSTANCE_QUOTA_BYTES = 21_474_836_480;
 export const DEFAULT_ATTACHMENT_UPLOAD_BYTES_PER_MINUTE = 268_435_456;
 
 /** Whether a number was read from the environment or is the built-in default. */
-export type ConfigSource = 'env' | 'default';
+type ConfigSource = 'env' | 'default';
 
-export interface DiskStorageConfig {
+interface DiskStorageConfig {
   /** Absolute path of the directory attachments are written under. */
   root: string;
 }

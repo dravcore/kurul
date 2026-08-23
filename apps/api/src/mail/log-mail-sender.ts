@@ -18,7 +18,7 @@ import type { MailMessage, MailSender } from './mail-sender';
  * cases have the same consequence and completely different causes, and an operator reading
  * "SMTP_HOST is unset" on a host where they set it would go looking for the wrong bug.
  */
-export const NO_SMTP_REASON =
+const NO_SMTP_REASON =
   'SMTP is not configured (SMTP_HOST is unset) — emails are written to this log instead ' +
   'of being delivered. Email addresses cannot be verified, so workspace invitations ' +
   'cannot be accepted. Configure SMTP before running this outside development.';

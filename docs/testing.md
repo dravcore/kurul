@@ -348,16 +348,19 @@ These floors keep already-covered code from sliding back. Each fails CI.
 | `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78 | `apps/web/vitest.config.ts` |
 | `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93 | `apps/web/vitest.config.ts` |
 | `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92 | `apps/web/vitest.config.ts` |
+| `apps/web` `components/auth/**`         | statements 94 / branches 91 / functions 95 / lines 94 | `apps/web/vitest.config.ts` |
+| `apps/web` `components/settings/**`     | statements 85 / branches 86 / functions 80 / lines 86 | `apps/web/vitest.config.ts` |
+| `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88 | `apps/web/vitest.config.ts` |
 
 All sit a few points under the measurement taken when they were introduced — enough margin
 that a routine refactor does not trip them, tight enough that deleting a test does.
 
-`apps/web` has **no global floor**, deliberately. Overall web coverage is around 83% of
+`apps/web` has **no global floor**, deliberately. Overall web coverage is around 85% of
 instrumented statements in recent runs, but that average still mixes heavily-tested hooks with
 thin page shells; a global floor at the average would catch little. Folder floors cover the
 surfaces that already have meaningful unit tests: route entrypoints (`app/**`), the
-interactive board / task / layout / notification components, and the `lib/**` helpers behind
-them. `apps/web/vitest.config.ts` carries the full reasoning inline.
+interactive board / task / layout / notification / auth / settings / dashboard components, and
+the `lib/**` helpers behind them. `apps/web/vitest.config.ts` carries the full reasoning inline.
 
 **What a folder floor does not catch.** Coverage is reported for files a test _imports_, not
 for every file on disk. Deleting the last test that imports a module therefore takes the

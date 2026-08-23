@@ -18,7 +18,7 @@ const pipe = new ValidationPipe({
   exceptionFactory: validationExceptionFactory,
 });
 
-export function transformDto(metatype: Metatype, body: Record<string, unknown>): Promise<unknown> {
+function transformDto(metatype: Metatype, body: Record<string, unknown>): Promise<unknown> {
   return pipe.transform(body, { type: 'body', metatype });
 }
 

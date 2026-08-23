@@ -193,6 +193,41 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
   Redis outage fallback and the degraded-mode reporting are all unchanged.
 
+### Fixed
+
+- **`charts.test.tsx` was load-sensitive ([#244](https://github.com/dravcore/kurul/issues/244)),
+  reproduced and fixed.** Running `apps/web`'s Vitest suite alongside `apps/api`'s Jest suite
+  reproduced it 6/6 tries. The cause: the file's bar-animation poll (`barPaths`) promises to
+  wait up to 10s, but neither `it()` that calls it set a matching Vitest test timeout, so
+  Vitest's own 5s default fired first once concurrent load delayed `requestAnimationFrame`
+  callbacks — aborting the test mid-`act()` and corrupting React's `act()` state for every
+  later test in the file, not just the one that timed out. Giving those two tests an explicit
+  timeout above the poll's own deadline stops the abort; the same concurrent-load reproduction
+  is 0/6 after the fix.
+- **The socket-join precondition in `e2e/support/board-page.ts` (`waitForBoardReady`) could
+  fail on a slow-but-live CI runner.** It shared the suite's global 10s `expect` timeout, sized
+  for the realtime path's steady-state case, not for a cold socket handshake plus `board:join`
+  round trip queued behind everything else starting up. It now gets its own 25s timeout; every
+  scenario's assertions after this precondition still run under the tighter global one.
+
+### Changed
+
+- **`knip` wired up** (`pnpm knip`, `knip.jsonc`) and its unused-code findings cleared: 35
+  constants/functions/types that had no consumer outside their own file lost their unnecessary
+  `export`, one fully dead type alias (`AuthSession`) was deleted, and a redundant direct
+  `@prisma/client-runtime-utils` dependency was found to not actually be redundant (Prisma's
+  generated client bare-`require`s it from outside `@prisma/client`'s own module tree) and was
+  restored with a stated `knip.jsonc` ignore instead. `apps/web/components/ui/**`
+  (shadcn/ui's generated component library) is ignored wholesale for the same reason knip
+  flagged it: it intentionally exports a fuller API than any one call site currently uses.
+- **Coverage floors added for `components/auth/**`, `components/settings/**` and
+  `components/dashboard/**`** in `apps/web/vitest.config.ts`, the last three interactive
+  surfaces without one; all three were already well-tested, so this ratchets the existing
+  baseline rather than adding tests.
+- **`docs/tr/architecture.md` resynced with the English original**: a missing `Column.category`
+  field, two missing data-model rows (`Checklist`/`ChecklistItem`), and a stale description of
+  multi-tenant enforcement that predated the current `WorkspaceGuard`-plus-service-level-predicate
+  model. `docs/tr/tech-stack.md` was already accurate.
 ### Added
 
 - **`pnpm bootstrap --check`, a doctor mode for the dev loop.** Answers "did something go stale
