@@ -184,7 +184,10 @@ services:
   # match the server major. Restore procedure: docs/development.md#upgrading-and-backups.
   #
   # backup_data lives on the same host as postgres_data — that covers "I dropped the wrong
-  # table", not "the disk died". Copy the volume off-host as well; see the same section.
+  # table", not "the disk died". Set BACKUP_REMOTE to an rclone remote path and the same sidecar
+  # also pushes both archives off-host every cycle, prunes the remote to the same BACKUP_KEEP,
+  # and reports unhealthy when the newest off-host copy goes stale
+  # (docs/self-hosting.md#off-host-copies). Left blank, nothing about this service changes.
   backup:
     image: postgres:18-alpine
     logging: *logging
@@ -201,7 +204,9 @@ services:
     # OPS-05 (2026-08-18 audit) — see postgres's mem_limit above for why a ceiling exists at all.
     # 256m: `pg_dump -Fc` streams its output rather than buffering the whole archive in memory
     # (see backup.sh), so this covers process overhead plus headroom for the `tar` this container
-    # also runs over attachment_data — not the size of either archive on disk.
+    # also runs over attachment_data — not the size of either archive on disk. The off-host push
+    # fits the same way: rclone streams each archive and its upload buffers are a handful of
+    # chunks, not the file, and it runs after both archives are closed rather than beside them.
     mem_limit: 256m
     environment:
       # postgres:5432 is the in-network address, same as the api/migrate services above —
@@ -220,6 +225,22 @@ services:
       # restores" — the answer here is not that the files are visible to users, but that this
       # copy is read and restored on the same rehearsed schedule as the dump beside it.
       ATTACHMENT_DIR: /attachments
+      # The off-host target, blank by default: an rclone remote path such as
+      # `s3:my-bucket/kurul` or `b2:my-bucket`. Blank means backup.sh skips its whole off-host
+      # half and this service behaves exactly as it did before that half existed, including the
+      # healthcheck below. See docs/self-hosting.md#off-host-copies.
+      BACKUP_REMOTE: ${BACKUP_REMOTE:-}
+    # Where the remote's CREDENTIALS come from, and the reason they are not in `.env`: rclone
+    # names its env-only config `RCLONE_CONFIG_<REMOTE>_<KEY>`, where `<REMOTE>` is chosen by the
+    # operator, so no fixed list of keys can be enumerated in `environment:` above the way every
+    # other secret in this file is. An optional second env file is the one mechanism that passes
+    # unknown key names through, and it also keeps object-storage keys out of the file the api
+    # and web containers read. `required: false` means an install with no off-host target (and
+    # one supplying credentials through a mounted rclone.conf instead) starts with no such file
+    # present.
+    env_file:
+      - path: ./rclone.env
+        required: false
     volumes:
       - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
       - backup_data:/backups
@@ -246,7 +267,15 @@ services:
     # apps/api/src/retention/cleanup.worker.ts) quietly assumes never happens.
     #
     # "Healthy" = a `kurul-*.dump` in /backups modified within the last 2×BACKUP_INTERVAL
-    # seconds. 2×, not 1×, so one slow or skipped cycle (a big `pg_dump`, or postgres
+    # seconds, or, once BACKUP_REMOTE is set, the `.offhost-stamp` file backup.sh touches only
+    # after a cycle's BOTH archives have landed on the remote and it has been pruned. The
+    # off-host check subsumes the local one rather than adding to it: that stamp cannot be newer
+    # than the archives it just uploaded, so a fresh stamp proves a fresh local pair as well,
+    # while the reverse is exactly the failure this exists to catch (dumps still being written
+    # here, nothing leaving the host). An operator who has declared a remote is told about a
+    # broken upload, not reassured by the copy that dies with the disk.
+    #
+    # 2×, not 1×, so one slow or skipped cycle (a big `pg_dump`, or postgres
     # restarting underneath it — both already survived by the `|| true` above) doesn't flap
     # this healthy → unhealthy → healthy every single interval; it takes a SECOND missed
     # cycle in a row to actually mean something is stuck.
@@ -282,11 +311,17 @@ services:
     # self-hosting.md's); an instance with an unusually large first dump that still needs
     # longer can raise `start_period` with a compose override file, same as any other
     # deployment-specific tuning in this project, rather than a knob added here pre-emptively.
+    # That reasoning covers the off-host branch too: the first push follows the first dump,
+    # so what it waits on is still database size plus one upload of it.
+    #
+    # $BACKUP_REMOTE is baked in the same way as $BACKUP_INTERVAL, from `${BACKUP_REMOTE:-}`
+    # above, so the empty case is a genuinely empty variable and the `find` that runs is
+    # character for character the one that ran before this branch existed.
     healthcheck:
       test:
         [
           'CMD-SHELL',
-          'mmin=$$(( ($$BACKUP_INTERVAL * 2 + 59) / 60 )); [ "$$mmin" -lt 1 ] && mmin=1; find /backups -maxdepth 1 -name "kurul-*.dump" -mmin "-$$mmin" 2>/dev/null | grep -q .',
+          'mmin=$$(( ($$BACKUP_INTERVAL * 2 + 59) / 60 )); [ "$$mmin" -lt 1 ] && mmin=1; if [ -n "$$BACKUP_REMOTE" ]; then find /backups/.offhost-stamp -mmin "-$$mmin" 2>/dev/null | grep -q .; else find /backups -maxdepth 1 -name "kurul-*.dump" -mmin "-$$mmin" 2>/dev/null | grep -q .; fi',
         ]
       interval: 5m
       timeout: 10s

@@ -153,12 +153,12 @@ olduğu için `.env.example`'da yer almazlar. Bkz.
 [Gözlemlenebilirlik](#gözlemlenebilirlik).
 
 `.env.example` ayrıca `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `REDIS_PASSWORD`,
-`BACKUP_INTERVAL` ve `BACKUP_KEEP` taşır. Altısı da **yalnızca compose'a aittir** —
-`docker-compose.yml` bunları `postgres`/`redis`/`migrate`/`api`/`backup` servislerine
-enterpolasyon eder ve hiçbir uygulama kodu doğrudan okumaz; bu yüzden yukarıdaki tabloda yer
-almazlar ve `apps/api` tarafında bağlanmaları gerekmez. İlk dördü için bkz.
+`BACKUP_INTERVAL`, `BACKUP_KEEP` ve `BACKUP_REMOTE` taşır. Yedisi de **yalnızca compose'a
+aittir** — `docker-compose.yml` bunları `postgres`/`redis`/`migrate`/`api`/`backup`
+servislerine enterpolasyon eder ve hiçbir uygulama kodu doğrudan okumaz; bu yüzden yukarıdaki
+tabloda yer almazlar ve `apps/api` tarafında bağlanmaları gerekmez. İlk dördü için bkz.
 [Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri), yedekleme
-çifti için bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme).
+üçlüsü için bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme).
 
 Bir secret üretmek için:
 
@@ -408,6 +408,41 @@ yalnız veritabanında hiç `Workspace` satırı yokken çalışır. `--seed` yi
 atlar. Betik o tabloyu herhangi bir sebeple okuyamazsa da atlar — yıkıcı dal asla tahmine
 dayanarak seçilmez.
 
+**`pnpm bootstrap --check`**, aynı betik için bir doctor mode'dur: Docker'a, veritabanına ya da
+ağa hiç dokunmadan "son bootstrap'tan bu yana bir şey bayatladı mı" sorusunu yanıtlar, bu yüzden
+5 saniyenin oldukça altında kalır ve her `git pull` sonrası, tam bir `pnpm bootstrap`'e değip
+değmediğine karar vermeden önce koşturmak için güvenlidir. Tam olarak üç şeyi kontrol eder ve
+başarısızlıkta bir düzeltme komutuyla, kontrol başına bir satır yazdırır:
+
+```
+✓ @kurul/shared-types dist: up to date
+✓ @kurul/auth-access dist: up to date
+✗ Prisma client: stale — schema.prisma is newer than the generated client
+  fix: pnpm db:generate
+✗ required env keys: POSTGRES_PASSWORD empty or missing in .env
+  fix: set POSTGRES_PASSWORD in .env — see docs/development.md#environment-variables
+```
+
+1. `packages/shared-types/dist` ve `packages/auth-access/dist`, kendi `src`'lerinden en az o
+   kadar yeni — `pnpm dev` ve `pnpm db:seed`'in gerçekte tükettiği iki build çıktısı (bunun
+   yerini aldığı hata modu için `[Unreleased]` CHANGELOG girdisine bakın: bayat bir `dist`
+   yüksek sesli başarısız olmak yerine çözümlenir ve her tüketicide `undefined` olarak geri
+   okunur).
+2. Üretilmiş Prisma client'ı (`apps/api/src/generated/prisma`), `schema.prisma`'dan en az o
+   kadar yeni.
+3. `.env`, boş olmayan `POSTGRES_PASSWORD` ve `BETTER_AUTH_SECRET` taşıyor — `pnpm bootstrap`'in
+   kendi ön kontrolünün zaten olmadan boot etmeyi reddettiği aynı iki anahtar — ve
+   `DATABASE_URL` artık `.env.example`'ın gönderdiği `<POSTGRES_PASSWORD>` yer tutucusunu
+   taşımıyor.
+
+Kasıtlı olarak `apps/api/dist` ya da `apps/web/.next`'i kontrol **etmez**: ne `pnpm bootstrap` ne
+de `pnpm dev` bunları build eder (bunlar `pnpm typecheck` ve bir production build için gereken
+`nest build` / `next build` çıktıları, dev loop'un değil), yani burada onları kontrol etmek sağlıklı
+bir dev checkout'u bozuk olarak raporlardı. Her kontrol geçtiğinde çıkış kodu `0`, aksi halde
+`1` — mantık [`scripts/lib/doctor.mjs`](../../scripts/lib/doctor.mjs)'de yaşıyor,
+[`scripts/lib/doctor.test.mjs`](../../scripts/lib/doctor.test.mjs)'de test ediliyor
+(`pnpm test:scripts`).
+
 `schema.prisma`'nın ve commit edilmiş migration'ların hâlâ uyuştuğunu doğrulamak için, en son
 migration'a alınmış bir veritabanına karşı `pnpm db:drift` çalıştırın — aşağıdaki [Migration
 sapmasını kontrol etme](#migration-sapmasını-kontrol-etme) bölümüne bakın.
@@ -602,22 +637,22 @@ işi olarak izleniyor, buraya dahil edilmedi.
 
 Repository kökünden çalıştırın.
 
-| Script           | Komut                 | Ne yapar                                                                                                                                                                                                                                                                                                                                                                           |
-| ---------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bootstrap`      | `pnpm bootstrap`      | Taze clone (veya taze pull) → çalışan dev loop: paylaşılan paketler, Prisma client, container'lar, migration'lar, demo veri. Idempotent; halihazırda workspace tutan bir veritabanını yeniden seed'lemez. `--seed` / `--no-seed` bunu geçersiz kılar. `pnpm setup` **değil** — o, shell profilinize yazan yerleşik bir pnpm komutudur                                              |
-| `dev`            | `pnpm dev`            | `apps/api` ve `apps/web`'i hot reload ile paralel çalıştırır                                                                                                                                                                                                                                                                                                                       |
-| `build`          | `pnpm build`          | Her workspace paketini build eder                                                                                                                                                                                                                                                                                                                                                  |
-| `lint`           | `pnpm lint`           | Tüm paketlerde ESLint                                                                                                                                                                                                                                                                                                                                                              |
-| `format`         | `pnpm format`         | Repo genelinde Prettier write                                                                                                                                                                                                                                                                                                                                                      |
-| `format:check`   | `pnpm format:check`   | Prettier check (CI kapısı)                                                                                                                                                                                                                                                                                                                                                         |
-| `typecheck`      | `pnpm typecheck`      | `@kurul/shared-types` + `@kurul/auth-access` build, ardından her workspace'te `tsc --noEmit`                                                                                                                                                                                                                                                                                       |
-| `test`           | `pnpm test`           | Tüm workspace paketlerinin test suite'lerini çalıştırır                                                                                                                                                                                                                                                                                                                            |
-| `db:generate`    | `pnpm db:generate`    | `prisma generate`'i çalıştırır: Prisma client'ı şemadan (yeniden) üretir. Migration'lara veya veritabanına dokunmaz. Klonlama sonrasında ve başkasının yaptığı şema/migration değişikliklerini pull'ladıktan sonra gereklidir                                                                                                                                                      |
-| `db:migrate`     | `pnpm db:migrate`     | `prisma migrate deploy`'u çalıştırır: var olan, zaten commit edilmiş migration'ları uygular. Asla migration oluşturmaz ve client'ı asla yeniden üretmez — CI/production için güvenlidir. Bunu yalnızca yeni migration'ları pull'ladıktan sonra çalıştırdıysanız, ardından `pnpm db:generate` çalıştırın                                                                            |
-| `db:migrate:dev` | `pnpm db:migrate:dev` | `prisma migrate dev`'i çalıştırır: yerel şemanızı diff'ler, **yeni bir migration dosyası oluşturur**, uygular ve client'ı yeniden üretir. `schema.prisma`'yı düzenledikten sonra yerelde çalıştırmanız gereken komut budur — `db:migrate` tek başına onu oluşturmaz                                                                                                                |
-| `db:seed`        | `pnpm db:seed`        | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır                                                                                                                                                    |
-| `db:studio`      | `pnpm db:studio`      | http://localhost:5555 adresinde Prisma Studio'yu açar                                                                                                                                                                                                                                                                                                                              |
-| `db:drift`       | `pnpm db:drift`       | `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`'u çalıştırır: yapılandırılmış veritabanını `schema.prisma` ile karşılaştırır ve herhangi bir farkta sıfırdan farklı çıkışla sonlanır. CI'nin `db:migrate`'ten sonra çalıştırdığı komutla aynıdır — bkz. [Migration sapmasını kontrol etme](#migration-sapmasını-kontrol-etme) |
+| Script           | Komut                 | Ne yapar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bootstrap`      | `pnpm bootstrap`      | Taze clone (veya taze pull) → çalışan dev loop: paylaşılan paketler, Prisma client, container'lar, migration'lar, demo veri. Idempotent; halihazırda workspace tutan bir veritabanını yeniden seed'lemez. `--seed` / `--no-seed` bunu geçersiz kılar. `--check`, onun yerine doctor mode'u koşturur — Docker yok, ağ yok, bayat/eksik dist, Prisma client ya da `.env` anahtarlarında sıfırdan farklı çıkış kodu döner, bkz. [yukarısı](#önerilen-geliştirme-döngüsü-servisler-dockerda-uygulamalar-hostta). `pnpm setup` **değil** — o, shell profilinize yazan yerleşik bir pnpm komutudur |
+| `dev`            | `pnpm dev`            | `apps/api` ve `apps/web`'i hot reload ile paralel çalıştırır                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `build`          | `pnpm build`          | Her workspace paketini build eder                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `lint`           | `pnpm lint`           | Tüm paketlerde ESLint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `format`         | `pnpm format`         | Repo genelinde Prettier write                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `format:check`   | `pnpm format:check`   | Prettier check (CI kapısı)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `typecheck`      | `pnpm typecheck`      | `@kurul/shared-types` + `@kurul/auth-access` build, ardından her workspace'te `tsc --noEmit`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `test`           | `pnpm test`           | Tüm workspace paketlerinin test suite'lerini çalıştırır                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `db:generate`    | `pnpm db:generate`    | `prisma generate`'i çalıştırır: Prisma client'ı şemadan (yeniden) üretir. Migration'lara veya veritabanına dokunmaz. Klonlama sonrasında ve başkasının yaptığı şema/migration değişikliklerini pull'ladıktan sonra gereklidir                                                                                                                                                                                                                                                                                                                                                                |
+| `db:migrate`     | `pnpm db:migrate`     | `prisma migrate deploy`'u çalıştırır: var olan, zaten commit edilmiş migration'ları uygular. Asla migration oluşturmaz ve client'ı asla yeniden üretmez — CI/production için güvenlidir. Bunu yalnızca yeni migration'ları pull'ladıktan sonra çalıştırdıysanız, ardından `pnpm db:generate` çalıştırın                                                                                                                                                                                                                                                                                      |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | `prisma migrate dev`'i çalıştırır: yerel şemanızı diff'ler, **yeni bir migration dosyası oluşturur**, uygular ve client'ı yeniden üretir. `schema.prisma`'yı düzenledikten sonra yerelde çalıştırmanız gereken komut budur — `db:migrate` tek başına onu oluşturmaz                                                                                                                                                                                                                                                                                                                          |
+| `db:seed`        | `pnpm db:seed`        | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır                                                                                                                                                                                                                                                                                                                                                              |
+| `db:studio`      | `pnpm db:studio`      | http://localhost:5555 adresinde Prisma Studio'yu açar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `db:drift`       | `pnpm db:drift`       | `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`'u çalıştırır: yapılandırılmış veritabanını `schema.prisma` ile karşılaştırır ve herhangi bir farkta sıfırdan farklı çıkışla sonlanır. CI'nin `db:migrate`'ten sonra çalıştırdığı komutla aynıdır — bkz. [Migration sapmasını kontrol etme](#migration-sapmasını-kontrol-etme)                                                                                                                                                                                                           |
 
 Tek bir workspace'i hedeflemek için pnpm'in filter flag'ini kullanın:
 
@@ -943,14 +978,15 @@ yedekleme sidecar'ı sessizce kurtarma noktası üretmeyi bırakır ki bu bölü
 tam olarak bu hatadır. `docker-compose.dev.yml`'de bilinçli olarak **yok** — `pnpm db:seed`'in
 istendiğinde sildiği yerel bir veritabanında saklanmaya değer bir şey yoktur.
 
-İki ayar, ikisi de compose tarafından `.env`'den okunur:
+Üç ayar, üçü de compose tarafından `.env`'den okunur:
 
 | Değişken          | Varsayılan | Amaç                                                                       |
 | ----------------- | ---------- | -------------------------------------------------------------------------- |
 | `BACKUP_INTERVAL` | `86400`    | Döngüler arası saniye. `86400` = günlük; bu **doğrudan** sizin RPO'nuzdur  |
 | `BACKUP_KEEP`     | `7`        | Her seride saklanan arşiv sayısı; her döngüden sonra daha eskileri silinir |
+| `BACKUP_REMOTE`   | boş        | Host dışı kopya için rclone remote yolu; boş = yalnızca yerel arşivler     |
 
-Compose bu ikisini `api` servisine de geçirir — yedekleme ayarı gibi okunduğu için gözden
+Compose ilk ikisini `api` servisine de geçirir — yedekleme ayarı gibi okunduğu için gözden
 kaçması kolaydır: gece koşan yetim dosya süpürmesi, bir dosyayı sahiplenmeyi bırakacak kadar
 eski bir dump hâlâ restore edilebilirken o dosyayı silmeyi reddeder ve bu grace period tam
 olarak `BACKUP_KEEP × BACKUP_INTERVAL`'dır. "Diskte var, veritabanında yok" ancak veritabanı
@@ -970,13 +1006,19 @@ docker compose exec backup ls -lh /backups   # en yeni çift ve kaç tanesi sakl
 
 Döngü başına bir değil iki satır: yalnızca dump'ı loglayan bir döngü, dosya arşivinin
 başarısız olduğu (ya da `ATTACHMENT_DIR`'in boş olduğu) anlamına gelir; üstündeki `ERROR`
-satırı hangisi olduğunu söyler.
+satırı hangisi olduğunu söyler. `BACKUP_REMOTE` ayarlıysa arşiv başına bir tane olmak üzere iki
+satır daha (`off-host: pushed …`) gelir ve aynı kural onlar için de geçerlidir.
 
 **Arşivleri host dışına kopyalayın.** `backup_data`, `postgres_data` ile aynı diskte durur;
-yani "yanlış tabloyu düşürdüm"ü kapsar, ölen bir diski veya kaybolan bir sunucuyu hiç
-kapsamaz — volume'ü düzenli olarak başka bir yere aynalayın
-(`docker compose exec -T backup cat /backups/<arşiv>` üzerinden ya da doğrudan volume'ün host
-yolundan `rsync`/`rclone`), yoksa felaket senaryosu yine her şeyi kaybettirir.
+yani yukarıdaki her şey "yanlış tabloyu düşürdüm"ü kapsar, ölen bir diski veya kaybolan bir
+sunucuyu hiç kapsamaz. `BACKUP_REMOTE`'a bir rclone remote yolu verin (`s3:bucket/prefix`,
+`b2:bucket`, `sftp:…`); aynı sidecar her döngüden sonra iki arşivi de oraya iter, remote'u aynı
+`BACKUP_KEEP` sayısına budar ve, asıl mesele budur, en yeni host dışı kopya
+`2 × BACKUP_INTERVAL`'ı geçtiğinde container'ı **unhealthy** raporlar; yani bozulan bir yükleme
+restore gününde değil bozulduğu gün fark edilir. Başarısız bir yükleme hiçbir zaman yerel bir
+arşive mal olmaz. Varsayılan olan boş değer bu bölümü tam olarak bu seçenek yokken olduğu gibi
+bırakır. Kurulum, kimlik bilgileri ve remote'tan restore:
+[Host dışı kopyalar](self-hosting.md#host-dışı-kopyalar).
 
 ### Elle dump almak
 

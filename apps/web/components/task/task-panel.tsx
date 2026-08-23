@@ -1,23 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { toast } from 'sonner';
-import type { LabelDto, TaskDto, UpdateTaskRequest, WorkspaceMemberDto } from '@kurul/shared-types';
-import { api, apiStatus, resolveApiMessage } from '@/lib/api';
+import type { LabelDto, TaskDto, WorkspaceMemberDto } from '@kurul/shared-types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { TaskAttachments } from './task-attachments';
 import { TaskChecklists } from './task-checklists';
 import { TaskMetadataPanel } from './task-metadata-panel';
+import { TaskPanelFields } from './task-panel-fields';
+import { TaskPanelStatus } from './task-panel-status';
 import { useTaskAttachments } from './use-task-attachments';
 import { useTaskChecklists } from './use-task-checklists';
+import { useTaskPanelFocus } from './use-task-panel-focus';
 
 interface TaskPanelProps {
   workspaceId: string;
@@ -40,6 +37,14 @@ interface TaskPanelProps {
   onRequestDelete: () => void;
 }
 
+/**
+ * The panel shell: the route-backed `<aside>`, its header, and the sections it composes.
+ *
+ * Everything with a life of its own has been factored out around it: the focus and dismiss
+ * behaviour into `useTaskPanelFocus`, the title/description write into `TaskPanelFields`, the
+ * no-task states into `TaskPanelStatus`, and each remaining section into its own component
+ * and hook. What is left here is the layout and the wiring between them.
+ */
 export function TaskPanel({
   workspaceId,
   boardId,
@@ -56,21 +61,21 @@ export function TaskPanel({
   onRequestDelete,
 }: TaskPanelProps): React.ReactElement {
   const t = useTranslations('app.board.task');
-  const tErrors = useTranslations('app.errors');
   const router = useRouter();
-  const panelRef = useRef<HTMLElement>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const openerRef = useRef<HTMLElement | null>(null);
-  const focusInsideRef = useRef(false);
-  const titleId = useId();
-  const descriptionId = useId();
-  const [title, setTitle] = useState(task?.title ?? '');
-  const [description, setDescription] = useState(task?.description ?? '');
-  const [pending, setPending] = useState(false);
+
+  const close = useCallback((): void => {
+    // `scroll: false` also opts out of the router's focus pass: Next calls `focus()` on the
+    // new route segment after any scroll-applying navigation, which would land on the board
+    // wrapper and undo the focus restoration in `useTaskPanelFocus`. The board is already on
+    // screen either way.
+    router.push(`/board/${boardId}`, { scroll: false });
+  }, [boardId, router]);
+
+  const { panelRef, headingRef } = useTaskPanelFocus({ taskId: task?.id, onClose: close });
 
   // Its own hook rather than more handlers in this component: the task a board row hands over
   // carries `checklists: null` — the summary only — so the checklist surface owns a read as
-  // well as five writes, and this file is already the widest in the folder.
+  // well as five writes.
   const checklists = useTaskChecklists({ workspaceId, task, canMutate, onUpdated });
 
   // Attachments do not ride on the task DTO the way checklists do — `TaskDto` carries only
@@ -87,183 +92,6 @@ export function TaskPanel({
     canMutate,
     onCountChanged: onAttachmentCountChanged,
   });
-
-  // Re-seed the editable fields when the panel switches task, or when the stored title or
-  // description changes under it (our own PATCH coming back, or a realtime edit). Done during
-  // render rather than from an effect so the panel never paints the previous task's title for
-  // one frame first — the flash was visible every time a card was opened from another card.
-  // The three compared values are exactly what the effect's dependency list was.
-  const [synced, setSynced] = useState({
-    id: task?.id,
-    title: task?.title,
-    description: task?.description,
-  });
-  if (
-    synced.id !== task?.id ||
-    synced.title !== task?.title ||
-    synced.description !== task?.description
-  ) {
-    setSynced({ id: task?.id, title: task?.title, description: task?.description });
-    setTitle(task?.title ?? '');
-    setDescription(task?.description ?? '');
-  }
-
-  // Closing only takes focus back if the user still has it in here. Tracked from `focusin`
-  // rather than read on the way out: by the time the unmount cleanup runs, React has already
-  // detached the panel and the browser has already reset `document.activeElement`.
-  useEffect(() => {
-    function onFocusIn(event: FocusEvent): void {
-      const target = event.target;
-      focusInsideRef.current =
-        target instanceof Node && (panelRef.current?.contains(target) ?? false);
-    }
-    document.addEventListener('focusin', onFocusIn);
-    return () => document.removeEventListener('focusin', onFocusIn);
-  }, []);
-
-  // Below `md` the panel is a fullscreen sheet (`fixed inset-0`). Without a focus trap, Tab
-  // walks onto the board underneath. Desktop keeps the panel in the layout flow, so the
-  // ordinary document tab order is correct there.
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return;
-    const media = window.matchMedia('(max-width: 767px)');
-
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key !== 'Tab' || !media.matches) return;
-      const root = panelRef.current;
-      if (!root) return;
-
-      const focusable = root.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusable.length === 0) return;
-
-      const first = focusable[0]!;
-      const last = focusable[focusable.length - 1]!;
-      const active = document.activeElement;
-
-      if (event.shiftKey && active === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      } else if (active instanceof Node && !root.contains(active)) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
-
-  useEffect(() => {
-    // Recorded before focus moves into the panel — nothing else in the tree knows which card
-    // opened it. Anything already inside is the panel's own doing (a task loading in
-    // underneath it), never a place worth returning to, and `<body>` is the lost-focus state
-    // this is here to avoid rather than a target to restore.
-    const opener = document.activeElement;
-    if (
-      opener instanceof HTMLElement &&
-      opener !== document.body &&
-      !panelRef.current?.contains(opener)
-    ) {
-      openerRef.current = opener;
-    }
-    headingRef.current?.focus();
-    focusInsideRef.current = panelRef.current?.contains(document.activeElement) ?? false;
-  }, [task?.id]);
-
-  // This panel is a plain `<aside>` behind a route segment, not a Radix dialog, so nothing
-  // hands focus back when the route drops it: React removes the focused node and the browser
-  // resets focus to `<body>`, dumping a keyboard user at the top of the document. Radix
-  // `FocusScope` covers the dialogs in `form-dialog.tsx`; here it is done by hand, on unmount.
-  useEffect(() => {
-    return () => {
-      if (!focusInsideRef.current) return;
-
-      const opener = openerRef.current;
-      if (opener?.isConnected) {
-        opener.focus();
-        if (document.activeElement === opener) return;
-      }
-
-      // The opener is regularly gone by now — the task was deleted, filtered out of the
-      // board, or moved by another client. The board's landmark keeps focus on the page and
-      // the tab order roughly where the user was, instead of back at `<body>`. It is not
-      // focusable on its own, so it is lent a tabindex for exactly this one focus.
-      const main = document.querySelector('main');
-      if (!main) return;
-      if (!main.hasAttribute('tabindex')) {
-        main.setAttribute('tabindex', '-1');
-        main.addEventListener('blur', () => main.removeAttribute('tabindex'), { once: true });
-      }
-      main.focus();
-    };
-  }, []);
-
-  const close = useCallback((): void => {
-    // `scroll: false` also opts out of the router's focus pass: Next calls `focus()` on the
-    // new route segment after any scroll-applying navigation, which would land on the board
-    // wrapper and undo the restoration above. The board is already on screen either way.
-    router.push(`/board/${boardId}`, { scroll: false });
-  }, [boardId, router]);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key !== 'Escape' || event.defaultPrevented) return;
-      event.preventDefault();
-      close();
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [close]);
-
-  async function save(): Promise<void> {
-    if (!task || !canMutate) return;
-    const nextTitle = title.trim();
-    if (nextTitle.length === 0) return;
-    const nextDescription = description.trim().length > 0 ? description : null;
-    if (nextTitle === task.title && nextDescription === task.description) return;
-
-    setPending(true);
-    const previousTitle = task.title;
-    const previousDescription = task.description;
-    onUpdated({ id: task.id, title: nextTitle, description: nextDescription });
-    try {
-      const body: UpdateTaskRequest = { title: nextTitle, description: nextDescription };
-      const updated = await api.patch<TaskDto, UpdateTaskRequest>(
-        `/workspaces/${workspaceId}/tasks/${task.id}`,
-        body,
-      );
-      onUpdated(updated);
-    } catch (caught) {
-      onUpdated({
-        id: task.id,
-        title: previousTitle,
-        description: previousDescription,
-      });
-      const status = apiStatus(caught);
-      // A retry only makes sense for a failure the server did not explain; re-sending a
-      // rejected write on a 403, or against a task that is gone, just repeats the toast.
-      if (status === 403 || status === 404) {
-        toast.error(
-          resolveApiMessage(caught, t, {
-            fallback: 'saveError',
-            byStatus: { 403: 'forbidden', 404: 'missing' },
-          }),
-        );
-        if (status === 404) close();
-      } else {
-        toast.error(t('saveError'), {
-          action: { label: t('retryAction'), onClick: () => void save() },
-        });
-      }
-    } finally {
-      setPending(false);
-    }
-  }
 
   return (
     <aside
@@ -296,64 +124,22 @@ export function TaskPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {/*
-          Three answers, not two. A cold deep link (`/board/x/task/y`) opens the panel before
-          the board has the row, and folding that into `!task` flashed "This task no longer
-          exists" at a task that exists — the one sentence here that must never be a guess.
-          Only the third branch is retryable: a 404 is the server being clear, and asking it
-          again just repeats itself. `loadError` is `null` for that case by contract.
-        */}
-        {loading ? (
-          <div className="flex flex-col gap-3">
-            <Skeleton className="h-9 w-full rounded-[var(--radius-md)]" />
-            <Skeleton className="h-32 w-full rounded-[var(--radius-md)]" />
-            <Skeleton className="h-24 w-full rounded-[var(--radius-md)]" />
-          </div>
-        ) : loadError ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-body text-destructive">{loadError}</p>
-            <div className="flex flex-wrap gap-2">
-              {onRetryLoad ? (
-                <Button type="button" onClick={onRetryLoad}>
-                  {tErrors('retry')}
-                </Button>
-              ) : null}
-              <Button type="button" variant="outline" onClick={close}>
-                {t('backToBoard')}
-              </Button>
-            </div>
-          </div>
-        ) : !task ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-body text-destructive">{t('missing')}</p>
-            <Button type="button" variant="outline" onClick={close}>
-              {t('backToBoard')}
-            </Button>
-          </div>
+        {loading || loadError || !task ? (
+          <TaskPanelStatus
+            loading={loading}
+            loadError={loadError}
+            onRetryLoad={onRetryLoad}
+            onClose={close}
+          />
         ) : (
           <>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={titleId}>{t('title')}</Label>
-              <Input
-                id={titleId}
-                value={title}
-                disabled={!canMutate || pending}
-                onChange={(event) => setTitle(event.target.value)}
-                onBlur={() => void save()}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={descriptionId}>{t('description')}</Label>
-              <Textarea
-                id={descriptionId}
-                value={description}
-                disabled={!canMutate || pending}
-                onChange={(event) => setDescription(event.target.value)}
-                onBlur={() => void save()}
-                rows={8}
-                className="min-h-32"
-              />
-            </div>
+            <TaskPanelFields
+              workspaceId={workspaceId}
+              task={task}
+              canMutate={canMutate}
+              onUpdated={onUpdated}
+              onClose={close}
+            />
             <TaskChecklists
               checklists={checklists.checklists}
               canMutate={canMutate}
