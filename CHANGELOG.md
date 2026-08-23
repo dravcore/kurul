@@ -113,6 +113,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
   Redis outage fallback and the degraded-mode reporting are all unchanged.
 
+### Changed
+
+- **`docs`:** [ADR 0030](docs/decisions/0030-typescript-7-hold.md) records why `typescript`
+  stays pinned `^5.8.2` across the workspace now that TypeScript 7.0 has shipped: both
+  `typescript-eslint` and `ts-jest` publish peer ranges that exclude it, and both maintainers
+  confirm the block is TypeScript 7.0 shipping without a stable compiler API. The
+  `dependabot.yml` ignore-rule comment now points at the ADR instead of restating the
+  rationale inline. No behaviour changes.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that
