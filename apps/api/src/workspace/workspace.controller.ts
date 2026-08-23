@@ -9,9 +9,11 @@ import {
   Query,
   Req,
   UseGuards,
+  applyDecorators,
 } from '@nestjs/common';
 import {
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
@@ -33,9 +35,11 @@ import {
   WorkspaceRoles,
   WorkspaceScoped,
 } from '../common/decorators/workspace-roles.decorator';
+import { SessionOnlyGuard } from '../common/guards/session-only.guard';
 import { ThrottleInvitations } from '../common/rate-limit/rate-limit';
 import { DemoRestrictedGuard } from '../demo/demo-restricted.guard';
 import type { AuthenticatedUser, WorkspaceMembership } from '../common/types/request-context';
+import { ErrorEnvelopeSchema } from '../openapi/schemas/error.schema';
 import {
   InvitationPageSchema,
   InvitationSchema,
@@ -52,6 +56,26 @@ import { WorkspaceMemberQueryDto } from './dto/workspace-member-query.dto';
 import { WorkspaceInvitationService } from './workspace-invitation.service';
 import { WorkspaceMemberService } from './workspace-member.service';
 import { WorkspaceService } from './workspace.service';
+
+/**
+ * The writes below are performed by Better Auth's organization plugin, which reads the caller
+ * from the request's session cookie and nothing else. A personal access token authenticates
+ * the Nest guards but carries no session for the plugin to find, so rather than let the
+ * plugin answer a misleading `401` to a valid credential, these handlers refuse a token up
+ * front with a `403` that says what is wrong. Lifting this means moving the write out from
+ * under the plugin (see `WorkspaceMemberService`'s header comment for why it sits there), and
+ * that is a decision for the `/v1` surface, not for this slice (ROADMAP, "API 1.0").
+ */
+const SessionOnly = (): MethodDecorator =>
+  applyDecorators(
+    UseGuards(SessionOnlyGuard),
+    ApiForbiddenResponse({
+      description:
+        'Also answered when the request authenticated with a personal access token: this ' +
+        'operation is performed by Better Auth and takes a session cookie only.',
+      type: ErrorEnvelopeSchema,
+    }),
+  );
 
 @ApiTags('Workspaces')
 @Controller('workspaces')
@@ -100,6 +124,7 @@ export class WorkspaceController {
   @ApiOperation({ summary: 'Rename a workspace, or change its slug' })
   @ApiOkResponse({ type: WorkspaceSchema })
   @WorkspaceRoles(...ADMIN_ROLES)
+  @SessionOnly()
   update(
     @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -121,6 +146,7 @@ export class WorkspaceController {
   @HttpCode(204)
   @UseGuards(DemoRestrictedGuard)
   @WorkspaceRoles(MemberRole.OWNER)
+  @SessionOnly()
   async remove(
     @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -167,6 +193,7 @@ export class WorkspaceController {
   @ApiNoContentResponse({ description: 'Left. Empty body.' })
   @HttpCode(204)
   @WorkspaceScoped()
+  @SessionOnly()
   async leaveWorkspace(
     @UuidParam('workspaceId') workspaceId: string,
     @CurrentMembership() membership: WorkspaceMembership,
@@ -208,6 +235,7 @@ export class WorkspaceController {
   @ApiNoContentResponse({ description: 'Removed. Empty body.' })
   @HttpCode(204)
   @WorkspaceRoles(...ADMIN_ROLES)
+  @SessionOnly()
   async removeMember(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('userId') userId: string,
@@ -232,6 +260,7 @@ export class WorkspaceController {
   })
   @ApiOkResponse({ type: WorkspaceMemberSchema })
   @WorkspaceRoles(...ADMIN_ROLES)
+  @SessionOnly()
   updateMemberRole(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('userId') userId: string,
@@ -287,6 +316,7 @@ export class WorkspaceController {
   @ApiCreatedResponse({ type: InvitationSchema })
   @ThrottleInvitations()
   @WorkspaceRoles(...ADMIN_ROLES)
+  @SessionOnly()
   createInvitation(
     @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -301,6 +331,7 @@ export class WorkspaceController {
   @ApiNoContentResponse({ description: 'Revoked. Empty body.' })
   @HttpCode(204)
   @WorkspaceRoles(...ADMIN_ROLES)
+  @SessionOnly()
   async revokeInvitation(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('invitationId') invitationId: string,
@@ -328,6 +359,7 @@ export class WorkspaceController {
   })
   @ApiOkResponse({ type: WorkspaceMemberSchema })
   @HttpCode(200)
+  @SessionOnly()
   acceptInvitation(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('invitationId') invitationId: string,

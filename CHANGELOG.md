@@ -9,6 +9,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Personal access tokens, the first slice of API 1.0.** A member mints a token for one
+  workspace at `POST /workspaces/:workspaceId/tokens` (or from the new "Personal access tokens"
+  section of Settings), sees the plaintext exactly once, and sends it as
+  `Authorization: Bearer kurul_pat_...` from a script, a CI job or any client that is not a
+  browser. The token acts as its owner in that workspace with the role the owner holds at the
+  time of each request; there are no scopes, because the workspace is the scope. `GET` lists
+  the caller's own live tokens by display prefix, `DELETE` revokes one immediately, and both
+  events are written to the workspace activity feed (`token.created`, `token.revoked`) and
+  the audit subset. The server stores a SHA-256 of the secret and a display prefix, nothing
+  else; a revoked, expired or unknown token all answer the same `401`; a token presented
+  against another workspace is the same `404` a non-member gets; and removing a member,
+  their leaving, or deleting their account ends their tokens too. The throttler runs ahead of
+  authentication, so a token spends the same per-IP budget a session does. A new
+  `personalAccessToken` Bearer scheme is declared in the OpenAPI document and every
+  workspace operation lists it beside the session cookie, except the token routes themselves
+  and the workspace-administration writes that Better Auth performs on a session (invite,
+  revoke, accept, remove a member, change a role, leave, rename and delete the workspace),
+  which answer `403` to a token and are named as the boundary of this slice in
+  [api-conventions.md](docs/api-conventions.md#authentication). Migration
+  `20260823120000_personal_access_token` adds the table. The model is first-party rather
+  than Better Auth's API-key plugin; the same section says why.
+- **ADR 0031: API versioning.** A `/v1` URI prefix on every route, introduced at 1.0 and not
+  before, with header negotiation and no-versioning rejected in writing, and the 1.0 surface
+  sequenced as personal access tokens, then `/v1`, then webhooks
+  ([docs/decisions/0031-api-versioning.md](docs/decisions/0031-api-versioning.md)).
 - **Off-host backup copies, and a healthcheck that watches them.** `BACKUP_REMOTE` in `.env`
   takes an [rclone](https://rclone.org/) remote path (`s3:bucket/prefix`, `b2:bucket`,
   `sftp:…`); with one set, the existing `backup` sidecar pushes **both** archives of every

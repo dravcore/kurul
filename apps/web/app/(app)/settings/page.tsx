@@ -5,6 +5,7 @@ import { ActivationFunnel } from '@/components/settings/activation-funnel';
 import { LanguageSettings } from '@/components/settings/language-settings';
 import { MembersSettings } from '@/components/settings/members-settings';
 import { NotificationSettings } from '@/components/settings/notification-settings';
+import { TokenSettings } from '@/components/settings/token-settings';
 import { WorkspaceSettings } from '@/components/settings/workspace-settings';
 
 /**
@@ -59,6 +60,14 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
             description={t('notifications.description')}
           >
             <NotificationSettings />
+          </SettingsSection>
+          {/* After notifications, before workspace: like the section above it, a token is
+              something a person sets up for themselves rather than for the workspace, and it
+              acts as this member, not as the workspace. Before it, on purpose: revoking a
+              token undoes itself the moment it is created again, which is nothing like the
+              controls below it that cannot be undone at all. */}
+          <SettingsSection title={t('tokens.title')} description={t('tokens.description')}>
+            <TokenSettings />
           </SettingsSection>
           {/* Near the end: it holds a control with no undo (delete the workspace), and every
               section above it is either read constantly (members) or set once and forgotten

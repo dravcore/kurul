@@ -274,6 +274,24 @@ SameSite=Lax` döner; ön ek de yok, `Secure` de yok ve oturum token'ı her iste
 metin olarak geçer. HTTPS olduğunu düşündüğünüz bir domain'de ön eksiz biçimi görüyorsanız
 `SITE_URL` hâlâ `http://` ile başlıyordur; düzeltip `docker compose up -d` çalıştırın.
 
+### API'yi bir script'ten çağırmak
+
+Bir script, bir CI işi ya da bir yedek kontrolü cookie ile uğraşmak istemez. Ayarlar'ı açın,
+"Kişisel erişim anahtarları" altında bir anahtar oluşturun, kopyalayın (yalnızca bir kez
+gösterilir) ve oluşturulduğu workspace'e karşı Bearer başlığı olarak gönderin:
+
+```bash
+curl -s https://kurul.example.com/api/workspaces/<workspaceId>/boards \
+  -H 'Authorization: Bearer kurul_pat_...'
+```
+
+Anahtar o tek workspace'te, istek geldiği andaki rolünüzle sizin yerinize işlem yapar; aynı
+ekrandan iptal etmek onu anında durdurur ve workspace aktivite akışı hem oluşturmayı hem
+iptali kaydeder. Neyi çağırıp neyi çağıramayacağı ve nedeni
+[api-conventions.md](api-conventions.md#kimlik-doğrulama) içinde. HTTPS argümanı burada iki
+kat geçerli: anahtar her istekte ağdan geçer, bu yüzden `http://` bir `SITE_URL`'e karşı asla
+kullanmayın.
+
 ## 5. Üzerine bir monitör koyun
 
 Bu, dağıtımın isteğe bağlı bir eki değil, bir adımıdır; en sona kalmasının nedeni, izleyecek
