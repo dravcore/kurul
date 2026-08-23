@@ -12,6 +12,7 @@ import { Prisma } from '../../generated/prisma';
 import { isProductionEnv } from '../env';
 import { getRequestId } from '../logging/request-id';
 import { captureServerError, type ServerErrorContext } from '../observability/sentry';
+import { PlanLimitCode, type PlanLimitDetail } from '@kurul/shared-types';
 import type { ValidationDetail } from '../validation/validation-exception.factory';
 
 interface ProblemDetails {
@@ -19,6 +20,8 @@ interface ProblemDetails {
   error: string;
   message: string;
   details?: ValidationDetail[];
+  /** Present only on a plan-limit refusal (ADR 0032): which ceiling, and the two numbers. */
+  planLimit?: PlanLimitDetail;
   path: string;
   timestamp: string;
   requestId?: string;
@@ -70,6 +73,33 @@ function asValidationDetails(value: unknown): ValidationDetail[] | undefined {
   }
 
   return details;
+}
+
+const PLAN_LIMIT_CODES = new Set<string>(Object.values(PlanLimitCode));
+
+/**
+ * Narrows the `planLimit` payload of a plan-limit refusal (ADR 0032).
+ *
+ * Validated rather than spread through, for `asValidationDetails`'s reason: the envelope is a
+ * published contract, and a half-filled `planLimit` would be worse for a client than none at
+ * all: it would branch on a ceiling nobody can name.
+ */
+function asPlanLimitDetail(value: unknown): PlanLimitDetail | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.code !== 'string' ||
+    !PLAN_LIMIT_CODES.has(value.code) ||
+    typeof value.limit !== 'number' ||
+    typeof value.current !== 'number'
+  ) {
+    return undefined;
+  }
+
+  return {
+    code: value.code as PlanLimitDetail['code'],
+    limit: value.limit,
+    current: value.current,
+  };
 }
 
 /**
@@ -244,6 +274,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let error = reasonPhrase(HttpStatus.INTERNAL_SERVER_ERROR);
     let message = 'An unexpected error occurred';
     let details: ValidationDetail[] | undefined;
+    let planLimit: PlanLimitDetail | undefined;
 
     const httpClientError = mapHttpClientError(exception);
 
@@ -267,6 +298,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
         // A structured payload always wins over the message-string fallback.
         details = asValidationDetails(body.details) ?? details;
+        planLimit = asPlanLimitDetail(body.planLimit);
       }
 
       if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
@@ -339,6 +371,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error,
       message,
       ...(details ? { details } : {}),
+      ...(planLimit ? { planLimit } : {}),
       path: request.url,
       timestamp: new Date().toISOString(),
       // Present on every response the running app produces (`requestIdMiddleware` runs

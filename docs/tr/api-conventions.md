@@ -302,7 +302,7 @@ nullable bir alanı temizler.
 | `204 No Content`             | Başarılı silme; boş body                                                                                                                                                                                                                                                      |
 | `400 Bad Request`            | Bozuk request veya validation hatası                                                                                                                                                                                                                                          |
 | `401 Unauthorized`           | Eksik veya geçersiz session                                                                                                                                                                                                                                                   |
-| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz                                                                                                                                                                                                                                   |
+| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz, **ya da** bir plan tavanı aşılacak (hangisi olduğunu `error` söyler, bkz. [Plan limitleri](#plan-limitleri))                                                                                                                     |
 | `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                                                                                                                                                                                 |
 | `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                                                                                                                                                                                   |
 | `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, bir yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor ya da bir depolama kotasını aşacak (hangisi olduğunu `error` söyler — bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)), ya da bir import `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor |
@@ -313,7 +313,51 @@ nullable bir alanı temizler.
 
 **Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
 doğrulardı, ki bu tenant sınırının ötesine bilgi sızdırır. `403`, rolü çok düşük meşru bir
-üye için ayrılmıştır.
+üye için, ve zarfın `error` alanının birbirinden ayırdığı, aşağıdaki plan tavanları için
+ayrılmıştır.
+
+### Plan limitleri
+
+Seat'lerin, board'ların, workspace'lerin ve hesapların yapılandırılabilir tavanları var
+([ADR 0032](decisions/0032-plan-limits.md)). Her tavan, **instance onu ayarlamadıkça
+sınırsızdır**, dolayısıyla yapılandırılmamış bir deployment bu yanıtlardan hiçbirini üretmez.
+
+Bir tavanı aşacak bir yazma, kendine ait bir `error` ile `403` olarak reddedilir, çünkü status
+tek başına hangi düzeltmenin önerileceğini söyleyemez: burada bir rol değişikliği asla yardımcı
+olmaz, birinin bir seat boşaltması ya da bir sayıyı yükseltmesi gerekir.
+
+```jsonc
+{
+  "statusCode": 403,
+  "error": "Plan Limit Exceeded",
+  "message": "This workspace has no seats left on its plan",
+  "planLimit": { "code": "PLAN_LIMIT_SEATS", "limit": 10, "current": 10 },
+  "path": "/workspaces/w_1/invitations",
+  "timestamp": "2026-08-23T09:12:31.114Z",
+  "requestId": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
+}
+```
+
+`planLimit`, `details` dışındaki tek opsiyonel zarf üyesidir. `current`, reddin olduğu anda
+sayılan şeydir, dolayısıyla `limit`'e eşit ya da onu aşabilir.
+
+| `planLimit.code`        | Reddeder                                     | Sayar                                                   |
+| ----------------------- | -------------------------------------------- | ------------------------------------------------------- |
+| `PLAN_LIMIT_SEATS`      | `POST .../invitations`, ve birini kabul etme | Üyeler artı hâlâ bekleyen davetler                      |
+| `PLAN_LIMIT_BOARDS`     | `POST .../boards`                            | Workspace'teki board'lar                                |
+| `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                           | Instance'taki workspace'ler                             |
+| `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                   | Instance'taki hesaplar, anonimleştirilmiş olanlar hariç |
+
+Bir daveti kabul etmek yalnızca üyeleri sayar, çünkü kabul edilen davet zaten kendi seat'ini
+tutuyordur. Attachment baytları da bir plan tavanıdır, ama onlar [ADR 0027](decisions/0027-attachment-quotas.md)'nin
+kendilerine verdiği `413`'ü ve `error: "Attachment Quota Exceeded"`'ı korur; plan katmanının
+eklediği şey, bir workspace'in kendine ait bir bayt tavanı taşıyabilmesidir.
+
+Bir istemcinin reddedilmeden önce sayıları gösterebilmesi için iki okuma bunları yayınlar:
+`GET /config` instance tavanlarını taşır (her çağıran için aynı kapasite), ve
+`GET /workspaces/{workspaceId}/plan` bir workspace'in çözümlenmiş tavanlarını ve güncel
+kullanımını taşır, herhangi bir üye tarafından okunabilir. Her ikisinde de `null`, sınırsız
+demektir.
 
 ## Request ve response body'leri
 

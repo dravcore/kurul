@@ -16,6 +16,7 @@ import { fieldChanges } from '../common/field-changes';
 import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
 import { toCursorPage } from '../common/pagination/cursor-page';
 import { MAX_PAGE_LIMIT } from '../common/pagination/page-limit';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import type { UpdateWorkspaceDto } from './dto/update-workspace.dto';
@@ -81,6 +82,7 @@ export class WorkspaceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   /** @internal — for tests. */
@@ -129,6 +131,13 @@ export class WorkspaceService {
    */
   async create(userId: string, dto: CreateWorkspaceDto, request: Request): Promise<WorkspaceDto> {
     await assertAccountNotDeleted(this.prisma, userId);
+
+    // Before the slug check, so an instance at its workspace ceiling says so rather than
+    // reporting whichever slug problem the caller happens to also have (ADR 0032). The write
+    // itself belongs to Better Auth, so this count and that insert cannot share a transaction;
+    // the overshoot is bounded by the number of simultaneous creates, which is the same soft
+    // ceiling ADR 0027 accepted for the byte quotas and for the same reason.
+    await this.planLimits.assertWorkspaceAvailable();
 
     const existing = await this.prisma.workspace.findUnique({
       where: { slug: dto.slug },

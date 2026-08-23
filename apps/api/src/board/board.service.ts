@@ -7,6 +7,7 @@ import { type DefaultLabel, boardTemplateFor, boardTemplatesFor } from '../commo
 import { assertBoard } from '../common/board-access';
 import { fieldChanges } from '../common/field-changes';
 import { LocaleService } from '../locale/locale.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateBoardDto } from './dto/create-board.dto';
 import type { UpdateBoardDto } from './dto/update-board.dto';
@@ -17,6 +18,7 @@ export class BoardService {
     private readonly prisma: PrismaService,
     private readonly localeService: LocaleService,
     private readonly activityService: ActivityService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   private toDto(row: {
@@ -90,6 +92,12 @@ export class BoardService {
     const locale = await this.localeService.resolve(actorId, acceptLanguage);
     const { columns, labels } = this.seedFor(dto, locale);
     const board = await this.prisma.$transaction(async (tx) => {
+      // Inside the transaction, against the same client as the insert: this is the one plan
+      // ceiling whose count and write can share a snapshot, so it does (ADR 0032). It is still
+      // a soft ceiling (read-committed lets two simultaneous creates each count `n`) and
+      // hardening it further is ADR 0027's rejected advisory lock, for ADR 0027's reason.
+      await this.planLimits.assertBoardAvailable(workspaceId, tx);
+
       // Columns and labels in the one nested create the board already needed. A template that
       // wrote its labels afterwards could leave a board standing with half a preset if the
       // second write failed, and "half a preset" is indistinguishable from a team that deleted

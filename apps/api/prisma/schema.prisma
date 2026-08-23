@@ -182,6 +182,20 @@ model Workspace {
   logo      String?
   metadata  String?
   createdAt DateTime @default(now())
+  /// This workspace's own plan ceilings, overriding the instance's `PLAN_MAX_*` configuration
+  /// key by key, or null for "whatever the instance says".
+  ///
+  /// A JSON column and not a typed table, because the row that will write it does not exist
+  /// yet: hosted billing (ADR 0028) assigns a plan whose shape is still being designed, and a
+  /// column per ceiling would make every ceiling a migration. Absent key = defer to the
+  /// instance, `null` = unlimited, `0` = unlimited (the spelling every other ceiling uses);
+  /// unknown keys and unusable values are ignored on read rather than refused, so a bad write
+  /// cannot take a tenant down. Understood keys today: `seats`, `boards`, `storageBytes`.
+  ///
+  /// Read by primary key as part of resolving a ceiling, never scanned or filtered on, so it
+  /// carries no index (migration 20260814150000_drop_unused_indexes for the discipline).
+  /// See docs/decisions/0032-plan-limits.md.
+  planLimits Json?
 
   members     WorkspaceMember[]
   invitations WorkspaceInvitation[]

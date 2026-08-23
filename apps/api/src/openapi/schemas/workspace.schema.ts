@@ -8,6 +8,9 @@ import type {
   UserDto,
   WorkspaceDto,
   WorkspaceMemberDto,
+  WorkspacePlanDto,
+  WorkspacePlanLimitsDto,
+  WorkspacePlanUsageDto,
 } from '@kurul/shared-types';
 
 /** The caller's own account. */
@@ -84,4 +87,33 @@ export class InvitationPageSchema implements CursorPage<InvitationDto> {
   items!: InvitationSchema[];
   nextCursor!: string | null;
   hasMore!: boolean;
+}
+
+/** One workspace's resolved ceilings. `null` is unlimited (ADR 0032). */
+export class WorkspacePlanLimitsSchema implements WorkspacePlanLimitsDto {
+  /** Members plus pending invitations this workspace may hold. */
+  seats!: number | null;
+  boards!: number | null;
+  /** Summed stored-file bytes this workspace may hold. */
+  storageBytes!: number | null;
+}
+
+/** What the workspace currently holds, counted the way the refusals count it. */
+export class WorkspacePlanUsageSchema implements WorkspacePlanUsageDto {
+  /** Members plus invitations still pending: an invitation holds its seat until it expires. */
+  seats!: number;
+  boards!: number;
+  /** Stored bytes. LINK attachments carry none. */
+  storageBytes!: number;
+}
+
+/**
+ * The ceilings that apply to this workspace and how much of each is in use.
+ *
+ * "Resolved" means the workspace's own override where it has one and the instance's
+ * configuration otherwise, so a client never has to know which of the two answered.
+ */
+export class WorkspacePlanSchema implements WorkspacePlanDto {
+  limits!: WorkspacePlanLimitsSchema;
+  usage!: WorkspacePlanUsageSchema;
 }

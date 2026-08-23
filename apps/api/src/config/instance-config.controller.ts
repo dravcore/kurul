@@ -4,6 +4,7 @@ import type { InstanceConfigDto } from '@kurul/shared-types';
 import { InstanceConfigSchema } from '../openapi/schemas/instance.schema';
 import { demoConfig } from '../demo/demo-mode';
 import { MailService } from '../mail/mail.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { StorageService } from '../storage/storage.service';
 
 /**
@@ -53,6 +54,7 @@ export class InstanceConfigController {
   constructor(
     private readonly mail: MailService,
     private readonly storage: StorageService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   /**
@@ -80,6 +82,10 @@ export class InstanceConfigController {
       mailEnabled: this.mail.isEnabled(),
       attachmentsEnabled: this.storage.persistsFiles,
       demo: demoConfig(),
+      // Instance ceilings only. A workspace's own resolved numbers, and what it is using, are
+      // tenant state and are served from `GET /workspaces/{workspaceId}/plan` (ADR 0032).
+      // This document is the same for every caller by definition.
+      planLimits: this.planLimits.instanceCeilings(),
     };
   }
 }

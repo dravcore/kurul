@@ -5,6 +5,7 @@ import { HealthModule } from './health/health.module';
 import { AttachmentModule } from './attachment/attachment.module';
 import { StorageModule } from './storage/storage.module';
 import { InstanceConfigModule } from './config/instance-config.module';
+import { PlanModule } from './plan/plan.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { AccountModule } from './account/account.module';
@@ -33,6 +34,10 @@ import { throttlerOptions } from './common/rate-limit/rate-limit';
     // Ahead of `InstanceConfigModule` so the reading order follows the dependency: the config
     // document asks `StorageService` whether this deployment stores attachments at all.
     StorageModule,
+    // Ahead of every module that writes something a ceiling counts: the layer that answers
+    // "is there room for one more" is a dependency of workspace, board and attachment writes,
+    // and registering it here is also what gives its boot log line an owner (ADR 0032).
+    PlanModule,
     AttachmentModule,
     InstanceConfigModule,
     AuthModule,

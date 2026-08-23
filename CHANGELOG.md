@@ -9,6 +9,37 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Plan limits: ceilings on seats, boards, workspaces and accounts, unlimited until an operator
+  sets one.** Four variables (`PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
+  `PLAN_MAX_WORKSPACES`, `PLAN_MAX_USERS`) put a number on quantities the product never bounded.
+  All four are unset in `.env.example` and unset means unlimited, so an instance that ignores
+  this block runs exactly the code it ran before: with no ceiling configured, no counting query
+  is issued at all. A written `0` also means unlimited, the spelling the attachment quotas
+  already use, and a negative or non-integer value refuses to boot. They deliberately have no
+  defaults where the byte quotas grew them in
+  [ADR 0027](docs/decisions/0027-attachment-quotas.md): a full disk takes Postgres down with it,
+  while a tenth board costs one row, and a default that starts refusing the eleventh member of
+  an existing team is a regression nobody configured.
+
+  One resolver answers every ceiling question, the ADR 0027 byte quotas included, which is what
+  lets a single workspace carry ceilings of its own in the new `Workspace.planLimits` JSON
+  column (absent key defers to the instance, `null` and `0` mean unlimited). That column is the
+  seam hosted billing ([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md))
+  writes when it assigns a plan, and it takes a new ceiling without a migration.
+
+  A seat is a member **or** an invitation still pending, so an admin at the ceiling cannot queue
+  up acceptances past it, and the refusal reaches the person who can free a seat rather than the
+  invitee clicking a link days later; accepting counts members only, since the invitation being
+  accepted is already holding its seat. `PLAN_MAX_USERS` refuses sign-up and nothing else:
+  signing in and verifying an address stay open at any count. An over-limit write answers `403`
+  with `error: "Plan Limit Exceeded"` and a `planLimit` object naming the code
+  (`PLAN_LIMIT_SEATS`, `PLAN_LIMIT_BOARDS`, `PLAN_LIMIT_WORKSPACES`, `PLAN_LIMIT_USERS`), the
+  limit and the count at the moment of refusal. `GET /config` publishes the instance ceilings and
+  the new `GET /workspaces/{workspaceId}/plan` the resolved ceilings and usage of one workspace,
+  so the members screen says "7 of 10 seats used" and the board list disables its create control
+  with a sentence instead of a silent refusal. Details and the rejected alternatives:
+  [ADR 0032](docs/decisions/0032-plan-limits.md).
+
 - **Demo mode, and everything a live demo instance needs except the host.** `DEMO_MODE=true` is
   the whole switch: the app shows a standing, dismissible banner naming how often the data
   disappears; all outbound email goes to the log transport whatever `SMTP_HOST` says, so a

@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { ActivityType, ColumnCategory, LabelColorSlot, type Locale } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
 import { LocaleService } from '../locale/locale.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BoardService } from './board.service';
 
@@ -29,15 +30,24 @@ describe('BoardService', () => {
     );
     const localeService = { resolve: jest.fn().mockResolvedValue(locale) };
     const activityService = { record: jest.fn().mockResolvedValue({ id: 'activity' }) };
+    // The board ceiling never refuses in this suite; only that `create` calls it is not
+    // asserted here, so a stub that always resolves keeps every existing case unchanged.
+    const planLimits = {
+      assertBoardAvailable: jest.fn().mockResolvedValue(undefined),
+      assertWorkspaceAvailable: jest.fn().mockResolvedValue(undefined),
+      assertSeatAvailable: jest.fn().mockResolvedValue(undefined),
+    } as unknown as PlanLimitsService;
     return {
       service: new BoardService(
         prisma as unknown as PrismaService,
         localeService as unknown as LocaleService,
         activityService as unknown as ActivityService,
+        planLimits,
       ),
       prisma,
       localeService,
       activityService,
+      planLimits,
     };
   }
 

@@ -24,8 +24,25 @@ const CEREN_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d53';
 
 const copy = messages.app.settings.members;
 
+/** No ceiling is the default; the seat tests set their own (ADR 0032). */
+const NO_PLAN_LIMITS = {
+  seatsPerWorkspace: null,
+  boardsPerWorkspace: null,
+  workspaces: null,
+  users: null,
+  storageBytesPerWorkspace: 2_147_483_648,
+  storageBytesPerInstance: 21_474_836_480,
+} as const;
+
 const workspace = vi.hoisted(() => ({
   value: { activeId: '', activeRole: null as MemberRole | null },
+}));
+
+const plan = vi.hoisted(() => ({
+  value: {
+    limits: { seats: null as number | null, boards: null, storageBytes: null },
+    usage: { seats: 3, boards: 0, storageBytes: 0 },
+  },
 }));
 
 vi.mock('@/lib/member-query', () => ({
@@ -40,6 +57,12 @@ vi.mock('@/lib/instance-config', async (importOriginal) => ({
 }));
 vi.mock('@/components/layout/workspace-provider', () => ({
   useWorkspaceContext: () => workspace.value,
+}));
+// Only the hook is replaced; `isAtCeiling` stays real, so the tests exercise the comparison the
+// screen makes rather than a boolean the test decided.
+vi.mock('@/lib/plan-query', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/plan-query')>()),
+  useWorkspacePlan: () => plan.value,
 }));
 vi.mock('@/lib/auth', () => ({
   authClient: {
@@ -147,12 +170,19 @@ beforeEach(() => {
   loadMembers.mockReset().mockResolvedValue(ROSTER);
   loadInvitations.mockReset().mockResolvedValue([]);
   // The configured deployment is the default, so the warning cases have to say so explicitly.
-  loadConfig
-    .mockReset()
-    .mockResolvedValue({ mailEnabled: true, attachmentsEnabled: false, demo: NO_DEMO });
+  loadConfig.mockReset().mockResolvedValue({
+    mailEnabled: true,
+    attachmentsEnabled: false,
+    demo: NO_DEMO,
+    planLimits: NO_PLAN_LIMITS,
+  });
   apiPost.mockReset();
   apiPatch.mockReset();
   apiDelete.mockReset();
+  plan.value = {
+    limits: { seats: null, boards: null, storageBytes: null },
+    usage: { seats: 3, boards: 0, storageBytes: 0 },
+  };
 });
 
 afterEach(() => {
@@ -372,7 +402,12 @@ describe('MembersSettings — what a MEMBER sees', () => {
  */
 describe('MembersSettings — a deployment that cannot send email', () => {
   it('says so, permanently, above the invite control', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo: NO_DEMO });
+    loadConfig.mockResolvedValue({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      demo: NO_DEMO,
+      planLimits: NO_PLAN_LIMITS,
+    });
     renderSection();
 
     expect(await screen.findByText(copy.mailDisabledTitle)).toBeTruthy();
@@ -380,7 +415,12 @@ describe('MembersSettings — a deployment that cannot send email', () => {
   });
 
   it('carries a link to the setup docs', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo: NO_DEMO });
+    loadConfig.mockResolvedValue({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      demo: NO_DEMO,
+      planLimits: NO_PLAN_LIMITS,
+    });
     renderSection();
 
     const link = await screen.findByRole('link', { name: copy.mailDisabledDocs });
@@ -394,7 +434,12 @@ describe('MembersSettings — a deployment that cannot send email', () => {
    * really there (docs/design.md §7).
    */
   it('points at the copy-link way out, and the control it names exists', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo: NO_DEMO });
+    loadConfig.mockResolvedValue({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      demo: NO_DEMO,
+      planLimits: NO_PLAN_LIMITS,
+    });
     loadInvitations.mockResolvedValue([invitation('inv-1', 'bekleyen@kurul.test')]);
     renderSection();
 
@@ -404,7 +449,12 @@ describe('MembersSettings — a deployment that cannot send email', () => {
   });
 
   it('cannot be dismissed, because nothing the admin does here would make it untrue', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo: NO_DEMO });
+    loadConfig.mockResolvedValue({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      demo: NO_DEMO,
+      planLimits: NO_PLAN_LIMITS,
+    });
     renderSection();
 
     const notice = (await screen.findByText(copy.mailDisabledTitle)).closest('div')?.parentElement;
@@ -425,12 +475,72 @@ describe('MembersSettings — a deployment that cannot send email', () => {
    */
   it('is neither shown to nor fetched for someone who cannot invite', async () => {
     workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.MEMBER };
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo: NO_DEMO });
+    loadConfig.mockResolvedValue({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      demo: NO_DEMO,
+      planLimits: NO_PLAN_LIMITS,
+    });
     renderSection();
 
     expect(await screen.findByText('Bora')).toBeTruthy();
     expect(loadConfig).not.toHaveBeenCalled();
     expect(screen.queryByText(copy.mailDisabledTitle)).toBeNull();
+  });
+});
+
+/**
+ * The seat ceiling (ADR 0032). A seat is a member or an invitation still pending, counted by
+ * the API; the screen only renders the pair and disables the control at the ceiling.
+ */
+describe('MembersSettings - the seat ceiling', () => {
+  it('says nothing about seats on a workspace with no ceiling', async () => {
+    renderSection();
+
+    expect(await screen.findByText('Bora')).toBeTruthy();
+    expect(screen.queryByText(/seats used/i)).toBeNull();
+    expect(screen.getByRole('button', { name: copy.inviteAction }).hasAttribute('disabled')).toBe(
+      false,
+    );
+  });
+
+  it('shows how many of the seats are used', async () => {
+    plan.value = {
+      limits: { seats: 10, boards: null, storageBytes: null },
+      usage: { seats: 7, boards: 0, storageBytes: 0 },
+    };
+    renderSection();
+
+    expect(await screen.findByText('7 of 10 seats used')).toBeTruthy();
+    expect(screen.getByRole('button', { name: copy.inviteAction }).hasAttribute('disabled')).toBe(
+      false,
+    );
+  });
+
+  it('disables the invite control at the ceiling and says how to free a seat', async () => {
+    plan.value = {
+      limits: { seats: 3, boards: null, storageBytes: null },
+      usage: { seats: 3, boards: 0, storageBytes: 0 },
+    };
+    renderSection();
+
+    expect(await screen.findByText('3 of 3 seats used')).toBeTruthy();
+    expect(screen.getByRole('button', { name: copy.inviteAction }).hasAttribute('disabled')).toBe(
+      true,
+    );
+    expect(screen.getByText(copy.seatLimitReached)).toBeTruthy();
+  });
+
+  it('shows the counter to a MEMBER, who has no invite control to explain', async () => {
+    workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.MEMBER };
+    plan.value = {
+      limits: { seats: 10, boards: null, storageBytes: null },
+      usage: { seats: 7, boards: 0, storageBytes: 0 },
+    };
+    renderSection();
+
+    expect(await screen.findByText('7 of 10 seats used')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: copy.inviteAction })).toBeNull();
   });
 });
 

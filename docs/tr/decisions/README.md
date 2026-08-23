@@ -40,6 +40,7 @@ Kurul, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğunluk
 | [0026](0026-account-deletion-anonymisation.md)         | Hesap Silme: `User` Satırını Yerinde Anonimleştir, Sahip Olunan Workspace Kararını Akışın İçinde Sor              | Kabul edildi                                          | 2026-08-15 |
 | [0027](0027-attachment-quotas.md)                      | Dosya Eki Depolama Kotaları: Workspace Başına ve Instance Geneli Yumuşak Bayt Tavanları                           | Kabul edildi                                          | 2026-08-18 |
 | [0028](0028-open-contributions-hosted-service.md)      | AGPL-3.0 Altında Açık Katkılar, CLA Yok; Gelir Yalnızca Barındırılan Bir Servisten                                | Kabul edildi (0014 ve 0015'in yerini aldı)            | 2026-08-21 |
+| [0032](0032-plan-limits.md)                            | Plan Limitleri: Her Tavan İçin Tek Çözümleyici, Ayarlanana Kadar Sınırsız                                         | Kabul edildi                                          | 2026-08-23 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 
