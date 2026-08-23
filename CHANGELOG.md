@@ -268,6 +268,25 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   no test was rewritten: the existing board and task suites pass unmodified, and the
   `components/board` and `components/task` coverage floors hold at their current values.
 
+### Fixed
+
+- **The `kurul-web` image and the browser suite's standalone bundle could not boot on
+  `next` 16.3.1.** `next` is now `16.3.2` (with `@next/eslint-plugin-next` moved in step).
+  16.3.1 bumped the `@swc/helpers` it pins from 0.5.15 to 0.5.23, a version whose exports map
+  offers `esm/` under the `module-sync` condition; Node 22.12 and newer resolve that condition,
+  but Turbopack's dependency tracing dropped it and copied only `cjs/` into
+  `.next/standalone`. The server then died in Next's own `require-hook.js` with
+  `Cannot find module '.../@swc/helpers/esm/_interop_require_default.js'` before it listened on
+  anything, which took out both the Docker image and the `webServer` the Playwright suite
+  starts. Upstream is [vercel/next.js#97598](https://github.com/vercel/next.js/issues/97598),
+  fixed by [#97372](https://github.com/vercel/next.js/pull/97372) and backported into 16.3.2.
+  0.3.0 shipped 16.3.0 and was never affected.
+
+  A CI step now boots the built `kurul-web` image and requires it to answer `/`, in the
+  `image-scan` job that already has the image in its daemon. Nothing in the pipeline started a
+  built artifact before, which is why a build that compiled and scanned clean could still be
+  dead on arrival; the check costs a few seconds and fails with the container's own log.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that
