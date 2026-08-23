@@ -13,12 +13,14 @@ updates:
     # week that lands several of them alongside the two grouped PRs.
     open-pull-requests-limit: 15
     ignore:
-      # TypeScript 7 is held, not skipped. Two dependencies declare ranges that exclude it:
-      # `typescript-eslint` peers on `typescript >=4.8.4 <6.1.0` and `ts-jest` on `>=4.3 <7`.
-      # Taking 7 today means dropping type-aware linting or the API test runner, which is not
-      # something a version bump gets to decide. Remove this entry once both publish stable
-      # releases that accept 7 — until then Dependabot would reopen a PR every week that
-      # cannot pass CI, and a recurring red PR teaches everyone to ignore red PRs.
+      # TypeScript 7 is held, not skipped — see ADR 0030
+      # (docs/decisions/0030-typescript-7-hold.md) for the full picture, the maintainer
+      # statements behind it and the trigger that lifts it. In short: `typescript-eslint`
+      # peers on `typescript >=4.8.4 <6.1.0` and `ts-jest` on `>=4.3 <7`, and both maintainers
+      # say the blocker is TypeScript 7.0 shipping without a stable compiler API. Remove this
+      # entry once both publish stable releases that accept 7 — until then Dependabot would
+      # reopen a PR every week that cannot pass CI, and a recurring red PR teaches everyone to
+      # ignore red PRs.
       - dependency-name: typescript
         update-types:
           - version-update:semver-major

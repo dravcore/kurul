@@ -138,6 +138,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
   Redis outage fallback and the degraded-mode reporting are all unchanged.
 
+### Changed
+
+- **`docs`:** [ADR 0030](docs/decisions/0030-typescript-7-hold.md) records why `typescript`
+  stays pinned `^5.8.2` across the workspace now that TypeScript 7.0 has shipped: both
+  `typescript-eslint` and `ts-jest` publish peer ranges that exclude it, and both maintainers
+  confirm the block is TypeScript 7.0 shipping without a stable compiler API. The
+  `dependabot.yml` ignore-rule comment now points at the ADR instead of restating the
+  rationale inline. No behaviour changes.
+- **The web app's client data layer is now written down, and the two widest files in it were
+  split along the seams that document names.**
+  [ADR 0029](docs/decisions/0029-client-data-layer.md) records what the layer is (a typed
+  `fetch` wrapper, one read primitive that models a single value arriving once, writes that
+  live beside the state they touch, and socket payloads that carry ids so a changed row is
+  refetched rather than merged out of the event), the five rules it runs by, and the one
+  measurement that would replace it with React Query: a third hand-written generation counter,
+  countable with `grep -rn "GenerationRef" apps/web`, which returns two today. Adopting a query
+  library now is rejected in writing, with the reasoning, so the question stops being reopened
+  per screen.
+
+  `use-board-data.ts` (381 lines) became four hooks behind one composer: `useBoardCaches` holds
+  the five lists and the refs that mirror them, `useBoardFetch` performs the reads,
+  `useBoardLoad` owns the skeleton, the error and the retry, and `useBoardPanelTask` covers the
+  deep-linked row the board itself never loaded. `task-panel.tsx` (409 lines) gave up its
+  hand-rolled dialog behaviour to `useTaskPanelFocus`, its title and description write to
+  `TaskPanelFields`, and its three no-task states to `TaskPanelStatus`. No behaviour changed and
+  no test was rewritten: the existing board and task suites pass unmodified, and the
+  `components/board` and `components/task` coverage floors hold at their current values.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that
