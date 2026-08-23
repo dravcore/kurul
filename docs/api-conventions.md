@@ -297,7 +297,7 @@ field leaves it untouched; sending `null` explicitly clears a nullable field.
 | `204 No Content`             | Successful delete; empty body                                                                                                                                                                                                                                        |
 | `400 Bad Request`            | Malformed request or validation failure                                                                                                                                                                                                                              |
 | `401 Unauthorized`           | Missing or invalid session                                                                                                                                                                                                                                           |
-| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient                                                                                                                                                                                                            |
+| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient, **or** a plan ceiling would be exceeded (its `error` says which, see [Plan limits](#plan-limits))                                                                                                         |
 | `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                                                                                                                                                          |
 | `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                                                                                                                                            |
 | `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, an upload is over `ATTACHMENT_MAX_BYTES` or would exceed a storage quota (its `error` says which — see [File uploads and downloads](#file-uploads-and-downloads)), or an import is over `TRELLO_IMPORT_MAX_BYTES` |
@@ -308,7 +308,50 @@ field leaves it untouched; sending `null` explicitly clears a nullable field.
 
 **Cross-workspace access returns `404`, not `403`.** A `403` would confirm that the resource
 exists, which leaks information across the tenant boundary. `403` is reserved for a
-legitimate member whose role is too low.
+legitimate member whose role is too low, and for the plan ceilings below, which the envelope's
+`error` field tells apart.
+
+### Plan limits
+
+Seats, boards, workspaces and accounts have configurable ceilings
+([ADR 0032](decisions/0032-plan-limits.md)). Every ceiling is **unlimited unless the instance
+sets it**, so an unconfigured deployment never produces any of these responses.
+
+A write that would cross a ceiling is refused with `403` and an `error` of its own, because the
+status alone cannot say which fix to suggest: a role change never helps here, someone has to
+free a seat or raise a number.
+
+```jsonc
+{
+  "statusCode": 403,
+  "error": "Plan Limit Exceeded",
+  "message": "This workspace has no seats left on its plan",
+  "planLimit": { "code": "PLAN_LIMIT_SEATS", "limit": 10, "current": 10 },
+  "path": "/workspaces/w_1/invitations",
+  "timestamp": "2026-08-23T09:12:31.114Z",
+  "requestId": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
+}
+```
+
+`planLimit` is the only optional envelope member besides `details`. `current` is what was
+counted at the moment of the refusal, so it can equal or exceed `limit`.
+
+| `planLimit.code`        | Refuses                                   | Counts                                             |
+| ----------------------- | ----------------------------------------- | -------------------------------------------------- |
+| `PLAN_LIMIT_SEATS`      | `POST .../invitations`, and accepting one | Members plus invitations still pending             |
+| `PLAN_LIMIT_BOARDS`     | `POST .../boards`                         | Boards in the workspace                            |
+| `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                        | Workspaces on the instance                         |
+| `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                | Accounts on the instance, anonymised ones excluded |
+
+Accepting an invitation counts members only, since the invitation being accepted is already
+holding its seat. Attachment bytes are a plan ceiling too, but they keep the `413` and the
+`error: "Attachment Quota Exceeded"` that [ADR 0027](decisions/0027-attachment-quotas.md) gave
+them; what the plan layer adds is that a workspace can carry its own byte ceiling.
+
+Two reads publish the numbers so a client can show them before it is refused: `GET /config`
+carries the instance ceilings (capability, identical for every caller), and
+`GET /workspaces/{workspaceId}/plan` carries one workspace's resolved ceilings and current
+usage, readable by any member. `null` in either document means unlimited.
 
 ## Request and response bodies
 

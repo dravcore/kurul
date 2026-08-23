@@ -7,6 +7,7 @@ import type {
   ActivationWindow,
   DemoConfigDto,
   InstanceConfigDto,
+  InstancePlanLimitsDto,
 } from '@kurul/shared-types';
 import type { DependencyStatus, ReadinessReport } from '../../health/health.service';
 
@@ -33,6 +34,41 @@ export class DemoConfigSchema implements DemoConfigDto {
   nextResetAt!: string | null;
 }
 
+/**
+ * The instance-wide ceilings, `null` for each one nobody configured (ADR 0032).
+ *
+ * The two byte fields are the ADR 0027 attachment quotas, which have non-null defaults and so
+ * are the only two an unconfigured instance publishes as numbers.
+ */
+export class InstancePlanLimitsSchema implements InstancePlanLimitsDto {
+  /**
+   * Members plus pending invitations one workspace may hold (`PLAN_MAX_SEATS_PER_WORKSPACE`).
+   * @example 10
+   */
+  seatsPerWorkspace!: number | null;
+
+  /** Boards one workspace may hold (`PLAN_MAX_BOARDS_PER_WORKSPACE`). */
+  boardsPerWorkspace!: number | null;
+
+  /** Workspaces this instance may hold (`PLAN_MAX_WORKSPACES`). */
+  workspaces!: number | null;
+
+  /** Accounts this instance may hold (`PLAN_MAX_USERS`). Refuses sign-up, never sign-in. */
+  users!: number | null;
+
+  /**
+   * `ATTACHMENT_WORKSPACE_QUOTA_BYTES`, in bytes. Defaults to 2 GiB.
+   * @example 2147483648
+   */
+  storageBytesPerWorkspace!: number | null;
+
+  /**
+   * `ATTACHMENT_INSTANCE_QUOTA_BYTES`, in bytes. Defaults to 20 GiB.
+   * @example 21474836480
+   */
+  storageBytesPerInstance!: number | null;
+}
+
 /** What this deployment is configured to do. Capability, never tenant state. */
 export class InstanceConfigSchema implements InstanceConfigDto {
   /** `false` when no SMTP host is configured: mail is written to the log and delivered nowhere. */
@@ -50,6 +86,12 @@ export class InstanceConfigSchema implements InstanceConfigDto {
    * the web renders a standing "data resets every hour" banner from it when it is not.
    */
   demo!: DemoConfigSchema;
+
+  /**
+   * The ceilings this instance's configuration puts on quantities. A workspace can carry lower
+   * ones of its own; those resolved numbers come from `GET /workspaces/{workspaceId}/plan`.
+   */
+  planLimits!: InstancePlanLimitsSchema;
 }
 
 /** Liveness — the process is up. Touches no dependency. */

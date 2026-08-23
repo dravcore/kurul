@@ -186,6 +186,26 @@ hata verdiği sürece süreç belleğine düşer. Bütçe aşımı, JSON gövdes
 `error: "Upload Budget Exceeded"` ve `Retry-After` başlığı taşıyan bir `429`'dur
 ([api-conventions.md](api-conventions.md#rate-limiting)).
 
+**Onun dışında hiçbir şey siz sınırlamadıkça sınırlı değil.** Dört değişken, bayt yerine
+_miktarlara_ tavan koyuyor ([ADR 0032](decisions/0032-plan-limits.md)), ve dördü de
+`.env.example`'da ayarsız: `PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
+`PLAN_MAX_WORKSPACES` ve `PLAN_MAX_USERS`. **Ayarlanmamış, sınırsız demek**, ve bu bloğa hiç
+dokunmayan bir instance'ın çalıştırdığı şey de bu: hiç sayım sorgusu atılmaz. Yazılı bir `0` da
+sınırsız demek; negatif ya da tam sayı olmayan bir değer açılışta reddedilir, ve geçerli sayılar
+başlangıçta loglanır (`Plan ceilings: …`). Attachment kotalarının aksine bunların hiç varsayılanı
+yok, ve bu bilerek: dolu bir disk veritabanını kendisiyle birlikte düşürür, onuncu bir board ise
+bir satıra mal olur.
+
+Bir **seat**, bir üye _ya da_ hâlâ kabul edilmeyi bekleyen bir davettir, dolayısıyla tavandaki bir
+admin kabulleri onun ötesine kuyruğa alamaz; bir daveti iptal etmek o seat'i anında boşaltır, ve
+süresi dolan bir davet kendini boşaltır. `PLAN_MAX_USERS` yalnızca **sign-up'ı** reddeder, hiçbir
+zaman sign-in'i değil, dolayısıyla onu zaten sahip olduğunuz hesap sayısının altına ayarlamak
+kimseyi kilitlemez. Tavanı aşan bir yazma, JSON gövdesi `error: "Plan Limit Exceeded"` taşıyan bir
+`403` ve kodu (`PLAN_LIMIT_SEATS`, `PLAN_LIMIT_BOARDS`, `PLAN_LIMIT_WORKSPACES`,
+`PLAN_LIMIT_USERS`), limiti ve güncel sayımı taşıyan bir `planLimit` objesidir. Bir workspace'e
+`Workspace.planLimits` JSON kolonunda kendine ait tavanlar verilebilir, ki bu, bunları anahtar
+anahtar override eder; uygulama onu asla kendisi yazmaz.
+
 **Trello import'u için de burada bir satır gerekmiyor.** `TRELLO_IMPORT_MAX_BYTES` (varsayılan
 `20971520`, 20 MiB) importer'ın kabul edeceği en büyük board export'udur ve pakete dahil Compose
 dosyası onu zaten geçiriyor. Dokunmadan önce bilmeye değer üç şey var. Bu bir **bellek** tavanıdır,

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ActivityModule } from '../activity/activity.module';
+import { PlanModule } from '../plan/plan.module';
 import { UploadBudgetService } from '../common/rate-limit/upload-budget';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { StorageModule } from '../storage/storage.module';
@@ -15,6 +16,9 @@ import { UploadBudgetGuard } from './upload-budget.guard';
   imports: [
     ActivityModule,
     StorageModule,
+    // The per-workspace byte quota is resolved through the plan layer now, so a workspace can
+    // carry its own (ADR 0032). The instance-wide one still comes straight off StorageService.
+    PlanModule,
     // The module announces TASK_UPDATED itself rather than borrowing TaskModule's
     // TaskEventsService: these endpoints answer with AttachmentDto, so there is no task response
     // to keep in step with the broadcast, and that guarantee was the only thing the borrowed

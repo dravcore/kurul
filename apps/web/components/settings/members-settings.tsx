@@ -9,6 +9,7 @@ import { authClient } from '@/lib/auth';
 import { fetchInstanceConfig } from '@/lib/instance-config';
 import { canManageMember, canManageMembers } from '@/lib/member-permissions';
 import { fetchAllWorkspaceMembers, fetchPendingInvitations } from '@/lib/member-query';
+import { isAtCeiling, useWorkspacePlan } from '@/lib/plan-query';
 import { formatRelativeTime } from '@/lib/relative-time';
 import { useApiResource, useResourceField } from '@/lib/use-api-resource';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
@@ -75,6 +76,12 @@ export function MembersSettings(): React.ReactElement {
 
   const currentUserId = session?.user.id ?? '';
   const canManage = canManageMembers(activeRole);
+
+  // Seats: members plus invitations still pending, counted by the API the same way the refusal
+  // counts them (ADR 0032). Read for every member, not only an admin: "7 of 10 seats" is what
+  // tells an ordinary member why nobody new is arriving.
+  const plan = useWorkspacePlan(activeId);
+  const atSeatCeiling = isAtCeiling(plan.usage.seats, plan.limits.seats);
 
   const load = useMemo(() => {
     if (!activeId) return null;
@@ -151,11 +158,20 @@ export function MembersSettings(): React.ReactElement {
           pending queue needs it just as much as someone about to add to it. */}
       {canManage && !roster.mailEnabled ? <MailDisabledNotice /> : null}
 
+      {plan.limits.seats === null ? null : (
+        <p className="text-small text-muted-foreground">
+          {t('seatUsage', { used: plan.usage.seats, limit: plan.limits.seats })}
+        </p>
+      )}
+
       {canManage ? (
-        <div className="flex justify-start">
-          <Button type="button" onClick={() => setInviteOpen(true)}>
+        <div className="flex flex-col items-start gap-2">
+          <Button type="button" onClick={() => setInviteOpen(true)} disabled={atSeatCeiling}>
             {t('inviteAction')}
           </Button>
+          {atSeatCeiling ? (
+            <p className="text-body text-muted-foreground">{t('seatLimitReached')}</p>
+          ) : null}
         </div>
       ) : null}
 

@@ -171,6 +171,8 @@
           "GUEST": "Read the boards, and nothing else."
         },
         "inviteAction": "Invite member",
+        "seatUsage": "{used} of {limit} seats used",
+        "seatLimitReached": "Every seat on this plan is taken. Remove a member, or revoke a pending invitation, to free one.",
         "inviteTitle": "Invite member",
         "inviteEmail": "Email address",
         "inviteRole": "Role",
@@ -372,6 +374,7 @@
       "emptyBody": "A board is where the work gets divided. Start with one.",
       "createTitle": "Create board",
       "createAction": "Create board",
+      "planLimitReached": "This workspace has used all {limit} of the boards its plan allows.",
       "createError": "Could not create this board.",
       "renameTitle": "Rename board",
       "renameAction": "Rename",

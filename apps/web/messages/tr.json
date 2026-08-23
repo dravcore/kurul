@@ -171,6 +171,8 @@
           "GUEST": "Board'ları okuma, başka hiçbir şey."
         },
         "inviteAction": "Üye davet et",
+        "seatUsage": "{limit} koltuktan {used} tanesi kullanılıyor",
+        "seatLimitReached": "Bu plandaki tüm koltuklar dolu. Bir koltuk açmak için bir üyeyi çıkarın veya bekleyen bir daveti iptal edin.",
         "inviteTitle": "Üye davet et",
         "inviteEmail": "E-posta adresi",
         "inviteRole": "Rol",
@@ -372,6 +374,7 @@
       "emptyBody": "Bir board, işin bölüştüğü yerdir. Bir tane ile başlayın.",
       "createTitle": "Board oluştur",
       "createAction": "Board oluştur",
+      "planLimitReached": "Bu workspace, planının izin verdiği {limit} board hakkının tamamını kullandı.",
       "createError": "Bu board oluşturulamadı.",
       "renameTitle": "Board'u yeniden adlandır",
       "renameAction": "Yeniden adlandır",

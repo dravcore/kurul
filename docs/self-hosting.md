@@ -178,6 +178,26 @@ counters live in Redis and fall back to process memory while Redis is erroring. 
 a `429` whose JSON body carries `error: "Upload Budget Exceeded"` and a `Retry-After` header
 ([api-conventions.md](api-conventions.md#rate-limiting)).
 
+**Nothing else is capped unless you cap it.** Four variables put ceilings on _quantities_
+rather than bytes ([ADR 0032](decisions/0032-plan-limits.md)), and all four are unset in
+`.env.example`: `PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
+`PLAN_MAX_WORKSPACES` and `PLAN_MAX_USERS`. **Unset means unlimited**, which is what an
+instance that never touches this block runs: no counting query is issued at all. A written `0`
+also means unlimited; a negative or non-integer value refuses to boot, and the effective
+numbers are logged at start (`Plan ceilings: …`). These deliberately have no defaults where
+the attachment quotas do: a full disk takes the database down with it, while a tenth board
+costs one row.
+
+A **seat** is a member _or_ an invitation still waiting to be accepted, so an admin at the
+ceiling cannot queue up acceptances past it; revoking an invitation frees its seat at once, and
+an expired one frees itself. `PLAN_MAX_USERS` refuses **sign-up only**, never sign-in, so
+setting it below the number of accounts you already have locks nobody out. An over-limit write
+is a `403` whose JSON body carries `error: "Plan Limit Exceeded"` and a `planLimit` object with
+the code (`PLAN_LIMIT_SEATS`, `PLAN_LIMIT_BOARDS`, `PLAN_LIMIT_WORKSPACES`, `PLAN_LIMIT_USERS`),
+the limit and the current count. One workspace can be given ceilings of its own in the
+`Workspace.planLimits` JSON column, which overrides these key by key; the app never writes it
+itself.
+
 **Trello import needs no line here either.** `TRELLO_IMPORT_MAX_BYTES` (default `20971520`,
 20 MiB) is the largest board export the importer will accept, and the bundled Compose file
 already passes it. Three things about it are worth knowing before you touch it. It is a

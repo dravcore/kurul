@@ -15,7 +15,20 @@ const loadConfig = vi.mocked(fetchInstanceConfig);
 const copy = messages.app.demo;
 
 function resolveWith(demo: DemoConfigDto): void {
-  loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false, demo });
+  loadConfig.mockResolvedValue({
+    mailEnabled: false,
+    attachmentsEnabled: false,
+    demo,
+    // Nothing here reads the ceilings; the banner needs the document to be complete, not capped.
+    planLimits: {
+      seatsPerWorkspace: null,
+      boardsPerWorkspace: null,
+      workspaces: null,
+      users: null,
+      storageBytesPerWorkspace: null,
+      storageBytesPerInstance: null,
+    },
+  });
 }
 
 function renderBanner(): void {

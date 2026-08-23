@@ -14,6 +14,7 @@ import {
 import type { AttachmentDto } from '@kurul/shared-types';
 import type { Prisma } from '../generated/prisma';
 import { ActivityService } from '../activity/activity.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { StorageService } from '../storage/storage.service';
@@ -53,6 +54,7 @@ export class AttachmentService {
     private readonly activity: ActivityService,
     private readonly realtime: RealtimeService,
     private readonly storage: StorageService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   /** One place builds the broadcast, so the four fields cannot drift between call sites. */
@@ -277,7 +279,13 @@ export class AttachmentService {
    * (`File too large`, …), which `transformException` matches on (ADR 0022).
    */
   private async assertWithinQuota(workspaceId: string, incomingBytes: number): Promise<void> {
-    const workspaceQuota = this.storage.workspaceQuotaBytes;
+    // The per-workspace ceiling is resolved through the plan layer, so a workspace carrying its
+    // own `storageBytes` override gets that number and every other workspace gets
+    // `ATTACHMENT_WORKSPACE_QUOTA_BYTES` exactly as before (ADR 0032). Nothing else here moved:
+    // the spelling is still the quota's (`0` is unlimited), and the refusal is still this
+    // module's 413. The instance ceiling has no per-workspace meaning and is read straight off
+    // the storage config.
+    const workspaceQuota = await this.planLimits.workspaceStorageQuotaBytes(workspaceId);
     const instanceQuota = this.storage.instanceQuotaBytes;
 
     if (workspaceQuota > 0) {

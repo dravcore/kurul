@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BoardDto, CreateBoardRequest } from '@kurul/shared-types';
+import { PLAN_LIMIT_ERROR } from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { BoardTemplatePicker } from '@/components/board/board-template-picker';
 import { FormDialog } from '@/components/common/form-dialog';
@@ -59,7 +60,14 @@ export function CreateBoardDialog({
       submitDisabled={name.trim().length === 0}
       initialFocusRef={nameInputRef}
       onSubmit={onSubmit}
-      resolveError={(caught) => resolveApiMessage(caught, t, { fallback: 'createError' })}
+      resolveError={(caught) =>
+        resolveApiMessage(caught, t, {
+          fallback: 'createError',
+          // The list screen already disables the control at the ceiling; this is the answer
+          // when the ceiling was reached between that read and this submit (ADR 0032).
+          byError: { [PLAN_LIMIT_ERROR]: 'planLimitReached' },
+        })
+      }
     >
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="board-name">{t('name')}</Label>

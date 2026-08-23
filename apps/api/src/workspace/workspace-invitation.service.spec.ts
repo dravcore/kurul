@@ -10,6 +10,7 @@ import type { Request } from 'express';
 import { ActivityService } from '../activity/activity.service';
 import { auth } from '../auth/auth';
 import { recordMailDelivery } from '../mail/mail-delivery-scope';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   EMAIL_NOT_VERIFIED_MESSAGE,
@@ -71,11 +72,19 @@ function buildService(): {
     },
   };
   const activityService = { record: jest.fn().mockResolvedValue({ id: 'activity' }) };
+  // The seat ceiling never refuses in this suite; `assertSeatAvailable` itself is exercised
+  // in plan-limits.spec.ts.
+  const planLimits = {
+    assertBoardAvailable: jest.fn().mockResolvedValue(undefined),
+    assertWorkspaceAvailable: jest.fn().mockResolvedValue(undefined),
+    assertSeatAvailable: jest.fn().mockResolvedValue(undefined),
+  } as unknown as PlanLimitsService;
 
   return {
     service: new WorkspaceInvitationService(
       prisma as unknown as PrismaService,
       activityService as unknown as ActivityService,
+      planLimits,
     ),
     prisma,
     activityService,
