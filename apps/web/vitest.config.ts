@@ -68,6 +68,15 @@ export default defineConfig({
       // there is a ratchet on code that is genuinely tested, which is the only kind this file
       // sets. It also means a new helper landing in `lib/` with no test at all is visible,
       // which is the regression the notification helpers themselves were.
+      //
+      // `components/auth/**`, `components/settings/**` and `components/dashboard/**`
+      // (2026-08-23, maintenance sweep): the three interactive surfaces still missing a floor.
+      // All three already carry real coverage, so this is a ratchet, not a target to grow into:
+      // measured with `pnpm --filter @kurul/web test:cov`, auth 99.31/96.04/100.00/99.31,
+      // settings 89.85/90.91/85.23/90.76, dashboard 94.12/68.42/95.24/93.33 (stmts/branch/
+      // funcs/lines). Dashboard's branch figure is the outlier, but it still sits well above
+      // `components/board/**`'s 54 branch floor, the lowest in this file, so it gets the same
+      // few-points-under margin as the rest rather than a round of new tests.
       thresholds: {
         'app/**': {
           statements: 85,
@@ -104,6 +113,24 @@ export default defineConfig({
           branches: 83,
           functions: 93,
           lines: 92,
+        },
+        'components/auth/**': {
+          statements: 94,
+          branches: 91,
+          functions: 95,
+          lines: 94,
+        },
+        'components/settings/**': {
+          statements: 85,
+          branches: 86,
+          functions: 80,
+          lines: 86,
+        },
+        'components/dashboard/**': {
+          statements: 89,
+          branches: 63,
+          functions: 90,
+          lines: 88,
         },
       },
     },
