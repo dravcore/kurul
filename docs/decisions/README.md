@@ -47,6 +47,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0027](0027-attachment-quotas.md)                      | Attachment Storage Quotas: Soft Byte Ceilings per Workspace and per Instance                             | Accepted                                               | 2026-08-18 |
 | [0028](0028-open-contributions-hosted-service.md)      | Open Contributions Under AGPL-3.0, No CLA; Revenue Only From a Hosted Service                            | Accepted (supersedes 0014, 0015)                       | 2026-08-21 |
 | [0029](0029-client-data-layer.md)                      | The Client Data Layer Stays Hand-Rolled; the Flip Trigger Is the Third Generation Counter                | Accepted                                               | 2026-08-23 |
+| [0030](0030-typescript-7-hold.md)                      | TypeScript Stays on the 5.x Line Until typescript-eslint and ts-jest Support 7                           | Accepted                                               | 2026-08-23 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).
