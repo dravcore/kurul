@@ -81,6 +81,65 @@ export async function waitForBoardReady(page: Page): Promise<void> {
   await expect(page.getByText('Reconnecting…')).toBeHidden({ timeout: BOARD_READY_TIMEOUT_MS });
 }
 
+/** What `watchSocketHandshake` collected off the wire, for a test to assert on. */
+export type SocketHandshakeReport = {
+  /** Namespace CONNECT packets (`40`) this page sent, per connection. */
+  connectPacketsPerConnection: number[];
+  /** Room-join acks that came back denied, as the error strings the server sent. */
+  deniedJoins: string[];
+};
+
+/**
+ * Records the Socket.io frames a page exchanges, so a test can assert on the handshake itself
+ * rather than only on what it eventually looked like.
+ *
+ * `waitForBoardReady` catches a broken handshake, but only as a symptom and only when it loses
+ * a race — which is how the two defects behind it survived: on a developer's machine the room
+ * was joined before either could bite, and the nightly failed on a fixed commit roughly every
+ * other night. Reading the frames turns both into assertions that hold every run:
+ *
+ * - **One CONNECT packet per connection.** `connectSocket()` opening an already-opening socket
+ *   made socket.io-client send `40` twice; Socket.io 4.x reads the second one as an invalid
+ *   state and closes the whole client, killing the connection mid-handshake.
+ * - **No denied join.** Authenticating the handshake in an async `connection` hook let
+ *   `board:join` be answered `unauthenticated` before the session read landed — a denial the
+ *   client never retried, so "Reconnecting…" stayed on screen for the life of the tab.
+ *
+ * Call it before the navigation that opens the socket; the returned reader may be read at any
+ * point after.
+ */
+export function watchSocketHandshake(page: Page): () => SocketHandshakeReport {
+  const connectPacketsPerConnection: number[] = [];
+  const deniedJoins: string[] = [];
+
+  page.on('websocket', (ws) => {
+    if (!ws.url().includes('/socket.io/')) return;
+    const index = connectPacketsPerConnection.push(0) - 1;
+
+    ws.on('framesent', (frame) => {
+      // Engine.io text frames: `40` is CONNECT for the default namespace, `40/nsp,` for a
+      // named one. Anything longer starting `40{` is the same packet carrying auth data.
+      if (/^40(\{|$)/.test(frame.payload.toString())) {
+        connectPacketsPerConnection[index] = (connectPacketsPerConnection[index] ?? 0) + 1;
+      }
+    });
+
+    ws.on('framereceived', (frame) => {
+      // An ack is `43<id>[payload]`; the joins are the only acked emits the board makes.
+      const match = /^43\d*(\[.*\])$/s.exec(frame.payload.toString());
+      if (!match?.[1]) return;
+      try {
+        const [ack] = JSON.parse(match[1]) as Array<{ ok?: boolean; error?: string } | undefined>;
+        if (ack && ack.ok !== true) deniedJoins.push(ack.error ?? 'unknown');
+      } catch {
+        // Not JSON we understand; the frame assertions below only care about the ones we do.
+      }
+    });
+  });
+
+  return () => ({ connectPacketsPerConnection, deniedJoins });
+}
+
 /**
  * Drags one card onto another with a real mouse, and waits for the drop to be applied.
  *

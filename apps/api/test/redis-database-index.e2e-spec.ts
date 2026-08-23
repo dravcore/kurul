@@ -203,7 +203,12 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
 
   it('opens both Socket.io adapter connections on the database the URL names', async () => {
     const adapters: unknown[] = [];
-    const server = { adapter: (factory: unknown) => adapters.push(factory) } as unknown as Server;
+    // `use` as well as `adapter`: `afterInit` registers the handshake-auth middleware on the
+    // server before it attaches the adapter, and this fake stands in for a real one.
+    const server = {
+      adapter: (factory: unknown) => adapters.push(factory),
+      use: () => {},
+    } as unknown as Server;
     const gateway = new RealtimeGateway(
       {} as unknown as PrismaService,
       { attachServer: () => {} } as unknown as RealtimeService,

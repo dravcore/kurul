@@ -5,11 +5,21 @@ type ManagerHandler = () => void;
 
 interface FakeSocket {
   connected: boolean;
+  /**
+   * socket.io-client's own "opening or open" flag, and the reason this fake is written the way
+   * it is. The real `connect()` does **not** set `connected` — that only turns true when the
+   * server's CONNECT ack arrives, a round trip later. A fake that flipped `connected`
+   * synchronously made "connects it only once" pass while the shipped code was calling
+   * `connect()` twice on an opening socket, which is exactly the bug this file now covers.
+   */
+  active: boolean;
   connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
   removeAllListeners: ReturnType<typeof vi.fn>;
   on: ReturnType<typeof vi.fn>;
   off: ReturnType<typeof vi.fn>;
+  handlers: Map<string, Set<SocketHandler>>;
+  emit: (event: string, ...args: unknown[]) => void;
   io: {
     on: ReturnType<typeof vi.fn>;
     off: ReturnType<typeof vi.fn>;
@@ -18,23 +28,38 @@ interface FakeSocket {
   };
 }
 
+type SocketHandler = (...args: unknown[]) => void;
+
 const created: FakeSocket[] = [];
 
 function createFakeSocket(): FakeSocket {
   const handlers = new Map<string, Set<ManagerHandler>>();
+  const socketHandlers = new Map<string, Set<SocketHandler>>();
   const client: FakeSocket = {
     connected: false,
+    active: false,
     connect: vi.fn(() => {
-      client.connected = true;
+      client.active = true;
       return client;
     }),
     disconnect: vi.fn(() => {
       client.connected = false;
+      client.active = false;
       return client;
     }),
     removeAllListeners: vi.fn(),
-    on: vi.fn(),
-    off: vi.fn(),
+    handlers: socketHandlers,
+    on: vi.fn((event: string, handler: SocketHandler) => {
+      const set = socketHandlers.get(event) ?? new Set<SocketHandler>();
+      set.add(handler);
+      socketHandlers.set(event, set);
+    }),
+    off: vi.fn((event: string, handler: SocketHandler) => {
+      socketHandlers.get(event)?.delete(handler);
+    }),
+    emit: (event: string, ...args: unknown[]) => {
+      for (const handler of [...(socketHandlers.get(event) ?? [])]) handler(...args);
+    },
     io: {
       handlers,
       on: vi.fn((event: string, handler: ManagerHandler) => {
@@ -157,6 +182,135 @@ describe('socket singleton', () => {
     expect(getSocket()).toBe(first);
     expect(vi.mocked(io)).toHaveBeenCalledTimes(1);
     expect(created[0]?.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-open a socket that is still opening', async () => {
+    // The board mounts two hooks — board room and notification room — in separate commits
+    // milliseconds apart, and both call `connectSocket()`. The socket is `active` but not yet
+    // `connected` in between, and a second `connect()` there makes socket.io-client send the
+    // namespace CONNECT packet twice on one connection. Socket.io 4.x reads a duplicate CONNECT
+    // for a namespace it already holds as an invalid state and closes the whole client, so the
+    // first connection dies mid-handshake and every join queued behind it goes unanswered.
+    const { connectSocket } = await loadSocketModule();
+
+    connectSocket();
+    const client = created[0];
+    expect(client).toBeDefined();
+    if (!client) return;
+    expect(client.active).toBe(true);
+    // Still awaiting the server's CONNECT ack, exactly as the real client would be.
+    expect(client.connected).toBe(false);
+
+    connectSocket();
+
+    expect(client.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-opens the socket after the server refuses the handshake', async () => {
+    // socket.io reconnects a connection that dropped, but not one the server refused: a
+    // `connect_error` runs the client's `destroy()`, which clears `active` and cancels the
+    // backoff — `reconnect_failed` never fires either. Without this retry the socket is dead
+    // for the lifetime of the page while the board still renders "Reconnecting…".
+    const { connectSocket } = await loadSocketModule();
+
+    connectSocket();
+    const client = created[0];
+    expect(client).toBeDefined();
+    if (!client) return;
+    client.active = false;
+    client.connect.mockClear();
+
+    client.emit('connect_error', new Error('unauthorized'));
+
+    expect(client.connect).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(client.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-opens the socket after a server-side disconnect', async () => {
+    const { connectSocket } = await loadSocketModule();
+
+    connectSocket();
+    const client = created[0];
+    expect(client).toBeDefined();
+    if (!client) return;
+    client.active = false;
+    client.connect.mockClear();
+
+    client.emit('disconnect', 'io server disconnect');
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(client.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves an ordinary drop to socket.io’s own reconnection', async () => {
+    // `active` stays true while the manager is backing off, and a retry scheduled here would
+    // race it. The extra retry exists only for the cases socket.io has abandoned.
+    const { connectSocket } = await loadSocketModule();
+
+    connectSocket();
+    const client = created[0];
+    expect(client).toBeDefined();
+    if (!client) return;
+    client.connect.mockClear();
+
+    client.emit('disconnect', 'transport close');
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(client.connect).not.toHaveBeenCalled();
+  });
+
+  it('backs off between refusals instead of hammering a refusing server', async () => {
+    const { connectSocket } = await loadSocketModule();
+
+    connectSocket();
+    const client = created[0];
+    expect(client).toBeDefined();
+    if (!client) return;
+
+    const delays: number[] = [];
+    for (let refusal = 0; refusal < 4; refusal += 1) {
+      client.active = false;
+      client.connect.mockClear();
+      client.emit('connect_error', new Error('unauthorized'));
+      let waited = 0;
+      while (client.connect.mock.calls.length === 0 && waited < 120_000) {
+        await vi.advanceTimersByTimeAsync(100);
+        waited += 100;
+      }
+      delays.push(waited);
+    }
+
+    // Doubling, with the manager's jitter factor applied, so a refused client is not a
+    // steady load on the API it is refusing to talk to.
+    expect(delays[0] ?? 0).toBeLessThan(delays[3] ?? 0);
+    expect(delays[3] ?? 0).toBeGreaterThan(2_000);
+  });
+
+  it('forgets the refusal backoff once a connection succeeds', async () => {
+    const { connectSocket } = await loadSocketModule();
+
+    connectSocket();
+    const client = created[0];
+    expect(client).toBeDefined();
+    if (!client) return;
+
+    client.active = false;
+    client.emit('connect_error', new Error('unauthorized'));
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    client.connected = true;
+    client.active = true;
+    client.emit('connect');
+
+    client.connected = false;
+    client.active = false;
+    client.connect.mockClear();
+    client.emit('connect_error', new Error('unauthorized'));
+    // Back to the first, short delay rather than continuing to double from where it left off.
+    await vi.advanceTimersByTimeAsync(1_600);
+
+    expect(client.connect).toHaveBeenCalledTimes(1);
   });
 
   it('drops every listener when the socket is disposed', async () => {

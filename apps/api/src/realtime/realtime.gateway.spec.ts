@@ -1,8 +1,15 @@
 import { Test } from '@nestjs/testing';
-import { SocketClientEvents } from '@kurul/shared-types';
+import { SocketClientEvents, SOCKET_UNAUTHORIZED } from '@kurul/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
+import { auth } from '../auth/auth';
 import { RealtimeGateway } from './realtime.gateway';
 import { boardRoom, RealtimeService, userRoom } from './realtime.service';
+
+jest.mock('../auth/auth', () => ({
+  auth: { api: { getSession: jest.fn() } },
+}));
+
+const getSession = auth.api.getSession as unknown as jest.Mock;
 
 const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d4f';
 const USER_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d53';
@@ -52,6 +59,89 @@ function anonymousClient() {
     leave: jest.fn(),
   };
 }
+
+/**
+ * The handshake is authenticated in Socket.io middleware, and these tests are about *when*
+ * rather than whether.
+ *
+ * The gateway used to resolve the session in `handleConnection`. Socket.io acks the CONNECT
+ * packet before it emits `connection` and queues nothing behind an async listener, so the
+ * client's `board:join` — sent one round trip later, from its own `connect` event — could be
+ * handled while `socket.data.userId` was still unwritten. The handler answered
+ * `unauthenticated`, the client never retried the join, and the board showed "Reconnecting…"
+ * for the life of the tab. Middleware closes that window: it runs before the ack, so the id is
+ * on `socket.data` before any handler can be reached, or the connection is refused.
+ */
+describe('RealtimeGateway handshake', () => {
+  function registerMiddleware(gateway: RealtimeGateway) {
+    const use = jest.fn();
+    gateway.afterInit({ use } as never);
+    const middleware = use.mock.calls[0]?.[0] as (
+      socket: unknown,
+      next: (error?: Error) => void,
+    ) => void;
+    expect(middleware).toBeDefined();
+    return middleware;
+  }
+
+  it('writes the session id onto the socket before the connection is allowed through', async () => {
+    const { gateway } = await buildGateway(null);
+    const middleware = registerMiddleware(gateway);
+    getSession.mockResolvedValue({ user: { id: USER_ID } });
+
+    const socket = { data: {} as { userId?: string }, handshake: { headers: {} } };
+    const next = jest.fn();
+
+    middleware(socket, next);
+    await new Promise(process.nextTick);
+
+    expect(next).toHaveBeenCalledWith();
+    // The ordering the whole fix rests on: by the time `next()` lets the connection through,
+    // the id is already there, so no handler can observe the socket without it.
+    expect(socket.data.userId).toBe(USER_ID);
+    expect(next.mock.invocationCallOrder[0]).toBeGreaterThan(0);
+  });
+
+  it('refuses a handshake with no session instead of connecting it', async () => {
+    const { gateway } = await buildGateway(null);
+    const middleware = registerMiddleware(gateway);
+    getSession.mockResolvedValue(null);
+
+    const socket = { data: {} as { userId?: string }, handshake: { headers: {} } };
+    const next = jest.fn();
+
+    middleware(socket, next);
+    await new Promise(process.nextTick);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(next.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+    expect((next.mock.calls[0]?.[0] as Error).message).toBe(SOCKET_UNAUTHORIZED);
+    expect(socket.data.userId).toBeUndefined();
+  });
+
+  it('refuses a handshake whose session read threw, rather than letting it through', async () => {
+    const { gateway } = await buildGateway(null);
+    const middleware = registerMiddleware(gateway);
+    getSession.mockRejectedValue(new Error('database is on fire'));
+
+    const socket = { data: {} as { userId?: string }, handshake: { headers: {} } };
+    const next = jest.fn();
+
+    middleware(socket, next);
+    await new Promise(process.nextTick);
+
+    expect((next.mock.calls[0]?.[0] as Error).message).toBe(SOCKET_UNAUTHORIZED);
+    expect(socket.data.userId).toBeUndefined();
+  });
+
+  it('has no connection hook that could authenticate after the fact', async () => {
+    const { gateway } = await buildGateway(null);
+
+    // `handleConnection` is the hook that made the race possible. Its absence is the
+    // regression guard: reintroducing it would reopen the window middleware closed.
+    expect((gateway as unknown as { handleConnection?: unknown }).handleConnection).toBeUndefined();
+  });
+});
 
 describe('RealtimeGateway board rooms', () => {
   it('uses the room name the emitter publishes to', () => {

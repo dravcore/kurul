@@ -2,7 +2,6 @@ import { Logger, type OnModuleDestroy } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
-  OnGatewayConnection,
   OnGatewayDisconnect,
   OnGatewayInit,
   SubscribeMessage,
@@ -14,6 +13,7 @@ import { fromNodeHeaders } from 'better-auth/node';
 import { Redis } from 'ioredis';
 import {
   SocketClientEvents,
+  SOCKET_UNAUTHORIZED,
   type BoardJoinPayload,
   type BoardLeavePayload,
   type NotificationsJoinPayload,
@@ -36,9 +36,7 @@ type AuthedSocket = Socket & {
     credentials: true,
   },
 })
-export class RealtimeGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
-{
+export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnModuleDestroy {
   private readonly logger = new Logger(RealtimeGateway.name);
   private redisClients: Redis[] = [];
 
@@ -51,25 +49,54 @@ export class RealtimeGateway
   ) {}
 
   afterInit(server: Server): void {
+    server.use((socket, next) => {
+      void this.authenticate(socket as AuthedSocket, next);
+    });
     this.realtime.attachServer(server);
     void this.attachRedisAdapter(server);
   }
 
-  async handleConnection(client: AuthedSocket): Promise<void> {
+  /**
+   * Resolves the handshake's session and stamps it on `socket.data`, as Socket.io
+   * *middleware* rather than in an `OnGatewayConnection` hook.
+   *
+   * That distinction is the whole point, and it is a correctness one, not a style one.
+   * Socket.io does not hold a connection's inbound packets while a `connection` listener is
+   * running: `Namespace._doConnect` acks the CONNECT packet and *then* emits `connection`, so
+   * an `async handleConnection` that awaits a session read hands the client a live socket
+   * while `socket.data.userId` is still undefined. The client emits `board:join` on its
+   * `connect` event — one round trip — and every room handler below reads `client.data.userId`
+   * and answers `unauthenticated` if the read has not landed yet. The board then shows
+   * "Reconnecting…" for the life of that socket, because a join is emitted once per connection
+   * and a denied one is never retried. It is a pure race: it loses only when the session read
+   * is slower than the client's round trip, which is why it never reproduced on a developer's
+   * machine and flipped a fixed commit's nightly browser suite green and red for a week.
+   *
+   * Middleware runs *before* the CONNECT ack, and Socket.io queues nothing behind it, so by
+   * the time any handler can be reached the id is either present or the connection was
+   * refused. The race cannot be lost because the window no longer exists.
+   *
+   * A refusal is `next(Error)` rather than `socket.disconnect(true)` for the same reason it is
+   * middleware: the client is told *why* before it is dropped, as a `connect_error` it can act
+   * on (`apps/web/lib/socket.ts` schedules its own retry, because Socket.io's reconnection
+   * gives up on both a server-side disconnect and a handshake error).
+   */
+  private async authenticate(client: AuthedSocket, next: (error?: Error) => void): Promise<void> {
     try {
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(client.handshake.headers),
       });
       if (!session?.user?.id) {
-        client.disconnect(true);
+        next(new Error(SOCKET_UNAUTHORIZED));
         return;
       }
       client.data.userId = session.user.id;
+      next();
     } catch (error) {
       this.logger.warn(
         `Socket auth failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      client.disconnect(true);
+      next(new Error(SOCKET_UNAUTHORIZED));
     }
   }
 

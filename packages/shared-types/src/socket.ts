@@ -39,6 +39,16 @@ export const SocketClientEvents = {
 
 export type SocketClientEventName = (typeof SocketClientEvents)[keyof typeof SocketClientEvents];
 
+/**
+ * The message a refused handshake carries, as the `connect_error` the client receives.
+ *
+ * Shared rather than duplicated because it is a wire contract: the API refuses an
+ * unauthenticated handshake with it in Socket.io middleware, and the client matches on it to
+ * tell "this session is not usable" apart from "the server is not reachable" — two conditions
+ * that need different retry behaviour and different words on screen.
+ */
+export const SOCKET_UNAUTHORIZED = 'unauthorized' as const;
+
 interface BoardScopedPayload {
   workspaceId: string;
   boardId: string;

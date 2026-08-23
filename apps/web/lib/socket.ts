@@ -21,6 +21,12 @@ let socket: Socket | null = null;
 /** Set while a manager-level retry is parked after the backoff gave up. */
 let coolDownTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** Set while a retry is parked after socket.io abandoned the connection outright. */
+let refusalTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Consecutive refusals, so the retry below backs off instead of hammering. */
+let refusals = 0;
+
 /** First retry delay; each attempt backs off from here up to the ceiling. */
 const RECONNECT_DELAY_MS = 1_000;
 
@@ -59,6 +65,47 @@ function onReconnectFailed(): void {
   }, RECONNECT_COOLDOWN_MS);
 }
 
+/**
+ * Re-opens a socket that socket.io has abandoned.
+ *
+ * socket.io reconnects a connection that *dropped*; it does not reconnect one the server
+ * *refused*. Both a middleware rejection (`connect_error`) and a server-side
+ * `socket.disconnect()` (`disconnect` with reason `io server disconnect`) run the client's
+ * `destroy()`, which clears the subscriptions `active` is derived from and cancels the backoff
+ * — `reconnect_failed` never fires either, so even the cooldown above never arms. The socket is
+ * then dead for the lifetime of the page while every consumer still renders "Reconnecting…",
+ * which is the UI stating something that is not true: nothing is reconnecting, and nothing ever
+ * will. A refused handshake is rarely permanent (a session that was momentarily unreadable, an
+ * API restarting mid-handshake), so the honest behaviour is to keep trying, slowly.
+ *
+ * Slowly is the operative word: this path has no backoff of its own to inherit, so it carries
+ * one. The delay doubles per consecutive refusal from `RECONNECT_DELAY_MS` up to
+ * `RECONNECT_DELAY_MAX_MS`, jittered by the same factor as the manager's, and the counter
+ * resets on the next successful connection.
+ */
+function onConnectionRefused(): void {
+  const client = socket;
+  if (client === null || client.active || refusalTimer !== null) return;
+
+  const step = Math.min(RECONNECT_DELAY_MS * 2 ** refusals, RECONNECT_DELAY_MAX_MS);
+  const jitter = 1 + RECONNECT_RANDOMIZATION_FACTOR * (Math.random() * 2 - 1);
+  refusals += 1;
+
+  refusalTimer = setTimeout(
+    () => {
+      refusalTimer = null;
+      if (socket === client && !client.connected && !client.active) {
+        client.connect();
+      }
+    },
+    Math.round(step * jitter),
+  );
+}
+
+function onConnected(): void {
+  refusals = 0;
+}
+
 const CONNECT_OPTIONS: Partial<ManagerOptions & SocketOptions> = {
   autoConnect: false,
   withCredentials: true,
@@ -95,13 +142,32 @@ export function getSocket(): Socket {
   if (!socket) {
     socket = createSocket();
     socket.io.on('reconnect_failed', onReconnectFailed);
+    socket.on('connect', onConnected);
+    socket.on('connect_error', onConnectionRefused);
+    socket.on('disconnect', onConnectionRefused);
   }
   return socket;
 }
 
+/**
+ * Opens the socket if it is not already open **or opening**.
+ *
+ * `active` rather than `connected`, and the difference is a bug that reached production.
+ * `connected` only turns true when the server's CONNECT acknowledgement arrives, so during the
+ * round trip in between it still reads false. Two hooks mount on the board — one for the board
+ * room, one for the notification room — and they land in separate commits milliseconds apart,
+ * so the second call used to find `connected === false`, call `connect()` on an already-opening
+ * socket and make socket.io-client emit the namespace CONNECT packet a *second* time on the
+ * same connection. Socket.io 4.x treats a duplicate CONNECT for a namespace it has already
+ * attached as an invalid state and closes the whole client (`Client.ondecoded`), so the very
+ * first connection died mid-handshake and the joins sent behind it were never answered.
+ *
+ * `active` is true from the moment `connect()` subscribes until the socket is disconnected or
+ * gives up, which is exactly "already opening or open".
+ */
 export function connectSocket(): Socket {
   const client = getSocket();
-  if (!client.connected) {
+  if (!client.active && !client.connected) {
     client.connect();
   }
   return client;
@@ -113,10 +179,18 @@ export function disconnectSocket(): void {
     clearTimeout(coolDownTimer);
     coolDownTimer = null;
   }
+  if (refusalTimer !== null) {
+    clearTimeout(refusalTimer);
+    refusalTimer = null;
+  }
+  refusals = 0;
   const client = socket;
   socket = null;
   client.disconnect();
   client.io.off('reconnect_failed', onReconnectFailed);
+  client.off('connect', onConnected);
+  client.off('connect_error', onConnectionRefused);
+  client.off('disconnect', onConnectionRefused);
   // Drops any listener a hook forgot to remove, so the instance and its closures can go.
   client.removeAllListeners();
 }
