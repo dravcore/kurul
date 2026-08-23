@@ -34,7 +34,7 @@ import { UnsupportedMediaTypeException } from '@nestjs/common';
  * ADR 0022 chose for its `default-src 'none'`. Sniffing rescues neither case, because both
  * files really are what they claim to be.
  */
-export const ALLOWED_MIME_TYPES: ReadonlySet<string> = new Set([
+const ALLOWED_MIME_TYPES: ReadonlySet<string> = new Set([
   'image/png',
   'image/jpeg',
   'image/gif',

@@ -47,19 +47,19 @@ export const DEMO_WORKSPACE_SLUG = 'demo';
 /** Who a seeded task or comment belongs to. Resolved to a real user id by `reset.ts`. */
 export type DemoPerson = 'demo' | 'teammate';
 
-export interface DemoChecklistSeed {
+interface DemoChecklistSeed {
   title: string;
   items: readonly { content: string; isDone: boolean }[];
 }
 
-export interface DemoCommentSeed {
+interface DemoCommentSeed {
   author: DemoPerson;
   body: string;
   /** Days before the reset. Positive numbers are in the past. */
   daysAgo: number;
 }
 
-export interface DemoTaskSeed {
+interface DemoTaskSeed {
   title: string;
   description?: string;
   priority: Priority;
@@ -75,12 +75,12 @@ export interface DemoTaskSeed {
   checklists?: readonly DemoChecklistSeed[];
 }
 
-export interface DemoColumnSeed {
+interface DemoColumnSeed {
   name: string;
   category: ColumnCategory;
 }
 
-export interface DemoLabelSeed {
+interface DemoLabelSeed {
   name: string;
   /** A design-token slot, never a hex (CLAUDE.md). */
   color: string;

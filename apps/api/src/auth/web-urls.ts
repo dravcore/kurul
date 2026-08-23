@@ -19,7 +19,7 @@ const BOARD_PATH = '/board';
  * Owned by `apps/web` — see the contract in
  * `docs/decisions/0013-invitation-email-verification.md`.
  */
-export const DEFAULT_VERIFICATION_CALLBACK_PATH = '/verify-email';
+const DEFAULT_VERIFICATION_CALLBACK_PATH = '/verify-email';
 
 function trimTrailingSlash(url: string): string {
   return url.replace(/\/+$/, '');

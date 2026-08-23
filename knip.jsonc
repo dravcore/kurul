@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+
+  // shadcn/ui primitives (`apps/web/components.json`): each file is the full component copied
+  // from `npx shadcn add`, not authored per call site. It intentionally exports its whole Radix
+  // API — variants, sub-parts like `DialogPortal` / `DropdownMenuSub*` — so a future call site
+  // can reach for any of it without re-running the generator. Pruning to "only what's imported
+  // today" fights the next `shadcn add` and the component's own docs, so these stay ignored
+  // rather than trimmed.
+  "ignore": ["apps/web/components/ui/**"],
+
+  "workspaces": {
+    ".": {
+      // Manual CLI tools invoked as `node scripts/<name>.mjs` (see docs/development.md,
+      // docs/testing.md, apps/api/Dockerfile) — never through a package.json script, so knip's
+      // default entry detection misses them.
+      "entry": ["scripts/*.mjs"]
+    },
+    "apps/api": {
+      // `generate-openapi.ts` is run compiled, as `node dist/openapi/generate-openapi.js`
+      // (apps/api/package.json's `openapi` / `openapi:check` scripts) — knip needs the source
+      // entry to trace it.
+      "entry": ["src/main.ts", "src/openapi/generate-openapi.ts"]
+    },
+    "e2e": {
+      // The performance measurement rig: deliberately not part of the smoke suite, run by hand
+      // via `playwright test -c measure.config.ts` (see measure.config.ts's own header).
+      "entry": ["measure.config.ts", "measure/*.measure.ts"]
+    }
+  }
+}

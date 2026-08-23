@@ -73,7 +73,7 @@ export interface AccountDeletionCounts {
  * copying them into a log aggregator on the way out would move the problem rather than solve
  * it — the rule ADR 0020's retention sweep already follows.
  */
-export interface AccountDeletedLogLine extends AccountDeletionCounts {
+interface AccountDeletedLogLine extends AccountDeletionCounts {
   ts: string;
   level: 'warn';
   event: 'account.deleted';

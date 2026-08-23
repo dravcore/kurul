@@ -34,7 +34,7 @@ type ResponseHeaders = NonNullable<Extract<ResponseOrRef, { description: string 
  * monorepo, so a client that pins the package pins the contract. A second version number here
  * would be a second promise, and the two would disagree the first time one of them moved.
  */
-export const OPENAPI_VERSION = '0.1.0';
+const OPENAPI_VERSION = '0.1.0';
 
 /** Name of the cookie security scheme every guarded operation references. */
 export const SESSION_SECURITY_SCHEME = 'session';

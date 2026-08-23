@@ -11,7 +11,7 @@ import { ConflictException } from '@nestjs/common';
  * Lives in the task module because its only callers are the task join-table writes. Move it
  * to `common/` the moment a second module needs it, not before.
  */
-export function isPrismaUniqueViolation(error: unknown): boolean {
+function isPrismaUniqueViolation(error: unknown): boolean {
   return (
     typeof error === 'object' &&
     error !== null &&

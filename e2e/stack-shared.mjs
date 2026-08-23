@@ -28,7 +28,7 @@ export const API_URL = `http://localhost:${API_PORT}`;
  * Not the `kurul_test` the Jest integration suite truncates between tests — a shared
  * database is how two parallel runs delete each other's rows mid-assertion.
  */
-export const E2E_DATABASE_NAME = 'kurul_test_playwright';
+const E2E_DATABASE_NAME = 'kurul_test_playwright';
 
 /**
  * Where the suite's API writes attachment bytes.

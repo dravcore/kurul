@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 
 /** The two things that may become of a workspace whose only OWNER is leaving. */
-export const WORKSPACE_DISPOSITION_ACTIONS = ['transfer', 'delete'] as const;
+const WORKSPACE_DISPOSITION_ACTIONS = ['transfer', 'delete'] as const;
 export type WorkspaceDispositionAction = (typeof WORKSPACE_DISPOSITION_ACTIONS)[number];
 
 /**
@@ -22,7 +22,7 @@ export type WorkspaceDispositionAction = (typeof WORKSPACE_DISPOSITION_ACTIONS)[
  * of an entire tenant. `ValidationPipe` walks the array before any of it runs, so the ceiling
  * costs nothing and the refusal is a `400` rather than a transaction that takes a minute.
  */
-export const MAX_WORKSPACE_DISPOSITIONS = 200;
+const MAX_WORKSPACE_DISPOSITIONS = 200;
 
 export class WorkspaceDispositionDto {
   @IsUUID('7')

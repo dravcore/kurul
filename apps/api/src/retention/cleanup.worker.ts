@@ -65,8 +65,8 @@ export const CLEANUP_BATCH_SIZE = 1000;
  */
 export const MAX_BATCHES_PER_TABLE = 1000;
 
-export const DEFAULT_NOTIFICATION_RETENTION_DAYS = 90;
-export const DEFAULT_ACTIVITY_RETENTION_DAYS = 365;
+const DEFAULT_NOTIFICATION_RETENTION_DAYS = 90;
+const DEFAULT_ACTIVITY_RETENTION_DAYS = 365;
 /**
  * Ninety days, matching {@link DEFAULT_NOTIFICATION_RETENTION_DAYS} rather than the activity
  * year — and the reason is who the row is about.
@@ -78,11 +78,11 @@ export const DEFAULT_ACTIVITY_RETENTION_DAYS = 365;
  * invite this person" is the right one, and that is the same ninety days a read notification
  * gets for the same reason: nothing reads it, so keeping it longer only stores an address.
  */
-export const DEFAULT_INVITATION_RETENTION_DAYS = 90;
+const DEFAULT_INVITATION_RETENTION_DAYS = 90;
 
 /** The `backup` sidecar's own defaults, mirrored so the two cannot silently disagree. */
-export const DEFAULT_BACKUP_INTERVAL_SECONDS = 86_400;
-export const DEFAULT_BACKUP_KEEP = 7;
+const DEFAULT_BACKUP_INTERVAL_SECONDS = 86_400;
+const DEFAULT_BACKUP_KEEP = 7;
 
 /**
  * The shortest orphan grace period this job will use, whatever the backup pair says.
@@ -216,7 +216,7 @@ export function cutoffFor(now: Date, days: number): Date {
  * The rule extends to the orphan sweep without an exception: a storage key is an attachment's
  * identity, so `orphanedFiles` is a number and never a list of paths.
  */
-export interface CleanupLogLine extends CleanupCounts {
+interface CleanupLogLine extends CleanupCounts {
   ts: string;
   level: 'info';
   event: 'retention.cleanup';

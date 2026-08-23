@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /** Returned when no `package.json` can be found or read — never thrown, never guessed. */
-export const UNKNOWN_VERSION = 'unknown';
+const UNKNOWN_VERSION = 'unknown';
 
 /**
  * The version of the running API, read from the nearest `package.json`.

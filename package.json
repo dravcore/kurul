@@ -27,6 +27,7 @@
     "openapi:check": "pnpm --filter @kurul/api openapi:check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "knip": "knip",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -48,6 +49,7 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
+    "knip": "6.32.2",
     "lint-staged": "^17.3.0",
     "prettier": "^3.5.3",
     "prisma": "^7.0.0",
