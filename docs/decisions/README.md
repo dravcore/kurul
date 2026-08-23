@@ -46,6 +46,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0026](0026-account-deletion-anonymisation.md)         | Account Deletion: Anonymise the User Row, Decide the Owned Workspace in the Flow                         | Accepted                                               | 2026-08-15 |
 | [0027](0027-attachment-quotas.md)                      | Attachment Storage Quotas: Soft Byte Ceilings per Workspace and per Instance                             | Accepted                                               | 2026-08-18 |
 | [0028](0028-open-contributions-hosted-service.md)      | Open Contributions Under AGPL-3.0, No CLA; Revenue Only From a Hosted Service                            | Accepted (supersedes 0014, 0015)                       | 2026-08-21 |
+| [0031](0031-api-versioning.md)                         | API Versioning: a `/v1` URI Prefix Introduced at 1.0, and the Order Things Ship In                       | Accepted                                               | 2026-08-23 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).
