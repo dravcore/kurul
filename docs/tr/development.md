@@ -153,12 +153,12 @@ olduğu için `.env.example`'da yer almazlar. Bkz.
 [Gözlemlenebilirlik](#gözlemlenebilirlik).
 
 `.env.example` ayrıca `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `REDIS_PASSWORD`,
-`BACKUP_INTERVAL` ve `BACKUP_KEEP` taşır. Altısı da **yalnızca compose'a aittir** —
-`docker-compose.yml` bunları `postgres`/`redis`/`migrate`/`api`/`backup` servislerine
-enterpolasyon eder ve hiçbir uygulama kodu doğrudan okumaz; bu yüzden yukarıdaki tabloda yer
-almazlar ve `apps/api` tarafında bağlanmaları gerekmez. İlk dördü için bkz.
+`BACKUP_INTERVAL`, `BACKUP_KEEP` ve `BACKUP_REMOTE` taşır. Yedisi de **yalnızca compose'a
+aittir** — `docker-compose.yml` bunları `postgres`/`redis`/`migrate`/`api`/`backup`
+servislerine enterpolasyon eder ve hiçbir uygulama kodu doğrudan okumaz; bu yüzden yukarıdaki
+tabloda yer almazlar ve `apps/api` tarafında bağlanmaları gerekmez. İlk dördü için bkz.
 [Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri), yedekleme
-çifti için bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme).
+üçlüsü için bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme).
 
 Bir secret üretmek için:
 
@@ -978,14 +978,15 @@ yedekleme sidecar'ı sessizce kurtarma noktası üretmeyi bırakır ki bu bölü
 tam olarak bu hatadır. `docker-compose.dev.yml`'de bilinçli olarak **yok** — `pnpm db:seed`'in
 istendiğinde sildiği yerel bir veritabanında saklanmaya değer bir şey yoktur.
 
-İki ayar, ikisi de compose tarafından `.env`'den okunur:
+Üç ayar, üçü de compose tarafından `.env`'den okunur:
 
 | Değişken          | Varsayılan | Amaç                                                                       |
 | ----------------- | ---------- | -------------------------------------------------------------------------- |
 | `BACKUP_INTERVAL` | `86400`    | Döngüler arası saniye. `86400` = günlük; bu **doğrudan** sizin RPO'nuzdur  |
 | `BACKUP_KEEP`     | `7`        | Her seride saklanan arşiv sayısı; her döngüden sonra daha eskileri silinir |
+| `BACKUP_REMOTE`   | boş        | Host dışı kopya için rclone remote yolu; boş = yalnızca yerel arşivler     |
 
-Compose bu ikisini `api` servisine de geçirir — yedekleme ayarı gibi okunduğu için gözden
+Compose ilk ikisini `api` servisine de geçirir — yedekleme ayarı gibi okunduğu için gözden
 kaçması kolaydır: gece koşan yetim dosya süpürmesi, bir dosyayı sahiplenmeyi bırakacak kadar
 eski bir dump hâlâ restore edilebilirken o dosyayı silmeyi reddeder ve bu grace period tam
 olarak `BACKUP_KEEP × BACKUP_INTERVAL`'dır. "Diskte var, veritabanında yok" ancak veritabanı
@@ -1005,13 +1006,19 @@ docker compose exec backup ls -lh /backups   # en yeni çift ve kaç tanesi sakl
 
 Döngü başına bir değil iki satır: yalnızca dump'ı loglayan bir döngü, dosya arşivinin
 başarısız olduğu (ya da `ATTACHMENT_DIR`'in boş olduğu) anlamına gelir; üstündeki `ERROR`
-satırı hangisi olduğunu söyler.
+satırı hangisi olduğunu söyler. `BACKUP_REMOTE` ayarlıysa arşiv başına bir tane olmak üzere iki
+satır daha (`off-host: pushed …`) gelir ve aynı kural onlar için de geçerlidir.
 
 **Arşivleri host dışına kopyalayın.** `backup_data`, `postgres_data` ile aynı diskte durur;
-yani "yanlış tabloyu düşürdüm"ü kapsar, ölen bir diski veya kaybolan bir sunucuyu hiç
-kapsamaz — volume'ü düzenli olarak başka bir yere aynalayın
-(`docker compose exec -T backup cat /backups/<arşiv>` üzerinden ya da doğrudan volume'ün host
-yolundan `rsync`/`rclone`), yoksa felaket senaryosu yine her şeyi kaybettirir.
+yani yukarıdaki her şey "yanlış tabloyu düşürdüm"ü kapsar, ölen bir diski veya kaybolan bir
+sunucuyu hiç kapsamaz. `BACKUP_REMOTE`'a bir rclone remote yolu verin (`s3:bucket/prefix`,
+`b2:bucket`, `sftp:…`); aynı sidecar her döngüden sonra iki arşivi de oraya iter, remote'u aynı
+`BACKUP_KEEP` sayısına budar ve, asıl mesele budur, en yeni host dışı kopya
+`2 × BACKUP_INTERVAL`'ı geçtiğinde container'ı **unhealthy** raporlar; yani bozulan bir yükleme
+restore gününde değil bozulduğu gün fark edilir. Başarısız bir yükleme hiçbir zaman yerel bir
+arşive mal olmaz. Varsayılan olan boş değer bu bölümü tam olarak bu seçenek yokken olduğu gibi
+bırakır. Kurulum, kimlik bilgileri ve remote'tan restore:
+[Host dışı kopyalar](self-hosting.md#host-dışı-kopyalar).
 
 ### Elle dump almak
 

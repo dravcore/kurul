@@ -9,6 +9,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Off-host backup copies, and a healthcheck that watches them.** `BACKUP_REMOTE` in `.env`
+  takes an [rclone](https://rclone.org/) remote path (`s3:bucket/prefix`, `b2:bucket`,
+  `sftp:…`); with one set, the existing `backup` sidecar pushes **both** archives of every
+  cycle there after writing them locally, then prunes the remote to the same `BACKUP_KEEP` as
+  the local series. Until now `backup_data` sat on the same disk as `postgres_data`, so a dead
+  disk took the database and every backup of it together, and the only answer in the docs was a
+  copy command an operator had to remember to run.
+
+  The healthcheck follows the remote: with `BACKUP_REMOTE` set, the service reports healthy
+  only while the newest **off-host** copy is under `2 × BACKUP_INTERVAL` old, so expired
+  credentials or a bucket that stopped accepting writes show up in `docker compose ps` on the
+  day they break rather than on restore day. A failed upload never deletes a local archive and
+  never stops the next local cycle; it logs `ERROR off-host:` and leaves the freshness stamp
+  where it was.
+
+  Credentials are rclone's own, in an optional `rclone.env` next to `docker-compose.yml` (git
+  ignored) as `RCLONE_CONFIG_<NAME>_<KEY>` variables, so S3, B2, R2, MinIO and SFTP all work
+  with no config file; a mounted `rclone.conf` works too. rclone itself is not in the sidecar's
+  stock `postgres:18-alpine` image, so with a remote configured the script downloads one pinned
+  release, verifies its sha256 before unpacking it, and caches it in the backup volume; an
+  `rclone` already on the container's `PATH` is used instead and nothing is downloaded.
+
+  **Leaving `BACKUP_REMOTE` blank changes nothing**, including the log lines and the
+  healthcheck. See [Off-host copies](docs/self-hosting.md#off-host-copies).
+
 - **Demo mode, and everything a live demo instance needs except the host.** `DEMO_MODE=true` is
   the whole switch: the app shows a standing, dismissible banner naming how often the data
   disappears; all outbound email goes to the log transport whatever `SMTP_HOST` says, so a
