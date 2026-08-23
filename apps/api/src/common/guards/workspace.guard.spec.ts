@@ -103,4 +103,35 @@ describe('WorkspaceGuard', () => {
     await expect(guard.canActivate(mockContext(request))).rejects.toBeInstanceOf(NotFoundException);
     expect(findUnique).not.toHaveBeenCalled();
   });
+
+  /**
+   * A personal access token is a membership with one extra constraint: the workspace it was
+   * minted in. Presented elsewhere it is a non-member, whatever the owner's other memberships
+   * say, and the answer is the same 404 before any query runs.
+   */
+  it('rejects a token bound to another workspace without querying, even when the owner is a member', async () => {
+    const { guard, findUnique } = buildGuard({
+      id: 'm1',
+      workspaceId: WORKSPACE_ID,
+      userId: USER_ID,
+      role: MemberRole.OWNER,
+    });
+    const request = mockRequest({ accessToken: { id: 't1', workspaceId: 'another-workspace' } });
+
+    await expect(guard.canActivate(mockContext(request))).rejects.toBeInstanceOf(NotFoundException);
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+
+  it('admits a token bound to this workspace exactly like a cookie session', async () => {
+    const { guard } = buildGuard({
+      id: 'm1',
+      workspaceId: WORKSPACE_ID,
+      userId: USER_ID,
+      role: MemberRole.GUEST,
+    });
+    const request = mockRequest({ accessToken: { id: 't1', workspaceId: WORKSPACE_ID } });
+
+    await expect(guard.canActivate(mockContext(request))).resolves.toBe(true);
+    expect(request.membership?.role).toBe(MemberRole.GUEST);
+  });
 });

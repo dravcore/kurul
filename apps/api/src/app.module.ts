@@ -22,6 +22,7 @@ import { NotificationModule } from './notification/notification.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RetentionModule } from './retention/retention.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
+import { TokenModule } from './token/token.module';
 import { SessionAuthGuard } from './common/guards/session-auth.guard';
 import { throttlerOptions } from './common/rate-limit/rate-limit';
 
@@ -40,6 +41,9 @@ import { throttlerOptions } from './common/rate-limit/rate-limit';
     // are the profile, `DELETE /me` is the end of it.
     AccountModule,
     MailModule,
+    // Global, like `AuthModule`: `SessionAuthGuard` depends on its service, and that guard is
+    // instantiated in every module that names it.
+    TokenModule,
     WorkspaceModule,
     BoardModule,
     TaskModule,
