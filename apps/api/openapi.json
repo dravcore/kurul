@@ -3364,7 +3364,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3443,6 +3443,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
