@@ -22,6 +22,14 @@ export class WorkspaceGuard implements CanActivate {
       throw new NotFoundException('Workspace not found');
     }
 
+    // A personal access token acts as its owner in exactly one workspace. Presented against
+    // any other, it is treated like a non-member of that workspace, which is what it is: the
+    // same 404, before the membership lookup, so the answer does not depend on whether the
+    // owner happens to belong to the other workspace too.
+    if (request.accessToken && request.accessToken.workspaceId !== workspaceId) {
+      throw new NotFoundException('Workspace not found');
+    }
+
     const membership = await this.prisma.workspaceMember.findUnique({
       where: {
         workspaceId_userId: {

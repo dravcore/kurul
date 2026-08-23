@@ -228,6 +228,42 @@ export interface InvitationDto {
   emailDelivery?: MailDeliveryStatus;
 }
 
+/**
+ * A personal access token: a second credential beside the session cookie, for a caller that is
+ * not a browser. Bound to one workspace and one user at creation, and it acts as that user in
+ * that workspace and nowhere else.
+ *
+ * The secret is never in this shape. It is handed out exactly once, in
+ * `CreatedPersonalAccessTokenDto`, and only its hash is stored afterwards, so a list can show
+ * `prefix` to tell two tokens apart and nothing that would let a reader use one.
+ */
+export interface PersonalAccessTokenDto {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  /** A label the owner chose, such as the script or machine the token lives on. */
+  name: string;
+  /**
+   * `kurul_pat_` plus the first eight characters of the secret. Enough to recognise a token in
+   * a list or a log line, useless as a credential.
+   */
+  prefix: string;
+  /** ISO 8601 UTC, or null while the token has never authenticated a request. */
+  lastUsedAt: string | null;
+  /** ISO 8601 UTC, or null for a token that does not expire. */
+  expiresAt: string | null;
+  /** ISO 8601 UTC. */
+  createdAt: string;
+}
+
+/**
+ * `POST /workspaces/:workspaceId/tokens` and nothing else returns this shape. `token` is the
+ * plaintext secret, shown once; no later response carries it and the server cannot recover it.
+ */
+export interface CreatedPersonalAccessTokenDto extends PersonalAccessTokenDto {
+  token: string;
+}
+
 export interface BoardDto {
   id: string;
   workspaceId: string;

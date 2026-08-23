@@ -1,7 +1,20 @@
-import { Controller, Get, Param, Post, Query, type INestApplication } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  type INestApplication,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { OpenAPIObject } from '@nestjs/swagger';
-import { buildOpenApiDocument, SESSION_SECURITY_SCHEME } from './openapi.document';
+import {
+  buildOpenApiDocument,
+  SESSION_SECURITY_SCHEME,
+  TOKEN_SECURITY_SCHEME,
+} from './openapi.document';
 
 /**
  * `applyGlobalContract` is the half of this module that is behaviour rather than prose, and it
@@ -45,6 +58,11 @@ class StubHealthController {
  */
 @Controller('workspaces/:workspaceId')
 class StubWorkspaceController {
+  @Get()
+  read(@Param('workspaceId') _workspaceId: string): string {
+    return 'ok';
+  }
+
   @Get('tasks/:taskId')
   get(@Param('workspaceId') _workspaceId: string, @Param('taskId') _taskId: string): string {
     return 'ok';
@@ -58,6 +76,75 @@ class StubWorkspaceController {
   /** Carries a query parameter, which the UUID pass must leave alone. */
   @Get('tasks')
   list(@Param('workspaceId') _workspaceId: string, @Query('cursor') _cursor: string): string {
+    return 'ok';
+  }
+}
+
+/**
+ * Every operation `SESSION_ONLY_OPERATIONS` names, plus one route with no workspace at all.
+ *
+ * The list is checked against the document the way `PUBLIC_PATHS` is, so a stub that declared
+ * only some of them would fail generation; the handlers are as empty as the ones above.
+ */
+@Controller()
+class StubSessionOnlyController {
+  @Post('workspaces/:workspaceId/tokens')
+  createToken(@Param('workspaceId') _workspaceId: string): string {
+    return 'ok';
+  }
+
+  @Get('workspaces/:workspaceId/tokens')
+  tokens(@Param('workspaceId') _workspaceId: string): string {
+    return 'ok';
+  }
+
+  @Delete('workspaces/:workspaceId/tokens/:tokenId')
+  revokeToken(@Param('workspaceId') _w: string, @Param('tokenId') _t: string): string {
+    return 'ok';
+  }
+
+  @Patch('workspaces/:workspaceId')
+  rename(@Param('workspaceId') _workspaceId: string): string {
+    return 'ok';
+  }
+
+  @Delete('workspaces/:workspaceId')
+  remove(@Param('workspaceId') _workspaceId: string): string {
+    return 'ok';
+  }
+
+  @Post('workspaces/:workspaceId/members/me/leave')
+  leave(@Param('workspaceId') _workspaceId: string): string {
+    return 'ok';
+  }
+
+  @Delete('workspaces/:workspaceId/members/:userId')
+  removeMember(@Param('workspaceId') _w: string, @Param('userId') _u: string): string {
+    return 'ok';
+  }
+
+  @Patch('workspaces/:workspaceId/members/:userId/role')
+  changeRole(@Param('workspaceId') _w: string, @Param('userId') _u: string): string {
+    return 'ok';
+  }
+
+  @Post('workspaces/:workspaceId/invitations')
+  invite(@Param('workspaceId') _workspaceId: string): string {
+    return 'ok';
+  }
+
+  @Delete('workspaces/:workspaceId/invitations/:invitationId')
+  revokeInvitation(@Param('workspaceId') _w: string, @Param('invitationId') _i: string): string {
+    return 'ok';
+  }
+
+  @Post('workspaces/:workspaceId/invitations/:invitationId/accept')
+  accept(@Param('workspaceId') _w: string, @Param('invitationId') _i: string): string {
+    return 'ok';
+  }
+
+  @Get('me')
+  me(): string {
     return 'ok';
   }
 }
@@ -100,7 +187,11 @@ describe('buildOpenApiDocument', () => {
     let app: INestApplication;
 
     beforeAll(async () => {
-      const built = await buildFrom([StubHealthController, StubWorkspaceController]);
+      const built = await buildFrom([
+        StubHealthController,
+        StubWorkspaceController,
+        StubSessionOnlyController,
+      ]);
       app = built.app;
       document = built.build();
     });
@@ -109,11 +200,46 @@ describe('buildOpenApiDocument', () => {
       await app.close();
     });
 
-    it('requires the session cookie on an ordinary operation', () => {
+    it('accepts a session cookie or a personal access token on a workspace operation', () => {
       const operation = document.paths['/workspaces/{workspaceId}/tasks/{taskId}']?.get;
 
-      expect(operation?.security).toEqual([{ [SESSION_SECURITY_SCHEME]: [] }]);
+      expect(operation?.security).toEqual([
+        { [SESSION_SECURITY_SCHEME]: [] },
+        { [TOKEN_SECURITY_SCHEME]: [] },
+      ]);
       expect(operation?.responses['401']).toBeDefined();
+    });
+
+    it('declares both security schemes once, at the document level', () => {
+      const schemes = document.components?.securitySchemes ?? {};
+
+      expect(schemes[SESSION_SECURITY_SCHEME]).toMatchObject({ type: 'apiKey', in: 'cookie' });
+      expect(schemes[TOKEN_SECURITY_SCHEME]).toMatchObject({ type: 'http', scheme: 'bearer' });
+    });
+
+    /**
+     * The two shapes a token is refused on. Token management, because a credential must not
+     * mint or enumerate credentials; a path with no workspace, because there is no scope to
+     * compare a workspace-bound token against.
+     */
+    it.each([
+      ['get', '/workspaces/{workspaceId}/tokens', 'token management'],
+      ['post', '/workspaces/{workspaceId}/invitations', 'a Better Auth write'],
+      ['get', '/me', 'an account route with no workspace in its path'],
+    ])('requires the session cookie alone on %s %s (%s)', (method, path) => {
+      const operation = document.paths[path]?.[method as 'get' | 'post'];
+
+      expect(operation?.security).toEqual([{ [SESSION_SECURITY_SCHEME]: [] }]);
+    });
+
+    it('keeps the token on the same path under a method the list does not name', () => {
+      // `PATCH /workspaces/{workspaceId}` is session-only; `GET` of the same path is not. The
+      // list is keyed by method and path together, or the read would lose its token by mistake.
+      const operation = document.paths['/workspaces/{workspaceId}']?.get;
+      expect(operation?.security).toEqual([
+        { [SESSION_SECURITY_SCHEME]: [] },
+        { [TOKEN_SECURITY_SCHEME]: [] },
+      ]);
     });
 
     it('spells the health probes as public with an empty array, not an absent key', () => {
@@ -207,8 +333,22 @@ describe('buildOpenApiDocument', () => {
       }
     });
 
+    it('refuses a document missing an operation SESSION_ONLY_OPERATIONS names', async () => {
+      const { app, build } = await buildFrom([StubHealthController, StubWorkspaceController]);
+
+      try {
+        expect(build).toThrow(/SESSION_ONLY_OPERATIONS names 11 operation\(s\)/);
+      } finally {
+        await app.close();
+      }
+    });
+
     it('refuses a path parameter it cannot vouch for as a UUIDv7', async () => {
-      const { app, build } = await buildFrom([StubHealthController, StubSlugController]);
+      const { app, build } = await buildFrom([
+        StubHealthController,
+        StubSessionOnlyController,
+        StubSlugController,
+      ]);
 
       try {
         expect(build).toThrow(/path parameter "slug"/);
@@ -224,7 +364,11 @@ describe('buildOpenApiDocument', () => {
     let app: INestApplication;
 
     beforeAll(async () => {
-      const built = await buildFrom([StubHealthController, StubWorkspaceController]);
+      const built = await buildFrom([
+        StubHealthController,
+        StubWorkspaceController,
+        StubSessionOnlyController,
+      ]);
       app = built.app;
       build = built.build;
     });

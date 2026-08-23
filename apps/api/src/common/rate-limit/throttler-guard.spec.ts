@@ -108,6 +108,31 @@ describe('ThrottlerGuard as a global guard', () => {
       expect(first.headers['x-ratelimit-remaining']).toBe(String(INVITATION_RATE_LIMIT - 1));
     });
 
+    /**
+     * Parity for personal access tokens. The throttler is registered ahead of
+     * `SessionAuthGuard` and keys on client IP and route, so it never learns which credential
+     * a request carried: a script replaying a Bearer token spends the same budget as a browser
+     * session, and the token requests and cookie requests from one address share it.
+     */
+    it('counts Bearer-token requests against the same per-IP budget as cookie requests', async () => {
+      const half = Math.floor(INVITATION_RATE_LIMIT / 2);
+      for (let attempt = 0; attempt < half; attempt += 1) {
+        await request(app.getHttpServer())
+          .post('/invitations')
+          .set('Authorization', 'Bearer kurul_pat_rate_limit_probe')
+          .expect(201);
+      }
+      for (let attempt = half; attempt < INVITATION_RATE_LIMIT; attempt += 1) {
+        await request(app.getHttpServer()).post('/invitations').expect(201);
+      }
+
+      const blocked = await request(app.getHttpServer())
+        .post('/invitations')
+        .set('Authorization', 'Bearer kurul_pat_rate_limit_probe')
+        .expect(429);
+      expect(blocked.body).toMatchObject({ statusCode: 429, message: RATE_LIMIT_ERROR_MESSAGE });
+    });
+
     it('holds task search to the tighter ceiling', async () => {
       for (let attempt = 0; attempt < TASK_SEARCH_RATE_LIMIT; attempt += 1) {
         await request(app.getHttpServer()).get('/tasks').query({ q: 'invoice' }).expect(200);

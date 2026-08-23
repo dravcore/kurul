@@ -284,6 +284,24 @@ HttpOnly; SameSite=Lax`, no prefix and no `Secure`, and the session token crosse
 clear text on every request. If you see the unprefixed form on a domain you believe is HTTPS,
 `SITE_URL` still has `http://` in it; fix it and `docker compose up -d`.
 
+### Calling the API from a script
+
+A script, a CI job or a backup check does not want a cookie. Open Settings, create a personal
+access token under "Personal access tokens", copy it (it is shown once), and send it as a
+Bearer header against the workspace it was created in:
+
+```bash
+curl -s https://kurul.example.com/api/workspaces/<workspaceId>/boards \
+  -H 'Authorization: Bearer kurul_pat_...'
+```
+
+The token acts as you, in that one workspace, with whatever role you hold when the request
+arrives; revoking it from the same screen stops it immediately, and the workspace activity
+feed records both the creation and the revocation. What it can and cannot call, and why, is in
+[api-conventions.md](api-conventions.md#authentication). The same HTTPS argument applies twice
+over here: a token crosses the network on every request, so never use one against an
+`http://` `SITE_URL`.
+
 ## 5. Point a monitor at it
 
 This is a step of the deployment, not an optional extra, and it is the last one because it is
@@ -402,6 +420,99 @@ behind — and passes every verification step that was written before attachment
 drill in [Restoring from a backup](development.md#restoring-from-a-backup) checks the files too.
 
 Restore steps are in [Upgrading and backups](development.md#upgrading-and-backups).
+
+### Off-host copies
+
+Better than remembering to run that command: give the sidecar a remote and it pushes both
+archives itself, every cycle. Set `BACKUP_REMOTE` in `.env` to an
+[rclone](https://rclone.org/) remote path and each cycle then also uploads the pair, prunes the
+remote to the same `BACKUP_KEEP`, and records that it worked. **Leave `BACKUP_REMOTE` blank and
+nothing changes**, including the healthcheck: this is opt-in, and an install that never sets it
+runs exactly the loop described above.
+
+| Variable                     | Default | Purpose                                                                                           |
+| ---------------------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| `BACKUP_REMOTE`              | blank   | rclone remote path, e.g. `s3:my-bucket/kurul`. Blank turns the whole off-host half off            |
+| `RCLONE_CONFIG_<NAME>_<KEY>` | -       | rclone's own env-var config, in `rclone.env` beside `docker-compose.yml`. `<NAME>` is your remote |
+| `RCLONE_CONFIG`              | -       | Path to a mounted `rclone.conf`, if you would rather keep credentials in a file than in env vars  |
+
+The credentials do **not** go in `.env`: rclone's env keys are named after your remote, so no
+fixed list of them can be declared in `docker-compose.yml`, and the `backup` service reads an
+optional `rclone.env` next to the compose file instead. That file is only read by this one
+container, unlike `.env`, which the api and web containers read too. Create it with `chmod 600`
+and keep it out of git (`.gitignore` already lists it).
+
+An S3 example, end to end. `KURULOFF` is an arbitrary remote name; it just has to match the one
+in `BACKUP_REMOTE`:
+
+```bash
+# rclone.env, next to docker-compose.yml, chmod 600
+RCLONE_CONFIG_KURULOFF_TYPE=s3
+RCLONE_CONFIG_KURULOFF_PROVIDER=AWS
+RCLONE_CONFIG_KURULOFF_ACCESS_KEY_ID=AKIA...
+RCLONE_CONFIG_KURULOFF_SECRET_ACCESS_KEY=...
+RCLONE_CONFIG_KURULOFF_REGION=eu-central-1
+```
+
+```bash
+# .env
+BACKUP_REMOTE=KURULOFF:my-backup-bucket/kurul
+```
+
+```bash
+docker compose up -d backup
+docker compose logs backup | grep off-host    # "pushed kurul-… to KURULOFF:…" per archive
+```
+
+Anything rclone speaks works the same way, with the same two lines: Backblaze B2
+(`_TYPE=b2`), any S3-compatible endpoint including MinIO and Cloudflare R2
+(`_TYPE=s3` plus `_ENDPOINT=`), SFTP (`_TYPE=sftp`), and so on. The key names are the config
+keys from [rclone's docs](https://rclone.org/docs/#config-file) uppercased. To use a
+`rclone.conf` file instead, mount it and point `RCLONE_CONFIG` at it (both lines in a
+`docker-compose.override.yml`, so an upgrade that replaces `docker-compose.yml` keeps them):
+
+```yaml
+services:
+  backup:
+    volumes:
+      - ./rclone.conf:/config/rclone.conf:ro
+    environment:
+      RCLONE_CONFIG: /config/rclone.conf
+```
+
+**rclone itself is downloaded on first use.** The sidecar runs a stock `postgres:18-alpine`
+image, so with `BACKUP_REMOTE` set the script fetches one pinned rclone release (about 20 MB,
+78 MB unpacked), checks it against a sha256 hard-coded in `scripts/backup.sh`, and caches it in
+the backup volume so later cycles and restarts reuse it. An
+`rclone` already on the container's `PATH` (your own image, a bind-mounted binary) is used
+instead and nothing is downloaded, which is also the answer for an air-gapped host.
+
+**The healthcheck follows the remote.** With `BACKUP_REMOTE` set, `docker compose ps` reports
+this service healthy only while the newest **off-host** copy is under `2 × BACKUP_INTERVAL`
+old, so credentials that expired, a bucket policy that changed, or a network that has been
+down since Tuesday surface as an unhealthy container instead of as a surprise on restore day.
+Local archives keep being written and kept throughout: a failed upload never deletes one, and
+the `ERROR off-host:` line in the log says what failed.
+
+To **restore from the remote**, fetch the pair back into the backup volume first, then follow
+the ordinary [restore drill](development.md#restoring-from-a-backup) unchanged, which is the
+point of the two copies being byte-identical:
+
+```bash
+docker compose exec backup /backups/.rclone/rclone --config= \
+  lsf "$BACKUP_REMOTE"                 # pick a timestamp, both halves of it
+docker compose exec backup /backups/.rclone/rclone --config= \
+  copy "$BACKUP_REMOTE/kurul-<timestamp>.dump" /backups/
+docker compose exec backup /backups/.rclone/rclone --config= \
+  copy "$BACKUP_REMOTE/kurul-<timestamp>-files.tar.gz" /backups/
+```
+
+`/backups/.rclone/rclone` is the downloaded copy; if you supplied your own rclone, that is just
+`rclone`, and `--config=` (which says "the config is env vars only") comes off when your
+credentials live in a mounted `rclone.conf`.
+
+If the host itself is gone, run those two `copy` commands from any machine with rclone and the
+same credentials, and hand the archives to a fresh install's restore.
 
 ## Demo instance
 

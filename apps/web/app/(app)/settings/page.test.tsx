@@ -30,6 +30,10 @@ vi.mock('@/components/settings/members-settings', () => ({
   MembersSettings: (): React.ReactElement => <div data-testid="members-settings" />,
 }));
 
+vi.mock('@/components/settings/token-settings', () => ({
+  TokenSettings: (): React.ReactElement => <div data-testid="token-settings" />,
+}));
+
 vi.mock('@/components/settings/workspace-settings', () => ({
   WorkspaceSettings: (): React.ReactElement => <div data-testid="workspace-settings" />,
 }));
@@ -63,20 +67,22 @@ describe('SettingsPage', () => {
     render(await SettingsPage());
 
     const headings = screen.getAllByRole('heading', { level: 2 }).map((node) => node.textContent);
-    // Members, Language, Workspace, Account: the section a new owner comes here to find leads,
-    // and the ordering rule below it is "the further down, the harder to undo" — deleting the
-    // workspace, then deleting the account, which is the only control here whose consequences
-    // reach past this tenant (ADR 0026).
+    // Members, Language, Notifications, Tokens, Workspace, Account: the section a new owner
+    // comes here to find leads, and the ordering rule below it is "the further down, the harder
+    // to undo": deleting the workspace, then deleting the account, which is the only control
+    // here whose consequences reach past this tenant (ADR 0026).
     expect(headings).toEqual([
       messages.app.settings.members.title,
       messages.app.settings.language.title,
       messages.app.settings.notifications.title,
+      messages.app.settings.tokens.title,
       messages.app.settings.workspace.title,
       messages.app.settings.account.title,
     ]);
     expect(screen.getByText(messages.app.settings.members.description)).toBeTruthy();
     expect(screen.getByText(messages.app.settings.language.description)).toBeTruthy();
     expect(screen.getByText(messages.app.settings.notifications.description)).toBeTruthy();
+    expect(screen.getByText(messages.app.settings.tokens.description)).toBeTruthy();
     expect(screen.getByText(messages.app.settings.workspace.description)).toBeTruthy();
     expect(screen.getByText(messages.app.settings.account.description)).toBeTruthy();
   });
@@ -87,6 +93,7 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('members-settings')).toBeTruthy();
     expect(screen.getByTestId('language-settings')).toBeTruthy();
     expect(screen.getByTestId('notification-settings')).toBeTruthy();
+    expect(screen.getByTestId('token-settings')).toBeTruthy();
     expect(screen.getByTestId('workspace-settings')).toBeTruthy();
     expect(screen.getByTestId('account-settings')).toBeTruthy();
   });
@@ -105,6 +112,8 @@ describe('SettingsPage', () => {
       messages.app.settings.language.description,
       messages.app.settings.notifications.title,
       messages.app.settings.notifications.description,
+      messages.app.settings.tokens.title,
+      messages.app.settings.tokens.description,
       messages.app.settings.workspace.title,
       messages.app.settings.workspace.description,
       messages.app.settings.account.title,

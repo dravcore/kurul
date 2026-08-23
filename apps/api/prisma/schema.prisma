@@ -100,6 +100,7 @@ model User {
   accounts        Account[]
   memberships     WorkspaceMember[]
   invitationsSent WorkspaceInvitation[]
+  accessTokens    PersonalAccessToken[]
   createdTasks    Task[]                @relation("TaskCreatedBy")
   assignees       TaskAssignee[]
   comments        Comment[]
@@ -199,6 +200,7 @@ model Workspace {
 
   members     WorkspaceMember[]
   invitations WorkspaceInvitation[]
+  accessTokens PersonalAccessToken[]
   boards      Board[]
   activities  Activity[]
   notifications Notification[]
@@ -234,6 +236,38 @@ model WorkspaceInvitation {
 
   @@index([workspaceId, email, status])
   @@index([inviterId])
+}
+
+/// A personal access token: a Bearer credential bound to one user in one workspace.
+///
+/// Only `tokenHash` (SHA-256 of the full plaintext) is stored; the plaintext is returned once by
+/// `POST /workspaces/:workspaceId/tokens` and never recoverable. `prefix` is the displayable head
+/// of the secret, kept so the owner can tell tokens apart. Revocation is a timestamp rather
+/// than a delete so the row stays as evidence beside its `token.revoked` activity entry; the
+/// auth lookup treats a revoked or expired row exactly like an unknown one.
+///
+/// `Cascade` on both parents: a token is meaningless without the workspace it is scoped to or
+/// the account it acts as. Account deletion anonymises rather than deletes the user row, so in
+/// practice the user side is cleared explicitly by `AccountDeletionService`; the cascade is the
+/// safety net for the one path that does delete users (the test database reset).
+model PersonalAccessToken {
+  id          String    @id @default(uuid(7))
+  workspaceId String
+  userId      String
+  name        String
+  prefix      String
+  tokenHash   String    @unique
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // The owner's list: `workspaceId = ? AND userId = ? AND revokedAt IS NULL ORDER BY id DESC`.
+  @@index([workspaceId, userId])
+  @@index([userId])
 }
 
 model Board {

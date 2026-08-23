@@ -39,6 +39,55 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   so the members screen says "7 of 10 seats used" and the board list disables its create control
   with a sentence instead of a silent refusal. Details and the rejected alternatives:
   [ADR 0032](docs/decisions/0032-plan-limits.md).
+- **Personal access tokens, the first slice of API 1.0.** A member mints a token for one
+  workspace at `POST /workspaces/:workspaceId/tokens` (or from the new "Personal access tokens"
+  section of Settings), sees the plaintext exactly once, and sends it as
+  `Authorization: Bearer kurul_pat_...` from a script, a CI job or any client that is not a
+  browser. The token acts as its owner in that workspace with the role the owner holds at the
+  time of each request; there are no scopes, because the workspace is the scope. `GET` lists
+  the caller's own live tokens by display prefix, `DELETE` revokes one immediately, and both
+  events are written to the workspace activity feed (`token.created`, `token.revoked`) and
+  the audit subset. The server stores a SHA-256 of the secret and a display prefix, nothing
+  else; a revoked, expired or unknown token all answer the same `401`; a token presented
+  against another workspace is the same `404` a non-member gets; and removing a member,
+  their leaving, or deleting their account ends their tokens too. The throttler runs ahead of
+  authentication, so a token spends the same per-IP budget a session does. A new
+  `personalAccessToken` Bearer scheme is declared in the OpenAPI document and every
+  workspace operation lists it beside the session cookie, except the token routes themselves
+  and the workspace-administration writes that Better Auth performs on a session (invite,
+  revoke, accept, remove a member, change a role, leave, rename and delete the workspace),
+  which answer `403` to a token and are named as the boundary of this slice in
+  [api-conventions.md](docs/api-conventions.md#authentication). Migration
+  `20260823120000_personal_access_token` adds the table. The model is first-party rather
+  than Better Auth's API-key plugin; the same section says why.
+- **ADR 0031: API versioning.** A `/v1` URI prefix on every route, introduced at 1.0 and not
+  before, with header negotiation and no-versioning rejected in writing, and the 1.0 surface
+  sequenced as personal access tokens, then `/v1`, then webhooks
+  ([docs/decisions/0031-api-versioning.md](docs/decisions/0031-api-versioning.md)).
+- **Off-host backup copies, and a healthcheck that watches them.** `BACKUP_REMOTE` in `.env`
+  takes an [rclone](https://rclone.org/) remote path (`s3:bucket/prefix`, `b2:bucket`,
+  `sftp:…`); with one set, the existing `backup` sidecar pushes **both** archives of every
+  cycle there after writing them locally, then prunes the remote to the same `BACKUP_KEEP` as
+  the local series. Until now `backup_data` sat on the same disk as `postgres_data`, so a dead
+  disk took the database and every backup of it together, and the only answer in the docs was a
+  copy command an operator had to remember to run.
+
+  The healthcheck follows the remote: with `BACKUP_REMOTE` set, the service reports healthy
+  only while the newest **off-host** copy is under `2 × BACKUP_INTERVAL` old, so expired
+  credentials or a bucket that stopped accepting writes show up in `docker compose ps` on the
+  day they break rather than on restore day. A failed upload never deletes a local archive and
+  never stops the next local cycle; it logs `ERROR off-host:` and leaves the freshness stamp
+  where it was.
+
+  Credentials are rclone's own, in an optional `rclone.env` next to `docker-compose.yml` (git
+  ignored) as `RCLONE_CONFIG_<NAME>_<KEY>` variables, so S3, B2, R2, MinIO and SFTP all work
+  with no config file; a mounted `rclone.conf` works too. rclone itself is not in the sidecar's
+  stock `postgres:18-alpine` image, so with a remote configured the script downloads one pinned
+  release, verifies its sha256 before unpacking it, and caches it in the backup volume; an
+  `rclone` already on the container's `PATH` is used instead and nothing is downloaded.
+
+  **Leaving `BACKUP_REMOTE` blank changes nothing**, including the log lines and the
+  healthcheck. See [Off-host copies](docs/self-hosting.md#off-host-copies).
 
 - **Demo mode, and everything a live demo instance needs except the host.** `DEMO_MODE=true` is
   the whole switch: the app shows a standing, dismissible banner naming how often the data
@@ -143,6 +192,46 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   along with the non-atomic fallback path that used them; `consume` is the whole interface now,
   and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
   Redis outage fallback and the degraded-mode reporting are all unchanged.
+
+### Added
+
+- **`pnpm bootstrap --check`, a doctor mode for the dev loop.** Answers "did something go stale
+  since the last bootstrap" from the filesystem alone — no Docker, no database, no network — so
+  it stays well under 5 seconds and is safe to run after every `git pull`. It checks that
+  `packages/shared-types/dist` and `packages/auth-access/dist` are at least as new as their
+  `src`, that the generated Prisma client is at least as new as `schema.prisma`, and that `.env`
+  carries `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` with `DATABASE_URL`'s placeholder
+  replaced — the same three ways this repo's dev loop has gone stale silently before. Prints one
+  line per check with a concrete fix command on failure (`pnpm build`, `pnpm db:generate`, which
+  `.env` key to set) and exits non-zero if any check fails. Logic lives in
+  `scripts/lib/doctor.mjs`, tested in `scripts/lib/doctor.test.mjs`.
+### Changed
+
+- **`docs`:** [ADR 0030](docs/decisions/0030-typescript-7-hold.md) records why `typescript`
+  stays pinned `^5.8.2` across the workspace now that TypeScript 7.0 has shipped: both
+  `typescript-eslint` and `ts-jest` publish peer ranges that exclude it, and both maintainers
+  confirm the block is TypeScript 7.0 shipping without a stable compiler API. The
+  `dependabot.yml` ignore-rule comment now points at the ADR instead of restating the
+  rationale inline. No behaviour changes.
+- **The web app's client data layer is now written down, and the two widest files in it were
+  split along the seams that document names.**
+  [ADR 0029](docs/decisions/0029-client-data-layer.md) records what the layer is (a typed
+  `fetch` wrapper, one read primitive that models a single value arriving once, writes that
+  live beside the state they touch, and socket payloads that carry ids so a changed row is
+  refetched rather than merged out of the event), the five rules it runs by, and the one
+  measurement that would replace it with React Query: a third hand-written generation counter,
+  countable with `grep -rn "GenerationRef" apps/web`, which returns two today. Adopting a query
+  library now is rejected in writing, with the reasoning, so the question stops being reopened
+  per screen.
+
+  `use-board-data.ts` (381 lines) became four hooks behind one composer: `useBoardCaches` holds
+  the five lists and the refs that mirror them, `useBoardFetch` performs the reads,
+  `useBoardLoad` owns the skeleton, the error and the retry, and `useBoardPanelTask` covers the
+  deep-linked row the board itself never loaded. `task-panel.tsx` (409 lines) gave up its
+  hand-rolled dialog behaviour to `useTaskPanelFocus`, its title and description write to
+  `TaskPanelFields`, and its three no-task states to `TaskPanelStatus`. No behaviour changed and
+  no test was rewritten: the existing board and task suites pass unmodified, and the
+  `components/board` and `components/task` coverage floors hold at their current values.
 
 ## [0.3.0] - 2026-08-22
 

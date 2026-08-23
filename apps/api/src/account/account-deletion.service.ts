@@ -57,6 +57,12 @@ export interface AccountDeletionCounts {
   commentsRedacted: number;
   activitiesRedacted: number;
   sessionsDeleted: number;
+  /**
+   * Personal access tokens, every workspace. Deleted rather than revoked: a revoked row is
+   * kept as evidence beside a `token.revoked` activity entry, and an erasure request is the
+   * one case where keeping a row that names the account is the wrong outcome.
+   */
+  accessTokensDeleted: number;
   accountsDeleted: number;
   verificationsDeleted: number;
   notificationsDeleted: number;
@@ -351,6 +357,7 @@ export class AccountDeletionService {
           commentsRedacted: 0,
           activitiesRedacted: 0,
           sessionsDeleted: 0,
+          accessTokensDeleted: 0,
           accountsDeleted: 0,
           verificationsDeleted: 0,
           notificationsDeleted: 0,
@@ -475,6 +482,9 @@ export class AccountDeletionService {
         ).count;
         result.usagePingsDeleted = (await tx.usagePing.deleteMany({ where: { userId } })).count;
         result.sessionsDeleted = (await tx.session.deleteMany({ where: { userId } })).count;
+        result.accessTokensDeleted = (
+          await tx.personalAccessToken.deleteMany({ where: { userId } })
+        ).count;
         result.accountsDeleted = (await tx.account.deleteMany({ where: { userId } })).count;
         // `Verification` has no `userId`, so `identifier` is its only link to a person — and
         // what that column holds depends on the flow. Better Auth 1.6 writes an *opaque* token
