@@ -35,6 +35,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runDoctorChecks } from './lib/doctor.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const DEV_COMPOSE = ['-f', join(ROOT, 'docker-compose.dev.yml')];
@@ -42,19 +43,48 @@ const DEV_COMPOSE = ['-f', join(ROOT, 'docker-compose.dev.yml')];
 const args = new Set(process.argv.slice(2));
 const FORCE_SEED = args.has('--seed');
 const SKIP_SEED = args.has('--no-seed');
-
-let step = 0;
-const total = 7;
+const CHECK_ONLY = args.has('--check');
 
 const say = (msg) => process.stdout.write(`${msg}\n`);
-const heading = (msg) => say(`\n\x1b[1m[${++step}/${total}] ${msg}\x1b[0m`);
-const note = (msg) => say(`      ${msg}`);
 
 function fail(message, hint) {
   process.stderr.write(`\n\x1b[31mbootstrap failed:\x1b[0m ${message}\n`);
   if (hint) process.stderr.write(`${hint}\n`);
   process.exit(1);
 }
+
+// ---------------------------------------------------------------------------------------
+// --check: doctor mode
+// ---------------------------------------------------------------------------------------
+// Answers "did something go stale since the last `pnpm bootstrap`" from the filesystem alone —
+// no Docker, no network, no database connection — so it is safe to run on every `git pull` and
+// stays well under the 5s budget a healthy checkout is expected to pass in. See
+// scripts/lib/doctor.mjs for what each check actually verifies and why these three and not
+// apps/api/dist or apps/web/.next (neither is a `pnpm bootstrap` or `pnpm dev` output).
+if (CHECK_ONLY) {
+  const results = runDoctorChecks(ROOT);
+  let healthy = true;
+
+  for (const result of results) {
+    if (result.ok) {
+      say(`\x1b[32m✓\x1b[0m ${result.name}: ${result.message}`);
+    } else {
+      healthy = false;
+      say(`\x1b[31m✗\x1b[0m ${result.name}: ${result.message}`);
+      say(`  fix: ${result.fix}`);
+    }
+  }
+
+  say('');
+  say(healthy ? '\x1b[32mHealthy.\x1b[0m' : '\x1b[31mNot healthy — see the fixes above.\x1b[0m');
+  process.exit(healthy ? 0 : 1);
+}
+
+let step = 0;
+const total = 7;
+
+const heading = (msg) => say(`\n\x1b[1m[${++step}/${total}] ${msg}\x1b[0m`);
+const note = (msg) => say(`      ${msg}`);
 
 /** Run a command with its output attached to this terminal; exit on failure. */
 function run(command, commandArgs, { hint } = {}) {

@@ -113,6 +113,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
   Redis outage fallback and the degraded-mode reporting are all unchanged.
 
+### Added
+
+- **`pnpm bootstrap --check`, a doctor mode for the dev loop.** Answers "did something go stale
+  since the last bootstrap" from the filesystem alone — no Docker, no database, no network — so
+  it stays well under 5 seconds and is safe to run after every `git pull`. It checks that
+  `packages/shared-types/dist` and `packages/auth-access/dist` are at least as new as their
+  `src`, that the generated Prisma client is at least as new as `schema.prisma`, and that `.env`
+  carries `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` with `DATABASE_URL`'s placeholder
+  replaced — the same three ways this repo's dev loop has gone stale silently before. Prints one
+  line per check with a concrete fix command on failure (`pnpm build`, `pnpm db:generate`, which
+  `.env` key to set) and exits non-zero if any check fails. Logic lives in
+  `scripts/lib/doctor.mjs`, tested in `scripts/lib/doctor.test.mjs`.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that
