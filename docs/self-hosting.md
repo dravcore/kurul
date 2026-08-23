@@ -264,6 +264,24 @@ HttpOnly; SameSite=Lax`, no prefix and no `Secure`, and the session token crosse
 clear text on every request. If you see the unprefixed form on a domain you believe is HTTPS,
 `SITE_URL` still has `http://` in it; fix it and `docker compose up -d`.
 
+### Calling the API from a script
+
+A script, a CI job or a backup check does not want a cookie. Open Settings, create a personal
+access token under "Personal access tokens", copy it (it is shown once), and send it as a
+Bearer header against the workspace it was created in:
+
+```bash
+curl -s https://kurul.example.com/api/workspaces/<workspaceId>/boards \
+  -H 'Authorization: Bearer kurul_pat_...'
+```
+
+The token acts as you, in that one workspace, with whatever role you hold when the request
+arrives; revoking it from the same screen stops it immediately, and the workspace activity
+feed records both the creation and the revocation. What it can and cannot call, and why, is in
+[api-conventions.md](api-conventions.md#authentication). The same HTTPS argument applies twice
+over here: a token crosses the network on every request, so never use one against an
+`http://` `SITE_URL`.
+
 ## 5. Point a monitor at it
 
 This is a step of the deployment, not an optional extra, and it is the last one because it is

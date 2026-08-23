@@ -11,6 +11,7 @@ REST conventions for the Kurul API: URLs, verbs, payloads, errors, pagination, a
 - [HTTP verbs and status codes](#http-verbs-and-status-codes)
 - [Request and response bodies](#request-and-response-bodies)
 - [Errors](#errors)
+- [Authentication](#authentication)
 - [Cross-origin requests](#cross-origin-requests)
 - [Rate limiting](#rate-limiting)
 - [Pagination](#pagination)
@@ -617,9 +618,93 @@ session cookies and invitation tokens. `ip` is Express's own `req.ip`, not a raw
 unconfigured, this is always the TCP peer, so behind an unconfigured reverse proxy it is the
 proxy's address for every request. See `TRUST_PROXY` below.
 
+## Authentication
+
+Two credentials. Every route except the two health probes requires one of them, and the
+OpenAPI document says which on every operation (`security`).
+
+**A session cookie**, issued by Better Auth at `POST /auth/sign-in/email`. The browser path,
+and what the web app uses. A non-browser client can store and replay it, but that is not what
+cookies are for, which is why the second credential exists.
+
+**A personal access token**, sent as `Authorization: Bearer kurul_pat_...`. Minted by a member
+at `POST /workspaces/:workspaceId/tokens`, shown in that one response and never again; the
+server stores a SHA-256 of it and cannot show it back. Listed (`GET .../tokens`, own tokens
+only, by display prefix) and revoked (`DELETE .../tokens/:tokenId`, immediate) by the person
+who minted it. A token may carry an expiry; an expired one reads exactly like a revoked one,
+which reads exactly like one that never existed: `401` for all three, so a stolen secret learns
+nothing about its own history.
+
+```
+POST   /workspaces/:workspaceId/tokens            # mint; the only response carrying the plaintext
+GET    /workspaces/:workspaceId/tokens            # the caller's live tokens, newest first
+DELETE /workspaces/:workspaceId/tokens/:tokenId   # revoke; another member's token is 404
+```
+
+### What a token is, and is not
+
+A token **acts as its owner, in one workspace, with the role the owner holds at the time of
+each request.** There are no scopes: the workspace is the scope, and the role is read live
+from the membership, so demoting or removing the owner changes what every one of their tokens
+can do on the next request (removal and leaving also revoke them outright, so a member re-added
+later does not find old credentials working). A GUEST's token can do what a GUEST can, and
+nothing a token does is unavailable to its owner through the web app. `ROADMAP.md`'s "API 1.0"
+section is explicit that this is **not OAuth** and that per-token scopes are not promised.
+
+Where a token is accepted follows from that scope:
+
+| Route                                                                                                                                         | With a token                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Anything under the token's own `/workspaces/:workspaceId/...`                                                                                 | As the owner, with the owner's current role                                                                                                      |
+| Any other `/workspaces/:workspaceId/...`                                                                                                      | `404`, exactly as for a non-member; whether the owner belongs to that workspace too makes no difference                                          |
+| A route with no workspace in its path: `/me`, `GET /workspaces`, `POST /workspaces`, `/config`, `/instance/*`                                 | `403`; a workspace-bound credential has no scope to compare there                                                                                |
+| The three token routes above                                                                                                                  | `403`; a credential must not mint, list or revoke credentials                                                                                    |
+| The workspace-administration writes Better Auth performs: rename and delete, invite, revoke and accept, remove a member, change a role, leave | `403`; these run on the caller's own Better Auth session, which a token does not carry. The reads beside them (roster, pending invitations) work |
+
+The last row is the slice boundary, named rather than hidden: lifting it means moving those
+writes out from under the organization plugin, and that is a `/v1` decision
+([ADR 0031](decisions/0031-api-versioning.md)), not a token one.
+
+**A request that carries a Bearer header is decided by that header alone.** It never falls
+back to a cookie the request also happens to send, and a Bearer credential that is not a
+`kurul_pat_` token is `401` rather than ignored: a client that sends a token expects to be the
+identity that token names.
+
+### Properties every token has
+
+- **Hashed at rest.** The row holds `sha256(plaintext)` and a display `prefix` (`kurul_pat_`
+  plus eight characters). A database dump yields no usable credential. SHA-256 rather than a
+  slow password hash because the secret is 256 random bits: there is nothing to guess, and a
+  slow hash would only tax every request.
+- **Workspace-bound at the guard.** `SessionAuthGuard` resolves the token to a user and a
+  workspace, and `WorkspaceGuard` refuses any other `:workspaceId` before the membership lookup
+  runs. The tenant isolation rule in [architecture.md](architecture.md) holds for tokens by the
+  same code path that holds it for cookies.
+- **Revocation is immediate** and is a timestamp, not a delete: the row stays as evidence
+  beside the `token.revoked` activity entry. Minting writes `token.created`. Both are in the
+  audit subset (`AUDIT_ACTIVITY_TYPES`) and neither payload carries the secret.
+- **Rate limited like everything else.** The throttler runs ahead of authentication and keys on
+  client IP and route, so a script replaying a token spends the same budget a browser session
+  does ([Rate limiting](#rate-limiting)).
+- **`lastUsedAt`** is stamped on first use and then at most once a minute, so a polling script
+  does not turn every read into a write.
+- **Account deletion deletes the tokens**, every workspace, inside the same transaction that
+  anonymises the account ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)).
+
+### Why a first-party model rather than Better Auth's API-key plugin
+
+Better Auth 1.7 ships its API-key plugin as a separate package that is not in this tree, and
+its key is bound to a user with free-form `metadata`, not to an organization: workspace scoping
+would have been a JSON field the guards parse rather than a foreign key the database enforces,
+and verification goes through `getSession`, which would hand `WorkspaceGuard` a session with no
+workspace on it. The plugin also brings its own per-key rate limiter and permission model, both
+of which this slice deliberately does not want. A 40-line Prisma model, one service and one
+branch in the existing guard express the scope exactly, keep revocation and listing under
+Kurul's own activity log, and leave the existing controllers untouched.
+
 ## Cross-origin requests
 
-Authentication is a **cookie**, so every request a browser makes to this API carries the
+Authentication is a **cookie** for the web app, so every request a browser makes to this API carries the
 caller's session automatically — including one initiated by a page the caller did not intend
 to act on. Three rules decide what the API does about that.
 
@@ -940,9 +1025,11 @@ Until 1.0:
 - `@kurul/shared-types` is versioned with the monorepo, so a client that pins the package
   version pins the contract.
 
-At 1.0, the API is frozen behind SemVer. If a versioning scheme is needed after that, it will
-be introduced by ADR — URI prefix (`/v1`) is the likely choice, decided when it is actually
-needed rather than pre-emptively.
+At 1.0, the API is frozen behind SemVer and every route gains a `/v1` URI prefix, with
+`/auth/*` and the two health probes outside it. The scheme, the rejection of header negotiation
+and of no-versioning, and the order the 1.0 surface ships in (personal access tokens, then
+`/v1`, then webhooks) are decided in [ADR 0031](decisions/0031-api-versioning.md); this section
+is the pre-1.0 rule set that record keeps in force until the prefix lands.
 
 ## See also
 

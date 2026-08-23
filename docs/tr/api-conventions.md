@@ -12,6 +12,7 @@ pagination ve DTO'lar.
 - [HTTP verb'leri ve status kodları](#http-verbleri-ve-status-kodları)
 - [Request ve response body'leri](#request-ve-response-bodyleri)
 - [Hatalar](#hatalar)
+- [Kimlik doğrulama](#kimlik-doğrulama)
 - [Cross-origin istekler](#cross-origin-istekler)
 - [Rate limiting](#rate-limiting)
 - [Pagination](#pagination)
@@ -627,11 +628,98 @@ session cookie'lerini ve davet token'larını taşır. `ip`, ham bir header değ
 `req.ip`'sidir — yapılandırılmamışsa bu her zaman TCP peer'ıdır, yani yapılandırılmamış bir
 reverse proxy arkasında her istek için proxy'nin adresidir. Aşağıda `TRUST_PROXY`'ye bakın.
 
+## Kimlik doğrulama
+
+İki kimlik bilgisi var. İki health probe'u dışındaki her route bunlardan birini ister, ve
+OpenAPI belgesi her operasyonda hangisinin gerektiğini söyler (`security`).
+
+**Bir session cookie'si**, Better Auth tarafından `POST /auth/sign-in/email`'de verilir. Tarayıcı
+yolu budur, ve web uygulamasının kullandığı da budur. Tarayıcı olmayan bir client onu saklayıp
+tekrar oynatabilir, ama cookie'ler bunun için değildir; ikinci kimlik bilgisinin var olma sebebi
+de budur.
+
+**Bir kişisel erişim token'ı**, `Authorization: Bearer kurul_pat_...` olarak gönderilir.
+`POST /workspaces/:workspaceId/tokens`'ta bir üye tarafından basılır, yalnızca o tek yanıtta
+gösterilir ve bir daha asla; sunucu onun SHA-256'sını saklar ve geri gösteremez. Basan kişi
+tarafından listelenir (`GET .../tokens`, yalnızca kendi token'ları, görüntü öneki üzerinden) ve
+iptal edilir (`DELETE .../tokens/:tokenId`, anında). Bir token bir son kullanma tarihi
+taşıyabilir; süresi dolmuş biri tıpkı iptal edilmiş biri gibi okunur, o da hiç var olmamış biri
+gibi okunur: üçü için de `401`, böylece çalınmış bir sır kendi geçmişi hakkında hiçbir şey
+öğrenmez.
+
+```
+POST   /workspaces/:workspaceId/tokens            # bas; plaintext'i taşıyan tek yanıt
+GET    /workspaces/:workspaceId/tokens            # çağıranın canlı token'ları, en yeniden eskiye
+DELETE /workspaces/:workspaceId/tokens/:tokenId   # iptal et; başka bir üyenin token'ı 404'tür
+```
+
+### Bir token nedir, ve ne değildir
+
+Bir token, **her isteğin anında sahibinin tuttuğu rolle, tek bir workspace'te sahibi olarak
+davranır.** Scope yoktur: workspace scope'tur, ve rol üyelikten canlı okunur; dolayısıyla sahibi
+düşürmek veya çıkarmak, sonraki istekte o kişinin bütün token'larının yapabileceğini değiştirir
+(çıkarma ve ayrılma da token'ları doğrudan iptal eder, böylece sonradan yeniden eklenen bir üye
+eski kimlik bilgilerini çalışır bulmaz). Bir GUEST'in token'ı GUEST'in yapabileceğini yapabilir,
+ve bir token'ın yaptığı hiçbir şey sahibi için web uygulaması üzerinden erişilemez değildir.
+`ROADMAP.md`'nin "API 1.0" bölümü, bunun **OAuth olmadığını** ve token başına scope'ların vaat
+edilmediğini açıkça söyler.
+
+Bir token'ın nerede kabul edildiği o scope'tan çıkar:
+
+| Route                                                                                                                                                                   | Token ile                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Token'ın kendi `/workspaces/:workspaceId/...`'ının altındaki her şey                                                                                                    | Sahibi olarak, sahibinin güncel rolüyle                                                                                                             |
+| Başka herhangi bir `/workspaces/:workspaceId/...`                                                                                                                       | `404`, tam olarak üye olmayan biri için olduğu gibi; sahibin o workspace'e de üye olup olmaması hiçbir fark yaratmaz                                |
+| Path'inde workspace olmayan bir route: `/me`, `GET /workspaces`, `POST /workspaces`, `/config`, `/instance/*`                                                           | `403`; workspace'e bağlı bir kimlik bilgisinin orada karşılaştıracağı bir scope yoktur                                                              |
+| Yukarıdaki üç token route'u                                                                                                                                             | `403`; bir kimlik bilgisi kimlik bilgisi basamaz, listeleyemez veya iptal edemez                                                                    |
+| Better Auth'un yaptığı workspace-yönetimi yazmaları: yeniden adlandırma ve silme, davet etme, iptal etme ve kabul etme, bir üyeyi çıkarma, bir rolü değiştirme, ayrılma | `403`; bunlar çağıranın kendi Better Auth session'ında çalışır, ve bir token onu taşımaz. Yanlarındaki okumalar (roster, bekleyen davetler) çalışır |
+
+Son satır dilim sınırıdır, gizlenmek yerine adlandırılmıştır: onu kaldırmak, o yazmaları
+organization plugin'inin altından çıkarmak demektir, ve bu bir `/v1` kararıdır
+([ADR 0031](decisions/0031-api-versioning.md)), bir token kararı değil.
+
+**Bir Bearer header'ı taşıyan istek, yalnızca o header'a göre karar verilir.** İsteğin taşıdığı
+bir cookie'ye asla geri düşmez, ve `kurul_pat_` bir token olmayan bir Bearer kimlik bilgisi, yok
+sayılmak yerine `401`'dir: bir token gönderen bir client, o token'ın adlandırdığı kimlik olmayı
+bekler.
+
+### Her token'ın taşıdığı özellikler
+
+- **Yerinde hashlenir.** Satır `sha256(plaintext)`'i ve bir görüntü `prefix`'i (`kurul_pat_` artı
+  sekiz karakter) tutar. Bir veritabanı dump'ı kullanılabilir bir kimlik bilgisi vermez. SHA-256,
+  yavaş bir parola hash'i yerine, çünkü sır 256 rastgele bittir: tahmin edilecek bir şey yoktur,
+  ve yavaş bir hash yalnızca her isteğe vergi koyardı.
+- **Guard'da workspace'e bağlıdır.** `SessionAuthGuard`, token'ı bir kullanıcıya ve bir
+  workspace'e çözer, ve `WorkspaceGuard`, üyelik sorgusu çalışmadan önce başka herhangi bir
+  `:workspaceId`'yi reddeder. [architecture.md](architecture.md)'deki tenant izolasyon kuralı,
+  token'lar için de cookie'ler için tuttuğu aynı kod yoluyla tutar.
+- **İptal anındadır** ve bir silme değil bir zaman damgasıdır: satır, `token.revoked` activity
+  girdisinin yanında kanıt olarak kalır. Basmak `token.created` yazar. İkisi de audit alt
+  kümesindedir (`AUDIT_ACTIVITY_TYPES`) ve hiçbir payload sırrı taşımaz.
+- **Her şey gibi rate limitlidir.** Throttler kimlik doğrulamadan önce çalışır ve client IP'sine
+  ve route'a göre anahtarlanır, böylece bir token'ı tekrar oynatan bir script, bir tarayıcı
+  session'ının harcadığı aynı bütçeyi harcar ([Rate limiting](#rate-limiting)).
+- **`lastUsedAt`**, ilk kullanımda ve sonrasında en fazla dakikada bir damgalanır, böylece
+  polling yapan bir script her okumayı bir yazmaya çevirmez.
+- **Hesap silme token'ları siler**, her workspace'te, hesabı anonimleştiren aynı transaction
+  içinde ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)).
+
+### Neden Better Auth'un API-key eklentisi yerine ilk taraf bir model
+
+Better Auth 1.7, API-key eklentisini bu ağaçta olmayan ayrı bir paket olarak sunar, ve anahtarı
+bir organization'a değil, serbest biçimli `metadata`'sı olan bir kullanıcıya bağlar: workspace
+scoping, veritabanının zorladığı bir foreign key yerine guard'ların ayrıştırdığı bir JSON alanı
+olurdu, ve doğrulama `getSession`'dan geçer, ki bu da `WorkspaceGuard`'a üzerinde workspace
+olmayan bir session verirdi. Eklenti ayrıca kendi başına, bu dilimin bilinçli olarak istemediği
+bir rate limiter ve izin modeli getirir. 40 satırlık bir Prisma modeli, bir servis ve mevcut
+guard'da bir dal, scope'u tam olarak ifade eder, iptali ve listelemeyi Kurul'un kendi activity
+log'unun altında tutar ve mevcut controller'ları dokunulmamış bırakır.
+
 ## Cross-origin istekler
 
-Kimlik doğrulama bir **cookie**'dir, dolayısıyla tarayıcının bu API'ye yaptığı her istek
-çağıranın session'ını otomatik olarak taşır — çağıranın üzerinde işlem yapmayı hiç
-istemediği bir sayfanın başlattığı istek dahil. Bu konuda API'nin ne yaptığına üç kural
+Kimlik doğrulama, web uygulaması için bir **cookie**'dir, dolayısıyla tarayıcının bu API'ye
+yaptığı her istek çağıranın session'ını otomatik olarak taşır, çağıranın üzerinde işlem yapmayı
+hiç istemediği bir sayfanın başlattığı istek dahil. Bu konuda API'nin ne yaptığına üç kural
 karar verir.
 
 **Okumaları CORS yönetir.** `WEB_URL` tek izinli origin'dir ve `credentials: true` ile
@@ -963,9 +1051,11 @@ bump edilmesi gerekirdi. Bkz.
 - `@kurul/shared-types` monorepo ile birlikte versiyonlanır, dolayısıyla paket
   versiyonunu pinleyen bir client kontratı da pinler.
 
-1.0'da API SemVer'ın arkasında dondurulur. Bundan sonra bir versiyonlama şeması gerekirse,
-bir ADR ile getirilecektir — URI öneki (`/v1`) muhtemel seçimdir, önden değil gerçekten
-ihtiyaç duyulduğunda karar verilecektir.
+1.0'da API SemVer'ın arkasında dondurulur ve her route, `/auth/*` ile iki health probe'u dışında
+kalacak şekilde bir `/v1` URI önekini kazanır. Şema, header negotiation'ın ve versiyonsuzluğun
+reddi, ve 1.0 yüzeyinin gönderilme sırası (önce kişisel erişim token'ları, sonra `/v1`, sonra
+webhook'lar) [ADR 0031](decisions/0031-api-versioning.md)'de karara bağlanır; bu bölüm, o kaydın
+önek gelene kadar yürürlükte tuttuğu 1.0-öncesi kural kümesidir.
 
 ## Ayrıca bakınız
 
