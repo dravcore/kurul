@@ -9,9 +9,11 @@ import {
   Query,
   Req,
   UseGuards,
+  applyDecorators,
 } from '@nestjs/common';
 import {
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
@@ -23,6 +25,7 @@ import type {
   InvitationDto,
   WorkspaceDto,
   WorkspaceMemberDto,
+  WorkspacePlanDto,
 } from '@kurul/shared-types';
 import type { Request } from 'express';
 import { CurrentMembership } from '../common/decorators/current-membership.decorator';
@@ -33,16 +36,20 @@ import {
   WorkspaceRoles,
   WorkspaceScoped,
 } from '../common/decorators/workspace-roles.decorator';
+import { SessionOnlyGuard } from '../common/guards/session-only.guard';
 import { ThrottleInvitations } from '../common/rate-limit/rate-limit';
 import { DemoRestrictedGuard } from '../demo/demo-restricted.guard';
 import type { AuthenticatedUser, WorkspaceMembership } from '../common/types/request-context';
+import { ErrorEnvelopeSchema } from '../openapi/schemas/error.schema';
 import {
   InvitationPageSchema,
   InvitationSchema,
   WorkspaceMemberPageSchema,
   WorkspaceMemberSchema,
+  WorkspacePlanSchema,
   WorkspaceSchema,
 } from '../openapi/schemas/workspace.schema';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
@@ -53,6 +60,26 @@ import { WorkspaceInvitationService } from './workspace-invitation.service';
 import { WorkspaceMemberService } from './workspace-member.service';
 import { WorkspaceService } from './workspace.service';
 
+/**
+ * The writes below are performed by Better Auth's organization plugin, which reads the caller
+ * from the request's session cookie and nothing else. A personal access token authenticates
+ * the Nest guards but carries no session for the plugin to find, so rather than let the
+ * plugin answer a misleading `401` to a valid credential, these handlers refuse a token up
+ * front with a `403` that says what is wrong. Lifting this means moving the write out from
+ * under the plugin (see `WorkspaceMemberService`'s header comment for why it sits there), and
+ * that is a decision for the `/v1` surface, not for this slice (ROADMAP, "API 1.0").
+ */
+const SessionOnly = (): MethodDecorator =>
+  applyDecorators(
+    UseGuards(SessionOnlyGuard),
+    ApiForbiddenResponse({
+      description:
+        'Also answered when the request authenticated with a personal access token: this ' +
+        'operation is performed by Better Auth and takes a session cookie only.',
+      type: ErrorEnvelopeSchema,
+    }),
+  );
+
 @ApiTags('Workspaces')
 @Controller('workspaces')
 export class WorkspaceController {
@@ -60,6 +87,7 @@ export class WorkspaceController {
     private readonly workspaceService: WorkspaceService,
     private readonly invitationService: WorkspaceInvitationService,
     private readonly memberService: WorkspaceMemberService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   @Get()
@@ -96,10 +124,35 @@ export class WorkspaceController {
     return this.workspaceService.getById(workspaceId);
   }
 
+  /**
+   * The ceilings that apply here and how much of each is used (ADR 0032).
+   *
+   * A sub-resource rather than fields on `GET :workspaceId`, for the reason the workspace read
+   * is cheap: this answers with three counted aggregates, and paying for them on every read of
+   * a workspace's name would tax the hottest read in the app for a number two screens want.
+   * Readable by any member, not just an admin: the seat counter is what tells an ordinary
+   * member why the invite button is disabled, and everything in it is already visible to them
+   * by counting the roster and the board list by hand.
+   */
+  @Get(':workspaceId/plan')
+  @ApiOperation({
+    summary: "Read this workspace's plan ceilings and current usage",
+    description:
+      'Resolved ceilings: the workspace override where it has one, the instance configuration ' +
+      'otherwise, `null` for unlimited. `usage.seats` counts members plus invitations still ' +
+      'pending, which is what the seat ceiling refuses against.',
+  })
+  @ApiOkResponse({ type: WorkspacePlanSchema })
+  @WorkspaceScoped()
+  plan(@UuidParam('workspaceId') workspaceId: string): Promise<WorkspacePlanDto> {
+    return this.planLimits.plan(workspaceId);
+  }
+
   @Patch(':workspaceId')
   @ApiOperation({ summary: 'Rename a workspace, or change its slug' })
   @ApiOkResponse({ type: WorkspaceSchema })
   @WorkspaceRoles(...ADMIN_ROLES)
+  @SessionOnly()
   update(
     @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -121,6 +174,7 @@ export class WorkspaceController {
   @HttpCode(204)
   @UseGuards(DemoRestrictedGuard)
   @WorkspaceRoles(MemberRole.OWNER)
+  @SessionOnly()
   async remove(
     @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -167,6 +221,7 @@ export class WorkspaceController {
   @ApiNoContentResponse({ description: 'Left. Empty body.' })
   @HttpCode(204)
   @WorkspaceScoped()
+  @SessionOnly()
   async leaveWorkspace(
     @UuidParam('workspaceId') workspaceId: string,
     @CurrentMembership() membership: WorkspaceMembership,
@@ -208,6 +263,7 @@ export class WorkspaceController {
   @ApiNoContentResponse({ description: 'Removed. Empty body.' })
   @HttpCode(204)
   @WorkspaceRoles(...ADMIN_ROLES)
+  @SessionOnly()
   async removeMember(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('userId') userId: string,
@@ -232,6 +288,7 @@ export class WorkspaceController {
   })
   @ApiOkResponse({ type: WorkspaceMemberSchema })
   @WorkspaceRoles(...ADMIN_ROLES)
+  @SessionOnly()
   updateMemberRole(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('userId') userId: string,
@@ -287,6 +344,7 @@ export class WorkspaceController {
   @ApiCreatedResponse({ type: InvitationSchema })
   @ThrottleInvitations()
   @WorkspaceRoles(...ADMIN_ROLES)
+  @SessionOnly()
   createInvitation(
     @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -301,6 +359,7 @@ export class WorkspaceController {
   @ApiNoContentResponse({ description: 'Revoked. Empty body.' })
   @HttpCode(204)
   @WorkspaceRoles(...ADMIN_ROLES)
+  @SessionOnly()
   async revokeInvitation(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('invitationId') invitationId: string,
@@ -328,6 +387,7 @@ export class WorkspaceController {
   })
   @ApiOkResponse({ type: WorkspaceMemberSchema })
   @HttpCode(200)
+  @SessionOnly()
   acceptInvitation(
     @UuidParam('workspaceId') workspaceId: string,
     @UuidParam('invitationId') invitationId: string,

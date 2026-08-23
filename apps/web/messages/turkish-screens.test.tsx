@@ -82,6 +82,13 @@ afterEach(() => {
 describe('the Turkish interface', () => {
   it('renders the board empty state in Turkish', async () => {
     fetchBoards.mockResolvedValue([]);
+    // The screen also reads its plan ceilings (ADR 0032). An unconfigured workspace has none,
+    // which is the state that leaves the create control enabled.
+    const { api } = await import('@/lib/api');
+    vi.mocked(api.get).mockResolvedValue({
+      limits: { seats: null, boards: null, storageBytes: null },
+      usage: { seats: 1, boards: 0, storageBytes: 0 },
+    });
 
     render(tr(<BoardList />));
 

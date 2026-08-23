@@ -13,9 +13,23 @@ const workspace = vi.hoisted(() => ({
   value: { activeId: '', activeRole: null as MemberRole | null },
 }));
 
+/** The plan document the screen reads; every test but the ceiling ones leaves it uncapped. */
+const plan = vi.hoisted(() => ({
+  value: {
+    limits: { seats: null as number | null, boards: null as number | null, storageBytes: null },
+    usage: { seats: 1, boards: 0, storageBytes: 0 },
+  },
+}));
+
 vi.mock('@/lib/workspace-boards', () => ({ fetchWorkspaceBoards: vi.fn() }));
 vi.mock('@/components/layout/workspace-provider', () => ({
   useWorkspaceContext: () => workspace.value,
+}));
+// Only the hook is replaced; `isAtCeiling` stays real, so these tests exercise the comparison
+// the screen actually makes rather than a boolean the test decided (ADR 0032).
+vi.mock('@/lib/plan-query', async () => ({
+  ...(await vi.importActual<typeof import('@/lib/plan-query')>('@/lib/plan-query')),
+  useWorkspacePlan: () => plan.value,
 }));
 vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
@@ -55,6 +69,10 @@ beforeEach(() => {
   fetchBoards.mockReset();
   postForm.mockReset();
   workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.ADMIN };
+  plan.value = {
+    limits: { seats: null, boards: null, storageBytes: null },
+    usage: { seats: 1, boards: 0, storageBytes: 0 },
+  };
 });
 
 afterEach(() => {
@@ -213,5 +231,52 @@ describe('BoardList', () => {
 
       expect(await screen.findByText('Board imported-1')).toBeDefined();
     });
+  });
+});
+
+describe('BoardList - the board ceiling (ADR 0032)', () => {
+  it('leaves the create control enabled when nothing caps boards', async () => {
+    fetchBoards.mockResolvedValue([board('b1')]);
+    plan.value = {
+      limits: { seats: null, boards: null, storageBytes: null },
+      usage: { seats: 1, boards: 40, storageBytes: 0 },
+    };
+
+    renderList();
+
+    const create = await screen.findByRole('button', { name: messages.app.board.createAction });
+    expect(create.hasAttribute('disabled')).toBe(false);
+    expect(screen.queryByText(/boards its plan allows/i)).toBeNull();
+  });
+
+  it('disables the create control at the ceiling and says which number was reached', async () => {
+    fetchBoards.mockResolvedValue([board('b1'), board('b2')]);
+    plan.value = {
+      limits: { seats: null, boards: 2, storageBytes: null },
+      usage: { seats: 1, boards: 2, storageBytes: 0 },
+    };
+
+    renderList();
+
+    const create = await screen.findByRole('button', { name: messages.app.board.createAction });
+    expect(create.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText(/all 2 of the boards its plan allows/i)).toBeDefined();
+  });
+
+  it('disables the create control in the empty state too, so the ceiling is not a dead end', async () => {
+    fetchBoards.mockResolvedValue([]);
+    plan.value = {
+      limits: { seats: null, boards: 1, storageBytes: null },
+      usage: { seats: 1, boards: 1, storageBytes: 0 },
+    };
+
+    renderList();
+
+    await screen.findByText(messages.app.board.emptyTitle);
+    for (const create of screen.getAllByRole('button', {
+      name: messages.app.board.createAction,
+    })) {
+      expect(create.hasAttribute('disabled')).toBe(true);
+    }
   });
 });

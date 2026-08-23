@@ -154,12 +154,12 @@ because a build without them succeeds silently. See
 [Observability](#observability).
 
 `.env.example` also carries `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
-`REDIS_PASSWORD`, `BACKUP_INTERVAL`, and `BACKUP_KEEP`. All six are **compose-only** —
-`docker-compose.yml` interpolates them into the `postgres`/`redis`/`migrate`/`api`/`backup`
-services and no application code reads them directly, so they are absent from the table
-above and need no wiring in `apps/api`. See
+`REDIS_PASSWORD`, `BACKUP_INTERVAL`, `BACKUP_KEEP`, and `BACKUP_REMOTE`. All seven are
+**compose-only** — `docker-compose.yml` interpolates them into the
+`postgres`/`redis`/`migrate`/`api`/`backup` services and no application code reads them
+directly, so they are absent from the table above and need no wiring in `apps/api`. See
 [Database and cache credentials](#database-and-cache-credentials) for the first four and
-[Upgrading and backups](#upgrading-and-backups) for the backup pair.
+[Upgrading and backups](#upgrading-and-backups) for the backup three.
 
 Generate a secret with:
 
@@ -404,6 +404,38 @@ database holds no `Workspace` row yet. `--seed` forces it anyway, `--no-seed` sk
 cannot read that table for any reason it also skips — the destructive branch is never the one
 taken on a guess.
 
+**`pnpm bootstrap --check`** is a doctor mode for the same script: it answers "did something go
+stale since the last bootstrap" without touching Docker, the database, or the network, so it
+stays well under 5 seconds and is safe to run after every `git pull` before deciding whether a
+full `pnpm bootstrap` is worth it. It checks exactly three things and prints one line per check
+with a fix command on failure:
+
+```
+✓ @kurul/shared-types dist: up to date
+✓ @kurul/auth-access dist: up to date
+✗ Prisma client: stale — schema.prisma is newer than the generated client
+  fix: pnpm db:generate
+✗ required env keys: POSTGRES_PASSWORD empty or missing in .env
+  fix: set POSTGRES_PASSWORD in .env — see docs/development.md#environment-variables
+```
+
+1. `packages/shared-types/dist` and `packages/auth-access/dist` are at least as new as their
+   `src` — the two build outputs `pnpm dev` and `pnpm db:seed` actually consume (see the
+   `[Unreleased]` CHANGELOG entry on the failure mode this replaced: a stale `dist` resolves
+   and reads back as `undefined` rather than failing loudly).
+2. The generated Prisma client (`apps/api/src/generated/prisma`) is at least as new as
+   `schema.prisma`.
+3. `.env` carries non-empty `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` — the same two keys
+   `pnpm bootstrap`'s own preflight already refuses to boot without — and `DATABASE_URL` no
+   longer carries the `<POSTGRES_PASSWORD>` placeholder `.env.example` ships.
+
+It deliberately does **not** check `apps/api/dist` or `apps/web/.next`: neither `pnpm bootstrap`
+nor `pnpm dev` builds them (those are `nest build` / `next build` outputs, needed for
+`pnpm typecheck` and a production build, not the dev loop), so checking them here would report a
+healthy dev checkout as broken. Exit code is `0` when every check passes, `1` otherwise — logic
+lives in [`scripts/lib/doctor.mjs`](../scripts/lib/doctor.mjs), tested in
+[`scripts/lib/doctor.test.mjs`](../scripts/lib/doctor.test.mjs) (`pnpm test:scripts`).
+
 Run `pnpm db:drift` against a database that is already on the latest migration to confirm
 `schema.prisma` and the committed migrations still agree — see [Checking for migration
 drift](#checking-for-migration-drift) below.
@@ -587,22 +619,22 @@ in [ROADMAP.md](../ROADMAP.md#hardening-track), not bundled in here.
 
 Run from the repository root.
 
-| Script           | Command               | What it does                                                                                                                                                                                                                                                                                                            |
-| ---------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bootstrap`      | `pnpm bootstrap`      | Fresh clone (or fresh pull) → running dev loop: shared packages, Prisma client, containers, migrations, demo data. Idempotent; will not reseed a database that already holds workspaces. `--seed` / `--no-seed` override that. **Not** `pnpm setup` — that is a built-in pnpm command that writes to your shell profile |
-| `dev`            | `pnpm dev`            | Runs `apps/api` and `apps/web` in parallel with hot reload                                                                                                                                                                                                                                                              |
-| `build`          | `pnpm build`          | Builds every workspace package                                                                                                                                                                                                                                                                                          |
-| `lint`           | `pnpm lint`           | ESLint across all packages                                                                                                                                                                                                                                                                                              |
-| `format`         | `pnpm format`         | Prettier write across the repo                                                                                                                                                                                                                                                                                          |
-| `format:check`   | `pnpm format:check`   | Prettier check (CI gate)                                                                                                                                                                                                                                                                                                |
-| `typecheck`      | `pnpm typecheck`      | Builds `@kurul/shared-types` + `@kurul/auth-access`, then `tsc --noEmit` in every workspace                                                                                                                                                                                                                             |
-| `test`           | `pnpm test`           | Runs the test suites of every workspace package                                                                                                                                                                                                                                                                         |
-| `db:generate`    | `pnpm db:generate`    | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made                                                                                                                    |
-| `db:migrate`     | `pnpm db:migrate`     | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate`                                                                 |
-| `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it                                                                                 |
-| `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                                                                                       |
-| `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                                                                                            |
-| `db:drift`       | `pnpm db:drift`       | Runs `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`: compares the configured database against `schema.prisma` and exits non-zero on any difference. Same command CI runs after `db:migrate` — see [Checking for migration drift](#checking-for-migration-drift)   |
+| Script           | Command               | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bootstrap`      | `pnpm bootstrap`      | Fresh clone (or fresh pull) → running dev loop: shared packages, Prisma client, containers, migrations, demo data. Idempotent; will not reseed a database that already holds workspaces. `--seed` / `--no-seed` override that. `--check` runs the doctor mode instead — no Docker, no network, exits non-zero on stale/missing dist, Prisma client or `.env` keys, see [above](#recommended-dev-loop-services-in-docker-apps-on-host). **Not** `pnpm setup` — that is a built-in pnpm command that writes to your shell profile |
+| `dev`            | `pnpm dev`            | Runs `apps/api` and `apps/web` in parallel with hot reload                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `build`          | `pnpm build`          | Builds every workspace package                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `lint`           | `pnpm lint`           | ESLint across all packages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `format`         | `pnpm format`         | Prettier write across the repo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `format:check`   | `pnpm format:check`   | Prettier check (CI gate)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `typecheck`      | `pnpm typecheck`      | Builds `@kurul/shared-types` + `@kurul/auth-access`, then `tsc --noEmit` in every workspace                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `test`           | `pnpm test`           | Runs the test suites of every workspace package                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `db:generate`    | `pnpm db:generate`    | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made                                                                                                                                                                                                                                                                                                                            |
+| `db:migrate`     | `pnpm db:migrate`     | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate`                                                                                                                                                                                                                                                                         |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it                                                                                                                                                                                                                                                                                         |
+| `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                                                                                                                                                                                                                                                                                               |
+| `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `db:drift`       | `pnpm db:drift`       | Runs `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`: compares the configured database against `schema.prisma` and exits non-zero on any difference. Same command CI runs after `db:migrate` — see [Checking for migration drift](#checking-for-migration-drift)                                                                                                                                                                                                           |
 
 To target a single workspace, use pnpm's filter flag:
 
@@ -929,15 +961,16 @@ silently stops producing recovery points, which is the failure this whole sectio
 prevent. It is deliberately **not** in `docker-compose.dev.yml` — a local database that
 `pnpm db:seed` wipes on demand has nothing worth keeping.
 
-Two settings, both read from `.env` by compose:
+Three settings, all read from `.env` by compose:
 
 | Variable          | Default | Purpose                                                                   |
 | ----------------- | ------- | ------------------------------------------------------------------------- |
 | `BACKUP_INTERVAL` | `86400` | Seconds between cycles. `86400` = daily; this **is** your RPO             |
 | `BACKUP_KEEP`     | `7`     | Archives of each series retained; older ones are deleted after each cycle |
+| `BACKUP_REMOTE`   | blank   | rclone remote path for the off-host copy; blank = local archives only     |
 
-Compose passes both to the `api` service as well, which is easy to miss because they read as
-backup settings: the nightly orphan-file sweep refuses to delete a stored file while a dump old
+Compose passes the first two to the `api` service as well, which is easy to miss because they
+read as backup settings: the nightly orphan-file sweep refuses to delete a stored file while a dump old
 enough to disown it is still restorable, and that grace period is exactly
 `BACKUP_KEEP × BACKUP_INTERVAL`. "On disk with no row pointing at it" is a correct predicate
 only while the database is authoritative, and a restore rewinds the rows while the disk stays
@@ -955,13 +988,19 @@ docker compose exec backup ls -lh /backups   # newest pair, and how many are kep
 ```
 
 Two lines per cycle, not one: a cycle that logged only the dump means the file archive failed
-(or `ATTACHMENT_DIR` is unset), and the `ERROR` line above it says which.
+(or `ATTACHMENT_DIR` is unset), and the `ERROR` line above it says which. With `BACKUP_REMOTE`
+set there are two more, one `off-host: pushed …` per archive, and the same rule applies to them.
 
-**Copy the archives off-host.** `backup_data` sits on the same disk as `postgres_data`, so it
-covers "I dropped the wrong table" and covers nothing about a dead disk or a lost server —
-mirror the volume somewhere else on a schedule (`rsync`/`rclone` from
-`docker compose exec -T backup cat /backups/<archive>`, or straight from the volume's host
-path) or the disaster case still loses everything.
+**Copy the archives off-host.** `backup_data` sits on the same disk as `postgres_data`, so
+everything above covers "I dropped the wrong table" and covers nothing about a dead disk or a
+lost server. Set `BACKUP_REMOTE` to an rclone remote path (`s3:bucket/prefix`, `b2:bucket`,
+`sftp:…`) and the same sidecar pushes both archives there after every cycle, prunes the remote
+to the same `BACKUP_KEEP`, and (this is the part that makes it a backup rather than a hope)
+reports the container **unhealthy** once the newest off-host copy passes `2 × BACKUP_INTERVAL`,
+so a broken upload is noticed on the day it breaks and not on restore day. A failed upload
+never costs a local archive. Blank, which is the default, leaves this section exactly as it was
+before that option existed. Setup, credentials, and restoring from the remote:
+[Off-host copies](self-hosting.md#off-host-copies).
 
 ### Taking a dump by hand
 

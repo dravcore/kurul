@@ -11,6 +11,7 @@ import {
   SocketEvents,
 } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { StorageService } from '../storage/storage.service';
@@ -48,12 +49,23 @@ function build(quotas: { workspaceQuotaBytes?: number; instanceQuotaBytes?: numb
     write: jest.fn().mockResolvedValue(undefined),
     remove: jest.fn().mockResolvedValue(undefined),
   } as unknown as StorageService;
+  // The workspace byte ceiling is now resolved through the plan layer rather than read
+  // straight off `storage` (ADR 0032 wraps ADR 0027's quota); the instance ceiling is
+  // untouched and still comes from `storage.instanceQuotaBytes` above. Mirroring the same
+  // number here keeps every quota test exercising the ceiling it already names.
+  const planLimits = {
+    assertBoardAvailable: jest.fn().mockResolvedValue(undefined),
+    assertWorkspaceAvailable: jest.fn().mockResolvedValue(undefined),
+    assertSeatAvailable: jest.fn().mockResolvedValue(undefined),
+    workspaceStorageQuotaBytes: jest.fn().mockResolvedValue(quotas.workspaceQuotaBytes ?? 0),
+  } as unknown as PlanLimitsService;
   return {
-    service: new AttachmentService(prisma, activity, realtime, storage),
+    service: new AttachmentService(prisma, activity, realtime, storage, planLimits),
     prisma,
     activity,
     realtime,
     storage,
+    planLimits,
   };
 }
 

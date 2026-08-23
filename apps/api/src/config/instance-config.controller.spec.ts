@@ -1,4 +1,6 @@
+import type { InstancePlanLimitsDto } from '@kurul/shared-types';
 import { MailService } from '../mail/mail.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { StorageService } from '../storage/storage.service';
 import { InstanceConfigController } from './instance-config.controller';
 
@@ -9,6 +11,21 @@ import { InstanceConfigController } from './instance-config.controller';
  * is tested in `src/demo/demo-mode.spec.ts`.
  */
 const NO_DEMO = { enabled: false, resetIntervalMinutes: null, nextResetAt: null } as const;
+
+/**
+ * A stand-in instance plan document. The four counts are the ones an unconfigured instance
+ * publishes (ADR 0032); the two byte quotas are `PlanLimitsService.instanceCeilings` own
+ * concern, tested against `StorageService` in plan-limits.spec.ts, not here. This suite only
+ * asserts that the controller passes the object through untouched.
+ */
+const PLAN_LIMITS: InstancePlanLimitsDto = {
+  seatsPerWorkspace: null,
+  boardsPerWorkspace: null,
+  workspaces: null,
+  users: null,
+  storageBytesPerWorkspace: 2_147_483_648,
+  storageBytesPerInstance: 21_474_836_480,
+};
 
 function buildController(
   mailEnabled: boolean,
@@ -30,7 +47,15 @@ function buildController(
     },
   } as unknown as StorageService;
 
-  return { controller: new InstanceConfigController(mail, storage), isEnabled, persistsFiles };
+  const planLimits = {
+    instanceCeilings: jest.fn().mockReturnValue(PLAN_LIMITS),
+  } as unknown as PlanLimitsService;
+
+  return {
+    controller: new InstanceConfigController(mail, storage, planLimits),
+    isEnabled,
+    persistsFiles,
+  };
 }
 
 describe('InstanceConfigController', () => {
@@ -41,6 +66,7 @@ describe('InstanceConfigController', () => {
       mailEnabled: true,
       attachmentsEnabled: false,
       demo: NO_DEMO,
+      planLimits: PLAN_LIMITS,
     });
   });
 
@@ -51,6 +77,7 @@ describe('InstanceConfigController', () => {
       mailEnabled: false,
       attachmentsEnabled: false,
       demo: NO_DEMO,
+      planLimits: PLAN_LIMITS,
     });
   });
 
@@ -61,6 +88,7 @@ describe('InstanceConfigController', () => {
       mailEnabled: false,
       attachmentsEnabled: true,
       demo: NO_DEMO,
+      planLimits: PLAN_LIMITS,
     });
   });
 
@@ -93,11 +121,13 @@ describe('InstanceConfigController', () => {
       mailEnabled: true,
       attachmentsEnabled: true,
       demo: NO_DEMO,
+      planLimits: PLAN_LIMITS,
     });
     expect(controller.config()).toEqual({
       mailEnabled: false,
       attachmentsEnabled: false,
       demo: NO_DEMO,
+      planLimits: PLAN_LIMITS,
     });
   });
 });

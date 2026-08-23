@@ -223,6 +223,18 @@ export interface UpdateMemberRoleRequest {
 }
 
 /**
+ * `POST /workspaces/:workspaceId/tokens`
+ *
+ * No scope field, on purpose: a token acts as its owner in this one workspace, with whatever
+ * role the owner holds at the time of the request (ROADMAP, "API 1.0"). `expiresAt` is an ISO
+ * 8601 instant in the future, or absent for a token that does not expire.
+ */
+export interface CreatePersonalAccessTokenRequest {
+  name: string;
+  expiresAt?: string | null;
+}
+
+/**
  * What is to become of one workspace the departing user is the only OWNER of.
  *
  * A discriminated union rather than an optional `newOwnerUserId`, because the two shapes are

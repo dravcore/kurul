@@ -171,7 +171,7 @@ apps/web/
 │   ├── auth/              # shared auth form primitives
 │   ├── brand/             # DamgaMark and other brand marks
 │   ├── ui/                # shadcn/ui primitives (landed Phase 3)
-│   ├── board/             # BoardList, BoardView, BoardColumn, dialogs
+│   ├── board/             # BoardList, BoardView, BoardColumn, dialogs, board hooks
 │   ├── task/              # TaskCard, TaskPanel, metadata editors, DnD helpers
 │   ├── dashboard/         # chart components (Phase 7+)
 │   ├── notification/      # NotificationBell, NotificationsList
@@ -180,12 +180,15 @@ apps/web/
 ├── messages/              # en.json, tr.json — UI copy, one flat file per locale
 └── lib/
     ├── api.ts             # typed REST client
+    ├── use-api-resource.ts # read primitive: one abort, one loading flag, one error
     ├── socket.ts          # Socket.io client (board realtime)
     ├── board-permissions.ts
     └── auth.ts            # Better Auth client (`@kurul/auth-access`)
 ```
 
-Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. `apps/web/proxy.ts` (Next 16's replacement for the `middleware.ts` convention) checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run, and mints the per-request CSP nonce on the way through; the client shell still bootstraps workspaces once the session is present. Board interaction uses `@dnd-kit` with the server as the source of truth — an optimistic move is reconciled against the API response and against inbound socket events.
+Two route groups split the layout tree: `(auth)` renders a bare shell, `(app)` renders the workspace chrome and assumes a session. `apps/web/proxy.ts` (Next 16's replacement for the `middleware.ts` convention) checks the Better Auth session cookie against `/auth/get-session` before `(app)` routes run, and mints the per-request CSP nonce on the way through; the client shell still bootstraps workspaces once the session is present.
+
+**Data layer:** there is no data-fetching library. Reads go through `lib/api.ts` (a typed `fetch` wrapper with no cache of its own) and `lib/use-api-resource.ts`, which models one value arriving once: one abort, one loading flag, one error, and the fetcher's identity as the whole invalidation story. Writes are plain `api.*` calls inside the hook that owns the state they touch, each stating its own optimistic update and rollback. Socket payloads carry ids ([ADR 0005](decisions/0005-realtime-socketio.md)), so a changed row is refetched rather than merged out of the event, which is why the client needs no entity cache. Board interaction uses `@dnd-kit` with the server as the source of truth: an optimistic move is reconciled against the API response and against inbound socket events. `BoardView` composes the whole thing from small single-concern hooks (`useBoardCaches`, `useBoardFetch`, `useBoardLoad` and `useBoardPanelTask` behind `useBoardData`, then `useBoardMutations`, `useBoardRealtime`, `useBoardTaskDnd`, `useBoardDialogs`), and that composition is the pattern a new board-scale surface follows. [ADR 0029](decisions/0029-client-data-layer.md) records why the layer is hand-rolled, the five rules it runs by, and the single greppable measurement that would replace it with React Query.
 
 **i18n:** `next-intl` is wired from Phase 1 (`i18n/request.ts`, `NextIntlClientProvider` in the
 root layout, UI copy in `messages/en.json`) so every user-facing string already goes through
@@ -480,6 +483,7 @@ The reasoning behind each of these choices is recorded as an ADR:
 | [`0026-account-deletion-anonymisation.md`](decisions/0026-account-deletion-anonymisation.md)                 | Account Deletion: Anonymise the User Row, Decide the Owned Workspace in the Flow                         |
 | [`0027-attachment-quotas.md`](decisions/0027-attachment-quotas.md)                                           | Attachment Storage Quotas: Soft Byte Ceilings per Workspace and per Instance                             |
 | [`0028-open-contributions-hosted-service.md`](decisions/0028-open-contributions-hosted-service.md)           | Open Contributions Under AGPL-3.0, No CLA; Revenue Only From a Hosted Service                            |
+| [`0029-client-data-layer.md`](decisions/0029-client-data-layer.md)                                           | The Client Data Layer Stays Hand-Rolled; the Flip Trigger Is the Third Generation Counter                |
 
 ---
 

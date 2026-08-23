@@ -21,6 +21,7 @@ import { buildInviteAcceptUrl } from '../auth/web-urls';
 import { toCursorPage } from '../common/pagination/cursor-page';
 import { MAX_PAGE_LIMIT } from '../common/pagination/page-limit';
 import { captureMailDelivery } from '../mail/mail-delivery-scope';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateInvitationDto } from './dto/create-invitation.dto';
 import type { WorkspaceInvitationQueryDto } from './dto/workspace-invitation-query.dto';
@@ -119,6 +120,7 @@ export class WorkspaceInvitationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   private headersFrom(request: Request): Headers {
@@ -228,6 +230,15 @@ export class WorkspaceInvitationService {
     const email = dto.email.toLowerCase();
 
     const pending = await this.findPendingInvitations(workspaceId, email);
+
+    // A pending invitation holds a seat (ADR 0032), so the ceiling is checked before one more
+    // is offered. That way the refusal reaches the admin who can free a seat, not the invitee
+    // who cannot. A resend of an invitation this workspace already holds is not a new seat,
+    // and is not refused: `pending` is non-empty exactly then.
+    if (pending.length === 0) {
+      await this.planLimits.assertSeatAvailable(workspaceId, { countsInvitations: true });
+    }
+
     if (pending.some((invitation) => invitation.role !== dto.role)) {
       for (const invitation of pending) {
         try {
@@ -359,6 +370,13 @@ export class WorkspaceInvitationService {
     if (!invitation || invitation.status !== 'pending' || invitation.workspaceId !== workspaceId) {
       throw new NotFoundException('Invitation not found');
     }
+
+    // Members only, not members plus invitations: the invitation being accepted is one of the
+    // pending ones and is about to stop being pending, so counting both would refuse the last
+    // seat of a workspace that has room for exactly the person walking through the door
+    // (ADR 0032). The check earns its place anyway: the ceiling can be lowered, or a seat
+    // taken by another acceptance, in the days between the invitation and the click.
+    await this.planLimits.assertSeatAvailable(workspaceId, { countsInvitations: false });
 
     try {
       const result = await auth.api.acceptInvitation({

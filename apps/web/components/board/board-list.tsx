@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BoardDto, TrelloImportReportDto } from '@kurul/shared-types';
 import { canCreateOrUpdateBoard, canDeleteBoard, canMutateColumns } from '@/lib/board-permissions';
+import { isAtCeiling, useWorkspacePlan } from '@/lib/plan-query';
 import { useApiResource } from '@/lib/use-api-resource';
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
@@ -44,6 +45,19 @@ export function BoardList(): React.ReactElement {
   // to a MEMBER would be showing a button whose only outcome is a 403 — the same reason every
   // other action on this screen is behind a role check.
   const canImport = canMutateColumns(activeRole);
+
+  // The board ceiling of this workspace, resolved by the API (ADR 0032). `usage.boards` rather
+  // than `boards.length`: the two agree, and taking the number from the same document as the
+  // ceiling means the pair can never be read from two different moments.
+  const plan = useWorkspacePlan(activeId);
+  const boardCeiling = plan.limits.boards;
+  const atBoardCeiling = isAtCeiling(plan.usage.boards, boardCeiling);
+  // One sentence, rendered in two places (the button's title and the line under it) so a
+  // pointer and a screen reader are told the same thing.
+  const ceilingNotice =
+    atBoardCeiling && boardCeiling !== null
+      ? t('planLimitReached', { limit: boardCeiling })
+      : undefined;
 
   const fetchBoards = useMemo(
     () => (activeId ? () => fetchWorkspaceBoards(activeId) : null),
@@ -113,12 +127,23 @@ export function BoardList(): React.ReactElement {
             </Button>
           ) : null}
           {canCreate ? (
-            <Button type="button" onClick={() => setCreateOpen(true)}>
+            // Disabled rather than hidden: the button is the only place the ceiling can be
+            // explained, and a control that vanishes reads as a permission problem.
+            <Button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              disabled={atBoardCeiling}
+              title={ceilingNotice}
+            >
               {t('createAction')}
             </Button>
           ) : null}
         </div>
       </div>
+
+      {canCreate && ceilingNotice !== undefined ? (
+        <p className="text-body text-muted-foreground">{ceilingNotice}</p>
+      ) : null}
 
       {boards.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
@@ -126,7 +151,7 @@ export function BoardList(): React.ReactElement {
           <h2 className="font-display text-title-lg font-semibold">{t('emptyTitle')}</h2>
           <p className="max-w-sm text-body text-muted-foreground">{t('emptyBody')}</p>
           {canCreate ? (
-            <Button type="button" onClick={() => setCreateOpen(true)}>
+            <Button type="button" onClick={() => setCreateOpen(true)} disabled={atBoardCeiling}>
               {t('createAction')}
             </Button>
           ) : null}

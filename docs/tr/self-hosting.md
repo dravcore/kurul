@@ -186,6 +186,26 @@ hata verdiği sürece süreç belleğine düşer. Bütçe aşımı, JSON gövdes
 `error: "Upload Budget Exceeded"` ve `Retry-After` başlığı taşıyan bir `429`'dur
 ([api-conventions.md](api-conventions.md#rate-limiting)).
 
+**Onun dışında hiçbir şey siz sınırlamadıkça sınırlı değil.** Dört değişken, bayt yerine
+_miktarlara_ tavan koyuyor ([ADR 0032](decisions/0032-plan-limits.md)), ve dördü de
+`.env.example`'da ayarsız: `PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
+`PLAN_MAX_WORKSPACES` ve `PLAN_MAX_USERS`. **Ayarlanmamış, sınırsız demek**, ve bu bloğa hiç
+dokunmayan bir instance'ın çalıştırdığı şey de bu: hiç sayım sorgusu atılmaz. Yazılı bir `0` da
+sınırsız demek; negatif ya da tam sayı olmayan bir değer açılışta reddedilir, ve geçerli sayılar
+başlangıçta loglanır (`Plan ceilings: …`). Attachment kotalarının aksine bunların hiç varsayılanı
+yok, ve bu bilerek: dolu bir disk veritabanını kendisiyle birlikte düşürür, onuncu bir board ise
+bir satıra mal olur.
+
+Bir **seat**, bir üye _ya da_ hâlâ kabul edilmeyi bekleyen bir davettir, dolayısıyla tavandaki bir
+admin kabulleri onun ötesine kuyruğa alamaz; bir daveti iptal etmek o seat'i anında boşaltır, ve
+süresi dolan bir davet kendini boşaltır. `PLAN_MAX_USERS` yalnızca **sign-up'ı** reddeder, hiçbir
+zaman sign-in'i değil, dolayısıyla onu zaten sahip olduğunuz hesap sayısının altına ayarlamak
+kimseyi kilitlemez. Tavanı aşan bir yazma, JSON gövdesi `error: "Plan Limit Exceeded"` taşıyan bir
+`403` ve kodu (`PLAN_LIMIT_SEATS`, `PLAN_LIMIT_BOARDS`, `PLAN_LIMIT_WORKSPACES`,
+`PLAN_LIMIT_USERS`), limiti ve güncel sayımı taşıyan bir `planLimit` objesidir. Bir workspace'e
+`Workspace.planLimits` JSON kolonunda kendine ait tavanlar verilebilir, ki bu, bunları anahtar
+anahtar override eder; uygulama onu asla kendisi yazmaz.
+
 **Trello import'u için de burada bir satır gerekmiyor.** `TRELLO_IMPORT_MAX_BYTES` (varsayılan
 `20971520`, 20 MiB) importer'ın kabul edeceği en büyük board export'udur ve pakete dahil Compose
 dosyası onu zaten geçiriyor. Dokunmadan önce bilmeye değer üç şey var. Bu bir **bellek** tavanıdır,
@@ -273,6 +293,24 @@ token'larının aktarım sırasında korunup korunmadığına karar veren tek an
 SameSite=Lax` döner; ön ek de yok, `Secure` de yok ve oturum token'ı her istekte ağdan açık
 metin olarak geçer. HTTPS olduğunu düşündüğünüz bir domain'de ön eksiz biçimi görüyorsanız
 `SITE_URL` hâlâ `http://` ile başlıyordur; düzeltip `docker compose up -d` çalıştırın.
+
+### API'yi bir script'ten çağırmak
+
+Bir script, bir CI işi ya da bir yedek kontrolü cookie ile uğraşmak istemez. Ayarlar'ı açın,
+"Kişisel erişim anahtarları" altında bir anahtar oluşturun, kopyalayın (yalnızca bir kez
+gösterilir) ve oluşturulduğu workspace'e karşı Bearer başlığı olarak gönderin:
+
+```bash
+curl -s https://kurul.example.com/api/workspaces/<workspaceId>/boards \
+  -H 'Authorization: Bearer kurul_pat_...'
+```
+
+Anahtar o tek workspace'te, istek geldiği andaki rolünüzle sizin yerinize işlem yapar; aynı
+ekrandan iptal etmek onu anında durdurur ve workspace aktivite akışı hem oluşturmayı hem
+iptali kaydeder. Neyi çağırıp neyi çağıramayacağı ve nedeni
+[api-conventions.md](api-conventions.md#kimlik-doğrulama) içinde. HTTPS argümanı burada iki
+kat geçerli: anahtar her istekte ağdan geçer, bu yüzden `http://` bir `SITE_URL`'e karşı asla
+kullanmayın.
 
 ## 5. Üzerine bir monitör koyun
 
@@ -396,6 +434,99 @@ dosyayı geride bırakır — üstelik attachment'lardan önce yazılmış her d
 [Yedekten geri dönme](development.md#yedekten-geri-dönme) tatbikatı dosyaları da kontrol eder.
 
 Geri yükleme adımları: [Yükseltme ve yedekleme](development.md#yükseltme-ve-yedekleme).
+
+### Host dışı kopyalar
+
+O komutu çalıştırmayı hatırlamaktan daha iyisi: sidecar'a bir remote verin, iki arşivi de her
+döngüde kendisi itsin. `.env` içindeki `BACKUP_REMOTE`'a bir [rclone](https://rclone.org/)
+remote yolu yazın; her döngü bundan sonra çifti yükler, remote'u aynı `BACKUP_KEEP` sayısına
+budar ve bunun başarıldığını kaydeder. **`BACKUP_REMOTE` boş kaldığında hiçbir şey değişmez**,
+healthcheck dahil: bu tamamen isteğe bağlıdır ve hiç ayarlamayan bir kurulum yukarıda anlatılan
+döngüyü aynen çalıştırır.
+
+| Değişken                       | Varsayılan | Amaç                                                                                             |
+| ------------------------------ | ---------- | ------------------------------------------------------------------------------------------------ |
+| `BACKUP_REMOTE`                | boş        | rclone remote yolu, örn. `s3:my-bucket/kurul`. Boş değer host dışı yarıyı tümüyle kapatır        |
+| `RCLONE_CONFIG_<AD>_<ANAHTAR>` | -          | rclone'un kendi env değişkeni yapılandırması, `docker-compose.yml` yanındaki `rclone.env` içinde |
+| `RCLONE_CONFIG`                | -          | Kimlik bilgilerini env yerine dosyada tutmak isterseniz, mount edilmiş `rclone.conf`'un yolu     |
+
+Kimlik bilgileri `.env`'e **girmez**: rclone'un env anahtarları remote'un adına göre adlandığı
+için `docker-compose.yml` içinde sabit bir liste tanımlanamaz, bu yüzden `backup` servisi
+compose dosyasının yanındaki isteğe bağlı `rclone.env` dosyasını okur. O dosyayı yalnızca bu
+container okur; `.env`'i api ve web container'ları da okur. `chmod 600` ile oluşturun ve git'e
+sokmayın (`.gitignore` zaten listeliyor).
+
+Uçtan uca bir S3 örneği. `KURULOFF` keyfi bir remote adıdır, yalnızca `BACKUP_REMOTE`
+içindekiyle aynı olması gerekir:
+
+```bash
+# rclone.env, docker-compose.yml'nin yanında, chmod 600
+RCLONE_CONFIG_KURULOFF_TYPE=s3
+RCLONE_CONFIG_KURULOFF_PROVIDER=AWS
+RCLONE_CONFIG_KURULOFF_ACCESS_KEY_ID=AKIA...
+RCLONE_CONFIG_KURULOFF_SECRET_ACCESS_KEY=...
+RCLONE_CONFIG_KURULOFF_REGION=eu-central-1
+```
+
+```bash
+# .env
+BACKUP_REMOTE=KURULOFF:my-backup-bucket/kurul
+```
+
+```bash
+docker compose up -d backup
+docker compose logs backup | grep off-host    # arşiv başına "pushed kurul-… to KURULOFF:…"
+```
+
+rclone'un konuştuğu her hedef aynı iki satırla çalışır: Backblaze B2 (`_TYPE=b2`), MinIO ve
+Cloudflare R2 dahil S3 uyumlu her endpoint (`_TYPE=s3` artı `_ENDPOINT=`), SFTP (`_TYPE=sftp`)
+ve diğerleri. Anahtar adları [rclone dokümanındaki](https://rclone.org/docs/#config-file)
+config anahtarlarının büyük harflisidir. Bunun yerine bir `rclone.conf` kullanacaksanız dosyayı
+mount edip `RCLONE_CONFIG`'i ona yöneltin (iki satır da `docker-compose.override.yml` içinde
+olsun ki `docker-compose.yml`'yi değiştiren bir upgrade onları silmesin):
+
+```yaml
+services:
+  backup:
+    volumes:
+      - ./rclone.conf:/config/rclone.conf:ro
+    environment:
+      RCLONE_CONFIG: /config/rclone.conf
+```
+
+**rclone ilk kullanımda indirilir.** Sidecar stok bir `postgres:18-alpine` imajı çalıştırır,
+bu yüzden `BACKUP_REMOTE` ayarlıyken script sabitlenmiş bir rclone sürümünü indirir (yaklaşık
+20 MB, açılmış hâli 78 MB), `scripts/backup.sh` içine gömülü sha256 ile doğrular ve sonraki
+döngülerle yeniden başlatmalar tekrar kullansın diye yedek volume'ünde saklar. Container'ın
+`PATH`'inde zaten bir `rclone` varsa (kendi imajınız, mount edilmiş bir binary) o kullanılır ve
+hiçbir şey indirilmez; internete kapalı bir host'un cevabı da budur.
+
+**Healthcheck remote'u takip eder.** `BACKUP_REMOTE` ayarlıyken `docker compose ps` bu servisi
+yalnızca en yeni **host dışı** kopya `2 × BACKUP_INTERVAL`'dan gençken healthy raporlar; süresi
+dolmuş kimlik bilgileri, değişmiş bir bucket policy'si veya salıdan beri kopuk bir ağ, restore
+gününde sürpriz olmak yerine unhealthy bir container olarak görünür. Yerel arşivler bu sırada
+yazılmaya ve saklanmaya devam eder: başarısız bir yükleme hiçbirini silmez ve logdaki
+`ERROR off-host:` satırı neyin başarısız olduğunu söyler.
+
+**Remote'tan restore** için önce çifti yedek volume'üne geri çekin, sonra olağan
+[restore tatbikatını](development.md#yedekten-geri-dönme) hiç değiştirmeden uygulayın; iki
+kopyanın byte olarak aynı olmasının anlamı da budur:
+
+```bash
+docker compose exec backup /backups/.rclone/rclone --config= \
+  lsf "$BACKUP_REMOTE"                 # bir zaman damgası seçin, iki yarısını da
+docker compose exec backup /backups/.rclone/rclone --config= \
+  copy "$BACKUP_REMOTE/kurul-<zaman damgası>.dump" /backups/
+docker compose exec backup /backups/.rclone/rclone --config= \
+  copy "$BACKUP_REMOTE/kurul-<zaman damgası>-files.tar.gz" /backups/
+```
+
+`/backups/.rclone/rclone` indirilen kopyadır; kendi rclone'unuzu verdiyseniz o yalnızca
+`rclone` olur ve kimlik bilgileriniz mount edilmiş bir `rclone.conf`'ta yaşıyorsa
+("yapılandırma yalnızca env değişkenleri" demek olan) `--config=` kalkar.
+
+Host'un kendisi gittiyse o iki `copy` komutunu rclone'u ve aynı kimlik bilgilerini taşıyan
+herhangi bir makinede çalıştırın ve arşivleri taze bir kurulumun restore adımına verin.
 
 ## Demo instance
 

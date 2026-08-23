@@ -12,6 +12,7 @@ import { auth } from '../auth/auth';
 import type { WorkspaceMembership } from '../common/types/request-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { evictUserFromWorkspaceSockets } from '../realtime/workspace-socket-eviction';
+import { TokenService } from '../token/token.service';
 import { WorkspaceMemberService } from './workspace-member.service';
 
 // `auth.ts` opens a Postgres pool and demands DATABASE_URL / BETTER_AUTH_SECRET at import
@@ -94,14 +95,17 @@ function buildService(roster: MemberSeed[]): {
   };
 
   const activityService = { record: jest.fn().mockResolvedValue({ id: 'activity' }) };
+  const tokenService = { revokeAllForMember: jest.fn().mockResolvedValue({ count: 0 }) };
 
   return {
     service: new WorkspaceMemberService(
       prisma as unknown as PrismaService,
       activityService as unknown as ActivityService,
+      tokenService as unknown as TokenService,
     ),
     prisma,
     activityService,
+    tokenService,
   };
 }
 
@@ -312,9 +316,11 @@ describe('WorkspaceMemberService.removeMember', () => {
       },
     };
     const activityService = { record: jest.fn().mockResolvedValue({ id: 'activity' }) };
+    const tokenService = { revokeAllForMember: jest.fn().mockResolvedValue({ count: 0 }) };
     const service = new WorkspaceMemberService(
       prisma as unknown as PrismaService,
       activityService as unknown as ActivityService,
+      tokenService as unknown as TokenService,
     );
 
     const thrown = await service

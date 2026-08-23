@@ -45,6 +45,104 @@ export interface InstanceConfigDto {
    * actions a demo refuses are refused by the API, not hidden by the client.
    */
   demo: DemoConfigDto;
+  /**
+   * The ceilings this instance's configuration puts on quantities, `null` for each one nobody
+   * set (ADR 0032).
+   *
+   * Capability, like the two booleans above: these are the numbers the operator's environment
+   * carries, identical for every caller. A workspace can be given lower ones of its own, and
+   * those resolved numbers are read from `GET /workspaces/{workspaceId}/plan`, never from here.
+   */
+  planLimits: InstancePlanLimitsDto;
+}
+
+/**
+ * The instance-wide half of the plan-limit layer (ADR 0032). `null` means unlimited, which is
+ * what every field is on an instance that configures nothing.
+ *
+ * The two storage fields are the ADR 0027 attachment quotas, published here rather than
+ * duplicated: one object answers every "what is the ceiling" question, whatever the ceiling
+ * counts. Their environment variables are unchanged, and unlike the four `PLAN_MAX_*` numbers
+ * they have non-null defaults.
+ */
+export interface InstancePlanLimitsDto {
+  /** Members plus pending invitations one workspace may hold. */
+  seatsPerWorkspace: number | null;
+  boardsPerWorkspace: number | null;
+  /** Workspaces the whole instance may hold. */
+  workspaces: number | null;
+  /** Accounts the whole instance may hold; refuses sign-up, never sign-in. */
+  users: number | null;
+  /** `ATTACHMENT_WORKSPACE_QUOTA_BYTES` (ADR 0027), as bytes. */
+  storageBytesPerWorkspace: number | null;
+  /** `ATTACHMENT_INSTANCE_QUOTA_BYTES` (ADR 0027), as bytes. */
+  storageBytesPerInstance: number | null;
+}
+
+/**
+ * One workspace's resolved ceilings and what it is currently using (ADR 0032).
+ *
+ * "Resolved" means the workspace's own override where it has one and the instance's
+ * configuration otherwise, so a client never has to know which of the two answered.
+ */
+export interface WorkspacePlanDto {
+  limits: WorkspacePlanLimitsDto;
+  usage: WorkspacePlanUsageDto;
+}
+
+/** The resolved ceilings of one workspace. `null` is unlimited. */
+export interface WorkspacePlanLimitsDto {
+  seats: number | null;
+  boards: number | null;
+  storageBytes: number | null;
+}
+
+/** What one workspace currently holds, counted the same way the refusals count it. */
+export interface WorkspacePlanUsageDto {
+  /** Members plus invitations still pending: an invitation holds its seat before acceptance. */
+  seats: number;
+  boards: number;
+  /** Summed size of the workspace's stored files; LINK attachments carry no bytes. */
+  storageBytes: number;
+}
+
+/**
+ * The `error` field of the 403 a write answers when a plan ceiling would be exceeded
+ * (ADR 0032).
+ *
+ * 403 already means "authenticated, and refused"; this string is what separates a ceiling
+ * from an insufficient role, which needs an entirely different fix. Clients branch on
+ * `statusCode` and `error`, never on `message` (`docs/api-conventions.md#errors`), and on
+ * `planLimit.code` when they need to know *which* ceiling.
+ */
+export const PLAN_LIMIT_ERROR = 'Plan Limit Exceeded';
+
+/**
+ * Which ceiling refused the write. Carried in the error envelope's `planLimit.code`, because
+ * one `error` string covers all four and a client that wants to say "you are out of seats"
+ * needs to tell them apart.
+ */
+export const PlanLimitCode = {
+  Seats: 'PLAN_LIMIT_SEATS',
+  Boards: 'PLAN_LIMIT_BOARDS',
+  Workspaces: 'PLAN_LIMIT_WORKSPACES',
+  Users: 'PLAN_LIMIT_USERS',
+} as const;
+
+export type PlanLimitCode = (typeof PlanLimitCode)[keyof typeof PlanLimitCode];
+
+/**
+ * The `planLimit` member of the error envelope on a plan-limit refusal (ADR 0032).
+ *
+ * The only optional envelope member other than `details`, and it exists for the same reason:
+ * "you cannot do that" is not actionable, "you are using 10 of 10 seats" is. `current` is what
+ * was counted at the moment of the refusal, so it can equal or exceed `limit` but never
+ * disagree with it silently.
+ */
+export interface PlanLimitDetail {
+  code: PlanLimitCode;
+  limit: number;
+  current: number;
 }
 
 /** The demo-instance section of {@link InstanceConfigDto}. */
@@ -128,6 +226,42 @@ export interface InvitationDto {
    * failure it is here to end.
    */
   emailDelivery?: MailDeliveryStatus;
+}
+
+/**
+ * A personal access token: a second credential beside the session cookie, for a caller that is
+ * not a browser. Bound to one workspace and one user at creation, and it acts as that user in
+ * that workspace and nowhere else.
+ *
+ * The secret is never in this shape. It is handed out exactly once, in
+ * `CreatedPersonalAccessTokenDto`, and only its hash is stored afterwards, so a list can show
+ * `prefix` to tell two tokens apart and nothing that would let a reader use one.
+ */
+export interface PersonalAccessTokenDto {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  /** A label the owner chose, such as the script or machine the token lives on. */
+  name: string;
+  /**
+   * `kurul_pat_` plus the first eight characters of the secret. Enough to recognise a token in
+   * a list or a log line, useless as a credential.
+   */
+  prefix: string;
+  /** ISO 8601 UTC, or null while the token has never authenticated a request. */
+  lastUsedAt: string | null;
+  /** ISO 8601 UTC, or null for a token that does not expire. */
+  expiresAt: string | null;
+  /** ISO 8601 UTC. */
+  createdAt: string;
+}
+
+/**
+ * `POST /workspaces/:workspaceId/tokens` and nothing else returns this shape. `token` is the
+ * plaintext secret, shown once; no later response carries it and the server cannot recover it.
+ */
+export interface CreatedPersonalAccessTokenDto extends PersonalAccessTokenDto {
+  token: string;
 }
 
 export interface BoardDto {

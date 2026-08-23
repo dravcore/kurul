@@ -166,7 +166,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -245,6 +245,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -386,7 +389,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -597,6 +600,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -664,7 +670,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -743,6 +749,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -802,7 +811,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -917,6 +926,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -1016,7 +1028,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1095,6 +1107,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -1173,7 +1188,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1252,6 +1267,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -1339,7 +1357,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1418,6 +1436,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -2082,6 +2103,539 @@
         ]
       }
     },
+    "/workspaces/{workspaceId}/tokens": {
+      "post": {
+        "description": "The response is the only place the plaintext `token` ever appears; the server keeps its SHA-256 and cannot show it again. The token acts as the caller, in this workspace only, with whatever role the caller holds at the time of each request. No scopes: the workspace is the scope.",
+        "operationId": "TokenController_create",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUIDv7. Opaque — never parsed, sorted or generated client-side."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedPersonalAccessTokenSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or one the server no longer recognises.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request authenticated with a personal access token. Tokens cannot create, list or revoke tokens; these routes take a session cookie only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The workspace does not exist, or the caller is not a member of it, or the addressed resource belongs to another workspace. All three answer `404` — a `403` would confirm that something exists across the tenant boundary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled failure. Never carries a stack trace, and never the raw exception message under `NODE_ENV=production`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a personal access token",
+        "tags": ["Tokens"],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "get": {
+        "description": "Only the tokens the caller created, and only the live ones: a revoked token leaves the list. Bounded by one person in one workspace, so a plain array.",
+        "operationId": "TokenController_list",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUIDv7. Opaque — never parsed, sorted or generated client-side."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PersonalAccessTokenSchema"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or one the server no longer recognises.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request authenticated with a personal access token. Tokens cannot create, list or revoke tokens; these routes take a session cookie only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The workspace does not exist, or the caller is not a member of it, or the addressed resource belongs to another workspace. All three answer `404` — a `403` would confirm that something exists across the tenant boundary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled failure. Never carries a stack trace, and never the raw exception message under `NODE_ENV=production`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the caller's own tokens",
+        "tags": ["Tokens"],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/workspaces/{workspaceId}/tokens/{tokenId}": {
+      "delete": {
+        "description": "Immediate: the next request carrying the token is `401`. Only the owner can revoke, and another member's token is `404`, the same answer as a token that never existed.",
+        "operationId": "TokenController_revoke",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUIDv7. Opaque — never parsed, sorted or generated client-side."
+          },
+          {
+            "name": "tokenId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUIDv7. Opaque — never parsed, sorted or generated client-side."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked. Empty body.",
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie, or one the server no longer recognises.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request authenticated with a personal access token. Tokens cannot create, list or revoke tokens; these routes take a session cookie only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The workspace does not exist, or the caller is not a member of it, or the addressed resource belongs to another workspace. All three answer `404` — a `403` would confirm that something exists across the tenant boundary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled failure. Never carries a stack trace, and never the raw exception message under `NODE_ENV=production`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revoke a token",
+        "tags": ["Tokens"],
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/workspaces": {
       "get": {
         "description": "The one collection in this API with no `:workspaceId` above it — it *is* how a caller discovers their tenants. Bounded by membership, so it is a plain array.",
@@ -2326,7 +2880,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2405,6 +2959,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -2480,7 +3037,7 @@
             }
           },
           "403": {
-            "description": "A member of the workspace whose role is not one of: OWNER, ADMIN.",
+            "description": "Also answered when the request authenticated with a personal access token: this operation is performed by Better Auth and takes a session cookie only.\n\nA member of the workspace whose role is not one of: OWNER, ADMIN.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2644,7 +3201,7 @@
             }
           },
           "403": {
-            "description": "A member of the workspace whose role is not one of: OWNER.",
+            "description": "Also answered when the request authenticated with a personal access token: this operation is performed by Better Auth and takes a session cookie only.\n\nA member of the workspace whose role is not one of: OWNER.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2753,6 +3310,146 @@
         ]
       }
     },
+    "/workspaces/{workspaceId}/plan": {
+      "get": {
+        "description": "Resolved ceilings: the workspace override where it has one, the instance configuration otherwise, `null` for unlimited. `usage.seats` counts members plus invitations still pending, which is what the seat ceiling refuses against.",
+        "operationId": "WorkspaceController_plan",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUIDv7. Opaque — never parsed, sorted or generated client-side."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspacePlanSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The workspace does not exist, or the caller is not a member of it, or the addressed resource belongs to another workspace. All three answer `404` — a `403` would confirm that something exists across the tenant boundary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled failure. Never carries a stack trace, and never the raw exception message under `NODE_ENV=production`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read this workspace's plan ceilings and current usage",
+        "tags": ["Workspaces"],
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "personalAccessToken": []
+          }
+        ]
+      }
+    },
     "/workspaces/{workspaceId}/members/me": {
       "get": {
         "description": "A caller that only needs its own role should never page the roster to find it.",
@@ -2807,7 +3504,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2886,6 +3583,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -2942,6 +3642,42 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Also answered when the request authenticated with a personal access token: this operation is performed by Better Auth and takes a session cookie only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
                 }
               }
             }
@@ -3094,7 +3830,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3173,6 +3909,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -3244,7 +3983,7 @@
             }
           },
           "403": {
-            "description": "A member of the workspace whose role is not one of: OWNER, ADMIN.",
+            "description": "Also answered when the request authenticated with a personal access token: this operation is performed by Better Auth and takes a session cookie only.\n\nA member of the workspace whose role is not one of: OWNER, ADMIN.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3437,7 +4176,7 @@
             }
           },
           "403": {
-            "description": "A member of the workspace whose role is not one of: OWNER, ADMIN.",
+            "description": "Also answered when the request authenticated with a personal access token: this operation is performed by Better Auth and takes a session cookie only.\n\nA member of the workspace whose role is not one of: OWNER, ADMIN.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3620,7 +4359,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3735,6 +4474,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -3811,7 +4553,7 @@
             }
           },
           "403": {
-            "description": "A member of the workspace whose role is not one of: OWNER, ADMIN.",
+            "description": "Also answered when the request authenticated with a personal access token: this operation is performed by Better Auth and takes a session cookie only.\n\nA member of the workspace whose role is not one of: OWNER, ADMIN.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3986,7 +4728,7 @@
             }
           },
           "403": {
-            "description": "A member of the workspace whose role is not one of: OWNER, ADMIN.",
+            "description": "Also answered when the request authenticated with a personal access token: this operation is performed by Better Auth and takes a session cookie only.\n\nA member of the workspace whose role is not one of: OWNER, ADMIN.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4168,6 +4910,42 @@
               }
             }
           },
+          "403": {
+            "description": "Also answered when the request authenticated with a personal access token: this operation is performed by Better Auth and takes a session cookie only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Correlation id for this request — the same value as the error envelope `requestId` and the server log lines. Echoed from the request when the client supplied a URL-safe value of 8-128 characters, generated otherwise.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Requests allowed for this route, in the current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests left in the current window. Never negative.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Seconds until the current window expires.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Over this route's per-IP budget. Carries `Retry-After` with the seconds to wait.",
             "headers": {
@@ -4262,7 +5040,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4341,6 +5119,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -4415,7 +5196,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4530,6 +5311,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -4598,7 +5382,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4677,6 +5461,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -4753,7 +5540,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4868,6 +5655,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -4927,7 +5717,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5042,6 +5832,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -5111,7 +5904,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5190,6 +5983,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -5261,7 +6057,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5340,6 +6136,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -5415,7 +6214,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5530,6 +6329,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -5609,7 +6411,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5724,6 +6526,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -5801,7 +6606,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5916,6 +6721,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -5974,7 +6782,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6089,6 +6897,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -6167,7 +6978,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6282,6 +7093,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -6565,7 +7379,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6644,6 +7458,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -6719,7 +7536,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6834,6 +7651,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -6902,7 +7722,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6981,6 +7801,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -7057,7 +7880,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7172,6 +7995,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -7231,7 +8057,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7346,6 +8172,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -7424,7 +8253,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7539,6 +8368,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -7617,7 +8449,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7732,6 +8564,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -7810,7 +8645,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7925,6 +8760,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -8002,7 +8840,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8117,6 +8955,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -8195,7 +9036,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8310,6 +9151,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -8388,7 +9232,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8503,6 +9347,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -8590,7 +9437,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8705,6 +9552,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -8781,7 +9631,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8896,6 +9746,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -8983,7 +9836,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9098,6 +9951,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -9185,7 +10041,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9300,6 +10156,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -9388,7 +10247,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9503,6 +10362,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -9578,7 +10440,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9693,6 +10555,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -9780,7 +10645,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9895,6 +10760,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -9990,7 +10858,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10069,6 +10937,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -10127,7 +10998,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10206,6 +11077,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -10264,7 +11138,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10343,6 +11217,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -10411,7 +11288,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10490,6 +11367,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -10560,7 +11440,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10639,6 +11519,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -10715,7 +11598,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10830,6 +11713,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -10907,7 +11793,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11022,6 +11908,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -11081,7 +11970,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11196,6 +12085,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -11284,7 +12176,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11363,6 +12255,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       },
@@ -11438,7 +12333,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11553,6 +12448,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -11614,7 +12512,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11729,6 +12627,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -11841,7 +12742,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11992,6 +12893,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -12058,7 +12962,7 @@
             }
           },
           "401": {
-            "description": "No session cookie, or one the server no longer recognises.",
+            "description": "No session cookie and no Bearer token, or a credential the server no longer recognises: a revoked or expired token reads the same as one that never existed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12137,6 +13041,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "personalAccessToken": []
           }
         ]
       }
@@ -12144,7 +13051,7 @@
   },
   "info": {
     "title": "Kurul API",
-    "description": "The REST contract of one Kurul instance, generated from the running application: every path,\nparameter, request body and response below is what the NestJS router and the DTO classes\nactually declare, not a hand-maintained copy of them.\n\nThe prose contract is [`docs/api-conventions.md`](https://github.com/dravcore/kurul/blob/develop/docs/api-conventions.md).\nWhere this document and that one disagree, one of them is wrong and neither wins by default.\n\n### What is not in here\n\n**`/auth/*`.** Better Auth is mounted on raw Express below the Nest router\n([ADR 0004](https://github.com/dravcore/kurul/blob/develop/docs/decisions/0004-auth-better-auth.md)),\nso it has no controller to scan and no route this document can discover. Sign-in, sign-up,\nsign-out and session refresh live there. **The Socket.io contract** is likewise absent: it is\nnot HTTP, and it is defined in `@kurul/shared-types`.\n\n### Authentication\n\nA **session cookie**, issued by `POST /auth/sign-in/email`. Every operation requires it except\nthe two health probes. A browser on the allowed origin sends it automatically; any other client\nmust store and replay it.\n\nWrites (`POST`/`PUT`/`PATCH`/`DELETE`) are additionally checked server-side against an\norigin allowlist. A request that announces an `Origin` other than `WEB_URL` is refused with\n`403` before it reaches a handler; a request that announces none — `curl`, a CI script, a\nnative client — is allowed, because no cross-site request shape carries a victim's cookie *and*\nomits the header.\n\n### Errors\n\nOne shape, everywhere, including failures nobody wrote a handler for: `ErrorEnvelopeSchema`.\nThere is no second error format. Clients branch on `statusCode` and `error`, never on\n`message` text. The single documented exception is `GET /health/ready`, whose `503` carries\nthe probe document instead — its caller is a healthcheck, not a client.\n\n**`404`, not `403`, across the tenant boundary.** A resource in another workspace, a\nworkspace the caller is not a member of, and a workspace that does not exist are all `404`.\n`403` means \"a member, whose role is too low\", and nothing else.\n\n### Pagination\n\nCursor pagination is the default, and **the cursor key is always `id`, never `position`**.\nThat is a correctness rule: fractional indexing rewrites `position` on every drag, so a row\nsomeone moves past the client's window would never be returned again. `limit` defaults to 50\n(100 on the member and invitation rosters) and is **clamped** at 100 rather than rejected.\n`nextCursor` is opaque — it is the `id` of the last item, and clients must not parse it.\n\n### Rate limiting\n\nPer client IP **and** per route, over a rolling 60-second window, so\none endpoint running hot never spends another's allowance. Responses under budget carry\n`X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`; a `429` carries\n`Retry-After`. All four are absent when `RATE_LIMIT_ENABLED=false` — supported for the\nintegration suite and for nothing else, since a deployment that sets it has no brute-force\nceiling at all.\n\n| Route | Budget |\n| --- | --- |\n| Anything not listed below | 100 / min |\n| `POST /workspaces/{workspaceId}/invitations` | 10 / min |\n| `GET /workspaces/{workspaceId}/boards/{boardId}/tasks?q=` | 30 / min |\n| `POST /workspaces/{workspaceId}/tasks/{taskId}/attachments` | 20 / min |\n| `POST /workspaces/{workspaceId}/imports/trello` | 3 / min |\n| `GET /workspaces/{workspaceId}/attachments/{attachmentId}/content` | 300 / min |\n| `GET /health`, `GET /health/ready` | exempt |\n\n`/auth/*` is governed by a second, independent limiter inside Better Auth and is not covered\nby the headers above.\n\n### Correlation\n\nEvery response carries `X-Request-Id`. A client may supply its own if it is URL-safe and 8-128\ncharacters; anything else is replaced with a generated UUIDv7. The same value appears in the\nerror envelope's `requestId` and in the server's log lines, so one id selects one request.",
+    "description": "The REST contract of one Kurul instance, generated from the running application: every path,\nparameter, request body and response below is what the NestJS router and the DTO classes\nactually declare, not a hand-maintained copy of them.\n\nThe prose contract is [`docs/api-conventions.md`](https://github.com/dravcore/kurul/blob/develop/docs/api-conventions.md).\nWhere this document and that one disagree, one of them is wrong and neither wins by default.\n\n### What is not in here\n\n**`/auth/*`.** Better Auth is mounted on raw Express below the Nest router\n([ADR 0004](https://github.com/dravcore/kurul/blob/develop/docs/decisions/0004-auth-better-auth.md)),\nso it has no controller to scan and no route this document can discover. Sign-in, sign-up,\nsign-out and session refresh live there. **The Socket.io contract** is likewise absent: it is\nnot HTTP, and it is defined in `@kurul/shared-types`.\n\n### Authentication\n\nTwo credentials, and every operation except the two health probes requires one of them.\n\nA **session cookie**, issued by `POST /auth/sign-in/email`. A browser on the allowed origin\nsends it automatically; any other client must store and replay it.\n\nA **personal access token**, sent as `Authorization: Bearer kurul_pat_...`, minted by\n`POST /workspaces/{workspaceId}/tokens` and shown once. A token acts as its owner in the one\nworkspace it was created in, with whatever role the owner holds at the time of each request;\nthere are no scopes beyond that. It is accepted on every operation whose path carries that\n`{workspaceId}` and refused everywhere else: another workspace is `404`, exactly as for a\nnon-member; an operation with no workspace in its path (`/me`, `GET /workspaces`,\n`/instance/*`) is `403`. A request that carries a Bearer header is decided by that header\nalone and never falls back to a cookie. Revocation is immediate, expiry is checked on every\nrequest, and the server stores only a SHA-256 of the secret.\n\nAn operation whose `security` lists only the `session` scheme is **session-only** and\nanswers `403` to a token: the three token-management operations, because a credential must\nnot mint or enumerate credentials, and the workspace-administration writes that Better Auth's\norganization plugin performs on the caller's own session (rename and delete the workspace,\ninvite, revoke and accept invitations, remove a member, change a role, leave). Boards, columns,\ntasks, labels, comments, checklists, attachments, imports, activity, notifications, the\ndashboard and every read under the workspace accept either credential. See\n[`docs/api-conventions.md`](https://github.com/dravcore/kurul/blob/develop/docs/api-conventions.md#authentication).\n\nWrites (`POST`/`PUT`/`PATCH`/`DELETE`) are additionally checked server-side against an\norigin allowlist. A request that announces an `Origin` other than `WEB_URL` is refused with\n`403` before it reaches a handler; a request that announces none — `curl`, a CI script, a\nnative client — is allowed, because no cross-site request shape carries a victim's cookie *and*\nomits the header.\n\n### Errors\n\nOne shape, everywhere, including failures nobody wrote a handler for: `ErrorEnvelopeSchema`.\nThere is no second error format. Clients branch on `statusCode` and `error`, never on\n`message` text. The single documented exception is `GET /health/ready`, whose `503` carries\nthe probe document instead — its caller is a healthcheck, not a client.\n\n**`404`, not `403`, across the tenant boundary.** A resource in another workspace, a\nworkspace the caller is not a member of, and a workspace that does not exist are all `404`.\n`403` means \"a member, whose role is too low\", and nothing else.\n\n### Pagination\n\nCursor pagination is the default, and **the cursor key is always `id`, never `position`**.\nThat is a correctness rule: fractional indexing rewrites `position` on every drag, so a row\nsomeone moves past the client's window would never be returned again. `limit` defaults to 50\n(100 on the member and invitation rosters) and is **clamped** at 100 rather than rejected.\n`nextCursor` is opaque — it is the `id` of the last item, and clients must not parse it.\n\n### Rate limiting\n\nPer client IP **and** per route, over a rolling 60-second window, so\none endpoint running hot never spends another's allowance. Responses under budget carry\n`X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`; a `429` carries\n`Retry-After`. All four are absent when `RATE_LIMIT_ENABLED=false` — supported for the\nintegration suite and for nothing else, since a deployment that sets it has no brute-force\nceiling at all.\n\n| Route | Budget |\n| --- | --- |\n| Anything not listed below | 100 / min |\n| `POST /workspaces/{workspaceId}/invitations` | 10 / min |\n| `GET /workspaces/{workspaceId}/boards/{boardId}/tasks?q=` | 30 / min |\n| `POST /workspaces/{workspaceId}/tasks/{taskId}/attachments` | 20 / min |\n| `POST /workspaces/{workspaceId}/imports/trello` | 3 / min |\n| `GET /workspaces/{workspaceId}/attachments/{attachmentId}/content` | 300 / min |\n| `GET /health`, `GET /health/ready` | exempt |\n\n`/auth/*` is governed by a second, independent limiter inside Better Auth and is not covered\nby the headers above.\n\n### Correlation\n\nEvery response carries `X-Request-Id`. A client may supply its own if it is URL-safe and 8-128\ncharacters; anything else is replaced with a generated UUIDv7. The same value appears in the\nerror envelope's `requestId` and in the server's log lines, so one id selects one request.",
     "version": "0.1.0",
     "contact": {},
     "license": {
@@ -12200,6 +13107,10 @@
     {
       "name": "Dashboard",
       "description": "Read-only aggregations over a workspace."
+    },
+    {
+      "name": "Tokens",
+      "description": "A member's own personal access tokens for one workspace: minted once, listed by prefix, revoked immediately. Session-only routes."
     }
   ],
   "servers": [
@@ -12215,6 +13126,12 @@
         "in": "cookie",
         "name": "better-auth.session_token",
         "description": "Session cookie issued by `POST /auth/sign-in/email`, which is served below the Nest router and is therefore not described in this document."
+      },
+      "personalAccessToken": {
+        "scheme": "bearer",
+        "bearerFormat": "kurul_pat_...",
+        "type": "http",
+        "description": "Personal access token from `POST /workspaces/{workspaceId}/tokens`. Bound to that workspace; acts as its owner with the role the owner holds at request time."
       }
     },
     "schemas": {
@@ -12465,6 +13382,52 @@
         },
         "required": ["enabled", "resetIntervalMinutes", "nextResetAt"]
       },
+      "InstancePlanLimitsSchema": {
+        "type": "object",
+        "properties": {
+          "seatsPerWorkspace": {
+            "type": "number",
+            "nullable": true,
+            "description": "Members plus pending invitations one workspace may hold (`PLAN_MAX_SEATS_PER_WORKSPACE`).",
+            "example": 10
+          },
+          "boardsPerWorkspace": {
+            "type": "number",
+            "nullable": true,
+            "description": "Boards one workspace may hold (`PLAN_MAX_BOARDS_PER_WORKSPACE`)."
+          },
+          "workspaces": {
+            "type": "number",
+            "nullable": true,
+            "description": "Workspaces this instance may hold (`PLAN_MAX_WORKSPACES`)."
+          },
+          "users": {
+            "type": "number",
+            "nullable": true,
+            "description": "Accounts this instance may hold (`PLAN_MAX_USERS`). Refuses sign-up, never sign-in."
+          },
+          "storageBytesPerWorkspace": {
+            "type": "number",
+            "nullable": true,
+            "description": "`ATTACHMENT_WORKSPACE_QUOTA_BYTES`, in bytes. Defaults to 2 GiB.",
+            "example": 2147483648
+          },
+          "storageBytesPerInstance": {
+            "type": "number",
+            "nullable": true,
+            "description": "`ATTACHMENT_INSTANCE_QUOTA_BYTES`, in bytes. Defaults to 20 GiB.",
+            "example": 21474836480
+          }
+        },
+        "required": [
+          "seatsPerWorkspace",
+          "boardsPerWorkspace",
+          "workspaces",
+          "users",
+          "storageBytesPerWorkspace",
+          "storageBytesPerInstance"
+        ]
+      },
       "InstanceConfigSchema": {
         "type": "object",
         "properties": {
@@ -12483,9 +13446,17 @@
                 "$ref": "#/components/schemas/DemoConfigSchema"
               }
             ]
+          },
+          "planLimits": {
+            "description": "The ceilings this instance's configuration puts on quantities. A workspace can carry lower\nones of its own; those resolved numbers come from `GET /workspaces/{workspaceId}/plan`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InstancePlanLimitsSchema"
+              }
+            ]
           }
         },
-        "required": ["mailEnabled", "attachmentsEnabled", "demo"]
+        "required": ["mailEnabled", "attachmentsEnabled", "demo", "planLimits"]
       },
       "UserSchema": {
         "type": "object",
@@ -12580,6 +13551,119 @@
         },
         "required": ["confirmEmail"]
       },
+      "CreateTokenDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A label for the owner's own list: the script, machine or purpose the token serves.",
+            "maxLength": 80
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When the token stops working, or absent / `null` for never. Must be in the future; the\nservice answers `400` for an instant that has already passed, since a token born expired\ncan only be a client mistake."
+          }
+        },
+        "required": ["name"]
+      },
+      "CreatedPersonalAccessTokenSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The secret, shown exactly once. The server stores only its SHA-256 and cannot show it\nagain; a client that loses it revokes this token and creates another."
+          },
+          "id": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The label chosen at creation."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "`kurul_pat_` plus the first eight characters of the secret. Enough to recognise a token in\na list or a log line, useless as a credential."
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO 8601 UTC, or `null` while the token has never authenticated a request."
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO 8601 UTC, or `null` for a token that does not expire."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 UTC."
+          }
+        },
+        "required": [
+          "token",
+          "id",
+          "workspaceId",
+          "userId",
+          "name",
+          "prefix",
+          "lastUsedAt",
+          "expiresAt",
+          "createdAt"
+        ]
+      },
+      "PersonalAccessTokenSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The label chosen at creation."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "`kurul_pat_` plus the first eight characters of the secret. Enough to recognise a token in\na list or a log line, useless as a credential."
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO 8601 UTC, or `null` while the token has never authenticated a request."
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO 8601 UTC, or `null` for a token that does not expire."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 UTC."
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "userId",
+          "name",
+          "prefix",
+          "lastUsedAt",
+          "expiresAt",
+          "createdAt"
+        ]
+      },
       "WorkspaceSchema": {
         "type": "object",
         "properties": {
@@ -12615,6 +13699,55 @@
           }
         },
         "required": ["name", "slug"]
+      },
+      "WorkspacePlanLimitsSchema": {
+        "type": "object",
+        "properties": {
+          "seats": {
+            "type": "number",
+            "nullable": true,
+            "description": "Members plus pending invitations this workspace may hold."
+          },
+          "boards": {
+            "type": "number",
+            "nullable": true
+          },
+          "storageBytes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Summed stored-file bytes this workspace may hold."
+          }
+        },
+        "required": ["seats", "boards", "storageBytes"]
+      },
+      "WorkspacePlanUsageSchema": {
+        "type": "object",
+        "properties": {
+          "seats": {
+            "type": "number",
+            "description": "Members plus invitations still pending: an invitation holds its seat until it expires."
+          },
+          "boards": {
+            "type": "number"
+          },
+          "storageBytes": {
+            "type": "number",
+            "description": "Stored bytes. LINK attachments carry none."
+          }
+        },
+        "required": ["seats", "boards", "storageBytes"]
+      },
+      "WorkspacePlanSchema": {
+        "type": "object",
+        "properties": {
+          "limits": {
+            "$ref": "#/components/schemas/WorkspacePlanLimitsSchema"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/WorkspacePlanUsageSchema"
+          }
+        },
+        "required": ["limits", "usage"]
       },
       "UpdateWorkspaceDto": {
         "type": "object",
@@ -12705,7 +13838,7 @@
             "type": "string"
           },
           "status": {
-            "enum": ["accepted", "canceled", "pending", "rejected"],
+            "enum": ["accepted", "pending", "canceled", "rejected"],
             "type": "string"
           },
           "expiresAt": {
