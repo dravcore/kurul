@@ -90,6 +90,25 @@ function tickLabels(container: HTMLElement, axis: 'xAxis' | 'yAxis'): string[] {
 const BAR_ANIMATION_TIMEOUT_MS = 10_000;
 
 /**
+ * Test-level timeout for the two `it()`s that call {@link barPaths}, comfortably above
+ * `BAR_ANIMATION_TIMEOUT_MS` itself.
+ *
+ * This is the fix for issue #244 ("load-sensitive"). `barPaths` promises to poll for up to
+ * `BAR_ANIMATION_TIMEOUT_MS`, but Vitest's own default per-test timeout is 5000ms — shorter
+ * than that promise. Under normal load the animation always finishes well inside 5s, so the
+ * mismatch was invisible; under concurrent load (confirmed by running this file alongside
+ * `apps/api`'s Jest suite, matching the two sightings in #244) `requestAnimationFrame`
+ * callbacks are delayed enough that Vitest's timeout fires *first*, aborting the test in the
+ * middle of an `act()` call. That abort is what produced every symptom in #244: not just the
+ * one bar-painting assertion timing out, but every other test in the file failing too — an
+ * `act()` killed mid-flight leaves React's environment in the "overlapping act() calls" state
+ * the aborted run logs, and every subsequent render in the same file inherits it. Giving these
+ * two tests a timeout Vitest will not pre-empt before `barPaths`'s own deadline can be reached
+ * removes the abort, not just the symptom.
+ */
+const BAR_ANIMATION_TEST_TIMEOUT_MS = BAR_ANIMATION_TIMEOUT_MS + 5_000;
+
+/**
  * Bars animate in and are absent from the first paint, so the shapes only exist once the
  * animation has run — asserting before that would test the scaffolding, not the drawn chart.
  *
@@ -123,24 +142,28 @@ describe('PriorityChart', () => {
     { priority: Priority.URGENT, count: 1 },
   ];
 
-  it('paints one bar per priority, coloured by its own token', async () => {
-    const container = renderChart(<PriorityChart data={data} />);
+  it(
+    'paints one bar per priority, coloured by its own token',
+    async () => {
+      const container = renderChart(<PriorityChart data={data} />);
 
-    const paths = await barPaths(container);
+      const paths = await barPaths(container);
 
-    // `<Cell>` is what makes the four bars four different colours; without it the chart
-    // renders as one flat series colour.
-    expect(paths.map((path) => path.getAttribute('fill'))).toEqual([
-      'var(--priority-low)',
-      'var(--priority-medium)',
-      'var(--priority-high)',
-      'var(--priority-urgent)',
-    ]);
-    // A bar with no geometry is a bar nobody can see.
-    for (const path of paths) {
-      expect(path.getAttribute('d')).toBeTruthy();
-    }
-  });
+      // `<Cell>` is what makes the four bars four different colours; without it the chart
+      // renders as one flat series colour.
+      expect(paths.map((path) => path.getAttribute('fill'))).toEqual([
+        'var(--priority-low)',
+        'var(--priority-medium)',
+        'var(--priority-high)',
+        'var(--priority-urgent)',
+      ]);
+      // A bar with no geometry is a bar nobody can see.
+      for (const path of paths) {
+        expect(path.getAttribute('d')).toBeTruthy();
+      }
+    },
+    BAR_ANIMATION_TEST_TIMEOUT_MS,
+  );
 
   it('labels the category axis with translated priority names', () => {
     const container = renderChart(<PriorityChart data={data} />);
@@ -159,21 +182,25 @@ describe('PriorityChart', () => {
 });
 
 describe('AssigneeChart', () => {
-  it('paints a bar per assignee and translates the synthetic buckets', async () => {
-    const container = renderChart(
-      <AssigneeChart
-        data={[
-          { userId: 'u1', name: 'Ada', count: 5 },
-          { userId: null, name: 'Unassigned', count: 2 },
-          { userId: null, name: 'Other', count: 1 },
-        ]}
-      />,
-    );
+  it(
+    'paints a bar per assignee and translates the synthetic buckets',
+    async () => {
+      const container = renderChart(
+        <AssigneeChart
+          data={[
+            { userId: 'u1', name: 'Ada', count: 5 },
+            { userId: null, name: 'Unassigned', count: 2 },
+            { userId: null, name: 'Other', count: 1 },
+          ]}
+        />,
+      );
 
-    expect(await barPaths(container)).toHaveLength(3);
-    // 'Unassigned'/'Other' are sentinels from the API, not real names, and must be localised.
-    expect(tickLabels(container, 'yAxis')).toEqual(['Ada', 'Unassigned', 'Other']);
-  });
+      expect(await barPaths(container)).toHaveLength(3);
+      // 'Unassigned'/'Other' are sentinels from the API, not real names, and must be localised.
+      expect(tickLabels(container, 'yAxis')).toEqual(['Ada', 'Unassigned', 'Other']);
+    },
+    BAR_ANIMATION_TEST_TIMEOUT_MS,
+  );
 
   it('renders an empty chart rather than throwing when there is no data', () => {
     const container = renderChart(<AssigneeChart data={[]} />);
