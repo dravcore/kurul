@@ -54,6 +54,10 @@ describe('AUDIT_ACTIVITY_TYPES', () => {
         // member leaving and an account ceasing to exist are different facts, and only the
         // second one is permanent (ADR 0026).
         'account',
+        // `token.created` / `token.revoked`: a personal access token is a standing credential
+        // for the workspace, so minting or revoking one is access-changing in the same sense
+        // as an invitation (api-conventions.md, "Authentication").
+        'token',
       ]),
     );
   });
