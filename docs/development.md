@@ -154,12 +154,12 @@ because a build without them succeeds silently. See
 [Observability](#observability).
 
 `.env.example` also carries `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
-`REDIS_PASSWORD`, `BACKUP_INTERVAL`, and `BACKUP_KEEP`. All six are **compose-only** —
-`docker-compose.yml` interpolates them into the `postgres`/`redis`/`migrate`/`api`/`backup`
-services and no application code reads them directly, so they are absent from the table
-above and need no wiring in `apps/api`. See
+`REDIS_PASSWORD`, `BACKUP_INTERVAL`, `BACKUP_KEEP`, and `BACKUP_REMOTE`. All seven are
+**compose-only** — `docker-compose.yml` interpolates them into the
+`postgres`/`redis`/`migrate`/`api`/`backup` services and no application code reads them
+directly, so they are absent from the table above and need no wiring in `apps/api`. See
 [Database and cache credentials](#database-and-cache-credentials) for the first four and
-[Upgrading and backups](#upgrading-and-backups) for the backup pair.
+[Upgrading and backups](#upgrading-and-backups) for the backup three.
 
 Generate a secret with:
 
@@ -929,15 +929,16 @@ silently stops producing recovery points, which is the failure this whole sectio
 prevent. It is deliberately **not** in `docker-compose.dev.yml` — a local database that
 `pnpm db:seed` wipes on demand has nothing worth keeping.
 
-Two settings, both read from `.env` by compose:
+Three settings, all read from `.env` by compose:
 
 | Variable          | Default | Purpose                                                                   |
 | ----------------- | ------- | ------------------------------------------------------------------------- |
 | `BACKUP_INTERVAL` | `86400` | Seconds between cycles. `86400` = daily; this **is** your RPO             |
 | `BACKUP_KEEP`     | `7`     | Archives of each series retained; older ones are deleted after each cycle |
+| `BACKUP_REMOTE`   | blank   | rclone remote path for the off-host copy; blank = local archives only     |
 
-Compose passes both to the `api` service as well, which is easy to miss because they read as
-backup settings: the nightly orphan-file sweep refuses to delete a stored file while a dump old
+Compose passes the first two to the `api` service as well, which is easy to miss because they
+read as backup settings: the nightly orphan-file sweep refuses to delete a stored file while a dump old
 enough to disown it is still restorable, and that grace period is exactly
 `BACKUP_KEEP × BACKUP_INTERVAL`. "On disk with no row pointing at it" is a correct predicate
 only while the database is authoritative, and a restore rewinds the rows while the disk stays
@@ -955,13 +956,19 @@ docker compose exec backup ls -lh /backups   # newest pair, and how many are kep
 ```
 
 Two lines per cycle, not one: a cycle that logged only the dump means the file archive failed
-(or `ATTACHMENT_DIR` is unset), and the `ERROR` line above it says which.
+(or `ATTACHMENT_DIR` is unset), and the `ERROR` line above it says which. With `BACKUP_REMOTE`
+set there are two more, one `off-host: pushed …` per archive, and the same rule applies to them.
 
-**Copy the archives off-host.** `backup_data` sits on the same disk as `postgres_data`, so it
-covers "I dropped the wrong table" and covers nothing about a dead disk or a lost server —
-mirror the volume somewhere else on a schedule (`rsync`/`rclone` from
-`docker compose exec -T backup cat /backups/<archive>`, or straight from the volume's host
-path) or the disaster case still loses everything.
+**Copy the archives off-host.** `backup_data` sits on the same disk as `postgres_data`, so
+everything above covers "I dropped the wrong table" and covers nothing about a dead disk or a
+lost server. Set `BACKUP_REMOTE` to an rclone remote path (`s3:bucket/prefix`, `b2:bucket`,
+`sftp:…`) and the same sidecar pushes both archives there after every cycle, prunes the remote
+to the same `BACKUP_KEEP`, and (this is the part that makes it a backup rather than a hope)
+reports the container **unhealthy** once the newest off-host copy passes `2 × BACKUP_INTERVAL`,
+so a broken upload is noticed on the day it breaks and not on restore day. A failed upload
+never costs a local archive. Blank, which is the default, leaves this section exactly as it was
+before that option existed. Setup, credentials, and restoring from the remote:
+[Off-host copies](self-hosting.md#off-host-copies).
 
 ### Taking a dump by hand
 
