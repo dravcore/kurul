@@ -250,6 +250,40 @@ jobs:
           cache-from: type=gha,scope=pr-${{ matrix.image }}
           cache-to: ${{ matrix.cache-to }}
 
+      # A Next.js standalone image can build green and still be dead on arrival: `next build`
+      # *traces* the server's runtime dependencies, and a tracing regression drops a file that
+      # nothing before `node server.js` ever asks for. next 16.3.1 did exactly that: it stopped
+      # copying `@swc/helpers/esm/*`, which Node ≥ 22.12 resolves through the `module-sync`
+      # exports condition, so every image built from it threw `MODULE_NOT_FOUND` at boot
+      # (vercel/next.js#97598, fixed in 16.3.2). Nothing in this pipeline noticed: `build`
+      # compiles, this job scans layers, and neither one *starts* the thing. Booting the image
+      # once and asking it for a page is the whole missing check.
+      #
+      # Only the web leg: the api image needs Postgres and Redis to answer anything, which is a
+      # compose stack rather than a step, while the web server answers `/` on its own (a 307 to
+      # the login route, and no API call is made to produce it). `-f` therefore also catches a 5xx,
+      # not just a process that never listened.
+      #
+      # Costs about 10s of wall time: the container is already local from the step above, Next
+      # standalone is ready in well under a second, and the loop exits on the first success.
+      - name: Web image boots and answers
+        if: matrix.image == 'kurul-web'
+        run: |
+          set -euo pipefail
+          docker run -d --name web-boot -p 3000:3000 kurul-web:runner
+          for _ in $(seq 1 20); do
+            if curl -fs -o /dev/null --max-time 3 http://127.0.0.1:3000/; then
+              echo "kurul-web answered /, the image boots"
+              docker rm -f web-boot >/dev/null
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "kurul-web did not answer / within 20s"
+          docker logs web-boot
+          docker rm -f web-boot >/dev/null
+          exit 1
+
       # `ignore-unfixed: true` is what separates a gate from a permanent red mark. node:24-alpine
       # carries HIGH and CRITICAL advisories for which no fixed version exists in any package the
       # image could move to, so without it every pull request fails for something no pull request
