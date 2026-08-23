@@ -209,6 +209,37 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   for the realtime path's steady-state case, not for a cold socket handshake plus `board:join`
   round trip queued behind everything else starting up. It now gets its own 25s timeout; every
   scenario's assertions after this precondition still run under the tighter global one.
+- **The board could show "Reconnecting…" forever over a socket that was connected and
+  healthy.** Two defects, either of which was enough on its own, and together they are what made
+  the browser suite fail on a fixed commit roughly every other nightly. Neither was a timeout:
+  the room was never joined, and nothing was retrying it.
+
+  The first is a race in the API. `RealtimeGateway` resolved the handshake's session in an
+  `async` `handleConnection` hook, and Socket.io acks the CONNECT packet *before* it emits
+  `connection` and queues nothing behind an async listener. The client emits `board:join` from
+  its own `connect` event — one round trip later — so on a machine where the session read was
+  slower than that round trip, the room handlers read `socket.data.userId` as undefined and
+  answered `unauthenticated`. Authentication now runs as Socket.io middleware, which completes
+  before the ack, so the id is on the socket before any handler can be reached or the connection
+  is refused outright. Measured against the API with a script that opens a socket the way the
+  board page does, 160 flows: 159 denied `unauthenticated` before, 0 after.
+
+  The second is in the web client. `connectSocket()` opened the socket when it was not
+  `connected`, but `connected` only turns true when the server's ack arrives, so the second of
+  the board's two socket hooks — board room and notification room, mounting milliseconds apart —
+  called `connect()` on an already-opening socket and made socket.io-client send the namespace
+  CONNECT packet twice on one connection. Socket.io 4.x reads a duplicate CONNECT for a
+  namespace it already holds as an invalid state and closes the whole client, so the first
+  connection died mid-handshake with its joins unanswered. The guard is now `active`, which
+  means "open or opening".
+
+  And a third thing that turned both into something permanent rather than a blip: socket.io
+  reconnects a connection that *dropped* but abandons one the server *refused* — a
+  `connect_error` or a server-side disconnect runs the client's `destroy()`, so `reconnect_failed`
+  never fires and even the existing cooldown never armed. `lib/socket.ts` now schedules its own
+  jittered, doubling retry for exactly those two cases, and a denied room join is retried with
+  backoff instead of standing for the life of the socket — so the indicator now describes
+  something that is actually happening.
 
 ### Changed
 

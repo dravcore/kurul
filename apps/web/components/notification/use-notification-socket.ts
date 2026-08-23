@@ -7,6 +7,7 @@ import {
   type NotificationUnreadChangedPayload,
 } from '@kurul/shared-types';
 import { connectSocket, getSocket } from '@/lib/socket';
+import { createRoomJoin } from '@/lib/socket-room';
 
 export type NotificationSocketHandlers = {
   /** The recipient's unread count changed — a notification arrived, or one was read. */
@@ -72,23 +73,26 @@ export function useNotificationSocket(
     const socket = getSocket();
     retainRoom(workspaceId);
 
+    // `connected` flips only once the room is actually joined: a socket that connected but was
+    // denied the room delivers nothing, and the caller has to keep its fallback refresh running
+    // rather than trust a live-looking flag. A denial is retried with backoff
+    // (`lib/socket-room.ts`) rather than left to stand for the life of the socket.
+    const join = createRoomJoin(
+      socket,
+      SocketClientEvents.NOTIFICATIONS_JOIN,
+      { workspaceId },
+      () => {
+        setConnected(true);
+        handlersRef.current.onResync();
+      },
+    );
+
     function onConnect(): void {
-      socket.emit(
-        SocketClientEvents.NOTIFICATIONS_JOIN,
-        { workspaceId },
-        (ack: { ok?: boolean } | undefined) => {
-          // `connected` flips only once the room is actually joined: a socket that connected
-          // but was denied the room delivers nothing, and the caller has to keep its fallback
-          // refresh running rather than trust a live-looking flag.
-          if (ack?.ok) {
-            setConnected(true);
-            handlersRef.current.onResync();
-          }
-        },
-      );
+      join.start();
     }
 
     function onDisconnect(): void {
+      join.cancel();
       setConnected(false);
     }
 
@@ -113,6 +117,7 @@ export function useNotificationSocket(
     }
 
     return () => {
+      join.cancel();
       if (releaseRoom(workspaceId)) {
         socket.emit(SocketClientEvents.NOTIFICATIONS_LEAVE, { workspaceId });
       }

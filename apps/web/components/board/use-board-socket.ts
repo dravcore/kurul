@@ -12,6 +12,7 @@ import {
   type TaskUpdatedPayload,
 } from '@kurul/shared-types';
 import { connectSocket, getSocket } from '@/lib/socket';
+import { createRoomJoin } from '@/lib/socket-room';
 
 export type BoardSocketHandlers = {
   onTaskCreated: (payload: TaskCreatedPayload) => void;
@@ -45,23 +46,21 @@ export function useBoardSocket(
     // the two cannot slip past `onConnect`.
     const socket = getSocket();
 
+    // `connected` flips only once the room is actually joined: a socket that connected but was
+    // denied the room delivers nothing, and the caller has to keep showing a reconnecting /
+    // offline state rather than trust a live-looking flag. A denial is retried with backoff
+    // (`lib/socket-room.ts`) rather than left to stand for the life of the socket.
+    const join = createRoomJoin(socket, SocketClientEvents.BOARD_JOIN, { boardId }, () => {
+      setConnected(true);
+      handlersRef.current.onResync();
+    });
+
     function onConnect(): void {
-      socket.emit(
-        SocketClientEvents.BOARD_JOIN,
-        { boardId },
-        (ack: { ok?: boolean } | undefined) => {
-          // `connected` flips only once the room is actually joined: a socket that connected
-          // but was denied the room delivers nothing, and the caller has to keep showing a
-          // reconnecting / offline state rather than trust a live-looking flag.
-          if (ack?.ok) {
-            setConnected(true);
-            handlersRef.current.onResync();
-          }
-        },
-      );
+      join.start();
     }
 
     function onDisconnect(): void {
+      join.cancel();
       setConnected(false);
     }
 
@@ -102,6 +101,7 @@ export function useBoardSocket(
     }
 
     return () => {
+      join.cancel();
       socket.emit(SocketClientEvents.BOARD_LEAVE, { boardId });
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);

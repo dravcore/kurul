@@ -1,5 +1,11 @@
 import { expect, test } from '../support/fixtures';
-import { column, dragCardOnto, expectCardOrder, waitForBoardReady } from '../support/board-page';
+import {
+  column,
+  dragCardOnto,
+  expectCardOrder,
+  waitForBoardReady,
+  watchSocketHandshake,
+} from '../support/board-page';
 
 /**
  * Scenario 2 — one person moves a card, a second browser sees it move.
@@ -35,6 +41,10 @@ test('a move made in one browser appears in another without a reload', async ({
 
   const ownerPage = await openAs(owner);
   const observerPage = await openAs(observer);
+
+  // Installed before the navigation that opens the sockets — see `watchSocketHandshake`.
+  const ownerHandshake = watchSocketHandshake(ownerPage);
+  const observerHandshake = watchSocketHandshake(observerPage);
 
   await Promise.all([
     ownerPage.goto(`/board/${board.id}`),
@@ -75,4 +85,22 @@ test('a move made in one browser appears in another without a reload', async ({
   // The observer's tab never navigated: if it had, this would be a test of `GET /tasks`
   // wearing a realtime costume.
   expect(observerPage.url()).toBe(`${new URL(observerPage.url()).origin}/board/${board.id}`);
+
+  // The handshake itself, asserted off the wire rather than through the indicator above.
+  // Both of these used to hold only by luck, and lost that luck on a loaded CI runner.
+  for (const [who, read] of [
+    ['owner', ownerHandshake],
+    ['observer', observerHandshake],
+  ] as const) {
+    const { connectPacketsPerConnection, deniedJoins } = read();
+    expect(
+      connectPacketsPerConnection.length,
+      `${who} should have opened a socket`,
+    ).toBeGreaterThan(0);
+    expect(
+      connectPacketsPerConnection,
+      `${who} must send exactly one namespace CONNECT per connection — a duplicate makes Socket.io close the client`,
+    ).toEqual(connectPacketsPerConnection.map(() => 1));
+    expect(deniedJoins, `${who} must not be denied a room it is a member of`).toEqual([]);
+  }
 });
