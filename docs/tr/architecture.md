@@ -198,7 +198,7 @@ apps/web/
 │   ├── auth/              # paylaşılan auth form primitive'leri
 │   ├── brand/             # DamgaMark ve diğer marka işaretleri
 │   ├── ui/                # shadcn/ui primitive'leri (Faz 3'te landed)
-│   ├── board/             # BoardList, BoardView, BoardColumn, dialog'lar
+│   ├── board/             # BoardList, BoardView, BoardColumn, dialog'lar, board hook'ları
 │   ├── task/              # TaskCard, TaskPanel, metadata editörleri, DnD yardımcıları
 │   ├── dashboard/         # grafik component'leri (Faz 7+)
 │   ├── notification/      # NotificationBell, NotificationsList
@@ -207,6 +207,7 @@ apps/web/
 ├── messages/              # en.json, tr.json — UI metni, locale başına tek düz dosya
 └── lib/
     ├── api.ts             # typed REST client
+    ├── use-api-resource.ts # okuma primitive'i: tek abort, tek loading, tek error
     ├── socket.ts          # Socket.io client (board realtime)
     ├── board-permissions.ts
     └── auth.ts            # Better Auth client (`@kurul/auth-access`)
@@ -216,9 +217,22 @@ apps/web/
 chrome'unu render eder ve bir session olduğunu varsayar. `apps/web/proxy.ts` (Next 16'nın
 `middleware.ts` konvansiyonunun yerine geçen dosyası), `(app)` route'larından önce Better Auth
 session cookie'sini `/auth/get-session` ile doğrular ve aynı geçişte istek başına CSP nonce'ını
-üretir; client shell session varken workspace bootstrap'ını yapar. Board etkileşimi `@dnd-kit` kullanır;
-doğruluk kaynağı sunucudur — optimistic bir taşıma hem API yanıtına hem de gelen socket
-event'lerine karşı uzlaştırılır.
+üretir; client shell session varken workspace bootstrap'ını yapar.
+
+**Veri katmanı:** bir veri çekme kütüphanesi yok. Okumalar `lib/api.ts` (kendi cache'i olmayan
+typed bir `fetch` sarmalayıcısı) ve `lib/use-api-resource.ts` üzerinden geçer; ikincisi tek bir
+değerin bir kez gelmesini modeller: tek abort, tek loading bayrağı, tek error ve invalidation'ın
+tamamı olarak fetcher'ın kimliği. Yazmalar, dokundukları state'in sahibi olan hook'un içinde düz
+`api.*` çağrılarıdır ve her biri kendi optimistic güncellemesini ve geri almasını yazar. Socket
+payload'ları id taşır ([ADR 0005](decisions/0005-realtime-socketio.md)), yani değişen bir satır
+event'ten birleştirilmek yerine yeniden çekilir; client'ın bir entity cache'ine bu yüzden ihtiyacı
+yok. Board etkileşimi `@dnd-kit` kullanır; doğruluk kaynağı sunucudur: optimistic bir taşıma hem
+API yanıtına hem de gelen socket event'lerine karşı uzlaştırılır. `BoardView` bütünü tek konulu
+küçük hook'lardan birleştirir (`useBoardData` arkasında `useBoardCaches`, `useBoardFetch`,
+`useBoardLoad` ve `useBoardPanelTask`; ardından `useBoardMutations`, `useBoardRealtime`,
+`useBoardTaskDnd`, `useBoardDialogs`) ve board ölçeğindeki yeni bir yüzeyin izlediği desen bu
+birleştirmedir. [ADR 0029](decisions/0029-client-data-layer.md) katmanın neden elle yazıldığını,
+işlettiği beş kuralı ve onu React Query ile değiştirecek tek grep'lenebilir ölçümü kayda geçirir.
 
 **i18n:** `next-intl` Faz 1'den beri kurulu (`i18n/request.ts`, root layout'ta
 `NextIntlClientProvider`, UI metni `messages/en.json`'da), yani her kullanıcıya görünen metin
@@ -531,6 +545,7 @@ Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 | [`0026-account-deletion-anonymisation.md`](decisions/0026-account-deletion-anonymisation.md)                 | Hesap Silme: `User` Satırını Yerinde Anonimleştir, Sahip Olunan Workspace Kararını Akışın İçinde Sor              |
 | [`0027-attachment-quotas.md`](decisions/0027-attachment-quotas.md)                                           | Dosya Eki Depolama Kotaları: Workspace Başına ve Instance Geneli Yumuşak Bayt Tavanları                           |
 | [`0028-open-contributions-hosted-service.md`](decisions/0028-open-contributions-hosted-service.md)           | AGPL-3.0 Altında Açık Katkılar, CLA Yok; Gelir Yalnızca Barındırılan Bir Servisten                                |
+| [`0029-client-data-layer.md`](decisions/0029-client-data-layer.md)                                           | İstemci Veri Katmanı El Yapımı Kalıyor; Geçiş Tetikleyicisi Üçüncü Generation Sayacı                              |
 
 ---
 

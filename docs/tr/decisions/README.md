@@ -40,6 +40,7 @@ Kurul, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğunluk
 | [0026](0026-account-deletion-anonymisation.md)         | Hesap Silme: `User` Satırını Yerinde Anonimleştir, Sahip Olunan Workspace Kararını Akışın İçinde Sor              | Kabul edildi                                          | 2026-08-15 |
 | [0027](0027-attachment-quotas.md)                      | Dosya Eki Depolama Kotaları: Workspace Başına ve Instance Geneli Yumuşak Bayt Tavanları                           | Kabul edildi                                          | 2026-08-18 |
 | [0028](0028-open-contributions-hosted-service.md)      | AGPL-3.0 Altında Açık Katkılar, CLA Yok; Gelir Yalnızca Barındırılan Bir Servisten                                | Kabul edildi (0014 ve 0015'in yerini aldı)            | 2026-08-21 |
+| [0029](0029-client-data-layer.md)                      | İstemci Veri Katmanı El Yapımı Kalıyor; Geçiş Tetikleyicisi Üçüncü Generation Sayacı                              | Kabul edildi                                          | 2026-08-23 |
 | [0030](0030-typescript-7-hold.md)                      | TypeScript, typescript-eslint ve ts-jest 7'yi Destekleyene Kadar 5.x Hattında Kalır                               | Kabul edildi                                          | 2026-08-23 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).

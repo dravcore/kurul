@@ -1,0 +1,135 @@
+'use client';
+
+import { useId, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
+import type { TaskDto, UpdateTaskRequest } from '@kurul/shared-types';
+import { api, apiStatus, resolveApiMessage } from '@/lib/api';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+
+interface TaskPanelFieldsProps {
+  workspaceId: string;
+  task: TaskDto;
+  canMutate: boolean;
+  onUpdated: (patch: Partial<TaskDto> & Pick<TaskDto, 'id'>) => void;
+  /** Called when the task turns out to be gone, so the panel does not sit on a dead row. */
+  onClose: () => void;
+}
+
+/**
+ * The task's title and description, and the write behind them.
+ *
+ * One of the three optimistic write paths named in
+ * [ADR 0029](../../../../docs/decisions/0029-client-data-layer.md): the edit is merged into the
+ * board's task list before the PATCH is sent, the server's answer is merged over it, and the
+ * two remembered fields go back if the write is refused. It lives beside the inputs rather
+ * than in the panel shell because the snapshot it rolls back to is exactly what these two
+ * fields were showing.
+ */
+export function TaskPanelFields({
+  workspaceId,
+  task,
+  canMutate,
+  onUpdated,
+  onClose,
+}: TaskPanelFieldsProps): React.ReactElement {
+  const t = useTranslations('app.board.task');
+  const titleId = useId();
+  const descriptionId = useId();
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description ?? '');
+  const [pending, setPending] = useState(false);
+
+  // Re-seed the editable fields when the panel switches task, or when the stored title or
+  // description changes under it (our own PATCH coming back, or a realtime edit). Done during
+  // render rather than from an effect so the panel never paints the previous task's title for
+  // one frame first — the flash was visible every time a card was opened from another card.
+  const [synced, setSynced] = useState({
+    id: task.id,
+    title: task.title,
+    description: task.description,
+  });
+  if (
+    synced.id !== task.id ||
+    synced.title !== task.title ||
+    synced.description !== task.description
+  ) {
+    setSynced({ id: task.id, title: task.title, description: task.description });
+    setTitle(task.title);
+    setDescription(task.description ?? '');
+  }
+
+  async function save(): Promise<void> {
+    if (!canMutate) return;
+    const nextTitle = title.trim();
+    if (nextTitle.length === 0) return;
+    const nextDescription = description.trim().length > 0 ? description : null;
+    if (nextTitle === task.title && nextDescription === task.description) return;
+
+    setPending(true);
+    const previousTitle = task.title;
+    const previousDescription = task.description;
+    onUpdated({ id: task.id, title: nextTitle, description: nextDescription });
+    try {
+      const body: UpdateTaskRequest = { title: nextTitle, description: nextDescription };
+      const updated = await api.patch<TaskDto, UpdateTaskRequest>(
+        `/workspaces/${workspaceId}/tasks/${task.id}`,
+        body,
+      );
+      onUpdated(updated);
+    } catch (caught) {
+      onUpdated({
+        id: task.id,
+        title: previousTitle,
+        description: previousDescription,
+      });
+      const status = apiStatus(caught);
+      // A retry only makes sense for a failure the server did not explain; re-sending a
+      // rejected write on a 403, or against a task that is gone, just repeats the toast.
+      if (status === 403 || status === 404) {
+        toast.error(
+          resolveApiMessage(caught, t, {
+            fallback: 'saveError',
+            byStatus: { 403: 'forbidden', 404: 'missing' },
+          }),
+        );
+        if (status === 404) onClose();
+      } else {
+        toast.error(t('saveError'), {
+          action: { label: t('retryAction'), onClick: () => void save() },
+        });
+      }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={titleId}>{t('title')}</Label>
+        <Input
+          id={titleId}
+          value={title}
+          disabled={!canMutate || pending}
+          onChange={(event) => setTitle(event.target.value)}
+          onBlur={() => void save()}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={descriptionId}>{t('description')}</Label>
+        <Textarea
+          id={descriptionId}
+          value={description}
+          disabled={!canMutate || pending}
+          onChange={(event) => setDescription(event.target.value)}
+          onBlur={() => void save()}
+          rows={8}
+          className="min-h-32"
+        />
+      </div>
+    </>
+  );
+}
