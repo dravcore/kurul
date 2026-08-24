@@ -133,7 +133,7 @@ export function InviteMemberDialog({
             </option>
           ))}
         </Select>
-        <p className="text-caption text-muted-foreground">{t(`roleHints.${role}`)}</p>
+        <p className="text-small text-muted-foreground">{t(`roleHints.${role}`)}</p>
       </div>
     </FormDialog>
   );

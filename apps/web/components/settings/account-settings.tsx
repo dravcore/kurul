@@ -61,7 +61,7 @@ export function AccountSettings(): React.ReactElement {
       <div className={ROW}>
         <div className="min-w-0">
           <p className="text-body text-foreground">{t('deleteSectionTitle')}</p>
-          <p className="text-caption text-muted-foreground">{t('deleteSectionBody')}</p>
+          <p className="text-small text-muted-foreground">{t('deleteSectionBody')}</p>
         </div>
         <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
           {t('deleteAction')}

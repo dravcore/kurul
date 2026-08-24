@@ -185,7 +185,7 @@ export function MembersSettings(): React.ReactElement {
               <li key={invitation.id} className={ROW}>
                 <div className="min-w-0">
                   <p className="truncate text-body text-foreground">{invitation.email}</p>
-                  <p className="text-caption text-muted-foreground">
+                  <p className="text-small text-muted-foreground">
                     {t('pendingExpires', {
                       when: formatRelativeTime(invitation.expiresAt, locale),
                     })}
@@ -230,7 +230,7 @@ export function MembersSettings(): React.ReactElement {
               <p className="min-w-0 truncate text-body text-foreground">
                 {member.name}
                 {isSelf ? (
-                  <span className="ml-2 text-caption text-muted-foreground">{t('you')}</span>
+                  <span className="ml-2 text-small text-muted-foreground">{t('you')}</span>
                 ) : null}
               </p>
               <div className="flex shrink-0 items-center gap-2">

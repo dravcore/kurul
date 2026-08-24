@@ -109,7 +109,7 @@ export function TokenSettings(): React.ReactElement {
                     a reader scanning the row needs to pick out "never used" or an expiry at a
                     glance, the same reason `MembersSettings` keeps the "You" badge separate
                     from the member's name rather than folding it into one string. */}
-                <p className="flex flex-wrap items-center gap-x-1.5 truncate text-caption text-muted-foreground">
+                <p className="flex flex-wrap items-center gap-x-1.5 truncate text-small text-muted-foreground">
                   <span className="font-mono">{token.prefix}…</span>
                   <span aria-hidden="true">·</span>
                   <span>{t('createdAt', { when: formatDate(token.createdAt, locale) })}</span>
