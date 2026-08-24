@@ -392,6 +392,9 @@ describe('BoardView empty states', () => {
     if (!emptyState) throw new Error('empty state container not found');
     expect(screen.queryByTestId('board-canvas')).toBeNull();
 
+    // Verify that the empty state message correctly reports the search term as 1 active filter
+    expect(emptyState.textContent).toContain('1 filter is active');
+
     // The active-filters chip bar renders its own "Clear filters" control; this one is the
     // empty state's, so the query is scoped to it rather than picking either match.
     const clearButton = screen
