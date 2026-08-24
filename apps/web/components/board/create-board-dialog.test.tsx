@@ -133,6 +133,44 @@ describe('CreateBoardDialog', () => {
     expect(radio('Bug Triage').checked).toBe(false);
   });
 
+  /**
+   * Selection wears `--signature` and focus wears `--ring`. The two tokens hold the same copper,
+   * so while the unlayered `*` rule was repainting both grey nothing distinguished them and the
+   * selected card carried the focus token by accident.
+   */
+  it('moves the signature border to whichever template is selected', async () => {
+    renderDialog();
+    await waitFor(() => expect(radio('Kanban').checked).toBe(true));
+
+    const cardOf = (name: string): Set<string> => {
+      const label = radio(name).closest('label');
+      if (label === null) throw new Error(`${name} has no enclosing label`);
+      return new Set(label.className.split(/\s+/).filter(Boolean));
+    };
+
+    expect(cardOf('Kanban').has('border-signature')).toBe(true);
+    expect(cardOf('Kanban').has('border-ring')).toBe(false);
+    expect(cardOf('Bug Triage').has('border-signature')).toBe(false);
+    expect(cardOf('Bug Triage').has('border-border')).toBe(true);
+    expect(cardOf('Bug Triage').has('hover:border-border-strong')).toBe(true);
+
+    fireEvent.click(radio('Bug Triage'));
+
+    await waitFor(() => expect(cardOf('Bug Triage').has('border-signature')).toBe(true));
+    expect(cardOf('Kanban').has('border-signature')).toBe(false);
+  });
+
+  /** Focus is the other copper edge; it belongs to every card, selected or not. */
+  it('keeps the focus edge on every template card', async () => {
+    renderDialog();
+    await waitFor(() => expect(screen.getAllByRole('radio')).toHaveLength(2));
+
+    for (const name of ['Kanban', 'Bug Triage']) {
+      const label = radio(name).closest('label');
+      expect(label?.className).toContain('focus-within:border-ring');
+    }
+  });
+
   it('sends the chosen template with the board', async () => {
     renderDialog();
 
