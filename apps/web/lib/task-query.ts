@@ -111,7 +111,6 @@ export function hasActiveFilters(filters: BoardTaskFilters): boolean {
 
 export function countActiveFilters(filters: BoardTaskFilters): number {
   let count = 0;
-  if (filters.q?.trim()) count += 1;
   count += filters.priority?.length ?? 0;
   count += filters.assigneeId?.length ?? 0;
   count += filters.labelId?.length ?? 0;
