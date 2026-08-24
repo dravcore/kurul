@@ -147,7 +147,7 @@ export function SidebarBody({
           )}
           onClick={() => void onSignOut()}
         >
-          <LogOut className="size-4" />
+          <LogOut className="size-5" />
           {!collapsed ? t('shell.signOut') : null}
         </Button>
       </div>
