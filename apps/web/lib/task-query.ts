@@ -109,18 +109,6 @@ export function hasActiveFilters(filters: BoardTaskFilters): boolean {
   );
 }
 
-/** Count all active filters that shape the board view, including search term. */
-export function countActiveFilters(filters: BoardTaskFilters): number {
-  let count = 0;
-  if (filters.q?.trim()) count += 1;
-  count += filters.priority?.length ?? 0;
-  count += filters.assigneeId?.length ?? 0;
-  count += filters.labelId?.length ?? 0;
-  if (filters.dueDateNull) count += 1;
-  if (filters.dueDateGte || filters.dueDateLte) count += 1;
-  return count;
-}
-
 /** Count only the menu filter options, excluding the free-text search term. */
 export function countActiveMenuFilters(filters: BoardTaskFilters): number {
   let count = 0;
@@ -130,6 +118,15 @@ export function countActiveMenuFilters(filters: BoardTaskFilters): number {
   if (filters.dueDateNull) count += 1;
   if (filters.dueDateGte || filters.dueDateLte) count += 1;
   return count;
+}
+
+/**
+ * Count all active filters that shape the board view, including search term. Derived from
+ * the menu count so a filter added to one counter cannot be forgotten in the other; the
+ * search term is the single deliberate difference between them.
+ */
+export function countActiveFilters(filters: BoardTaskFilters): number {
+  return countActiveMenuFilters(filters) + (filters.q?.trim() ? 1 : 0);
 }
 
 /** Replace filter keys on an existing URLSearchParams, keep unrelated keys. */
