@@ -295,6 +295,17 @@ compile the same source `pnpm typecheck` reads and cannot pass against a stale b
 required for `pnpm typecheck`, `nest build`, `next build` and `pnpm dev`, see
 [development.md](development.md#clone-and-install).
 
+`apps/web/workspace-packages.test.ts` is one of four **structural guards** that sit at the root of
+`apps/web` (or beside `globals.css`) instead of next to a component, because their subject is the
+app as a whole. The other three came with the cascade-layer repair:
+`apps/web/app/globals-css-layers.test.ts` compiles `app/globals.css` through the installed
+Tailwind and resolves the cascade the way a browser would, so the wildcard `border-color` rule
+cannot leave `@layer base` unnoticed; `apps/web/border-utilities.test.ts` scans the tree and fails
+on any border class drawn from outside the reviewed token set;
+`apps/web/app/theme-classes.test.ts` asks Tailwind whether every `text-`, `bg-`, `border-`,
+`font-` and `shadow-` class in the tree resolves to CSS at all. The rules they enforce are
+written down in [coding-standards.md](coding-standards.md#styling).
+
 ## Writing tests
 
 - **Arrange–Act–Assert**, with blank lines between the three parts.

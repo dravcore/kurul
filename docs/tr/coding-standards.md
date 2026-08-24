@@ -232,6 +232,17 @@ components/
 - Koşullu class'lar string concatenation değil, `cn()` helper'ından geçer.
 - Design token'ları (renkler, spacing, radius) Tailwind theme'inden gelir — component'lerde
   keyfi hex değerleri yok.
+- `apps/web/app/globals.css` içindeki yazar CSS'i, kuralın yanına yazılmış bir gerekçe yoksa
+  `@layer base` içine girer. Katmansız bir kural özgüllüğünden bağımsız olarak her cascade
+  katmanını yener; bu yüzden katmansız bir `*` seçici, Tailwind'in `@layer utilities` içine
+  ürettiği yardımcı sınıfları yeniden boyar ve markup'ta yazılan class söylediği şeyi ifade
+  etmeyi bırakır. Bugünkü tek istisna `:focus-visible` outline'ı ve gerekçesi kuralın yanında
+  duruyor. `apps/web/app/globals-css-layers.test.ts` bunu korur.
+- Her `text-*`, `bg-*`, `border-*`, `font-*` ve `shadow-*` class'ının `@theme inline` içinde ya da
+  Tailwind'in yerleşik ölçeğinde bir karşılığı olmalı. Karşılığı olmayan class hiç CSS üretmez:
+  hata da vermez, element yalnızca miras alır ve yanlışlık review'da görünmez.
+  `apps/web/app/theme-classes.test.ts` ağacı Tailwind üzerinden derler ve hiçbir şey üretmeyen her
+  class'ta kırmızıya döner.
 
 ## Paylaşılan tipler (`packages/shared-types`)
 

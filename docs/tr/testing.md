@@ -300,6 +300,17 @@ geçemez. `apps/api/src/workspace-packages.spec.ts`, `apps/api/test/harness.e2e-
 `pnpm typecheck`, `nest build`, `next build` ve `pnpm dev` için gereklidir, bkz.
 [development.md](development.md#klonlama-ve-kurulum).
 
+`apps/web/workspace-packages.test.ts`, bir component'in yanında değil `apps/web` kökünde (ya da
+`globals.css`'in yanında) duran dört **yapısal koruma** testinden biridir; konuları tek bir modül
+değil uygulamanın bütünü olduğu için oradalar. Diğer üçü cascade katman onarımıyla geldi:
+`apps/web/app/globals-css-layers.test.ts`, `app/globals.css`'i kurulu Tailwind üzerinden derler ve
+cascade'i bir tarayıcının çözdüğü gibi çözer, böylece joker `border-color` kuralı fark edilmeden
+`@layer base` dışına çıkamaz; `apps/web/border-utilities.test.ts` ağacı tarar ve incelenmiş token
+kümesinin dışından çizilen her border class'ında kırmızıya döner;
+`apps/web/app/theme-classes.test.ts` ağaçtaki her `text-`, `bg-`, `border-`, `font-` ve `shadow-`
+class'ının CSS'e çözülüp çözülmediğini Tailwind'e sorar. Uyguladıkları kurallar
+[coding-standards.md](coding-standards.md#stil) içinde yazılıdır.
+
 ## Test yazma
 
 - **Arrange–Act–Assert**, üç kısım arasında boş satırlarla.
