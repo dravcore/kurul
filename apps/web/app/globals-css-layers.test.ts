@@ -354,9 +354,11 @@ describe('globals.css cascade layers', () => {
     expect(layerRank(sheet, divide.layer)).toBeGreaterThan(layerRank(sheet, 'base'));
   });
 
-  // components/ui/button.tsx still carries `outline-none`, a @layer utilities rule. The
-  // :focus-visible outline therefore has to stay unlayered to remain a button's only focus
-  // indicator. Phase 4 drops `outline-none` and moves the rule; this guards the gap until then.
+  // components/ui/button.tsx carries `outline-none` next to `focus-visible:border-ring` and
+  // `focus-visible:ring-[3px] ring-ring/50`, all @layer utilities rules. Layering this outline
+  // would leave a focused button with the 1px border and the half-opacity ring instead of the
+  // 2px --ring at 2px offset docs/design.md §5 requires, so it stays unlayered until Phase 4
+  // drops `outline-none` and settles the ring utilities together.
   it('keeps the :focus-visible outline above every utility', () => {
     const focus = sheet.rules.filter((rule) => rule.selector === ':focus-visible');
     expect(focus).not.toHaveLength(0);
