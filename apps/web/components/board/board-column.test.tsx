@@ -117,6 +117,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('BoardColumn empty drop zone', () => {
+  /**
+   * The one resting border in the tree that changed colour when the `*` rule moved into
+   * `@layer base`: it had been drawing the hairline grey rather than `--border-strong`. It is
+   * the empty-column affordance of docs/design.md §7, not a live drop target, which is why it
+   * is allowed the dashed outline §5 forbids while a card is in the air.
+   */
+  it('draws the empty column its dashed border-strong outline', () => {
+    renderColumn([]);
+    const zone = screen.getByText(messages.app.board.column.emptyDrop);
+    const classes = new Set(zone.className.split(/\s+/).filter(Boolean));
+
+    expect(classes.has('border-dashed')).toBe(true);
+    expect(classes.has('border-border-strong')).toBe(true);
+    expect(classes.has('border')).toBe(true);
+  });
+
+  it('drops the zone as soon as the column holds a task', () => {
+    renderColumn(makeTasks(1));
+
+    expect(screen.queryByText(messages.app.board.column.emptyDrop)).toBeNull();
+  });
+});
+
 describe('BoardColumn render budget', () => {
   it('renders every card when the column is under the budget', () => {
     const observers = installIntersectionObserver();

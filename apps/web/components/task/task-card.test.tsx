@@ -32,12 +32,17 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
   };
 }
 
-function renderCard(overrides: Partial<TaskDto> = {}) {
+function renderCard(overrides: Partial<TaskDto> = {}, selected = false) {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <TaskCard task={task(overrides)} boardId="board-1" />
+      <TaskCard task={task(overrides)} boardId="board-1" selected={selected} />
     </NextIntlClientProvider>,
   );
+}
+
+/** Substring matching cannot tell `border-border` from `hover:border-border-strong`. */
+function classesOf(element: Element): Set<string> {
+  return new Set(element.className.split(/\s+/).filter(Boolean));
 }
 
 afterEach(() => {
@@ -75,6 +80,44 @@ describe('TaskCard estimate', () => {
     renderCard({ estimatedMinutes: null });
 
     expect(screen.queryByText(/\dh|\dm/)).toBeNull();
+  });
+});
+
+describe('TaskCard selection', () => {
+  /**
+   * The copper edge is what separates the open task from its neighbours on the board. Until the
+   * `*` border rule moved into `@layer base` it was repainted the hairline grey, so the card
+   * that carried it looked like every other one, and nothing in the suite would have noticed.
+   */
+  it('wears the signature border only while it is the selected card', () => {
+    renderCard({}, true);
+    const selected = screen.getByRole('link');
+
+    expect(classesOf(selected).has('border-signature')).toBe(true);
+    expect(selected.getAttribute('data-selected')).toBe('true');
+    expect(selected.getAttribute('aria-current')).toBe('true');
+  });
+
+  it('leaves an unselected card on the plain hairline', () => {
+    renderCard();
+    const unselected = screen.getByRole('link');
+
+    expect(classesOf(unselected).has('border-signature')).toBe(false);
+    expect(classesOf(unselected).has('border-border')).toBe(true);
+    expect(unselected.hasAttribute('data-selected')).toBe(false);
+    expect(unselected.hasAttribute('aria-current')).toBe(false);
+  });
+
+  /** Hover and focus stay distinct from selection; all three are borders on the same element. */
+  it('keeps the hover and focus edges on every card, selected or not', () => {
+    for (const selected of [false, true]) {
+      cleanup();
+      renderCard({}, selected);
+      const classes = classesOf(screen.getByRole('link'));
+
+      expect(classes.has('hover:border-border-strong')).toBe(true);
+      expect(classes.has('focus-visible:border-ring')).toBe(true);
+    }
   });
 });
 

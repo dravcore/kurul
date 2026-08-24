@@ -238,6 +238,7 @@ function requireRule(
 }
 
 const borderUtilities = {
+  'border-border': 'var(--border)',
   'border-input': 'var(--input)',
   'border-signature': 'var(--signature)',
   'border-destructive': 'var(--destructive)',
@@ -245,11 +246,40 @@ const borderUtilities = {
   'border-border-strong': 'var(--border-strong)',
 } as const;
 
+/**
+ * The state borders the layer move brought back, each with the condition it is supposed to wait
+ * for. Their whole risk is drawing at the wrong moment rather than not drawing at all: an
+ * `aria-invalid` variant that matched any value of the attribute would put a red edge on every
+ * valid field the app marks `aria-invalid="false"`.
+ */
+const stateVariants = {
+  'focus-visible:border-ring': { suffix: ':focus-visible', value: 'var(--ring)' },
+  'focus-within:border-ring': { suffix: ':focus-within', value: 'var(--ring)' },
+  'focus-within:border-border-strong': { suffix: ':focus-within', value: 'var(--border-strong)' },
+  'hover:border-border-strong': { suffix: ':hover', value: 'var(--border-strong)' },
+  'aria-invalid:border-destructive': {
+    suffix: '[aria-invalid="true"]',
+    value: 'var(--destructive)',
+  },
+} as const;
+
+/** The compiled selector for `className`, with Tailwind's `\` before each character a bare
+ * class name cannot hold. */
+function escapeClass(className: string): string {
+  return `.${className.replaceAll(/[:/[\]]/g, (character) => `\\${character}`)}`;
+}
+
 describe('globals.css cascade layers', () => {
   let sheet: Stylesheet;
+  let css: string;
 
   beforeAll(async () => {
-    sheet = parseStylesheet(await compileGlobals(Object.keys(borderUtilities)));
+    css = await compileGlobals([
+      ...Object.keys(borderUtilities),
+      ...Object.keys(stateVariants),
+      'divide-border',
+    ]);
+    sheet = parseStylesheet(css);
   }, 30_000);
 
   it('emits Tailwind utilities into a layer that outranks base', () => {
@@ -283,6 +313,45 @@ describe('globals.css cascade layers', () => {
 
   it.each(Object.entries(borderUtilities))('lets %s draw its own token', (className, expected) => {
     expect(winningValue(sheet, className, 'border-color')).toBe(expected);
+  });
+
+  it.each(Object.entries(stateVariants))(
+    'draws %s only in its own state, above the wildcard',
+    (className, { suffix, value }) => {
+      const escaped = escapeClass(className);
+      const rule = requireRule(sheet, `a rule for ${className}`, (candidate) => {
+        return candidate.selector.startsWith(escaped);
+      });
+
+      expect(rule.selector).toBe(`${escaped}${suffix}`);
+      expect(rule.declarations.at(-1)).toEqual({ property: 'border-color', value });
+      expect(layerRank(sheet, rule.layer)).toBeGreaterThan(layerRank(sheet, 'base'));
+    },
+  );
+
+  // docs/design.md §5: hover motion and hover-only affordances are gated on a real pointer, so
+  // a tapped card does not keep the hover edge until something else is tapped.
+  it('gates the hover border behind a hover-capable pointer', () => {
+    const open = css.indexOf('{', css.indexOf('@media (hover: hover)'));
+    expect(open).toBeGreaterThan(0);
+
+    const gate = css.slice(open, blockEnd(css, open) + 1);
+    expect(gate).toContain('.hover\\:border-border-strong:hover');
+  });
+
+  // `divide-*` compiles under `:where()`, which zeroes its specificity. Only the layer order
+  // keeps it ahead of the wildcard, so it is the one border utility that would still lose if
+  // the `*` rule ever went back to being unlayered.
+  it('keeps divide-border ahead of the wildcard despite :where() zero specificity', () => {
+    const divide = requireRule(sheet, 'a rule for divide-border', (rule) => {
+      return rule.selector.includes('.divide-border');
+    });
+
+    expect(divide.declarations.at(-1)).toEqual({
+      property: 'border-color',
+      value: 'var(--border)',
+    });
+    expect(layerRank(sheet, divide.layer)).toBeGreaterThan(layerRank(sheet, 'base'));
   });
 
   // components/ui/button.tsx still carries `outline-none`, a @layer utilities rule. The

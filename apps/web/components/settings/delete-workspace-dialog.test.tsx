@@ -94,6 +94,26 @@ describe('DeleteWorkspaceDialog', () => {
     expect(apiDelete).not.toHaveBeenCalled();
   });
 
+  /**
+   * `aria-invalid:border-destructive` compiles to `[aria-invalid="true"]`, so the red edge only
+   * appears if the attribute carries that exact string. The field passes a boolean, and a
+   * boolean that reached the DOM as a bare attribute or as `""` would paint an untouched field
+   * red. Before the `*` border rule moved into `@layer base` this drew nothing either way, so
+   * the wrong state would have gone unseen.
+   */
+  it('marks the confirmation field invalid only once something wrong is typed in it', () => {
+    renderDialog();
+
+    expect(confirmField().className).toContain('aria-invalid:border-destructive');
+    expect(confirmField().getAttribute('aria-invalid')).toBe('false');
+
+    fireEvent.change(confirmField(), { target: { value: 'kurul' } });
+    expect(confirmField().getAttribute('aria-invalid')).toBe('true');
+
+    fireEvent.change(confirmField(), { target: { value: workspace.name } });
+    expect(confirmField().getAttribute('aria-invalid')).toBe('false');
+  });
+
   it('never calls the endpoint from a mistyped confirmation click', () => {
     renderDialog();
 
