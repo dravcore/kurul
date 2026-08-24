@@ -3,6 +3,11 @@
 /* Kurul design tokens — values from docs/design.md §3 (Phase 3 validated). */
 
 :root {
+  /* Native controls and scrollbars (select, date/number inputs, the OS scrollbar chrome) key
+     off this property, not off next-themes' `class` attribute, so it cannot be left to that
+     provider's `enableColorScheme` default. */
+  color-scheme: light;
+
   --background: #f7f8f7;
   --foreground: #191c1b;
   --card: #ffffff;
@@ -76,6 +81,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   --background: #0e100f;
   --foreground: #e8ecea;
   --card: #161918;

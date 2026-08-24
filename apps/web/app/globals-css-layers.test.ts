@@ -364,4 +364,21 @@ describe('globals.css cascade layers', () => {
       expect(layerRank(sheet, rule.layer)).toBeGreaterThan(layerRank(sheet, 'utilities'));
     }
   });
+
+  // jsdom never computes `color-scheme` (it lays out nothing), so the only thing a test in this
+  // runner can check is that the declaration reaches the compiled stylesheet at all. Whether the
+  // browser actually honours it was checked separately, in a real Chromium, against
+  // `getComputedStyle(document.documentElement).colorScheme` on this same compiled output.
+  it.each([
+    ['light', ':root'],
+    ['dark', '.dark'],
+  ] as const)(
+    'declares color-scheme: %s on %s so native controls do not depend on the theme provider default',
+    (scheme, selector) => {
+      const rule = requireRule(sheet, `a \`${selector}\` rule`, (candidate) => {
+        return candidate.selector === selector;
+      });
+      expect(rule.declarations).toContainEqual({ property: 'color-scheme', value: scheme });
+    },
+  );
 });
