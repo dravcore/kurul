@@ -188,8 +188,13 @@
   --shadow-drag: var(--elevation-drag);
 }
 
-* {
-  border-color: var(--border);
+/* Inside `base` because an unlayered rule outranks every cascade layer regardless of
+   specificity, so an unlayered `*` here silently repaints every `border-*` utility Tailwind
+   emits into `@layer utilities`. */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 body {
@@ -208,6 +213,10 @@ body {
   font-family: var(--font-mono);
 }
 
+/* Unlayered on purpose, unlike the `*` rule above. components/ui/button.tsx still carries
+   `outline-none`, a `@layer utilities` rule, so a button's only focus indicator is this
+   outline winning by being unlayered. It moves into `base` in the same change that drops
+   `outline-none` and settles the ring utilities. */
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
