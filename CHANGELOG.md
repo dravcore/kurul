@@ -267,6 +267,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   jittered, doubling retry for exactly those two cases, and a denied room join is retried with
   backoff instead of standing for the life of the socket — so the indicator now describes
   something that is actually happening.
+- **The nightly browser suite ran on `main`, not on `develop`.** GitHub runs a scheduled
+  workflow on the repository's default branch, and the checkout step in
+  `.github/workflows/e2e.yml` passed no `ref`, so every 03:00 UTC run re-tested the last
+  release's commit while the docs said it covered the day's merges. Between releases that
+  commit never changes: a regression merged to `develop` stayed invisible until the next
+  release pull request, and the socket fix above stayed red in the nightly for days after it
+  had landed. The schedule now checks out `develop` (the `pull_request` and
+  `workflow_dispatch` triggers are unchanged), and a new step prints the branch and commit
+  that actually ran, since the run's own head branch still names the branch the schedule was
+  read from. `main` keeps its coverage where it changes: the release and hotfix pull requests.
 
 ### Changed
 
