@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { Priority, type TaskDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
@@ -390,6 +390,67 @@ describe('TaskPanel Escape', () => {
 
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Below `md` the panel is a fullscreen sheet and keeps `Tab` inside itself by hand. A dialog
+ * opened from within it is a layer above, with a focus scope of its own: two traps pulling in
+ * opposite directions is a keyboard trap (WCAG 2.1.2), so the panel's stands down while a layer
+ * is open. jsdom applies no media query on its own, so the breakpoint is stubbed.
+ */
+describe('TaskPanel mobile Tab trap', () => {
+  function matchMobile(): void {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      media: query,
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  }
+
+  afterEach(() => {
+    // Back to jsdom's own state, which is no `matchMedia` at all: the hook reads that as
+    // "no breakpoint information" and leaves the trap off, which is what every other test in
+    // this file runs against.
+    Reflect.deleteProperty(window, 'matchMedia');
+  });
+
+  const panel = (): HTMLElement => screen.getByRole('complementary');
+
+  it('lets Tab move on inside a dialog opened from the panel', () => {
+    matchMobile();
+    render(<Board open />);
+    // Held onto before the dialog opens: Radix marks everything outside it `aria-hidden`, so
+    // the panel has no accessible role left to query by while the layer above it is up.
+    const sheet = panel();
+    const trigger = screen.getByRole('button', { name: messages.app.board.task.deleteAction });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole('dialog');
+    const insideDialog = within(dialog).getAllByRole('button')[0]!;
+    insideDialog.focus();
+
+    const notPrevented = fireEvent.keyDown(insideDialog, { key: 'Tab' });
+
+    expect(notPrevented).toBe(true);
+    expect(sheet.contains(document.activeElement)).toBe(false);
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
+  it('still pulls Tab back into the panel while it is the topmost layer', () => {
+    matchMobile();
+    render(<Board open />);
+    const outside = screen.getByTestId('board-menu');
+    outside.focus();
+
+    const notPrevented = fireEvent.keyDown(outside, { key: 'Tab' });
+
+    expect(notPrevented).toBe(false);
+    expect(panel().contains(document.activeElement)).toBe(true);
   });
 });
 

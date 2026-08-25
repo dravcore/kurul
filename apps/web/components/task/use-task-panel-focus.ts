@@ -64,6 +64,11 @@ export function useTaskPanelFocus({
 
     function onKeyDown(event: KeyboardEvent): void {
       if (event.key !== 'Tab' || !media.matches) return;
+      // A layer above the panel owns the key, for the same reason it owns `Esc` below. Without
+      // this, Radix's own `FocusScope` moves focus into the dialog and the trap below reads
+      // that as focus having escaped the panel, hauls it back, and Tab stops advancing inside
+      // the dialog: a keyboard trap (WCAG 2.1.2).
+      if (event.defaultPrevented || document.querySelector(OPEN_LAYER_SELECTOR)) return;
       const root = panelRef.current;
       if (!root) return;
 
