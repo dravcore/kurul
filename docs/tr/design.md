@@ -56,15 +56,45 @@ Renkli bir header veya tonlanmış bir background yerine bu seçildi çünkü la
 yok, 36px satır yüksekliğinde hayatta kalıyor, yoğun bir column'da anında okunuyor — ve kelimenin
 tam anlamıyla meclisin toplandığı yere dikilen sancaktır.
 
-| Signature bakır nerede görünebilir                         | Nerede görünmemeli                                             |
-| ---------------------------------------------------------- | -------------------------------------------------------------- |
-| Sancak rail'i (aktif / seçili / drop target)               | Sayfa veya section background'ları, header'lar, hero wash'ları |
-| Primary action button'ları — view başına en fazla bir tane | Secondary ve tertiary button'lar                               |
-| Focus ring, selection ring, meter ve progress fill'leri    | Kart border'ları, divider'lar, tablo header'ları               |
-| Body metni içindeki link'ler                               | Label'lar, priority badge'leri, status badge'leri, avatar'lar  |
-| Wordmark ve empty-state mark'ları                          | Grafikler, tek **emphasis** ton'u dışında (§8)                 |
+Bakır iki güç seviyesinde çalışır ve bu fazın bulup düzelttiği kusur tam olarak bu ikisinin
+birbirine karışmasıydı.
 
-Aynı anda iki bakır şey görünüyorsa ve hiçbiri bir primary action değilse, biri yanlıştır.
+**Tam güç** (`--primary` ile `--signature` her temada aynı hex'i paylaşır) uygulamanın en nadir
+rengidir: **ekran başına en fazla iki kullanım**, sancak rail'i, artı, varsa o view'ın tek
+primary action button'ı. Bu sayıma üçüncü bir kullanım olarak girmeyen, muaf tutulan iki şey
+vardır. **Focus ring** de tam güçtedir, ama yapısı gereği tekildir ve geçicidir: tek seferde tek
+bir elemanda, yalnızca o eleman focus'u tuttuğu sürece, bu yüzden rail'in yanında ikinci bir
+işaret olarak durmaz, o elemanın zaten taşıdığı işaretin yerine geçer. Ve bir **data işareti**
+(bir meter fill'i, bir progress fill'i, grafiğin tek `--signature` **emphasis** serisi, §8) tam
+güçte çizilir çünkü o, ekranın etrafındaki chrome'u değil, gösterilen değerin kendisidir; bu
+yüzden bir settings sayfası, kendi tek copper Invite button'ının yanında bir copper progress
+bar'ı, üçüncü bir chrome kullanımı harcamadan taşıyabilir.
+
+**Tint** (`--signature-subtle`) hiçbir zaman tam güce ulaşmaz ve bu bütçeye de girmez, ama
+bedava bir dekorasyon değildir: tam olarak tek bir role bağlıdır, **aktif veya seçili**, o anda
+o durumda olan satır, kart, drop-target column veya panel her neyse onun üzerinde. Bir ekran
+aynı anda birden fazla elemanı bu şekilde tint'leyebilir, bir multi-select'teki her seçili satır
+gibi, iki kullanımlık bütçeyi harcamadan, çünkü tint kimliği değil durumu işaretler.
+
+| Signature bakır nerede görünebilir                                                                                 | Nerede görünmemeli                                             |
+| ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| Sancak rail'i (aktif / seçili / drop target)                                                                       | Sayfa veya section background'ları, header'lar, hero wash'ları |
+| View'ın tek primary action button'ı                                                                                | Secondary ve tertiary button'lar                               |
+| Focus ring, yukarıdaki gibi muaf · meter, progress fill'leri ve grafiğin emphasis serisi, data işareti olarak muaf | Kart border'ları, divider'lar, tablo header'ları               |
+| Body metni içindeki link'ler                                                                                       | Label'lar, priority badge'leri, status badge'leri, avatar'lar  |
+| Wordmark ve empty-state mark'ları                                                                                  | Grafikler, tek **emphasis** serisi dışında                     |
+
+Her iki güç seviyesinde de iki kural geçerlidir. **Tonlanmış bir zemin üstünde renkli metin
+olmaz**: tint'lenmiş bir satır veya drop-target column, anlamını bir dot veya bir ikonda taşır,
+asla tint'in üstüne yatırılmış renkli bir label'da değil (§8, grafik legend'ları için aynı
+kuralı yazar: "metin text token giyer, asla series hue'sunu değil"). Ve **bakır metin
+`--accent` üzerine hiç konmaz**: açık temada orada 4.28:1 ölçülür (§3), tek başına AA'yı
+geçecek bir sayı, ama kural bir taban değil bir yasak olarak yazılıdır, çünkü `--accent`
+chrome'un kendi hover adımıdır ve üstündeki bakır bir link gibi değil, kimliğin mobilyaya
+sızması gibi okunur.
+
+Aynı anda iki tam güç işaret görünüyorsa ve bunlar rail ile o view'ın tek primary action'ı
+değilse, biri yanlıştır.
 
 | İkonografi                                              | Kural                                                                                                                                                                                   |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -167,6 +197,21 @@ eşdeğer).
 | `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — field'lar ve satırlar · kart başlıkları, aktif nav |
 | `small` · `micro`      | 12 / 16 · 11 / 14 | 400 · 500 | Metadata, timestamp'ler · chip'ler, count'lar, axis tick'leri        |
 
+Bu ölçeğin tamamı budur, bir Tailwind varsayılanının fark edilmeden dolduracağı bir boşluk
+bırakmaz: `text-sm`, `text-lg`, `text-xs` ve `font-medium` component ağacından tamamen kalktı,
+ve `app/theme-classes.test.ts` ağaçtaki her `text-`, `bg-`, `border-`, `font-` ve `shadow-`
+class'ını Tailwind üzerinden derleyip hiçbir şey üretmeyen birini build'i kırarak yakalıyor;
+böylece geri dönen bir varsayılan bir daha fark edilmeden yerleşemiyor. `text-lg`, her çağrı
+yerinde `title` (16/24) oluyor, `DialogTitle` dahil: bir dialog'un başlığı bir section
+başlığıdır, kendine ait bir boyut değil, ve zaten `18px`'lik bir adım hiç olmadı. `text-xs`,
+`small` (12/16) oluyor, asla `micro` (11/14) değil: iki çağrı yeri de bir button label'ı ve bir
+keyboard-shortcut ipucuydu, ikisi de en küçük adıma sığacak kadar metadata değil. `font-medium`
+her yerde `font-strong` (550) oluyor. Label ve dialog başlığı artık kendi adımlarının
+line-height'ını taşıyor, 18px ve 24px, üstüne binmiş bir `leading-none` olmadan: o, davetsiz
+misafir bir shadcn varsayılanıydı, bu ölçeğin hiç istediği bir seçim değildi. (Tailwind'in kendi
+`text-base`'i, 16px, 768px altındaki üç form field'inde bilinçli bir istisna olarak kalıyor,
+§4, bu ölçekte bir boşluk değil.)
+
 `tabular-nums`, sayı column'larında, axis tick'lerinde ve tablo hücrelerinde — asla bir hero
 figure veya bir stat-tile değeri üzerinde değil.
 
@@ -228,6 +273,18 @@ board'daki ve drawer'daki her button, link, input ve menu item'ını tarar ve ik
 birinde 44px'in altındaki her kutuda fail eder. jsdom hiçbir şeyi layout etmediği için bir
 unit test bu iddiayı kuramaz.
 
+**768px altında her metin field'ında 16px, üstünde `body`.** 44px dokunma tabanını
+gerekçelendiren aynı iOS Safari davranışı, bir field 16px'in altında hesaplanırsa focus'ta
+sayfanın tamamını da zoom'lar; Tailwind'in kendi `text-base`'i tam olarak bu eşik değerdir:
+`Input`, `Textarea` ve `Select` üçü de `text-base md:text-body` taşır, bu yüzden kural, bir
+primitif başına değil, bu bölümdeki her şeyle aynı `max-md` breakpoint'ine bağlıdır. Tıpkı 44px
+tabanı gibi iki şekilde uygulanır: ölçülür, ve yapısal olarak geriye kaymayı zorlaştırır.
+`e2e/tests/mobile-navigation.spec.ts`, 360px'te board'da, navigation drawer'da ve task
+panel'de her field'ın hesaplanmış `font-size`'ını okur ve `16px`'in altındaki her şeyde fail
+eder; `lib/utils.ts`'in `cn()`'i, `tailwind-merge`'ü bu tip ölçeğiyle genişletir, böylece bir
+tüketicinin kendi `text-*` override'ı, ikisi birden DOM'a ulaşıp stylesheet sırasının hangisinin
+boyanacağına karar vermesi yerine, bir primitifin varsayılanıyla yine tekilleşir.
+
 **Touch'ta drag grip'ten yapılır.** Kart gövdesi column'un scroller'ına aittir — dnd-kit
 listener'larını taşıyan wrapper'ın kendi `touch-action`'ı yoktur, dolayısıyla dikey bir
 hareketi browser üstlenir — grip ise `touch-action: none` bildirir, ve o 44px'lik tek bölgeyi
@@ -264,8 +321,19 @@ full-screen bir sheet'e dönüşür. Confirmation'lar, board oluşturma ve destr
 | Remote delete          | 160ms boyunca 0'a fade olur, ardından gap 160ms boyunca kapanır — iki beat, gözün takip edebilmesi için                                                                 |
 | Presence · disconnect  | Topbar'da avatar'lar, başkasının açık tuttuğu bir kartta küçük bir avatar · sessiz, inline bir "Reconnecting…" ("Yeniden bağlanıyor…") bar'ı, asla blocking bir overlay |
 
-**Keyboard baseline.** Focus her zaman görünürdür: 2px offset'te 2px `--ring`, ve bir
-replacement olmadan `outline: none` bir review blocker'dır. Offset yalnızca focus alan bölge
+**Keyboard baseline.** Focus her zaman görünürdür, ve tam olarak tek bir göstergedir: 2px
+offset'te 2px `--ring`, ve bir replacement olmadan `outline: none` bir review blocker'dır. O tek
+işaret, `@layer base`'den, her keyboard'la ulaşılabilir kontrolde bir kez çizilir: primitiflerin
+yanında duran `focus-visible:ring-[3px] ring-ring/50` ve `focus-visible:border-ring` class'ları
+kalktı, ve katmanlı kuralı ezecek her `outline-none` / `outline-hidden` de kalktı. Bunlardan
+geriye kalan, script ile focus alan (Tab, bir arrow key veya bir link ile değil) kısa bir
+programmatic focus container listesidir (bir dialog'un content'i, drawer, task panel'in
+heading'i), artı bir dropdown row'u ve skip link'in `main` hedefi; ikisi de bastırılmış değil,
+herkesle aynı base outline'ı çizer. Hem invalid hem focus'ta olan bir field, kenarın yanına
+ikinci bir işaret büyütmek yerine o tek outline'ı `--destructive`'e boyar
+(`[aria-invalid='true']:focus-visible`); border'ın yanında renkli bir ring'i de tutmak önceki
+plandı, Tailwind v4'ün bir ring-width class'ı yanında olmadan bir ring-color class'ından hiçbir
+şey boyamadığı ortaya çıkınca bu plandan vazgeçildi. Offset yalnızca focus alan bölge
 shell'i doldurduğunda ve dıştaki bir offset kırpılacağında içeri döner; bugün bu yalnızca skip
 link'in `main` hedefidir. Tab order visual order'ı takip eder; board bir composite widget'tır, bu
 yüzden `Tab` bir column'a ulaşır ve arrow'lar onun içinde hareket eder. `Esc` yalnızca en üstteki

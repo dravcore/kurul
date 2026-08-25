@@ -54,15 +54,43 @@ than blinking. Chosen over a colored header or tinted background because it cost
 survives at 36px row height, reads instantly in a dense column — and is literally the banner
 planted where the assembly is meeting.
 
-| Signature copper may appear                          | Must not appear                                    |
-| ---------------------------------------------------- | -------------------------------------------------- |
-| The sancak rail (active / selected / drop target)    | Page or section backgrounds, headers, hero washes  |
-| Primary action buttons — at most one per view        | Secondary and tertiary buttons                     |
-| Focus ring, selection ring, meter and progress fills | Card borders, dividers, table headers              |
-| Links inside body copy                               | Labels, priority badges, status badges, avatars    |
-| Wordmark and empty-state marks                       | Charts, except as the single **emphasis** hue (§8) |
+Copper works at two power levels, and mixing them up is the defect this phase found and fixed.
 
-If two copper things are visible at once and neither is a primary action, one is wrong.
+**Full strength** (`--primary` and `--signature` share one hex per theme) is the app's rarest
+color: **at most two uses per screen**, the sancak rail plus, on a view that has one, its single
+primary action button. Two things are exempt from that count rather than a third use of it. The
+**focus ring** is full strength too, but it is singular and transient by construction: on exactly
+one element, only for as long as that element holds focus, so it never stands beside the rail as
+a second mark, it replaces whatever mark that element already carried. And a **data mark** (a
+meter fill, a progress fill, the chart's one `--signature` **emphasis** series, §8) draws full
+strength because it _is_ the value being shown, not chrome describing the screen around it, so a
+settings page can carry a copper progress bar next to its one copper Invite button without
+spending a third chrome use.
+
+**Tint** (`--signature-subtle`) never reaches full strength and never joins that budget either,
+but it is not free decoration: it is bound to exactly one role, **active or selected**, on
+whatever row, card, drop-target column or panel currently holds that state. A screen may tint
+several elements this way at once, every selected row in a multi-select, without spending the
+two-use budget, because tint marks state, not identity.
+
+| Signature copper may appear                                                                                   | Must not appear                                   |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| The sancak rail (active / selected / drop target)                                                             | Page or section backgrounds, headers, hero washes |
+| The view's one primary action button                                                                          | Secondary and tertiary buttons                    |
+| The focus ring, exempt as above · meter, progress fills and the chart's emphasis series, exempt as data marks | Card borders, dividers, table headers             |
+| Links inside body copy                                                                                        | Labels, priority badges, status badges, avatars   |
+| Wordmark and empty-state marks                                                                                | Charts, except as the single **emphasis** series  |
+
+Two rules hold at either power level. **No colored text sits on a tinted ground**: a tinted row
+or drop-target column carries its meaning in a dot or an icon, never in a colored label laid over
+the tint (§8 states the identical rule for chart legends: "text wears text tokens, never the
+series hue"). And **copper text never sits on `--accent`**: it measures 4.28:1 there in light
+mode (§3), a number that would clear AA on its own, but the rule is written as a ban rather than
+a floor, because `--accent` is chrome's own hover step, and copper on it reads as identity
+leaking into furniture rather than as a link.
+
+If two full-strength marks are visible at once and they are not the rail and that view's one
+primary action, one is wrong.
 
 | Iconography                                    | Rule                                                                                                                                                             |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -161,6 +189,20 @@ binary font assets to the repo).
 | `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — fields and rows · card titles, active nav |
 | `small` · `micro`      | 12 / 16 · 11 / 14 | 400 · 500 | Metadata, timestamps · chips, counts, axis ticks            |
 
+This is the whole scale, with no gap left for a Tailwind default to fill unnoticed: `text-sm`,
+`text-lg`, `text-xs` and `font-medium` are gone from the component tree, and
+`app/theme-classes.test.ts` compiles every `text-`, `bg-`, `border-`, `font-` and `shadow-` class
+through Tailwind and fails the build on one that resolves to nothing, so a reintroduced default
+cannot land unnoticed again. `text-lg` becomes `title` (16/24) at every call site, `DialogTitle`
+included: a dialog's title is a section title, not a size of its own, and there is no `18px`
+step for it to have kept. `text-xs` becomes `small` (12/16), never `micro` (11/14): its two call
+sites were a button label and a keyboard-shortcut hint, neither one metadata small enough for the
+smallest step. `font-medium` becomes `font-strong` (550) throughout. The label and the dialog
+title both carry their own step's line-height now, 18px and 24px, with no `leading-none` layered
+on top: that was a shadcn default riding along uninvited, not a choice this scale ever asked for.
+(Tailwind's own `text-base`, 16px, stays as a deliberate exception on three form fields below
+768px, §4, not a gap in this scale.)
+
 `tabular-nums` on columns of numbers, axis ticks, and table cells — never on a hero figure or
 a stat-tile value.
 
@@ -219,6 +261,18 @@ It is **measured, not asserted**: `e2e/tests/mobile-navigation.spec.ts` sweeps e
 link, input and menu item on the board and in the drawer at 360px and fails on any box under
 44px in either axis. jsdom lays nothing out, so a unit test cannot make this claim.
 
+**16px below 768px, `body` above it, on every text field.** The same iOS Safari behavior that
+justifies the 44px touch floor also zooms the whole page on focus if the field it lands in
+computes under 16px, and Tailwind's own `text-base` is exactly that threshold: `Input`,
+`Textarea` and `Select` all carry `text-base md:text-body`, so the rule is keyed to the same
+`max-md` breakpoint as everything else in this section rather than judged one primitive at a
+time. It is enforced the same two ways the 44px floor is: measured, and structurally hard to
+regress past. `e2e/tests/mobile-navigation.spec.ts` reads every field's computed `font-size` on
+the board, in the navigation drawer and in the task panel at 360px and fails on anything short of
+`16px`, and `lib/utils.ts`'s `cn()` extends `tailwind-merge` with this type scale so a consumer's
+own `text-*` override still deduplicates against a primitive's default instead of both classes
+reaching the DOM and stylesheet order deciding which one paints.
+
 **Touch drag is by the grip.** The card body belongs to the column's scroller — the wrapper
 carrying dnd-kit's listeners has no `touch-action`, so the browser claims a vertical gesture
 there — and the grip declares `touch-action: none`, which is what hands that one 44px region to
@@ -256,10 +310,22 @@ creation, and destructive actions stay **dialogs**; those genuinely need to bloc
 | Remote delete          | Fade to 0 over 160ms, then close the gap over 160ms — two beats, so the eye can follow                                                              |
 | Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Reconnecting…" bar, never a blocking overlay                                    |
 
-**Keyboard baseline.** Focus is always visible: 2px `--ring` at 2px offset, and `outline: none`
-without a replacement is a review blocker. The offset turns inward only where the focused region
-fills the shell and an outside offset would be clipped away, which today is the skip link's
-`main`. Tab order follows visual order; the board is a composite widget, so `Tab` reaches a
+**Keyboard baseline.** Focus is always visible, and it is exactly one indicator: 2px `--ring` at
+2px offset, and `outline: none` without a replacement is a review blocker. That single mark is
+drawn once, from `@layer base`, on every keyboard-reachable control: the
+`focus-visible:ring-[3px] ring-ring/50` and `focus-visible:border-ring` utilities that used to
+sit beside it on the primitives are gone, and so is every `outline-none` / `outline-hidden` that
+would otherwise outrank the layered rule. What survives them is a short, named list of
+programmatic focus containers that take focus by script rather than by Tab, an arrow key or a
+link (a dialog's content, the drawer, the task panel's heading), plus a dropdown row and the
+skip link's `main` target, both of which draw the same base outline as everything else rather
+than a suppressed one. A field that is both invalid and focused recolors that one outline to
+`--destructive` (`[aria-invalid='true']:focus-visible`) instead of growing a second mark beside
+the border; keeping a colored ring alongside the border was the earlier plan, dropped once
+Tailwind v4 turned out to paint nothing from a ring-color utility with no ring-width utility
+beside it. The offset turns inward only where the focused region fills the shell and an outside
+offset would be clipped away, which today is the skip link's `main`. Tab order follows visual
+order; the board is a composite widget, so `Tab` reaches a
 column and arrows move within it. `Esc` closes the topmost layer only and returns focus to
 whatever opened it. Reserved now, mapped in Phase 4+: `⌘K`
 command palette, `C` create task, `/` filter, `?` help — nothing else claims a bare letter key.
