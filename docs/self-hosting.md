@@ -792,7 +792,7 @@ web app is built against it. Three rules, in this order, all on one hostname:
 
 | Path       | Goes to  | Prefix              | Max request body              |
 | ---------- | -------- | ------------------- | ----------------------------- |
-| `/auth/*`  | api:4000 | kept as-is          | proxy default is fine         |
+| `/auth/*`  | api:4000 | kept as-is          | **64 KiB** (`65536` bytes)    |
 | `/api/*`   | api:4000 | `/api` **stripped** | **26 MiB** (`27262976` bytes) |
 | everything | web:3000 | kept as-is          | proxy default is fine         |
 
@@ -839,6 +839,33 @@ never sees and never logs. Caddy imposes no body limit of its own, which is why 
 **1 MB**, so a replacement proxy that omits the row rejects every attachment larger than a
 megabyte.
 
+#### Why `/auth/*` has a ceiling of its own, and why it is 64 KiB
+
+Rule 1 carries a limit too, and a much smaller one. Better Auth reads the raw request stream
+itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on every other route, so that
+ceiling never applied to `/auth/*`: a `POST /auth/sign-in/email` was read to completion at any
+size, and the built-in attempt budget (3 per 10 seconds per IP and path on sign-in, sign-up and
+change-password, 100 per minute on the other auth routes) counts requests, not bytes. Every body
+those routes take is a JSON object of a few hundred bytes, so 64 KiB is two orders of magnitude
+of headroom.
+
+The API enforces the same number as `AUTH_BODY_MAX_BYTES` (`65536`, a constant in
+`apps/api/src/auth/auth-body-limit.ts`, not an environment variable): a request that declares a
+`Content-Length` above it is answered with the `Request body is too large` `413` envelope before
+a byte of the body is read. Here the proxy and the API **may be equal**, unlike the pair above:
+an auth body has no multipart envelope, both layers count the same bytes, and the ordering rule
+holds at equality.
+
+A body sent without a `Content-Length` (chunked transfer encoding, which a browser never uses
+for a JSON string body) is the one case the two layers answer differently. The proxy is the
+layer that bounds it with a status: `request_body max_size` cuts the body at the same 64 KiB.
+The API cannot answer a body it is already streaming to Better Auth, so it counts the bytes as
+they arrive and closes the connection past the ceiling, which keeps an instance exposed without
+a proxy bounded too, but as a dropped connection rather than a `413`. That is one more reason
+the proxy is part of the default stack rather than an optional extra.
+`apps/api/src/storage/two-layer-limit.spec.ts` pins the Caddyfile figure, the nginx row below
+and the API constant to each other.
+
 ### Telling the 413s apart
 
 Both layers answer an oversized upload with `413` — and so does a third limit that has nothing
@@ -858,8 +885,10 @@ proxy's ceiling is too low (see "Why the proxy's number is 26 MiB and the API's 
 
 The third row is a different limit that happens to share the status code: `REQUEST_BODY_MAX_BYTES`
 (default `1048576`, 1 MiB) caps the **JSON and form-encoded** bodies every other endpoint takes,
-and no attachment ever passes through it. If you see it, nothing about your storage or your proxy
-is misconfigured — some request simply sent more JSON than the API accepts.
+and no attachment ever passes through it. The same sentence under a `path` starting with `/auth/`
+is the smaller `AUTH_BODY_MAX_BYTES` (64 KiB) instead; see rule 1 above. If you see either,
+nothing about your storage or your proxy is misconfigured: some request simply sent more JSON
+than the API accepts.
 
 The fourth row is a different failure again: the file is under `ATTACHMENT_MAX_BYTES`, but storing
 it would push a workspace or the instance over its quota. See "Attachment storage is unbounded
@@ -901,7 +930,12 @@ on the server, in the browser and in the verification links it emails; the rest 
 mounted at its own root and gets the prefix removed on the way in. In nginx:
 
 ```nginx
-location /auth/ { proxy_pass http://api:4000;  }   # no trailing slash → path preserved
+location /auth/ {
+  proxy_pass http://api:4000;                      # no trailing slash → path preserved
+  client_max_body_size 64k;                        # EQUAL to AUTH_BODY_MAX_BYTES (64 KiB): an
+                                                   # auth body has no multipart envelope, so the
+                                                   # two layers count the same bytes.
+}
 location /api/  {
   proxy_pass http://api:4000/;                     # trailing slash    → /api stripped
   client_max_body_size 26m;                        # ABOVE ATTACHMENT_MAX_BYTES (25 MiB), not
