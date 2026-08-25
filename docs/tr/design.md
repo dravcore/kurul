@@ -256,6 +256,15 @@ hareket eder. `Esc` yalnızca en üstteki layer'ı kapatır ve focus'u onu açan
 Şimdiden reserve edilmiş, Faz 4+'ta map edilecek: `⌘K` command palette, `C` create task, `/`
 filter, `?` help — başka hiçbir şey çıplak bir letter key talep etmez.
 
+**Dialog'lar sınırlıdır ve kendi gövdelerini scroll eder.** Bir dialog yüzeyi en fazla
+`calc(100dvh - 4rem)` yüksekliğindedir; gövdesi scroll olur, header ve footer o scroll'un dışında
+sabit kalır, böylece submit ve cancel kontrolleri her pencere yüksekliğinde ve §9'un istediği
+%200 zoom'da ekranda kalır. Açık bir dialog'un arkasındaki sayfa scroll kilidi altındadır, yani
+tavanı olmayan bir yüzey kendi footer'ını ekranın altına iter ve ona ulaşmak için scroll edilecek
+hiçbir şey kalmaz. Kapatma kontrolü scrollport'un içine değil, header ile birlikte sabitlenir:
+absolute konumlanmış bir kutu, scroll container'ının içinde içerikle birlikte kayar ve onun
+tarafından kırpılır.
+
 **Motion.** Yalnızca amaçlı micro-interaction'lar, **view başına en fazla bir orchestrated an** —
 board'da bu, column'ların ilk paint'idir, başka hiçbir şey değil.
 
@@ -294,6 +303,10 @@ board'da bu, column'ların ilk paint'idir, başka hiçbir şey değil.
 **Empty state'ler birer davettir** — screen başına bir damga mark'ı ve bir primary action. Bir
 sonraki hamleyi adlandırırlar; feature'ı açıklamazlar. Damga mark'larının göründüğü tek yer
 burasıdır.
+
+**Bir primary action, tüm ekranda bir tane demektir.** Aksiyonu empty state taşıyorsa, sayfa
+başlığındaki aynı aksiyonun kopyası ekran boşken gizlenir ve ilk satırla birlikte geri gelir.
+İlk çalıştırmada birbirinin aynısı iki primary buton, okuyucunun sahip olmadığı bir seçimdir.
 
 | Surface                           | Mark       | Headline                                                       | Body                                                                                                                                                                                                                                                              | Action                                                                         |
 | --------------------------------- | ---------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |

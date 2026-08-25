@@ -5,6 +5,8 @@ import { NotificationType, type NotificationDto } from '@kurul/shared-types';
 import { toast } from 'sonner';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
+import { NotificationBell } from './notification-bell';
+import { NotificationUnreadProvider } from './notification-unread-provider';
 import { NotificationsList } from './notifications-list';
 
 // `@/lib/notification-actions` and `@/lib/notification-nav` are deliberately real: what this
@@ -34,7 +36,7 @@ vi.mock('./use-notification-socket', () => ({
 }));
 
 vi.mock('@/components/layout/workspace-provider', () => ({
-  useWorkspaceContext: () => ({ activeId: 'w1', activeRole: null }),
+  useWorkspaceContext: () => ({ activeId: 'w1', activeRole: null, bootstrapped: true }),
 }));
 
 const apiGet = vi.mocked(api.get);
@@ -61,6 +63,8 @@ function notification(id: string, overrides: Partial<NotificationDto> = {}): Not
 
 /** The page the next list request answers with, keyed by nothing — tests set it per call. */
 let listPages: { items: NotificationDto[]; nextCursor: string | null }[] = [];
+/** What the server says is unread, for the tests that mount the bell alongside the page. */
+let unread = 0;
 let taskLookup: () => Promise<{ boardId: string }> = () => Promise.resolve({ boardId: BOARD_ID });
 /** Every list URL the screen asked for, in order — the filters are only visible here. */
 let listUrls: string[] = [];
@@ -69,12 +73,37 @@ function serveList(...pages: { items: NotificationDto[]; nextCursor: string | nu
   listPages = pages;
 }
 
-function renderList(): void {
+/**
+ * The page as the shell mounts it: inside the provider that owns the unread count. Real rather
+ * than stubbed, so the count this screen writes to is the same object the badge reads.
+ */
+function renderInShell(content: React.ReactNode): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <NotificationsList />
+      <NotificationUnreadProvider>{content}</NotificationUnreadProvider>
     </NextIntlClientProvider>,
   );
+}
+
+function renderList(): void {
+  renderInShell(<NotificationsList />);
+}
+
+/**
+ * The page with the bell beside it. Two separate subtrees in the real app (the bell sits in the
+ * sidebar, the page in `main`), which is the whole reason the count is held above both.
+ */
+function renderListWithBell(): void {
+  renderInShell(
+    <>
+      <NotificationBell />
+      <NotificationsList />
+    </>,
+  );
+}
+
+function bell(): HTMLElement {
+  return screen.getByRole('button', { name: messages.app.notifications.open });
 }
 
 function rows(): HTMLElement[] {
@@ -102,10 +131,14 @@ beforeEach(() => {
   socketHandlers = null;
   listUrls = [];
   listPages = [{ items: [], nextCursor: null }];
+  unread = 0;
   taskLookup = () => Promise.resolve({ boardId: BOARD_ID });
 
   apiGet.mockImplementation(((url: string) => {
     if (url.includes('/tasks/')) return taskLookup();
+    // Answered before `listUrls` is written, so the badge's read stays out of the list of URLs
+    // this screen asked for.
+    if (url.includes('/notifications/unread-count')) return Promise.resolve({ count: unread });
     listUrls.push(url);
     return Promise.resolve(listPages.length > 1 ? listPages.shift() : listPages[0]);
   }) as never);
@@ -415,5 +448,51 @@ describe('NotificationsList realtime', () => {
 
     act(() => socketHandlers?.onResync());
     await waitFor(() => expect(listUrls.length).toBeGreaterThan(afterLoad));
+  });
+});
+
+/**
+ * The bug this pairing exists for: mark-all-read used to patch only the rows this screen had
+ * loaded, while the badge counted every unread row on the server. The user cleared the page and
+ * the bell went on showing a number, until a socket signal or the two-minute fallback poll
+ * happened to correct it.
+ */
+describe('NotificationsList and the bell share one unread count', () => {
+  it('empties the badge on mark-all-read, including the rows this page never loaded', async () => {
+    unread = 5;
+    // Two rows on screen against five unread on the server, and a cursor saying there is more:
+    // patching the loaded rows cannot reach zero, so only a shared counter can.
+    serveList({ items: [notification('n1'), notification('n2')], nextCursor: 'cursor-1' });
+    renderListWithBell();
+    await waitFor(() => expect(bell().textContent).toContain('5'));
+
+    const markAll = await screen.findByRole('button', {
+      name: messages.app.notifications.markAllRead,
+    });
+    fireEvent.click(markAll);
+
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith('/workspaces/w1/notifications/read-all'),
+    );
+    // Locally, in the same pass as the rows: nothing here waits for a socket signal or a refetch.
+    await waitFor(() => expect(bell().textContent).toBe(''));
+  });
+
+  /** A badge cleared by a write the server refused is a lie with nowhere to correct itself. */
+  it('keeps the badge when the page could not mark everything read', async () => {
+    unread = 5;
+    serveList({ items: [notification('n1')], nextCursor: null });
+    apiPost.mockRejectedValue(new Error('network'));
+    renderListWithBell();
+    await waitFor(() => expect(bell().textContent).toContain('5'));
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: messages.app.notifications.markAllRead }),
+    );
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(messages.app.notifications.markReadError),
+    );
+    expect(bell().textContent).toContain('5');
   });
 });

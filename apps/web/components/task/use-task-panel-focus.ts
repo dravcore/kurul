@@ -15,6 +15,16 @@ export type UseTaskPanelFocusResult = {
 };
 
 /**
+ * The overlay surfaces `components/ui/dialog.tsx` marks while they are open.
+ *
+ * Read from the DOM rather than from a counter the layers keep between them: Radix already
+ * writes `data-state` on the content it mounts, so there is no second copy of the truth to
+ * fall out of step with it, and nothing to reset when a layer unmounts without closing.
+ */
+const OPEN_LAYER_SELECTOR =
+  '[data-slot="dialog-content"][data-state="open"], [data-slot="dialog-drawer-content"][data-state="open"]';
+
+/**
  * The dialog behaviour the task panel has to hand-roll.
  *
  * The panel is a plain `<aside>` behind a route segment, not a Radix dialog, so nothing gives
@@ -54,6 +64,11 @@ export function useTaskPanelFocus({
 
     function onKeyDown(event: KeyboardEvent): void {
       if (event.key !== 'Tab' || !media.matches) return;
+      // A layer above the panel owns the key, for the same reason it owns `Esc` below. Without
+      // this, Radix's own `FocusScope` moves focus into the dialog and the trap below reads
+      // that as focus having escaped the panel, hauls it back, and Tab stops advancing inside
+      // the dialog: a keyboard trap (WCAG 2.1.2).
+      if (event.defaultPrevented || document.querySelector(OPEN_LAYER_SELECTOR)) return;
       const root = panelRef.current;
       if (!root) return;
 
@@ -126,9 +141,16 @@ export function useTaskPanelFocus({
     };
   }, []);
 
+  // `Esc` closes the topmost layer only (docs/design.md §5). This listener is on `window`, the
+  // last stop of every keystroke in the document, so it sees the presses the layers above the
+  // panel have already dealt with: the delete confirmation dismisses itself from a `document`
+  // listener in the capture phase, and the mention picker from a React handler on the composer.
+  // `defaultPrevented` is what both of them say so with; a modal dialog is recognised on top of
+  // that, because a layer that covers the panel owns the key whether or not it marks the event.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (document.querySelector(OPEN_LAYER_SELECTOR)) return;
       event.preventDefault();
       onClose();
     }

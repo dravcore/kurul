@@ -40,27 +40,75 @@ function DialogOverlay({
   );
 }
 
+/**
+ * Radix hands focus back to `DialogTrigger` on close. Every dialog in this app but the mobile
+ * drawer is driven by an `open` prop instead of a trigger, so there is nothing for it to hand
+ * focus back to and dismissing one drops a keyboard user on `<body>`, against the rule in
+ * `docs/design.md` §5 that `Esc` closes the topmost layer and returns focus to whatever opened
+ * it. The opener is read in `onOpenAutoFocus`, which Radix fires while focus is still outside
+ * the content, and is the trigger itself wherever one is used.
+ *
+ * The surface caps its height (`docs/design.md` §5) and the scroll sits on the body wrapper
+ * below, not on the surface itself: the close button is positioned against the surface, and an
+ * absolutely positioned box whose containing block is a scroll container scrolls away with the
+ * content and is clipped by it.
+ *
+ * The body carries its own small padding rather than relying on the surface's, and offsets it
+ * with an equal negative margin so the visible layout is unchanged. Per CSS Overflow 3, setting
+ * `overflow-y: auto` computes `overflow-x` to `auto` too (a box cannot scroll one axis and paint
+ * past the other), and both axes then clip anything painted outside the body's own padding edge,
+ * including the 2px `outline` at 2px `outline-offset` that `:focus-visible` draws in
+ * `globals.css`. A full-width control's ring sits flush with the body's edge on every side
+ * (left/right always, and top/bottom for whatever row is first or last), so without room inside
+ * that edge the ring is cut off outright, not just softened. `-1`/`1` is 4px either way, exactly
+ * the outline's 2px plus its 2px offset.
+ */
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
 }) {
   const t = useTranslations('common');
+  const openerRef = React.useRef<HTMLElement | null>(null);
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        onOpenAutoFocus={(event) => {
+          const opener = document.activeElement;
+          openerRef.current =
+            opener instanceof HTMLElement && opener !== document.body ? opener : null;
+          onOpenAutoFocus?.(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          const opener = openerRef.current;
+          if (event.defaultPrevented || !opener?.isConnected) return;
+          // Claims the restore before Radix's own handler, which would reach for the trigger
+          // that is not there and leave focus where it fell.
+          event.preventDefault();
+          opener.focus();
+        }}
         className={cn(
-          'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-overlay duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+          'fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-4rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-lg border bg-background p-6 shadow-overlay duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
           className,
         )}
         {...props}
       >
-        {children}
+        {/* `min-h-0`: a flex child refuses to shrink below its content without it, which would
+            hand the overflow back to the surface and undo the cap above. `-m-1`/`p-1` give the
+            focus ring room inside the scrollport's clip edge (see the doc comment above) while
+            netting to zero visible offset, since the padding just pulls content back in by the
+            same 4px the negative margin let the box grow by. */}
+        <div data-slot="dialog-body" className="-m-1 grid min-h-0 gap-4 overflow-y-auto p-1">
+          {children}
+        </div>
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
@@ -134,7 +182,10 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn('flex flex-col gap-2 text-center sm:text-left', className)}
+      className={cn(
+        'sticky top-0 flex flex-col gap-2 bg-background text-center sm:text-left',
+        className,
+      )}
       {...props}
     />
   );
@@ -152,7 +203,10 @@ function DialogFooter({
   return (
     <div
       data-slot="dialog-footer"
-      className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}
+      className={cn(
+        'sticky bottom-0 flex flex-col-reverse gap-2 bg-background sm:flex-row sm:justify-end',
+        className,
+      )}
       {...props}
     >
       {children}

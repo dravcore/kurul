@@ -246,6 +246,14 @@ composite widget, so `Tab` reaches a column and arrows move within it. `Esc` clo
 layer only and returns focus to whatever opened it. Reserved now, mapped in Phase 4+: `⌘K`
 command palette, `C` create task, `/` filter, `?` help — nothing else claims a bare letter key.
 
+**Dialogs are bounded and scroll their own body.** A dialog surface is at most
+`calc(100dvh - 4rem)` tall; its body scrolls, and the header and footer stay pinned outside that
+scroll so the submit and cancel controls are on screen at any window height and at the 200% zoom
+§9 asks for. The page behind an open dialog is scroll-locked, so a surface with no ceiling puts
+its own footer past the bottom of the screen with nothing left to scroll. The close control is
+pinned with the header rather than placed inside the scrollport, where an absolutely positioned
+box scrolls away with the content and is clipped by it.
+
 **Motion.** Purposeful micro-interactions only, **at most one orchestrated moment per view** —
 on the board that is the first paint of the columns, and nothing else.
 
@@ -282,6 +290,10 @@ on the board that is the first paint of the columns, and nothing else.
 
 **Empty states are invitations** — one damga mark and one primary action per screen. They name
 the next move; they do not explain the feature. This is the only place damga marks appear.
+
+**One primary action counts the whole screen.** Where the empty state carries the action, the
+page header's copy of the same action is hidden while the screen is empty and comes back with the
+first row. Two identical primary buttons on a first run is a choice the reader does not have.
 
 | Surface               | Mark       | Headline                     | Body                                                                                                  | Action                           |
 | --------------------- | ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------- |

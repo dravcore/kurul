@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   post: vi.fn<(path: string, body: unknown) => Promise<unknown>>(),
   setActive: vi.fn(),
+  onSignOut: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -22,10 +23,17 @@ vi.mock('@/lib/auth', () => ({
   authClient: { organization: { setActive: mocks.setActive } },
 }));
 
+// Same call site `SidebarBody`'s sign-out button uses (`components/layout/sidebar-body.tsx`):
+// the actual sign-out sequence lives once in `WorkspaceProvider`, so this route reuses it
+// through the context rather than a second copy.
+vi.mock('@/components/layout/workspace-provider', () => ({
+  useWorkspaceContext: () => ({ onSignOut: mocks.onSignOut }),
+}));
+
 import NewWorkspacePage from './page';
 
-function renderPage(): void {
-  render(
+function renderPage(): ReturnType<typeof render> {
+  return render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <NewWorkspacePage />
     </NextIntlClientProvider>,
@@ -40,10 +48,34 @@ beforeEach(() => {
   mocks.refresh.mockReset();
   mocks.post.mockReset().mockResolvedValue({ id: WORKSPACE_ID });
   mocks.setActive.mockReset().mockResolvedValue({ data: null, error: null });
+  mocks.onSignOut.mockReset();
 });
 
 afterEach(() => {
   cleanup();
+});
+
+describe('NewWorkspacePage scroller', () => {
+  it('declares its own flex-1 overflow-y-auto scroller, since the shell main has none', () => {
+    const { container } = renderPage();
+
+    const scroller = container.querySelector('.overflow-y-auto');
+
+    expect(scroller).not.toBeNull();
+    expect(scroller?.className).toContain('flex-1');
+  });
+});
+
+describe('NewWorkspacePage header', () => {
+  it('shows the wordmark and signs out through the shared workspace mechanism', () => {
+    renderPage();
+
+    expect(screen.getByText('Kurul')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(mocks.onSignOut).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('NewWorkspacePage', () => {

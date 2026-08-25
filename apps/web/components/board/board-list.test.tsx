@@ -140,6 +140,27 @@ describe('BoardList', () => {
     expect(screen.queryByText(messages.app.board.listError)).toBeNull();
   });
 
+  describe('single primary action in zero-board state', () => {
+    it('shows exactly one create button in the empty state', async () => {
+      fetchBoards.mockResolvedValue([]);
+      renderList();
+
+      await screen.findByText(messages.app.board.emptyTitle);
+      const createButtons = screen.queryAllByRole('button', {
+        name: messages.app.board.createAction,
+      });
+      expect(createButtons).toHaveLength(1);
+    });
+
+    it('hides the empty state and shows the header create button when there are boards', async () => {
+      fetchBoards.mockResolvedValue([board('b1')]);
+      renderList();
+
+      await screen.findByText('Board b1');
+      expect(screen.queryByText(messages.app.board.emptyTitle)).toBeNull();
+    });
+  });
+
   describe('Trello import', () => {
     async function openImport(): Promise<void> {
       fetchBoards.mockResolvedValue([]);

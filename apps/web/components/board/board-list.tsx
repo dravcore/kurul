@@ -126,7 +126,7 @@ export function BoardList(): React.ReactElement {
               {t('import.action')}
             </Button>
           ) : null}
-          {canCreate ? (
+          {canCreate && boards.length > 0 ? (
             // Disabled rather than hidden: the button is the only place the ceiling can be
             // explained, and a control that vanishes reads as a permission problem.
             <Button
