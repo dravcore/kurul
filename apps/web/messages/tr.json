@@ -13,7 +13,39 @@
       "submit": "Giriş yap",
       "noAccount": "Hesabınız yok mu?",
       "registerLink": "Hesap oluşturun",
+      "forgotPasswordLink": "Parolanızı mı unuttunuz?",
       "error": "Giriş yapılamadı. E-posta adresinizi ve parolanızı kontrol edin."
+    },
+    "forgotPassword": {
+      "title": "Parolanızı sıfırlayın",
+      "subtitle": "Hesabınızın e-posta adresini girin. Bu adrese ait bir hesap varsa yeni parola seçmeniz için bir bağlantı göndeririz.",
+      "email": "E-posta",
+      "submit": "Sıfırlama bağlantısı gönder",
+      "sending": "Gönderiliyor…",
+      "sent": "Bu adrese ait bir hesap varsa sıfırlama bağlantısı yolda. Bağlantı bir saat geçerli.",
+      "sendError": "Bağlantı gönderilemedi. Birazdan tekrar deneyin.",
+      "backToLogin": "Giriş ekranına dön"
+    },
+    "resetPassword": {
+      "loading": "Bağlantınız kontrol ediliyor…",
+      "title": "Yeni bir parola seçin",
+      "subtitle": "En az 8 karakter olmalı.",
+      "newPassword": "Yeni parola",
+      "submit": "Yeni parolayı kaydet",
+      "submitting": "Kaydediliyor…",
+      "successTitle": "Parola değiştirildi",
+      "successBody": "Yeni parolanız kaydedildi ve diğer tüm oturumlar kapatıldı. Devam etmek için giriş yapın.",
+      "signInCta": "Giriş yap",
+      "invalidTitle": "Bu bağlantı çalışmadı",
+      "invalidBody": "Süresi dolmuş, daha önce kullanılmış ya da son karakterleri eksik kopyalanmış olabilir. Sıfırlama bağlantıları bir saat geçerlidir.",
+      "requestNewLink": "Yeni bağlantı gönder",
+      "error": "Parolanız değiştirilemedi. Kendinize yeni bir bağlantı gönderip tekrar deneyin.",
+      "fieldErrors": {
+        "password": {
+          "tooShort": "Parola en az 8 karakter olmalı.",
+          "tooLong": "Parola çok uzun."
+        }
+      }
     },
     "register": {
       "loading": "Kayıt ekranı yükleniyor…",

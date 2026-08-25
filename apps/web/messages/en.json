@@ -13,7 +13,39 @@
       "submit": "Sign in",
       "noAccount": "Need an account?",
       "registerLink": "Create one",
+      "forgotPasswordLink": "Forgot your password?",
       "error": "Could not sign in. Check your email and password."
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "subtitle": "Enter the email address of your account. If it has one, we'll send a link for choosing a new password.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "sending": "Sending…",
+      "sent": "If that address has an account, a reset link is on its way. It works for one hour.",
+      "sendError": "Could not send the link. Try again in a moment.",
+      "backToLogin": "Back to sign in"
+    },
+    "resetPassword": {
+      "loading": "Checking your link…",
+      "title": "Choose a new password",
+      "subtitle": "It has to be at least 8 characters long.",
+      "newPassword": "New password",
+      "submit": "Set new password",
+      "submitting": "Saving…",
+      "successTitle": "Password changed",
+      "successBody": "Your new password is set and every other session was signed out. Sign in to continue.",
+      "signInCta": "Sign in",
+      "invalidTitle": "This link didn't work",
+      "invalidBody": "It may have expired, been used already, or been copied without its last characters. Reset links work for one hour.",
+      "requestNewLink": "Send a new link",
+      "error": "Could not change your password. Send yourself a new link and try again.",
+      "fieldErrors": {
+        "password": {
+          "tooShort": "Password must be at least 8 characters long.",
+          "tooLong": "Password is too long."
+        }
+      }
     },
     "register": {
       "loading": "Loading sign-up…",
