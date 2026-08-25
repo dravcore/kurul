@@ -527,17 +527,18 @@ yapamayacağı şeyi tek istekte yapmamalı.
 
 **Hatalar:**
 
-| Durum | Ne zaman                                                                                |
-| ----- | --------------------------------------------------------------------------------------- |
-| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil |
-| `403` | Workspace üyesi, ama rolü `ADMIN`'in altında                                            |
-| `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı     |
-| `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                        |
-| `429` | Bir dakikalık pencerede üçten fazla import                                              |
+| Durum | Ne zaman                                                                                                                                                                                         |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil                                                                                                          |
+| `403` | Workspace üyesi, ama rolü `ADMIN`'in altında **ya da** workspace board tavanında (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, bkz. [Plan limitleri](#plan-limitleri)) |
+| `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı                                                                                                              |
+| `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                                                                                                                                 |
+| `429` | Bir dakikalık pencerede üçten fazla import                                                                                                                                                       |
 
 Ayrıştırıcıya ulaşan tek hata `400`'dür ve **ulaştığında hiçbir şey yazılmaz**: export, transaction
 açılmadan önce baştan sona okunup eşlenir, yani reddedilen bir import workspace'i baytı baytına
-olduğu gibi bırakır.
+olduğu gibi bırakır. Board tavanı `403`'ü de hiçbir şey yazmaz: kontrol, board satırından önce,
+transaction'ın ilk ifadesidir, dolayısıyla ret boş bir transaction'ı geri alır.
 
 **Cevabın gövdesi raporun kendisidir ve hiçbir yerde saklanmaz.**
 

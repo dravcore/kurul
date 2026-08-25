@@ -517,17 +517,19 @@ its caller could not do in several.
 
 **Errors:**
 
-| Status | When                                                                                                 |
-| ------ | ---------------------------------------------------------------------------------------------------- |
-| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export              |
-| `403`  | Workspace member whose role is below `ADMIN`                                                         |
-| `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it |
-| `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                      |
-| `429`  | More than three imports in a rolling minute                                                          |
+| Status | When                                                                                                                                                                                                |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export                                                                                                             |
+| `403`  | Workspace member whose role is below `ADMIN`, **or** the workspace is at its board ceiling (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, see [Plan limits](#plan-limits)) |
+| `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it                                                                                                |
+| `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                                                                                                                     |
+| `429`  | More than three imports in a rolling minute                                                                                                                                                         |
 
 A `400` is the only failure that reaches the parser, and **nothing is written when it does**: the
 export is read and mapped entirely before the transaction opens, so a rejected import leaves the
-workspace byte-for-byte as it was.
+workspace byte-for-byte as it was. The board-ceiling `403` writes nothing either: the check is the
+first statement inside the transaction, before the board row, so the refusal rolls back an empty
+transaction.
 
 **The response body is the whole report, and it is not stored anywhere.**
 
