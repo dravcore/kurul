@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -303,7 +303,10 @@ const EXEMPT_PAIRS: {
     surface: '--signature-subtle',
     floor: AA_TEXT,
     measured: 4.33,
-    reason: 'the only call site is the checklist glyph, a mark held to 3:1 and clearing it',
+    reason:
+      'the only call site is the checklist glyph in components/task/checklist-badge.tsx, a ' +
+      'mark held to 3:1 and clearing it; "keeps the checklist completion colour on the glyph" ' +
+      'below is what keeps the colour off the 11px ratio beside it',
   },
   {
     theme: 'dark',
@@ -776,10 +779,15 @@ const PINNED_CALL_SITES: {
  * means a JSX parser, and a JSX parser inside a contrast gate is a worse bet than a list somebody
  * has actually read.
  *
- * So the cheap half is automated instead: a file that paints one of those grounds anywhere and
- * one of those text colours anywhere has to be listed here with a note saying how the two are
- * kept apart. Seven qualify today and every one of them was read; in six the text is a sibling
- * error branch that renders instead of the list rather than inside it.
+ * So the question is split, and this list is one half of it: a file that paints one of those
+ * grounds anywhere and one of those text colours anywhere is listed here with a note saying how
+ * the two are kept apart. Seven qualify today and every one of them was read; in six the text is
+ * a sibling error branch that renders instead of the list rather than inside it.
+ *
+ * What it does not catch, and what `TEXT_UNDER_A_RISKY_GROUND` below is for: a descendant whose
+ * own file paints no ground at all. components/task/checklist-badge.tsx paints
+ * `text-status-good` and nothing else, and it is components/task/task-card.tsx that puts the
+ * selection tint under it, so neither file writes both and this scan reports neither.
  */
 const GROUND_AND_TEXT_IN_ONE_FILE: { file: string; note: string }[] = [
   {
@@ -823,16 +831,18 @@ const GROUND_AND_TEXT_IN_ONE_FILE: { file: string; note: string }[] = [
   },
 ];
 
+/** Whether a source paints any utility in `utilities`, on any element. */
+function paintsAny(file: string, utilities: readonly (readonly [string, string])[]): boolean {
+  const values = paintedValues(readFileSync(file, 'utf8'));
+  return utilities.some(([utility]) => values.some((value) => utilityPresent(value, utility)));
+}
+
 /** Every rendered source that paints one of `GROUNDS` and one of `TEXTS`, wherever in the file. */
 function filesPairingGroundAndText(): string[] {
-  const found: string[] = [];
-  for (const file of renderedSources(webRoot)) {
-    const values = paintedValues(readFileSync(file, 'utf8'));
-    const paints = (utilities: readonly (readonly [string, string])[]): boolean =>
-      utilities.some(([utility]) => values.some((value) => utilityPresent(value, utility)));
-    if (paints(GROUNDS) && paints(TEXTS)) found.push(relativeToWeb(file));
-  }
-  return found.sort();
+  return renderedSources(webRoot)
+    .filter((file) => paintsAny(file, GROUNDS) && paintsAny(file, TEXTS))
+    .map(relativeToWeb)
+    .sort();
 }
 
 describe('the copper and destructive text exemption', () => {
@@ -851,9 +861,11 @@ describe('the copper and destructive text exemption', () => {
   it('finds no second file pairing a risky ground with a risky text colour', () => {
     expect(
       filesPairingGroundAndText(),
-      'one element writing both is what `paintedCallSites` catches; a ground on an ancestor ' +
-        'and the text on a descendant is what this catches. Read the file, and either move the ' +
-        'text off the ground or add the file with a note saying how the two are kept apart',
+      'one element writing both is what `paintedCallSites` catches; one file writing both, on ' +
+        'elements that may or may not nest, is what this catches; and a descendant whose own ' +
+        'file paints no ground is what `TEXT_UNDER_A_RISKY_GROUND` catches. Read the file, and ' +
+        'either move the text off the ground or add the file with a note saying how the two ' +
+        'are kept apart',
     ).toEqual(GROUND_AND_TEXT_IN_ONE_FILE.map((entry) => entry.file).sort());
   });
 
@@ -888,6 +900,135 @@ describe('the copper and destructive text exemption', () => {
       }),
     );
     expect(drifted).toEqual([]);
+  });
+});
+
+/**
+ * The other half of the nesting question: a risky text colour in a file that paints no risky
+ * ground of its own, reached from a file that does.
+ *
+ * The import graph stands in for the render tree. Every rendered source painting one of
+ * `GROUNDS` is a root, every `.tsx` under apps/web it imports is walked from there, and a file
+ * reached that way that paints one of `TEXTS` and no ground of its own is listed here with the
+ * grounds above it and what keeps the pairing legal.
+ *
+ * An import is not a render, so this over-reports: three of the four entries are reached through
+ * a branch or a dialog that never renders inside the ground element. That is the safe direction
+ * for a gate whose failure mode is "a human reads the file". The direction it cannot cover is a
+ * child handed to a primitive by its caller: components/ui/button.tsx paints `hover:bg-accent`
+ * around whatever it is given and components/ui/dropdown-menu.tsx paints its focus ground the
+ * same way, so a caller putting a coloured element inside one sits above the ground rather than
+ * below it and neither list sees it. The tree has none today: every risky text colour rendered
+ * beside a `<Button>` is the sibling error line a retry button offers to reload, and the four
+ * destructive menu rows wear the variant that replaces the focus ground with its own tint.
+ */
+const TEXT_UNDER_A_RISKY_GROUND: { file: string; note: string }[] = [
+  {
+    file: 'components/board/import-report-panel.tsx',
+    note:
+      'the copper "set column categories" link, reached from components/board/board-list.tsx, ' +
+      'which paints `hover:bg-accent` on a board card. The panel renders above the grid and ' +
+      'paints its own `bg-card` root, so the link measures 5.05 light and 5.69 dark',
+  },
+  {
+    file: 'components/brand/damga-mark.tsx',
+    note:
+      'the copper tamga, reached from board-list.tsx, where it is the empty state that renders ' +
+      'instead of the card grid. It is an `aria-hidden` svg wherever it renders, a mark held ' +
+      'to 3:1, and copper clears 3 on all six surfaces (4.11 worst, light on the tint)',
+  },
+  {
+    file: 'components/common/submit-error.tsx',
+    note:
+      'the destructive submit-failure line, reached from board-list.tsx through the create, ' +
+      'rename, delete and import dialogs. Every caller renders it inside a dialog body or an ' +
+      'auth form, whose grounds are --popover (4.62 dark, the worst of them) and --background',
+  },
+  {
+    file: 'components/task/checklist-badge.tsx',
+    note:
+      'the one real nesting on this side. The badge renders inside the card, whose ground is ' +
+      '`bg-card` at rest, `bg-accent` on hover and `bg-signature-subtle` when selected, and ' +
+      'board-column.tsx paints the same tint under the whole column while a card is over it. ' +
+      'Worst is light --status-good on the tint at 4.33, which EXEMPT_PAIRS records and which ' +
+      'is legal only while the colour is a mark on the glyph',
+  },
+];
+
+/** The `.tsx` under apps/web a source imports, by the two specifier shapes the tree uses. */
+function localImports(file: string): string[] {
+  const found: string[] = [];
+  for (const match of readFileSync(file, 'utf8').matchAll(/from\s+['"]([^'"]+)['"]/g)) {
+    const specifier = match[1];
+    if (specifier === undefined) continue;
+    const base = specifier.startsWith('@/')
+      ? path.join(webRoot, specifier.slice(2))
+      : specifier.startsWith('.')
+        ? path.resolve(path.dirname(file), specifier)
+        : undefined;
+    if (base === undefined) continue;
+    const resolved = [`${base}.tsx`, path.join(base, 'index.tsx')].find((candidate) =>
+      existsSync(candidate),
+    );
+    if (resolved !== undefined) found.push(resolved);
+  }
+  return found;
+}
+
+function walkImports(file: string, seen: Set<string>, reached: string[]): void {
+  for (const next of localImports(file)) {
+    if (seen.has(next)) continue;
+    seen.add(next);
+    if (paintsAny(next, TEXTS) && !paintsAny(next, GROUNDS)) reached.push(relativeToWeb(next));
+    walkImports(next, seen, reached);
+  }
+}
+
+/**
+ * Every rendered source painting one of `TEXTS` and none of `GROUNDS`, reachable by import from
+ * a source that paints one of `GROUNDS`.
+ */
+function filesPaintingTextUnderARiskyGround(): string[] {
+  const roots = renderedSources(webRoot).filter((file) => paintsAny(file, GROUNDS));
+  const seen = new Set(roots);
+  const reached: string[] = [];
+  for (const root of roots) walkImports(root, seen, reached);
+  return reached.sort();
+}
+
+/** A `size-*` utility, which is how this tree sizes an icon and only an icon. */
+const ICON_SIZE = /(?<![a-z0-9])size-\d/;
+
+describe('text under a ground its own file does not paint', () => {
+  it('finds no unlisted file painting a risky text colour under a risky ground', () => {
+    expect(
+      filesPaintingTextUnderARiskyGround(),
+      'this file paints one of the text colours that misses 4.5:1 on the hover step or the ' +
+        'selection tint, and something painting one of those grounds imports it. Read where it ' +
+        'renders, and either move the colour off the ground, make it a mark, or add the file ' +
+        'here with the grounds above it and the ratio it measures there',
+    ).toEqual(TEXT_UNDER_A_RISKY_GROUND.map((entry) => entry.file).sort());
+  });
+
+  // The 4.33 above is not a property of the token, it is a property of where the token is
+  // written: on the glyph it is a mark at 3:1 and on the ratio next to it, 11px text at 4.5:1.
+  // Nothing else in this file can tell those two apart, so the badge is asserted directly.
+  it('keeps the checklist completion colour on the glyph rather than on the badge', () => {
+    const source = readFileSync(path.join(webRoot, 'components/task/checklist-badge.tsx'), 'utf8');
+    const coloured = paintedValues(source).filter((value) =>
+      TEXTS.some(([utility]) => utilityPresent(value, utility)),
+    );
+    expect(
+      coloured,
+      'components/task/checklist-badge.tsx paints exactly one coloured element, the glyph',
+    ).toHaveLength(1);
+    expect(
+      coloured.every((value) => ICON_SIZE.test(value)),
+      'light --status-good measures 4.33:1 on the selection tint a selected card puts under ' +
+        'this badge, and EXEMPT_PAIRS excuses that only because the colour is a mark: it ' +
+        'belongs on the icon, not on the badge wrapper or the 11px ratio beside it, both of ' +
+        'which are text held to 4.5:1',
+    ).toBe(true);
   });
 });
 

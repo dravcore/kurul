@@ -21,6 +21,8 @@ type Declaration = { property: string; value: string };
 type StyleRule = {
   selector: string;
   layer: string | null;
+  /** The at-rule preludes this rule is nested inside, outermost first. */
+  atRules: string[];
   declarations: Declaration[];
   order: number;
 };
@@ -113,11 +115,16 @@ function topLevelDeclarations(body: string): Declaration[] {
   return declarations;
 }
 
+/** One level of nesting: the `@layer` in force there, and the at-rule that opened it. */
+type Frame = { layer: string | null; at: string | null };
+
 function parseStylesheet(css: string): Stylesheet {
   const rules: StyleRule[] = [];
   const layerOrder: string[] = [];
-  const stack: (string | null)[] = [];
-  const currentLayer = (): string | null => stack.at(-1) ?? null;
+  const stack: Frame[] = [];
+  const currentLayer = (): string | null => stack.at(-1)?.layer ?? null;
+  const enclosingAtRules = (): string[] =>
+    stack.map((frame) => frame.at).filter((at): at is string => at !== null);
   let buffer = '';
   let order = 0;
 
@@ -137,7 +144,7 @@ function parseStylesheet(css: string): Stylesheet {
       if (prelude.startsWith('@layer')) {
         const name = prelude.slice('@layer'.length).trim();
         if (name && !layerOrder.includes(name)) layerOrder.push(name);
-        stack.push(name || currentLayer());
+        stack.push({ layer: name || currentLayer(), at: null });
         continue;
       }
       if (prelude.startsWith('@')) {
@@ -146,13 +153,14 @@ function parseStylesheet(css: string): Stylesheet {
           i = blockEnd(css, i);
           continue;
         }
-        stack.push(currentLayer());
+        stack.push({ layer: currentLayer(), at: prelude });
         continue;
       }
       const end = blockEnd(css, i);
       rules.push({
         selector: prelude,
         layer: currentLayer(),
+        atRules: enclosingAtRules(),
         declarations: topLevelDeclarations(css.slice(i + 1, end)),
         order: (order += 1),
       });
@@ -410,7 +418,12 @@ describe('globals.css cascade layers', () => {
     const rule = requireRule(sheet, 'a compiled `dark:bg-accent` rule', (candidate) => {
       return candidate.selector.startsWith(escapeClass('dark:bg-accent'));
     });
-    expect(rule.selector).toContain('.dark');
+    // Asserted on what the variant appends, not on the class name it is written with: the rule
+    // is found by its escaped class `.dark\:bg-accent`, which contains the substring `.dark`
+    // whatever the variant compiles to. `:where(.dark` is the class variant's own output, and
+    // the at-rule stack is empty for it while the stock variant nests it in a media query.
+    expect(rule.selector).toContain(':where(.dark');
+    expect(rule.atRules.filter((atRule) => atRule.startsWith('@media'))).toEqual([]);
     expect(css).not.toContain('prefers-color-scheme');
   });
 });
