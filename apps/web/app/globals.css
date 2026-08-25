@@ -45,8 +45,11 @@
   --ring: #a85a28;
   --signature: #a85a28;
 
-  /* Never copper (--signature) text on this tint. Neutral --foreground text is allowed and is
-     measured against it like any other surface. */
+  /* Never copper (--signature) text on this tint: it measures 4.11:1 in light, under the 4.5
+     floor. Neutral --foreground text is allowed (13.98:1) and is measured against it like any
+     other surface. Two call sites still break the rule, components/task/comment-body.tsx and
+     components/layout/workspace-switcher.tsx; app/globals.contrast.test.ts pins both with the
+     ratio they measure, so the list cannot grow unnoticed and P4 empties it. */
   --signature-subtle: #f2e6da;
   --foreground-secondary: #545a57;
   --foreground-disabled: #7f8683;

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -168,9 +168,13 @@ const TEXT_TOKENS = [
  * Copper and destructive as *text*, not as a fill or a mark.
  *
  * Exempt on `--accent` and `--signature-subtle`, measured light copper 4.28 on accent and 4.11 on
- * the tint, dark destructive 4.13 on accent. The design rule is what makes the exemption safe
- * rather than the number: docs/design.md keeps copper text off the signature tint, and no call
- * site may put copper or destructive text on the hover step, which is a grep, not a measurement.
+ * the tint, dark destructive 4.13 on accent. Every other exemption in this file rests on a
+ * number; this one rests on a rule (docs/design.md: no copper text on the signature tint, and no
+ * call site puts copper or destructive text on the hover step), and a rule nothing reads is a
+ * rule nothing keeps. So it is not taken on trust: `PINNED_CALL_SITES` below is the list of call
+ * sites that pair one of those grounds with one of those text colours, the tree is scanned
+ * against it, and each pin carries the ratio it measures in both themes, so a token moving under
+ * a pin fails here instead of passing quietly.
  */
 const COPPER_AND_DESTRUCTIVE_TEXT = ['--primary', '--signature', '--destructive'];
 
@@ -272,6 +276,205 @@ for (const theme of THEMES) {
     });
   });
 }
+
+/**
+ * The call-site half of the copper and destructive exemption.
+ *
+ * Grounds and text colours are named by their utility class, because that is what a call site
+ * writes. An alpha derivative counts as its token: `bg-signature-subtle/40` is still the tint,
+ * only weaker, so a pairing on it is still the pairing the rule forbids.
+ */
+const GROUNDS = [
+  ['bg-signature-subtle', '--signature-subtle'],
+  ['bg-accent', '--accent'],
+] as const;
+
+const TEXTS = [
+  ['text-signature', '--signature'],
+  ['text-primary', '--primary'],
+  ['text-destructive', '--destructive'],
+] as const;
+
+type GroundClass = (typeof GROUNDS)[number][0];
+type TextClass = (typeof TEXTS)[number][0];
+
+const TOKEN_OF = new Map<string, string>([...GROUNDS, ...TEXTS]);
+
+function tokenOf(utility: string): string {
+  const token = TOKEN_OF.get(utility);
+  if (token === undefined) throw new Error(`no token is mapped to \`${utility}\``);
+  return token;
+}
+
+const webRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+const NOT_RENDERED = new Set(['node_modules', '.next', 'coverage', 'public', 'messages']);
+
+/**
+ * Every source a browser renders. Test files are excluded for the same reason `globals.css`
+ * keeps them out of Tailwind's scanner: a class-like string inside one is prose, not a painted
+ * element.
+ */
+function renderedSources(directory: string, found: string[] = []): string[] {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (NOT_RENDERED.has(entry.name)) continue;
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) renderedSources(full, found);
+    else if (entry.name.endsWith('.tsx') && !entry.name.endsWith('.test.tsx')) found.push(full);
+  }
+  return found;
+}
+
+/**
+ * Every `className` value in a source: a quoted string, or the balanced `{ ... }` expression a
+ * `cn()` call fills. One value is one painted element, which is the unit the rule is about, and
+ * it is why this is not a line grep: the ground and the text colour of one element routinely sit
+ * on different lines of the same `cn()`.
+ */
+function classNameValues(source: string): string[] {
+  const values: string[] = [];
+  for (const attribute of source.matchAll(/className\s*=\s*/g)) {
+    const start = attribute.index + attribute[0].length;
+    const opener = source.charAt(start);
+    let end = start;
+    if (opener === '"' || opener === "'" || opener === '`') {
+      end = start + 1;
+      while (end < source.length && source.charAt(end) !== opener) {
+        end += source.charAt(end) === '\\' ? 2 : 1;
+      }
+      end += 1;
+    } else if (opener === '{') {
+      let depth = 0;
+      let quote = '';
+      while (end < source.length) {
+        const character = source.charAt(end);
+        if (quote !== '') {
+          if (character === '\\') end += 1;
+          else if (character === quote) quote = '';
+        } else if (character === '"' || character === "'" || character === '`') {
+          quote = character;
+        } else if (character === '{') {
+          depth += 1;
+        } else if (character === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            end += 1;
+            break;
+          }
+        }
+        end += 1;
+      }
+    } else {
+      continue;
+    }
+    values.push(source.slice(start, end));
+  }
+  return values;
+}
+
+/** A utility is present under any variant prefix (`dark:`, `focus:`) and any alpha suffix. */
+function utilityPresent(value: string, utility: string): boolean {
+  return new RegExp(`(?<![a-z0-9])${utility}(?![-\\w])`).test(value);
+}
+
+function siteLine(file: string, text: string, ground: string): string {
+  return `${file}: ${text} on ${ground}`;
+}
+
+function paintedCallSites(): string[] {
+  const found: string[] = [];
+  for (const file of renderedSources(webRoot)) {
+    const source = readFileSync(file, 'utf8');
+    for (const value of classNameValues(source)) {
+      for (const [ground] of GROUNDS) {
+        if (!utilityPresent(value, ground)) continue;
+        for (const [text] of TEXTS) {
+          if (!utilityPresent(value, text)) continue;
+          found.push(
+            siteLine(path.relative(webRoot, file).split(path.sep).join('/'), text, ground),
+          );
+        }
+      }
+    }
+  }
+  return [...new Set(found)].sort();
+}
+
+/**
+ * What the tree paints today, with the ratio each pairing measures and who clears it. Two of the
+ * three are below the 4.5 floor in light and are named in the phase report as open AA failures:
+ * this list is the hand-over, not a blessing.
+ */
+const PINNED_CALL_SITES: {
+  file: string;
+  text: TextClass;
+  ground: GroundClass;
+  light: number;
+  dark: number;
+  note: string;
+}[] = [
+  {
+    file: 'components/layout/workspace-switcher.tsx',
+    text: 'text-signature',
+    ground: 'bg-signature-subtle',
+    light: 4.11,
+    dark: 5.14,
+    // The workspace initial. Light is under the floor and this phase's tint moved it down from
+    // 4.37, so it is a measured failure, not only a rule violation. `text-foreground` on the
+    // same tint measures 13.98 light and 11.77 dark.
+    note: 'P4 moves it to text-foreground with the mention chip',
+  },
+  {
+    file: 'components/task/comment-body.tsx',
+    text: 'text-signature',
+    ground: 'bg-signature-subtle',
+    light: 4.11,
+    dark: 5.14,
+    note: 'the mention chip, already slated to be text-foreground on the tint in P4',
+  },
+  {
+    file: 'components/ui/dropdown-menu.tsx',
+    text: 'text-destructive',
+    ground: 'bg-accent',
+    light: 4.99,
+    dark: 4.13,
+    // Never rendered: `data-[variant=destructive]:focus:bg-destructive/10` replaces
+    // `focus:bg-accent` on exactly the variant that turns the text destructive, so a destructive
+    // item's focus ground is never `--accent`. Pinned so that dropping the override shows here.
+    note: 'the variant that turns the text destructive replaces the accent focus ground',
+  },
+];
+
+describe('the copper and destructive text exemption', () => {
+  it('finds no call site the pinned list does not name', () => {
+    const pinned = PINNED_CALL_SITES.map((site) =>
+      siteLine(site.file, site.text, site.ground),
+    ).sort();
+    expect(
+      paintedCallSites(),
+      'copper or destructive text on the signature tint or on the hover step is exempt from the ' +
+        '4.5:1 floor only while no call site draws it: move the element to text-foreground, or ' +
+        'pin it above with its measured ratio and the task that clears it',
+    ).toEqual(pinned);
+  });
+
+  it('keeps the ratio each pinned call site measures on record', () => {
+    const drifted = PINNED_CALL_SITES.flatMap((site) =>
+      THEMES.flatMap((theme) => {
+        const text = hexOf(theme, tokenOf(site.text));
+        const ground = hexOf(theme, tokenOf(site.ground));
+        const measured = round(contrastRatio(text, ground), 2);
+        return measured === site[theme]
+          ? []
+          : [
+              `${theme}: ${siteLine(site.file, site.text, site.ground)} measures ` +
+                `${measured.toFixed(2)}:1, recorded ${site[theme].toFixed(2)}:1`,
+            ];
+      }),
+    );
+    expect(drifted).toEqual([]);
+  });
+});
 
 describe('dark elevation ramp', () => {
   // Canvas to hover step, each surface one visible step above the last. Dark depth is a lighter
