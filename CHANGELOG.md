@@ -154,6 +154,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recovered, and the list admits what the reset cannot recover, not what is annoying. An
   ordinary install is untouched; the `DEMO_MODE` table in
   [self-hosting.md](docs/self-hosting.md#what-demo_modetrue-changes) names the new row.
+- **Request bodies to `/auth/*` are bounded, at the proxy and at the API.** Better Auth reads
+  the raw request stream itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on
+  every other route, and the bundled `docker/Caddyfile` set `request_body max_size` only on
+  `/api/*`, so a `POST /auth/sign-in/email` could stream a body of any size into the API
+  container's heap (512 MB, `--max-old-space-size=384`) at the built-in attempt budget of 3 per
+  10 seconds per IP and path on sign-in, sign-up and change-password, and 100 per minute on the
+  other auth routes. `handle /auth/*` now carries `max_size 64KiB`, and the mount refuses a
+  declared `Content-Length` over the same `AUTH_BODY_MAX_BYTES` (`65536`, a constant in
+  `apps/api/src/auth/auth-body-limit.ts`) with the standard `413` envelope before a byte is
+  read; a chunked body, which has no length to check, is counted as it streams and the
+  connection is closed past the ceiling. The largest legitimate auth body is a few hundred bytes
+  of JSON. The nginx contract in `docs/self-hosting.md` gains `client_max_body_size 64k;` for
+  `location /auth/`, and `two-layer-limit.spec.ts` pins the Caddyfile figure, the nginx row and
+  the API constant to each other; unlike the upload pair, the two may be equal, since there is
+  no multipart envelope between them.
 - **The web app's `script-src` no longer allows `'unsafe-inline'`.** Inline script is admitted
   by a per-request nonce instead: `apps/web/proxy.ts` — Next 16's replacement for the
   `middleware.ts` convention, which is where the old file moved — draws 16 bytes from the
@@ -255,6 +270,54 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   along with the non-atomic fallback path that used them; `consume` is the whole interface now,
   and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
   Redis outage fallback and the degraded-mode reporting are all unchanged.
+- **The PR pipeline is a flat graph of six jobs, and its wall time is the longest of them.**
+  `ci.yml` ran `build` behind `lint` and `test` although it uses nothing they produce, and
+  `test` ran the unit suites and then, against Postgres and Redis service containers, the
+  migration, the drift check and the integration suite, back to back. Measured over the last
+  twenty `develop` runs, fifteen took 301-342 s, past the five-minute trigger `ROADMAP.md`
+  records for OPS-10; install and `prisma generate` were not the cost (about 20 runner-seconds
+  per run), the job graph was. `build` now has no `needs`, `test` is split into `test-unit`
+  (shared packages, `scripts/`, the api and web suites with coverage, and no services: the api
+  suite passes against a closed port with `REDIS_URL` unset) and `test-integration` (the
+  services, `db:migrate`, `db:drift`, `test:e2e`), and `ci-ok` waits on all six with the same
+  skipped-or-cancelled handling. Branch protection names only `ci-ok` and `CodeQL`, so the
+  renamed jobs need no settings change.
+
+  Two cache changes travel with it, because the image-scan leg becomes the critical path once
+  `test` is untangled. Pull request runs no longer write the BuildKit `type=gha` cache: every
+  PR stored a full `mode=max` copy of the build stage under its own ref, the repository sat at
+  10.87 GB against GitHub's 10 GB cache limit, and eviction by last access took `develop`'s
+  entries with it, so the leg designed to read a warm cache built cold (212 s against 54 s).
+  Only `push` runs write now. `concurrency.cancel-in-progress` is true for pull requests only,
+  so a merge burst cannot cancel the `develop` run that writes the cache every PR reads. Every
+  job also carries a `timeout-minutes` ceiling (lint 15, test-unit 20, test-integration 25,
+  build 20, image-scan 40, compose-config 5, ci-ok 5): the default is six hours, and two
+  release-candidate runs of `release-images.yml` once held a runner for 4 h and 5.7 h before
+  being cancelled by hand.
+  Target: `ci-ok` under 3m30s, tracked in the OPS-10 row of `ROADMAP.md`.
+
+- **Compose tuning for first boot, Redis and Postgres.** Three small changes, applied to both
+  `docker-compose.yml` and `docker-compose.dev.yml`. The `postgres` healthcheck now probes over
+  TCP (`pg_isready -h 127.0.0.1 ...`): without a host it asked the Unix socket, which the official
+  entrypoint's temporary initdb server also answers on the first boot of an empty volume, so
+  `migrate` could be released before anything listened on 5432 and exit 1 once, which reads to a
+  newcomer as a broken install. `redis` runs with `--maxmemory 100mb --maxmemory-policy
+  noeviction` under its 128m `mem_limit`, so a Redis that fills up answers with a logged
+  `OOM command not allowed` the API already survives (its rate limiters fall back to process
+  memory) instead of a bare exit 137 that `restart: unless-stopped` turns into a loop;
+  `noeviction` is the policy BullMQ requires for the queues that live there. `postgres` gets
+  `shm_size: 256m`, because Docker's default 64 MB `/dev/shm` is where parallel workers and hash
+  joins run out of dynamic shared memory on a heavy dashboard query. None of it is memory on top
+  of the existing ceilings; the sizing notes in
+  [self-hosting.md](docs/self-hosting.md#server-sizing) describe all three.
+
+  `REDIS_MAXMEMORY` in `.env` (default `100mb`, unchanged) now makes that ceiling adjustable
+  without editing the compose file. On an instance that is already running, check where the
+  dataset sits before upgrading into it: `docker compose exec redis redis-cli -a
+  "$REDIS_PASSWORD" INFO memory | grep used_memory_human`. With `noeviction`, a dataset already
+  near or over the ceiling does not shrink on its own; it refuses writes until keys expire, so
+  raise `REDIS_MAXMEMORY` and the `redis` `mem_limit` together rather than after the fact.
+
 - **The self-hosting guide installs and upgrades from a release tag, with a runbook.**
   `docs/self-hosting.md` now fetches `docker-compose.yml`, `docker/Caddyfile`,
   `scripts/backup.sh` and `.env.example` from the `v0.3.0` tag URL rather than from `main`, so
@@ -277,6 +340,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   bumps the tag on the page. Turkish mirrors updated in step.
 
 ### Fixed
+
+- **A Trello import no longer steps over the workspace's board ceiling.**
+  `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on
+  `POST .../boards` but not on `POST .../imports/trello`, which creates its board by its own
+  `tx.board.create`, so an `OWNER` or `ADMIN` at the limit could keep adding boards by importing
+  any small export. `TrelloImportService` now asks `PlanLimitsService` for room as the first
+  statement of its transaction, with the same transaction client and the same `403`
+  `PLAN_LIMIT_BOARDS` refusal `BoardService.create` gives, and a refused import writes nothing.
+  Imported link attachment names also go through the display-name cleaning `createLink` applies
+  (bidi overrides, control characters, quotes and backslashes stripped, 255-character clamp,
+  URL fallback for a name that is empty afterwards), which the importer had skipped; the rule
+  moved to `attachment-display-name.ts` so both writers of `Attachment.filename` share one
+  function. [ADR 0032](docs/decisions/0032-plan-limits.md) names the importer in its
+  enforcement list.
 
 - **`PLAN_MAX_*`, `INSTANCE_ADMIN_EMAILS`, the retention windows, telemetry, `API_DOCS_ENABLED`,
   `RATE_LIMIT_ENABLED` and the database pool knobs were inert under the bundled Compose stack.**
@@ -356,6 +433,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   jittered, doubling retry for exactly those two cases, and a denied room join is retried with
   backoff instead of standing for the life of the socket — so the indicator now describes
   something that is actually happening.
+- **Restarting the `backup` sidecar no longer spends a retention slot.** `scripts/backup.sh`
+  took a dump on entry every time its container started, and every host reboot,
+  `docker compose up` after a `.env` edit and image pull starts it. Retention is a count
+  (`BACKUP_KEEP` newest archives, no age check), so a day of restarts could push a week of
+  history out of the seven default slots, and the API's orphan-file sweep, whose grace window
+  assumes one pair per `BACKUP_INTERVAL`, was quietly covering less than the documented week.
+  The loop now skips its boot-time cycle while a dump younger than half of `BACKUP_INTERVAL`
+  already exists, logs the skip, and sleeps only the remainder of the interval, so both the
+  cadence and the history come through a restart unchanged. A first boot with no dump still
+  dumps immediately, and the hand-run `backup.sh once` is never skipped. `scripts/backup.test.mjs`
+  starts the loop twice within seconds and asserts one pair, and the `BACKUP_KEEP` comments in
+  `docker-compose.yml` and `.env.example` now say that retention is count-based.
+
 - **`docker/Caddyfile`'s header quoted the nginx body limit the same file warns against.** The
   bring-your-own-proxy contract at the top of the file said the rule-2 body limit "matches"
   the API's `ATTACHMENT_MAX_BYTES` (`client_max_body_size 25m;`), while the `request_body`

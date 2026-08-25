@@ -88,7 +88,7 @@ job'ından önce açıkça build eder, çünkü `pnpm typecheck` orada koşar.
 Test suite'leri bunun istisnasıdır. Jest (`apps/api`, unit ve integration) ve Vitest
 (`apps/web`, `packages/auth-access`) iki paketi de `src/index.ts` dosyalarına eşler; bu yüzden
 `pnpm test` hiç `dist` olmayan bir checkout'ta geçer ve asla bayat bir build'e karşı koşmaz.
-CI'daki test job'ı da bu sebeple build adımını bilerek atlar. Bayat build iki arızanın kötü
+CI'daki test job'ları da bu sebeple build adımını bilerek atlar. Bayat build iki arızanın kötü
 olanıdır, çünkü çözümlenir: son build'den sonra eklenen bir enum her tüketicide `undefined`
 olarak okunur. `pnpm dev` ve `pnpm db:seed` hâlâ `dist` üzerinden gider; bu yüzden iki
 paketten birine gelen bir değişikliği çektikten sonra yeniden build edin.
@@ -1000,6 +1000,15 @@ noktası (RPO ≤ 24 sa) ve bir haftalık geçmiş** demektir; host'ta cron yok,
 yedekleme sidecar'ı sessizce kurtarma noktası üretmeyi bırakır ki bu bölümün var olma sebebi
 tam olarak bu hatadır. `docker-compose.dev.yml`'de bilinçli olarak **yok** — `pnpm db:seed`'in
 istendiğinde sildiği yerel bir veritabanında saklanmaya değer bir şey yoktur.
+
+O hafta bir arşiv sayısıdır, yaş değil, ve container'ı yeniden başlatmak bundan harcamaz. Döngü
+eskiden her başladığında girişte bir çift alırdı ve her host reboot'u, `.env` düzenlemesinden
+sonraki her `docker compose up` ve her image pull onu başlatır; yani bir günlük yeniden
+başlatmalar bir haftalık geçmişi yedi slotun dışına itebilirdi. Artık `BACKUP_INTERVAL`'ın
+yarısından genç bir dump zaten varken o ilk döngüyü atlar, atladığını loglar ve yalnızca
+aralığın kalanı kadar uyur; böylece hem kadans hem de geçmiş yeniden başlatmadan önceki gibi
+kalır. Aşağıdaki elle çalıştırılan `backup.sh once` hiçbir zaman atlanmaz: dump isteyen
+operatör dump alır.
 
 Üç ayar, üçü de compose tarafından `.env`'den okunur:
 

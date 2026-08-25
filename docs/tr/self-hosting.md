@@ -51,15 +51,15 @@ büyüyen container hangisiyse onun yerine Postgres'i esirgemek için hiçbir se
 için öldürülür ve başka bir servisin yaptığı hiçbir şey Postgres'i onunla birlikte
 düşüremez.
 
-| Servis     | `mem_limit` | Bu sayının nedeni                                                                                |
-| ---------- | ----------- | ------------------------------------------------------------------------------------------------ |
-| `postgres` | 512m        | Küçük bir ekibin board'u için cömert bir taban                                                   |
-| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) ikisi de heap'ine buffer'lar  |
-| `web`      | 512m        | Aynı Next.js SSR process'i, `api` ile aynı "seçilmemiş tavan" sorunu                             |
-| `migrate`  | 512m        | `api` ile aynı — aynı build stage, aynı Prisma CLI, yalnızca startup'ta bir kez                  |
-| `backup`   | 256m        | `pg_dump` buffer'lamak yerine stream eder; bu, process overhead'i ve attachment `tar`'ını kapsar |
-| `redis`    | 128m        | Yalnızca cache, session, rate limit, bildirim — asla board verisi, küçük ve sınırlı working set  |
-| `proxy`    | 128m        | TLS sonlandırır ve proxy'ler; gövdeler `api`'ninki gibi buffer'lanmak yerine Caddy'den geçer     |
+| Servis     | `mem_limit` | Bu sayının nedeni                                                                                  |
+| ---------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| `postgres` | 512m        | Küçük bir ekibin board'u için cömert bir taban; `/dev/shm` 256m'ye çıkarıldı, aşağıya bakın        |
+| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) ikisi de heap'ine buffer'lar    |
+| `web`      | 512m        | Aynı Next.js SSR process'i, `api` ile aynı "seçilmemiş tavan" sorunu                               |
+| `migrate`  | 512m        | `api` ile aynı: aynı build stage, aynı Prisma CLI, yalnızca startup'ta bir kez                     |
+| `backup`   | 256m        | `pg_dump` buffer'lamak yerine stream eder; bu, process overhead'i ve attachment `tar`'ını kapsar   |
+| `redis`    | 128m        | Yalnızca cache, session, rate limit, bildirim, asla board verisi; `maxmemory` 100mb, aşağıya bakın |
+| `proxy`    | 128m        | TLS sonlandırır ve proxy'ler; gövdeler `api`'ninki gibi buffer'lanmak yerine Caddy'den geçer       |
 
 `api` ve `web`, 512m tavanlarının %75'i olan `NODE_OPTIONS=--max-old-space-size=384`'ü de
 ayarlar — böylece V8'in heap'i, Node'un kendi container-belleği sezgisine bırakılmak yerine
@@ -68,6 +68,30 @@ kapsamadığı şeyler içindir (thread stack'leri, native buffer'lar, code spac
 sert limitine varmadan önce kendi yakalanabilir "JavaScript heap out of memory" hatasına çarpar
 — bu da çıplak bir `SIGKILL` yerine `docker compose logs api` (ya da `web`) içinde bir satır
 olarak görünür.
+
+`redis` de 128m'sinin içinde aynı muameleyi görür: komut satırında `--maxmemory 100mb
+--maxmemory-policy noeviction` vardır, yani dolan bir Redis, cgroup tarafından öldürülüp
+döngü halinde yeniden başlatılmak yerine yazmalara
+`OOM command not allowed when used memory > 'maxmemory'` ile cevap verir (`docker compose logs
+api` içinde bir satır; API'nin rate limiter'ları Redis hata verirken process belleğine düşer,
+bir cache miss de bir cache miss'tir). `noeviction`, bildirim ve retention kuyrukları bu
+Redis'te yaşayan BullMQ'nun şart koştuğu politikadır: evict edilen bir iş sessizce hiç
+çalışmayan bir iştir, dolayısıyla dolu bir Redis anahtar düşürmek yerine yazmayı reddeder.
+`postgres` `shm_size: 256m` taşır çünkü Docker'ın `/dev/shm`'i varsayılan olarak 64 MB'dır ve
+Postgres paralel worker'lar ile hash join'ler için dinamik paylaşımlı belleği oraya ayırır;
+bitmesi, ağır bir dashboard sorgusunda
+`could not resize shared memory segment ... No space left on device` olarak görünür. İkisi de
+tablodaki tavanların üstüne bellek değildir: bir `/dev/shm` sayfası container'ın cgroup'una
+diğer her sayfa gibi yazılır ve `maxmemory`, Docker'ın Redis'e uyguladığı limitin altında
+Redis'in kendine uyguladığı bir limittir.
+
+`REDIS_MAXMEMORY`, `.env` içinde bu tavanı `docker-compose.yml`'e dokunmadan yükseltir; `redis`
+`mem_limit`'ini de onunla birlikte yükseltin ki Redis kendi limitine cgroup'unkinden önce
+çarpsın. Zaten çalışan bir instance'ta yükseltmeden önce dataset'in gerçekte nerede durduğunu
+kontrol edin: `docker compose exec redis redis-cli -a "$REDIS_PASSWORD" INFO memory | grep
+used_memory_human`. `noeviction` ile tavanın zaten üzerindeki bir dataset kendini geri
+küçültmez: yeterince key kendiliğinden expire olana kadar her yazmayı reddeder, kontrolün
+sayıdan önce gelmesinin nedeni budur.
 
 Bunlar birer tavan, rezervasyon değil — `mem_limit`'inden az kullanan bir container hiçbir ek
 maliyete yol açmaz, ve özellikle `migrate`, `api` ile `web` başlamayı bitirmeden önce (başarıyla)
@@ -443,7 +467,11 @@ docker compose logs api | grep -i mail
 `backup_data` volume'üne **iki** arşiv yazar — veritabanının `pg_dump`'ı ve yüklenmiş attachment
 dosyalarının `.tar.gz`'i — ve her seriden `BACKUP_KEEP` tanesini tutar. Bir döngünün iki arşivi
 de **aynı zaman damgasını** taşır; bir restore hangi tar'ın hangi dump'a ait olduğunu böyle
-bilir.
+bilir. `BACKUP_KEEP` bir sayıdır, yaş değil, ve bir yeniden başlatma bu sayıdan harcamaz:
+sidecar, `BACKUP_INTERVAL`'ın yarısından genç bir dump varken açılıştaki döngüsünü atlar,
+dolayısıyla bir reboot ya da `.env` düzenlemesinden sonraki `docker compose up` elinizdeki
+geçmişi olduğu gibi bırakır
+([zamanlanmış yedekleme sidecar'ı](development.md#zamanlanmış-yedekleme-sidecarı)).
 
 Bu, "yanlış workspace'i sildim" durumunu karşılar. Ölen bir diski karşılamaz — arşivler
 veritabanıyla aynı makinede durur. Onları makine dışına kopyalayın — yalnız dump'ı değil, **en
@@ -918,7 +946,7 @@ kural:
 
 | Yol            | Nereye   | Prefix                | Azami istek gövdesi          |
 | -------------- | -------- | --------------------- | ---------------------------- |
-| `/auth/*`      | api:4000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
+| `/auth/*`      | api:4000 | olduğu gibi korunur   | **64 KiB** (`65536` bayt)    |
 | `/api/*`       | api:4000 | `/api` **kaldırılır** | **26 MiB** (`27262976` bayt) |
 | geri kalan her | web:3000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
 
@@ -965,6 +993,32 @@ koymaz — pakete dahil `docker/Caddyfile`'ın limiti açıkça yazmasının seb
 `client_max_body_size` için **1 MB** varsayar; yani satırı atlayan bir yedek proxy, bir
 megabayttan büyük her eki reddeder.
 
+#### `/auth/*` neden kendi tavanına sahip ve neden 64 KiB
+
+Kural 1 de bir limit taşır, hem de çok daha küçüğünü. Better Auth ham istek akışını kendisi
+okur; diğer bütün rotalarda `REQUEST_BODY_MAX_BYTES`'ı uygulayan parser'ların altındadır,
+dolayısıyla o tavan `/auth/*` için hiç geçerli olmadı: bir `POST /auth/sign-in/email` hangi
+boyutta olursa olsun sonuna kadar okunuyordu ve yerleşik deneme bütçesi (sign-in, sign-up ve
+change-password'de IP ve yol başına 10 saniyede 3, diğer auth rotalarında dakikada 100) baytı
+değil isteği sayar. Bu rotaların aldığı her gövde birkaç yüz baytlık bir JSON nesnesidir; 64 KiB
+bunun iki büyüklük mertebesi üstünde bir pay bırakır.
+
+API aynı sayıyı `AUTH_BODY_MAX_BYTES` olarak uygular (`65536`; bir ortam değişkeni değil,
+`apps/api/src/auth/auth-body-limit.ts` içindeki bir sabit): bunun üstünde bir `Content-Length`
+bildiren istek, gövdesinden tek bayt okunmadan `Request body is too large` yazan `413` zarfıyla
+cevaplanır. Burada proxy ile API, yukarıdaki çiftin aksine, **eşit olabilir**: bir auth
+gövdesinin multipart zarfı yoktur, iki katman aynı baytları sayar ve sıralama kuralı eşitlikte de
+geçerlidir.
+
+`Content-Length` olmadan gönderilen bir gövde (chunked transfer encoding; bir tarayıcı JSON
+gövdesi için bunu hiç kullanmaz) iki katmanın farklı cevapladığı tek durumdur. Onu bir status
+koduyla sınırlayan katman proxy'dir: `request_body max_size` gövdeyi aynı 64 KiB'ta keser. API,
+Better Auth'a akıtmakta olduğu bir gövdeye cevap veremez; bu yüzden baytları geldikçe sayar ve
+tavan aşılınca bağlantıyı kapatır. Bu, proxy'siz açığa çıkarılmış bir instance'ı da sınırlı
+tutar, ama `413` yerine kopan bir bağlantıyla. Proxy'nin isteğe bağlı bir ek değil, varsayılan
+stack'in parçası olmasının bir sebebi daha budur. `apps/api/src/storage/two-layer-limit.spec.ts`
+Caddyfile'daki sayıyı, aşağıdaki nginx satırını ve API sabitini birbirine sabitler.
+
 ### 413'leri birbirinden ayırmak
 
 Her iki katman da boyutu aşan bir yüklemeye `413` ile cevap verir — ve yüklemelerle hiç ilgisi
@@ -985,8 +1039,10 @@ API'ninki neden 25" bölümüne bakın).
 
 Üçüncü satır, aynı status kodunu paylaşan başka bir limittir: `REQUEST_BODY_MAX_BYTES`
 (varsayılan `1048576`, 1 MiB) diğer bütün uçların aldığı **JSON ve form-encoded** gövdeleri
-sınırlar ve hiçbir attachment oradan geçmez. Bunu görüyorsanız ne storage'ınızda ne proxy'nizde
-yanlış bir şey var; bir istek yalnızca API'nin kabul ettiğinden fazla JSON göndermiştir.
+sınırlar ve hiçbir attachment oradan geçmez. Aynı cümle `/auth/` ile başlayan bir `path` altında
+geliyorsa limit, daha küçük olan `AUTH_BODY_MAX_BYTES`'tır (64 KiB); yukarıdaki kural 1'e bakın.
+İkisinden birini görüyorsanız ne storage'ınızda ne proxy'nizde yanlış bir şey var; bir istek
+yalnızca API'nin kabul ettiğinden fazla JSON göndermiştir.
 
 Dördüncü satır ise başka bir başarısızlıktır: dosya `ATTACHMENT_MAX_BYTES`'ın altındadır, ama onu
 saklamak bir workspace'i ya da instance'ı kendi kotasının üzerine çıkarır. Boyutlandırma için
@@ -1028,7 +1084,12 @@ gönderdiği doğrulama linklerinde aynı dize olmak zorundadır. API'nin geri k
 mount edilmiştir ve prefix girişte kaldırılır. nginx'te:
 
 ```nginx
-location /auth/ { proxy_pass http://api:4000;  }   # sondaki slash yok → yol korunur
+location /auth/ {
+  proxy_pass http://api:4000;                      # sondaki slash yok → yol korunur
+  client_max_body_size 64k;                        # AUTH_BODY_MAX_BYTES'a (64 KiB) EŞİT: auth
+                                                   # gövdesinin multipart zarfı yok, iki katman
+                                                   # aynı baytları sayar.
+}
 location /api/  {
   proxy_pass http://api:4000/;                     # sondaki slash var → /api kaldırılır
   client_max_body_size 26m;                        # ATTACHMENT_MAX_BYTES'ın (25 MiB) ÜSTÜNDE,

@@ -322,6 +322,9 @@ describe('mountBetterAuth', () => {
       method: 'POST',
       url: '/auth/sign-up/email',
       path: '/auth/sign-up/email',
+      // The wiring reads `Content-Length` before anything else, so even a fake request that
+      // never reaches Better Auth has to carry the headers a real one always has.
+      headers: {},
       requestId: 'req-0000004',
     } as unknown as Request;
 
@@ -364,6 +367,7 @@ describe('mountBetterAuth', () => {
         method: 'POST',
         url: '/auth/sign-up/email',
         path: '/auth/sign-up/email',
+        headers: {},
       } as unknown as Request,
       res,
     );

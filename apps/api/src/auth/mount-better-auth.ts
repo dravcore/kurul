@@ -1,13 +1,16 @@
 import { Logger, type INestApplication } from '@nestjs/common';
 import { toNodeHandler } from 'better-auth/node';
 import type { Request, Response } from 'express';
+import { STATUS_CODES } from 'node:http';
 import { PLAN_LIMIT_ERROR, SIGNUP_DISABLED_ERROR, type PlanLimitDetail } from '@kurul/shared-types';
 import { isProductionEnv } from '../common/env';
+import { REQUEST_BODY_TOO_LARGE_MESSAGE } from '../common/filters/all-exceptions.filter';
 import { getRequestId } from '../common/logging/request-id';
 import { captureServerError } from '../common/observability/sentry';
 import { DEMO_RESTRICTED_MESSAGE } from '../demo/demo-restricted.guard';
 import { demoModeEnabled } from '../demo/demo-mode';
 import { PlanLimitsService } from '../plan/plan-limits.service';
+import { boundStreamedBody, declaresOversizedBody } from './auth-body-limit';
 import { auth } from './auth';
 import { isBlockedOrganizationMutation } from './organization-http-firewall';
 import { signUpEnabled } from './sign-up-policy';
@@ -84,13 +87,15 @@ export function isDemoRestrictedAuthRequest(req: Request): boolean {
 
 /** What a refusal below the Nest router says, beyond the fields the envelope always carries. */
 interface Refusal {
+  /** Defaults to `403`, the status every policy refusal here answers with. */
+  statusCode?: number;
   error: string;
   message: string;
   planLimit?: PlanLimitDetail;
 }
 
 /**
- * Writes the `403` envelope by hand.
+ * Writes the error envelope the exception filter would have produced.
  *
  * By hand because no exception filter is listening below the Nest router, which is the reason
  * the organization firewall writes its own. It carries the fields the filter would have
@@ -99,8 +104,9 @@ interface Refusal {
  */
 function refuse(req: Request, res: Response, refusal: Refusal): void {
   const requestId = getRequestId(req);
-  res.status(403).json({
-    statusCode: 403,
+  const statusCode = refusal.statusCode ?? 403;
+  res.status(statusCode).json({
+    statusCode,
     error: refusal.error,
     message: refusal.message,
     ...(refusal.planLimit === undefined ? {} : { planLimit: refusal.planLimit }),
@@ -117,7 +123,7 @@ function refuse(req: Request, res: Response, refusal: Refusal): void {
  * rejected promise there is an unhandled rejection: the socket never gets a response, and under
  * Node's default `--unhandled-rejections=throw` the process exits with it. `AllExceptionsFilter`
  * only ever sees faults inside the Nest router, so this reproduces the envelope it would have
- * written for the same fault one layer up, exactly as `refuse` reproduces the `403`.
+ * written for the same fault one layer up, exactly as `refuse` reproduces the refusal envelopes.
  *
  * The message follows the filter's rule too: the cause is published outside production and
  * withheld inside it, so a deployed instance never leaks an internal string to a caller.
@@ -171,6 +177,9 @@ function failClosed(req: Request, res: Response, cause: unknown): void {
  * that has just closed registration, or been lowered below its own user count, must not lock
  * out the people already on it.
  *
+ * The `/auth/*` body ceiling is not among them: it guards the process rather than a policy, so
+ * `mountBetterAuth` applies it above this handler, before anything here reads a request.
+ *
  * Rejecting is allowed: `mountBetterAuth` answers a thrown handler with `failClosed`, so the
  * head count query failing on a dead database is a `500` and not a hung socket.
  */
@@ -218,10 +227,48 @@ export function mountBetterAuth(app: INestApplication): void {
   // one throws out of `bootstrap()` rather than out of a request nobody is catching.
   logger.log(describeAuthMountPolicy());
 
-  const handle = createAuthRequestHandler(app.get(PlanLimitsService), toNodeHandler(auth));
+  const authHandler = toNodeHandler(auth);
+
+  /**
+   * Better Auth, with the streaming half of the `/auth/*` body ceiling attached.
+   *
+   * Order matters: the auth handler takes the stream first, then the byte counter joins it.
+   * `boundStreamedBody` explains why the other order would starve Better Auth's reader.
+   */
+  async function handOffToBetterAuth(req: Request, res: Response): Promise<void> {
+    const pending = authHandler(req, res);
+    boundStreamedBody(req);
+    await pending;
+  }
+
+  const handle = createAuthRequestHandler(app.get(PlanLimitsService), handOffToBetterAuth);
 
   // Express 5 requires a named wildcard; braces also match the bare `/auth` base.
   expressApp.all('/auth/{*splat}', (req, res) => {
+    // The API half of the `/auth/*` body ceiling, ahead of everything that could read the
+    // stream. The `REQUEST_BODY_MAX_BYTES` parsers in `configure-app.ts` are registered below
+    // this mount and never see these requests, and Better Auth reads the raw stream itself, so
+    // without this check a sign-in body of any size streamed into the heap. A declared length
+    // is refused here with the same envelope those parsers produce, before a byte of the body
+    // is read; the length-less (chunked) case is bounded in `handOffToBetterAuth` above, once
+    // Better Auth has taken the stream. See `auth-body-limit.ts` for the number and the
+    // reasoning.
+    //
+    // Answering before the body has arrived leaves the rest of it on the wire. Node reads and
+    // discards it for us, so a client that keeps the connection (every browser, `fetch`, curl)
+    // reads this envelope. A client that asked for `Connection: close` can instead see the
+    // connection drop mid-upload, because Node closes the socket as soon as the response
+    // finishes on a connection the client itself said it would not reuse. Draining a body of
+    // any size to make that case uniform is the cost this check exists to refuse.
+    if (declaresOversizedBody(req)) {
+      refuse(req, res, {
+        statusCode: 413,
+        error: STATUS_CODES[413] ?? 'Payload Too Large',
+        message: REQUEST_BODY_TOO_LARGE_MESSAGE,
+      });
+      return;
+    }
+
     if (isBlockedOrganizationMutation(req.path)) {
       res.status(403).json({
         statusCode: 403,
