@@ -88,8 +88,8 @@ and `pnpm typecheck` both do this for you as a side effect; `pnpm dev`, `pnpm db
 
 The test suites are the exception. Jest (`apps/api`, unit and integration) and Vitest
 (`apps/web`, `packages/auth-access`) map both packages to their `src/index.ts`, so `pnpm test`
-passes on a checkout with no `dist` at all and never runs against a stale one; the CI test job
-deliberately skips the build for that reason. A stale build is the worse of the two failures,
+passes on a checkout with no `dist` at all and never runs against a stale one; the CI test jobs
+deliberately skip the build for that reason. A stale build is the worse of the two failures,
 because it resolves: an enum added since the last build reads back as `undefined` in every
 consumer. `pnpm dev` and `pnpm db:seed` still go through `dist`, so rebuild after pulling a
 change to either package.

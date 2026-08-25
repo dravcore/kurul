@@ -237,6 +237,32 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   along with the non-atomic fallback path that used them; `consume` is the whole interface now,
   and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
   Redis outage fallback and the degraded-mode reporting are all unchanged.
+- **The PR pipeline is a flat graph of six jobs, and its wall time is the longest of them.**
+  `ci.yml` ran `build` behind `lint` and `test` although it uses nothing they produce, and
+  `test` ran the unit suites and then, against Postgres and Redis service containers, the
+  migration, the drift check and the integration suite, back to back. Measured over the last
+  twenty `develop` runs, fifteen took 301-342 s, past the five-minute trigger `ROADMAP.md`
+  records for OPS-10; install and `prisma generate` were not the cost (about 20 runner-seconds
+  per run), the job graph was. `build` now has no `needs`, `test` is split into `test-unit`
+  (shared packages, `scripts/`, the api and web suites with coverage, and no services: the api
+  suite passes against a closed port with `REDIS_URL` unset) and `test-integration` (the
+  services, `db:migrate`, `db:drift`, `test:e2e`), and `ci-ok` waits on all six with the same
+  skipped-or-cancelled handling. Branch protection names only `ci-ok` and `CodeQL`, so the
+  renamed jobs need no settings change.
+
+  Two cache changes travel with it, because the image-scan leg becomes the critical path once
+  `test` is untangled. Pull request runs no longer write the BuildKit `type=gha` cache: every
+  PR stored a full `mode=max` copy of the build stage under its own ref, the repository sat at
+  10.87 GB against GitHub's 10 GB cache limit, and eviction by last access took `develop`'s
+  entries with it, so the leg designed to read a warm cache built cold (212 s against 54 s).
+  Only `push` runs write now. `concurrency.cancel-in-progress` is true for pull requests only,
+  so a merge burst cannot cancel the `develop` run that writes the cache every PR reads. Every
+  job also carries a `timeout-minutes` ceiling (lint 15, test-unit 20, test-integration 25,
+  build 20, image-scan 40, compose-config 5, ci-ok 5): the default is six hours, and two
+  release-candidate runs of `release-images.yml` once held a runner for 4 h and 5.7 h before
+  being cancelled by hand.
+  Target: `ci-ok` under 3m30s, tracked in the OPS-10 row of `ROADMAP.md`.
+
 - **Compose tuning for first boot, Redis and Postgres.** Three small changes, applied to both
   `docker-compose.yml` and `docker-compose.dev.yml`. The `postgres` healthcheck now probes over
   TCP (`pg_isready -h 127.0.0.1 ...`): without a host it asked the Unix socket, which the official

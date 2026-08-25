@@ -88,7 +88,7 @@ job'ından önce açıkça build eder, çünkü `pnpm typecheck` orada koşar.
 Test suite'leri bunun istisnasıdır. Jest (`apps/api`, unit ve integration) ve Vitest
 (`apps/web`, `packages/auth-access`) iki paketi de `src/index.ts` dosyalarına eşler; bu yüzden
 `pnpm test` hiç `dist` olmayan bir checkout'ta geçer ve asla bayat bir build'e karşı koşmaz.
-CI'daki test job'ı da bu sebeple build adımını bilerek atlar. Bayat build iki arızanın kötü
+CI'daki test job'ları da bu sebeple build adımını bilerek atlar. Bayat build iki arızanın kötü
 olanıdır, çünkü çözümlenir: son build'den sonra eklenen bir enum her tüketicide `undefined`
 olarak okunur. `pnpm dev` ve `pnpm db:seed` hâlâ `dist` üzerinden gider; bu yüzden iki
 paketten birine gelen bir değişikliği çektikten sonra yeniden build edin.
