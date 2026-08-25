@@ -349,13 +349,20 @@ gelirse) tetiklenir ve bunun tek bir sebebi vardır: workflow imaj yayınlar, co
 ve SBOM ekler — bunların **hiçbiri CI'da koşmaz**. Hiç çalışmamış bir workflow'un ilk koşusunu
 gerçek bir sürüm yapmak, sürümün kendisini teste dönüştürür.
 
-Dolayısıyla yayın yolu değiştiyse — yeni bir action major'ı, imzalama veya SBOM adımlarında bir
-değişiklik, yeni bir registry — 5. adımdan önce prova edin:
+Dolayısıyla yayın yolu değiştiyse (yeni bir action major'ı, imzalama veya SBOM adımlarında bir
+değişiklik, yeni bir registry), `release/*` branch'inde, 2. adımdan sonra ve 5. adımdan önce
+prova edin:
 
 ```bash
 git tag -a v0.2.0-rc.1 -m "v0.2.0-rc.1"
 git push origin v0.2.0-rc.1
 ```
+
+Sıra önemlidir: `guard` job'ı package.json denetimini ön-sürüm tag'lerine de uygular (yalnız
+CHANGELOG başlığı kararlı tag'e özeldir); dolayısıyla prova tag'inin altındaki ağaç çoktan
+`X.Y.Z` demelidir. 2. adımdaki bump'tan önce kesilen bir tag guard'da kırılır ve guard eski
+versiyonda kalan dosyaları adıyla söyler. Soy denetimi `main`, `release/*` veya `hotfix/*`
+üzerindeki bir ön-sürüm tag'ini kabul eder; release branch'i bunun için doğal yerdir.
 
 Prova gerçek bir yayındır: gerçek imajlar, gerçek imza, gerçek SBOM asset'leri, ve
 [self-hosting.md](self-hosting.md#çektiğiniz-imajı-doğrulamak)'daki `cosign verify` komutu
@@ -372,8 +379,8 @@ yerine sürümü kırar. Ama bu doğrulama da ilk kez sürümü kestiğinizde ko
 
 Prova tag'i tek kullanımlıktır. Gerçek sürüm çıkınca tag'i ve release'ini silin; imajlar kendi
 `-rc` tag'leriyle registry'de kalır ve paket listesinde bir satırdan başka maliyeti olmaz. Tag'i
-silmek admin'in adımıdır: 5. adımda anlatılan `v*` ruleset'i tag silmeyi herkes için engeller,
-admin'in bypass'ı ise silmeyi geçiren şeydir.
+silmek admin'in adımıdır: 5. adımdaki `v*` ruleset'i yerine oturduğunda tag silmeyi herkes için
+engeller, admin'in bypass'ı ise silmeyi geçiren şeydir.
 
 ## Hotfix süreci
 

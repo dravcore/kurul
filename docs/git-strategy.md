@@ -337,13 +337,19 @@ a hyphen), and that exists for one reason: the workflow publishes images, signs 
 cosign and attaches SBOMs, and none of that is exercised by CI. Cutting a version as the first
 run of an unexecuted workflow makes the release itself the test.
 
-So when the publish path has changed — a new action major, a change to the signing or SBOM
-steps, a new registry — rehearse it before step 5:
+So when the publish path has changed (a new action major, a change to the signing or SBOM
+steps, a new registry), rehearse it on the `release/*` branch, after step 2 and before step 5:
 
 ```bash
 git tag -a v0.2.0-rc.1 -m "v0.2.0-rc.1"
 git push origin v0.2.0-rc.1
 ```
+
+The order matters: the `guard` job applies the package.json check to pre-release tags too
+(only the CHANGELOG heading is stable-only), so the tree under a rehearsal tag must already say
+`X.Y.Z`. A tag cut before step 2's bump fails the guard, which names the files at the old
+version. The ancestry check accepts a pre-release tag on `main`, `release/*` or `hotfix/*`, so
+the release branch is the natural place for it.
 
 The rehearsal is a real publish: real images, a real signature, real SBOM assets, and the
 `cosign verify` command in [self-hosting.md](self-hosting.md#verifying-what-you-pulled) works
@@ -360,8 +366,8 @@ that 404s; but the assertion itself first runs when you cut the version.
 
 A rehearsal tag is disposable. Delete it and its release when the real version ships; the
 images stay in the registry under their exact `-rc` tags and cost nothing but a line in the
-package list. Deleting the tag is the admin's step: the `v*` ruleset described in step 5 blocks
-tag deletion for everyone else, and the admin's bypass is what lets it through.
+package list. Deleting the tag is the admin's step: once the `v*` ruleset from step 5 is in
+place it blocks tag deletion for everyone else, and the admin's bypass is what lets it through.
 
 ## Hotfix process
 
