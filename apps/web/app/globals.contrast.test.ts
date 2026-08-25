@@ -860,10 +860,10 @@ describe('the copper and destructive text exemption', () => {
   // The one pin above rests on a class still being in the string. `focus:bg-accent` and
   // `data-[variant=destructive]:focus:bg-destructive/10` both land in `@layer utilities`, and the
   // second carries one more attribute selector, so it wins and the destructive row's focus ground
-  // is its own tint rather than the hover step. Nine call sites render that variant
-  // (components/board/board-column.tsx and components/settings/members-settings.tsx among them),
-  // so the row is not hypothetical: drop the override and the pin becomes a 4.13:1 call site
-  // while the scan above still reports it as pinned and clean.
+  // is its own tint rather than the hover step. Four menu rows render that variant
+  // (components/board/board-column.tsx, components/board/board-list.tsx and two in
+  // components/settings/members-settings.tsx), so the row is not hypothetical: drop the override
+  // and the pin becomes a 4.13:1 call site while the scan above still reports it as clean.
   it('keeps the destructive menu row off the accent focus ground', () => {
     const source = readFileSync(path.join(webRoot, 'components/ui/dropdown-menu.tsx'), 'utf8');
     const row = paintedValues(source).find(
