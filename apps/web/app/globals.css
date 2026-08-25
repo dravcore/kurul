@@ -446,9 +446,12 @@ body {
   }
 
   /* components/board/board-column.tsx marks the column dnd-kit reports as `isOver`. The column
-     has no resting border, so this is the edge, not a thickening of one. */
-  [data-drop-target] {
-    border: 2px solid Highlight;
+     has no resting border, so this is the edge, not a thickening of one. Scoped to the `section`
+     it renders and drawn as an outline so the 2px mark does not add to the box and reflow the
+     column's content by 4px each time `isOver` flips. */
+  section[data-drop-target] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
 
   /* The items carry `outline-hidden`, so the ground is the whole indicator and a forced ground

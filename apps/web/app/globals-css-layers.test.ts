@@ -277,10 +277,26 @@ function escapeClass(className: string): string {
   return `.${className.replaceAll(/[:/[\]]/g, (character) => `\\${character}`)}`;
 }
 
-/** The body of the first `@media` block whose prelude starts with `query`, braces excluded. */
+/**
+ * The body of the sole `@media` block whose prelude is `query`, braces excluded. Counts every
+ * textual occurrence of `query` in the compiled sheet rather than taking the first: a candidate
+ * list that ever grows a Tailwind-emitted `forced-colors:` or `contrast-more:` variant would
+ * compile that variant's own `@media` block under the same prelude text, and the first-match
+ * lookup this replaced would silently hand this function whichever of the two came first instead
+ * of failing.
+ */
 function mediaBody(query: string): string {
-  const start = css.indexOf(query);
-  if (start === -1) throw new Error(`the compiled CSS has no \`${query}\` block`);
+  let count = 0;
+  let start = -1;
+  for (let index = css.indexOf(query); index !== -1; index = css.indexOf(query, index + 1)) {
+    count += 1;
+    if (start === -1) start = index;
+  }
+  if (count !== 1) {
+    throw new Error(
+      `the compiled CSS has \`${query}\` ${count} time(s), expected exactly one unambiguous block`,
+    );
+  }
   const open = css.indexOf('{', start);
   return css.slice(open + 1, blockEnd(css, open));
 }
@@ -461,11 +477,14 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
     expect(border.declarations).toEqual([{ property: 'border-color', value: 'Highlight' }]);
   });
 
-  it('gives the drop target a Highlight border in place of its tint', () => {
-    const drop = requireRule(forced, 'the drop target border', (rule) => {
-      return rule.selector === '[data-drop-target]';
+  it('gives the drop target a Highlight outline in place of its tint, without reflowing it', () => {
+    const drop = requireRule(forced, 'the drop target outline', (rule) => {
+      return rule.selector === 'section[data-drop-target]';
     });
-    expect(drop.declarations).toEqual([{ property: 'border', value: '2px solid Highlight' }]);
+    expect(drop.declarations).toEqual([
+      { property: 'outline', value: '2px solid Highlight' },
+      { property: 'outline-offset', value: '-2px' },
+    ]);
   });
 
   it('paints the highlighted menu row with the palette pair the mode provides', () => {
@@ -507,15 +526,16 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
   // The tints these rules replace are `@layer utilities` (`bg-signature-subtle`,
   // `border-signature`), so an unlayered fallback is what makes them win without a specificity
   // race against whatever utility a call site adds next.
-  it.each(['a[data-selected]', 'a[data-selected]:not(:focus-visible)', '[data-drop-target]'])(
-    'keeps %s above every utility',
-    (selector) => {
-      const rule = requireRule(sheet, `a rule for ${selector}`, (candidate) => {
-        return candidate.selector === selector;
-      });
-      expect(layerRank(sheet, rule.layer)).toBeGreaterThan(layerRank(sheet, 'utilities'));
-    },
-  );
+  it.each([
+    'a[data-selected]',
+    'a[data-selected]:not(:focus-visible)',
+    'section[data-drop-target]',
+  ])('keeps %s above every utility', (selector) => {
+    const rule = requireRule(sheet, `a rule for ${selector}`, (candidate) => {
+      return candidate.selector === selector;
+    });
+    expect(layerRank(sheet, rule.layer)).toBeGreaterThan(layerRank(sheet, 'utilities'));
+  });
 
   it('raises the hairline to --border-strong under prefers-contrast: more', () => {
     const contrast = parseStylesheet(mediaBody('@media (prefers-contrast: more)'));

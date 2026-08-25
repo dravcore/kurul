@@ -130,6 +130,18 @@ function contrastRatio(a: string, b: string): number {
   return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 }
 
+/** CIE L* (perceptual lightness, 0-100) of `hex`, from the same relative luminance `luminance`
+ * already computes. Used only for the overlay scrim below: a contrast ratio compares two colours
+ * that sit side by side, but "how much darker did the screen just get" is a single-colour
+ * before/after question that a ratio cannot answer and L* can. */
+function labL(hex: string): number {
+  const y = luminance(hex);
+  const epsilon = 216 / 24389;
+  const kappa = 24389 / 27;
+  const f = y > epsilon ? Math.cbrt(y) : (kappa * y + 16) / 116;
+  return 116 * f - 16;
+}
+
 /**
  * Every comparison below runs on the rounded number the failure message prints, so the value a
  * reader is shown is the value the assertion used. Two decimals for the AA floors, three for the
@@ -1765,5 +1777,54 @@ describe('APCA on the dark theme', () => {
       }),
     );
     expect(broken).toEqual([]);
+  });
+});
+
+/**
+ * `--overlay-scrim` composites over `--background`, not over text, so it is not one of the
+ * text/surface pairs the rest of this file gates: nothing is read through it, it is the ground a
+ * dialog opens behind. Its contract is a felt-family tint, not raw black, at a bounded darkening
+ * of the light canvas; `components/ui/dialog.test.tsx` covers that the class painting it is
+ * `bg-overlay-scrim` rather than `bg-black`, so the rgba themselves and the drop they cause are
+ * what belongs here.
+ */
+describe('--overlay-scrim', () => {
+  function parseRgba(value: string): { red: number; green: number; blue: number; alpha: number } {
+    const match = /^rgb\(\s*(\d+)\s+(\d+)\s+(\d+)\s*\/\s*([\d.]+)\s*\)$/.exec(value);
+    if (!match) throw new Error(`not an rgb() token: ${value}`);
+    const [, red, green, blue, alpha] = match;
+    return {
+      red: Number(red),
+      green: Number(green),
+      blue: Number(blue),
+      alpha: Number(alpha),
+    };
+  }
+
+  function toHex({ red, green, blue }: { red: number; green: number; blue: number }): string {
+    return `#${[red, green, blue].map((value) => value.toString(16).padStart(2, '0')).join('')}`;
+  }
+
+  it('pins the light and dark scrim to their measured rgba', () => {
+    const light = parseRgba(rootDeclarations.get('--overlay-scrim') ?? '');
+    const dark = parseRgba(darkDeclarations.get('--overlay-scrim') ?? '');
+
+    expect(light).toEqual({ red: 25, green: 28, blue: 27, alpha: 0.38 });
+    expect(dark).toEqual({ red: 5, green: 7, blue: 6, alpha: 0.7 });
+  });
+
+  // Dark stays unmeasured here on purpose: composited over a canvas already this dark, no alpha
+  // of any neutral separates a dialog by shade alone, which is why globals.css hands that job to
+  // the dialog's own surface step and --border-strong ring instead (see the comment above
+  // --overlay-scrim's dark declaration). Only the light drop has a shade to measure.
+  it('drops the light canvas 28 to 32 L* points behind a dialog, not the 45 bg-black/50 gave', () => {
+    const scrim = parseRgba(rootDeclarations.get('--overlay-scrim') ?? '');
+    const canvas = hexOf('light', '--background');
+    const behindDialog = composite(toHex(scrim), canvas, scrim.alpha);
+
+    const drop = round(labL(canvas) - labL(behindDialog), 2);
+
+    expect(drop).toBeGreaterThanOrEqual(28);
+    expect(drop).toBeLessThanOrEqual(32);
   });
 });

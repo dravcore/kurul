@@ -12,9 +12,10 @@ import {
 
 /**
  * `isOver` is dnd-kit's, and reaching it for real would mean driving a pointer drag across two
- * measured rects in a DOM that measures everything as zero. The flag below replaces that one
- * value and leaves the rest of dnd-kit alone; it is `false` for every other test in this file,
- * which is what the real hook returns there anyway.
+ * measured rects in a DOM that measures everything as zero. `vi.mock('@dnd-kit/core')` replaces
+ * the module for the whole import graph, not just the one call site: sortable's own internal
+ * `useDroppable` sees the flag too, since it imports the same module this file mocks. The flag is
+ * `false` for every other test in this file, which is what the real hook returns there anyway.
  */
 let droppableIsOver = false;
 
