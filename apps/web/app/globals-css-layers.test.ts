@@ -236,6 +236,40 @@ function winningValue(sheet: Stylesheet, className: string, property: string): s
     ?.value;
 }
 
+/**
+ * The value that wins for `property` on an element carrying every class in `classNames` at once
+ * (e.g. `class="text-title font-strong"`), each contributed by its own single-class Tailwind
+ * utility rule. Every candidate here has specificity 1 (one class, no combinator), so a tie on
+ * layer falls to source order exactly as `winningValue` already resolves it — the later utility
+ * in Tailwind's compiled order wins outright, with no signal from either utility's use of a CSS
+ * custom-property default to fall back on.
+ */
+function winningValueAmong(
+  sheet: Stylesheet,
+  classNames: string[],
+  property: string,
+): string | undefined {
+  const applicable = sheet.rules
+    .filter((rule) => classNames.some((className) => rule.selector === `.${className}`))
+    .filter((rule) => rule.declarations.some((declaration) => declaration.property === property));
+
+  let winner: StyleRule | undefined;
+  for (const candidate of applicable) {
+    if (winner === undefined) {
+      winner = candidate;
+      continue;
+    }
+    const byLayer = layerRank(sheet, candidate.layer) - layerRank(sheet, winner.layer);
+    const byOrder = candidate.order - winner.order;
+    if (byLayer > 0 || (byLayer === 0 && byOrder > 0)) {
+      winner = candidate;
+    }
+  }
+
+  return winner?.declarations.filter((declaration) => declaration.property === property).at(-1)
+    ?.value;
+}
+
 function requireRule(
   sheet: Stylesheet,
   described: string,
@@ -335,6 +369,10 @@ beforeAll(async () => {
     'divide-border',
     'dark:bg-accent',
     'focus-visible:-outline-offset-2',
+    'text-title',
+    'text-title-lg',
+    'font-semibold',
+    'font-strong',
   ]);
   sheet = parseStylesheet(css);
 }, 30_000);
@@ -546,6 +584,38 @@ describe('globals.css cascade layers', () => {
         (declaration) => declaration.property === 'font-variation-settings',
       ),
     ).toBe(false);
+  });
+
+  // `font-strong` writes a direct `font-weight: 550`, so pairing it with `text-title` or
+  // `text-title-lg` (whose 600 comes from the `--text-title--font-weight` custom property that
+  // `@theme inline` gives those size steps) does not blend the two: Tailwind's compiled order
+  // always places `.font-strong` after both title utilities in the same `utilities` layer, so at
+  // equal specificity `font-strong`'s direct value wins and silently drops the heading to 550 --
+  // `body-strong`'s weight, one step below what docs/design.md:160 specifies for a title. Page
+  // and panel headings must pair `text-title`/`text-title-lg` with `font-semibold` instead (or no
+  // weight utility at all) to keep the 600 the type-scale table calls for.
+  it('drops text-title(-lg) to 550 when paired with font-strong, and documents why', () => {
+    expect(winningValueAmong(sheet, ['text-title', 'font-strong'], 'font-weight')).toBe('550');
+    expect(winningValueAmong(sheet, ['text-title-lg', 'font-strong'], 'font-weight')).toBe('550');
+  });
+
+  it('keeps text-title(-lg) at 600 when paired with font-semibold, unlike font-strong', () => {
+    // .font-semibold wins the same source-order tie .font-strong does (it also compiles after
+    // the title utilities), but its declared value is `var(--font-weight-semibold)`, which
+    // globals.css defines as 600 -- the title utilities' own weight, not font-strong's 550.
+    expect(winningValueAmong(sheet, ['text-title', 'font-semibold'], 'font-weight')).toBe(
+      'var(--font-weight-semibold)',
+    );
+    expect(winningValueAmong(sheet, ['text-title-lg', 'font-semibold'], 'font-weight')).toBe(
+      'var(--font-weight-semibold)',
+    );
+    expect(
+      requireRule(sheet, 'the --font-weight-semibold custom property', (rule) => {
+        return rule.declarations.some(
+          (declaration) => declaration.property === '--font-weight-semibold',
+        );
+      }).declarations,
+    ).toContainEqual({ property: '--font-weight-semibold', value: '600' });
   });
 
   it('binds the dark variant to the theme class rather than the OS preference', () => {
