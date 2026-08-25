@@ -1,9 +1,11 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { Priority, type TaskDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import messages from '@/messages/en.json';
+import { DeleteTaskDialog } from './delete-task-dialog';
 import { TaskPanel } from './task-panel';
 
 const push = vi.fn();
@@ -18,10 +20,39 @@ vi.mock('@/lib/api', () => ({
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
 // The metadata panel fetches comments, activity, members and labels. None of that is part of
-// the panel's focus contract, and all of it would have to be stubbed to render it here.
-vi.mock('./task-metadata-panel', () => ({
-  TaskMetadataPanel: (): React.ReactElement => <div data-testid="metadata" />,
-}));
+// the panel's focus contract, and all of it would have to be stubbed to render it here. The one
+// piece this file does need is the comment composer: its mention picker is a layer of its own
+// inside the panel, so the real section renders in the stub's place with a fixed member list.
+// Everything the factory touches is imported inside it, because the test module's own bindings
+// are not initialised yet when the mocked module is first pulled in.
+vi.mock('./task-metadata-panel', async () => {
+  const { MemberRole } = await import('@kurul/shared-types');
+  const { TaskCommentsSection } = await import('./task-comments-section');
+  return {
+    TaskMetadataPanel: (): React.ReactElement => (
+      <div data-testid="metadata">
+        <TaskCommentsSection
+          comments={[]}
+          members={[
+            {
+              id: 'm1',
+              workspaceId: 'w1',
+              userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51',
+              role: MemberRole.MEMBER,
+              name: 'Ayşe Yıldız',
+              avatarUrl: null,
+            },
+          ]}
+          canMutate
+          pending={false}
+          loading={false}
+          onSubmit={() => Promise.resolve(true)}
+          onDelete={() => {}}
+        />
+      </div>
+    ),
+  };
+});
 
 // The attachment surface owns a read of its own (`GET .../attachments`) plus the instance
 // config, neither of which is part of this file's contract. The hook is stubbed rather than the
@@ -64,7 +95,8 @@ const task: TaskDto = {
 
 /**
  * Mirrors the shape the panel actually lives in: the board's `<main>` landmark, the task card
- * that links to it, and the panel rendered next to them only while the route selects a task.
+ * that links to it, the panel rendered next to them only while the route selects a task, and
+ * the delete confirmation the board owns (`board-dialogs.tsx`) but the panel opens.
  */
 function Board({
   open,
@@ -82,6 +114,7 @@ function Board({
   loadError?: string | null;
   onRetryLoad?: () => void;
 }): React.ReactElement {
+  const [deleting, setDeleting] = useState(false);
   return (
     <NextIntlClientProvider locale="en" messages={messages}>
       <main>
@@ -104,9 +137,16 @@ function Board({
             loadError={loadError}
             onRetryLoad={onRetryLoad}
             onUpdated={vi.fn()}
-            onRequestDelete={vi.fn()}
+            onRequestDelete={() => setDeleting(true)}
           />
         ) : null}
+        <DeleteTaskDialog
+          open={deleting}
+          onOpenChange={setDeleting}
+          workspaceId="w1"
+          task={selected}
+          onDeleted={() => setDeleting(false)}
+        />
       </main>
     </NextIntlClientProvider>
   );
@@ -115,6 +155,12 @@ function Board({
 const heading = (): HTMLElement => screen.getByRole('heading', { name: task.title });
 const card = (): HTMLElement => screen.getByTestId('card');
 const landmark = (): HTMLElement => screen.getByRole('main');
+
+beforeAll(() => {
+  // jsdom ships no layout and therefore no `scrollIntoView`, which the mention picker calls
+  // every time the highlighted option moves.
+  Element.prototype.scrollIntoView = vi.fn();
+});
 
 afterEach(() => {
   cleanup();
@@ -272,13 +318,78 @@ describe('TaskPanel close', () => {
     // restoration above — see the comment on `close`.
     expect(push).toHaveBeenCalledWith('/board/b1', { scroll: false });
   });
+});
 
-  it('closes on Escape', () => {
-    render(<Board open />);
+/**
+ * The panel is a hand-rolled layer: it listens for `Escape` on `window`, which is the last stop
+ * of every keystroke in the document, including the ones a layer above it has already dealt
+ * with. One press must dismiss exactly one layer.
+ */
+describe('TaskPanel Escape', () => {
+  const deleteTrigger = (): HTMLElement =>
+    screen.getByRole('button', { name: messages.app.board.task.deleteAction });
+  const composer = (): HTMLTextAreaElement =>
+    screen.getByLabelText(messages.app.board.task.addComment) as HTMLTextAreaElement;
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+  /** Dispatched where the user's keystroke lands, so every listener between it and `window` runs. */
+  function pressEscape(): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+  }
+
+  /**
+   * Typed rather than pasted. React synthesises `onSelect` from the keys around a change, so a
+   * change with no keystroke behind it leaves the caret unrecorded and makes the next keydown
+   * look like a caret move, which reopens the picker that the same Escape just closed.
+   */
+  function type(textarea: HTMLTextAreaElement, value: string): void {
+    fireEvent.change(textarea, { target: { value, selectionStart: value.length } });
+    fireEvent.keyUp(textarea, { key: value.slice(-1) });
+  }
+
+  it('closes the panel and hands focus back', () => {
+    const { rerender } = render(<Board open={false} />);
+    const opener = card();
+    opener.focus();
+    rerender(<Board open />);
+
+    pressEscape();
 
     expect(push).toHaveBeenCalledWith('/board/b1', { scroll: false });
+    // The router is mocked, so the navigation that `push` stands for is played out by hand.
+    rerender(<Board open={false} />);
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('gives the delete confirmation the first Escape and the panel the second', async () => {
+    render(<Board open />);
+    const trigger = deleteTrigger();
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getByRole('dialog')).toBeDefined();
+
+    pressEscape();
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(push).not.toHaveBeenCalled();
+    // Radix hands the trigger its focus back on a task of its own, not in the keystroke.
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+
+    pressEscape();
+
+    expect(push).toHaveBeenCalledWith('/board/b1', { scroll: false });
+  });
+
+  it('dismisses the mention picker without taking the panel with it', () => {
+    render(<Board open />);
+    const textarea = composer();
+    textarea.focus();
+    type(textarea, 'ping @Ay');
+    expect(screen.getByRole('listbox')).toBeDefined();
+
+    pressEscape();
+
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(push).not.toHaveBeenCalled();
   });
 });
 

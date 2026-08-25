@@ -168,22 +168,18 @@ describe('TaskCommentsSection', () => {
     expect(textarea.getAttribute('aria-activedescendant')).toBeNull();
   });
 
-  it('closes the picker on Escape without letting the panel see the key', () => {
+  it('closes the picker on Escape and marks the key as dealt with', () => {
     renderSection();
     const textarea = composer();
     type(textarea, '@y');
 
-    // The task panel closes itself on a window-level Escape, so the picker has to stop it.
-    const onWindowEscape = vi.fn();
-    window.addEventListener('keydown', onWindowEscape);
-    try {
-      fireEvent.keyDown(textarea, { key: 'Escape' });
-    } finally {
-      window.removeEventListener('keydown', onWindowEscape);
-    }
+    // The task panel closes itself on a window-level Escape and skips the ones a layer above
+    // it has already answered (use-task-panel-focus.ts), which is what this marks.
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    fireEvent(textarea, escape);
 
     expect(screen.queryByRole('listbox')).toBeNull();
-    expect(onWindowEscape).not.toHaveBeenCalled();
+    expect(escape.defaultPrevented).toBe(true);
   });
 
   it('submits the trimmed body and clears the draft', async () => {

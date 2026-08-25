@@ -122,9 +122,9 @@ export function TaskCommentsSection({
     if (!mentionPickerOpen) return;
 
     if (event.key === 'Escape') {
+      // The panel's own Escape handler (use-task-panel-focus.ts) reads this: a key already
+      // dealt with by the layer above it is not the panel's to close on.
       event.preventDefault();
-      // Stop here: the panel's own Escape handler would otherwise close the whole task.
-      event.stopPropagation();
       closeMentionPicker();
       return;
     }
