@@ -382,6 +382,22 @@ nobody can join your workspace. The Members screen says so in the product, too. 
 email (assignment, mention, due-soon) uses the same settings and simply stays off without
 them; once SMTP works, each user can switch it off for themselves under Settings.
 
+**Password reset needs SMTP too, and fails quietly without it.** `POST /auth/request-password-reset`
+answers `200` whatever happens (it answers the same for an address that has no account, so
+nobody can enumerate accounts with it), and with `SMTP_HOST` unset the whole message, reset
+link included, goes to the API log instead of to the person:
+
+```
+Email not sent (no SMTP): from=Kurul <noreply@localhost> to=you@example.com subject=Reset your Kurul password
+...
+http://localhost:4000/auth/reset-password/<token>?callbackURL=http%3A%2F%2Flocalhost%3A3000%2Freset-password
+```
+
+That is workable on a solo install (copy the link out of `docker compose logs api` within the
+hour it is valid) and is not a recovery path for anyone else, because a locked-out user cannot
+read your logs. On a `DEMO_MODE` instance no reset mail is written even to the log for the demo
+account itself, whose password is published anyway.
+
 Any SMTP provider works. Two things go wrong most often:
 
 - **`SMTP_SECURE`.** `true` means implicit TLS, which is port 465 only. Port 587 and 25 use

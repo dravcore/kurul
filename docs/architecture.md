@@ -436,6 +436,7 @@ What is _not_ affected is more important than what is:
 | Role changed (e.g. ADMIN → GUEST)      | **Immediately** — `WorkspaceGuard` reads `WorkspaceMember` from the database on every request   |
 | Removed from a workspace               | **Immediately** — same guard, same read; the membership row is gone and the request 404s        |
 | Email verified                         | Immediately — `autoSignInAfterVerification` rewrites the cookie, which is why that option is on |
+| Password reset from an emailed link    | Up to 60 seconds late: `revokeSessionsOnPasswordReset` drops every session row of the account   |
 
 So the window is a _session-identity_ window, not an _authorization_ window. A demoted or
 ejected member cannot act on their old role for 60 seconds; only a signed-out browser can

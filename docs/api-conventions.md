@@ -678,6 +678,15 @@ who minted it. A token may carry an expiry; an expired one reads exactly like a 
 which reads exactly like one that never existed: `401` for all three, so a stolen secret learns
 nothing about its own history.
 
+**A forgotten password is recovered, not reissued by an admin.**
+`POST /auth/request-password-reset` mails a single-use link that is good for one hour, and
+`POST /auth/reset-password` spends it. Both are Better Auth's, and the request endpoint answers
+the same `200` and the same body for an address with no account as for one with an account, so
+it cannot be used to find out who has one. Spending the link revokes every session the account
+held (`revokeSessionsOnPasswordReset`), which is what makes a reset a way to take an account
+back rather than only a way to remember it. Delivery is a hard requirement: see
+[self-hosting](self-hosting.md#email-smtp) for what an instance without SMTP does instead.
+
 ```
 POST   /workspaces/:workspaceId/tokens            # mint; the only response carrying the plaintext
 GET    /workspaces/:workspaceId/tokens            # the caller's live tokens, newest first
@@ -807,6 +816,7 @@ running hot never spends another endpoint's allowance.
 | `POST /workspaces/:workspaceId/imports/trello` | 3 / min       | A 20 MiB body parsed into heap, then thousands of rows in one transaction              |
 | `GET .../attachments/:attachmentId/content`    | 300 / min     | _Above_ the default: a panel with ten image attachments issues ten requests on open    |
 | `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10s       | Better Auth's built-in rule for credential endpoints                                   |
+| `/auth/request-password-reset`                 | 3 / 60s       | Built-in too: each call mails a link to an address the caller did not prove they own   |
 | `/auth/*` otherwise                            | 100 / min     | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004)              |
 | `GET /health`, `GET /health/ready`             | exempt        | A throttled probe would report a healthy API as down                                   |
 

@@ -9,6 +9,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Password reset by email: a forgotten password is now recovered by the person who forgot it.**
+  "Forgot your password?" on the sign-in screen leads to `/forgot-password`, which asks for an
+  address and mails a single-use link good for one hour; the link lands on `/reset-password`,
+  where a new password is chosen. Until now the only way back into a locked-out account was an
+  instance admin deleting it, which destroyed the workspace memberships along with it.
+
+  The request endpoint answers the same `200` and the same body for an address with no account
+  as for one with an account, so it cannot be used to find out who has an account here, and
+  Better Auth's built-in `3 / 60s` rule already caps it. Spending the link revokes every session
+  the account held, which is what makes a reset a way to take an account back and not only a way
+  to remember it; a spent or expired link is refused and says so, rather than failing silently.
+  The email is written in the recipient's language, EN and TR, from the same template shape the
+  verification mail uses. Delivery is a hard requirement: with `SMTP_HOST` unset the whole
+  message including the link goes to the API log instead, which is workable on a solo install
+  and is not a recovery path for anyone else, see
+  [self-hosting](docs/self-hosting.md#email-smtp). On a `DEMO_MODE` instance the demo account
+  is skipped, since its password is published and a reset would only lock every visitor out.
 - **Plan limits: ceilings on seats, boards, workspaces and accounts, unlimited until an operator
   sets one.** Four variables (`PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
   `PLAN_MAX_WORKSPACES`, `PLAN_MAX_USERS`) put a number on quantities the product never bounded.

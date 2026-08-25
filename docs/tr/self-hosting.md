@@ -395,6 +395,22 @@ kimse workspace'inize katılamaz. Üyeler ekranı bunu üründe de söyler. Bild
 (atama, mention, due-soon) aynı ayarları kullanır ve onlar olmadan yalnızca kapalı kalır; SMTP
 çalıştığında her kullanıcı bunları Ayarlar'dan kendisi için kapatabilir.
 
+**Parola sıfırlama da SMTP ister ve o olmadan sessizce başarısız olur.**
+`POST /auth/request-password-reset` her durumda `200` döner (hesabı olmayan bir adres için de
+aynısını döner, böylece kimse bu uçla hesap listesi çıkaramaz) ve `SMTP_HOST` boşken mesajın
+tamamı, sıfırlama bağlantısı dahil, kişiye değil API log'una gider:
+
+```
+Email not sent (no SMTP): from=Kurul <noreply@localhost> to=siz@example.com subject=Reset your Kurul password
+...
+http://localhost:4000/auth/reset-password/<token>?callbackURL=http%3A%2F%2Flocalhost%3A3000%2Freset-password
+```
+
+Tek kişilik bir kurulumda bu iş görür (bağlantıyı geçerli olduğu bir saat içinde
+`docker compose logs api` çıktısından kopyalarsınız), başkası için bir kurtarma yolu değildir:
+dışarıda kalmış bir kullanıcı sizin log'larınızı okuyamaz. `DEMO_MODE` açık bir kurulumda,
+parolası zaten yayımlanmış olan demo hesabı için sıfırlama postası log'a bile yazılmaz.
+
 Her SMTP sağlayıcısı çalışır. En sık iki şey ters gider:
 
 - **`SMTP_SECURE`.** `true`, yalnızca 465 portunda geçerli olan implicit TLS demektir. 587 ve
