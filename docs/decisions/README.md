@@ -50,6 +50,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0030](0030-typescript-7-hold.md)                      | TypeScript Stays on the 5.x Line Until typescript-eslint and ts-jest Support 7                           | Accepted                                               | 2026-08-23 |
 | [0031](0031-api-versioning.md)                         | API Versioning: a `/v1` URI Prefix Introduced at 1.0, and the Order Things Ship In                       | Accepted                                               | 2026-08-23 |
 | [0032](0032-plan-limits.md)                            | Plan Limits: One Resolver for Every Ceiling, Unlimited Until Configured                                  | Accepted                                               | 2026-08-23 |
+| [0033](0033-webhook-delivery-and-failure-policy.md)    | Webhook Delivery and Failure Policy: Workspace-Owned Endpoints, an Outbox Row, and a Signed Envelope     | Proposed                                               | 2026-08-26 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).

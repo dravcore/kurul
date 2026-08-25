@@ -44,6 +44,7 @@ Kurul, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğunluk
 | [0030](0030-typescript-7-hold.md)                      | TypeScript, typescript-eslint ve ts-jest 7'yi Destekleyene Kadar 5.x Hattında Kalır                               | Kabul edildi                                          | 2026-08-23 |
 | [0031](0031-api-versioning.md)                         | API Versiyonlama: 1.0'da Tanıtılan Bir `/v1` URI Öneki ve Şeylerin Gönderilme Sırası                              | Kabul edildi                                          | 2026-08-23 |
 | [0032](0032-plan-limits.md)                            | Plan Limitleri: Her Tavan İçin Tek Çözümleyici, Ayarlanana Kadar Sınırsız                                         | Kabul edildi                                          | 2026-08-23 |
+| [0033](0033-webhook-delivery-and-failure-policy.md)    | Webhook Teslimi ve Hata Politikası: Workspace'e Ait Endpoint'ler, Bir Outbox Satırı ve İmzalı Bir Zarf            | Önerildi                                              | 2026-08-26 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 
