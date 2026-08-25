@@ -197,7 +197,7 @@ const TEXT_TOKENS = [
 /**
  * Copper and destructive as *text*, not as a fill or a mark.
  *
- * Measured on all six surfaces, like every other text token. The five pairs that come up short
+ * Measured on all six surfaces, like every other text token. The four pairs that come up short
  * are in `EXEMPT_PAIRS` with their numbers, and they rest on a rule rather than on a number
  * (docs/design.md: no copper text on the signature tint, and no call site puts copper or
  * destructive text on the hover step). A rule nothing reads is a rule nothing keeps, so it is
@@ -300,36 +300,6 @@ const EXEMPT_PAIRS: {
     floor: AA_TEXT,
     measured: 4.11,
     reason: "--primary's twin value under the name link and rail call sites use",
-  },
-  {
-    theme: 'dark',
-    token: '--destructive',
-    surface: '--accent',
-    floor: AA_TEXT,
-    measured: 4.13,
-    reason: 'destructive text on the hover step, which the dropdown variant replaces with a tint',
-  },
-  {
-    theme: 'light',
-    token: '--status-good',
-    surface: '--signature-subtle',
-    floor: AA_TEXT,
-    measured: 4.33,
-    reason:
-      'the only call site is the checklist glyph in components/task/checklist-badge.tsx, a ' +
-      'mark held to 3:1 and clearing it; "keeps the checklist completion colour on the glyph" ' +
-      'below is what keeps the colour off the 11px ratio beside it',
-  },
-  {
-    theme: 'dark',
-    token: '--status-danger',
-    surface: '--accent',
-    floor: AA_TEXT,
-    measured: 4.13,
-    reason:
-      'the overdue date on a hovered card (components/task/task-card.tsx) is text at 4.13; ' +
-      'closing it means splitting dark --status-danger from --destructive or giving the date ' +
-      'the mark docs/design.md §3 pairs a severity with, neither of which is this gate to make',
   },
 ];
 
@@ -471,9 +441,18 @@ for (const theme of THEMES) {
       const fills: [string, string][] = [
         ['--primary-foreground', '--primary'],
         ['--destructive-foreground', '--destructive'],
+        ['--primary-foreground', '--primary-hover'],
       ];
       const failures = fills.flatMap(([text, fill]) => belowFloor(theme, [text], [fill], AA_TEXT));
       expect(failures).toEqual([]);
+    });
+
+    // `--destructive-hover` carries the button's literal `text-white`, not the
+    // `--destructive-foreground` token: the button never reads that token in dark mode (see
+    // `TEXT_ON_FILL_CALL_SITES` below), so `text-white` is what the hover actually paints under.
+    it('holds white against --destructive-hover at 4.5:1', () => {
+      const ratio = round(contrastRatio('#ffffff', hexOf(theme, '--destructive-hover')), 2);
+      expect(ratio).toBeGreaterThanOrEqual(AA_TEXT);
     });
 
     it('holds every boundary and state token at 3:1 on every surface', () => {
@@ -773,7 +752,7 @@ const PINNED_CALL_SITES: {
     text: 'text-destructive',
     ground: 'bg-accent',
     light: 4.99,
-    dark: 4.13,
+    dark: 4.81,
     // Never rendered: `data-[variant=destructive]:focus:bg-destructive/10` replaces
     // `focus:bg-accent` on exactly the variant that turns the text destructive, so a destructive
     // item's focus ground is never `--accent`. Pinned so that dropping the override shows here.
@@ -821,7 +800,8 @@ const GROUND_AND_TEXT_IN_ONE_FILE: { file: string; note: string }[] = [
     note:
       'the one real nesting. The overdue date is `text-status-danger` inside a card whose ' +
       'ground is `bg-card` at rest, `bg-accent` on hover and the tint when selected. Worst of ' +
-      'the three is the dark hover step at 4.13, which EXEMPT_PAIRS records',
+      'the three is the dark hover step at 4.81, which clears 4.5 on its own now that dark ' +
+      '--status-danger moved with --destructive',
   },
   {
     file: 'components/task/task-comments-section.tsx',
@@ -887,7 +867,9 @@ describe('the copper and destructive text exemption', () => {
   // is its own tint rather than the hover step. Four menu rows render that variant
   // (components/board/board-column.tsx, components/board/board-list.tsx and two in
   // components/settings/members-settings.tsx), so the row is not hypothetical: drop the override
-  // and the pin becomes a 4.13:1 call site while the scan above still reports it as clean.
+  // and the pin becomes a 4.81:1 call site on the plain hover step rather than the destructive
+  // tint's own 4.61, still clearing AA but losing the distinct red focus a destructive row is
+  // supposed to carry, while the scan above still reports it as clean.
   it('keeps the destructive menu row off the accent focus ground', () => {
     const source = readFileSync(path.join(webRoot, 'components/ui/dropdown-menu.tsx'), 'utf8');
     const row = paintedValues(source).find(
@@ -962,8 +944,9 @@ const TEXT_UNDER_A_RISKY_GROUND: { file: string; note: string }[] = [
       'the one real nesting on this side. The badge renders inside the card, whose ground is ' +
       '`bg-card` at rest, `bg-accent` on hover and `bg-signature-subtle` when selected, and ' +
       'board-column.tsx paints the same tint under the whole column while a card is over it. ' +
-      'Worst is light --status-good on the tint at 4.33, which EXEMPT_PAIRS records and which ' +
-      'is legal only while the colour is a mark on the glyph',
+      'Worst is light --status-good on the tint at 4.75, which clears 4.5:1 on its own now ' +
+      'that the token moved; the colour still stays on the glyph rather than the badge or the ' +
+      'ratio beside it, matching the severity-mark rule in docs/design.md §3',
   },
 ];
 
@@ -1022,9 +1005,11 @@ describe('text under a ground its own file does not paint', () => {
     ).toEqual(TEXT_UNDER_A_RISKY_GROUND.map((entry) => entry.file).sort());
   });
 
-  // The 4.33 above is not a property of the token, it is a property of where the token is
-  // written: on the glyph it is a mark at 3:1 and on the ratio next to it, 11px text at 4.5:1.
-  // Nothing else in this file can tell those two apart, so the badge is asserted directly.
+  // Light --status-good now clears 4.5:1 everywhere it lands, including as running text, so
+  // the glyph-only placement is a design rule rather than a contrast requirement: docs/
+  // design.md §3 pairs a severity colour with a mark, not with the badge or the ratio beside
+  // it. Nothing else in this file can tell mark and text apart, so the badge is asserted
+  // directly.
   it('keeps the checklist completion colour on the glyph rather than on the badge', () => {
     const source = readFileSync(path.join(webRoot, 'components/task/checklist-badge.tsx'), 'utf8');
     const coloured = paintedValues(source).filter((value) =>
@@ -1036,10 +1021,10 @@ describe('text under a ground its own file does not paint', () => {
     ).toHaveLength(1);
     expect(
       coloured.every((value) => ICON_SIZE.test(value)),
-      'light --status-good measures 4.33:1 on the selection tint a selected card puts under ' +
-        'this badge, and EXEMPT_PAIRS excuses that only because the colour is a mark: it ' +
-        'belongs on the icon, not on the badge wrapper or the 11px ratio beside it, both of ' +
-        'which are text held to 4.5:1',
+      'light --status-good clears 4.5:1 everywhere it lands (4.75 on the selection tint a ' +
+        'selected card puts under this badge), but the colour still belongs on the icon, not ' +
+        'on the badge wrapper or the 11px ratio beside it: docs/design.md §3 pairs a severity ' +
+        'colour with a mark, not with running text',
     ).toBe(true);
   });
 });
@@ -1054,8 +1039,8 @@ describe('text under a ground its own file does not paint', () => {
  * under it.
  *
  * The one left is shadcn's destructive button, and it is the case where the token is the wrong
- * answer: `--destructive-foreground` is dark ink in dark mode and measures 2.83 on the fill that
- * button actually paints there (`dark:bg-destructive/60`), against white's 5.71.
+ * answer: `--destructive-foreground` is dark ink in dark mode and measures 3.56 on the fill that
+ * button actually paints there (`dark:bg-destructive/60`), against white's 5.08.
  */
 const TEXT_ON_FILL_CALL_SITES: {
   file: string;
@@ -1070,11 +1055,12 @@ const TEXT_ON_FILL_CALL_SITES: {
     text: '#ffffff',
     ground: '--destructive',
     light: 5.89,
-    dark: 3.11,
+    dark: 2.67,
     note:
-      'the dark 3.11 is the base rule, which `dark:bg-destructive/60` replaces in dark and ' +
-      'ALPHA_DERIVATIVES measures at 5.71 there. What is left under the floor is the hover, ' +
-      'also in that table at 3.59: P4 owns components/ui/button.tsx',
+      'the dark 2.67 is the base rule, which `dark:bg-destructive/60` replaces in dark and ' +
+      'ALPHA_DERIVATIVES measures at 5.08 there; the hover is --destructive-hover, a solid ' +
+      'token gated on its own floor above, not an alpha of this fill. P4 owns ' +
+      'components/ui/button.tsx',
   },
 ];
 
@@ -1184,48 +1170,17 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     worst: { light: 16.41, dark: 12.85 },
   },
   {
-    utility: 'hover:bg-primary/90',
-    files: ['components/ui/button.tsx'],
-    fill: '--primary',
-    alpha: 0.9,
-    over: NEUTRAL_SURFACES,
-    text: '--primary-foreground',
-    floor: AA_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 4.17, dark: 5.6 },
-    reason:
-      'shadcn hovers a filled button by thinning the fill, which on a light page mixes the ' +
-      'copper toward white and takes the white label under 4.5 (4.17 on a card). Hovering the ' +
-      'primary action the other way needs a --primary-hover token, which is a palette decision ' +
-      'this gate does not own; P4 owns components/ui/button.tsx',
-  },
-  {
-    utility: 'hover:bg-destructive/90',
-    files: ['components/ui/button.tsx'],
-    fill: '--destructive',
-    alpha: 0.9,
-    over: NEUTRAL_SURFACES,
-    text: '#ffffff',
-    floor: AA_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 5.1, dark: 3.59 },
-    reason:
-      'the same shadcn hover, and in dark it outranks `dark:bg-destructive/60` on specificity, ' +
-      'so hovering undoes the one rule that made the dark destructive button readable (5.71 ' +
-      'resting, 3.59 hovered). P4 owns components/ui/button.tsx',
-  },
-  {
     utility: 'dark:bg-destructive/60',
     files: ['components/ui/button.tsx'],
     fill: '--destructive',
     alpha: 0.6,
     over: NEUTRAL_SURFACES,
     // `text-white`, not `--destructive-foreground`: the token is dark ink in dark mode and
-    // measures 2.83 on this fill, against white's 5.71. See TEXT_ON_FILL_CALL_SITES.
+    // measures 3.56 on this fill, against white's 5.08. See TEXT_ON_FILL_CALL_SITES.
     text: '#ffffff',
     floor: AA_TEXT,
     themes: ['dark'],
-    worst: { dark: 5.71 },
+    worst: { dark: 5.08 },
   },
   {
     utility: 'hover:bg-secondary/80',
@@ -1258,12 +1213,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: '--destructive',
     floor: AA_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 5.04, dark: 4.06 },
-    reason:
-      'a destructive row keeps --destructive as its label, so every point the focus tint gains ' +
-      'it loses again underneath. Dark --destructive clears 4.5 on the flat popover (4.62) and ' +
-      'on nothing raised above it: the accent hover step measures 4.13 and this tint 4.06. ' +
-      'Closing it means a darker dark --destructive, which is a palette decision',
+    worst: { light: 5.04, dark: 4.61 },
   },
   {
     utility: 'focus-visible:ring-ring/50',
@@ -1315,7 +1265,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: 'self',
     floor: AA_NON_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 1.38, dark: 1.31 },
+    worst: { light: 1.38, dark: 1.37 },
     reason:
       'a halo beside `aria-invalid:border-destructive`, which draws the same edge at full ' +
       'strength and is gated at 3:1 above',
@@ -1334,7 +1284,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: 'self',
     floor: AA_NON_TEXT,
     themes: ['dark'],
-    worst: { dark: 1.81 },
+    worst: { dark: 1.99 },
     reason: 'the dark half of the same halo, beside the same full-strength border',
   },
   {
@@ -1346,7 +1296,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: 'self',
     floor: AA_NON_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 1.38, dark: 1.31 },
+    worst: { light: 1.38, dark: 1.37 },
     reason: 'the destructive variant tinting its focus halo, over the unlayered --ring outline',
   },
   {
@@ -1358,7 +1308,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: 'self',
     floor: AA_NON_TEXT,
     themes: ['dark'],
-    worst: { dark: 1.81 },
+    worst: { dark: 1.99 },
     reason: 'the dark half of the same halo, over the same unlayered outline',
   },
   {
@@ -1380,7 +1330,8 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
       'WCAG 1.4.3 exempts text in an inactive control, and docs/design.md §9 holds disabled ' +
       'text to 3:1 anyway, which this clears. It is worth noting rather than hiding that ' +
       '--foreground-disabled exists, is gated at 3:1 above, and no control reads it: a drawn ' +
-      'disabled colour would be steadier than an alpha over an unknown ground',
+      'disabled colour would be steadier than an alpha over an unknown ground. The last open ' +
+      'gap from task-7-report.md §6; P4 owns components/ui/button.tsx and input.tsx',
   },
   {
     utility: 'data-[disabled]:opacity-50',
@@ -1651,6 +1602,52 @@ describe('light elevation', () => {
       `light --card ${card} against --popover ${popover} is ${measured.toFixed(3)}:1, neither ` +
         `one surface nor a ${SURFACE_STEP.toFixed(2)}:1 step`,
     ).toBe(true);
+  });
+});
+
+describe('hover steps', () => {
+  // A hover that clears its own floor but sits on top of its resting fill is not a hover: the
+  // reader has to see it move. Held to the same `SURFACE_STEP` the surface ramp above is.
+  it('keeps --primary-hover a visible step from --primary', () => {
+    for (const theme of THEMES) {
+      const primary = hexOf(theme, '--primary');
+      const hover = hexOf(theme, '--primary-hover');
+      const measured = round(contrastRatio(primary, hover), 3);
+      expect(
+        measured,
+        `${theme}: --primary ${primary} against --primary-hover ${hover} is ` +
+          `${measured.toFixed(3)}:1, below ${SURFACE_STEP.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(SURFACE_STEP);
+    }
+  });
+
+  // Light rests on the flat `--destructive` fill, so the step is measured off that token
+  // directly.
+  it('keeps --destructive-hover a visible step from --destructive in light', () => {
+    const resting = hexOf('light', '--destructive');
+    const hover = hexOf('light', '--destructive-hover');
+    const measured = round(contrastRatio(resting, hover), 3);
+    expect(
+      measured,
+      `light: --destructive ${resting} against --destructive-hover ${hover} is ` +
+        `${measured.toFixed(3)}:1, below ${SURFACE_STEP.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(SURFACE_STEP);
+  });
+
+  // Dark never rests on the flat `--destructive` fill: `dark:bg-destructive/60` (see
+  // `ALPHA_DERIVATIVES` above) replaces it on every surface the button can sit on, so the step
+  // that matters is off that composite, on the two surfaces the button actually lands on.
+  it('keeps --destructive-hover a visible step from the dark:bg-destructive/60 fill', () => {
+    const hover = hexOf('dark', '--destructive-hover');
+    for (const ground of ['--card', '--background'] as const) {
+      const resting = composite(hexOf('dark', '--destructive'), hexOf('dark', ground), 0.6);
+      const measured = round(contrastRatio(resting, hover), 3);
+      expect(
+        measured,
+        `dark: dark:bg-destructive/60 over ${ground} ${resting} against --destructive-hover ` +
+          `${hover} is ${measured.toFixed(3)}:1, below ${SURFACE_STEP.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(SURFACE_STEP);
+    }
   });
 });
 

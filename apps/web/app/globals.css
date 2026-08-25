@@ -31,6 +31,11 @@
   --popover-foreground: #191c1b;
   --primary: #a85a28;
   --primary-foreground: #ffffff;
+  /* A hover cannot be an alpha of --primary: thinning the fill toward the page (shadcn's
+     default hover) drops --primary-foreground under 4.5:1 in light (4.17 on a card). This is a
+     solid step instead, moved toward the theme's floor, the same direction the surface ramp
+     moves. --destructive-hover below follows the same reasoning. */
+  --primary-hover: #964f23;
 
   /* --secondary and --accent share one value and --muted holds a different one. --accent is
      the hover step, so it has to stay a visible step away from both grounds it is painted
@@ -43,6 +48,9 @@
   --accent-foreground: #191c1b;
   --destructive: #c0281f;
   --destructive-foreground: #ffffff;
+  /* Same reason as --primary-hover above: a thinned --destructive mixes toward the page and
+     takes white under 4.5:1 before the hover finishes fading in. */
+  --destructive-hover: #b0241c;
 
   /* The one colour token allowed under 3:1: it separates two areas of a single surface and
      never carries state on its own. Every edge that means something interactive or selected
@@ -68,7 +76,7 @@
   --priority-high: #8a5a00;
   --priority-urgent: #c0281f;
   --status-info: #3f6b99;
-  --status-good: #1f7a4d;
+  --status-good: #1d7349;
   --status-warning: #8a5a00;
   --status-danger: #c0281f;
 
@@ -130,14 +138,20 @@
   --popover-foreground: #e8ecea;
   --primary: #d98a4e;
   --primary-foreground: #131715;
+  --primary-hover: #e0955b;
   --secondary: #2f3331;
   --secondary-foreground: #e8ecea;
   --muted: #1a1e1c;
   --muted-foreground: #98a09c;
   --accent: #2f3331;
   --accent-foreground: #e8ecea;
-  --destructive: #f0665c;
+  /* #f47a73 is the lowest value that clears 4.5:1 against --accent (4.81), the tightest step
+     this colour sits on as running text: the overdue date on a hovered card
+     (components/task/task-card.tsx) and the dropdown's destructive row. --status-danger and
+     --priority-urgent below share it, being the same severity by another name. */
+  --destructive: #f47a73;
   --destructive-foreground: #131715;
+  --destructive-hover: #b8524a;
   --border: #3a403d;
   --border-strong: #767d7a;
   --input: var(--border-strong);
@@ -150,11 +164,11 @@
   --priority-low: #8a928e;
   --priority-medium: #6ba3e8;
   --priority-high: #d9a227;
-  --priority-urgent: #f0665c;
+  --priority-urgent: #f47a73;
   --status-info: #6ba3e8;
   --status-good: #3fbf85;
   --status-warning: #d9a227;
-  --status-danger: #f0665c;
+  --status-danger: #f47a73;
 
   --label-slot-1: #3987e5;
   --label-slot-2: #d95926;
@@ -184,6 +198,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -192,6 +207,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-hover: var(--destructive-hover);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-input: var(--input);
