@@ -450,7 +450,7 @@ for (const theme of THEMES) {
 
     // `--destructive-hover` carries the button's literal `text-white`, not the
     // `--destructive-foreground` token: the button never reads that token in dark mode (see
-    // `TEXT_ON_FILL_CALL_SITES` below), so `text-white` is what the hover actually paints under.
+    // `RAW_COLOUR_CALL_SITES` below), so `text-white` is what the hover actually paints under.
     it('holds white against --destructive-hover at 4.5:1', () => {
       const ratio = round(contrastRatio('#ffffff', hexOf(theme, '--destructive-hover')), 2);
       expect(ratio).toBeGreaterThanOrEqual(AA_TEXT);
@@ -1042,30 +1042,38 @@ describe('text under a ground its own file does not paint', () => {
 });
 
 /**
- * Text that is not a token.
+ * Colour that is not a token.
  *
- * Every colour here goes through a token so that the two themes move together. `text-white` does
- * not, and a fixed white on a token that flips can only be right in one theme: the unread count
- * wore one on `bg-signature` and measured 5.05 in light against 2.73 in dark, which is a number
- * nobody can read. It now wears `--primary-foreground`, the token that flips with the copper
- * under it.
+ * Every colour here goes through a token so that the two themes move together. A raw one cannot:
+ * a fixed white on a token that flips is right in one theme at best. The unread count wore
+ * `text-white` on `bg-signature` and measured 5.05 in light against 2.73 in dark, a number nobody
+ * can read; it now wears `--primary-foreground`, the token that flips with the copper under it.
  *
- * The one left is shadcn's destructive button, and it is the case where the token is the wrong
- * answer: `--destructive-foreground` is dark ink in dark mode and measures 3.56 on the fill that
- * button actually paints there (`dark:bg-destructive/60`), against white's 5.08.
+ * The scan is the whole raw-colour family, not the one string that turned up first. `bg-white`,
+ * `border-black` and a hex inside an arbitrary value are the same defect as `text-white`, and one
+ * of them was in the tree the whole time a scan for `text-white` alone reported it clean. `%23`
+ * is the `#` a `url()` has to escape, which is how that one stayed out of every grep.
+ *
+ * Two call sites are pinned. shadcn's destructive button is where the token is the wrong answer:
+ * `--destructive-foreground` is dark ink in dark mode and measures 3.56 on the fill that button
+ * actually paints there (`dark:bg-destructive/60`), against white's 5.08. The select chevron is
+ * where no token reaches: it is drawn into the control's own background as a `data:` URI, and
+ * inside one `var()` is not read at all and `currentColor` resolves against the SVG rather than
+ * against the document.
  */
-const TEXT_ON_FILL_CALL_SITES: {
+const RAW_COLOUR_CALL_SITES: {
   file: string;
-  text: string;
-  ground: string;
+  colour: string;
+  /** The grounds the element can land on. The recorded ratio is the worst of them. */
+  over: readonly string[];
   light: number;
   dark: number;
   note: string;
 }[] = [
   {
     file: 'components/ui/button.tsx',
-    text: '#ffffff',
-    ground: '--destructive',
+    colour: '#ffffff',
+    over: ['--destructive'],
     light: 5.89,
     dark: 2.67,
     note:
@@ -1074,36 +1082,66 @@ const TEXT_ON_FILL_CALL_SITES: {
       'token gated on its own floor above, not an alpha of this fill. P4 owns ' +
       'components/ui/button.tsx',
   },
+  {
+    file: 'components/ui/select.tsx',
+    colour: '#888888',
+    over: NEUTRAL_SURFACES,
+    light: 3.18,
+    dark: 4.05,
+    note:
+      'the chevron, written `%23888` inside the background `url()`. A mark and not text, so the ' +
+      'floor is the 3:1 boundary one, and it clears that on all four grounds a field lands on. ' +
+      'Replacing it with an overlaid icon would let it read a token but would also make it ' +
+      'inherit nothing from the control: the disabled and focus states it follows today come ' +
+      'from being the background of the control itself',
+  },
 ];
 
-function filesPaintingRawText(): string[] {
+/**
+ * A colour written as a palette name or a hex rather than a token: the `-white` / `-black`
+ * utilities, and a hex inside an arbitrary value in either spelling a class string can carry.
+ */
+const RAW_COLOUR = [
+  /(?<![a-z0-9])(?:text|bg|border|ring|fill|stroke|outline|divide|shadow|from|via|to)-(?:white|black)(?![-\w])/,
+  /\[[^\]]*(?:#|%23)[0-9a-fA-F]{3,8}/,
+];
+
+function filesPaintingRawColour(): string[] {
   const found: string[] = [];
   for (const file of renderedSources(webRoot)) {
     const values = paintedValues(readFileSync(file, 'utf8'));
-    if (values.some((value) => utilityPresent(value, 'text-white')))
+    if (values.some((value) => RAW_COLOUR.some((pattern) => pattern.test(value))))
       found.push(relativeToWeb(file));
   }
   return found.sort();
 }
 
-describe('text that is not a token', () => {
-  it('finds no untokenised text colour the pinned list does not name', () => {
+/** The ground in `over` that `colour` measures worst against in `theme`, and that measurement. */
+function worstGround(theme: Theme, colour: string, over: readonly string[]) {
+  return over
+    .map((ground) => ({ ground, measured: round(contrastRatio(colour, hexOf(theme, ground)), 2) }))
+    .reduce((low, next) => (next.measured < low.measured ? next : low));
+}
+
+describe('colour that is not a token', () => {
+  it('finds no untokenised colour the pinned list does not name', () => {
     expect(
-      filesPaintingRawText(),
-      'a raw palette colour cannot flip with the theme: move it to the -foreground token of the ' +
-        'fill it sits on, or pin it here with what it measures in both themes',
-    ).toEqual(TEXT_ON_FILL_CALL_SITES.map((site) => site.file).sort());
+      filesPaintingRawColour(),
+      'a raw palette colour cannot flip with the theme: move it to the token of the ground it ' +
+        'sits on, or pin it here with what it measures in both themes',
+    ).toEqual(RAW_COLOUR_CALL_SITES.map((site) => site.file).sort());
   });
 
   it('keeps the ratio each untokenised pin measures on record', () => {
-    const drifted = TEXT_ON_FILL_CALL_SITES.flatMap((site) =>
+    const drifted = RAW_COLOUR_CALL_SITES.flatMap((site) =>
       THEMES.flatMap((theme) => {
-        const measured = round(contrastRatio(site.text, hexOf(theme, site.ground)), 2);
-        return measured === site[theme]
+        const worst = worstGround(theme, site.colour, site.over);
+        return worst.measured === site[theme]
           ? []
           : [
-              `${theme}: ${site.file} draws ${site.text} on ${site.ground} at ` +
-                `${measured.toFixed(2)}:1, recorded ${site[theme].toFixed(2)}:1 (${site.note})`,
+              `${theme}: ${site.file} draws ${site.colour} on ${worst.ground} at ` +
+                `${worst.measured.toFixed(2)}:1, recorded ${site[theme].toFixed(2)}:1 ` +
+                `(${site.note})`,
             ];
       }),
     );
@@ -1188,7 +1226,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     alpha: 0.6,
     over: NEUTRAL_SURFACES,
     // `text-white`, not `--destructive-foreground`: the token is dark ink in dark mode and
-    // measures 3.56 on this fill, against white's 5.08. See TEXT_ON_FILL_CALL_SITES.
+    // measures 3.56 on this fill, against white's 5.08. See RAW_COLOUR_CALL_SITES.
     text: '#ffffff',
     floor: AA_TEXT,
     themes: ['dark'],
