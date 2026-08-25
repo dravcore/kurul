@@ -60,11 +60,11 @@ describe('DialogFooter', () => {
  * Content taller than the viewport (`delete-account-dialog.tsx`, one `<select>` per owned
  * workspace) used to be unreachable: Radix locks page scroll and the dialog itself had no
  * height cap, so a short viewport left the footer's submit button off-screen with no way to
- * reach it. The content surface now caps its own height and scrolls itself; the header and
- * footer opt out of that scroll so the submit/cancel controls stay on screen throughout.
+ * reach it. The surface now caps its own height and its body scrolls; the header and footer opt
+ * out of that scroll so the submit/cancel controls stay on screen throughout.
  */
 describe('DialogContent height boundary', () => {
-  it('caps its own height, scrolls internally, and keeps header and footer out of that scroll', () => {
+  function renderTallDialog(): void {
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <Dialog open>
@@ -84,10 +84,18 @@ describe('DialogContent height boundary', () => {
         </Dialog>
       </NextIntlClientProvider>,
     );
+  }
+
+  it('caps its own height, scrolls its body, and keeps header and footer out of that scroll', () => {
+    renderTallDialog();
 
     const content = screen.getByRole('dialog');
     expect(content.className).toContain('max-h-[calc(100dvh-4rem)]');
-    expect(content.className).toContain('overflow-y-auto');
+    expect(content.className).not.toContain('overflow-y-auto');
+
+    const body = document.querySelector('[data-slot="dialog-body"]');
+    expect(body?.className).toContain('overflow-y-auto');
+    expect(body?.className).toContain('min-h-0');
 
     const header = document.querySelector('[data-slot="dialog-header"]');
     expect(header?.className).toContain('sticky');
@@ -96,6 +104,22 @@ describe('DialogContent height boundary', () => {
     const footer = document.querySelector('[data-slot="dialog-footer"]');
     expect(footer?.className).toContain('sticky');
     expect(footer?.className).toContain('bottom-0');
+  });
+
+  /**
+   * The close button is `absolute` against the surface. Had the scroll stayed on the surface,
+   * the surface would be its containing block *and* its scrollport, and the button would scroll
+   * out of the box with the first wheel notch on exactly the dialog this cap exists for. jsdom
+   * lays nothing out, so the guarantee is asserted structurally: the button is a sibling of the
+   * scrolling body, never inside it.
+   */
+  it('leaves the close button outside the scrolling body', () => {
+    renderTallDialog();
+
+    const close = screen.getByRole('button', { name: messages.common.close });
+
+    expect(close.closest('[data-slot="dialog-body"]')).toBeNull();
+    expect(close.parentElement).toBe(screen.getByRole('dialog'));
   });
 
   it('leaves the drawer variant without a height cap or its own scroll', () => {

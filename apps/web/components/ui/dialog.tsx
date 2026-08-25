@@ -47,6 +47,13 @@ function DialogOverlay({
  * `docs/design.md` §5 that `Esc` closes the topmost layer and returns focus to whatever opened
  * it. The opener is read in `onOpenAutoFocus`, which Radix fires while focus is still outside
  * the content, and is the trigger itself wherever one is used.
+ *
+ * The surface caps its height (`docs/design.md` §5) and the scroll sits on the body wrapper
+ * below, not on the surface itself: the close button is positioned against the surface, and an
+ * absolutely positioned box whose containing block is a scroll container scrolls away with the
+ * content and is clipped by it. Padding on the surface rather than on the scrollport is the
+ * other half of the same split, since a scrollport's own padding is scrolled through and would
+ * show content above the sticky header.
  */
 function DialogContent({
   className,
@@ -81,12 +88,16 @@ function DialogContent({
           opener.focus();
         }}
         className={cn(
-          'fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-4rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-lg border bg-background p-6 shadow-overlay duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+          'fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-4rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-lg border bg-background p-6 shadow-overlay duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
           className,
         )}
         {...props}
       >
-        {children}
+        {/* `min-h-0`: a flex child refuses to shrink below its content without it, which would
+            hand the overflow back to the surface and undo the cap above. */}
+        <div data-slot="dialog-body" className="grid min-h-0 gap-4 overflow-y-auto">
+          {children}
+        </div>
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
