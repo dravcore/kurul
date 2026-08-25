@@ -346,6 +346,44 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   inline style the theme provider writes, so the browser's own widgets follow the theme and keep
   doing so if that provider is reconfigured.
 
+### Fixed
+
+- **A dialog taller than the window had no way to reach its own buttons.** The page behind an
+  open dialog is scroll-locked and the surface had no ceiling, so on a short viewport, or at the
+  200% zoom `docs/design.md` §9 requires, the footer of a long dialog (deleting an account, one
+  transfer target per owned workspace) sat below the bottom of the screen with nothing left to
+  scroll. Dialog surfaces now cap at `calc(100dvh - 4rem)` and scroll their body, with the header
+  and footer pinned outside that scroll so Cancel and the destructive action are always on
+  screen. The corner close button is pinned with them rather than sitting inside the scrollport,
+  where it would leave the box on the first wheel notch. Dismissing any dialog also hands focus
+  back to the control that opened it: these dialogs are driven by an `open` prop rather than a
+  `DialogTrigger`, and Radix's own restore was reaching for a trigger that is never rendered and
+  leaving a keyboard user on `<body>`.
+- **`Esc` in the task panel could close two layers at once.** The delete confirmation opened from
+  inside the panel dismissed itself and took the panel with it on a single press, against the
+  rule that `Esc` closes the topmost layer only. The panel's listener now stands down while a
+  dialog or drawer is open, and so does the fullscreen sheet's `Tab` trap below 768px, which had
+  been hauling focus back out of a dialog opened over it and stopping `Tab` from advancing inside
+  it at all.
+- **The zero-board screen offered the same Create board twice.** A first run showed the header
+  button and the empty state's button side by side, two identical primary actions where the
+  design language asks for one. The header's copy is hidden while the workspace has no boards and
+  returns with the first one.
+- **`/workspaces/new` could not be scrolled, and showed two of everything on desktop.** The route
+  declared no scroller of its own, so on a short viewport or at 200% zoom the Create workspace
+  button was unreachable inside the shell's `100dvh` box; it now carries its own
+  `flex-1 overflow-y-auto`. It also carries a header of its own with the wordmark and Sign out,
+  and the shell drops the desktop sidebar entirely while the account has no workspace: every
+  sidebar link needs one, and following any of them only bounces back to this page.
+- **The create-board dialog opened with the whole template catalog expanded.** Four full-height
+  cards pushed the name field and the Create button past the bottom of a laptop window. The
+  picker now opens as one line that names the template about to be applied, with a Change template
+  disclosure that reveals the same keyboard-navigable card list as before.
+- **The notification bell kept its unread count after Mark all read.** The bell and the
+  notifications page each counted for themselves, so clearing the page left a number standing on
+  the bell until the next load. Both now read one shell-level count, and marking everything read
+  clears it in the same frame.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that
