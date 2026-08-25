@@ -59,8 +59,8 @@ export function TaskCard({
         // density and invalidates a performance measurement; it is a real discrepancy and it
         // is not this change's to settle.
         'block rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 text-left transition-colors max-md:min-h-11',
-        'hover:border-border-strong hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
-        selected && 'border-signature bg-signature-subtle/40',
+        'hover:border-border-strong hover:bg-accent focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        selected && 'border-signature bg-signature-subtle',
         className,
       )}
       aria-current={selected ? 'true' : undefined}

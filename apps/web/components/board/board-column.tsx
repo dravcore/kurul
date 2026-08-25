@@ -187,8 +187,8 @@ export const BoardColumn = memo(function BoardColumn({
   return (
     <section
       className={cn(
-        'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-[var(--radius-md)] bg-muted/60',
-        isOver && 'bg-signature-subtle/50',
+        'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-[var(--radius-md)] bg-muted',
+        isOver && 'bg-signature-subtle',
         className,
       )}
       style={style}

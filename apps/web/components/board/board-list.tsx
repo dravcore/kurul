@@ -161,7 +161,7 @@ export function BoardList(): React.ReactElement {
           {boards.map((board) => (
             <li
               key={board.id}
-              className="group relative rounded-[var(--radius-lg)] border border-border bg-card p-4 transition-colors hover:border-border-strong hover:bg-muted/40 focus-within:border-border-strong"
+              className="group relative rounded-[var(--radius-lg)] border border-border bg-card p-4 transition-colors hover:border-border-strong hover:bg-accent focus-within:border-border-strong"
             >
               <Link href={`/board/${board.id}`} className="block pr-8">
                 <p className="text-body font-strong text-foreground">{board.name}</p>
