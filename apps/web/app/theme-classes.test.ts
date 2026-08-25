@@ -124,7 +124,7 @@ interface Occurrence {
  * Every non-arbitrary occurrence in `app/` and `components/`, stripped to the bare utility
  * (variant and opacity modifier dropped) each is being asked to resolve.
  *
- * Arbitrary values (`bg-[url(...)]`, `text-[10px]`) are excluded here, not merely allowed to
+ * Arbitrary values (`bg-[length:1rem_1rem]`, `text-[10px]`) are excluded here, not merely allowed to
  * pass: Tailwind compiles them from the literal value the author wrote, so there is no catalogue
  * entry to miss and nothing this test's technique can check. Opacity modifiers (`bg-muted/40`)
  * are handled by dropping the modifier and resolving what remains: `/40` is never itself a

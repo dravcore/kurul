@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Test files are never rendered, so a class-like string inside one (a code example in a comment,
+   a test title quoting a class name) must never reach the compiled stylesheet: Tailwind's scanner
+   is language-agnostic and would otherwise treat prose like `bg-[url(...)]` as a real candidate. */
+@source not "../**/*.test.{ts,tsx}";
+
 /* Kurul design tokens — values from docs/design.md §3 (Phase 3 validated). */
 
 :root {
