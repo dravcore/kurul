@@ -414,21 +414,22 @@ yayımlar (`api-coverage`, `web-coverage`).
 
 Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalıştırır:
 
-| Adım                   | Komut                                                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Shared paket build     | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                 |
-| Lint                   | `pnpm lint`                                                                                                         |
-| Format kontrolü        | `pnpm format:check`                                                                                                 |
-| Typecheck              | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                                           |
-| Audit                  | `pnpm audit --audit-level high`                                                                                     |
-| Unit testler (api)     | `pnpm --filter @kurul/api test:cov`                                                                                 |
-| Unit testler (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                                               |
-| Unit testler (pkgs)    | `pnpm --filter "./packages/*" test`                                                                                 |
-| Unit testler (scripts) | `pnpm test:scripts`                                                                                                 |
-| Integration testler    | Postgres ve Redis service container'larına karşı `pnpm --filter @kurul/api test:e2e`                                |
-| Build                  | `pnpm build`                                                                                                        |
-| Imaj build + tarama    | Yayımlanan üç imaj, ardından her birine Trivy (aşağıya bakın)                                                       |
-| **Kapı** (zorunlu)     | `ci-ok` — tüm upstream job'lar (`lint`, `test`, `build`, `image-scan`) başarıysa geçer (atlanmamış/iptal edilmemiş) |
+| Adım                   | Komut                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shared paket build     | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                                                           |
+| Lint                   | `pnpm lint`                                                                                                                                                   |
+| Format kontrolü        | `pnpm format:check`                                                                                                                                           |
+| Typecheck              | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                                                                                     |
+| Audit                  | `pnpm audit --audit-level high`                                                                                                                               |
+| Unit testler (api)     | `pnpm --filter @kurul/api test:cov`                                                                                                                           |
+| Unit testler (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                                                                                         |
+| Unit testler (pkgs)    | `pnpm --filter "./packages/*" test`                                                                                                                           |
+| Unit testler (scripts) | `pnpm test:scripts`                                                                                                                                           |
+| Integration testler    | Postgres ve Redis service container'larına karşı `pnpm --filter @kurul/api test:e2e`                                                                          |
+| Build                  | `pnpm build`                                                                                                                                                  |
+| Imaj build + tarama    | Yayımlanan üç imaj, ardından her birine Trivy (aşağıya bakın)                                                                                                 |
+| Compose + Caddy parse  | İki compose dosyası üzerinde, `demo` profile'ı ile ve profile'sız `docker compose config -q`, ve `docker/Caddyfile` üzerinde `caddy validate` (aşağıya bakın) |
+| **Kapı** (zorunlu)     | `ci-ok`: tüm upstream job'lar (`lint`, `test`, `build`, `image-scan`, `compose-config`) başarıysa geçer (atlanmamış/iptal edilmemiş)                          |
 
 **Merge öncesi tüm adımlar geçmelidir.** Kapı job'ı (`ci-ok`) branch korumasında yapılandırılan
 tek zorunlu status kontrol — eğer herhangi bir upstream job başarısızsa, atlanırsa ya da iptal
@@ -472,6 +473,22 @@ Bilinmeye değer iki tercih:
 
 Hiçbir şey push edilmez: `push: false` ve `load: true` ile her imaj kendi runner'ının içinde
 kalır. Yayımlama, tag'in arkasında, `release-images.yml`'de kalır.
+
+### Compose ve Caddyfile parse
+
+`compose-config`, `docker-compose.yml`'i `docker compose config -q` ile bir kez profile'sız,
+bir kez `--profile demo` ile render eder, ardından `docker-compose.dev.yml`'i render eder ve
+stack'in gönderdiği `caddy:2-alpine` imajında `docker/Caddyfile` üzerinde `caddy validate`
+çalıştırır. Env dosyası, `.env.example` artı varsayılanı olmayan iki anahtardır
+(`POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`); bu, [self-hosting.md](self-hosting.md)'nin
+anlattığı kurulumun kendisidir, dolayısıyla job tam olarak bir operatörün çarpacağı şeyde
+düşer: bozuk bir YAML anchor'ı, adı değişmiş bir Caddy direktifi ya da düz bir
+`docker compose up -d`'nin karşılayamayacağı bir zorunlu değişken interpolasyonu (`${VAR:?}`).
+Compose, servisleri profile'a göre filtrelemeden önce dosyanın tamamını interpolasyondan
+geçirir; bu yüzden sonuncusu profile arkasındaki bir serviste bile ısırır, `demo-reset`
+sidecar'ı `develop` üzerindeki her sıradan kurulumu tam da böyle bozmuştu. Compose bacakları
+hiçbir daemon'la konuşmaz, job'ın tamamı saniyeler sürer ve `needs:` olmadan `lint` ve
+`test`'in yanında koşar.
 
 ### CI'da browser e2e
 

@@ -522,7 +522,9 @@ same credentials, and hand the archives to a fresh install's restore.
 
 This section is for one job: running a **public demo** that anyone can sign into and that
 throws its contents away on a schedule. If you are self-hosting Kurul for your own team, skip
-it. Nothing here is on by default and none of it changes an ordinary install.
+it. Nothing here is on by default and none of it changes an ordinary install: `.env.example`
+ships `DEMO_MODE` and `DEMO_PASSWORD` blank, and blank is the ordinary install. Without the
+profile, `docker compose up -d` neither starts the sidecar nor asks for either value.
 
 Two things make a demo: `DEMO_MODE=true`, which changes how the API behaves, and the `demo`
 compose profile, which starts the sidecar that does the wiping. Both, or neither.
