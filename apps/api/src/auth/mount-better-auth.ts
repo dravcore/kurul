@@ -1,8 +1,10 @@
-import type { INestApplication } from '@nestjs/common';
+import { Logger, type INestApplication } from '@nestjs/common';
 import { toNodeHandler } from 'better-auth/node';
 import type { Request, Response } from 'express';
 import { PLAN_LIMIT_ERROR, SIGNUP_DISABLED_ERROR, type PlanLimitDetail } from '@kurul/shared-types';
+import { isProductionEnv } from '../common/env';
 import { getRequestId } from '../common/logging/request-id';
+import { captureServerError } from '../common/observability/sentry';
 import { DEMO_RESTRICTED_MESSAGE } from '../demo/demo-restricted.guard';
 import { demoModeEnabled } from '../demo/demo-mode';
 import { PlanLimitsService } from '../plan/plan-limits.service';
@@ -48,6 +50,26 @@ const DEMO_RESTRICTED_AUTH_PATHS: ReadonlySet<string> = new Set([
   '/auth/change-email',
 ]);
 
+const logger = new Logger('BetterAuthMount');
+
+/**
+ * The two switches this mount refuses on, resolved once and written to the boot log.
+ *
+ * Called for its throw as much as for its line. `envBool` refuses a spelling it cannot read as
+ * a boolean, and both switches are otherwise read only inside the request handler below, where
+ * no exception filter is listening: `SIGNUP_ENABLED=fasle` would leave the very route the
+ * switch exists to close hanging with no response at all, and take the process down with an
+ * unhandled rejection. Reading them here, at bootstrap, turns an operator's typo back into what
+ * it should be, a container that refuses to start, which is the bargain
+ * `PlanLimitsService.onModuleInit` already makes for `PLAN_MAX_*` and `ATTACHMENT_MAX_BYTES`.
+ *
+ * The values are described, not cached. Every read below stays live, which is what lets a test
+ * flip either variable around a single request instead of rebuilding the container.
+ */
+function describeAuthMountPolicy(): string {
+  return `Auth mount policy: signUpEnabled=${signUpEnabled()} demoMode=${demoModeEnabled()}`;
+}
+
 function pathWithoutQuery(req: Request): string {
   return req.path.split('?')[0] ?? req.path;
 }
@@ -89,6 +111,50 @@ function refuse(req: Request, res: Response, refusal: Refusal): void {
 }
 
 /**
+ * Answers a handler that threw with the `500` envelope, by hand.
+ *
+ * Nothing above catches it. `mountBetterAuth` hands the handler straight to Express, so a
+ * rejected promise there is an unhandled rejection: the socket never gets a response, and under
+ * Node's default `--unhandled-rejections=throw` the process exits with it. `AllExceptionsFilter`
+ * only ever sees faults inside the Nest router, so this reproduces the envelope it would have
+ * written for the same fault one layer up, exactly as `refuse` reproduces the `403`.
+ *
+ * The message follows the filter's rule too: the cause is published outside production and
+ * withheld inside it, so a deployed instance never leaks an internal string to a caller.
+ *
+ * `headersSent` means Better Auth already answered and then failed on the way out. There is no
+ * envelope left to write at that point, so the response is only ended, which is still the
+ * difference between a closed socket and a hung one.
+ */
+function failClosed(req: Request, res: Response, cause: unknown): void {
+  const requestId = getRequestId(req);
+  const error =
+    cause instanceof Error ? cause : new Error(`Non-Error exception thrown: ${String(cause)}`);
+  const suffix = requestId === undefined ? '' : ` (requestId=${requestId})`;
+  logger.error(`${error.message}${suffix}`, error.stack);
+  captureServerError(error, {
+    ...(requestId === undefined ? {} : { requestId }),
+    ...(typeof req.method === 'string' ? { method: req.method } : {}),
+    ...(typeof req.url === 'string' ? { path: req.url } : {}),
+    statusCode: 500,
+  });
+
+  if (res.headersSent) {
+    res.end();
+    return;
+  }
+
+  res.status(500).json({
+    statusCode: 500,
+    error: 'Internal Server Error',
+    message: isProductionEnv() ? 'An unexpected error occurred' : error.message,
+    path: req.url,
+    timestamp: new Date().toISOString(),
+    ...(requestId === undefined ? {} : { requestId }),
+  });
+}
+
+/**
  * The per-request half of the mount, built apart from the Express wiring so a unit test can
  * drive it with a fake request and a fake Better Auth handler.
  *
@@ -104,6 +170,9 @@ function refuse(req: Request, res: Response, refusal: Refusal): void {
  * address and every other `/auth/*` route stay open whatever the switches say: an instance
  * that has just closed registration, or been lowered below its own user count, must not lock
  * out the people already on it.
+ *
+ * Rejecting is allowed: `mountBetterAuth` answers a thrown handler with `failClosed`, so the
+ * head count query failing on a dead database is a `500` and not a hung socket.
  */
 export function createAuthRequestHandler(
   planLimits: Pick<PlanLimitsService, 'signUpRefusal'>,
@@ -145,6 +214,10 @@ export function mountBetterAuth(app: INestApplication): void {
     all: (path: string, handler: (req: Request, res: Response) => void) => void;
   };
 
+  // Before anything is wired: `describeAuthMountPolicy` reads both switches, and a malformed
+  // one throws out of `bootstrap()` rather than out of a request nobody is catching.
+  logger.log(describeAuthMountPolicy());
+
   const handle = createAuthRequestHandler(app.get(PlanLimitsService), toNodeHandler(auth));
 
   // Express 5 requires a named wildcard; braces also match the bare `/auth` base.
@@ -158,6 +231,8 @@ export function mountBetterAuth(app: INestApplication): void {
       return;
     }
 
-    void handle(req, res);
+    handle(req, res).catch((cause: unknown) => {
+      failClosed(req, res, cause);
+    });
   });
 }

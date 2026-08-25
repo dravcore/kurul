@@ -16,7 +16,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `POST /auth/sign-up/email` with `403` and `error: "Sign-up Disabled"` whatever the count is,
   in the same hand-written envelope the plan ceiling uses at the Better Auth mount (`requestId`
   included), and writes no row. Unset or `true` is open, so every existing install runs exactly
-  as before. Like the ceiling it refuses sign-up only: signing in, verifying an address and
+  as before. It is also read once at boot, alongside `DEMO_MODE`, so a spelling the boolean
+  parser cannot read (`SIGNUP_ENABLED=fasle`) refuses to start the container, the bargain the
+  `PLAN_MAX_*` ceilings already make: below the Nest router no exception filter is listening, so
+  the alternative is the one route the switch governs hanging with no response at all. Like the ceiling it refuses sign-up only: signing in, verifying an address and
   everything else under `/auth` stay open, so closing it never locks out the people already on
   the instance. `GET /config` publishes it as `signUpEnabled`, read from the same function the
   mount consults so the document and the refusal cannot disagree. It is independent of

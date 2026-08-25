@@ -27,6 +27,10 @@ export const SIGNUP_ENABLED_ENV = 'SIGNUP_ENABLED';
  * Read per call rather than cached at boot, matching `demoModeEnabled()`: the paths that ask are
  * not hot, a restart is the only way to change the variable either way, and reading live is what
  * lets a test flip it around a single request instead of rebuilding the Nest container.
+ *
+ * Live, but not unvalidated: `mountBetterAuth` calls this once at bootstrap so a value `envBool`
+ * cannot read refuses to start, rather than surfacing on the one route the switch governs, below
+ * the Nest router where no exception filter would turn it into a response.
  */
 export function signUpEnabled(): boolean {
   return envBool(SIGNUP_ENABLED_ENV, true);

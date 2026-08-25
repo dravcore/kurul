@@ -1,3 +1,4 @@
+import { Logger, type INestApplication } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { PLAN_LIMIT_ERROR, PlanLimitCode, SIGNUP_DISABLED_ERROR } from '@kurul/shared-types';
 import { DEMO_MODE_ENV } from '../demo/demo-mode';
@@ -6,6 +7,7 @@ import {
   createAuthRequestHandler,
   isDemoRestrictedAuthRequest,
   isSignUpRequest,
+  mountBetterAuth,
 } from './mount-better-auth';
 import { SIGNUP_ENABLED_ENV } from './sign-up-policy';
 
@@ -230,5 +232,143 @@ describe('the path predicates', () => {
     expect(isDemoRestrictedAuthRequest(req('POST', '/auth/change-email'))).toBe(true);
     expect(isDemoRestrictedAuthRequest(req('GET', '/auth/change-password'))).toBe(false);
     expect(isDemoRestrictedAuthRequest(req('POST', '/auth/update-user'))).toBe(false);
+  });
+});
+
+/**
+ * The Express wiring, which is where the two things that have no filter above them live: the
+ * boot-time read of the switches, and the answer to a handler that threw.
+ */
+describe('mountBetterAuth', () => {
+  const original = { ...process.env };
+  let logged: jest.SpyInstance;
+  let reported: jest.SpyInstance;
+
+  beforeEach(() => {
+    // The mount writes its policy line and any fault through Nest's logger; neither belongs in
+    // the test output, and the spies are what the boot case asserts on.
+    logged = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    reported = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    process.env = { ...original };
+  });
+
+  /**
+   * Stands in for the Nest application: the Express instance whose `all` the mount registers on,
+   * and the container it pulls `PlanLimitsService` out of. `get` ignores its token because the
+   * mount asks for exactly one provider.
+   */
+  function fakeApp(planLimits: { signUpRefusal: jest.Mock }): {
+    app: INestApplication;
+    handlers: Array<(req: Request, res: Response) => void>;
+  } {
+    const handlers: Array<(req: Request, res: Response) => void> = [];
+    const app = {
+      getHttpAdapter: () => ({
+        getInstance: () => ({
+          all: (_path: string, handler: (req: Request, res: Response) => void) => {
+            handlers.push(handler);
+          },
+        }),
+      }),
+      get: () => planLimits,
+    } as unknown as INestApplication;
+    return { app, handlers };
+  }
+
+  it('reads both switches at boot and refuses to start on a malformed one', () => {
+    const { app } = fakeApp({ signUpRefusal: jest.fn() });
+
+    process.env[SIGNUP_ENABLED_ENV] = 'fasle';
+    expect(() => mountBetterAuth(app)).toThrow(/Invalid SIGNUP_ENABLED/);
+
+    process.env[SIGNUP_ENABLED_ENV] = 'false';
+    process.env[DEMO_MODE_ENV] = 'ture';
+    expect(() => mountBetterAuth(app)).toThrow(/Invalid DEMO_MODE/);
+
+    // Both readable: the mount starts and says which policy it is running.
+    process.env[DEMO_MODE_ENV] = 'true';
+    expect(() => mountBetterAuth(app)).not.toThrow();
+    expect(logged).toHaveBeenCalledWith('Auth mount policy: signUpEnabled=false demoMode=true');
+  });
+
+  /**
+   * The reason the boot read matters, and the belt to its braces: below the Nest router nothing
+   * catches a rejection, so without this the caller waits on a socket that is never answered and
+   * Node takes the process down with an unhandled rejection.
+   */
+  it('answers a rejected handler with the 500 envelope instead of leaking the rejection', async () => {
+    delete process.env[SIGNUP_ENABLED_ENV];
+    delete process.env[DEMO_MODE_ENV];
+    const signUpRefusal = jest.fn().mockRejectedValue(new Error('the database is down'));
+    const { app, handlers } = fakeApp({ signUpRefusal });
+
+    mountBetterAuth(app);
+    expect(handlers).toHaveLength(1);
+
+    const json = jest.fn();
+    const answered = new Promise<Record<string, unknown>>((resolve) => {
+      json.mockImplementation((body: Record<string, unknown>) => resolve(body));
+    });
+    const res = {
+      headersSent: false,
+      status: jest.fn().mockReturnValue({ json }),
+      end: jest.fn(),
+    } as unknown as Response;
+    const req = {
+      method: 'POST',
+      url: '/auth/sign-up/email',
+      path: '/auth/sign-up/email',
+      requestId: 'req-0000004',
+    } as unknown as Request;
+
+    handlers[0]!(req, res);
+
+    // Resolves only because the rejection was caught and turned into a response; an
+    // unhandled rejection would leave this promise pending until the test times out.
+    await expect(answered).resolves.toEqual({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: 'the database is down',
+      path: '/auth/sign-up/email',
+      timestamp: expect.any(String),
+      requestId: 'req-0000004',
+    });
+    expect(reported).toHaveBeenCalledWith(
+      'the database is down (requestId=req-0000004)',
+      expect.any(String),
+    );
+  });
+
+  /** Better Auth answered and then failed on the way out: no second envelope, but no hang. */
+  it('only ends the response when the headers are already out', async () => {
+    delete process.env[SIGNUP_ENABLED_ENV];
+    delete process.env[DEMO_MODE_ENV];
+    const signUpRefusal = jest.fn().mockRejectedValue(new Error('too late'));
+    const { app, handlers } = fakeApp({ signUpRefusal });
+
+    mountBetterAuth(app);
+
+    const end = jest.fn();
+    const ended = new Promise<void>((resolve) => {
+      end.mockImplementation(() => resolve());
+    });
+    const status = jest.fn();
+    const res = { headersSent: true, status, end } as unknown as Response;
+
+    handlers[0]!(
+      {
+        method: 'POST',
+        url: '/auth/sign-up/email',
+        path: '/auth/sign-up/email',
+      } as unknown as Request,
+      res,
+    );
+
+    await expect(ended).resolves.toBeUndefined();
+    expect(status).not.toHaveBeenCalled();
   });
 });
