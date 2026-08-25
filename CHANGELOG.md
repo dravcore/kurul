@@ -146,6 +146,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   every context (`e2e/support/fixtures.ts`). That check was verified against a build with the
   nonce removed, where it failed on `script-src-elem blocked inline` rather than passing
   quietly — which is how the old `'unsafe-inline'` would otherwise come back unnoticed.
+- **The release workflow no longer trusts a tag's name.** A new `guard` job in
+  `.github/workflows/release-images.yml` runs before any image is built, and every other job
+  waits for it. It checks the two things the release process asks a human to get right by
+  hand: a `vX.Y.Z` tag must point at the tip of `main` (the merge commit step 5 tags), while a
+  pre-release tag must be reachable from `main` or from an open `release/*` or `hotfix/*`
+  branch, the rehearsal path; and every workspace `package.json` must carry the tag's version,
+  with a stable tag also needing its `## [X.Y.Z] - ` heading in `CHANGELOG.md`. Until now a
+  tag typed on `develop`, or on a tree whose version bump was forgotten, would have been built,
+  signed and published, and a stable one would also have moved `latest` under every operator
+  who pulls without `TAG`. A failing guard names the offending file, or the refs it searched,
+  and nothing is pushed; `publish-sbom` waits on the guard explicitly, since its
+  `!cancelled()` condition would otherwise run past a rejected tag with `contents: write`.
+  Every job in the workflow also gained a `timeout-minutes`. The guard catches a slip inside
+  the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
+  repository admin is a repository ruleset, described in
+  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the operator checklist
+  in `ROADMAP.md`.
 
 ### Added
 
