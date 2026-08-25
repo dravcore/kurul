@@ -814,6 +814,16 @@ web app is built against it. Three rules, in this order, all on one hostname:
 
 `/api/*` must also pass WebSocket upgrades through — that is the realtime board feed.
 
+**One route carries a secret in its path, so keep it out of the proxy's access log.**
+`GET /auth/reset-password/<token>` is a URL a real browser follows, and the token in it is live
+until the form on the other side is submitted. The API's own access log writes that path as
+`/auth/reset-password/:token` and never the token itself
+(`apps/api/src/common/logging/access-log.middleware.ts`), but a proxy in front logs the URL it
+was asked for. The bundled `docker/Caddyfile` configures no `log` directive and so writes no
+access log at all; nginx's default `combined` format logs `$request`, which is the whole URL. If
+you keep an access log on this hostname, filter or rewrite `/auth/reset-password/*` in it, and
+until you do, treat that log as something that holds live credentials.
+
 #### Why the proxy's number is 26 MiB and the API's is 25
 
 **This is not a typo and the two must not be made equal.** The largest _attachment_ this

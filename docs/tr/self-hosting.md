@@ -826,6 +826,16 @@ kural:
 
 `/api/*` ayrıca WebSocket upgrade'lerini de geçirmelidir — realtime pano akışı odur.
 
+**Bir route sırrını yolunda taşır, onu proxy'nin access log'undan uzak tutun.**
+`GET /auth/reset-password/<token>`, gerçek bir tarayıcının izlediği bir URL'dir ve içindeki
+token, karşı taraftaki form gönderilene kadar canlıdır. API'nin kendi access log'u bu yolu
+`/auth/reset-password/:token` olarak yazar, token'ın kendisini asla
+(`apps/api/src/common/logging/access-log.middleware.ts`); ama öndeki proxy, kendisinden istenen
+URL'i olduğu gibi log'lar. Paketlenmiş `docker/Caddyfile` hiçbir `log` direktifi tanımlamaz, yani
+hiç access log yazmaz; nginx'in varsayılan `combined` formatı ise URL'in tamamı olan `$request`'i
+log'lar. Bu hostname'de access log tutuyorsanız `/auth/reset-password/*` yolunu filtreleyin ya da
+yeniden yazın; bunu yapana kadar o log'u canlı kimlik bilgisi tutan bir yer sayın.
+
 #### Proxy'nin sayısı neden 26 MiB, API'ninki neden 25
 
 **Bu bir yazım hatası değil ve ikisi eşitlenmemeli.** Bu instance'ın kabul ettiği en büyük _ek_

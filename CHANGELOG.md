@@ -26,6 +26,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and is not a recovery path for anyone else, see
   [self-hosting](docs/self-hosting.md#email-smtp). On a `DEMO_MODE` instance the demo account
   is skipped, since its password is published and a reset would only lock every visitor out.
+
+  The emailed link is the first URL this API serves with a live secret in its path, so the JSON
+  access log now writes it as `/auth/reset-password/:token`. A reverse proxy of your own in
+  front of it still logs the URL it was asked for unless you filter that route out, see
+  [self-hosting](docs/self-hosting.md#bringing-your-own-reverse-proxy).
 - **Plan limits: ceilings on seats, boards, workspaces and accounts, unlimited until an operator
   sets one.** Four variables (`PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
   `PLAN_MAX_WORKSPACES`, `PLAN_MAX_USERS`) put a number on quantities the product never bounded.
