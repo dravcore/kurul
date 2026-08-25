@@ -229,7 +229,10 @@ components/
 ### Stil
 
 - Markup'ta Tailwind utility class'ları; CSS modülleri yok, styled-components yok.
-- Koşullu class'lar string concatenation değil, `cn()` helper'ından geçer.
+- Koşullu class'lar string concatenation değil, `cn()` helper'ından geçer. `cn()`
+  (`apps/web/lib/utils.ts`) `tailwind-merge`'ü Kurul'un tip ölçeği ve `font-strong` ağırlığıyla
+  genişletir; böylece bir tüketicinin `text-*`/`font-*` override'ı, primitifin kendi
+  varsayılanıyla tekilleşir, ikisi birden DOM'a ulaşmaz.
 - Design token'ları (renkler, spacing, radius) Tailwind theme'inden gelir — component'lerde
   keyfi hex değerleri yok.
 - `apps/web/app/globals.css` içindeki yazar CSS'i, kuralın yanına yazılmış bir gerekçe yoksa

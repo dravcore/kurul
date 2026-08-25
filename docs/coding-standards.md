@@ -226,7 +226,10 @@ components/
 ### Styling
 
 - Tailwind utility classes in the markup; no CSS modules, no styled-components.
-- Conditional classes go through the `cn()` helper, never string concatenation.
+- Conditional classes go through the `cn()` helper, never string concatenation. `cn()`
+  (`apps/web/lib/utils.ts`) extends `tailwind-merge` with Kurul's type scale and the
+  `font-strong` weight, so a consumer's `text-*`/`font-*` override deduplicates against a
+  primitive's own default instead of both classes reaching the DOM.
 - Design tokens (colors, spacing, radius) come from the Tailwind theme — no arbitrary hex
   values in components.
 - Author CSS in `apps/web/app/globals.css` goes inside `@layer base` unless there is a written
