@@ -21,8 +21,16 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Every job carries a `timeout-minutes` ceiling a few multiples above what it measures
+  # (lint ~1m, test-unit ~1m30s, test-integration ~3m, build ~1m, an image-scan leg up to
+  # ~4m30s on a cache miss). Without one a hung socket, a stuck registry pull or a wedged Trivy
+  # download holds a runner for the six-hour default: two release-candidate runs of
+  # release-images.yml did exactly that (4h and 5.7h) before someone cancelled them by hand,
+  # and on a public repository that is also how a fork's pull request can burn the project's
+  # runner concurrency.
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       # prisma.config.ts requires DATABASE_URL even for `prisma generate`.
       DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_ci
@@ -58,6 +66,7 @@ jobs:
   # pull and the health-check wait.
   test-unit:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       # No Postgres or Redis service here, and nothing below dials one. `prisma generate` reads
       # DATABASE_URL through prisma.config.ts without connecting, and importing the application
@@ -112,6 +121,7 @@ jobs:
 
   test-integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:18-alpine
@@ -174,6 +184,7 @@ jobs:
   # still fails if this job does.
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_ci
       # Neither of these is connected to or dialled in this job — no Postgres service runs here
@@ -235,6 +246,7 @@ jobs:
   # -----------------------------------------------------------------------------------
   image-scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     permissions:
       # Checkout, the Trivy release download and the actions cache, and nothing else. No image
       # leaves this job, so there is no `packages: write` and no `docker/login-action`.
@@ -364,6 +376,7 @@ jobs:
     if: always()
     needs: [lint, test-unit, test-integration, build, image-scan]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Decide gate result
         run: |
