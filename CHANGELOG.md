@@ -146,6 +146,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   every context (`e2e/support/fixtures.ts`). That check was verified against a build with the
   nonce removed, where it failed on `script-src-elem blocked inline` rather than passing
   quietly — which is how the old `'unsafe-inline'` would otherwise come back unnoticed.
+- **The release workflow no longer trusts a tag's name.** A new `guard` job in
+  `.github/workflows/release-images.yml` runs before any image is built, and every other job
+  waits for it. It checks the two things the release process asks a human to get right by
+  hand: a `vX.Y.Z` tag must point at the tip of `main` (the merge commit step 5 tags), while a
+  pre-release tag must be reachable from `main` or from an open `release/*` or `hotfix/*`
+  branch, the rehearsal path; and every workspace `package.json` must carry the tag's version,
+  with a stable tag also needing its `## [X.Y.Z] - ` heading in `CHANGELOG.md`. Until now a
+  tag typed on `develop`, or on a tree whose version bump was forgotten, would have been built,
+  signed and published, and a stable one would also have moved `latest` under every operator
+  who pulls without `TAG`. A failing guard names the offending file, or the refs it searched,
+  and nothing is pushed; `publish-sbom` waits on the guard explicitly, since its
+  `!cancelled()` condition would otherwise run past a rejected tag with `contents: write`.
+  Every job in the workflow also gained a `timeout-minutes`. The guard catches a slip inside
+  the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
+  repository admin is a repository ruleset, described in
+  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the operator checklist
+  in `ROADMAP.md`.
 
 ### Added
 
@@ -231,6 +248,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   being cancelled by hand.
   Target: `ci-ok` under 3m30s, tracked in the OPS-10 row of `ROADMAP.md`.
 
+- **The self-hosting guide installs and upgrades from a release tag, with a runbook.**
+  `docs/self-hosting.md` now fetches `docker-compose.yml`, `docker/Caddyfile`,
+  `scripts/backup.sh` and `.env.example` from the `v0.3.0` tag URL rather than from `main`, so
+  the files and the images an install runs come from the same release, and `.env` gets
+  `chmod 600` on the way in. The Upgrading section is an ordered runbook, backup first: read the
+  CHANGELOG, `backup.sh once` and copy the pair off-host, re-fetch the files at the new tag (a
+  `pull` refreshes images and nothing else, so an install that never re-fetched kept a
+  `backup.sh` that ignores `BACKUP_REMOTE`), set `TAG`, `pull`, `up -d --wait`, `ps -a`,
+  `curl /api/health/ready`, then links to the rollback and restore drills in
+  `docs/development.md` instead of copies of them. A short "Release notes for operators" list
+  points at the CHANGELOG entries that ask something before `pull`. Two things moved with it.
+  `TRUST_PROXY` is forwarded by `docker-compose.yml` as `${TRUST_PROXY:-1}` and ships blank in
+  `.env.example`, so a CDN in front of `proxy` is a `.env` line rather than an edit to a file
+  the next upgrade replaces; an existing `.env` that still carries `TRUST_PROXY=false` from an
+  older `.env.example` must drop the line, or the API stops seeing client addresses behind
+  Caddy. And a new "Browser error tracking" section states that `NEXT_PUBLIC_SENTRY_*` are
+  compiled into the web image, that the published GHCR image ships without them, and that
+  enabling browser Sentry means building `web` from a clone, cross-linked from `.env.example`
+  and `docs/development.md`. The release process in `docs/git-strategy.md` gains the step that
+  bumps the tag on the page. Turkish mirrors updated in step.
+
 ### Fixed
 
 - **`PLAN_MAX_*`, `INSTANCE_ADMIN_EMAILS`, the retention windows, telemetry, `API_DOCS_ENABLED`,
@@ -311,6 +349,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   jittered, doubling retry for exactly those two cases, and a denied room join is retried with
   backoff instead of standing for the life of the socket — so the indicator now describes
   something that is actually happening.
+- **`docker/Caddyfile`'s header quoted the nginx body limit the same file warns against.** The
+  bring-your-own-proxy contract at the top of the file said the rule-2 body limit "matches"
+  the API's `ATTACHMENT_MAX_BYTES` (`client_max_body_size 25m;`), while the `request_body`
+  block further down sets `26MiB` and explains that a limit equal to the file size rejects a
+  file of exactly the published size, because the multipart envelope rides on top of it. The
+  header now says one MiB above and `26m`, the same figure as the nginx snippet in
+  `docs/self-hosting.md`.
 - **The nightly browser suite ran on `main`, not on `develop`.** GitHub runs a scheduled
   workflow on the repository's default branch, and the checkout step in
   `.github/workflows/e2e.yml` passed no `ref`, so every 03:00 UTC run re-tested the last
