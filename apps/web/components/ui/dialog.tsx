@@ -51,9 +51,17 @@ function DialogOverlay({
  * The surface caps its height (`docs/design.md` §5) and the scroll sits on the body wrapper
  * below, not on the surface itself: the close button is positioned against the surface, and an
  * absolutely positioned box whose containing block is a scroll container scrolls away with the
- * content and is clipped by it. Padding on the surface rather than on the scrollport is the
- * other half of the same split, since a scrollport's own padding is scrolled through and would
- * show content above the sticky header.
+ * content and is clipped by it.
+ *
+ * The body carries its own small padding rather than relying on the surface's, and offsets it
+ * with an equal negative margin so the visible layout is unchanged. Per CSS Overflow 3, setting
+ * `overflow-y: auto` computes `overflow-x` to `auto` too (a box cannot scroll one axis and paint
+ * past the other), and both axes then clip anything painted outside the body's own padding edge,
+ * including the 2px `outline` at 2px `outline-offset` that `:focus-visible` draws in
+ * `globals.css`. A full-width control's ring sits flush with the body's edge on every side
+ * (left/right always, and top/bottom for whatever row is first or last), so without room inside
+ * that edge the ring is cut off outright, not just softened. `-1`/`1` is 4px either way, exactly
+ * the outline's 2px plus its 2px offset.
  */
 function DialogContent({
   className,
@@ -94,8 +102,11 @@ function DialogContent({
         {...props}
       >
         {/* `min-h-0`: a flex child refuses to shrink below its content without it, which would
-            hand the overflow back to the surface and undo the cap above. */}
-        <div data-slot="dialog-body" className="grid min-h-0 gap-4 overflow-y-auto">
+            hand the overflow back to the surface and undo the cap above. `-m-1`/`p-1` give the
+            focus ring room inside the scrollport's clip edge (see the doc comment above) while
+            netting to zero visible offset, since the padding just pulls content back in by the
+            same 4px the negative margin let the box grow by. */}
+        <div data-slot="dialog-body" className="-m-1 grid min-h-0 gap-4 overflow-y-auto p-1">
           {children}
         </div>
         {showCloseButton && (

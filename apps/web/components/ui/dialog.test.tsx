@@ -107,6 +107,22 @@ describe('DialogContent height boundary', () => {
   });
 
   /**
+   * `overflow-y: auto` computes `overflow-x` to `auto` too (CSS Overflow 3), so the body clips
+   * anything that paints outside its own box, including the `:focus-visible` outline
+   * (`globals.css`: 2px outline, 2px offset) full-width controls draw right at the body's edge.
+   * The body must carry its own padding to give that outline room, offset by an equal negative
+   * margin so the padding does not shift the visible layout of a dialog that never scrolls. jsdom
+   * lays nothing out, so the room is asserted as the class pairing rather than pixels.
+   */
+  it('gives the body padding to hold the focus ring, offset so the layout does not shift', () => {
+    renderTallDialog();
+
+    const body = document.querySelector('[data-slot="dialog-body"]');
+    expect(body?.className).toContain('p-1');
+    expect(body?.className).toContain('-m-1');
+  });
+
+  /**
    * The close button is `absolute` against the surface. Had the scroll stayed on the surface,
    * the surface would be its containing block *and* its scrollport, and the button would scroll
    * out of the box with the first wheel notch on exactly the dialog this cap exists for. jsdom
