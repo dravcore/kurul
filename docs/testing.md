@@ -405,21 +405,29 @@ on every run, passing or failing.
 
 Every pull request runs, on `develop` and `main` as well:
 
-| Step                 | Command                                                                                                  |
-| -------------------- | -------------------------------------------------------------------------------------------------------- |
-| Build shared pkgs    | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                      |
-| Lint                 | `pnpm lint`                                                                                              |
-| Format check         | `pnpm format:check`                                                                                      |
-| Typecheck            | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                                      |
-| Audit                | `pnpm audit --audit-level high`                                                                          |
-| Unit tests (api)     | `pnpm --filter @kurul/api test:cov`                                                                      |
-| Unit tests (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                                    |
-| Unit tests (pkgs)    | `pnpm --filter "./packages/*" test`                                                                      |
-| Unit tests (scripts) | `pnpm test:scripts`                                                                                      |
-| Integration tests    | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers                        |
-| Build                | `pnpm build`                                                                                             |
-| Image build + scan   | The three shipped images, then Trivy over each (see below)                                               |
-| **Gate** (required)  | `ci-ok` — passes only if `lint`, `test`, `build` and `image-scan` all succeed (not skipped or cancelled) |
+| Step                 | Job                | Command                                                                                                                 |
+| -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Build shared pkgs    | `lint`             | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                     |
+| Lint                 | `lint`             | `pnpm lint`                                                                                                             |
+| Format check         | `lint`             | `pnpm format:check`                                                                                                     |
+| Typecheck            | `lint`             | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                                                     |
+| Audit                | `lint`             | `pnpm audit --audit-level high`                                                                                         |
+| Unit tests (api)     | `test-unit`        | `pnpm --filter @kurul/api test:cov`                                                                                     |
+| Unit tests (web)     | `test-unit`        | `pnpm --filter @kurul/web exec vitest run --coverage`                                                                   |
+| Unit tests (pkgs)    | `test-unit`        | `pnpm --filter "./packages/*" test`                                                                                     |
+| Unit tests (scripts) | `test-unit`        | `pnpm test:scripts`                                                                                                     |
+| Migration drift      | `test-integration` | `pnpm db:migrate`, then `pnpm db:drift` against the Postgres service container                                          |
+| Integration tests    | `test-integration` | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers                                       |
+| Build                | `build`            | `pnpm build`                                                                                                            |
+| Image build + scan   | `image-scan`       | The three shipped images, then Trivy over each (see below)                                                              |
+| **Gate** (required)  | `ci-ok`            | Passes only if `lint`, `test-unit`, `test-integration`, `build` and `image-scan` all succeed (not skipped or cancelled) |
+
+The five jobs above the gate run in parallel and none of them `needs` another: `build` installs
+and generates the Prisma client on its own, and `test-integration` is the only job with Postgres
+and Redis service containers, so the unit suites in `test-unit` start without a container pull.
+The pipeline's wall time is therefore its longest job rather than the sum of them, and it is
+tracked against the OPS-10 row in
+[ROADMAP.md](../ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit).
 
 **All steps must pass before merge.** The gate job (`ci-ok`) is the single required status check
 configured in branch protection — if any upstream job fails, is skipped, or is cancelled, the
@@ -457,9 +465,11 @@ Two choices are worth knowing about:
   version anywhere would fail every pull request for something no pull request can do, and a
   check that is always red is a check nobody reads. What is left is the actionable set: a base
   image bump or a dependency bump.
-- **It runs beside `lint` and `test`, not after `build`.** The job is off the critical path on
-  purpose, so it costs runner minutes rather than pipeline wall time, and it reads a buildx
-  layer cache (`type=gha`) that the `develop` runs of this same workflow write.
+- **It runs beside `lint`, `test-unit`, `test-integration` and `build`, not after them.** The
+  job is off the critical path on purpose, so it costs runner minutes rather than pipeline wall
+  time, and it reads a buildx layer cache (`type=gha`) that only the `develop` and `main` runs
+  of this same workflow write. Pull request runs read that cache and write nothing, so their
+  own caches cannot crowd `develop`'s out of the repository's 10 GB cache allowance.
 
 Nothing is pushed: `push: false` with `load: true` keeps each image inside its own runner.
 Publishing stays in `release-images.yml`, behind a tag.

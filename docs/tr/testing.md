@@ -414,21 +414,30 @@ yayımlar (`api-coverage`, `web-coverage`).
 
 Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalıştırır:
 
-| Adım                   | Komut                                                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Shared paket build     | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                 |
-| Lint                   | `pnpm lint`                                                                                                         |
-| Format kontrolü        | `pnpm format:check`                                                                                                 |
-| Typecheck              | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                                           |
-| Audit                  | `pnpm audit --audit-level high`                                                                                     |
-| Unit testler (api)     | `pnpm --filter @kurul/api test:cov`                                                                                 |
-| Unit testler (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                                               |
-| Unit testler (pkgs)    | `pnpm --filter "./packages/*" test`                                                                                 |
-| Unit testler (scripts) | `pnpm test:scripts`                                                                                                 |
-| Integration testler    | Postgres ve Redis service container'larına karşı `pnpm --filter @kurul/api test:e2e`                                |
-| Build                  | `pnpm build`                                                                                                        |
-| Imaj build + tarama    | Yayımlanan üç imaj, ardından her birine Trivy (aşağıya bakın)                                                       |
-| **Kapı** (zorunlu)     | `ci-ok` — tüm upstream job'lar (`lint`, `test`, `build`, `image-scan`) başarıysa geçer (atlanmamış/iptal edilmemiş) |
+| Adım                   | Job                | Komut                                                                                                                                   |
+| ---------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Shared paket build     | `lint`             | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                                     |
+| Lint                   | `lint`             | `pnpm lint`                                                                                                                             |
+| Format kontrolü        | `lint`             | `pnpm format:check`                                                                                                                     |
+| Typecheck              | `lint`             | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                                                               |
+| Audit                  | `lint`             | `pnpm audit --audit-level high`                                                                                                         |
+| Unit testler (api)     | `test-unit`        | `pnpm --filter @kurul/api test:cov`                                                                                                     |
+| Unit testler (web)     | `test-unit`        | `pnpm --filter @kurul/web exec vitest run --coverage`                                                                                   |
+| Unit testler (pkgs)    | `test-unit`        | `pnpm --filter "./packages/*" test`                                                                                                     |
+| Unit testler (scripts) | `test-unit`        | `pnpm test:scripts`                                                                                                                     |
+| Migrasyon drift'i      | `test-integration` | `pnpm db:migrate`, ardından Postgres service container'ına karşı `pnpm db:drift`                                                        |
+| Integration testler    | `test-integration` | Postgres ve Redis service container'larına karşı `pnpm --filter @kurul/api test:e2e`                                                    |
+| Build                  | `build`            | `pnpm build`                                                                                                                            |
+| Imaj build + tarama    | `image-scan`       | Yayımlanan üç imaj, ardından her birine Trivy (aşağıya bakın)                                                                           |
+| **Kapı** (zorunlu)     | `ci-ok`            | Yalnızca `lint`, `test-unit`, `test-integration`, `build` ve `image-scan` job'larının tümü başarıysa geçer (atlanmamış/iptal edilmemiş) |
+
+Kapının üstündeki beş job paralel koşar ve hiçbiri bir diğerine `needs` ile bağlı değildir:
+`build` kurulumunu ve Prisma client üretimini kendi yapar; Postgres ve Redis service
+container'ı olan tek job `test-integration`'dır, bu yüzden `test-unit` içindeki unit suite'ler
+container çekmeden başlar. Pipeline'ın duvar saati süresi dolayısıyla job'ların toplamı değil
+en uzun job'ıdır ve
+[ROADMAP.md](../../ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit) içindeki
+OPS-10 satırına karşı izlenir.
 
 **Merge öncesi tüm adımlar geçmelidir.** Kapı job'ı (`ci-ok`) branch korumasında yapılandırılan
 tek zorunlu status kontrol — eğer herhangi bir upstream job başarısızsa, atlanırsa ya da iptal
@@ -466,9 +475,12 @@ Bilinmeye değer iki tercih:
   halde her PR'ı düşürürdü; sürekli kırmızı duran bir kontrolü de kimse okumaz. Geriye tam
   olarak aksiyon alınabilir küme kalır: bir base imaj yükseltmesi ya da bir bağımlılık
   yükseltmesi.
-- **`build`'den sonra değil, `lint` ve `test`'in yanında koşar.** Job bilinçli olarak kritik
-  yolun dışında; böylece pipeline duvar saatine değil runner dakikalarına mal olur ve aynı
-  workflow'un `develop` koşularının yazdığı buildx katman cache'ini (`type=gha`) okur.
+- **`lint`, `test-unit`, `test-integration` ve `build`'den sonra değil, onların yanında
+  koşar.** Job bilinçli olarak kritik yolun dışında; böylece pipeline duvar saatine değil runner
+  dakikalarına mal olur ve yalnızca aynı workflow'un `develop` ve `main` koşularının yazdığı
+  buildx katman cache'ini (`type=gha`) okur. Pull request koşuları o cache'i okur ama hiçbir şey
+  yazmaz; böylece kendi cache'leri `develop`'ınkini deponun 10 GB'lık cache payının dışına
+  itemez.
 
 Hiçbir şey push edilmez: `push: false` ve `load: true` ile her imaj kendi runner'ının içinde
 kalır. Yayımlama, tag'in arkasında, `release-images.yml`'de kalır.
