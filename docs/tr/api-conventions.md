@@ -833,7 +833,7 @@ Bütçeler **client IP'si ve route başına**, kayan bir dakikalık pencerede sa
 | `POST /workspaces/:workspaceId/imports/trello` | 3 / dk       | Heap'e ayrıştırılan 20 MiB'lık gövde, ardından tek transaction'da binlerce satır     |
 | `GET .../attachments/:attachmentId/content`    | 300 / dk     | Varsayılanın _üstünde_: on görsel ekli bir panel açılışta on istek üretir            |
 | `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10sn     | Better Auth'un kimlik endpoint'leri için yerleşik kuralı                             |
-| `/auth/request-password-reset`                 | 3 / 60sn     | O da yerleşik: her çağrı, kimin adına olduğu belli olmayan bir mesajı relay'e verir  |
+| `/auth/request-password-reset`                 | 3 / 60sn     | O da yerleşik: her çağrı, çağıranın sahipliğini kanıtlamadığı adrese bağlantı yollar |
 | Diğer `/auth/*`                                | 100 / dk     | Better Auth'un kendi limiter'ı — `/auth/*` Nest router'ını atlar (ADR 0004)          |
 | `GET /health`, `GET /health/ready`             | muaf         | Throttle edilen bir probe, sağlıklı bir API'yi çökmüş gösterir                       |
 
