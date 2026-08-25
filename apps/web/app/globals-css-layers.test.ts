@@ -497,6 +497,7 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
       "[data-slot='dropdown-menu-radio-item'][data-highlighted]",
     ]);
     expect(row.declarations).toEqual([
+      { property: 'forced-color-adjust', value: 'none' },
       { property: 'background', value: 'Highlight' },
       { property: 'color', value: 'HighlightText' },
     ]);
@@ -510,17 +511,41 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
     expect(icon.declarations).toEqual([{ property: 'color', value: 'HighlightText' }]);
   });
 
-  // Nothing here opts out of the forced palette. Every fallback names a system colour, which the
-  // mode honours, so the opt-out would buy the rule nothing while inheriting into every
-  // descendant and leaving their author colours literal (an `!important` red icon on a Highlight
-  // ground, say) instead of letting the UA force them onto the user's palette.
-  it('opts nothing out of the forced palette', () => {
+  // Only the highlighted row opts out. Chromium paints a Canvas backplate behind that row's text
+  // and nowhere else's, so it is the one rule the opt-out buys anything for; every other
+  // fallback in this block names a system colour the mode already honours, and opting those out
+  // too would inherit into their descendants and leave author colours literal instead of forced
+  // onto the user's palette.
+  it('opts only the highlighted menu row out of the forced palette', () => {
     const optOuts = forced.rules.filter((rule) => {
       return rule.declarations.some((declaration) => {
         return declaration.property === 'forced-color-adjust';
       });
     });
-    expect(optOuts.map((rule) => selectorParts(rule))).toEqual([]);
+    expect(optOuts.map((rule) => selectorParts(rule))).toEqual([
+      [
+        "[data-slot='dropdown-menu-item'][data-highlighted]",
+        "[data-slot='dropdown-menu-checkbox-item'][data-highlighted]",
+        "[data-slot='dropdown-menu-radio-item'][data-highlighted]",
+      ],
+    ]);
+
+    const [row] = optOuts;
+    expect(row!.declarations).toEqual([
+      { property: 'forced-color-adjust', value: 'none' },
+      { property: 'background', value: 'Highlight' },
+      { property: 'color', value: 'HighlightText' },
+    ]);
+
+    // Separate from identifying which rule opts out: no other rule in the block does.
+    const others = forced.rules.filter((rule) => rule !== row);
+    expect(
+      others.every((rule) => {
+        return rule.declarations.every(
+          (declaration) => declaration.property !== 'forced-color-adjust',
+        );
+      }),
+    ).toBe(true);
   });
 
   // The tints these rules replace are `@layer utilities` (`bg-signature-subtle`,

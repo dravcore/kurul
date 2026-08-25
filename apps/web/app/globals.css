@@ -470,13 +470,15 @@ body {
     outline-offset: -2px;
   }
 
-  /* The items carry `outline-hidden`, so the ground is the whole indicator and a forced ground
-     would be the popover's own. The mode honours system colours, so naming the pair is enough;
-     `forced-color-adjust: none` would add nothing here and would inherit into every descendant,
-     keeping their author colours literal instead of forced onto the user's palette. */
+  /* Chromium paints a Canvas-coloured backplate behind text runs in forced-colours mode; on this
+     row that plate sits under the label and hides it, so `forced-color-adjust: none` is the only
+     way to suppress it. The pair of system colours stays explicit so the row still follows the
+     user's palette instead of an author colour. The opt-out inherits into every descendant,
+     which is why the `svg` rule below stays: without it the icon would keep its literal grey. */
   [data-slot='dropdown-menu-item'][data-highlighted],
   [data-slot='dropdown-menu-checkbox-item'][data-highlighted],
   [data-slot='dropdown-menu-radio-item'][data-highlighted] {
+    forced-color-adjust: none;
     background: Highlight;
     color: HighlightText;
   }
