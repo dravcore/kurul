@@ -978,6 +978,15 @@ yedekleme sidecar'ı sessizce kurtarma noktası üretmeyi bırakır ki bu bölü
 tam olarak bu hatadır. `docker-compose.dev.yml`'de bilinçli olarak **yok** — `pnpm db:seed`'in
 istendiğinde sildiği yerel bir veritabanında saklanmaya değer bir şey yoktur.
 
+O hafta bir arşiv sayısıdır, yaş değil, ve container'ı yeniden başlatmak bundan harcamaz. Döngü
+eskiden her başladığında girişte bir çift alırdı ve her host reboot'u, `.env` düzenlemesinden
+sonraki her `docker compose up` ve her image pull onu başlatır; yani bir günlük yeniden
+başlatmalar bir haftalık geçmişi yedi slotun dışına itebilirdi. Artık `BACKUP_INTERVAL`'ın
+yarısından genç bir dump zaten varken o ilk döngüyü atlar, atladığını loglar ve yalnızca
+aralığın kalanı kadar uyur; böylece hem kadans hem de geçmiş yeniden başlatmadan önceki gibi
+kalır. Aşağıdaki elle çalıştırılan `backup.sh once` hiçbir zaman atlanmaz: dump isteyen
+operatör dump alır.
+
 Üç ayar, üçü de compose tarafından `.env`'den okunur:
 
 | Değişken          | Varsayılan | Amaç                                                                       |

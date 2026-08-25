@@ -19,9 +19,13 @@
 # carries; see ADR 0022's scope note on backup_data living on the same host as postgres_data.
 #
 # Usage:
-#   backup.sh          # loop forever: dump, archive, prune, sleep BACKUP_INTERVAL, repeat
+#   backup.sh          # loop forever: dump, archive, prune, sleep BACKUP_INTERVAL, repeat.
+#                      # The first pass is skipped when a dump younger than BACKUP_INTERVAL/2
+#                      # already exists, so a container restart is not a backup cycle (see the
+#                      # main loop at the bottom)
 #   backup.sh once     # take exactly one of each, prune, exit (manual/ad-hoc backup, and what
-#                      # the restore drill in docs/development.md uses)
+#                      # the restore drill in docs/development.md uses). Never skipped: an
+#                      # operator asking for a dump gets a dump
 #
 # Configuration (all optional except the password):
 #   PGHOST           postgres        # in-network address of the database server
@@ -190,6 +194,20 @@ prune_pattern() {
 prune() {
   prune_pattern "kurul-*.dump"
   prune_pattern "kurul-*-files.tar.gz"
+}
+
+# Seconds since the newest finished dump was written; fails when there is none, or when the
+# mtime cannot be read, and the caller then takes a dump, i.e. behaves as this script always
+# did. Newest by NAME, the same sort prune_pattern() trusts, not `ls -t`. The mtime rather than
+# the timestamp in the name because parsing that back into seconds is a different `date` on
+# every libc; `stat -c %Y` is GNU and BusyBox (postgres:18-alpine, where this runs), `stat -f %m`
+# is BSD, which is what the test suite meets on a macOS laptop.
+newest_dump_age() {
+  newest=$(ls -1 "$BACKUP_DIR"/kurul-*.dump 2>/dev/null | sort -r | head -n 1)
+  [ -n "$newest" ] || return 1
+  mtime=$(stat -c %Y "$newest" 2>/dev/null || stat -f %m "$newest" 2>/dev/null) || return 1
+  [ -n "$mtime" ] || return 1
+  echo $(($(date +%s) - mtime))
 }
 
 # --- off-host copy (everything below is dead code while BACKUP_REMOTE is unset) --------------
@@ -365,6 +383,27 @@ log "starting: every ${BACKUP_INTERVAL}s, keeping ${BACKUP_KEEP} archives of eac
 # Exit promptly on `docker compose stop` instead of sitting out the rest of the sleep: the
 # sleep runs in the background and `wait` is interruptible by a trapped signal.
 trap 'log "stopping"; exit 0' INT TERM
+
+# A container start is not a backup cycle. Every host reboot, `docker compose down`/`up`,
+# `restart` and image pull starts this sidecar afresh, and the loop below used to take a pair on
+# entry every time. Retention is a COUNT (prune() keeps the newest BACKUP_KEEP by name, with no
+# age check), so each of those pairs pushed the oldest one out: a day of restarts left a week's
+# worth of slots holding dumps of the same day and no yesterday. So when a dump younger than
+# half an interval already exists the first pass is skipped, and the sleep before the next one
+# is only what is left of the interval, which keeps the cadence, the RPO the docs promise and the
+# API's BACKUP_KEEP × BACKUP_INTERVAL orphan-sweep window exactly what they were before the
+# restart. Half, not a whole interval: a dump older than that is nearer the next scheduled one
+# than the last, and taking it now buys a fresher recovery point for the slot it costs. The
+# `once` mode above is unconditional on purpose, see its usage note.
+#
+# A very first boot has no dump and takes one immediately, which is the case the backup
+# healthcheck's `start_period` in docker-compose.yml is sized for.
+age=$(newest_dump_age) || age=""
+if [ -n "$age" ] && [ "$age" -ge 0 ] && [ "$age" -lt $((BACKUP_INTERVAL / 2)) ]; then
+  log "skipping the boot-time cycle: the newest dump is ${age}s old, next cycle in $((BACKUP_INTERVAL - age))s"
+  sleep "$((BACKUP_INTERVAL - age))" &
+  wait $!
+fi
 
 while true; do
   cycle_stamp=$(next_stamp)

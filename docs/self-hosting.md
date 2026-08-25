@@ -402,7 +402,10 @@ The `backup` service is already running: every `BACKUP_INTERVAL` seconds (24h by
 writes **two** archives into the `backup_data` volume — a `pg_dump` of the database and a
 `.tar.gz` of the uploaded attachment files — and keeps `BACKUP_KEEP` of each series. Both
 archives of one cycle carry the **same timestamp**, which is how a restore knows which tar
-belongs to which dump.
+belongs to which dump. `BACKUP_KEEP` is a count, not an age, and a restart does not spend one:
+the sidecar skips its boot-time cycle while a dump younger than half of `BACKUP_INTERVAL`
+exists, so a reboot or a `docker compose up` after a `.env` edit leaves the history you had
+([the scheduled backup sidecar](development.md#the-scheduled-backup-sidecar)).
 
 That covers "I deleted the wrong workspace". It does not cover a dead disk — the archives sit
 on the same host as the database. Copy them off the machine, **both halves of the newest

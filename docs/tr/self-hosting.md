@@ -416,7 +416,11 @@ docker compose logs api | grep -i mail
 `backup_data` volume'üne **iki** arşiv yazar — veritabanının `pg_dump`'ı ve yüklenmiş attachment
 dosyalarının `.tar.gz`'i — ve her seriden `BACKUP_KEEP` tanesini tutar. Bir döngünün iki arşivi
 de **aynı zaman damgasını** taşır; bir restore hangi tar'ın hangi dump'a ait olduğunu böyle
-bilir.
+bilir. `BACKUP_KEEP` bir sayıdır, yaş değil, ve bir yeniden başlatma bu sayıdan harcamaz:
+sidecar, `BACKUP_INTERVAL`'ın yarısından genç bir dump varken açılıştaki döngüsünü atlar,
+dolayısıyla bir reboot ya da `.env` düzenlemesinden sonraki `docker compose up` elinizdeki
+geçmişi olduğu gibi bırakır
+([zamanlanmış yedekleme sidecar'ı](development.md#zamanlanmış-yedekleme-sidecarı)).
 
 Bu, "yanlış workspace'i sildim" durumunu karşılar. Ölen bir diski karşılamaz — arşivler
 veritabanıyla aynı makinede durur. Onları makine dışına kopyalayın — yalnız dump'ı değil, **en

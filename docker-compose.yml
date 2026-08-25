@@ -216,6 +216,13 @@ services:
       PGUSER: ${POSTGRES_USER:-kurul}
       PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
       PGDATABASE: ${POSTGRES_DB:-kurul}
+      # Retention is a COUNT: backup.sh keeps the newest BACKUP_KEEP archives of each series and
+      # never looks at their age. A container start used to spend one of those slots (the loop
+      # dumped on entry, every reboot, `up` and image pull included), so a day of restarts could
+      # push a week of history out; backup.sh now skips its boot-time cycle while a dump younger
+      # than BACKUP_INTERVAL/2 exists, and restarts no longer consume retention. The two values
+      # are also handed to `api` above, whose orphan-file sweep waits BACKUP_KEEP × BACKUP_INTERVAL
+      # on the assumption of one pair per interval, which that skip is what keeps true.
       BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
       # Where the read-only attachments mount lands. Blank would skip the file archive
@@ -306,7 +313,11 @@ services:
     # starts immediately at container boot (see backup.sh's main loop below `mkdir -p
     # "$BACKUP_DIR"`), not after one BACKUP_INTERVAL has elapsed, so how long it takes is a
     # function of database size, not of the configured cadence — sizing it off a 24h default
-    # would hide a genuinely broken first cycle for most of a day. 10 minutes is generous for
+    # would hide a genuinely broken first cycle for most of a day. A RESTART is the other case:
+    # backup.sh skips that boot-time cycle when a dump younger than BACKUP_INTERVAL/2 already
+    # exists (so restarts stop eating count-based retention, see BACKUP_KEEP above), and the
+    # dump it leaves in place is exactly what the `find -mmin` below reads, so the check is
+    # healthy from the first probe. 10 minutes is generous for
     # the databases a single-host Compose install runs (this file's whole premise, and
     # self-hosting.md's); an instance with an unusually large first dump that still needs
     # longer can raise `start_period` with a compose override file, same as any other
