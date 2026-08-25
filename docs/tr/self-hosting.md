@@ -194,7 +194,8 @@ dokunmayan bir instance'ın çalıştırdığı şey de bu: hiç sayım sorgusu 
 sınırsız demek; negatif ya da tam sayı olmayan bir değer açılışta reddedilir, ve geçerli sayılar
 başlangıçta loglanır (`Plan ceilings: …`). Attachment kotalarının aksine bunların hiç varsayılanı
 yok, ve bu bilerek: dolu bir disk veritabanını kendisiyle birlikte düşürür, onuncu bir board ise
-bir satıra mal olur.
+bir satıra mal olur. Paketlenmiş `docker-compose.yml` dördünü de `api` container'ına iletir;
+kendi compose dosyanız da aynısını yapmak zorunda, çünkü container `.env`'i kendisi asla okumaz.
 
 Bir **seat**, bir üye _ya da_ hâlâ kabul edilmeyi bekleyen bir davettir, dolayısıyla tavandaki bir
 admin kabulleri onun ötesine kuyruğa alamaz; bir daveti iptal etmek o seat'i anında boşaltır, ve
@@ -453,8 +454,11 @@ döngüyü aynen çalıştırır.
 Kimlik bilgileri `.env`'e **girmez**: rclone'un env anahtarları remote'un adına göre adlandığı
 için `docker-compose.yml` içinde sabit bir liste tanımlanamaz, bu yüzden `backup` servisi
 compose dosyasının yanındaki isteğe bağlı `rclone.env` dosyasını okur. O dosyayı yalnızca bu
-container okur; `.env`'i api ve web container'ları da okur. `chmod 600` ile oluşturun ve git'e
-sokmayın (`.gitignore` zaten listeliyor).
+container okur. `.env`'i de hiçbir container okumaz: Compose onu `${VAR}` enterpolasyonu için
+kullanır ve her servise açık bir anahtar listesi iletir. API'nin okuduğu her ayar için o liste,
+[`docker-compose.yml`](../../docker-compose.yml) içindeki `api` servisinin `environment:`
+bloğudur; o blokta olmayan bir anahtar `.env`'de nasıl ayarlanırsa ayarlansın API'ye ulaşmaz.
+`rclone.env`'i `chmod 600` ile oluşturun ve git'e sokmayın (`.gitignore` zaten listeliyor).
 
 Uçtan uca bir S3 örneği. `KURULOFF` keyfi bir remote adıdır, yalnızca `BACKUP_REMOTE`
 içindekiyle aynı olması gerekir:
@@ -533,7 +537,9 @@ herhangi bir makinede çalıştırın ve arşivleri taze bir kurulumun restore a
 Bu bölüm tek bir iş için: herkesin giriş yapabildiği ve içeriğini belirli aralıklarla çöpe atan
 bir **herkese açık demo** çalıştırmak. Kurul'u kendi ekibiniz için barındırıyorsanız burayı
 atlayın. Buradaki hiçbir şey varsayılan olarak açık değil ve hiçbiri sıradan bir kurulumu
-değiştirmiyor.
+değiştirmiyor: `.env.example` `DEMO_MODE` ve `DEMO_PASSWORD`'ü boş gönderir ve boş olan zaten
+sıradan kurulumdur. Profile olmadan `docker compose up -d` ne sidecar'ı başlatır ne de bu iki
+değerden birini ister.
 
 Bir demoyu iki şey oluşturur: API'nin davranışını değiştiren `DEMO_MODE=true` ve silme işini
 yapan sidecar'ı başlatan `demo` compose profile'ı. Ya ikisi birden, ya hiçbiri.
