@@ -121,6 +121,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- **Request bodies to `/auth/*` are bounded, at the proxy and at the API.** Better Auth reads
+  the raw request stream itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on
+  every other route, and the bundled `docker/Caddyfile` set `request_body max_size` only on
+  `/api/*`, so a `POST /auth/sign-in/email` could stream a body of any size into the API
+  container's heap (512 MB, `--max-old-space-size=384`) at the built-in attempt budget of 3 per
+  10 seconds per IP and path on sign-in, sign-up and change-password, and 100 per minute on the
+  other auth routes. `handle /auth/*` now carries `max_size 64KiB`, and the mount refuses a
+  declared `Content-Length` over the same `AUTH_BODY_MAX_BYTES` (`65536`, a constant in
+  `apps/api/src/auth/auth-body-limit.ts`) with the standard `413` envelope before a byte is
+  read; a chunked body, which has no length to check, is counted as it streams and the
+  connection is closed past the ceiling. The largest legitimate auth body is a few hundred bytes
+  of JSON. The nginx contract in `docs/self-hosting.md` gains `client_max_body_size 64k;` for
+  `location /auth/`, and `two-layer-limit.spec.ts` pins the Caddyfile figure, the nginx row and
+  the API constant to each other; unlike the upload pair, the two may be equal, since there is
+  no multipart envelope between them.
 - **The web app's `script-src` no longer allows `'unsafe-inline'`.** Inline script is admitted
   by a per-request nonce instead: `apps/web/proxy.ts` — Next 16's replacement for the
   `middleware.ts` convention, which is where the old file moved — draws 16 bytes from the
