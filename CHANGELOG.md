@@ -196,6 +196,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **CI now parses the compose files and the Caddyfile on every pull request.** A new
+  `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
+  `docker compose config -q`, without a profile and with `--profile demo`, renders
+  `docker-compose.dev.yml`, and runs `caddy validate` over `docker/Caddyfile` in the
+  `caddy:2-alpine` image the stack ships. The env file is `.env.example` plus `POSTGRES_PASSWORD`
+  and `BETTER_AUTH_SECRET`, the install the docs describe, so the job fails on exactly what an
+  operator would hit: a broken YAML anchor, a renamed Caddy directive, or a required-variable
+  interpolation that a plain `docker compose up -d` cannot satisfy. Until now nothing in CI read
+  either file: `image-scan` builds the images, the browser suite builds its own stack, and
+  `scripts/bootstrap.mjs` validates only `docker-compose.dev.yml`, which is how the `demo-reset`
+  interpolation fixed below reached `develop`. The compose legs need no daemon, the job takes
+  seconds, and it is wired into the `ci-ok` gate like every other job
+  ([testing.md](docs/testing.md#compose-and-caddyfile-parse)).
 - **Better Auth upgraded to 1.7.1, which needs a database migration before the API starts.**
   `Account` gains a required `issuer` column and a unique `(issuer, accountId)` index: identity
   is now keyed on the pair rather than on `accountId` alone, so two providers handing out the
@@ -217,6 +230,39 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`PLAN_MAX_*`, `INSTANCE_ADMIN_EMAILS`, the retention windows, telemetry, `API_DOCS_ENABLED`,
+  `RATE_LIMIT_ENABLED` and the database pool knobs were inert under the bundled Compose stack.**
+  Compose reads `.env` for `${VAR}` interpolation only and never hands the file to a container,
+  `docker-compose.yml` forwards an explicit list of keys to the `api` service, and the api image
+  carries no `.env` of its own, so a setting missing from that list never reached the process
+  however it was set. Seventeen documented settings were missing: a demo operator writing
+  `PLAN_MAX_USERS=1` got an instance that logged `Plan ceilings: unlimited` and capped nothing,
+  nobody could become an instance admin (the activation dashboard and the GDPR erasure route were
+  unreachable on every curl/GHCR install), and `CLEANUP_ENABLED`, the three `*_RETENTION_DAYS`,
+  `TELEMETRY_ENABLED`/`TELEMETRY_ENDPOINT`/`TELEMETRY_TIMEOUT_MS`, `API_DOCS_ENABLED`,
+  `RATE_LIMIT_ENABLED`, `DATABASE_POOL_MAX`, `DATABASE_POOL_CONNECTION_TIMEOUT_MS` and
+  `DATABASE_STATEMENT_TIMEOUT_MS` kept their defaults whatever `.env` said, with nothing logged
+  about it. All seventeen are now on the `api` service as `${KEY:-}`, which the env helpers treat
+  as unset, so an untouched `.env` runs exactly what it ran before. A new
+  `scripts/lib/compose-env.test.mjs` (`pnpm test:scripts`) fails when a key the API reads and
+  `.env.example` documents is missing from that block, so the next variable cannot repeat this;
+  `docs/self-hosting.md` no longer claims the containers read `.env`, and the "adding an
+  environment variable" rule in `docs/development.md` gained the forwarding step.
+
+- **Every plain `docker compose` invocation on `develop` failed with "required variable
+  DEMO_MODE is missing a value".** The `demo-reset` sidecar added for the public demo declared
+  `DEMO_MODE` and `DEMO_PASSWORD` in the required form (`${VAR:?message}`), on the reasoning
+  that a service behind `profiles: ['demo']` is never evaluated without the profile. Compose
+  interpolates the whole file before it filters services by profile, and `:?` treats an empty
+  value as missing, so `cp .env.example .env` (both keys ship blank) followed by
+  `docker compose up -d`, `pull`, `ps` or `config` aborted on an install that never asked for a
+  demo, with a message telling that operator to set `DEMO_MODE=true`. No release carries the
+  defect: `v0.3.0` predates the change. Both keys now default to blank (`${VAR:-}`). The refusal
+  the `:?` was standing in for already exists where it can be logged, in
+  `apps/api/src/demo/reset-guard.ts` (any `DEMO_MODE` other than true) and `reset.ts` (a blank
+  or short `DEMO_PASSWORD`), so a demo profile started with either key unset prints "Refusing
+  to reset" in `docker compose --profile demo logs demo-reset` instead of Compose refusing the
+  file for everyone.
 - **`charts.test.tsx` was load-sensitive ([#244](https://github.com/dravcore/kurul/issues/244)),
   reproduced and fixed.** Running `apps/web`'s Vitest suite alongside `apps/api`'s Jest suite
   reproduced it 6/6 tries. The cause: the file's bar-animation poll (`barPaths`) promises to
@@ -262,6 +308,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   jittered, doubling retry for exactly those two cases, and a denied room join is retried with
   backoff instead of standing for the life of the socket — so the indicator now describes
   something that is actually happening.
+- **The nightly browser suite ran on `main`, not on `develop`.** GitHub runs a scheduled
+  workflow on the repository's default branch, and the checkout step in
+  `.github/workflows/e2e.yml` passed no `ref`, so every 03:00 UTC run re-tested the last
+  release's commit while the docs said it covered the day's merges. Between releases that
+  commit never changes: a regression merged to `develop` stayed invisible until the next
+  release pull request, and the socket fix above stayed red in the nightly for days after it
+  had landed. The schedule now checks out `develop` (the `pull_request` and
+  `workflow_dispatch` triggers are unchanged), and a new step prints the branch and commit
+  that actually ran, since the run's own head branch still names the branch the schedule was
+  read from. `main` keeps its coverage where it changes: the release and hotfix pull requests.
 
 ### Changed
 

@@ -422,6 +422,13 @@ services:
       # is set and to nothing when it isn't, so this URL matches whichever branch the redis
       # service's own entrypoint took above without a second flag to keep in sync.
       REDIS_URL: redis://${REDIS_PASSWORD:+:${REDIS_PASSWORD}@}redis:6379
+      # The three knobs on the `pg` pool `apps/api/src/prisma/database.ts` opens against the
+      # URL above. Blank = the API's own defaults (20 connections, 10s connection wait, 30s
+      # statement timeout). Not on `migrate`: Prisma's engine reads DATABASE_URL directly and
+      # never goes through this pool.
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-}
+      DATABASE_POOL_CONNECTION_TIMEOUT_MS: ${DATABASE_POOL_CONNECTION_TIMEOUT_MS:-}
+      DATABASE_STATEMENT_TIMEOUT_MS: ${DATABASE_STATEMENT_TIMEOUT_MS:-}
       API_PORT: 4000
       # Both derive from SITE_URL — the one public origin the `proxy` service answers on —
       # because that is now the only address a browser ever uses for either app (see
@@ -450,6 +457,13 @@ services:
       # you put in front (a CDN in front of `proxy` makes this `2`) — see
       # docs/self-hosting.md.
       TRUST_PROXY: 1
+      # The interactive console at /docs and the document at /openapi.json. Blank follows
+      # NODE_ENV, which the image bakes to `production`, so this stack ships with them off
+      # until an operator writes `true` (see .env.example for why that default is the decision).
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-}
+      # Master switch for the request throttles, the API's only brute-force ceiling. Passed
+      # through so that turning it off is a deliberate `false` in .env rather than impossible.
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       # Largest JSON/form-encoded body the API reads (issue #214). Passed through rather than
       # left to the default so an operator who sets it in .env actually gets it — a limit that
       # silently ignores its own variable is the same class of defect as the unconfigured
@@ -504,6 +518,17 @@ services:
       # ATTACHMENT_MAX_BYTES, which is why it is a separate number rather than a derived one, and
       # it needs no STORAGE_PATH — an import writes link rows and stores no bytes.
       TRELLO_IMPORT_MAX_BYTES: ${TRELLO_IMPORT_MAX_BYTES:-20971520}
+      # Plan ceilings (docs/decisions/0032-plan-limits.md): quantities rather than bytes. Blank
+      # and `0` both mean unlimited, which is what every install runs until an operator writes a
+      # number; a negative or non-integer value refuses to boot. Passed through for the same
+      # reason as every other limit in this block: before they were, PLAN_MAX_USERS=1 in .env
+      # produced an instance that logged `Plan ceilings: unlimited` and capped nothing. Not on
+      # `demo-reset`: the reset creates the demo account through Better Auth directly, below the
+      # route where the sign-up ceiling is enforced, and it empties the database first anyway.
+      PLAN_MAX_SEATS_PER_WORKSPACE: ${PLAN_MAX_SEATS_PER_WORKSPACE:-}
+      PLAN_MAX_BOARDS_PER_WORKSPACE: ${PLAN_MAX_BOARDS_PER_WORKSPACE:-}
+      PLAN_MAX_WORKSPACES: ${PLAN_MAX_WORKSPACES:-}
+      PLAN_MAX_USERS: ${PLAN_MAX_USERS:-}
       # Read by the orphan sweep, which refuses to delete a file while a dump old enough to
       # disown it is still restorable — its grace period is BACKUP_KEEP × BACKUP_INTERVAL, with
       # a 24h floor the API applies whatever these say (the window also covers an upload whose
@@ -512,6 +537,24 @@ services:
       # are passed here rather than defaulted in code.
       BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
+      # The nightly retention sweep (docs/development.md#data-retention), same worker as the
+      # orphan sweep above. Blank windows = the API's defaults (90 / 365 / 90 days); `0` on a
+      # window keeps those rows forever; a negative value refuses the run. `false` on the switch
+      # stops the whole sweep, so the instance keeps everything it ever wrote.
+      CLEANUP_ENABLED: ${CLEANUP_ENABLED:-true}
+      NOTIFICATION_RETENTION_DAYS: ${NOTIFICATION_RETENTION_DAYS:-}
+      ACTIVITY_RETENTION_DAYS: ${ACTIVITY_RETENTION_DAYS:-}
+      INVITATION_RETENTION_DAYS: ${INVITATION_RETENTION_DAYS:-}
+      # Comma-separated addresses allowed on the instance-wide routes (the activation funnel
+      # and the GDPR erasure endpoint, docs/api-conventions.md). Blank = nobody, and without
+      # this line nobody was the only possible answer on a Compose install.
+      INSTANCE_ADMIN_EMAILS: ${INSTANCE_ADMIN_EMAILS:-}
+      # Outbound telemetry, off unless an operator opts in; see
+      # docs/development.md#activation-funnel-and-telemetry. Blank = off and no endpoint, so
+      # an install that never touches these sends nothing, exactly as before they were passed.
+      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-}
+      TELEMETRY_ENDPOINT: ${TELEMETRY_ENDPOINT:-}
+      TELEMETRY_TIMEOUT_MS: ${TELEMETRY_TIMEOUT_MS:-}
       # The demo instance. Off everywhere by default, and one variable rather than a set of
       # them so an operator cannot get half of it: `true` shows the "this data disappears"
       # banner, routes all outbound mail to the log whatever SMTP says, refuses account and
@@ -589,11 +632,23 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env — see docs/development.md#environment-variables}
       BETTER_AUTH_URL: ${SITE_URL:-http://localhost}
       WEB_URL: ${SITE_URL:-http://localhost}
-      # Both checks the reset makes before deleting anything. `DEMO_MODE` has no default here
-      # on purpose: every other service in this file defaults it to `false`, and a container
-      # whose whole job is to empty a database should not inherit a default either way.
-      DEMO_MODE: ${DEMO_MODE:?set DEMO_MODE=true in .env to run the demo profile, see docs/self-hosting.md#demo-instance}
-      DEMO_PASSWORD: ${DEMO_PASSWORD:?set DEMO_PASSWORD in .env, it is the published password for the demo account, see docs/self-hosting.md#demo-instance}
+      # Both checks the reset makes before deleting anything. Blank defaults (`:-`), not the
+      # required form (`:?`), and the difference is not cosmetic: Compose interpolates the whole
+      # file before it filters services by profile, so a `:?` on these two lines aborted every
+      # plain `docker compose pull`/`up -d`/`config` with the shipped `.env.example` (both keys
+      # blank), on an install that never asked for a demo, with a message telling that operator
+      # to set DEMO_MODE=true. To run the demo profile, set DEMO_MODE=true and DEMO_PASSWORD in
+      # .env (docs/self-hosting.md#demo-instance). Leaving either blank is refused at runtime,
+      # where it can be logged, rather than at parse time: `reset-guard.ts`
+      # (`assertDemoResetAllowed`) exits on any DEMO_MODE other than true, and `reset.ts` exits
+      # on a blank DEMO_PASSWORD or one shorter than 8 characters, so
+      # `docker compose --profile demo logs demo-reset` shows "Refusing to reset" instead of
+      # Compose refusing the file.
+      # Still no `false` here, unlike `api` above: an empty value is refused exactly as `false`
+      # is, and a container whose whole job is to empty a database should not carry a default
+      # either way.
+      DEMO_MODE: ${DEMO_MODE:-}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
       DEMO_RESET_INTERVAL_MINUTES: ${DEMO_RESET_INTERVAL_MINUTES:-60}
       # No REDIS_URL, and that is the decision rather than an omission: nothing this script does
       # touches Redis, and Better Auth would build a rate-limit client at module load for a
