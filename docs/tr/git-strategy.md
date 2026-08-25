@@ -231,7 +231,7 @@ Release'ler `develop`'tan bir `release/*` branch'i üzerinden kesilir. Versiyonl
 git switch develop && git pull
 git switch -c release/0.2.0
 
-# 2. Her package.json'da versiyonu bump'la (kök, apps/*, packages/*)
+# 2. Her package.json'da versiyonu bump'la (kök, apps/*, packages/*, e2e)
 #    ve CHANGELOG.md'yi finalize et: [Unreleased]'i [0.2.0] - YYYY-MM-DD olarak yeniden adlandır,
 #    en üste yeni bir boş [Unreleased] bölümü ekle.
 git commit -am "chore(release): 0.2.0"

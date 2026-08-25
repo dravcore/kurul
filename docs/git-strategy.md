@@ -225,7 +225,7 @@ Releases are cut from `develop` through a `release/*` branch. Versions follow
 git switch develop && git pull
 git switch -c release/0.2.0
 
-# 2. Bump the version in every package.json (root, apps/*, packages/*)
+# 2. Bump the version in every package.json (root, apps/*, packages/*, e2e)
 #    and finalize CHANGELOG.md: rename [Unreleased] to [0.2.0] - YYYY-MM-DD,
 #    add a fresh empty [Unreleased] section on top.
 git commit -am "chore(release): 0.2.0"
