@@ -20,9 +20,10 @@
 #
 # Usage:
 #   backup.sh          # loop forever: dump, archive, prune, sleep BACKUP_INTERVAL, repeat.
-#                      # The first pass is skipped when a dump younger than BACKUP_INTERVAL/2
-#                      # already exists, so a container restart is not a backup cycle (see the
-#                      # main loop at the bottom)
+#                      # The first pass's dump is skipped when one younger than BACKUP_INTERVAL/2
+#                      # already exists, so a container restart does not spend a retention slot;
+#                      # the files archive and the off-host push still catch up on that same
+#                      # pass if either is missing or stale (see the main loop at the bottom)
 #   backup.sh once     # take exactly one of each, prune, exit (manual/ad-hoc backup, and what
 #                      # the restore drill in docs/development.md uses). Never skipped: an
 #                      # operator asking for a dump gets a dump
@@ -196,16 +197,28 @@ prune() {
   prune_pattern "kurul-*-files.tar.gz"
 }
 
+# Path to the newest kurul-*.dump by NAME, or empty when none exists. Same sort
+# prune_pattern() trusts, not `ls -t`: names are ISO-8601 basic UTC, so a reverse lexicographic
+# sort is a reverse chronological sort.
+newest_dump_path() {
+  ls -1 "$BACKUP_DIR"/kurul-*.dump 2>/dev/null | sort -r | head -n 1
+}
+
+# mtime of $1 in epoch seconds, or fails when the file is missing or the mtime cannot be read.
+# `stat -c %Y` is GNU and BusyBox (postgres:18-alpine, where this runs), `stat -f %m` is BSD,
+# which is what the test suite meets on a macOS laptop.
+file_mtime() {
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
+}
+
 # Seconds since the newest finished dump was written; fails when there is none, or when the
 # mtime cannot be read, and the caller then takes a dump, i.e. behaves as this script always
-# did. Newest by NAME, the same sort prune_pattern() trusts, not `ls -t`. The mtime rather than
-# the timestamp in the name because parsing that back into seconds is a different `date` on
-# every libc; `stat -c %Y` is GNU and BusyBox (postgres:18-alpine, where this runs), `stat -f %m`
-# is BSD, which is what the test suite meets on a macOS laptop.
+# did. The mtime rather than the timestamp in the name because parsing that back into seconds
+# is a different `date` on every libc.
 newest_dump_age() {
-  newest=$(ls -1 "$BACKUP_DIR"/kurul-*.dump 2>/dev/null | sort -r | head -n 1)
+  newest=$(newest_dump_path)
   [ -n "$newest" ] || return 1
-  mtime=$(stat -c %Y "$newest" 2>/dev/null || stat -f %m "$newest" 2>/dev/null) || return 1
+  mtime=$(file_mtime "$newest") || return 1
   [ -n "$mtime" ] || return 1
   echo $(($(date +%s) - mtime))
 }
@@ -389,18 +402,55 @@ trap 'log "stopping"; exit 0' INT TERM
 # entry every time. Retention is a COUNT (prune() keeps the newest BACKUP_KEEP by name, with no
 # age check), so each of those pairs pushed the oldest one out: a day of restarts left a week's
 # worth of slots holding dumps of the same day and no yesterday. So when a dump younger than
-# half an interval already exists the first pass is skipped, and the sleep before the next one
-# is only what is left of the interval, which keeps the cadence, the RPO the docs promise and the
-# API's BACKUP_KEEP × BACKUP_INTERVAL orphan-sweep window exactly what they were before the
-# restart. Half, not a whole interval: a dump older than that is nearer the next scheduled one
-# than the last, and taking it now buys a fresher recovery point for the slot it costs. The
-# `once` mode above is unconditional on purpose, see its usage note.
+# half an interval already exists take_dump alone is skipped, and the sleep before the next
+# scheduled cycle is only what is left of the interval, which keeps the cadence, the RPO the
+# docs promise and the API's BACKUP_KEEP × BACKUP_INTERVAL orphan-sweep window exactly what they
+# were before the restart. Half, not a whole interval: a dump older than that is nearer the next
+# scheduled one than the last, and taking it now buys a fresher recovery point for the slot it
+# costs. The `once` mode above is unconditional on purpose, see its usage note.
+#
+# take_dump alone, not the whole cycle: a restart that follows a FIX rather than a reboot (the
+# attachments mount was remounted, the rclone credentials were corrected) must not have to wait
+# out a full BACKUP_INTERVAL just because the dump half of the last cycle already succeeded.
+# take_files still runs below when the files archive matching the newest dump's own timestamp is
+# missing, and push_remote still runs when BACKUP_REMOTE is set and the off-host stamp is
+# missing or older than that dump. Each of the three decisions logs its own line.
 #
 # A very first boot has no dump and takes one immediately, which is the case the backup
 # healthcheck's `start_period` in docker-compose.yml is sized for.
+newest=$(newest_dump_path)
 age=$(newest_dump_age) || age=""
 if [ -n "$age" ] && [ "$age" -ge 0 ] && [ "$age" -lt $((BACKUP_INTERVAL / 2)) ]; then
   log "skipping the boot-time cycle: the newest dump is ${age}s old, next cycle in $((BACKUP_INTERVAL - age))s"
+
+  # Same stamp the dump was written with, so a retaken files archive lands beside it under the
+  # name a restore expects instead of under a fresh one next to a now-unmatched dump.
+  newest_name=${newest##*/}
+  boot_stamp=${newest_name#kurul-}
+  boot_stamp=${boot_stamp%.dump}
+
+  if [ -n "$ATTACHMENT_DIR" ]; then
+    if [ -e "$BACKUP_DIR/kurul-$boot_stamp-files.tar.gz" ]; then
+      log "boot: files archive for $boot_stamp already exists, leaving it"
+    else
+      log "boot: files archive for $boot_stamp is missing, taking it now"
+      take_files "$boot_stamp" || true
+    fi
+  fi
+
+  if [ -n "$BACKUP_REMOTE" ]; then
+    dump_mtime=$(file_mtime "$newest") || dump_mtime=""
+    stamp_mtime=$(file_mtime "$REMOTE_STAMP") || stamp_mtime=""
+    if [ -z "$stamp_mtime" ] || { [ -n "$dump_mtime" ] && [ "$stamp_mtime" -lt "$dump_mtime" ]; }; then
+      log "boot: off-host stamp is missing or older than $boot_stamp, pushing now"
+      push_remote "$boot_stamp" || true
+    else
+      log "boot: off-host stamp already covers $boot_stamp, not pushing again"
+    fi
+  fi
+
+  prune
+
   sleep "$((BACKUP_INTERVAL - age))" &
   wait $!
 fi
