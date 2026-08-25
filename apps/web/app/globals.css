@@ -5,6 +5,16 @@
    is language-agnostic and would otherwise treat prose like `bg-[url(...)]` as a real candidate. */
 @source not "../**/*.test.{ts,tsx}";
 
+/* next-themes writes the theme onto the document as a class (components/layout/theme-provider.tsx
+   passes `attribute="class"`) and every token below is declared on `.dark`. Tailwind's own `dark:`
+   variant defaults to `@media (prefers-color-scheme: dark)`, which reports the operating system's
+   preference and not this app's theme, so without this line a `dark:` utility and the `.dark`
+   tokens it was written against disagree for anyone whose chosen theme differs from their OS:
+   `dark:bg-destructive/60` thins a light-theme button to 3.02:1 under its white label, and a
+   dark-theme one keeps the full fill at 3.11:1. app/globals-css-layers.test.ts compiles the sheet
+   and checks which selector the variant actually emits. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Kurul design tokens — values from docs/design.md §3 (Phase 3 validated). */
 
 :root {

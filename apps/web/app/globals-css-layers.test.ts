@@ -290,6 +290,7 @@ beforeAll(async () => {
     ...Object.keys(borderUtilities),
     ...Object.keys(stateVariants),
     'divide-border',
+    'dark:bg-accent',
   ]);
   sheet = parseStylesheet(css);
 }, 30_000);
@@ -396,6 +397,22 @@ describe('globals.css cascade layers', () => {
       expect(rule.declarations).toContainEqual({ property: 'color-scheme', value: scheme });
     },
   );
+
+  // The theme is a class (`attribute="class"` in components/layout/theme-provider.tsx) and every
+  // dark token is declared on `.dark`, but Tailwind's stock `dark:` variant is
+  // `@media (prefers-color-scheme: dark)`. Left at the default the two disagree for any reader
+  // whose chosen theme differs from their OS, and the disagreement is measurable: the eight
+  // `dark:` utilities in components/ui/ then paint a light-theme surface with dark-theme alpha
+  // (`dark:bg-destructive/60` under `text-white` lands at 3.02:1) or leave a dark-theme surface
+  // with the light-theme rule (`bg-destructive` at 3.11:1). app/globals.contrast.test.ts measures
+  // each theme as its own token set, which is only the truth while this variant follows the class.
+  it('binds the dark variant to the theme class rather than the OS preference', () => {
+    const rule = requireRule(sheet, 'a compiled `dark:bg-accent` rule', (candidate) => {
+      return candidate.selector.startsWith(escapeClass('dark:bg-accent'));
+    });
+    expect(rule.selector).toContain('.dark');
+    expect(css).not.toContain('prefers-color-scheme');
+  });
 });
 
 /**
