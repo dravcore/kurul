@@ -448,6 +448,20 @@ for (const theme of THEMES) {
       expect(failures).toEqual([]);
     });
 
+    // components/notification/notification-bell.tsx paints its unread badge `bg-foreground
+    // text-background`, which neither SURFACES nor TEXT_TOKENS covers: `--foreground` is a text
+    // token everywhere else in this file and never a ground. A single dedicated pair rather than
+    // widening either array, because adding `--foreground` to SURFACES would ask every other
+    // text and boundary token to clear AA against ink as a ground too, which is not a pairing
+    // anything else in the tree paints.
+    it('holds --background against --foreground at 4.5:1 (the unread badge)', () => {
+      const ratio = round(
+        contrastRatio(hexOf(theme, '--background'), hexOf(theme, '--foreground')),
+        2,
+      );
+      expect(ratio).toBeGreaterThanOrEqual(AA_TEXT);
+    });
+
     // `--destructive-hover` carries the button's literal `text-white`, not the
     // `--destructive-foreground` token: the button never reads that token in dark mode (see
     // `RAW_COLOUR_CALL_SITES` below), so `text-white` is what the hover actually paints under.
