@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { AppSidebar } from './app-sidebar';
 import { DemoBanner } from './demo-banner';
 import { useWorkspaceContext, WorkspaceProvider } from './workspace-provider';
+import { NotificationUnreadProvider } from '@/components/notification/notification-unread-provider';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -113,8 +114,14 @@ export function AppShell({
   children: React.ReactNode;
 }>): React.ReactElement {
   return (
+    /* The unread count is mounted here, above both surfaces that read it: the bell renders
+       inside `AppSidebar` and the notifications page inside `main`, so this is the lowest node
+       that contains both. It sits under `WorkspaceProvider` because the count is scoped to the
+       active workspace, which is what that provider resolves. */
     <WorkspaceProvider>
-      <AppShellFrame>{children}</AppShellFrame>
+      <NotificationUnreadProvider>
+        <AppShellFrame>{children}</AppShellFrame>
+      </NotificationUnreadProvider>
     </WorkspaceProvider>
   );
 }

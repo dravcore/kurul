@@ -22,9 +22,10 @@ export type NotificationSocketHandlers = {
 /**
  * How many mounted hooks hold each workspace's notification room.
  *
- * The bell lives in the app shell and the notifications page mounts inside it, so both
- * subscribe to the same room. Without a count, navigating away from the page would emit a
- * leave that also unsubscribes the bell — which would then sit there, silent, looking correct.
+ * The shell's unread provider (which feeds the bell) and the notifications page that mounts
+ * inside it both subscribe to the same room. Without a count, navigating away from the page
+ * would emit a leave that also unsubscribes the badge, which would then sit there, silent,
+ * looking correct.
  * Module scope is the right scope: `lib/socket.ts` hands out one socket per tab, and rooms are
  * a property of that socket, not of a component.
  */

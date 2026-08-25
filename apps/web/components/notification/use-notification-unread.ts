@@ -21,7 +21,7 @@ export interface UseNotificationUnreadOptions {
   enabled: boolean;
   /** The notification room is joined, so the count arrives by push and needs no timer. */
   connected: boolean;
-  /** Bumped by the bell when the socket says the count moved. */
+  /** Bumped by the provider when the socket says the count moved. */
   refreshKey: number;
 }
 
@@ -36,13 +36,14 @@ export interface NotificationUnread {
  *
  * Owns one number and everything that keeps it honest: the read itself, the refresh a dropped
  * room calls for, and the fallback poll that covers a socket that never comes back. The count
- * is deliberately kept when a refresh fails — a badge has nowhere to print "this failed", so
- * blanking it to zero would say "nothing unread", which is the one thing it must not say
- * wrongly.
+ * is deliberately kept when a refresh fails, because a badge has nowhere to print "this
+ * failed": blanking it to zero would say "nothing unread", which is the one thing it must not
+ * say wrongly.
  *
- * The socket lives in the bell, not here: it also drives the dropdown's rows, and two
- * subscriptions to the same room would double every join. So `connected` and `refreshKey`
- * arrive as props — the room's state and its signal, respectively.
+ * Called once, by `NotificationUnreadProvider`, which is also where the socket lives: the same
+ * room drives the bell's dropdown rows, and two subscriptions to it would double every join.
+ * So `connected` and `refreshKey` arrive as props, the room's state and its signal
+ * respectively.
  */
 export function useNotificationUnread({
   workspaceId,
