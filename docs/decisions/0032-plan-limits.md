@@ -75,8 +75,10 @@ keys are `seats`, `boards`, `storageBytes`. Resolution is override, then instanc
 then unlimited.
 
 **Enforcement is at the write, one refusal shape.** Board creation checks inside the transaction
-that inserts the board. Workspace creation, invitation, acceptance and sign-up check immediately
-before the write they guard. Each refuses with `403` and:
+that inserts the board, and so does the Trello importer (`POST .../imports/trello`), the other
+route that adds a board: the check is the first statement of its transaction, so a refused import
+writes nothing. Workspace creation, invitation, acceptance and sign-up check immediately before
+the write they guard. Each refuses with `403` and:
 
 ```jsonc
 {

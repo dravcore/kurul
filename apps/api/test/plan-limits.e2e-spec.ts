@@ -1,7 +1,8 @@
 import { INestApplication } from '@nestjs/common';
+import { join } from 'node:path';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { MemberRole, PLAN_LIMIT_ERROR, PlanLimitCode } from '@kurul/shared-types';
+import { ActivityType, MemberRole, PLAN_LIMIT_ERROR, PlanLimitCode } from '@kurul/shared-types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PLAN_LIMIT_ENV } from '../src/plan/plan-limits';
 import { createTestApp } from './helpers/app';
@@ -112,6 +113,51 @@ describe('Plan limits (e2e)', () => {
       await expect(prisma.board.count({ where: { workspaceId: workspace.id } })).resolves.toBe(1);
       // The board's columns are part of the same transaction, so a refused create leaves none.
       await expect(prisma.column.count()).resolves.toBe(defaultColumnCountOf(1));
+    });
+
+    /**
+     * The importer is the other route that adds a board, and it creates one by a different
+     * call (`tx.board.create` in `TrelloImportService`, not `BoardService.create`), so a ceiling
+     * enforced on `POST .../boards` alone would be a ceiling any admin with a small export
+     * could step over. The same `403`, the same `planLimit`, and a database the refused import
+     * never touched: no board, no columns beyond the first board's own, no tasks and no
+     * `board.imported` activity row.
+     */
+    it('refuses a Trello import at the ceiling with the same 403, and writes nothing', async () => {
+      const owner = await signUp(app, { name: 'Import Owner' });
+      const workspace = await createWorkspace(owner.agent, 'Imports', 'boards-import');
+      setLimit(PLAN_LIMIT_ENV.boardsPerWorkspace, 1);
+
+      await owner.agent
+        .post(`/workspaces/${workspace.id}/boards`)
+        .send({ name: 'First' })
+        .expect(201);
+
+      const refused = await owner.agent
+        .post(`/workspaces/${workspace.id}/imports/trello`)
+        .attach('file', TRELLO_FIXTURE, 'trello.json')
+        .expect(403);
+
+      expect(refused.body).toMatchObject({
+        statusCode: 403,
+        error: PLAN_LIMIT_ERROR,
+        planLimit: { code: PlanLimitCode.Boards, limit: 1, current: 1 },
+      });
+      await expect(prisma.board.count({ where: { workspaceId: workspace.id } })).resolves.toBe(1);
+      await expect(prisma.column.count()).resolves.toBe(defaultColumnCountOf(1));
+      await expect(prisma.task.count()).resolves.toBe(0);
+      await expect(prisma.attachment.count()).resolves.toBe(0);
+      await expect(
+        prisma.activity.count({ where: { type: ActivityType.BoardImported } }),
+      ).resolves.toBe(0);
+
+      // The control: one more board of room, and the same export goes through the same route.
+      setLimit(PLAN_LIMIT_ENV.boardsPerWorkspace, 2);
+      await owner.agent
+        .post(`/workspaces/${workspace.id}/imports/trello`)
+        .attach('file', TRELLO_FIXTURE, 'trello.json')
+        .expect(201);
+      await expect(prisma.board.count({ where: { workspaceId: workspace.id } })).resolves.toBe(2);
     });
 
     it('counts each workspace on its own', async () => {
@@ -360,6 +406,9 @@ describe('Plan limits (e2e)', () => {
 });
 
 /** Every board seeds the same default columns, so a board count implies a column count. */
+/** A small, valid Trello export; what it holds is `trello-import.e2e-spec.ts`'s business. */
+const TRELLO_FIXTURE = join(__dirname, 'fixtures', 'trello', 'synthetic-full-board.json');
+
 function defaultColumnCountOf(boards: number): number {
   return boards * 3;
 }

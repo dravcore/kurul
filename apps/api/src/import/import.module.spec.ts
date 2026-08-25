@@ -100,4 +100,15 @@ describe('ImportModule multipart configuration', () => {
     // The control half: the read finds the modules that *are* imported.
     expect(named).toContain('ActivityModule');
   });
+
+  it('imports the plan layer, because an import is a board create by another route', () => {
+    // ADR 0032: the board ceiling is enforced at every write that adds a board, and this module
+    // owns one of the two. Dropping `PlanModule` here would make `TrelloImportService` fail to
+    // resolve at boot, but this assertion names the reason rather than leaving it to a DI error.
+    const named = importedModules().map((entry) =>
+      typeof entry === 'function' ? entry.name : ((entry as DynamicModule).module?.name ?? ''),
+    );
+
+    expect(named).toContain('PlanModule');
+  });
 });

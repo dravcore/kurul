@@ -929,7 +929,7 @@ kural:
 
 | Yol            | Nereye   | Prefix                | Azami istek gövdesi          |
 | -------------- | -------- | --------------------- | ---------------------------- |
-| `/auth/*`      | api:4000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
+| `/auth/*`      | api:4000 | olduğu gibi korunur   | **64 KiB** (`65536` bayt)    |
 | `/api/*`       | api:4000 | `/api` **kaldırılır** | **26 MiB** (`27262976` bayt) |
 | geri kalan her | web:3000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
 
@@ -976,6 +976,32 @@ koymaz — pakete dahil `docker/Caddyfile`'ın limiti açıkça yazmasının seb
 `client_max_body_size` için **1 MB** varsayar; yani satırı atlayan bir yedek proxy, bir
 megabayttan büyük her eki reddeder.
 
+#### `/auth/*` neden kendi tavanına sahip ve neden 64 KiB
+
+Kural 1 de bir limit taşır, hem de çok daha küçüğünü. Better Auth ham istek akışını kendisi
+okur; diğer bütün rotalarda `REQUEST_BODY_MAX_BYTES`'ı uygulayan parser'ların altındadır,
+dolayısıyla o tavan `/auth/*` için hiç geçerli olmadı: bir `POST /auth/sign-in/email` hangi
+boyutta olursa olsun sonuna kadar okunuyordu ve yerleşik deneme bütçesi (sign-in, sign-up ve
+change-password'de IP ve yol başına 10 saniyede 3, diğer auth rotalarında dakikada 100) baytı
+değil isteği sayar. Bu rotaların aldığı her gövde birkaç yüz baytlık bir JSON nesnesidir; 64 KiB
+bunun iki büyüklük mertebesi üstünde bir pay bırakır.
+
+API aynı sayıyı `AUTH_BODY_MAX_BYTES` olarak uygular (`65536`; bir ortam değişkeni değil,
+`apps/api/src/auth/auth-body-limit.ts` içindeki bir sabit): bunun üstünde bir `Content-Length`
+bildiren istek, gövdesinden tek bayt okunmadan `Request body is too large` yazan `413` zarfıyla
+cevaplanır. Burada proxy ile API, yukarıdaki çiftin aksine, **eşit olabilir**: bir auth
+gövdesinin multipart zarfı yoktur, iki katman aynı baytları sayar ve sıralama kuralı eşitlikte de
+geçerlidir.
+
+`Content-Length` olmadan gönderilen bir gövde (chunked transfer encoding; bir tarayıcı JSON
+gövdesi için bunu hiç kullanmaz) iki katmanın farklı cevapladığı tek durumdur. Onu bir status
+koduyla sınırlayan katman proxy'dir: `request_body max_size` gövdeyi aynı 64 KiB'ta keser. API,
+Better Auth'a akıtmakta olduğu bir gövdeye cevap veremez; bu yüzden baytları geldikçe sayar ve
+tavan aşılınca bağlantıyı kapatır. Bu, proxy'siz açığa çıkarılmış bir instance'ı da sınırlı
+tutar, ama `413` yerine kopan bir bağlantıyla. Proxy'nin isteğe bağlı bir ek değil, varsayılan
+stack'in parçası olmasının bir sebebi daha budur. `apps/api/src/storage/two-layer-limit.spec.ts`
+Caddyfile'daki sayıyı, aşağıdaki nginx satırını ve API sabitini birbirine sabitler.
+
 ### 413'leri birbirinden ayırmak
 
 Her iki katman da boyutu aşan bir yüklemeye `413` ile cevap verir — ve yüklemelerle hiç ilgisi
@@ -996,8 +1022,10 @@ API'ninki neden 25" bölümüne bakın).
 
 Üçüncü satır, aynı status kodunu paylaşan başka bir limittir: `REQUEST_BODY_MAX_BYTES`
 (varsayılan `1048576`, 1 MiB) diğer bütün uçların aldığı **JSON ve form-encoded** gövdeleri
-sınırlar ve hiçbir attachment oradan geçmez. Bunu görüyorsanız ne storage'ınızda ne proxy'nizde
-yanlış bir şey var; bir istek yalnızca API'nin kabul ettiğinden fazla JSON göndermiştir.
+sınırlar ve hiçbir attachment oradan geçmez. Aynı cümle `/auth/` ile başlayan bir `path` altında
+geliyorsa limit, daha küçük olan `AUTH_BODY_MAX_BYTES`'tır (64 KiB); yukarıdaki kural 1'e bakın.
+İkisinden birini görüyorsanız ne storage'ınızda ne proxy'nizde yanlış bir şey var; bir istek
+yalnızca API'nin kabul ettiğinden fazla JSON göndermiştir.
 
 Dördüncü satır ise başka bir başarısızlıktır: dosya `ATTACHMENT_MAX_BYTES`'ın altındadır, ama onu
 saklamak bir workspace'i ya da instance'ı kendi kotasının üzerine çıkarır. Boyutlandırma için
@@ -1039,7 +1067,12 @@ gönderdiği doğrulama linklerinde aynı dize olmak zorundadır. API'nin geri k
 mount edilmiştir ve prefix girişte kaldırılır. nginx'te:
 
 ```nginx
-location /auth/ { proxy_pass http://api:4000;  }   # sondaki slash yok → yol korunur
+location /auth/ {
+  proxy_pass http://api:4000;                      # sondaki slash yok → yol korunur
+  client_max_body_size 64k;                        # AUTH_BODY_MAX_BYTES'a (64 KiB) EŞİT: auth
+                                                   # gövdesinin multipart zarfı yok, iki katman
+                                                   # aynı baytları sayar.
+}
 location /api/  {
   proxy_pass http://api:4000/;                     # sondaki slash var → /api kaldırılır
   client_max_body_size 26m;                        # ATTACHMENT_MAX_BYTES'ın (25 MiB) ÜSTÜNDE,
