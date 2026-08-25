@@ -114,22 +114,57 @@ const createButton = (): HTMLButtonElement =>
   screen.getByRole('button', { name: 'Create board' }) as HTMLButtonElement;
 const radio = (name: string): HTMLInputElement =>
   screen.getByRole('radio', { name: new RegExp(name) }) as HTMLInputElement;
+const changeTemplateButton = (): HTMLButtonElement =>
+  screen.getByRole('button', { name: 'Change template' }) as HTMLButtonElement;
+
+/** Opens the disclosure and waits for the card list it reveals. */
+async function expandTemplates(): Promise<void> {
+  fireEvent.click(await screen.findByRole('button', { name: 'Change template' }));
+  await waitFor(() => expect(screen.getAllByRole('radio')).toHaveLength(2));
+}
 
 describe('CreateBoardDialog', () => {
-  it('renders one option per template, with its columns and label preset', async () => {
+  it('opens on name, description and a single-line disclosure, the template list hidden', async () => {
     renderDialog();
 
-    await waitFor(() => expect(screen.getAllByRole('radio')).toHaveLength(2));
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+    expect(changeTemplateButton().getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+  });
+
+  it('creates a board on the catalog default with the picker left collapsed', async () => {
+    const { onCreated } = renderDialog();
+
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+    fireEvent.change(nameField(), { target: { value: 'Roadmap' } });
+    fireEvent.click(createButton());
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalled());
+    expect(apiPost).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/boards`, {
+      name: 'Roadmap',
+      description: null,
+      template: 'kanban',
+    });
+    expect(onCreated).toHaveBeenCalledWith(created);
+  });
+
+  it('reveals one option per template, with its columns and label preset, once expanded', async () => {
+    renderDialog();
+
+    await expandTemplates();
     expect(apiGet).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/board-templates`);
     expect(screen.getByText('To Do → In Progress → Done')).toBeTruthy();
     expect(screen.getByText('Feature')).toBeTruthy();
     expect(screen.getByText('Critical')).toBeTruthy();
+    // The disclosure is one-directional: expanding replaces it with the card list.
+    expect(screen.queryByRole('button', { name: 'Change template' })).toBeNull();
   });
 
   it('preselects whatever the API listed first, naming no slug of its own', async () => {
     renderDialog();
 
-    await waitFor(() => expect(radio('Kanban').checked).toBe(true));
+    await expandTemplates();
+    expect(radio('Kanban').checked).toBe(true);
     expect(radio('Bug Triage').checked).toBe(false);
   });
 
@@ -140,7 +175,7 @@ describe('CreateBoardDialog', () => {
    */
   it('moves the signature border to whichever template is selected', async () => {
     renderDialog();
-    await waitFor(() => expect(radio('Kanban').checked).toBe(true));
+    await expandTemplates();
 
     const cardOf = (name: string): Set<string> => {
       const label = radio(name).closest('label');
@@ -163,7 +198,7 @@ describe('CreateBoardDialog', () => {
   /** Focus is the other copper edge; it belongs to every card, selected or not. */
   it('keeps the focus edge on every template card', async () => {
     renderDialog();
-    await waitFor(() => expect(screen.getAllByRole('radio')).toHaveLength(2));
+    await expandTemplates();
 
     for (const name of ['Kanban', 'Bug Triage']) {
       const label = radio(name).closest('label');
@@ -174,7 +209,7 @@ describe('CreateBoardDialog', () => {
   it('sends the chosen template with the board', async () => {
     renderDialog();
 
-    await waitFor(() => expect(screen.getAllByRole('radio')).toHaveLength(2));
+    await expandTemplates();
     fireEvent.change(nameField(), { target: { value: '  Incoming  ' } });
     fireEvent.click(radio('Bug Triage'));
     fireEvent.click(createButton());
@@ -213,28 +248,40 @@ describe('CreateBoardDialog', () => {
     expect(onCreated).toHaveBeenCalledWith(created);
   });
 
-  it('reopens on the catalog’s default rather than on the last choice', async () => {
+  it('reopens collapsed, on the catalog’s default rather than on the last choice', async () => {
     const { rerender } = renderDialog();
 
-    await waitFor(() => expect(screen.getAllByRole('radio')).toHaveLength(2));
+    await expandTemplates();
     fireEvent.change(nameField(), { target: { value: 'First' } });
     fireEvent.click(radio('Bug Triage'));
     fireEvent.click(createButton());
-    await waitFor(() => expect(apiPost).toHaveBeenCalled());
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
 
     rerender(false);
     rerender(true);
 
+    // A fresh mount opens on the disclosure, collapsed, same as the first time.
+    await waitFor(() => expect(changeTemplateButton().getAttribute('aria-expanded')).toBe('false'));
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(nameField().value).toBe('');
+
     // The next board is a new decision. Inheriting the last one would quietly seed a triage
     // board for someone who opened the dialog to make an ordinary one.
-    await waitFor(() => expect(radio('Kanban').checked).toBe(true));
-    expect(nameField().value).toBe('');
+    fireEvent.change(nameField(), { target: { value: 'Second' } });
+    fireEvent.click(createButton());
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+    expect(apiPost).toHaveBeenLastCalledWith(`/workspaces/${WORKSPACE_ID}/boards`, {
+      name: 'Second',
+      description: null,
+      template: 'kanban',
+    });
   });
 
   it('refuses to create a board with no name, template or not', async () => {
     renderDialog();
 
-    await waitFor(() => expect(screen.getAllByRole('radio')).toHaveLength(2));
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
     fireEvent.change(nameField(), { target: { value: '   ' } });
 
     expect(createButton().disabled).toBe(true);

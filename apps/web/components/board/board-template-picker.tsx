@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import type { BoardTemplateDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { labelSlotClass } from '@/components/task/label-chip';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface BoardTemplatePickerProps {
@@ -26,6 +27,12 @@ interface BoardTemplatePickerProps {
  * Native radios inside a `<fieldset>`, not a custom widget: arrow-key roving, the label/input
  * association and the group name in a screen reader all come free, and every one of them is
  * something a div-with-`role` has to reimplement.
+ *
+ * The fieldset itself starts behind a "Change template" disclosure. The catalog's first entry
+ * is already selected by the time anyone can see this (the effect below picks it silently), so
+ * the dialog opens on name, description and one line of text instead of four full-height
+ * template cards. Expanding is one-directional: once the fieldset is revealed it is exactly the
+ * card list this component always rendered, with nothing new added above it to collapse again.
  */
 export function BoardTemplatePicker({
   workspaceId,
@@ -35,6 +42,7 @@ export function BoardTemplatePicker({
   const t = useTranslations('app.board');
   const [templates, setTemplates] = useState<BoardTemplateDto[]>([]);
   const [failed, setFailed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -76,6 +84,21 @@ export function BoardTemplatePicker({
     );
   }
   if (templates.length === 0) return null;
+
+  if (!expanded) {
+    return (
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        className="h-auto self-start p-0"
+        aria-expanded={false}
+        onClick={() => setExpanded(true)}
+      >
+        {t('changeTemplate')}
+      </Button>
+    );
+  }
 
   return (
     <fieldset className="flex flex-col gap-1.5">
