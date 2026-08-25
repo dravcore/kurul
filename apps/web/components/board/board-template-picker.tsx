@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslations } from 'next-intl';
 import type { BoardTemplateDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
@@ -33,6 +34,9 @@ interface BoardTemplatePickerProps {
  * the dialog opens on name, description and one line of text instead of four full-height
  * template cards. Expanding is one-directional: once the fieldset is revealed it is exactly the
  * card list this component always rendered, with nothing new added above it to collapse again.
+ * Expanding also unmounts the toggle button that carried keyboard focus, so the click handler
+ * hands focus to the first radio itself (`flushSync` + a ref) rather than letting the browser
+ * drop it and Radix's dialog focus-trap silently recapture it on an invisible target.
  */
 export function BoardTemplatePicker({
   workspaceId,
@@ -43,6 +47,7 @@ export function BoardTemplatePicker({
   const [templates, setTemplates] = useState<BoardTemplateDto[]>([]);
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const firstRadioRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let live = true;
@@ -93,7 +98,16 @@ export function BoardTemplatePicker({
         size="sm"
         className="h-auto self-start p-0"
         aria-expanded={false}
-        onClick={() => setExpanded(true)}
+        onClick={() => {
+          // The fieldset mounts in the same render that unmounts this button, so a plain
+          // `setExpanded(true)` leaves nothing focused: the browser drops `activeElement` to
+          // `<body>` the instant this button is removed, and Radix's FocusScope (this dialog
+          // traps focus) reacts to exactly that by focusing its own content wrapper, which is
+          // `outline-none` — an invisible focus target. `flushSync` forces the fieldset to exist
+          // before that fallback can run, so the explicit `.focus()` below wins the race instead.
+          flushSync(() => setExpanded(true));
+          firstRadioRef.current?.focus();
+        }}
       >
         {t('changeTemplate')}
       </Button>
@@ -104,7 +118,7 @@ export function BoardTemplatePicker({
     <fieldset className="flex flex-col gap-1.5">
       <legend className="mb-1.5 text-small font-medium text-foreground">{t('template')}</legend>
       <div className="flex flex-col gap-1.5">
-        {templates.map((template) => (
+        {templates.map((template, index) => (
           <label
             key={template.slug}
             className={cn(
@@ -119,6 +133,7 @@ export function BoardTemplatePicker({
             )}
           >
             <input
+              ref={index === 0 ? firstRadioRef : undefined}
               type="radio"
               name="board-template"
               className="mt-0.5 accent-primary"

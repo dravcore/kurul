@@ -160,6 +160,19 @@ describe('CreateBoardDialog', () => {
     expect(screen.queryByRole('button', { name: 'Change template' })).toBeNull();
   });
 
+  it('hands keyboard focus to the first template when the disclosure expands', async () => {
+    renderDialog();
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+    fireEvent.click(changeTemplateButton());
+
+    await waitFor(() => expect(screen.getAllByRole('radio')).toHaveLength(2));
+    // The toggle button that carried focus is gone the instant the fieldset mounts; a keyboard
+    // user pressing Enter on it must not be left on `document.body` (which the dialog's Radix
+    // focus trap would otherwise silently recapture onto an `outline-none`, invisible target).
+    expect(document.activeElement).toBe(radio('Kanban'));
+  });
+
   it('preselects whatever the API listed first, naming no slug of its own', async () => {
     renderDialog();
 
