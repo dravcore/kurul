@@ -308,8 +308,9 @@ field leaves it untouched; sending `null` explicitly clears a nullable field.
 
 **Cross-workspace access returns `404`, not `403`.** A `403` would confirm that the resource
 exists, which leaks information across the tenant boundary. `403` is reserved for a
-legitimate member whose role is too low, and for the plan ceilings below, which the envelope's
-`error` field tells apart.
+legitimate member whose role is too low, for the plan ceilings below, for a closed registration
+(`SIGNUP_ENABLED=false`) and for the actions a demo instance refuses (`DEMO_MODE=true`), which
+the envelope's `error` field tells apart.
 
 ### Plan limits
 

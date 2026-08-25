@@ -314,8 +314,9 @@ nullable bir alanı temizler.
 
 **Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
 doğrulardı, ki bu tenant sınırının ötesine bilgi sızdırır. `403`, rolü çok düşük meşru bir
-üye için, ve zarfın `error` alanının birbirinden ayırdığı, aşağıdaki plan tavanları için
-ayrılmıştır.
+üye için, aşağıdaki plan tavanları için, kapalı kayıt (`SIGNUP_ENABLED=false`) için ve bir demo
+instance'ın reddettiği eylemler (`DEMO_MODE=true`) için ayrılmıştır; zarfın `error` alanı
+bunları birbirinden ayırır.
 
 ### Plan limitleri
 

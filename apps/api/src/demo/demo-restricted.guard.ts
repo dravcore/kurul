@@ -11,12 +11,14 @@ export const DEMO_RESTRICTED_MESSAGE =
 /**
  * Refuses an action that a public demo cannot afford to let a stranger take.
  *
- * The list is deliberately three routes long: two Nest routes this guard is attached to,
- * `DELETE /me` and `DELETE /workspaces/:workspaceId`, and one Better Auth route,
+ * The list is deliberately three reachable routes long: two Nest routes this guard is attached
+ * to, `DELETE /me` and `DELETE /workspaces/:workspaceId`, and one Better Auth route,
  * `POST /auth/change-password`, refused in `mountBetterAuth` (`auth/mount-better-auth.ts`)
- * because `/auth/*` is served by Express below the Nest router and no guard can see it. All
- * three are on the list for the same reason, which is worth stating so the list does not grow
- * by vibes:
+ * because `/auth/*` is served by Express below the Nest router and no guard can see it.
+ * `DEMO_RESTRICTED_AUTH_PATHS` holds a fourth path, `/auth/change-email`, which no instance can
+ * reach today and which is there only so it cannot be opened by accident (see below). All three
+ * reachable ones are on the list for the same reason, which is worth stating so the list does
+ * not grow by vibes:
  *
  * > **They destroy something a *different* visitor is using, and the hourly reset is not a
  * > recovery path for the person it happened to.**
