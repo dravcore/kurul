@@ -286,6 +286,16 @@ body {
   font-family: var(--font-mono);
 }
 
+@layer components {
+  /* Dialed to the carved 40pt cut only on the `display` step, not on `.font-display` itself:
+     the wordmark (sidebar-body.tsx) sets that family at 16px, and forcing this axis on the
+     family utility would draw it with the display step's strokes instead of the low-optical-size
+     cut it needs at that size (docs/design.md §3). */
+  .text-display {
+    font-variation-settings: 'opsz' 40;
+  }
+}
+
 /* The whole keyboard baseline, in one place: 2px `--ring` at 2px offset (docs/design.md §5).
    Inside `base` like the `*` rule above, which is only correct because no keyboard-reachable
    control carries a focus ring or an outline suppressor of its own any more. Every

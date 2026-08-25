@@ -523,6 +523,31 @@ describe('globals.css cascade layers', () => {
   // (`dark:bg-destructive/60` under `text-white` lands at 3.02:1) or leave a dark-theme surface
   // with the light-theme rule (`bg-destructive` at 3.11:1). app/globals.contrast.test.ts measures
   // each theme as its own token set, which is only the truth while this variant follows the class.
+  // `.font-display` sets the family on every allowed context, including the 16px sidebar
+  // wordmark (docs/design.md §3), where the display cut's carved strokes would read as
+  // hairline. Only the 40/44 `display` step is meant to draw with that cut, so the axis lives
+  // on the size utility instead of the family one; a rule on `.font-display` would force the
+  // wordmark into the same 40pt cut it needs to stay clear of.
+  it('scopes the opsz axis to .text-display rather than .font-display', () => {
+    const textDisplay = requireRule(sheet, 'the .text-display opsz rule', (rule) => {
+      return rule.selector === '.text-display';
+    });
+    expect(textDisplay.layer).toBe('components');
+    expect(textDisplay.declarations).toContainEqual({
+      property: 'font-variation-settings',
+      value: "'opsz' 40",
+    });
+
+    const fontDisplay = requireRule(sheet, 'the .font-display font-family rule', (rule) => {
+      return rule.selector === '.font-display';
+    });
+    expect(
+      fontDisplay.declarations.some(
+        (declaration) => declaration.property === 'font-variation-settings',
+      ),
+    ).toBe(false);
+  });
+
   it('binds the dark variant to the theme class rather than the OS preference', () => {
     const rule = requireRule(sheet, 'a compiled `dark:bg-accent` rule', (candidate) => {
       return candidate.selector.startsWith(escapeClass('dark:bg-accent'));

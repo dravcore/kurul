@@ -6,13 +6,14 @@ const mocks = vi.hoisted(() => ({
   getMessages: vi.fn<() => Promise<Record<string, unknown>>>(),
   getTranslations: vi.fn<(ns: string) => Promise<(key: string) => string>>(),
   headers: vi.fn<() => Promise<Headers>>(),
+  fraunces: vi.fn(() => ({ variable: '--font-fraunces' })),
 }));
 
 // `next/font/google` is a build-time transform, not a runtime module — the loaders are
 // invoked at import time, so they have to be stubbed before the layout is loaded at all.
 vi.mock('next/font/google', () => ({
   Archivo: () => ({ variable: '--font-archivo' }),
-  Fraunces: () => ({ variable: '--font-fraunces' }),
+  Fraunces: mocks.fraunces,
   JetBrains_Mono: () => ({ variable: '--font-jetbrains' }),
 }));
 
@@ -136,5 +137,16 @@ describe('RootLayout', () => {
   it('keeps the English metadata copy in the catalogue', () => {
     expect(messages.app.meta.title).toBe('Kurul');
     expect(messages.app.meta.description).toBe('Open-source Kanban-focused project management');
+  });
+
+  // Without the `opsz` axis, next/font/google embeds only Fraunces' default instance, which is
+  // cut for text-sized rendering (docs/design.md §3). A 40px `display` heading drawn from that
+  // instance carries the low-optical-size cut's thinner strokes instead of the display cut the
+  // scale is meant to look like, and no test that renders the layout in jsdom can tell the two
+  // cuts apart, so this asserts the axis was requested at all.
+  it('loads Fraunces with the opsz axis so the display cut is embedded', () => {
+    // The loader runs once, at module import, so this reads the call captured when this file's
+    // own top-level `import './layout'` first evaluated the module.
+    expect(mocks.fraunces).toHaveBeenCalledWith(expect.objectContaining({ axes: ['opsz'] }));
   });
 });

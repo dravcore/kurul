@@ -18,6 +18,10 @@ const fraunces = Fraunces({
   subsets: ['latin', 'latin-ext'],
   variable: '--font-fraunces',
   display: 'swap',
+  // Without this axis next/font/google embeds only the low-optical-size cut, so a 40px
+  // `display` heading renders with 14pt strokes instead of the carved 40pt cut docs/design.md
+  // §3 describes; `.text-display` in globals.css dials the instance to that cut at runtime.
+  axes: ['opsz'],
 });
 
 const jetbrainsMono = JetBrains_Mono({
