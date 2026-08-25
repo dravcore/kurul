@@ -63,7 +63,8 @@ edemeyen varyantı seçmemek.
 
 ## Karar
 
-Birbirlerine bağlı oldukları sırayla on bir karar. İlki diğer onunun şeklini belirliyor.
+Birbirlerine bağlı oldukları sırayla on bir karar, ardından da geriye bıraktıkları kapsam dışılar.
+İlk karar diğer onunun şeklini belirliyor.
 
 ### 0. Endpoint'lere operatör değil workspace sahip
 
@@ -297,12 +298,25 @@ indekslerindeki önce-ölç duruşuna bilinçli bir istisnadır ve ölçüm
 [#187](https://github.com/dravcore/kurul/issues/187)'dir: mevcut indekssiz süpürmeler çok daha küçük
 tablolarda bilinen bir maliyettir.
 
+Kısmi olanı bir `WHERE` yan tümcesidir ve Prisma şeması bunu ifade edemez; dolayısıyla migration'da
+ham SQL olarak yazılır ve `pg_indexes`'i okuyan bir testle yerinde tutulur. Bu mekanizma, bu kaydın
+farklı verebileceği bir karar değildir: [ADR 0017](0017-partial-indexes-outside-prisma-schema.md) onu
+zaten kararlaştırdı ve bu indeks yeni bir vaka değil, o mekanizmanın bir sonraki kullanıcısıdır.
+
 ### 9. Demo instance endpoint oluşturmayı reddeder
 
 `DEMO_MODE=true`, endpoint route'larındaki `POST`'u reddeder. Herhangi bir ziyaretçinin dışa giden bir
-URL kaydedebildiği genel bir demo, üzerine imza iliştirilmiş açık bir HTTP rölesidir; bu,
-`DemoRestrictedGuard`'ın bugün koruduğu iki route'tan farklı bir sınıf problemdir ve guard'ın kendi
-yazılı kuralına göre üçüncü bir girişi hak eder.
+URL kaydedebildiği genel bir demo, üzerine Kurul'un imzası iliştirilmiş ve API container'ının
+erişebildiği her yere nişan alabilen açık bir HTTP rölesidir.
+
+Guard'ın mevcut kabul kuralı bunu kapsayacak kadar esnemiyor ve esnediğini varsaymak, guard'ın kendi
+yorumunun uyardığı şey olurdu. O kural, eylemin "**başka** bir ziyaretçinin kullandığı bir şeyi yok
+etmesi ve saatlik sıfırlamanın, bunun başına geldiği kişi için bir kurtarma yolu olmaması"dır; dışa
+giden bir URL kaydetmek hiçbir şeyi yok etmez ve sıfırlama onu da her şey gibi temizler. Dolayısıyla
+bu, birincisinin altına sokuşturulmuş değil açıkça yazılmış **ikinci** bir kabul kuralıdır: bir eylem,
+instance'ı anonim bir ziyaretçi adına üçüncü taraflara ulaşma aracına dönüştürdüğünde de demo modunda
+reddedilir. Yorum, listenin "vibe'larla" büyümemesini istiyor; bu, yazılı bir gerekçe talebidir, zaten
+orada olan iki gerekçenin son gerekçeler olduğu iddiası değil.
 
 ### 10. Yönetim route'ları ve yeteneğin nerede yayımlandığı
 
@@ -321,10 +335,19 @@ access token `403` alır ve OpenAPI belgesi bu operasyonların her birinde `secu
 [api-conventions.md](../api-conventions.md#kimlik-doğrulama)'nin zaten adlandırdığı sınırı yeni bir
 kural icat etmek yerine genişletir.
 
-Yetenek `GET /config`'te **yayımlanmaz**. `InstanceConfigDto` deployment yeteneğidir ve kendi yorumları
-"asla tenant durumu değil" der; bir workspace'in endpoint'i olup olmadığı tenant durumudur ve yukarıdaki
-endpoint listesi route'u okuma yüzeyidir. Bu, (a) modelinin ihtiyaç duyacağı şeyin ayna görüntüsüdür:
-orada `mailEnabled`'ın yanında bir `webhooksEnabled` boolean'ı olurdu.
+**Yeteneğin iki yarısı var ve ikisi iki ayrı yerde yayımlanıyor.** Deployment yarısı, bu instance'ın
+hiç webhook teslim edip edemeyeceğidir ve 4. bölüm bunu zaten `REDIS_URL`'e bağlıyor. Bu, `mailEnabled`
+ve `attachmentsEnabled`'ın olduğu anlamda bir deployment gerçeğidir; dolayısıyla `InstanceConfigDto`
+onların yanına `webhooksEnabled: boolean` kazanır ve `apps/api/openapi.json`'daki `/config` şeması
+buna göre yeniden üretilir. Bu olmadan bir admin'in bu deployment'ta Redis olmadığını öğrenmesinin tek
+yolu, oluşturma formunu doldurup bir `4xx` okumaktır; diğer iki bayrak tam da bu keşif yolunu ortadan
+kaldırmak için var.
+
+Tenant yarısı, yani **bu workspace'in** bir endpoint'i olup olmadığı ve hangisi olduğu, orada
+yayımlanmaz ve yayımlanmayacak. `InstanceConfigDto`'nun kendi yorumları "asla tenant durumu değil" der,
+bunun okuma yüzeyi yukarıdaki endpoint listesi route'udur ve `GET /config` oturum açmış her çağıran
+tarafından okunabilir. (a) modelinin ilk yarıya ihtiyacı olurdu ve dışarıda tutacak bir ikinci yarısı
+olmazdı; sınır aynı sınırdır, iki kez uygulanmıştır.
 
 ### 11. Kapsam dışı olanlar
 
@@ -400,10 +423,16 @@ hacimli tabloda daha kısa bir pencere, gecelik süpürmenin maliyetini de orant
   nesnesi yoktur (o 3.1'dedir) ve commit edilmiş belge 3.0.0'dır, dolayısıyla dışa giden kontrat düzyazıyla
   belgelenir ve payload bir component şeması olarak tanımlanır, üretilmiş bir operasyon olarak değil.
   Yönetim route'ları sıradan üretilmiş operasyonlardır.
+- **`packages/shared-types` `InstanceConfigDto.webhooksEnabled`'ı kazanır ve `apps/api/openapi.json`
+  aynı pull request'te yeniden üretilir**, çünkü kod ile commit edilmiş belge anlaşmazlığa düştüğünde
+  CI hata verir; api-conventions'ın "Instance yapılandırması" bölümü ve Türkçe aynası da yeni bayrağı
+  katıldığı ikisinin yanında belgeler.
 - **`.env.example`, `docs/self-hosting.md`, `docker-compose.yml` ve Türkçe aynaları
   `WEBHOOK_TIMEOUT_MS`, `WEBHOOK_ALLOW_INSECURE_URLS` ve `WEBHOOK_DELIVERY_RETENTION_DAYS`'i kazanır.**
   Compose'un `api` environment bloğunda forward edilmeyen bir değişken, yayımlanan yığını çalıştıran hiç
-  kimse için var değildir.
+  kimse için var değildir; bu artık hatırlanan değil denetlenen bir şey:
+  `scripts/lib/compose-env.test.mjs`, `docker-compose.yml` API'nin okuduğu bir ayarı düşürdüğünde
+  build'i düşürür.
 - **`task.moved` payload'ındaki `fromColumnCategory` eklemelidir ve gerisinden önce inebilir.** Bu kaydın
   özellikten önce gönderilmeye değer tek parçasıdır ve güvenlidir: payload okuyucuları bilmedikleri
   anahtarları yok sayar.
@@ -415,22 +444,22 @@ hacimli tabloda daha kısa bir pencere, gecelik süpürmenin maliyetini de orant
 
 ## Değerlendirilen Alternatifler
 
-| Alternatif                                                                      | Neden değil                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| (a) Instance için operatörün yapılandırdığı `WEBHOOK_URL`                       | M'e karşı L kadar ucuz, ama barındırılan her workspace Dravcore'un URL'ini paylaşırdı ve ADR 0028 çözümü bir özellik olarak satmayı yasaklıyor. Webhook'ları yalnızca kendi kendine barındıranlara ait kılar |
-| (c) Önce operatör, sonra workspace endpoint'leri                                | Yalnızca zarf ve imzayı kurtarır, ki bu kayıt onları zaten sabitliyor; iki yapılandırma yolunu ya sonsuza kadar yaşatır ya da bir self-host `.env`'ini kırar                                                 |
-| Operatör yapılandırmasında workspace başına hedefler                            | Bir `InstanceSetting` tablosu ve instance-admin yazma route'ları gerektirir; kaçınmaya çalıştığı workspace tablosundan daha büyük bir yeni yüzeydir                                                          |
-| Mailer gibi commit sonrası ateşle-ve-unut                                       | Tasarım gereği en-fazla-bir-kere; roadmap'in "en-az-bir-kere" iddiası ilk yeniden başlatmada yanlış olurdu ve commit ile gönderim arasındaki bir çökme event'i kayıtsız kaybeder                             |
-| Outbox satırı olmadan BullMQ job'ı                                              | Postgres commit'inin yarattığı bir yükümlülüğün kayıt sistemini Redis yapar; onu hiçbir şey yedeklemez ve bir flush teslimleri sessizce kaybeder                                                             |
-| Saklanan bir `task.completed` activity tipi                                     | Günlüğün zaten kaydettiği bir taşımanın saf fonksiyonu için sözlüğe kalıcı, adı değiştirilemez bir ekleme; kolon yeniden kategorilendirme sorusunu depolamaya zorlar                                         |
-| Bir kolon yeniden kategorilendirildiğinde her task için `task.completed` yaymak | Tek bir `PATCH` sınırsız bir teslim patlamasına dönüşür ve dashboard'un zaten belgelediği asimetri bir cümle yerine bir teslim fırtınası olur                                                                |
-| Aynı kolon içindeki yeniden sıralamaları `task.moved` olarak teslim etmek       | Kolon içindeki her sürükleme bir teslim olur, hepsi de durum yansıtan her tüketici için no-op                                                                                                                |
-| Bunun yerine `task.moved` activity satırını daraltmak                           | İki mevcut okuyucu o satırları sayıyor; bir webhook'u şekillendirmek için depolama formatını değiştirmek aktivasyon hunisinin ve dashboard'un sayılarını oynatır                                             |
-| Düz metin sır kolonu                                                            | Token dokümantasyonunun ilan ettiği "bir veritabanı dump'ı kullanılabilir bir kimlik bilgisi vermez" özelliğini, veritabanının tutacağı ilk tenant başına sır için emekliye ayırır                           |
-| Zaman damgası olmadan yalnızca ham gövdeyi imzalamak                            | Yakalanan bir istek sonsuza kadar tekrar oynatılabilir kalır; imzalanan string'deki zaman damgası ve beş dakikalık pencere onu sınırlayan şeydir                                                             |
-| Teslimde yönlendirmeleri takip etmek                                            | Doğrulanmış genel bir hostname Compose ağına ya da bir metadata adresine yönlendirebilir, ki egress doğrulayıcısı tam olarak bunu önlemek için var                                                           |
-| Endpoint'i devre dışı bırakmak yerine sonsuza kadar denemek                     | Kalıcı olarak ölü bir alıcı sınırsız bir kuyruğa ve instance'tan sürekli dışa giden bir taramaya dönüşür; onu düzeltebilecek kişi, kaydeden admin'dir                                                        |
-| Devre dışı bir endpoint'i soğuma süresi sonrası otomatik açmak                  | Fazladan adımları olan bir retry döngüsü; endpoint hakkında hiçbir şey değişmedi ve hata tanımı gereği alıcı tarafında                                                                                       |
-| `GET /config`'te `webhooksEnabled` yayımlamak                                   | `InstanceConfigDto` deployment yeteneğidir ve bunu kendisi söyler; bir workspace'in endpoint'i olup olmadığı tenant durumudur ve workspace okumasına aittir                                                  |
-| Endpoint yönetiminin token ile yapılabilmesi                                    | Bir egress hedefi ekleyebilen sürekli bir kimlik bilgisi ikinci bir sızdırma kanalıdır; token route'ları da aynı nedenle session-only                                                                        |
-| Teslim günlüğünde saklama penceresi olmaması                                    | Webhook'ların eklediği en yüksek hacimli tablo sonsuza kadar büyürdü ve pencereyi indeksleriyle sonradan eklemek şemadaki en büyük tabloya karşı bir migration demek                                         |
+| Alternatif                                                                                       | Neden değil                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a) Instance için operatörün yapılandırdığı `WEBHOOK_URL`                                        | M'e karşı L kadar ucuz, ama barındırılan her workspace Dravcore'un URL'ini paylaşırdı ve ADR 0028 çözümü bir özellik olarak satmayı yasaklıyor. Webhook'ları yalnızca kendi kendine barındıranlara ait kılar                    |
+| (c) Önce operatör, sonra workspace endpoint'leri                                                 | Yalnızca zarf ve imzayı kurtarır, ki bu kayıt onları zaten sabitliyor; iki yapılandırma yolunu ya sonsuza kadar yaşatır ya da bir self-host `.env`'ini kırar                                                                    |
+| Operatör yapılandırmasında workspace başına hedefler                                             | Bir `InstanceSetting` tablosu ve instance-admin yazma route'ları gerektirir; kaçınmaya çalıştığı workspace tablosundan daha büyük bir yeni yüzeydir                                                                             |
+| Mailer gibi commit sonrası ateşle-ve-unut                                                        | Tasarım gereği en-fazla-bir-kere; roadmap'in "en-az-bir-kere" iddiası ilk yeniden başlatmada yanlış olurdu ve commit ile gönderim arasındaki bir çökme event'i kayıtsız kaybeder                                                |
+| Outbox satırı olmadan BullMQ job'ı                                                               | Postgres commit'inin yarattığı bir yükümlülüğün kayıt sistemini Redis yapar; onu hiçbir şey yedeklemez ve bir flush teslimleri sessizce kaybeder                                                                                |
+| Saklanan bir `task.completed` activity tipi                                                      | Günlüğün zaten kaydettiği bir taşımanın saf fonksiyonu için sözlüğe kalıcı, adı değiştirilemez bir ekleme; kolon yeniden kategorilendirme sorusunu depolamaya zorlar                                                            |
+| Bir kolon yeniden kategorilendirildiğinde her task için `task.completed` yaymak                  | Tek bir `PATCH` sınırsız bir teslim patlamasına dönüşür ve dashboard'un zaten belgelediği asimetri bir cümle yerine bir teslim fırtınası olur                                                                                   |
+| Aynı kolon içindeki yeniden sıralamaları `task.moved` olarak teslim etmek                        | Kolon içindeki her sürükleme bir teslim olur, hepsi de durum yansıtan her tüketici için no-op                                                                                                                                   |
+| Bunun yerine `task.moved` activity satırını daraltmak                                            | İki mevcut okuyucu o satırları sayıyor; bir webhook'u şekillendirmek için depolama formatını değiştirmek aktivasyon hunisinin ve dashboard'un sayılarını oynatır                                                                |
+| Düz metin sır kolonu                                                                             | Token dokümantasyonunun ilan ettiği "bir veritabanı dump'ı kullanılabilir bir kimlik bilgisi vermez" özelliğini, veritabanının tutacağı ilk tenant başına sır için emekliye ayırır                                              |
+| Zaman damgası olmadan yalnızca ham gövdeyi imzalamak                                             | Yakalanan bir istek sonsuza kadar tekrar oynatılabilir kalır; imzalanan string'deki zaman damgası ve beş dakikalık pencere onu sınırlayan şeydir                                                                                |
+| Teslimde yönlendirmeleri takip etmek                                                             | Doğrulanmış genel bir hostname Compose ağına ya da bir metadata adresine yönlendirebilir, ki egress doğrulayıcısı tam olarak bunu önlemek için var                                                                              |
+| Endpoint'i devre dışı bırakmak yerine sonsuza kadar denemek                                      | Kalıcı olarak ölü bir alıcı sınırsız bir kuyruğa ve instance'tan sürekli dışa giden bir taramaya dönüşür; onu düzeltebilecek kişi, kaydeden admin'dir                                                                           |
+| Devre dışı bir endpoint'i soğuma süresi sonrası otomatik açmak                                   | Fazladan adımları olan bir retry döngüsü; endpoint hakkında hiçbir şey değişmedi ve hata tanımı gereği alıcı tarafında                                                                                                          |
+| Endpoint listesini ya da bir workspace'in endpoint'i olup olmadığını `GET /config`'te yayımlamak | `InstanceConfigDto` deployment yeteneğidir ve bunu kendisi söyler, `/config` oturum açmış her çağıran tarafından okunabilir ve bu tenant durumudur; yeteneğin deployment yarısı orada `webhooksEnabled` olarak **yayımlanıyor** |
+| Endpoint yönetiminin token ile yapılabilmesi                                                     | Bir egress hedefi ekleyebilen sürekli bir kimlik bilgisi ikinci bir sızdırma kanalıdır; token route'ları da aynı nedenle session-only                                                                                           |
+| Teslim günlüğünde saklama penceresi olmaması                                                     | Webhook'ların eklediği en yüksek hacimli tablo sonsuza kadar büyürdü ve pencereyi indeksleriyle sonradan eklemek şemadaki en büyük tabloya karşı bir migration demek                                                            |

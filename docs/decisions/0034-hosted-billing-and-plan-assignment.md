@@ -126,8 +126,12 @@ A row exists only for a workspace that has been through checkout. No row means t
 is also what every self-hosted workspace looks like, so the two cases share one code path instead of
 needing a synthetic free-plan row created by an `afterCreateOrganization` hook.
 
-A second table, `BillingEvent (provider, eventId, receivedAt)` with a unique index on
-`(provider, eventId)`, is the idempotency ledger for section 4.
+A second table, `BillingEvent`, is the idempotency ledger for section 4:
+`id String @id @default(uuid(7))` like every other row in this schema, then `provider`, `eventId` and
+`receivedAt`, with a unique index on `(provider, eventId)`. The unique pair is what the ledger is
+_read_ by and the reason the table exists; the id is not optional decoration, because
+[CLAUDE.md](../../CLAUDE.md) makes UUIDv7 the id of every row and the retention sweep this table
+enters below pages on `id` the way every other cursor in the API does.
 
 ### 3. The plan catalogue is code, not rows
 
@@ -273,7 +277,7 @@ ADR 0032's "two read surfaces" rule intact instead of introducing a third. `mana
 provider's customer portal and is non-null only for an owner, because it is a link into a billing
 account; every other member sees the code and the name.
 
-### 9. Soft ceilings become billing boundaries, which fires ADR 0027's trigger
+### 9. Soft ceilings become billing boundaries, which is a new trigger for the advisory lock
 
 [ADR 0027](0027-attachment-quotas.md) considered a per-workspace `pg_advisory_xact_lock` and
 rejected it in writing, and [ADR 0032](0032-plan-limits.md) restated the same trade for counts:
@@ -281,9 +285,17 @@ check-then-write, overshoot bounded by concurrency, "**Trigger:** a report of a 
 deliberately". `BoardService` carries a comment pointing at that rejection.
 
 Both rejections were correct for a ceiling that is an operator guard-rail. **Neither survives a
-ceiling that is a revenue boundary**, and this record is the trigger firing rather than a
-contradiction of either: a limit a customer can exceed by sending ten requests at once is not a
-plan. So, **as part of the billing slice and not before it**, a per-workspace
+ceiling that is a revenue boundary**: a limit a customer can exceed by sending ten requests at once
+is not a plan.
+
+This is a new trigger, not one of the triggers those records named, and the difference is worth
+being exact about. ADR 0027's are "a measured deployment where concurrent overshoot materially
+exceeds one `ATTACHMENT_MAX_BYTES`, or an operator report of the quota being raced deliberately",
+and ADR 0032 restates the same pair for counts. Neither has fired, and this record does not claim
+otherwise. What changed is what the ceiling _means_, which is a reason those records could not have
+weighed because there was no revenue behind a ceiling when they were written. So the ground is
+stated here and the earlier records are revisited on it, rather than being read as having predicted
+this. So, **as part of the billing slice and not before it**, a per-workspace
 `pg_advisory_xact_lock(hashtext(workspaceId))` is taken inside the transaction for board creation,
 invitation creation and acceptance, and attachment creation, with a single fixed key around
 sign-up for the instance-wide user ceiling. `GET .../plan` keeps its current unlocked reads, which
@@ -370,18 +382,27 @@ more than that.
   workspace and it cascades with its workspace.
 - **The advisory lock changes measured behaviour on hosted instances.** Board creation, invitation
   creation and acceptance, and attachment creation serialise per workspace. That is a real latency
-  cost under concurrency and it is accepted here for the deployments that need exact ceilings, on
-  the trigger ADR 0027 itself specified.
+  cost under concurrency and it is accepted here for the deployments that need exact ceilings, on a
+  trigger this record states rather than one ADR 0027 predicted.
 - **On acceptance, [ROADMAP.md](../../ROADMAP.md) and [api-conventions.md](../api-conventions.md)
   change and this record does not change them.** The "Hosted service billing and plan assignment"
   row gains a link here and a first sub-item (the ADR itself), its acceptance criterion grows the
   inertness e2e, and the `Plan limits` section of api-conventions gains the `plan` member of
   `WorkspacePlanDto` with its Turkish mirror. `apps/api/openapi.json` is regenerated in the same
   pull request as the DTO change, because CI fails when the code and the document disagree.
+- **[ADR 0027](0027-attachment-quotas.md) and [ADR 0032](0032-plan-limits.md) are partially
+  reversed by section 9 and their index rows say so.** Both keep the status they have and gain an
+  annotation in the shape [0011](0011-label-task-metadata-permissions.md) and
+  [0022](0022-attachment-storage.md) already use, naming this record: their advisory-lock rejections
+  stand for a ceiling that is an operator guard-rail and are revisited here for one that is a
+  revenue boundary. A reader who arrives at 0027 from the index should not have to reach 0034 to
+  learn that.
 - **`.env.example`, `docs/self-hosting.md`, `docker-compose.yml` and the Turkish mirrors gain
   `BILLING_PROVIDER` and the provider's key and signing-secret variables**, all unset, with the
   paragraph that says what unset means. A variable that is not forwarded in the Compose `api`
-  environment block does not exist for anyone running the published stack.
+  environment block does not exist for anyone running the published stack, and that is now checked
+  rather than remembered: `scripts/lib/compose-env.test.mjs` fails the build when
+  `docker-compose.yml` drops a setting the API reads.
 - **A pricing decision is now blocking a code decision, and that is the right way round.**
   `PLAN_CATALOG`'s numbers cannot be written until the tiers are chosen. Everything else in this
   record can be built against placeholder tiers, which is why the catalogue is one constant and not

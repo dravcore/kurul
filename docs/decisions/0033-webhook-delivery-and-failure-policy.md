@@ -62,8 +62,8 @@ variant that is structurally unable to serve the population that pays.
 
 ## Decision
 
-Eleven decisions, in the order they depend on each other. The first one decides the shape of the
-other ten.
+Eleven decisions, in the order they depend on each other, and then the non-goals they leave behind.
+The first decision decides the shape of the other ten.
 
 ### 0. A workspace owns its endpoints, not the operator
 
@@ -296,12 +296,27 @@ measure-first stance on retention indexes, and issue
 [#187](https://github.com/dravcore/kurul/issues/187) is the measurement: the existing unindexed
 sweeps are a known cost on much smaller tables.
 
+The partial one is a `WHERE` clause, which the Prisma schema cannot express, so it is written as raw
+SQL in the migration and held in place by a test that reads `pg_indexes`. That mechanism is not a
+decision this record gets to make differently:
+[ADR 0017](0017-partial-indexes-outside-prisma-schema.md) already settled it, and this index is the
+next user of it rather than a new case.
+
 ### 9. A demo instance refuses endpoint creation
 
 `DEMO_MODE=true` refuses `POST` on the endpoint routes. A public demo where any visitor can register
-an outbound URL is an open HTTP relay with a signature attached, which is a different class of
-problem from the two routes `DemoRestrictedGuard` guards today and admits a third entry under the
-guard's own stated rule.
+an outbound URL is an open HTTP relay with Kurul's signature attached, aimed at whatever the API
+container can reach.
+
+The guard's existing admission rule does not stretch to cover this, and pretending it does would be
+the thing its own comment warns against. That rule is that the action "destroys something a
+_different_ visitor is using, and the hourly reset is not a recovery path for the person it happened
+to"; registering an outbound URL destroys nothing, and the reset clears it like everything else. So
+this is a **second** admission rule, stated rather than smuggled in under the first: an action is
+also refused in demo mode when it turns the instance into a tool for reaching third parties on an
+anonymous visitor's behalf. The comment asks that the list not grow "by vibes", which is a demand
+for a written reason, not a claim that the two reasons already there are the only ones there will
+ever be.
 
 ### 10. Management routes, and where the capability is published
 
@@ -320,10 +335,19 @@ access token gets `403`, and the OpenAPI document says `security: [session]` on 
 operations. That extends the boundary [api-conventions.md](../api-conventions.md#authentication)
 already names rather than inventing a new rule.
 
-The capability is **not** published on `GET /config`. `InstanceConfigDto` is deployment capability
-and its own comments say "never tenant state"; whether a workspace has an endpoint is tenant state,
-and the endpoint list route above is the read surface. This is the mirror image of what model (a)
-would have needed, which was a `webhooksEnabled` boolean beside `mailEnabled`.
+**The capability has two halves and they are published in two different places.** The deployment
+half is whether this instance can deliver a webhook at all, which section 4 already makes
+conditional on `REDIS_URL`. That is a deployment fact in exactly the sense `mailEnabled` and
+`attachmentsEnabled` are, so `InstanceConfigDto` gains `webhooksEnabled: boolean` beside them, with
+the `/config` schema in `apps/api/openapi.json` regenerated to match. Without it the only way an
+admin can learn that this deployment has no Redis is to fill in the create form and read a `4xx`,
+which is the discovery path the other two flags exist to remove.
+
+The tenant half, whether _this workspace_ has an endpoint and which one, is not published there and
+never will be. `InstanceConfigDto`'s own comments say "never tenant state", the read surface for it
+is the endpoint list route above, and `GET /config` is readable by any signed-in caller. Model (a)
+would have needed the first half and had no second half to keep out; the boundary is the same one,
+applied twice.
 
 ### 11. Non-goals
 
@@ -401,10 +425,16 @@ highest-volume table is also what keeps the nightly sweep's cost proportional.
   OpenAPI 3.0 has no top-level `webhooks` object (that is 3.1) and the committed document is 3.0.0,
   so the outbound contract is documented in prose with the payload declared as a component schema,
   not as a generated operation. The management routes are ordinary generated operations.
+- **`packages/shared-types` gains `InstanceConfigDto.webhooksEnabled` and `apps/api/openapi.json` is
+  regenerated in the same pull request**, because CI fails when the code and the committed document
+  disagree, and the "Instance configuration" section of api-conventions and its Turkish mirror
+  document the new flag beside the two it joins.
 - **`.env.example`, `docs/self-hosting.md`, `docker-compose.yml` and the Turkish mirrors gain
   `WEBHOOK_TIMEOUT_MS`, `WEBHOOK_ALLOW_INSECURE_URLS` and `WEBHOOK_DELIVERY_RETENTION_DAYS`.** A
   variable that is not forwarded in the Compose `api` environment block does not exist for anyone
-  running the published stack.
+  running the published stack, and that is now checked rather than remembered:
+  `scripts/lib/compose-env.test.mjs` fails the build when `docker-compose.yml` drops a setting the
+  API reads.
 - **`fromColumnCategory` in the `task.moved` payload is additive and can land before the rest.** It
   is the only part of this record that is worth shipping ahead of the feature, and it is safe:
   payload readers ignore keys they do not know.
@@ -417,22 +447,22 @@ highest-volume table is also what keeps the nightly sweep's cost proportional.
 
 ## Alternatives considered
 
-| Alternative                                                              | Why not                                                                                                                                                                  |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| (a) Operator-configured `WEBHOOK_URL` for the instance                   | Cheaper by an M against an L, but every hosted workspace would share Dravcore's URL, and ADR 0028 forbids selling the fix as a feature. It makes webhooks self-host-only |
-| (c) Operator first, workspace endpoints later                            | Saves only the envelope and signature, which this record fixes anyway; leaves two configuration paths that must both live forever or break a self-hoster's `.env`        |
-| Per-workspace destinations held in operator configuration                | Needs an `InstanceSetting` table plus instance-admin write routes, which is a larger new surface than the workspace-owned table it is trying to avoid                    |
-| Fire-and-forget after commit, like the mailer                            | At-most-once by design; the roadmap's "at-least-once" claim would be false on the first restart, and a crash between commit and send loses the event with no record      |
-| BullMQ job with no outbox row                                            | Makes Redis the system of record for an obligation created by a Postgres commit; nothing backs it up and a flush loses deliveries silently                               |
-| A stored `task.completed` activity type                                  | A permanent, unrenameable addition to the vocabulary for a pure function of a move already logged; forces the column re-categorisation question into storage             |
-| Emitting `task.completed` for every task when a column is re-categorised | One `PATCH` becomes an unbounded burst of deliveries, and the asymmetry the dashboard already documents becomes a delivery storm instead of a sentence                   |
-| Delivering same-column reorders as `task.moved`                          | Every drag inside a column becomes a delivery, all of them no-ops for any consumer mirroring a status                                                                    |
-| Narrowing the `task.moved` activity row instead                          | Two existing readers count those rows; changing the storage format to shape a webhook would move the activation funnel's and the dashboard's numbers                     |
-| Plaintext secret column                                                  | Retires the "a database dump yields no usable credential" property the token documentation advertises, for the first per-tenant secret the database would hold           |
-| Signing the raw body only, without a timestamp                           | A captured request stays replayable forever; the timestamp in the signed string plus a five-minute window is what bounds it                                              |
-| Following redirects on delivery                                          | A validated public hostname can redirect into the Compose network or to a metadata address, which is precisely what the egress validator exists to prevent               |
-| Retrying forever instead of disabling an endpoint                        | A permanently dead receiver becomes an unbounded queue and a standing outbound scan from the instance; the admin who registered it is the one who can fix it             |
-| Auto-re-enabling a disabled endpoint after a cooling period              | A retry loop with extra steps; nothing about the endpoint has changed, and the failure is on the receiver's side by definition                                           |
-| Publishing `webhooksEnabled` on `GET /config`                            | `InstanceConfigDto` is deployment capability and says so; whether a workspace has an endpoint is tenant state and belongs on the workspace read                          |
-| Token-usable endpoint management                                         | A standing credential that can add an egress destination is a second exfiltration channel; the token routes are session-only for the same reason                         |
-| No retention window on the delivery log                                  | The highest-volume table webhooks add would grow forever, and adding a window plus its indexes later is a migration against the largest table in the schema              |
+| Alternative                                                                    | Why not                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| (a) Operator-configured `WEBHOOK_URL` for the instance                         | Cheaper by an M against an L, but every hosted workspace would share Dravcore's URL, and ADR 0028 forbids selling the fix as a feature. It makes webhooks self-host-only                                           |
+| (c) Operator first, workspace endpoints later                                  | Saves only the envelope and signature, which this record fixes anyway; leaves two configuration paths that must both live forever or break a self-hoster's `.env`                                                  |
+| Per-workspace destinations held in operator configuration                      | Needs an `InstanceSetting` table plus instance-admin write routes, which is a larger new surface than the workspace-owned table it is trying to avoid                                                              |
+| Fire-and-forget after commit, like the mailer                                  | At-most-once by design; the roadmap's "at-least-once" claim would be false on the first restart, and a crash between commit and send loses the event with no record                                                |
+| BullMQ job with no outbox row                                                  | Makes Redis the system of record for an obligation created by a Postgres commit; nothing backs it up and a flush loses deliveries silently                                                                         |
+| A stored `task.completed` activity type                                        | A permanent, unrenameable addition to the vocabulary for a pure function of a move already logged; forces the column re-categorisation question into storage                                                       |
+| Emitting `task.completed` for every task when a column is re-categorised       | One `PATCH` becomes an unbounded burst of deliveries, and the asymmetry the dashboard already documents becomes a delivery storm instead of a sentence                                                             |
+| Delivering same-column reorders as `task.moved`                                | Every drag inside a column becomes a delivery, all of them no-ops for any consumer mirroring a status                                                                                                              |
+| Narrowing the `task.moved` activity row instead                                | Two existing readers count those rows; changing the storage format to shape a webhook would move the activation funnel's and the dashboard's numbers                                                               |
+| Plaintext secret column                                                        | Retires the "a database dump yields no usable credential" property the token documentation advertises, for the first per-tenant secret the database would hold                                                     |
+| Signing the raw body only, without a timestamp                                 | A captured request stays replayable forever; the timestamp in the signed string plus a five-minute window is what bounds it                                                                                        |
+| Following redirects on delivery                                                | A validated public hostname can redirect into the Compose network or to a metadata address, which is precisely what the egress validator exists to prevent                                                         |
+| Retrying forever instead of disabling an endpoint                              | A permanently dead receiver becomes an unbounded queue and a standing outbound scan from the instance; the admin who registered it is the one who can fix it                                                       |
+| Auto-re-enabling a disabled endpoint after a cooling period                    | A retry loop with extra steps; nothing about the endpoint has changed, and the failure is on the receiver's side by definition                                                                                     |
+| Publishing the endpoint list, or whether a workspace has one, on `GET /config` | `InstanceConfigDto` is deployment capability and says so, `/config` is readable by any signed-in caller, and that is tenant state; the deployment half of the capability _is_ published there as `webhooksEnabled` |
+| Token-usable endpoint management                                               | A standing credential that can add an egress destination is a second exfiltration channel; the token routes are session-only for the same reason                                                                   |
+| No retention window on the delivery log                                        | The highest-volume table webhooks add would grow forever, and adding a window plus its indexes later is a migration against the largest table in the schema                                                        |

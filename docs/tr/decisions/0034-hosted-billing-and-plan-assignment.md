@@ -129,8 +129,12 @@ kendi kendine barındırılan her workspace de böyle görünür, dolayısıyla 
 `afterCreateOrganization` hook'unun oluşturduğu yapay bir ücretsiz plan satırına ihtiyaç duymadan tek
 bir kod yolunu paylaşır.
 
-İkinci bir tablo, `(provider, eventId)` üzerinde tekil indeksi olan `BillingEvent (provider, eventId,
-receivedAt)`, 4. bölümün idempotency defteridir.
+İkinci bir tablo, `BillingEvent`, 4. bölümün idempotency defteridir: bu şemadaki her satır gibi
+`id String @id @default(uuid(7))`, ardından `provider`, `eventId` ve `receivedAt`, `(provider,
+eventId)` üzerinde tekil bir indeksle. Tablonun var olma nedeni ve **okunduğu** anahtar o tekil
+çifttir; id ise isteğe bağlı bir süs değildir, çünkü [CLAUDE.md](../../../CLAUDE.md) her satırın
+id'sini UUIDv7 yapıyor ve bu tablonun aşağıda girdiği saklama süpürmesi, API'deki her cursor gibi `id`
+üzerinden sayfalıyor.
 
 ### 3. Plan kataloğu satır değil kod
 
@@ -276,7 +280,7 @@ mevcut okumaya eklemek, üçüncü bir yüzey açmak yerine ADR 0032'nin "iki ok
 koruyor. `manageUrl` sağlayıcının müşteri portalıdır ve yalnızca bir owner için null olmayan bir
 değerdir, çünkü bir faturalandırma hesabına giden bir bağlantıdır; diğer her üye kodu ve adı görür.
 
-### 9. Yumuşak tavanlar faturalandırma sınırı olur, bu da ADR 0027'nin tetiğini ateşler
+### 9. Yumuşak tavanlar faturalandırma sınırı olur, bu da advisory kilit için yeni bir tetiktir
 
 [ADR 0027](0027-attachment-quotas.md) workspace başına bir `pg_advisory_xact_lock`'u değerlendirip
 yazılı olarak reddetti ve [ADR 0032](0032-plan-limits.md) aynı takası sayımlar için yineledi:
@@ -284,9 +288,17 @@ oku-sonra-yaz, eşzamanlılıkla sınırlı aşım, "**Tetik:** bir tavanın kas
 rapor". `BoardService` o reddi işaret eden bir yorum taşıyor.
 
 Her iki ret de operatör korkuluğu olan bir tavan için doğruydu. **Hiçbiri gelir sınırı olan bir tavanda
-ayakta kalmıyor** ve bu kayıt, ikisiyle de çelişmek yerine tetiğin ateşlenmesidir: bir müşterinin aynı
-anda on istek göndererek aşabildiği bir limit bir plan değildir. Dolayısıyla, **faturalandırma
-diliminin parçası olarak, ondan önce değil**, board oluşturma, davet oluşturma ve kabul etme ve dosya
+ayakta kalmıyor**: bir müşterinin aynı anda on istek göndererek aşabildiği bir limit bir plan
+değildir.
+
+Bu yeni bir tetiktir, o kayıtların adlandırdığı tetiklerden biri değil ve farkı net söylemeye değer.
+ADR 0027'ninkiler "eşzamanlı aşımın bir `ATTACHMENT_MAX_BYTES`'ı belirgin biçimde aştığı ölçülmüş bir
+deployment ya da kotanın kasten yarıştırıldığına dair bir operatör raporu"dur ve ADR 0032 aynı çifti
+sayımlar için yineler. Hiçbiri ateşlenmedi ve bu kayıt aksini iddia etmiyor. Değişen şey, tavanın ne
+**anlama geldiği**; o kayıtların tartamayacağı bir gerekçe bu, çünkü yazıldıklarında bir tavanın
+arkasında gelir yoktu. Dolayısıyla zemin burada yazılıyor ve önceki kayıtlar bu zemin üzerinde yeniden
+ele alınıyor, bunu önceden görmüş gibi okunmuyorlar. Dolayısıyla, **faturalandırma diliminin parçası
+olarak, ondan önce değil**, board oluşturma, davet oluşturma ve kabul etme ve dosya
 eki oluşturma için transaction içinde workspace başına bir
 `pg_advisory_xact_lock(hashtext(workspaceId))` alınır; instance geneli kullanıcı tavanı için de kayıt
 etrafında tek bir sabit anahtar. `GET .../plan` mevcut kilitsiz okumalarını korur; onlar bir gösterimdir
@@ -374,17 +386,26 @@ reddetmek için inşa edildi ve faturalandırma, ondan bundan fazlasını isteye
 - **Advisory kilit barındırılan instance'larda ölçülebilir davranışı değiştirir.** Board oluşturma,
   davet oluşturma ve kabul etme ve dosya eki oluşturma workspace başına serileşir. Bu, eşzamanlılık
   altında gerçek bir gecikme maliyetidir ve tam tavana ihtiyaç duyan deployment'lar için, ADR 0027'nin
-  kendi belirlediği tetikle burada kabul ediliyor.
+  önceden gördüğü bir tetikle değil, bu kaydın yazdığı bir tetikle burada kabul ediliyor.
 - **Kabul edilirse [ROADMAP.md](../../../ROADMAP.md) ve
   [api-conventions.md](../api-conventions.md) değişir, bu kayıt onları değiştirmez.** "Hosted service
   billing and plan assignment" satırı buraya bir link ve ilk bir alt maddesi (ADR'nin kendisi) kazanır,
   kabul kriteri atıllık e2e'siyle büyür ve api-conventions'ın `Plan limitleri` bölümü
   `WorkspacePlanDto`'nun `plan` üyesini Türkçe aynasıyla kazanır. `apps/api/openapi.json` DTO
   değişikliğiyle aynı pull request'te yeniden üretilir, çünkü kod ile belge uyuşmazsa CI başarısız olur.
+- **[ADR 0027](0027-attachment-quotas.md) ve [ADR 0032](0032-plan-limits.md), 9. bölümce kısmen geri
+  alınır ve indeks satırları bunu söyler.** İkisi de mevcut durumunu korur ve
+  [0011](0011-label-task-metadata-permissions.md) ile [0022](0022-attachment-storage.md)'nin zaten
+  kullandığı biçimde, bu kaydı adlandıran bir not kazanır: advisory kilit retleri, operatör korkuluğu
+  olan bir tavan için geçerliliğini koruyor ve gelir sınırı olan bir tavan için burada yeniden ele
+  alınıyor. İndeksten 0027'ye gelen bir okuyucunun bunu öğrenmek için 0034'e kadar gitmesi
+  gerekmemeli.
 - **`.env.example`, `docs/self-hosting.md`, `docker-compose.yml` ve Türkçe aynaları `BILLING_PROVIDER`'ı
   ve sağlayıcının anahtar ve imzalama sırrı değişkenlerini kazanır**, hepsi ayarsız, ve ayarsızın ne
   demek olduğunu söyleyen paragrafla. Compose'un `api` environment bloğunda forward edilmeyen bir
-  değişken, yayımlanan yığını çalıştıran hiç kimse için var değildir.
+  değişken, yayımlanan yığını çalıştıran hiç kimse için var değildir; bu artık hatırlanan değil
+  denetlenen bir şey: `scripts/lib/compose-env.test.mjs`, `docker-compose.yml` API'nin okuduğu bir
+  ayarı düşürdüğünde build'i düşürür.
 - **Artık bir fiyatlandırma kararı bir kod kararını bekletiyor ve doğru sıra bu.** `PLAN_CATALOG`'un
   sayıları, katmanlar seçilmeden yazılamaz. Bu kayıttaki diğer her şey yer tutucu katmanlara karşı inşa
   edilebilir; kataloğun bir şema değil tek bir sabit olmasının nedeni de budur.
