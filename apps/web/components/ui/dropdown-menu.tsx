@@ -67,7 +67,8 @@ function DropdownMenuGroup({ ...props }: React.ComponentProps<typeof DropdownMen
  * mouse press, and the row focused by the next pointer move inherits the state. Measured on the
  * running app, Chromium 151 and Firefox 153 agree. A hovered row therefore wears the same single
  * outline an arrowed-to row does, which is the safe direction: one mark too many for a mouse,
- * never one too few for a keyboard.
+ * never one too few for a keyboard. docs/design.md §9 carries that as a decision rather than a
+ * side effect of the layer move.
  */
 function DropdownMenuItem({
   className,
