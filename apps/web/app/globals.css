@@ -442,19 +442,19 @@ body {
     border: 2px solid Highlight;
   }
 
-  /* The menu row is the one place that opts out of the forced palette, and only to paint the
-     pair the palette itself hands out: the items carry `outline-hidden`, so the ground is the
-     whole indicator and a forced ground would be the popover's own. */
+  /* The items carry `outline-hidden`, so the ground is the whole indicator and a forced ground
+     would be the popover's own. The mode honours system colours, so naming the pair is enough;
+     `forced-color-adjust: none` would add nothing here and would inherit into every descendant,
+     keeping their author colours literal instead of forced onto the user's palette. */
   [data-slot='dropdown-menu-item'][data-highlighted],
   [data-slot='dropdown-menu-checkbox-item'][data-highlighted],
   [data-slot='dropdown-menu-radio-item'][data-highlighted] {
     background: Highlight;
     color: HighlightText;
-    forced-color-adjust: none;
   }
 
-  /* `forced-color-adjust` is inherited, so opting the row out opts its icon out too, and the
-     icon carries `text-muted-foreground`, a real grey with no contract against Highlight. */
+  /* The icon declares its own colour (`text-muted-foreground`), so the row's `HighlightText`
+     never reaches it and the mode forces that grey to CanvasText, unreadable on Highlight. */
   [data-slot='dropdown-menu-item'][data-highlighted] svg,
   [data-slot='dropdown-menu-checkbox-item'][data-highlighted] svg,
   [data-slot='dropdown-menu-radio-item'][data-highlighted] svg {

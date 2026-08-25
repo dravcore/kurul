@@ -450,31 +450,28 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
     expect(row.declarations).toEqual([
       { property: 'background', value: 'Highlight' },
       { property: 'color', value: 'HighlightText' },
-      { property: 'forced-color-adjust', value: 'none' },
     ]);
 
-    // `forced-color-adjust` is inherited, so opting one row out of the forced palette also opts
-    // out everything inside it. The icon carries `text-muted-foreground`, a real grey with no
-    // contract against Highlight, so it is put back on the palette by hand.
+    // The icon declares its own `color` (`text-muted-foreground`), so the row's `HighlightText`
+    // never reaches it and the mode forces that grey to CanvasText, which has no contract
+    // against a Highlight ground. A system colour keyword is honoured, so the icon names one.
     const icon = requireRule(forced, "the highlighted row's icon colour", (rule) => {
       return rule.selector.includes('svg');
     });
     expect(icon.declarations).toEqual([{ property: 'color', value: 'HighlightText' }]);
   });
 
-  it('opts nothing else out of the forced palette', () => {
+  // Nothing here opts out of the forced palette. Every fallback names a system colour, which the
+  // mode honours, so the opt-out would buy the rule nothing while inheriting into every
+  // descendant and leaving their author colours literal (an `!important` red icon on a Highlight
+  // ground, say) instead of letting the UA force them onto the user's palette.
+  it('opts nothing out of the forced palette', () => {
     const optOuts = forced.rules.filter((rule) => {
       return rule.declarations.some((declaration) => {
         return declaration.property === 'forced-color-adjust';
       });
     });
-    expect(optOuts.map((rule) => selectorParts(rule))).toEqual([
-      [
-        "[data-slot='dropdown-menu-item'][data-highlighted]",
-        "[data-slot='dropdown-menu-checkbox-item'][data-highlighted]",
-        "[data-slot='dropdown-menu-radio-item'][data-highlighted]",
-      ],
-    ]);
+    expect(optOuts.map((rule) => selectorParts(rule))).toEqual([]);
   });
 
   // The tints these rules replace are `@layer utilities` (`bg-signature-subtle`,
