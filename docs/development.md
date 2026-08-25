@@ -88,8 +88,8 @@ and `pnpm typecheck` both do this for you as a side effect; `pnpm dev`, `pnpm db
 
 The test suites are the exception. Jest (`apps/api`, unit and integration) and Vitest
 (`apps/web`, `packages/auth-access`) map both packages to their `src/index.ts`, so `pnpm test`
-passes on a checkout with no `dist` at all and never runs against a stale one; the CI test job
-deliberately skips the build for that reason. A stale build is the worse of the two failures,
+passes on a checkout with no `dist` at all and never runs against a stale one; the CI test jobs
+deliberately skip the build for that reason. A stale build is the worse of the two failures,
 because it resolves: an enum added since the last build reads back as `undefined` in every
 consumer. `pnpm dev` and `pnpm db:seed` still go through `dist`, so rebuild after pulling a
 change to either package.
@@ -980,6 +980,14 @@ service is `restart: unless-stopped`: a backup sidecar that stays down after a r
 silently stops producing recovery points, which is the failure this whole section exists to
 prevent. It is deliberately **not** in `docker-compose.dev.yml` — a local database that
 `pnpm db:seed` wipes on demand has nothing worth keeping.
+
+That week is a count of archives, not an age, and restarting the container does not spend one.
+The loop used to take a pair on entry every time it started, and every host reboot, `docker
+compose up` after a `.env` edit and image pull starts it, so a day of restarts could push a
+week of history out of the seven slots. Now it skips that first cycle while a dump younger than
+half of `BACKUP_INTERVAL` already exists, logs the skip, and sleeps only the remainder of the
+interval, so both the cadence and the history are what they were before the restart. The
+hand-run `backup.sh once` below is never skipped: an operator asking for a dump gets one.
 
 Three settings, all read from `.env` by compose:
 

@@ -76,8 +76,10 @@ anahtarlar `seats`, `boards`, `storageBytes`. Çözümleme sırası: override, s
 sonra sınırsız.
 
 **Uygulama yazmada, tek bir ret şeklinde.** Board oluşturma, board'u ekleyen transaction'ın
-içinde denetler. Workspace oluşturma, davet, kabul ve sign-up, koruduğu yazmadan hemen önce
-denetler. Her biri `403` ile ve şununla reddeder:
+içinde denetler; board ekleyen öteki route olan Trello içe aktarıcı (`POST .../imports/trello`)
+da öyle: denetim, transaction'ının ilk ifadesidir, dolayısıyla reddedilen bir içe aktarma hiçbir
+şey yazmaz. Workspace oluşturma, davet, kabul ve sign-up, koruduğu yazmadan hemen önce denetler.
+Her biri `403` ile ve şununla reddeder:
 
 ```jsonc
 {

@@ -1,10 +1,75 @@
 import { INestApplication } from '@nestjs/common';
+import { request as httpRequest, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { AUTH_BODY_MAX_BYTES } from '../src/auth/auth-body-limit';
+import { REQUEST_BODY_TOO_LARGE_MESSAGE } from '../src/common/filters/all-exceptions.filter';
+import { UUID_V7_REGEX } from '../src/common/uuid';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';
 import { createWorkspace, signIn, signUp } from './helpers/auth';
 import { resetDatabase } from './helpers/db';
+
+const ONE_MEBIBYTE = 1024 * 1024;
+
+/**
+ * A sign-in body of exactly `bytes` bytes: real credentials plus a `padding` field Better Auth's
+ * schema strips. Sent as a string so the `Content-Length` is the number under test and not
+ * whatever superagent's serialiser happens to produce.
+ */
+function signInBodyOfSize(email: string, password: string, bytes: number): string {
+  const frame = JSON.stringify({ email, password, padding: '' });
+  const room = bytes - Buffer.byteLength(frame);
+  if (room < 0) throw new Error(`a ${bytes}-byte body cannot hold the credentials`);
+  return JSON.stringify({ email, password, padding: 'x'.repeat(room) });
+}
+
+type StreamOutcome = { kind: 'response'; status: number } | { kind: 'error'; code?: string };
+
+/**
+ * POSTs `totalBytes` of body with `Transfer-Encoding: chunked` and no `Content-Length`, the one
+ * shape the mount cannot refuse from the headers alone, straight over `node:http` because
+ * superagent always declares a length for the bodies it is given.
+ */
+function streamChunkedBody(
+  server: Server,
+  path: string,
+  totalBytes: number,
+): Promise<StreamOutcome> {
+  const { address, port } = server.address() as AddressInfo;
+  return new Promise((resolve) => {
+    const req = httpRequest(
+      {
+        host: address,
+        port,
+        method: 'POST',
+        path,
+        headers: { 'content-type': 'application/json', 'transfer-encoding': 'chunked' },
+      },
+      (res) => {
+        res.resume();
+        res.on('end', () => resolve({ kind: 'response', status: res.statusCode ?? 0 }));
+      },
+    );
+    req.on('error', (error: NodeJS.ErrnoException) => resolve({ kind: 'error', code: error.code }));
+
+    const chunk = Buffer.alloc(16 * 1024, 'x');
+    let sent = 0;
+    req.write('{"email":"nobody@test.example.com","password":"');
+    const pump = (): void => {
+      while (sent < totalBytes) {
+        sent += chunk.length;
+        if (!req.write(chunk)) {
+          req.once('drain', pump);
+          return;
+        }
+      }
+      req.end('"}');
+    };
+    pump();
+  });
+}
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
@@ -58,6 +123,87 @@ describe('Auth (e2e)', () => {
       .get('/me')
       .set('Cookie', ['better-auth.session_token=not-a-real-session'])
       .expect(401);
+  });
+
+  /**
+   * The `/auth/*` body ceiling (`AUTH_BODY_MAX_BYTES`), against the real mount and a real
+   * socket. `src/auth/auth-body-limit.spec.ts` covers the arithmetic; what only this file can
+   * show is that the check runs ahead of Better Auth's own reader without starving it.
+   */
+  describe('the request body ceiling', () => {
+    /**
+     * A sign-in request carrying `bytes` of body over a connection the client means to keep.
+     *
+     * `Connection: keep-alive` is set by hand because superagent asks for `Connection: close`
+     * on every request, and that turns an early refusal into a race the assertion loses roughly
+     * one run in ten. Node closes a socket the moment a response finishes on a connection the
+     * client asked to close, so the megabyte still in flight is met by a reset and the client
+     * reports `write ECONNRESET` instead of reading the `413` the server had already written.
+     * On a kept connection Node pulls the rest of the body off the wire and discards it, and
+     * the response is always readable. Every real caller (a browser, `fetch`, curl) keeps the
+     * connection, so this is the ordinary case and not a workaround. The refusal itself is
+     * identical either way: it is written from the headers, before a byte of the body is read.
+     */
+    function postSignIn(email: string, password: string, bytes: number): request.Test {
+      return request(app.getHttpServer())
+        .post('/auth/sign-in/email')
+        .set('Content-Type', 'application/json')
+        .set('Connection', 'keep-alive')
+        .send(signInBodyOfSize(email, password, bytes));
+    }
+
+    it('refuses a 1 MiB body with the standard 413 envelope, before Better Auth reads it', async () => {
+      const user = await signUp(app);
+      const sessionsBefore = await prisma.session.count();
+
+      const response = await postSignIn(user.email, user.password, ONE_MEBIBYTE).expect(413);
+
+      expect(response.headers['content-type']).toMatch(/application\/json/);
+      expect(response.body).toEqual({
+        statusCode: 413,
+        error: 'Payload Too Large',
+        message: REQUEST_BODY_TOO_LARGE_MESSAGE,
+        path: '/auth/sign-in/email',
+        timestamp: expect.any(String),
+        requestId: expect.stringMatching(UUID_V7_REGEX),
+      });
+      expect(response.headers['x-request-id']).toBe(response.body.requestId);
+      // Refused from the headers, so the valid credentials inside were never read: no session.
+      expect(response.headers['set-cookie']).toBeUndefined();
+      await expect(prisma.session.count()).resolves.toBe(sessionsBefore);
+    });
+
+    it('is a strict ceiling: exactly AUTH_BODY_MAX_BYTES signs in, one byte more is refused', async () => {
+      // The boundary is what the proxy row is held to (`two-layer-limit.spec.ts`): a body Caddy
+      // lets through at `max_size` must be a body the API accepts.
+      const user = await signUp(app);
+
+      const atCeiling = await postSignIn(user.email, user.password, AUTH_BODY_MAX_BYTES).expect(
+        200,
+      );
+      expect(atCeiling.headers['set-cookie']).toEqual(
+        expect.arrayContaining([expect.stringContaining('better-auth.session_token=')]),
+      );
+
+      await postSignIn(user.email, user.password, AUTH_BODY_MAX_BYTES + 1).expect(413);
+    });
+
+    it('cuts a chunked body past the ceiling and keeps serving afterwards', async () => {
+      const user = await signUp(app);
+
+      // No `Content-Length` to refuse up front, so the guard counts as Better Auth reads and
+      // closes the connection: the client gets no response at all, not a late 200.
+      const outcome = await streamChunkedBody(
+        app.getHttpServer(),
+        '/auth/sign-in/email',
+        ONE_MEBIBYTE,
+      );
+      expect(outcome.kind).toBe('error');
+
+      // The cut is per request. The process is intact and the route answers the next caller.
+      const agent = await signIn(app, user.email, user.password);
+      await agent.get('/me').expect(200);
+    });
   });
 
   it('creates a workspace owned by the signed-in user', async () => {
