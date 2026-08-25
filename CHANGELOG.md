@@ -245,6 +245,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A Trello import no longer steps over the workspace's board ceiling.**
+  `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on
+  `POST .../boards` but not on `POST .../imports/trello`, which creates its board by its own
+  `tx.board.create`, so an `OWNER` or `ADMIN` at the limit could keep adding boards by importing
+  any small export. `TrelloImportService` now asks `PlanLimitsService` for room as the first
+  statement of its transaction, with the same transaction client and the same `403`
+  `PLAN_LIMIT_BOARDS` refusal `BoardService.create` gives, and a refused import writes nothing.
+  Imported link attachment names also go through the display-name cleaning `createLink` applies
+  (bidi overrides, control characters, quotes and backslashes stripped, 255-character clamp,
+  URL fallback for a name that is empty afterwards), which the importer had skipped; the rule
+  moved to `attachment-display-name.ts` so both writers of `Attachment.filename` share one
+  function. [ADR 0032](docs/decisions/0032-plan-limits.md) names the importer in its
+  enforcement list.
+
 - **`PLAN_MAX_*`, `INSTANCE_ADMIN_EMAILS`, the retention windows, telemetry, `API_DOCS_ENABLED`,
   `RATE_LIMIT_ENABLED` and the database pool knobs were inert under the bundled Compose stack.**
   Compose reads `.env` for `${VAR}` interpolation only and never hands the file to a container,
