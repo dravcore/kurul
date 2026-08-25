@@ -13439,6 +13439,10 @@
             "type": "boolean",
             "description": "`false` when `STORAGE_PATH` is unset, so this deployment stores no files.\n\nLink attachments do not depend on it — a `LINK` needs no storage at all."
           },
+          "signUpEnabled": {
+            "type": "boolean",
+            "description": "`false` when the operator has closed registration with `SIGNUP_ENABLED=false`.\n\nA policy switch beside the `planLimits.users` head count: `POST /auth/sign-up/email` then\nanswers `403` with `error: \"Sign-up Disabled\"` whatever the count is, and signing in stays\nopen. Independent of `demo.enabled`."
+          },
           "demo": {
             "description": "The demo-instance section. `enabled` is `false` on every ordinary self-hosted install, and\nthe web renders a standing \"data resets every hour\" banner from it when it is not.",
             "allOf": [
@@ -13456,7 +13460,7 @@
             ]
           }
         },
-        "required": ["mailEnabled", "attachmentsEnabled", "demo", "planLimits"]
+        "required": ["mailEnabled", "attachmentsEnabled", "signUpEnabled", "demo", "planLimits"]
       },
       "UserSchema": {
         "type": "object",

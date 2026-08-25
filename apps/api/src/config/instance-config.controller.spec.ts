@@ -1,11 +1,13 @@
 import type { InstancePlanLimitsDto } from '@kurul/shared-types';
+import { SIGNUP_ENABLED_ENV } from '../auth/sign-up-policy';
 import { MailService } from '../mail/mail.service';
 import { PlanLimitsService } from '../plan/plan-limits.service';
 import { StorageService } from '../storage/storage.service';
 import { InstanceConfigController } from './instance-config.controller';
 
 /**
- * `DEMO_MODE` is unset in this suite, so every document carries the off shape. Spelled out
+ * `DEMO_MODE` and `SIGNUP_ENABLED` are unset in this suite unless a test says otherwise, so
+ * every document carries the off shape for the one and the open shape for the other. Spelled out
  * rather than matched loosely: the nulls are the contract (`demo-mode.ts` refuses to publish a
  * plausible-looking schedule on an instance that has none), and the schedule's own arithmetic
  * is tested in `src/demo/demo-mode.spec.ts`.
@@ -59,12 +61,19 @@ function buildController(
 }
 
 describe('InstanceConfigController', () => {
+  const original = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...original };
+  });
+
   it('reports mail as enabled when the mail module has a delivering transport', () => {
     const { controller } = buildController(true);
 
     expect(controller.config()).toEqual({
       mailEnabled: true,
       attachmentsEnabled: false,
+      signUpEnabled: true,
       demo: NO_DEMO,
       planLimits: PLAN_LIMITS,
     });
@@ -76,6 +85,7 @@ describe('InstanceConfigController', () => {
     expect(controller.config()).toEqual({
       mailEnabled: false,
       attachmentsEnabled: false,
+      signUpEnabled: true,
       demo: NO_DEMO,
       planLimits: PLAN_LIMITS,
     });
@@ -87,6 +97,24 @@ describe('InstanceConfigController', () => {
     expect(controller.config()).toEqual({
       mailEnabled: false,
       attachmentsEnabled: true,
+      signUpEnabled: true,
+      demo: NO_DEMO,
+      planLimits: PLAN_LIMITS,
+    });
+  });
+
+  /**
+   * The same function the Better Auth mount reads, so a client that sees `false` here is the
+   * client whose sign-up would be refused; the document is not allowed a second opinion.
+   */
+  it('reports registration as closed when SIGNUP_ENABLED is false', () => {
+    process.env[SIGNUP_ENABLED_ENV] = 'false';
+    const { controller } = buildController(false);
+
+    expect(controller.config()).toEqual({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      signUpEnabled: false,
       demo: NO_DEMO,
       planLimits: PLAN_LIMITS,
     });
@@ -120,12 +148,14 @@ describe('InstanceConfigController', () => {
     expect(controller.config()).toEqual({
       mailEnabled: true,
       attachmentsEnabled: true,
+      signUpEnabled: true,
       demo: NO_DEMO,
       planLimits: PLAN_LIMITS,
     });
     expect(controller.config()).toEqual({
       mailEnabled: false,
       attachmentsEnabled: false,
+      signUpEnabled: true,
       demo: NO_DEMO,
       planLimits: PLAN_LIMITS,
     });
