@@ -7,7 +7,10 @@ const mocks = vi.hoisted(() => ({
   searchParams: new URLSearchParams(),
   resetPassword:
     vi.fn<
-      (args: { newPassword: string; token: string }) => Promise<{ error: { code?: string } | null }>
+      (args: {
+        newPassword: string;
+        token: string;
+      }) => Promise<{ error: { code?: string; status?: number } | null }>
     >(),
 }));
 
@@ -107,6 +110,19 @@ describe('ResetPasswordView', () => {
     expect(await screen.findByText('Password must be at least 8 characters long.')).toBeTruthy();
     expect(screen.getByLabelText('New password').getAttribute('aria-invalid')).toBe('true');
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('names the rate limit rather than sending the reader after another link', async () => {
+    // Better Auth's limiter answers `429` with no error code of its own. The generic message
+    // tells the reader to request a new link, which is exactly what a counting limiter refuses.
+    mocks.resetPassword.mockResolvedValue({ error: { status: 429 } });
+    renderView();
+
+    submit('correct-horse-battery');
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe('Too many requests. Try again in a few seconds.');
+    expect(screen.getByLabelText('New password')).toBeTruthy();
   });
 
   it('announces any other refusal above the form and keeps the form', async () => {

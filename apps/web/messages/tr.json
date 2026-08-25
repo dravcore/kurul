@@ -24,6 +24,7 @@
       "sending": "Gönderiliyor…",
       "sent": "Bu adrese ait bir hesap varsa sıfırlama bağlantısı yolda. Bağlantı bir saat geçerli.",
       "sendError": "Bağlantı gönderilemedi. Birazdan tekrar deneyin.",
+      "rateLimited": "Çok fazla istek. Birkaç saniye içinde tekrar deneyin.",
       "backToLogin": "Giriş ekranına dön"
     },
     "resetPassword": {
@@ -40,6 +41,7 @@
       "invalidBody": "Süresi dolmuş, daha önce kullanılmış ya da son karakterleri eksik kopyalanmış olabilir. Sıfırlama bağlantıları bir saat geçerlidir.",
       "requestNewLink": "Yeni bağlantı gönder",
       "error": "Parolanız değiştirilemedi. Kendinize yeni bir bağlantı gönderip tekrar deneyin.",
+      "rateLimited": "Çok fazla istek. Birkaç saniye içinde tekrar deneyin.",
       "fieldErrors": {
         "password": {
           "tooShort": "Parola en az 8 karakter olmalı.",

@@ -10,6 +10,12 @@ import { Button } from '@/components/ui/button';
 import { authClient } from '@/lib/auth';
 
 /**
+ * Better Auth's rate limiter answers with a bare `429` and no error code of its own, so this is
+ * the one refusal here that is read off the status rather than off `error.code`.
+ */
+const TOO_MANY_REQUESTS = 429;
+
+/**
  * The "I forgot my password" form.
  *
  * The endpoint answers `200` for every address, registered or not, precisely so nobody can
@@ -43,7 +49,7 @@ export function ForgotPasswordView(): React.ReactElement {
       });
 
       if (result.error) {
-        setError(t('sendError'));
+        setError(result.error.status === TOO_MANY_REQUESTS ? t('rateLimited') : t('sendError'));
         return;
       }
 

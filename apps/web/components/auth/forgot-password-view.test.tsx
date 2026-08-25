@@ -6,7 +6,10 @@ import messages from '@/messages/en.json';
 const mocks = vi.hoisted(() => ({
   requestPasswordReset:
     vi.fn<
-      (args: { email: string; redirectTo: string }) => Promise<{ error: { code?: string } | null }>
+      (args: {
+        email: string;
+        redirectTo: string;
+      }) => Promise<{ error: { code?: string; status?: number } | null }>
     >(),
 }));
 
@@ -91,11 +94,23 @@ describe('ForgotPasswordView', () => {
     const status = await screen.findByRole('status');
     await waitFor(() => expect(status.textContent).toBe(NEUTRAL_MESSAGE));
 
-    mocks.requestPasswordReset.mockResolvedValue({ error: { code: 'RATE_LIMITED' } });
+    mocks.requestPasswordReset.mockResolvedValue({ error: { status: 500 } });
     submit('ayse@example.com');
 
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByRole('status').textContent).toBe('');
+  });
+
+  it('names the rate limit rather than blaming the send', async () => {
+    // Better Auth's limiter answers `429` with no error code of its own, so the status is what
+    // there is to branch on (docs/design.md §6 asks for its own copy here).
+    mocks.requestPasswordReset.mockResolvedValue({ error: { status: 429 } });
+    renderView();
+
+    submit('ayse@example.com');
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe('Too many requests. Try again in a few seconds.');
   });
 
   it('treats a thrown request like a refused one', async () => {

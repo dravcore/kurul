@@ -14,6 +14,14 @@ import { authClient } from '@/lib/auth';
 const INVALID_TOKEN_CODE = 'INVALID_TOKEN';
 
 /**
+ * Better Auth's rate limiter answers with a bare `429` and no error code of its own, so this is
+ * the one refusal here that is read off the status rather than off `error.code`. It matters
+ * because the generic message tells the reader to send themselves a new link, which is the
+ * worst possible advice while a limiter is counting.
+ */
+const TOO_MANY_REQUESTS = 429;
+
+/**
  * Reset-form error codes that belong under the password field, and the message each maps to.
  *
  * Branching on the machine-readable code, never the English sentence beside it
@@ -65,6 +73,8 @@ export function ResetPasswordView(): React.ReactElement {
           setLinkRejected(true);
         } else if (code !== undefined && code in PASSWORD_FIELD_ERRORS) {
           setFieldError(t(PASSWORD_FIELD_ERRORS[code]!));
+        } else if (result.error.status === TOO_MANY_REQUESTS) {
+          setError(t('rateLimited'));
         } else {
           setError(t('error'));
         }

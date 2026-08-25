@@ -24,6 +24,7 @@
       "sending": "Sending…",
       "sent": "If that address has an account, a reset link is on its way. It works for one hour.",
       "sendError": "Could not send the link. Try again in a moment.",
+      "rateLimited": "Too many requests. Try again in a few seconds.",
       "backToLogin": "Back to sign in"
     },
     "resetPassword": {
@@ -40,6 +41,7 @@
       "invalidBody": "It may have expired, been used already, or been copied without its last characters. Reset links work for one hour.",
       "requestNewLink": "Send a new link",
       "error": "Could not change your password. Send yourself a new link and try again.",
+      "rateLimited": "Too many requests. Try again in a few seconds.",
       "fieldErrors": {
         "password": {
           "tooShort": "Password must be at least 8 characters long.",
