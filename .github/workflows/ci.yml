@@ -14,7 +14,11 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Only a pull request is cancelled by a newer push to the same ref. A `develop` push is the
+  # run that writes the buildx layer cache every pull request reads (see image-scan below), so
+  # a merge burst that cancelled it left that cache stale and the next PR's image-scan leg
+  # doing a cold build. `develop` and `main` runs now finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -268,10 +272,9 @@ jobs:
       # Trivy to read and is discarded with the runner. Publishing stays where it belongs, in
       # release-images.yml, behind a tag.
       #
-      # The gha cache a pull request writes is scoped to that pull request and discarded on
-      # merge; what makes a PR's first run fast is the cache written by this same workflow's run
-      # on `develop` (it triggers on `push` there too), which every branch cut from develop can
-      # read.
+      # What makes a PR's run fast is the cache written by this same workflow's run on `develop`
+      # (it triggers on `push` there too), which every branch cut from develop can read. Pull
+      # request runs only read it; `cache-to` below says why they stopped writing.
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -287,7 +290,13 @@ jobs:
           # is actually published.
           provenance: false
           cache-from: type=gha,scope=pr-${{ matrix.image }}
-          cache-to: ${{ matrix.cache-to }}
+          # Written on `push` only, i.e. by the `develop` and `main` runs, and read by everyone.
+          # Pull request runs used to write too, and each stored a full `mode=max` copy of the
+          # build stage under its own ref, which no other run can read and which is discarded
+          # on merge: with three PRs open the repository sat at 10.87 GB against GitHub's 10 GB
+          # cache limit, and eviction by last access took develop's entries with it, which is
+          # the cache miss this whole arrangement exists to avoid.
+          cache-to: ${{ github.event_name == 'push' && matrix.cache-to || '' }}
 
       # A Next.js standalone image can build green and still be dead on arrival: `next build`
       # *traces* the server's runtime dependencies, and a tracing regression drops a file that
