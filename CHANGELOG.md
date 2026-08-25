@@ -318,6 +318,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   built artifact before, which is why a build that compiled and scanned clean could still be
   dead on arrival; the check costs a few seconds and fails with the container's own log.
 
+### Fixed
+
+- **Border colours written in the markup were not the ones being drawn.** `app/globals.css`
+  declared `* { border-color: var(--border) }` outside any cascade layer, and an unlayered
+  author rule outranks every `@layer` regardless of specificity, so it silently repainted every
+  `border-*` utility Tailwind emits into `@layer utilities`. The rule now sits in `@layer base`,
+  which is what makes the selected task card's copper edge, the selected template card in the
+  create-board dialog and an empty column's dashed drop zone paint the token their class names
+  always named. Field borders take the same path: an input's `aria-invalid:border-destructive`
+  now really turns the edge red instead of leaving it hairline grey. The `:focus-visible`
+  outline stays unlayered on purpose and says why in place; it moves in the same change that
+  drops `outline-none` from the button primitive.
+- **Eleven settings and dialog labels rendered at body size instead of the 12/16 caption size
+  they asked for.** They carried `text-caption`, a class with no `@theme inline` counterpart, so
+  Tailwind emitted no CSS for it at all and the elements simply inherited the body's 13/18. They
+  now carry `text-small`, the size `docs/design.md` assigns to metadata and helper text. A new
+  `apps/web/app/theme-classes.test.ts` compiles every `text-`, `bg-`, `border-`, `font-` and
+  `shadow-` class in the tree through Tailwind itself and fails on any that resolves to nothing,
+  so the next such class cannot land unnoticed.
+- **The board's Filters badge counted the search term.** Typing in the search box put a `1` on a
+  menu whose options were all untouched, and clearing the menu could not clear it. The badge now
+  counts only what the menu itself sets. The empty-state message, which describes everything
+  narrowing the board rather than one control's state, still counts the search term.
+- **Native selects, date pickers and scrollbars could ignore the theme.** `color-scheme` is now
+  declared in the stylesheet, `light` on `:root` and `dark` on `.dark`, rather than left to an
+  inline style the theme provider writes, so the browser's own widgets follow the theme and keep
+  doing so if that provider is reconfigured.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that

@@ -1,8 +1,18 @@
 @import 'tailwindcss';
 
+/* Test files are never rendered, so a class-like string inside one (a code example in a comment,
+   a test title quoting a class name) must never reach the compiled stylesheet: Tailwind's scanner
+   is language-agnostic and would otherwise treat prose like `bg-[url(...)]` as a real candidate. */
+@source not "../**/*.test.{ts,tsx}";
+
 /* Kurul design tokens — values from docs/design.md §3 (Phase 3 validated). */
 
 :root {
+  /* Native controls and scrollbars (select, date/number inputs, the OS scrollbar chrome) key
+     off this property, not off next-themes' `class` attribute, so it cannot be left to that
+     provider's `enableColorScheme` default. */
+  color-scheme: light;
+
   --background: #f7f8f7;
   --foreground: #191c1b;
   --card: #ffffff;
@@ -76,6 +86,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   --background: #0e100f;
   --foreground: #e8ecea;
   --card: #161918;
@@ -188,8 +200,13 @@
   --shadow-drag: var(--elevation-drag);
 }
 
-* {
-  border-color: var(--border);
+/* Inside `base` because an unlayered rule outranks every cascade layer regardless of
+   specificity, so an unlayered `*` here silently repaints every `border-*` utility Tailwind
+   emits into `@layer utilities`. */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 body {
@@ -208,6 +225,13 @@ body {
   font-family: var(--font-mono);
 }
 
+/* Unlayered on purpose, unlike the `*` rule above. components/ui/button.tsx carries
+   `outline-none` next to `focus-visible:border-ring` and `focus-visible:ring-[3px]
+   ring-ring/50`, both `@layer utilities` rules, so layering this outline would not leave a
+   focused button bare: it would leave it with a 1px copper border and a 50%-opacity ring,
+   and neither is the 2px `--ring` at 2px offset docs/design.md §5 sets as the keyboard
+   baseline. The rule moves into `base` in the same change that drops `outline-none` and
+   settles the ring utilities, Phase 4. */
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;

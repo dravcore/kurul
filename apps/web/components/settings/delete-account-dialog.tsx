@@ -171,7 +171,7 @@ export function DeleteAccountDialog({
 
         {!preview.loading && !preview.failed ? (
           <div className="flex flex-col gap-4">
-            <p className="text-caption text-muted-foreground">
+            <p className="text-small text-muted-foreground">
               {t('retained', {
                 comments: preview.data.retainedContent.comments,
                 tasks: preview.data.retainedContent.tasksCreated,
@@ -207,7 +207,7 @@ export function DeleteAccountDialog({
                       // Said in the UI rather than discovered from a 404: there is nobody in
                       // this workspace to hand it to, so the only disposition the API accepts
                       // for it is deletion.
-                      <p className="text-caption text-muted-foreground">{t('ownedNobodyLeft')}</p>
+                      <p className="text-small text-muted-foreground">{t('ownedNobodyLeft')}</p>
                     ) : null}
                   </div>
                 ))}

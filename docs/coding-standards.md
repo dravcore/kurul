@@ -229,6 +229,17 @@ components/
 - Conditional classes go through the `cn()` helper, never string concatenation.
 - Design tokens (colors, spacing, radius) come from the Tailwind theme — no arbitrary hex
   values in components.
+- Author CSS in `apps/web/app/globals.css` goes inside `@layer base` unless there is a written
+  reason not to, stated next to the rule. An unlayered rule outranks every cascade layer whatever
+  its specificity, so an unlayered `*` selector repaints the utilities Tailwind emits into
+  `@layer utilities` and a class written in the markup stops meaning what it says. The
+  `:focus-visible` outline is the one current exception and carries its reason in place.
+  Guarded by `apps/web/app/globals-css-layers.test.ts`.
+- Every `text-*`, `bg-*`, `border-*`, `font-*` and `shadow-*` class must resolve against
+  `@theme inline` or Tailwind's built-in scale. A class with no counterpart compiles to no CSS at
+  all: nothing errors, the element just inherits and the mistake is invisible in review.
+  `apps/web/app/theme-classes.test.ts` compiles the tree through Tailwind and fails on any class
+  that emits nothing.
 
 ## Shared types (`packages/shared-types`)
 

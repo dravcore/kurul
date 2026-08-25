@@ -87,8 +87,11 @@ export function BoardTemplatePicker({
             className={cn(
               'flex cursor-pointer gap-2.5 rounded-md border p-2.5 transition-colors',
               'focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50',
+              // `border-signature`, not `border-ring`: the two tokens hold the same copper
+              // today, so a selected card and a focused one were telling the cascade the same
+              // thing by accident. Selection is the rail; focus is the ring.
               template.slug === value
-                ? 'border-ring bg-muted/40'
+                ? 'border-signature bg-muted/40'
                 : 'border-border hover:border-border-strong hover:bg-muted/40',
             )}
           >

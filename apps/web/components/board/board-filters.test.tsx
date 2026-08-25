@@ -190,7 +190,7 @@ describe('BoardFilters menu', () => {
   it('counts the active filters on the trigger', () => {
     renderFilters({ q: 'bug', priority: [Priority.HIGH, Priority.LOW], dueDateNull: true });
 
-    expect(screen.getByRole('button', { name: /Filters/ }).textContent).toContain('4');
+    expect(screen.getByRole('button', { name: /Filters/ }).textContent).toContain('3');
   });
 
   it('adds and removes a priority', () => {

@@ -57,8 +57,11 @@ export function TokenCreatedDialog({
           <DialogTitle>{t('createdTitle')}</DialogTitle>
           <DialogDescription>{t('createdBody')}</DialogDescription>
         </DialogHeader>
+        {/* A read-only surface that shows the token, not a field, so it takes the plain
+            hairline rather than the form-control token it was copied from. The two resolve to
+            one value today and would part company the moment either moves. */}
         {token ? (
-          <p className="break-all rounded-md border border-input bg-muted/40 p-3 font-mono text-small text-foreground">
+          <p className="break-all rounded-md border border-border bg-muted/40 p-3 font-mono text-small text-foreground">
             {token.token}
           </p>
         ) : null}

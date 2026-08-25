@@ -20,6 +20,10 @@ export function ThemeProvider({
       attribute="class"
       defaultTheme="system"
       enableSystem
+      // `:root` and `.dark` in app/globals.css own `color-scheme`; left at its default this
+      // prop writes an inline style that outranks any stylesheet rule. The pre-paint script
+      // still sets the class, so the CSS value applies before first paint.
+      enableColorScheme={false}
       disableTransitionOnChange
       nonce={nonce}
     >
