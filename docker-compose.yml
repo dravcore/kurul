@@ -589,11 +589,23 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env — see docs/development.md#environment-variables}
       BETTER_AUTH_URL: ${SITE_URL:-http://localhost}
       WEB_URL: ${SITE_URL:-http://localhost}
-      # Both checks the reset makes before deleting anything. `DEMO_MODE` has no default here
-      # on purpose: every other service in this file defaults it to `false`, and a container
-      # whose whole job is to empty a database should not inherit a default either way.
-      DEMO_MODE: ${DEMO_MODE:?set DEMO_MODE=true in .env to run the demo profile, see docs/self-hosting.md#demo-instance}
-      DEMO_PASSWORD: ${DEMO_PASSWORD:?set DEMO_PASSWORD in .env, it is the published password for the demo account, see docs/self-hosting.md#demo-instance}
+      # Both checks the reset makes before deleting anything. Blank defaults (`:-`), not the
+      # required form (`:?`), and the difference is not cosmetic: Compose interpolates the whole
+      # file before it filters services by profile, so a `:?` on these two lines aborted every
+      # plain `docker compose pull`/`up -d`/`config` with the shipped `.env.example` (both keys
+      # blank), on an install that never asked for a demo, with a message telling that operator
+      # to set DEMO_MODE=true. To run the demo profile, set DEMO_MODE=true and DEMO_PASSWORD in
+      # .env (docs/self-hosting.md#demo-instance). Leaving either blank is refused at runtime,
+      # where it can be logged, rather than at parse time: `reset-guard.ts`
+      # (`assertDemoResetAllowed`) exits on any DEMO_MODE other than true, and `reset.ts` exits
+      # on a blank DEMO_PASSWORD or one shorter than 8 characters, so
+      # `docker compose --profile demo logs demo-reset` shows "Refusing to reset" instead of
+      # Compose refusing the file.
+      # Still no `false` here, unlike `api` above: an empty value is refused exactly as `false`
+      # is, and a container whose whole job is to empty a database should not carry a default
+      # either way.
+      DEMO_MODE: ${DEMO_MODE:-}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
       DEMO_RESET_INTERVAL_MINUTES: ${DEMO_RESET_INTERVAL_MINUTES:-60}
       # No REDIS_URL, and that is the decision rather than an omission: nothing this script does
       # touches Redis, and Better Auth would build a rate-limit client at module load for a

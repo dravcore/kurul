@@ -533,7 +533,9 @@ herhangi bir makinede çalıştırın ve arşivleri taze bir kurulumun restore a
 Bu bölüm tek bir iş için: herkesin giriş yapabildiği ve içeriğini belirli aralıklarla çöpe atan
 bir **herkese açık demo** çalıştırmak. Kurul'u kendi ekibiniz için barındırıyorsanız burayı
 atlayın. Buradaki hiçbir şey varsayılan olarak açık değil ve hiçbiri sıradan bir kurulumu
-değiştirmiyor.
+değiştirmiyor: `.env.example` `DEMO_MODE` ve `DEMO_PASSWORD`'ü boş gönderir ve boş olan zaten
+sıradan kurulumdur. Profile olmadan `docker compose up -d` ne sidecar'ı başlatır ne de bu iki
+değerden birini ister.
 
 Bir demoyu iki şey oluşturur: API'nin davranışını değiştiren `DEMO_MODE=true` ve silme işini
 yapan sidecar'ı başlatan `demo` compose profile'ı. Ya ikisi birden, ya hiçbiri.

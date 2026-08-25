@@ -174,6 +174,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **CI now parses the compose files and the Caddyfile on every pull request.** A new
+  `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
+  `docker compose config -q`, without a profile and with `--profile demo`, renders
+  `docker-compose.dev.yml`, and runs `caddy validate` over `docker/Caddyfile` in the
+  `caddy:2-alpine` image the stack ships. The env file is `.env.example` plus `POSTGRES_PASSWORD`
+  and `BETTER_AUTH_SECRET`, the install the docs describe, so the job fails on exactly what an
+  operator would hit: a broken YAML anchor, a renamed Caddy directive, or a required-variable
+  interpolation that a plain `docker compose up -d` cannot satisfy. Until now nothing in CI read
+  either file: `image-scan` builds the images, the browser suite builds its own stack, and
+  `scripts/bootstrap.mjs` validates only `docker-compose.dev.yml`, which is how the `demo-reset`
+  interpolation fixed below reached `develop`. The compose legs need no daemon, the job takes
+  seconds, and it is wired into the `ci-ok` gate like every other job
+  ([testing.md](docs/testing.md#compose-and-caddyfile-parse)).
 - **Better Auth upgraded to 1.7.1, which needs a database migration before the API starts.**
   `Account` gains a required `issuer` column and a unique `(issuer, accountId)` index: identity
   is now keyed on the pair rather than on `accountId` alone, so two providers handing out the
@@ -195,6 +208,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Every plain `docker compose` invocation on `develop` failed with "required variable
+  DEMO_MODE is missing a value".** The `demo-reset` sidecar added for the public demo declared
+  `DEMO_MODE` and `DEMO_PASSWORD` in the required form (`${VAR:?message}`), on the reasoning
+  that a service behind `profiles: ['demo']` is never evaluated without the profile. Compose
+  interpolates the whole file before it filters services by profile, and `:?` treats an empty
+  value as missing, so `cp .env.example .env` (both keys ship blank) followed by
+  `docker compose up -d`, `pull`, `ps` or `config` aborted on an install that never asked for a
+  demo, with a message telling that operator to set `DEMO_MODE=true`. No release carries the
+  defect: `v0.3.0` predates the change. Both keys now default to blank (`${VAR:-}`). The refusal
+  the `:?` was standing in for already exists where it can be logged, in
+  `apps/api/src/demo/reset-guard.ts` (any `DEMO_MODE` other than true) and `reset.ts` (a blank
+  or short `DEMO_PASSWORD`), so a demo profile started with either key unset prints "Refusing
+  to reset" in `docker compose --profile demo logs demo-reset` instead of Compose refusing the
+  file for everyone.
 - **`charts.test.tsx` was load-sensitive ([#244](https://github.com/dravcore/kurul/issues/244)),
   reproduced and fixed.** Running `apps/web`'s Vitest suite alongside `apps/api`'s Jest suite
   reproduced it 6/6 tries. The cause: the file's bar-animation poll (`barPaths`) promises to
