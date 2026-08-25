@@ -269,19 +269,32 @@ function escapeClass(className: string): string {
   return `.${className.replaceAll(/[:/[\]]/g, (character) => `\\${character}`)}`;
 }
 
+/** The body of the first `@media` block whose prelude starts with `query`, braces excluded. */
+function mediaBody(query: string): string {
+  const start = css.indexOf(query);
+  if (start === -1) throw new Error(`the compiled CSS has no \`${query}\` block`);
+  const open = css.indexOf('{', start);
+  return css.slice(open + 1, blockEnd(css, open));
+}
+
+/** The selectors a comma-separated prelude lists, in the order it lists them. */
+function selectorParts(rule: StyleRule): string[] {
+  return rule.selector.split(',').map((part) => part.trim());
+}
+
+let sheet: Stylesheet;
+let css: string;
+
+beforeAll(async () => {
+  css = await compileGlobals([
+    ...Object.keys(borderUtilities),
+    ...Object.keys(stateVariants),
+    'divide-border',
+  ]);
+  sheet = parseStylesheet(css);
+}, 30_000);
+
 describe('globals.css cascade layers', () => {
-  let sheet: Stylesheet;
-  let css: string;
-
-  beforeAll(async () => {
-    css = await compileGlobals([
-      ...Object.keys(borderUtilities),
-      ...Object.keys(stateVariants),
-      'divide-border',
-    ]);
-    sheet = parseStylesheet(css);
-  }, 30_000);
-
   it('emits Tailwind utilities into a layer that outranks base', () => {
     expect(sheet.layerOrder).toContain('base');
     expect(sheet.layerOrder).toContain('utilities');
@@ -383,4 +396,124 @@ describe('globals.css cascade layers', () => {
       expect(rule.declarations).toContainEqual({ property: 'color-scheme', value: scheme });
     },
   );
+});
+
+/**
+ * The border-based twins of the states this phase built out of a surface step or a tint.
+ * `forced-colors: active` replaces every author colour with the user's palette, so a hover step,
+ * a selection tint and a drop tint all collapse onto the same ground: without these rules the
+ * three states below are indistinguishable from a resting card, column or menu row, which is
+ * what docs/design.md §9 forbids. jsdom evaluates no media queries, so the compiled stylesheet
+ * is where the fallbacks can be checked at all; a real Chromium under forced-colors and
+ * prefers-contrast emulation is the phase-level check on top of this one.
+ */
+describe('globals.css forced-colours and contrast fallbacks', () => {
+  let forced: Stylesheet;
+
+  beforeAll(() => {
+    forced = parseStylesheet(mediaBody('@media (forced-colors: active)'));
+  });
+
+  it('outlines the selected card in Highlight and hands the outline back on focus', () => {
+    const selection = requireRule(forced, 'the selected card outline', (rule) => {
+      return rule.selector === 'a[data-selected]:not(:focus-visible)';
+    });
+    expect(selection.declarations).toEqual([
+      { property: 'outline', value: '2px solid Highlight' },
+      { property: 'outline-offset', value: '2px' },
+    ]);
+
+    // Selection and focus are two different states and stay two different marks: the focused
+    // card keeps the `:focus-visible` outline, and this border is what still says "selected".
+    const border = requireRule(forced, "the selected card's Highlight border", (rule) => {
+      return rule.selector === 'a[data-selected]';
+    });
+    expect(border.declarations).toEqual([{ property: 'border-color', value: 'Highlight' }]);
+  });
+
+  it('gives the drop target a Highlight border in place of its tint', () => {
+    const drop = requireRule(forced, 'the drop target border', (rule) => {
+      return rule.selector === '[data-drop-target]';
+    });
+    expect(drop.declarations).toEqual([{ property: 'border', value: '2px solid Highlight' }]);
+  });
+
+  it('paints the highlighted menu row with the palette pair the mode provides', () => {
+    const row = requireRule(forced, 'the highlighted menu row', (rule) => {
+      return selectorParts(rule).includes("[data-slot='dropdown-menu-item'][data-highlighted]");
+    });
+    expect(selectorParts(row)).toEqual([
+      "[data-slot='dropdown-menu-item'][data-highlighted]",
+      "[data-slot='dropdown-menu-checkbox-item'][data-highlighted]",
+      "[data-slot='dropdown-menu-radio-item'][data-highlighted]",
+    ]);
+    expect(row.declarations).toEqual([
+      { property: 'background', value: 'Highlight' },
+      { property: 'color', value: 'HighlightText' },
+      { property: 'forced-color-adjust', value: 'none' },
+    ]);
+
+    // `forced-color-adjust` is inherited, so opting one row out of the forced palette also opts
+    // out everything inside it. The icon carries `text-muted-foreground`, a real grey with no
+    // contract against Highlight, so it is put back on the palette by hand.
+    const icon = requireRule(forced, "the highlighted row's icon colour", (rule) => {
+      return rule.selector.includes('svg');
+    });
+    expect(icon.declarations).toEqual([{ property: 'color', value: 'HighlightText' }]);
+  });
+
+  it('opts nothing else out of the forced palette', () => {
+    const optOuts = forced.rules.filter((rule) => {
+      return rule.declarations.some((declaration) => {
+        return declaration.property === 'forced-color-adjust';
+      });
+    });
+    expect(optOuts.map((rule) => selectorParts(rule))).toEqual([
+      [
+        "[data-slot='dropdown-menu-item'][data-highlighted]",
+        "[data-slot='dropdown-menu-checkbox-item'][data-highlighted]",
+        "[data-slot='dropdown-menu-radio-item'][data-highlighted]",
+      ],
+    ]);
+  });
+
+  // The tints these rules replace are `@layer utilities` (`bg-signature-subtle`,
+  // `border-signature`), so an unlayered fallback is what makes them win without a specificity
+  // race against whatever utility a call site adds next.
+  it.each(['a[data-selected]', 'a[data-selected]:not(:focus-visible)', '[data-drop-target]'])(
+    'keeps %s above every utility',
+    (selector) => {
+      const rule = requireRule(sheet, `a rule for ${selector}`, (candidate) => {
+        return candidate.selector === selector;
+      });
+      expect(layerRank(sheet, rule.layer)).toBeGreaterThan(layerRank(sheet, 'utilities'));
+    },
+  );
+
+  it('raises the hairline to --border-strong under prefers-contrast: more', () => {
+    const contrast = parseStylesheet(mediaBody('@media (prefers-contrast: more)'));
+
+    // One rule, one declaration: the request is a darker hairline, not a second palette.
+    expect(contrast.rules).toHaveLength(1);
+    const [raised] = contrast.rules;
+    expect(selectorParts(raised!)).toEqual([':root', '.dark']);
+    expect(raised!.declarations).toEqual([{ property: '--border', value: 'var(--border-strong)' }]);
+  });
+
+  it('overrides both themes from source order rather than specificity', () => {
+    // `:root` and `.dark` are both a single class-or-pseudo-class, so nothing but source order
+    // decides which `--border` a dark document ends up with.
+    const darkTokens = requireRule(sheet, 'the `.dark` token block', (rule) => {
+      return (
+        rule.selector === '.dark' &&
+        rule.declarations.some((declaration) => declaration.property === '--border')
+      );
+    });
+    const raised = requireRule(sheet, 'the prefers-contrast override', (rule) => {
+      return rule.declarations.some((declaration) => {
+        return declaration.property === '--border' && declaration.value === 'var(--border-strong)';
+      });
+    });
+    expect(raised.order).toBeGreaterThan(darkTokens.order);
+  });
 });

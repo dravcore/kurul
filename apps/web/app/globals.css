@@ -419,3 +419,55 @@ body {
     animation-name: drawer-fade-out;
   }
 }
+
+/* Forced colours replace every author colour with the user's palette, which erases exactly the
+   channel this phase's feedback leans on: a surface step and a tint. Every state built on one
+   carries a border-based twin here, per docs/design.md §9. */
+@media (forced-colors: active) {
+  /* Selection and focus stay two marks. The outline is selection while the card is not focused;
+     the moment it is, `:focus-visible` takes the outline back and this border is what still
+     says the card is the open one. */
+  a[data-selected]:not(:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  a[data-selected] {
+    border-color: Highlight;
+  }
+
+  /* components/board/board-column.tsx marks the column dnd-kit reports as `isOver`. The column
+     has no resting border, so this is the edge, not a thickening of one. */
+  [data-drop-target] {
+    border: 2px solid Highlight;
+  }
+
+  /* The menu row is the one place that opts out of the forced palette, and only to paint the
+     pair the palette itself hands out: the items carry `outline-hidden`, so the ground is the
+     whole indicator and a forced ground would be the popover's own. */
+  [data-slot='dropdown-menu-item'][data-highlighted],
+  [data-slot='dropdown-menu-checkbox-item'][data-highlighted],
+  [data-slot='dropdown-menu-radio-item'][data-highlighted] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  /* `forced-color-adjust` is inherited, so opting the row out opts its icon out too, and the
+     icon carries `text-muted-foreground`, a real grey with no contract against Highlight. */
+  [data-slot='dropdown-menu-item'][data-highlighted] svg,
+  [data-slot='dropdown-menu-checkbox-item'][data-highlighted] svg,
+  [data-slot='dropdown-menu-radio-item'][data-highlighted] svg {
+    color: HighlightText;
+  }
+}
+
+/* The hairline darkens to a value the ramp already holds instead of thickening or opening a
+   second palette. After `.dark` because both selectors weigh the same and only source order
+   decides which `--border` a dark document ends up with. */
+@media (prefers-contrast: more) {
+  :root,
+  .dark {
+    --border: var(--border-strong);
+  }
+}
