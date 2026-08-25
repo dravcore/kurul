@@ -981,6 +981,14 @@ silently stops producing recovery points, which is the failure this whole sectio
 prevent. It is deliberately **not** in `docker-compose.dev.yml` — a local database that
 `pnpm db:seed` wipes on demand has nothing worth keeping.
 
+That week is a count of archives, not an age, and restarting the container does not spend one.
+The loop used to take a pair on entry every time it started, and every host reboot, `docker
+compose up` after a `.env` edit and image pull starts it, so a day of restarts could push a
+week of history out of the seven slots. Now it skips that first cycle while a dump younger than
+half of `BACKUP_INTERVAL` already exists, logs the skip, and sleeps only the remainder of the
+interval, so both the cadence and the history are what they were before the restart. The
+hand-run `backup.sh once` below is never skipped: an operator asking for a dump gets one.
+
 Three settings, all read from `.env` by compose:
 
 | Variable          | Default | Purpose                                                                   |

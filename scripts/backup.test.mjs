@@ -13,7 +13,7 @@
  * docker-compose.yml, so the two halves of the feature cannot drift apart silently.
  */
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
@@ -163,6 +163,74 @@ function runBackup(world, env = {}) {
       .filter(Boolean)
       .map((line) => line.replace(/^\S+ /, '')),
   };
+}
+
+/**
+ * Loop mode, the way the compose `backup` service runs it: start the script with no argument,
+ * read its log until `until(line)` matches, then stop it the way `docker compose stop` does
+ * (SIGTERM) and wait for it to exit. The script parks in `sleep … & wait $!`, so the sleep is a
+ * child of its own; `detached` puts both in one process group and the negative pid signals the
+ * group, otherwise the orphaned sleep would hold the stdout pipe open for a whole interval. The
+ * group is signalled a second time once the shell has exited: a trap runs after the command in
+ * flight, and when that command was the `sleep … &` itself the sleep was forked after the first
+ * signal and is still parked on the pipe.
+ */
+function runLoopUntil(world, env, until) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('sh', [BACKUP_SH], {
+      detached: true,
+      env: {
+        PATH: `${world.bin}:${process.env.PATH}`,
+        BACKUP_DIR: world.backups,
+        ATTACHMENT_DIR: world.attachments,
+        BACKUP_KEEP: '7',
+        ...env,
+      },
+    });
+    const lines = [];
+    let pending = '';
+    let done = false;
+    const signalGroup = () => {
+      try {
+        process.kill(-child.pid, 'SIGTERM');
+      } catch {
+        // Already gone.
+      }
+    };
+    const stop = (error) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      signalGroup();
+      child.once('exit', () => {
+        signalGroup();
+        if (error) reject(error);
+        else resolve(lines);
+      });
+    };
+    const timer = setTimeout(
+      () => stop(new Error(`backup.sh never logged what was expected: ${lines.join(' | ')}`)),
+      10_000,
+    );
+    child.stdout.on('data', (chunk) => {
+      pending += chunk;
+      const parts = pending.split('\n');
+      pending = parts.pop();
+      for (const raw of parts) {
+        if (!raw) continue;
+        const line = raw.replace(/^\S+ /, '');
+        lines.push(line);
+        if (until(line)) stop();
+      }
+    });
+    child.once('exit', (code) => {
+      if (!done) {
+        done = true;
+        clearTimeout(timer);
+        reject(new Error(`backup.sh exited early with ${code}: ${lines.join(' | ')}`));
+      }
+    });
+  });
 }
 
 function rcloneCalls(world) {
@@ -333,6 +401,150 @@ describe('backup.sh with an off-host target', () => {
       readdirSync(world.backups).some((f) => f.endsWith('.dump')),
       'the local recovery point is taken even when the off-host half cannot run',
     );
+  });
+});
+
+describe('backup.sh loop mode across container restarts', () => {
+  const archives = (world) =>
+    readdirSync(world.backups)
+      .filter((f) => f.startsWith('kurul-'))
+      .sort();
+  const wroteFiles = (line) => line.includes('wrote') && line.includes('-files.tar.gz');
+
+  it('takes no second pair when restarted seconds after the first', async () => {
+    // BACKUP_INTERVAL is 60 so "within seconds" is comfortably inside the half-interval the
+    // skip looks at, on a loaded CI runner as much as on a laptop.
+    const world = makeWorld();
+    const env = { BACKUP_INTERVAL: '60' };
+
+    // First boot: no dump yet, so the loop dumps on entry, exactly as it always did.
+    const first = await runLoopUntil(world, env, wroteFiles);
+    assert.equal(first.filter((line) => line.startsWith('backup: wrote')).length, 2);
+    const afterFirst = archives(world);
+    assert.equal(afterFirst.length, 2, afterFirst.join(', '));
+
+    // A restart (reboot, `docker compose up` after a .env edit, an image pull): the pair from a
+    // moment ago is the recovery point, and retention is a count, so no new pair.
+    const second = await runLoopUntil(world, env, (line) => line.includes('skipping'));
+    assert.ok(
+      second.some((line) =>
+        /^backup: skipping the boot-time cycle: the newest dump is \d+s old/.test(line),
+      ),
+      second.join(' | '),
+    );
+    assert.ok(
+      second.every((line) => !line.startsWith('backup: wrote')),
+      second.join(' | '),
+    );
+    assert.deepEqual(archives(world), afterFirst);
+  });
+
+  it('retakes just the missing files archive when the newest dump is fresh', async () => {
+    // The dump half of a cycle succeeded, ATTACHMENT_DIR was not mounted yet (or the tar
+    // failed), so no files archive exists for it. A restart after the mount is fixed must not
+    // wait out a whole BACKUP_INTERVAL for the files half to catch up.
+    const world = makeWorld();
+    const dump = join(world.backups, 'kurul-20200101T000000Z.dump');
+    writeFileSync(dump, 'PGDMP-fake-archive');
+    const fresh = new Date(Date.now() - 5 * 1000);
+    utimesSync(dump, fresh, fresh);
+
+    const run = await runLoopUntil(world, { BACKUP_INTERVAL: '60' }, wroteFiles);
+
+    assert.ok(
+      run.some((line) =>
+        /^backup: skipping the boot-time cycle: the newest dump is \d+s old/.test(line),
+      ),
+      run.join(' | '),
+    );
+    assert.ok(
+      run.some((line) => line.includes('files archive for 20200101T000000Z is missing')),
+      run.join(' | '),
+    );
+    const written = archives(world);
+    assert.deepEqual(
+      written.filter((f) => f.endsWith('.dump')),
+      ['kurul-20200101T000000Z.dump'],
+      'the fresh dump was left alone, no second one taken',
+    );
+    assert.deepEqual(
+      written.filter((f) => f.endsWith('-files.tar.gz')),
+      ['kurul-20200101T000000Z-files.tar.gz'],
+      'the missing files archive was produced',
+    );
+  });
+
+  it('pushes off-host on restart when a fresh pair exists but nothing has reached the remote', async () => {
+    // Mirrors the files-archive case above for the other half of OPS-01: the operator fixes
+    // rclone credentials and restarts, and the off-host healthcheck must not stay unhealthy for
+    // a whole BACKUP_INTERVAL just because the local pair was already fresh.
+    const world = makeWorld();
+    const env = { BACKUP_INTERVAL: '60' };
+
+    const first = await runLoopUntil(world, env, wroteFiles);
+    assert.equal(first.filter((line) => line.startsWith('backup: wrote')).length, 2);
+    const afterFirst = archives(world);
+    const stamp = stampOf(afterFirst.find((f) => f.endsWith('.dump')));
+
+    // Stopped as soon as the dump reaches the remote (the fake rclone's `cp` runs, and is
+    // logged, before push_remote's own "pushed" line, so this is not a race with the copy
+    // itself): the second archive, the remote prune and the stamp all follow inside the same
+    // push_remote() call and are exercised end-to-end elsewhere ("pushes both archives and
+    // stamps the cycle"), so this test only has to show the boot path decides to call it.
+    const remoteEnv = {
+      ...env,
+      BACKUP_REMOTE: 'fake:kurul',
+      FAKE_REMOTE: world.remote,
+      RCLONE_LOG: world.rcloneLog,
+    };
+    const second = await runLoopUntil(
+      world,
+      remoteEnv,
+      (line) => line.includes('pushed') && line.includes(`kurul-${stamp}.dump`),
+    );
+
+    assert.ok(
+      second.some((line) =>
+        /^backup: skipping the boot-time cycle: the newest dump is \d+s old/.test(line),
+      ),
+      second.join(' | '),
+    );
+    assert.ok(
+      second.some((line) => line.includes(`off-host stamp is missing or older than ${stamp}`)),
+      second.join(' | '),
+    );
+    assert.ok(
+      second.every((line) => !line.startsWith('backup: wrote')),
+      'the fresh pair is left alone, only the off-host push runs',
+    );
+    assert.deepEqual(archives(world), afterFirst, 'boot push does not touch the local archives');
+    assert.ok(
+      readdirSync(join(world.remote, 'kurul')).includes(`kurul-${stamp}.dump`),
+      'the dump reached the remote',
+    );
+  });
+
+  it('dumps on entry when the newest dump is older than half an interval', async () => {
+    const world = makeWorld();
+    const stale = join(world.backups, 'kurul-20200101T000000Z.dump');
+    writeFileSync(stale, 'old');
+    const when = new Date(Date.now() - 45 * 1000);
+    utimesSync(stale, when, when);
+
+    const run = await runLoopUntil(world, { BACKUP_INTERVAL: '60' }, wroteFiles);
+    assert.ok(
+      run.every((line) => !line.includes('skipping')),
+      run.join(' | '),
+    );
+    assert.equal(archives(world).filter((f) => f.endsWith('.dump')).length, 2);
+  });
+
+  it('never skips a `once` run', () => {
+    const world = makeWorld();
+    assert.equal(runBackup(world, { BACKUP_INTERVAL: '86400' }).status, 0);
+    assert.equal(runBackup(world, { BACKUP_INTERVAL: '86400' }).status, 0);
+    // next_stamp() waited for the next second, so the two pairs are distinct.
+    assert.equal(archives(world).filter((f) => f.endsWith('.dump')).length, 2);
   });
 });
 
