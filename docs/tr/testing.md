@@ -35,11 +35,11 @@ Testler, bu maliyetin gerçek güven satın aldığı yerlerde yazılır.
 
 ## Piramit
 
-| Katman          | Araç                                   | Kapsam                                                                                               | Durum                                                |
-| --------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Servisler, guard'lar, saf fonksiyonlar, board/izin logic'i, DnD hook'ları. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu                              |
-| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden)       | Her endpoint için zorunlu                            |
-| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | Yedi senaryo (`e2e/`) — her gece ve her sürüm öncesi |
+| Katman          | Araç                                   | Kapsam                                                                                               | Durum                                                                  |
+| --------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Servisler, guard'lar, saf fonksiyonlar, board/izin logic'i, DnD hook'ları. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu                                                |
+| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden)       | Her endpoint için zorunlu                                              |
+| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | Yedi senaryo (`e2e/`): her gece `develop` üzerinde ve her sürüm öncesi |
 
 ```
         /\        e2e — yedi kritik akış (Playwright, gerçek Chromium)
@@ -496,11 +496,16 @@ Browser suite'i kendi workflow'unda,
 [`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml), farklı bir takvimle ve
 **`ci-ok` kapısının dışında** koşar:
 
-| Tetikleyici                      | Neden                                                                                                |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Her gece 03:00 UTC               | Günün merge'lerini içerecek kadar geç, kırmızı bir koşu sabah sizi beklesin diye yeterince erken     |
-| `main`'e açılan pull request'ler | Onları yalnızca `release/*` ve `hotfix/*` açar, yani tam olarak sürüm adayı ve hotfix başına bir kez |
-| `workflow_dispatch`              | İhtiyaç oldukça                                                                                      |
+| Tetikleyici                            | Neden                                                                                                                |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Her gece 03:00 UTC, `develop` üzerinde | Günün merge'lerinin indiği dal: onları içerecek kadar geç, kırmızı bir koşu sabah sizi beklesin diye yeterince erken |
+| `main`'e açılan pull request'ler       | Onları yalnızca `release/*` ve `hotfix/*` açar, yani tam olarak sürüm adayı ve hotfix başına bir kez                 |
+| `workflow_dispatch`                    | İhtiyaç oldukça                                                                                                      |
+
+GitHub zamanlanmış bir workflow'u varsayılan dalda çalıştırır; bu yüzden takvim workflow'un
+`main`'deki kopyasında tanımlıdır ve checkout adımı `develop`'ı çeker; koşu logu gerçekte hangi
+dalın ve commit'in koştuğunu yazar. `main` bilerek her gece test edilmez: sürümler arasında
+değişmez ve onu değiştiren pull request'ler suite'i zaten koşturur.
 
 Zorunlu kontrol olmaması bilinçli. Bu suite Postgres, Redis, Mailpit, derlenmiş bir API ve
 production web build'i başlatır, sonra Chromium'u hepsinin içinden geçirir — projenin en
