@@ -9,12 +9,12 @@ Build adımı yok. `docker compose pull` her sürüm için yayınlanan imajları
 her domain'de çalışır — API URL'i imajın içine derlenmiş değildir (gerekçesi için bkz.
 [Neden yeniden build gerekmiyor](#neden-yeniden-build-gerekmiyor)).
 
-> **v0.2.0 mu kuruyorsunuz? Bunun yerine `git clone` kullanın.** v0.2.0 ve öncesi sürümler
-> yalnızca `api` ve `web` imajlarını yayınladı; bu sayfanın çektiği üçüncü imaj olan
-> `kurul-migrate`, v0.2.0'dan sonraki ilk sürümden itibaren var. Aşağıdaki indirme adımı build
-> edilecek bir kaynak ağacı getirmediği için v0.2.0'da bu sayfadaki adımlar stack'i
-> başlatamaz — [Sorun giderme](#sorun-giderme) bölümünde gösterildiği gibi clone'dan kurun ve
-> bir sonraki sürümden itibaren bu sayfaya dönün.
+> **v0.2.0 ya da daha eskisini mi kuruyorsunuz? Bunun yerine `git clone` kullanın.** v0.2.0
+> ve öncesi sürümler yalnızca `api` ve `web` imajlarını yayınladı; bu sayfanın çektiği üçüncü
+> imaj olan `kurul-migrate`, v0.3.0'dan itibaren var. Aşağıdaki indirme adımı build edilecek
+> bir kaynak ağacı getirmediği için v0.2.0'da bu sayfadaki adımlar stack'i başlatamaz:
+> [Sorun giderme](#sorun-giderme) bölümünde gösterildiği gibi clone'dan kurun ve v0.3.0'dan
+> itibaren bu sayfaya dönün.
 
 ## Gerekenler
 
@@ -106,25 +106,37 @@ dig +short kurul.example.com
 
 ## 2. Compose dosyasını indirin ve yapılandırın
 
+Aşağıdaki URL'ler bir release tag'i taşıyor, `v0.3.0`, ve aynı tag birkaç satır aşağıda `.env`'e
+`TAG` olarak giriyor. Dosyaları `main`'den değil, çalıştıracağınız sürümden indirin:
+`docker-compose.yml`, `docker/Caddyfile` ve `scripts/backup.sh` imajlarla birlikte sürümlenir
+ve daha yeni bir ağaçtan gelen bir compose dosyası, sabitlediğiniz sürümün hiç yayınlamadığı
+bir servisi, değişkeni ya da imajı adlandırabilir. Başka bir sürümü kurmak için her URL'deki ve
+`TAG`'deki `v0.3.0`'ı değiştirin.
+
 ```bash
 mkdir -p /opt/kurul && cd /opt/kurul
-curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker-compose.yml
 curl -fsSL --create-dirs -o docker/Caddyfile \
-  https://raw.githubusercontent.com/dravcore/kurul/main/docker/Caddyfile
+  https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker/Caddyfile
 curl -fsSL --create-dirs -o scripts/backup.sh \
-  https://raw.githubusercontent.com/dravcore/kurul/main/scripts/backup.sh
+  https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/scripts/backup.sh
 chmod +x scripts/backup.sh
-curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/main/.env.example
+curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/.env.example
+chmod 600 .env
 ```
 
 `scripts/backup.sh` isteğe bağlı değil: `docker-compose.yml` içindeki `backup` servisi tam
 olarak o yolu container'ına bind-mount eder ve dosya yoksa o servisin var olma amacı olan
-zamanlanmış yedekler hiç alınmaz.
+zamanlanmış yedekler hiç alınmaz. `chmod 600 .env`, çünkü dosya birazdan veritabanı parolasını,
+oturum sırrını ve SMTP parolasını taşıyacak; [Host dışı kopyalar](#host-dışı-kopyalar)
+bölümündeki `rclone.env` tavsiyesi de aynı kural.
 
 `.env`'i düzenleyin. Yalnızca Docker ile kurulumda önemli olan satırlar şunlar — dosyadaki geri
 kalan her şey ya geliştirme döngüsü için ya da çalışan bir varsayılana sahip:
 
 ```bash
+TAG=v0.3.0                                  # yukarıdaki dosyaların geldiği sürüm
+
 SITE_URL=https://kurul.example.com          # domain'iniz, şema dahil
 
 POSTGRES_PASSWORD=<openssl rand -hex 32>       # base64 değil hex — bir URL'in içine giriyor
@@ -636,17 +648,94 @@ aldığı aynı tavsiye ve demonun düştüğünü internetteki birinden önce s
 
 ## Upgrade
 
-```bash
-docker compose pull && docker compose up -d
-```
+Bir release imajlar artı dosyalardır. `docker compose pull` imajları yeniler, başka hiçbir şeyi
+değil; dolayısıyla yalnızca pull yapan bir kurulum, kurulduğu günkü `docker-compose.yml`,
+`docker/Caddyfile` ve `scripts/backup.sh` ile çalışmaya devam eder ve sonraki her release'in
+eklediği servis (`demo` profilinin `demo-reset`'i), compose'un ilettiği değişken
+(`BACKUP_REMOTE`, attachment kotaları) ya da Caddy kuralı ona sessizce ulaşmaz. Runbook
+dosyaları bu yüzden yeniden indirir. Adımları her seferinde bu sırayla yapın; hiçbiri uzun
+değil.
 
-Migration'lar otomatik çalışır: tek seferlik `migrate` servisi, `api` başlamadan önce bekleyen
-migration'ları uygular. `latest`'i takip etmek yerine bilinçli upgrade etmeyi tercih
-ediyorsanız `.env`'de `TAG=v0.2.0` ile bir sürümü sabitleyin.
+1. **Release'i okuyun.** Hedef sürümün [CHANGELOG](../../CHANGELOG.md) bölümü her kırıcı
+   değişikliği ve her migration notunu taşır; aşağıdaki
+   [Operatörler için sürüm notları](#operatörler-için-sürüm-notları) ise `pull`'dan önce sizden
+   bir şey isteyenleri gösterir.
+2. **Şimdi bir yedek alın ve host dışına kopyalayın.** Sidecar'ın son döngüsü bir gün eski
+   olabilir; bu, upgrade'in hemen öncesinden ve bir rollback'in isteyeceği kurtarma noktası tam
+   olarak bu:
+
+   ```bash
+   docker compose exec backup /bin/sh /usr/local/bin/backup.sh once
+   ```
+
+   Sonra çifti [Yedekler](#yedekler) bölümündeki komutla volume'den dışarı kopyalayın ya da
+   `BACKUP_REMOTE` ayarlıysa `docker compose logs backup` içindeki iki `off-host: pushed`
+   satırını doğrulayın. Neden iki yarısı da gerekli ve `docker compose down -v`'den sağ çıkan
+   elle alınan varyant: [Elle dump almak](development.md#elle-dump-almak).
+
+3. **Dosyaları yeni tag'den yeniden indirin.**
+   [Kurulumun 2. adımındaki](#2-compose-dosyasını-indirin-ve-yapılandırın) `curl` satırlarını
+   her URL'de yeni sürümle yeniden çalıştırın, `.env` olanı hariç: `.env` sizindir ve kalır.
+   Diğer üç dosya olduğu gibi değiştirilir; yerel bir değişikliğin dosyaların kendisine değil
+   `.env`'e ya da bir `docker-compose.override.yml`'e ait olmasının nedeni bu
+   ([`rclone.conf` mount'u](#host-dışı-kopyalar) ve
+   [`TRUST_PROXY`](#kendi-reverse-proxynizi-kullanmak) zaten öyle yapıyor). Release'in neyi
+   değiştirdiğini çalışmadan önce görmek isterseniz yeni compose dosyasını eskisiyle
+   `diff`'leyin.
+4. **`TAG`'i** `.env`'de yeni sürüme ayarlayın, URL'lerdekiyle aynı string.
+5. **Pull ve başlatma:**
+
+   ```bash
+   docker compose pull
+   docker compose up -d --wait
+   ```
+
+   Migration'lar otomatik çalışır: tek seferlik `migrate` servisi onları `api` başlamadan önce
+   uygular ve `--wait`, uzun süreli her servis healthy raporladığında döner, biri raporlamazsa
+   sıfırdan farklı kodla.
+
+6. **Doğrulayın:**
+
+   ```bash
+   docker compose ps -a                          # migrate: Exited (0); gerisi healthy
+   curl -fsS https://kurul.example.com/api/health/ready
+   ```
+
+   `-a`, yoksa tek seferlik `migrate` satırı gizlenir. Sonra siteyi açıp bir kez giriş yapın.
+
+7. **Ters giderse:** [Geri alma (rollback)](development.md#geri-alma-rollback) imajları önceki
+   tag'e geri almayı ve bunun tek başına ne zaman yettiğini anlatır;
+   [Yedekten geri dönme](development.md#yedekten-geri-dönme) ise 2. adımda aldığınız arşivin
+   tatbikatı. İkisi de bilerek burada tekrarlanmıyor: adımlar, ters giden bir upgrade de olsa
+   başka bir şey de olsa aynı.
+
+`latest`'i takip etmek yerine `.env`'de `TAG=v0.3.0` ile bir sürümü sabitleyin: upgrade, 2.
+adımdaki yedek elinizdeyken bilinçli attığınız bir adım olmalı, bir sonraki
+`docker compose up`'ın size yaptığı bir şey değil.
+
+### Operatörler için sürüm notları
+
+Bir release'in bu sayfanın indirttiği dosyalarda neyi değiştirdiği ya da `pull`'dan önce
+sizden ne beklediği. Girdilerin tamamı `CHANGELOG.md`'de; bu liste yalnızca onları gösterir.
+
+- **Sonraki release ([Unreleased](../../CHANGELOG.md#unreleased)):** Better Auth 1.7.1,
+  `migrate` servisinin ilk `up`'ta uyguladığı bir migration getiriyor; çalıştırılacak bir şey
+  yok, ama onu karşılayan 2. adımdaki yedek. `BACKUP_REMOTE` ve host dışı kopya, 3. adımdaki
+  `scripts/backup.sh` ve `docker-compose.yml`'i gerektirir (v0.3.0'ın script'i değişkeni hata
+  vermeden yok sayar); kurulumu [Host dışı kopyalar](#host-dışı-kopyalar) bölümünde.
+  `TRUST_PROXY` artık `.env`'den, varsayılanı `1` olarak okunuyor: daha eski bir
+  `.env.example`'ın `.env`'inizde bıraktığı `TRUST_PROXY=false` satırını silin, yoksa Caddy
+  arkasındaki API istemci adreslerini görmeyi bırakır
+  ([ayrıntı](#kendi-reverse-proxynizi-kullanmak)).
+- **0.3.0 ([CHANGELOG](../../CHANGELOG.md#030---2026-08-22)):** attachment kotalarına
+  varsayılan geldi; upgrade'den önce kullanımınızı kontrol edin, bkz. aşağıdaki
+  [Attachment kotalarının artık varsayılanı var](#attachment-kotalarının-artık-varsayılanı-var).
+  Ayrıca `kurul-migrate`'i yayınlayan ilk sürüm, yani bu sayfadaki `curl` kurulumunun çalıştığı
+  ilk sürüm.
 
 ### Attachment kotalarının artık varsayılanı var
 
-`v0.2.0` sonrası sürümler, `ATTACHMENT_WORKSPACE_QUOTA_BYTES` / `ATTACHMENT_INSTANCE_QUOTA_BYTES`
+`v0.3.0` ve sonrası, `ATTACHMENT_WORKSPACE_QUOTA_BYTES` / `ATTACHMENT_INSTANCE_QUOTA_BYTES`
 ayarlanmadığında attachment depolamasını workspace başına 2 GiB, instance başına 20 GiB ile
 sınırlar (eskiden sınırsız demekti). **Halihazırda 2 GiB'den fazla dosya tutan bir workspace,
 bir sonraki yüklemesinde `413` alır**; bunu istemiyorsanız upgrade'den önce daha yüksek bir sayı
@@ -683,11 +772,14 @@ docker compose exec postgres pg_dump -U kurultay -Fc kurultay > /tmp/kurul-migra
 docker compose down                     # -v DEĞİL: volume'ler zaten koruduğunuz şey
 ```
 
-Sonra dizini yeniden adlandırın ve yeni compose dosyasını alın:
+Sonra dizini yeniden adlandırın ve release'in dosyalarını, geçtiğiniz tag'den,
+[kurulumun 2. adımındaki](#2-compose-dosyasını-indirin-ve-yapılandırın) `curl` satırlarıyla
+alın (`.env` olanı hariç; sizinki kalır):
 
 ```bash
 cd /opt && mv kurultay kurul && cd kurul
-curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker-compose.yml
+# sonra docker/Caddyfile ve scripts/backup.sh de aynı şekilde
 ```
 
 `.env`'i düzenleyin: `POSTGRES_USER` ve `POSTGRES_DB` `kurul` olur, `DATABASE_URL`'in kimlik ve
@@ -724,14 +816,13 @@ varsayılan olarak kullandığı Sigstore bundle formatında yazılır ve cosign
 
 ```bash
 cosign verify \
-  --certificate-identity "https://github.com/dravcore/kurul/.github/workflows/release-images.yml@refs/tags/v0.2.0" \
+  --certificate-identity "https://github.com/dravcore/kurul/.github/workflows/release-images.yml@refs/tags/v0.3.0" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  ghcr.io/dravcore/kurul-api:v0.2.0
+  ghcr.io/dravcore/kurul-api:v0.3.0
 ```
 
-Aynısını `kurul-web` için — ve v0.2.0'dan sonraki sürümlerde, kendisini ilk yayınlayan
-sürümden itibaren aynı şekilde imzalanan `kurul-migrate` için — tekrarlayın; başka bir sürümü
-doğrularken `v0.2.0`'ı iki yerde de değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi
+Aynısını, aynı şekilde imzalanan `kurul-web` ve `kurul-migrate` için tekrarlayın; başka bir
+sürümü doğrularken `v0.3.0`'ı iki yerde de değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi
 anlatıyor: biri imzalayan workflow'un
 üzerinde çalıştığı git ref'i, diğeri sorduğunuz imaj tag'i.
 
@@ -747,7 +838,7 @@ Başarılı bir çalıştırma yaptığı kontrolleri ve doğruladığı digest'
 yazdırır:
 
 ```
-Verification for ghcr.io/dravcore/kurul-api:v0.2.0 --
+Verification for ghcr.io/dravcore/kurul-api:v0.3.0 --
 The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
@@ -766,7 +857,7 @@ Son argüman olarak hem tag hem digest çalışır; imajı çoktan çekmiş bir 
 katı soruyu sorar — tag'in şu anda neyi gösterdiğini değil, diskteki baytları sorar:
 
 ```bash
-docker image inspect ghcr.io/dravcore/kurul-api:v0.2.0 --format '{{index .RepoDigests 0}}'
+docker image inspect ghcr.io/dravcore/kurul-api:v0.3.0 --format '{{index .RepoDigests 0}}'
 ```
 
 ### SBOM nerede
@@ -776,19 +867,19 @@ asset olarak — imaj başına ve mimari başına bir tane, çünkü iki mimari 
 içermiyor:
 
 ```
-kurul-api-v0.2.0-linux-amd64.spdx.json
-kurul-api-v0.2.0-linux-arm64.spdx.json
-kurul-web-v0.2.0-linux-amd64.spdx.json
-kurul-web-v0.2.0-linux-arm64.spdx.json
+kurul-api-v0.3.0-linux-amd64.spdx.json
+kurul-api-v0.3.0-linux-arm64.spdx.json
+kurul-web-v0.3.0-linux-amd64.spdx.json
+kurul-web-v0.3.0-linux-arm64.spdx.json
+kurul-migrate-v0.3.0-linux-amd64.spdx.json
+kurul-migrate-v0.3.0-linux-arm64.spdx.json
 ```
-
-v0.2.0'dan sonraki sürümler aynı çifti `kurul-migrate` için de ekler.
 
 Format SPDX 2.3 JSON; `grype`, `trivy` ve Dependency-Track'in üçü de dönüştürmeden okur:
 
 ```bash
-gh release download v0.2.0 --repo dravcore/kurul --pattern '*.spdx.json'
-grype sbom:./kurul-api-v0.2.0-linux-amd64.spdx.json
+gh release download v0.3.0 --repo dravcore/kurul --pattern '*.spdx.json'
+grype sbom:./kurul-api-v0.3.0-linux-amd64.spdx.json
 ```
 
 **SBOM dosyasının kendisi imzalı değildir** — yukarıdaki imza imajı kapsar, SBOM ise aynı
@@ -798,7 +889,7 @@ güvenmeyin: zaten doğruladığınız imajdan [syft](https://github.com/anchore
 yeniden üretip karşılaştırın.
 
 ```bash
-syft scan registry:ghcr.io/dravcore/kurul-api:v0.2.0 --platform linux/amd64 -o spdx-json
+syft scan registry:ghcr.io/dravcore/kurul-api:v0.3.0 --platform linux/amd64 -o spdx-json
 ```
 
 ## Kendi reverse proxy'nizi kullanmak
@@ -964,9 +1055,13 @@ location /      { proxy_pass http://web:3000;  }
 ```
 
 Proxy'niz Kurul'un kendi `proxy` servisini değiştirmek yerine onun önünde duruyorsa,
-`docker-compose.yml`'deki `api` servisinin `TRUST_PROXY` değerini hop sayısına yükseltin
-(Caddy'nin önündeki bir CDN bunu `2` yapar). `1`'de bırakılırsa tüm rate-limit kovaları ve
-access log'daki tüm IP'ler dıştaki proxy'nizin adresine çöker.
+`.env`'de `TRUST_PROXY`'yi hop sayısına ayarlayın (Caddy'nin önündeki bir CDN bunu `2` yapar).
+`docker-compose.yml` bu değişkeni `api` servisine varsayılanı `1` olarak iletir; yani boş ya da
+hiç olmayan bir satır tek hop durumudur ve değer, her [upgrade](#upgrade)'in yaptığı compose
+dosyası yeniden indirmesinden sağ çıkar. İki hop arkasında `1`'de bırakılırsa tüm rate-limit
+kovaları ve access log'daki tüm IP'ler dıştaki proxy'nizin adresine çöker. `false` yazılırsa
+(compose satırı iletmeden önceki eski bir `.env.example`'ın gönderdiği değer) aynı şey tek hop
+arkasında da olur; böyle bir satırı bırakmak yerine silin.
 
 ## Neden yeniden build gerekmiyor
 
@@ -974,6 +1069,10 @@ Next.js, `NEXT_PUBLIC_*` değişkenlerini build zamanında gönderdiği JavaScri
 Bu nedenle mutlak bir `NEXT_PUBLIC_API_URL`, web imajını tek bir dağıtıma özgü hale getirir ve
 "imajı çek, env'i ver" modeli çalışamaz — Kurul'un eskiden tam olarak dayattığı şey buydu
 ([denetim bulgusu PM-02](https://github.com/dravcore/kurul/issues/119)).
+
+Bir `NEXT_PUBLIC_*` değeri hâlâ gömülü, çünkü yerine gömülecek her yerde doğru bir değer yok:
+tarayıcı Sentry DSN'i. Bunun pull ile kurulmuş bir instance için ne anlama geldiğini aşağıdaki
+[Tarayıcı hata takibi](#tarayıcı-hata-takibi) anlatıyor.
 
 Çözüm değeri gömülmekten çıkarmak değil, zaten her yerde doğru olan bir değeri gömmek.
 Yayınlanan imaj `NEXT_PUBLIC_API_URL=/api` taşır; bu, sayfanın sunulduğu origin üzerinde bir
@@ -995,20 +1094,54 @@ docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.
 Bu imaj artık `api.example.com`'a özgüdür ve dağıtım başına yeniden build etmeye geri
 dönersiniz — bu bir eksiklik değil, bilinçli takastır.
 
+### Tarayıcı hata takibi
+
+`NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT` ve `NEXT_PUBLIC_SENTRY_RELEASE`, imaj
+build edilirken web bundle'ının içine derlenir: `docker-compose.yml` bunları `environment:`
+olarak değil `build.args` olarak geçer ve API URL'inin aksine gömülecek dağıtımdan bağımsız bir
+değer yoktur, çünkü bir DSN tek bir Sentry projesini adlandırır. Release workflow'u
+`ghcr.io/dravcore/kurul-web`'i üçü de boşken build eder ve boş, Sentry SDK'sının bundle'a hiç
+girmemesi demektir. Dolayısıyla yayınlanan imaj tarayıcı hata takibi olmadan gelir ve bu
+sayfanın anlattığı kurulumda `.env`'e yazılan bir `NEXT_PUBLIC_SENTRY_DSN` satırı hiçbir şeyi
+değiştirmez, hiçbir log'da uyarı da vermez. API tarafı farklı: `SENTRY_DSN` container
+başlarken okunan sıradan bir çalışma zamanı değişkenidir ve
+[Hata takibi](development.md#hata-takibi-sentry--varsayılan-kapalı) bölümünün anlattığı gibi
+`.env`'den çalışır.
+
+Tarayıcı hata takibi bu yüzden web imajını kendiniz build etmek demektir; bunun için de `curl`
+kurulumunun sahip olmadığı bir kaynak ağacı gerekir. `NEXT_PUBLIC_SENTRY_*` satırlarını
+`.env`'inize yazın, çalıştırdığınız tag'i clone'layın ve sonucun kurulumunuzun çözdüğü `TAG`'i
+taşıması için o `.env`'in bir kopyasından build edin:
+
+```bash
+git clone --branch v0.3.0 https://github.com/dravcore/kurul.git /opt/kurul-src
+cp /opt/kurul/.env /opt/kurul-src/.env
+cd /opt/kurul-src && docker compose build web      # ghcr.io/dravcore/kurul-web:<TAG> olarak etiketler
+cd /opt/kurul && docker compose up -d web          # pull yok: az önce build edilen imajı kullanır
+```
+
+Compose dosyası olmadan aynı build, clone içinden
+`docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_SENTRY_DSN=https://... .`
+komutudur. Her iki durumda da imaj tek bir Sentry projesine özgüdür ve bir sonraki
+[upgrade](#upgrade)'in `docker compose pull`'u onu yayınlanan imajla değiştirir: her
+upgrade'den sonra yeniden build edin, yoksa takip onunla birlikte durur. Kurulumun geri kalanı,
+iki proje ve neyin gönderildiği:
+[Hata takibi](development.md#hata-takibi-sentry--varsayılan-kapalı).
+
 ## Sorun giderme
 
 **`docker compose pull` `denied` ile bitiyor.** İmajları, bir release tag'inde çalışan bir
 workflow yayınlar; dolayısıyla her biri yalnızca kendisini ilk taşıyan sürümden itibaren var:
-`api` ve `web` `v0.2.0`'dan, `kurul-migrate` ise `v0.2.0`'dan sonraki ilk sürümden itibaren —
-`v0.2.0`'da diğer ikisi çözülse bile o tek imaj için pull başarısız olur. Bir imajdan önceki
-bir sürümdeyken iki sonuç doğar. `docker compose pull`, `postgres`, `redis` ve `caddy`'yi
-başarıyla indirdikten sonra sıfırdan farklı bir kodla çıkar — yalnızca çıkış koduna değil
-çıktının sonuna bakın, çünkü başarılı olanlar, olmayanları ekrandan yukarı kaydırır. Bir de 2.
-adımda indirdiğiniz dosyalar `main` dalından gelir ve `main` yalnızca en son release'in
-taşıdığını taşır: `docker-compose.yml` içinde `proxy:` servisi yoksa ve
-indirilecek bir `docker/Caddyfile` yoksa release'in ilerisindesiniz demektir ve bu rehberdeki
-HTTPS'in hiçbiri az önce indirdiğiniz şey için geçerli değildir. Ya release'i bekleyin ya da
-çekmek yerine kaynaktan build edin:
+`api` ve `web` `v0.2.0`'dan, `kurul-migrate` ise `v0.3.0`'dan. Bu yüzden `v0.2.0`'da diğer
+ikisi çözülse bile o tek imaj için pull başarısız olur ve `docker compose pull`, `postgres`,
+`redis` ve `caddy`'yi başarıyla indirdikten sonra sıfırdan farklı bir kodla çıkar: yalnızca
+çıkış koduna değil çıktının sonuna bakın, çünkü başarılı olanlar, olmayanları ekrandan yukarı
+kaydırır. Daha yeni bir sürümde aynı belirti genellikle dosyalarla imajların uyuşmadığı
+anlamına gelir: `main`'den ya da `TAG`'den daha yeni bir tag'den indirilmiş bir
+`docker-compose.yml`, sabitlediğiniz sürümün hiç yayınlamadığı bir imajı ya da servisi
+adlandırabilir; 2. adımın her dosyayı `TAG`'deki tag'den indirmesinin ve bir
+[upgrade](#upgrade)'in onları yeniden indirmesinin nedeni bu. Doğru tag'den yeniden indirin ya
+da çekmek yerine kaynaktan build edin:
 
 ```bash
 git clone https://github.com/dravcore/kurul.git && cd kurul

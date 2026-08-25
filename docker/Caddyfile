@@ -23,12 +23,13 @@
 #
 # plus WebSocket upgrades passed through on rule 2, and a request body limit on both API rules:
 # 64 KiB on rule 1, the API's AUTH_BODY_MAX_BYTES (nginx: `client_max_body_size 64k;`), and
-# 26 MiB on rule 2, one mebibyte above the API's ATTACHMENT_MAX_BYTES (nginx:
-# `client_max_body_size 26m;`). The body limits are part of the contract, not tuning knobs:
-# Caddy imposes none by default and nginx defaults to 1 MB, so a replacement proxy that omits
-# the second fails every upload over a megabyte with a 413 that appears in no documentation,
-# and one that omits the first leaves the auth routes reading bodies of any size into the API's
-# heap. Rules 1 and 2 differ on purpose; the comments on each below say why.
+# 26 MiB on rule 2, one mebibyte above the API's ATTACHMENT_MAX_BYTES, not equal to it (nginx:
+# `client_max_body_size 26m;`; the `request_body` block below says why an equal limit rejects a
+# file of exactly the published size). The body limits are part of the contract, not tuning
+# knobs: Caddy imposes none by default and nginx defaults to 1 MB, so a replacement proxy that
+# omits the second fails every upload over a megabyte with a 413 that appears in no
+# documentation, and one that omits the first leaves the auth routes reading bodies of any size
+# into the API's heap. Rules 1 and 2 differ on purpose; the comments on each below say why.
 {
 	# Nothing here is administered over Caddy's HTTP admin API — the config is this file, and a
 	# change is a container restart. Leaving the endpoint listening (localhost:2019 inside the

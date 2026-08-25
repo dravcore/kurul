@@ -9,12 +9,12 @@ There is no build step. `docker compose pull` fetches images published for every
 the same image works on every domain — the API URL is not compiled into it (see
 [Why there is no rebuild](#why-there-is-no-rebuild) if you want the reasoning).
 
-> **Installing v0.2.0? Use `git clone` instead.** Releases up to and including v0.2.0
-> published only the `api` and `web` images; the third one this page pulls, `kurul-migrate`,
-> exists from the first release after v0.2.0 onward. The download step below fetches no source
-> tree to build it from, so on v0.2.0 the steps on this page cannot start the stack — install
-> from a clone as shown in [Troubleshooting](#troubleshooting), and come back to this page
-> from the next release on.
+> **Installing v0.2.0 or older? Use `git clone` instead.** Releases up to and including
+> v0.2.0 published only the `api` and `web` images; the third one this page pulls,
+> `kurul-migrate`, exists from v0.3.0 onward. The download step below fetches no source tree to
+> build it from, so on v0.2.0 the steps on this page cannot start the stack: install from a
+> clone as shown in [Troubleshooting](#troubleshooting), and come back to this page from v0.3.0
+> on.
 
 ## What you need
 
@@ -100,25 +100,37 @@ dig +short kurul.example.com
 
 ## 2. Fetch the compose file and configure
 
+The URLs below name a release tag, `v0.3.0`, and the same tag goes into `.env` as `TAG` a few
+lines further down. Fetch the files from the release you are going to run, not from `main`:
+`docker-compose.yml`, `docker/Caddyfile` and `scripts/backup.sh` are versioned with the images,
+and a compose file from a newer tree can name a service, a variable or an image the release you
+pinned never shipped. To install a different release, replace `v0.3.0` in every URL and in
+`TAG`.
+
 ```bash
 mkdir -p /opt/kurul && cd /opt/kurul
-curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker-compose.yml
 curl -fsSL --create-dirs -o docker/Caddyfile \
-  https://raw.githubusercontent.com/dravcore/kurul/main/docker/Caddyfile
+  https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker/Caddyfile
 curl -fsSL --create-dirs -o scripts/backup.sh \
-  https://raw.githubusercontent.com/dravcore/kurul/main/scripts/backup.sh
+  https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/scripts/backup.sh
 chmod +x scripts/backup.sh
-curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/main/.env.example
+curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/.env.example
+chmod 600 .env
 ```
 
 `scripts/backup.sh` is not optional: the `backup` service in `docker-compose.yml` bind-mounts
 that exact path into its container, and without the file the scheduled backups that service
-exists to take never run.
+exists to take never run. `chmod 600 .env` because the file is about to hold the database
+password, the session secret and the SMTP password; the `rclone.env` advice in
+[Off-host copies](#off-host-copies) is the same rule.
 
 Edit `.env`. For a Docker-only install these are the lines that matter — everything else in the
 file is either for the development loop or has a working default:
 
 ```bash
+TAG=v0.3.0                                  # the release the files above came from
+
 SITE_URL=https://kurul.example.com          # your domain, scheme included
 
 POSTGRES_PASSWORD=<openssl rand -hex 32>       # hex, not base64 — it goes inside a URL
@@ -621,17 +633,90 @@ and it is the thing that tells you the demo is down before someone on the intern
 
 ## Upgrading
 
-```bash
-docker compose pull && docker compose up -d
-```
+A release is images plus files. `docker compose pull` refreshes the images and nothing else, so
+an install that only ever pulls keeps running the `docker-compose.yml`, `docker/Caddyfile` and
+`scripts/backup.sh` it was installed with, and every later release that added a service (the
+`demo` profile's `demo-reset`), a variable compose forwards (`BACKUP_REMOTE`, the attachment
+quotas) or a Caddy rule quietly does not reach it. The runbook re-fetches the files for that
+reason. Do the steps in this order, every time; none of them is long.
 
-Migrations run automatically: the one-shot `migrate` service applies them before `api` starts.
-Pin a release with `TAG=v0.2.0` in `.env` if you would rather upgrade deliberately than track
-`latest`.
+1. **Read the release.** The [CHANGELOG](../CHANGELOG.md) section for the target version
+   carries every breaking change and every migration note, and
+   [Release notes for operators](#release-notes-for-operators) below points at the ones that
+   ask something of you before `pull`.
+2. **Take a backup now, and copy it off the host.** The sidecar's last cycle may be a day old;
+   this one is from right before the upgrade, which is the recovery point a rollback wants:
+
+   ```bash
+   docker compose exec backup /bin/sh /usr/local/bin/backup.sh once
+   ```
+
+   Then copy the pair out of the volume with the command in [Backups](#backups), or, with
+   `BACKUP_REMOTE` set, confirm the two `off-host: pushed` lines in
+   `docker compose logs backup`. Why both halves, and the by-hand variant that survives a
+   `docker compose down -v`: [Taking a dump by hand](development.md#taking-a-dump-by-hand).
+
+3. **Re-fetch the files at the new tag.** Run the `curl` lines from
+   [step 2 of the install](#2-fetch-the-compose-file-and-configure) again with the new version
+   in each URL, all except the `.env` one: `.env` is yours and stays. The other three files are
+   replaced outright, which is why a local change belongs in `.env` or in a
+   `docker-compose.override.yml` (as the [`rclone.conf` mount](#off-host-copies) and
+   [`TRUST_PROXY`](#bringing-your-own-reverse-proxy) already do) rather than in the files
+   themselves. `diff` the new compose file against the old one if you want to see what the
+   release changed before it runs.
+4. **Set `TAG`** in `.env` to the new version, the same string as in the URLs.
+5. **Pull and start:**
+
+   ```bash
+   docker compose pull
+   docker compose up -d --wait
+   ```
+
+   Migrations run automatically: the one-shot `migrate` service applies them before `api`
+   starts, and `--wait` returns once every long-running service reports healthy, non-zero if
+   one does not.
+
+6. **Verify:**
+
+   ```bash
+   docker compose ps -a                          # migrate: Exited (0); the rest healthy
+   curl -fsS https://kurul.example.com/api/health/ready
+   ```
+
+   `-a`, or the one-shot `migrate` row is hidden. Then open the site and sign in once.
+
+7. **If it went wrong:** [Rollback](development.md#rollback) covers moving the images back to
+   the previous tag and when that alone is enough;
+   [Restoring from a backup](development.md#restoring-from-a-backup) is the drill for the
+   archive you took in step 2. Neither is repeated here on purpose: the steps are the same
+   whether an upgrade or anything else went wrong.
+
+Pin a release with `TAG=v0.3.0` in `.env` rather than tracking `latest`: an upgrade should be
+a step you take deliberately, with the backup from step 2 in hand, not something the next
+`docker compose up` does to you.
+
+### Release notes for operators
+
+What a release changes in the files this page has you fetch, or expects of you before `pull`.
+The full entries live in `CHANGELOG.md`; this list only points at them.
+
+- **Next release ([Unreleased](../CHANGELOG.md#unreleased)):** Better Auth 1.7.1 ships a
+  migration the `migrate` service applies on the first `up`; nothing to run, but the backup in
+  step 2 is what covers it. `BACKUP_REMOTE` and the off-host copy need the `scripts/backup.sh`
+  and `docker-compose.yml` from step 3 (v0.3.0's script ignores the variable without an
+  error); setup in [Off-host copies](#off-host-copies). `TRUST_PROXY` is now read from `.env`
+  with a default of `1`: delete a `TRUST_PROXY=false` line an older `.env.example` left in your
+  `.env`, or the API behind Caddy stops seeing client addresses
+  ([details](#bringing-your-own-reverse-proxy)).
+- **0.3.0 ([CHANGELOG](../CHANGELOG.md#030---2026-08-22)):** attachment quotas gained
+  defaults; check your usage before upgrading, see
+  [Attachment quotas now have defaults](#attachment-quotas-now-have-defaults) below. Also the
+  first release that publishes `kurul-migrate`, so the first one this page's `curl` install
+  works on.
 
 ### Attachment quotas now have defaults
 
-Releases after `v0.2.0` cap attachment storage at 2 GiB per workspace and 20 GiB per instance
+`v0.3.0` and later cap attachment storage at 2 GiB per workspace and 20 GiB per instance
 when `ATTACHMENT_WORKSPACE_QUOTA_BYTES` / `ATTACHMENT_INSTANCE_QUOTA_BYTES` are unset (they
 used to mean unlimited). **A workspace already holding more than 2 GiB of files will get a
 `413` on its next upload** unless you set a higher number, or `0` for unlimited, before you
@@ -668,11 +753,14 @@ docker compose exec postgres pg_dump -U kurultay -Fc kurultay > /tmp/kurul-migra
 docker compose down                     # NOT -v: the volumes are what you are keeping
 ```
 
-Then rename the directory and take the new compose file:
+Then rename the directory and take the release's files, at the tag you are moving to, with the
+`curl` lines from [step 2 of the install](#2-fetch-the-compose-file-and-configure) (all but the
+`.env` one; yours stays):
 
 ```bash
 cd /opt && mv kurultay kurul && cd kurul
-curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker-compose.yml
+# then docker/Caddyfile and scripts/backup.sh the same way
 ```
 
 Edit `.env`: `POSTGRES_USER` and `POSTGRES_DB` become `kurul`, and the `DATABASE_URL`
@@ -711,14 +799,13 @@ them.
 
 ```bash
 cosign verify \
-  --certificate-identity "https://github.com/dravcore/kurul/.github/workflows/release-images.yml@refs/tags/v0.2.0" \
+  --certificate-identity "https://github.com/dravcore/kurul/.github/workflows/release-images.yml@refs/tags/v0.3.0" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  ghcr.io/dravcore/kurul-api:v0.2.0
+  ghcr.io/dravcore/kurul-api:v0.3.0
 ```
 
-Repeat it for `kurul-web` — and, on releases after v0.2.0, for `kurul-migrate`, which is
-signed the same way from the release that first publishes it — and replace `v0.2.0` in both
-places when you verify another release. The version appears twice for two different reasons:
+Repeat it for `kurul-web` and `kurul-migrate`, which are signed the same way, and replace
+`v0.3.0` in both places when you verify another release. The version appears twice for two different reasons:
 once as the git ref the signing workflow ran on, and once as the image tag you are asking
 about.
 
@@ -733,7 +820,7 @@ pushed a tag to their own fork of this repository.
 A successful run prints the checks it performed and a JSON claim naming the digest it verified:
 
 ```
-Verification for ghcr.io/dravcore/kurul-api:v0.2.0 --
+Verification for ghcr.io/dravcore/kurul-api:v0.3.0 --
 The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
@@ -754,7 +841,7 @@ the digest is the stricter question — it asks about the exact bytes on disk ra
 whatever the tag points at now:
 
 ```bash
-docker image inspect ghcr.io/dravcore/kurul-api:v0.2.0 --format '{{index .RepoDigests 0}}'
+docker image inspect ghcr.io/dravcore/kurul-api:v0.3.0 --format '{{index .RepoDigests 0}}'
 ```
 
 ### Where the SBOM lives
@@ -764,20 +851,20 @@ downloadable assets — one per image per architecture, because the two architec
 do not contain the same packages:
 
 ```
-kurul-api-v0.2.0-linux-amd64.spdx.json
-kurul-api-v0.2.0-linux-arm64.spdx.json
-kurul-web-v0.2.0-linux-amd64.spdx.json
-kurul-web-v0.2.0-linux-arm64.spdx.json
+kurul-api-v0.3.0-linux-amd64.spdx.json
+kurul-api-v0.3.0-linux-arm64.spdx.json
+kurul-web-v0.3.0-linux-amd64.spdx.json
+kurul-web-v0.3.0-linux-arm64.spdx.json
+kurul-migrate-v0.3.0-linux-amd64.spdx.json
+kurul-migrate-v0.3.0-linux-arm64.spdx.json
 ```
-
-Releases after v0.2.0 add the same pair for `kurul-migrate`.
 
 The format is SPDX 2.3 JSON, which is what `grype`, `trivy` and Dependency-Track all read
 without conversion:
 
 ```bash
-gh release download v0.2.0 --repo dravcore/kurul --pattern '*.spdx.json'
-grype sbom:./kurul-api-v0.2.0-linux-amd64.spdx.json
+gh release download v0.3.0 --repo dravcore/kurul --pattern '*.spdx.json'
+grype sbom:./kurul-api-v0.3.0-linux-amd64.spdx.json
 ```
 
 **The SBOM file itself is not signed** — the signature above covers the image, and the SBOM is a
@@ -787,7 +874,7 @@ trust the file: regenerate it yourself from the image you have already verified,
 [syft](https://github.com/anchore/syft), and compare.
 
 ```bash
-syft scan registry:ghcr.io/dravcore/kurul-api:v0.2.0 --platform linux/amd64 -o spdx-json
+syft scan registry:ghcr.io/dravcore/kurul-api:v0.3.0 --platform linux/amd64 -o spdx-json
 ```
 
 ## Bringing your own reverse proxy
@@ -951,10 +1038,14 @@ location /api/  {
 location /      { proxy_pass http://web:3000;  }
 ```
 
-If your proxy sits in front of Kurul's own `proxy` rather than replacing it, raise
-`TRUST_PROXY` in `docker-compose.yml`'s `api` service to the number of hops (a CDN in front of
-Caddy makes it `2`). Left at `1`, every rate-limit bucket and every access-log IP collapses
-onto your outer proxy's address.
+If your proxy sits in front of Kurul's own `proxy` rather than replacing it, set `TRUST_PROXY`
+in `.env` to the number of hops (a CDN in front of Caddy makes it `2`). `docker-compose.yml`
+forwards that variable to the `api` service with a default of `1`, so a blank or absent line is
+the single-hop case, and the value survives the re-fetch of the compose file that every
+[upgrade](#upgrading) does. Left at `1` behind two hops, every rate-limit bucket and every
+access-log IP collapses onto your outer proxy's address. Set to `false` (the value an older
+`.env.example` shipped, from before compose forwarded the line) the same happens behind one hop,
+so remove such a line rather than leave it.
 
 ## Why there is no rebuild
 
@@ -962,6 +1053,11 @@ Next.js compiles `NEXT_PUBLIC_*` variables into the JavaScript it ships, at buil
 absolute `NEXT_PUBLIC_API_URL` therefore makes a web image specific to one deployment, and
 "pull the image, set the environment" cannot work — which is exactly what Kurul used to
 require ([audit finding PM-02](https://github.com/dravcore/kurul/issues/119)).
+
+One `NEXT_PUBLIC_*` value is still baked, because nothing that would be correct everywhere
+exists to bake in its place: the browser Sentry DSN.
+[Browser error tracking](#browser-error-tracking) below says what that means for a pull-based
+install.
 
 The fix is not to un-bake the value but to bake a value that is already correct everywhere. The
 published image carries `NEXT_PUBLIC_API_URL=/api`, a path on whatever origin the page was
@@ -983,19 +1079,51 @@ docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.
 That image is then specific to `api.example.com`, and you are back to rebuilding per
 deployment — which is the trade-off, not an oversight.
 
+### Browser error tracking
+
+`NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT` and `NEXT_PUBLIC_SENTRY_RELEASE` are
+compiled into the web bundle when the image is built: `docker-compose.yml` passes them as
+`build.args`, not as `environment:`, and unlike the API URL there is no deployment-independent
+value to bake, because a DSN names one Sentry project. The release workflow builds
+`ghcr.io/dravcore/kurul-web` with all three blank, and blank means the Sentry SDK is left out of
+the bundle entirely. So the published image ships without browser error tracking, and a
+`NEXT_PUBLIC_SENTRY_DSN` line in `.env` on the install this page describes changes nothing,
+with no warning in any log. The API side is different: `SENTRY_DSN` is an ordinary runtime
+variable, read at container start, and works from `.env` as
+[Error tracking](development.md#error-tracking-sentry--off-by-default) describes.
+
+Browser error tracking therefore means building the web image yourself, which needs a source
+tree the `curl` install does not have. Put the `NEXT_PUBLIC_SENTRY_*` lines in your `.env`,
+clone the tag you run, and build from a copy of that `.env` so the result carries the same
+`TAG` your install resolves:
+
+```bash
+git clone --branch v0.3.0 https://github.com/dravcore/kurul.git /opt/kurul-src
+cp /opt/kurul/.env /opt/kurul-src/.env
+cd /opt/kurul-src && docker compose build web      # tags ghcr.io/dravcore/kurul-web:<TAG>
+cd /opt/kurul && docker compose up -d web          # no pull: uses the image just built
+```
+
+Without a compose file, the same build is
+`docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_SENTRY_DSN=https://... .` from the
+clone. Either way the image is specific to one Sentry project, and the `docker compose pull` of
+the next [upgrade](#upgrading) replaces it with the published one: rebuild after every upgrade,
+or the tracking stops with it. The rest of the setup, the two projects and what is sent, is in
+[Error tracking](development.md#error-tracking-sentry--off-by-default).
+
 ## Troubleshooting
 
 **`docker compose pull` ends in `denied`.** The images are published by a workflow that runs
 on a release tag, so each exists only from the release that first shipped it: `api` and `web`
-from `v0.2.0`, `kurul-migrate` from the first release after `v0.2.0` — on `v0.2.0` the pull
-fails for that one image even though the other two resolve. Two things follow while you are on
-a release that predates an image. `docker compose pull` exits non-zero after successfully
-pulling `postgres`, `redis` and `caddy` — read the tail of its output, not just the exit code,
-because the ones that worked scroll the ones that did not off the screen. And the files you
-fetch in step 2 come from the `main` branch, which only carries what the newest release
-carried: if `docker-compose.yml` has no `proxy:` service and there is no `docker/Caddyfile` to
-download, you are ahead of the release, and none of the HTTPS in this guide applies to what
-you just downloaded. Either wait for the release, or build from source instead of pulling:
+from `v0.2.0`, `kurul-migrate` from `v0.3.0`. On `v0.2.0` the pull therefore fails for that one
+image even though the other two resolve, and `docker compose pull` exits non-zero after
+successfully pulling `postgres`, `redis` and `caddy`: read the tail of its output, not just the
+exit code, because the ones that worked scroll the ones that did not off the screen. The same
+symptom on a newer release usually means the files and the images disagree: a
+`docker-compose.yml` fetched from `main`, or from a newer tag than `TAG`, can name an image or a
+service the release you pinned never published, which is why step 2 fetches every file from the
+tag in `TAG` and why an [upgrade](#upgrading) re-fetches them. Re-fetch at the right tag, or
+build from source instead of pulling:
 
 ```bash
 git clone https://github.com/dravcore/kurul.git && cd kurul
