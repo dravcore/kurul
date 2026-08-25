@@ -345,7 +345,7 @@ sayılan şeydir, dolayısıyla `limit`'e eşit ya da onu aşabilir.
 | `planLimit.code`        | Reddeder                                     | Sayar                                                   |
 | ----------------------- | -------------------------------------------- | ------------------------------------------------------- |
 | `PLAN_LIMIT_SEATS`      | `POST .../invitations`, ve birini kabul etme | Üyeler artı hâlâ bekleyen davetler                      |
-| `PLAN_LIMIT_BOARDS`     | `POST .../boards`                            | Workspace'teki board'lar                                |
+| `PLAN_LIMIT_BOARDS`     | `POST .../boards`, `POST .../imports/trello` | Workspace'teki board'lar                                |
 | `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                           | Instance'taki workspace'ler                             |
 | `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                   | Instance'taki hesaplar, anonimleştirilmiş olanlar hariç |
 

@@ -336,12 +336,12 @@ free a seat or raise a number.
 `planLimit` is the only optional envelope member besides `details`. `current` is what was
 counted at the moment of the refusal, so it can equal or exceed `limit`.
 
-| `planLimit.code`        | Refuses                                   | Counts                                             |
-| ----------------------- | ----------------------------------------- | -------------------------------------------------- |
-| `PLAN_LIMIT_SEATS`      | `POST .../invitations`, and accepting one | Members plus invitations still pending             |
-| `PLAN_LIMIT_BOARDS`     | `POST .../boards`                         | Boards in the workspace                            |
-| `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                        | Workspaces on the instance                         |
-| `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                | Accounts on the instance, anonymised ones excluded |
+| `planLimit.code`        | Refuses                                      | Counts                                             |
+| ----------------------- | -------------------------------------------- | -------------------------------------------------- |
+| `PLAN_LIMIT_SEATS`      | `POST .../invitations`, and accepting one    | Members plus invitations still pending             |
+| `PLAN_LIMIT_BOARDS`     | `POST .../boards`, `POST .../imports/trello` | Boards in the workspace                            |
+| `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                           | Workspaces on the instance                         |
+| `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                   | Accounts on the instance, anonymised ones excluded |
 
 Accepting an invitation counts members only, since the invitation being accepted is already
 holding its seat. Attachment bytes are a plan ceiling too, but they keep the `413` and the

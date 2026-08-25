@@ -195,6 +195,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A Trello import no longer steps over the workspace's board ceiling.**
+  `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on
+  `POST .../boards` but not on `POST .../imports/trello`, which creates its board by its own
+  `tx.board.create`, so an `OWNER` or `ADMIN` at the limit could keep adding boards by importing
+  any small export. `TrelloImportService` now asks `PlanLimitsService` for room as the first
+  statement of its transaction, with the same transaction client and the same `403`
+  `PLAN_LIMIT_BOARDS` refusal `BoardService.create` gives, and a refused import writes nothing.
+  Imported link attachment names also go through the display-name cleaning `createLink` applies
+  (bidi overrides, control characters, quotes and backslashes stripped, 255-character clamp,
+  URL fallback for a name that is empty afterwards), which the importer had skipped; the rule
+  moved to `attachment-display-name.ts` so both writers of `Attachment.filename` share one
+  function. [ADR 0032](docs/decisions/0032-plan-limits.md) names the importer in its
+  enforcement list.
 - **`charts.test.tsx` was load-sensitive ([#244](https://github.com/dravcore/kurul/issues/244)),
   reproduced and fixed.** Running `apps/web`'s Vitest suite alongside `apps/api`'s Jest suite
   reproduced it 6/6 tries. The cause: the file's bar-animation poll (`barPaths`) promises to
