@@ -267,6 +267,23 @@ docker compose down -v                     # -v: sonraki koşuya volume bırakma
 #    bunu v0.2.0'dan sonraki ilk release'de gerektirir — bu workflow'un onu
 #    ilk yayınladığı release — ve sonradan eklenen her yeni imaj adı da aynı
 #    şekilde, bir kez, buna ihtiyaç duyar.
+#
+#    Workflow, herhangi bir imaj build edilmeden önce `guard` job'ında iki şeyi
+#    denetler; böylece buradaki bir hata yayınlanmak yerine bir dakika içinde
+#    kırılır:
+#    - tag'in nereyi gösterdiği: bir vX.Y.Z tag'i main'in ucu (bu merge
+#      commit'i) olmak zorundadır; bir ön-sürüm tag'i (vX.Y.Z-rc.N) main'de
+#      ya da bir release/* veya hotfix/* branch'inde durmalıdır;
+#    - ağacın ne söylediği: her package.json versiyonu X.Y.Z'ye eşit olmalı
+#      ve bir vX.Y.Z tag'i için CHANGELOG.md bir `## [X.Y.Z] - ` başlığı
+#      taşımalıdır.
+#    v* tag'leri ayrıca bir repository ruleset ile korunmalıdır (hedef: tag,
+#    refs/tags/v*; create, update, delete ve non-fast-forward engellenir;
+#    bypass: yalnızca repository admin'i); böylece contents:write yetkili bir
+#    token tek başına bir release tag'ini push edemez, taşıyamaz ve silemez.
+#    Ruleset kod değil bir repository ayarıdır: oluşturulması ROADMAP.md'deki
+#    operatör kontrol listesindedir ve yerine oturduğunda bir v* tag'ini
+#    yalnızca admin push edebilir, taşıyabilir ve silebilir.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
@@ -354,7 +371,9 @@ o biçimin üretildiğini doğruluyor; yani bir gerileme, 404 veren belgelenmiş
 yerine sürümü kırar. Ama bu doğrulama da ilk kez sürümü kestiğinizde koşar.
 
 Prova tag'i tek kullanımlıktır. Gerçek sürüm çıkınca tag'i ve release'ini silin; imajlar kendi
-`-rc` tag'leriyle registry'de kalır ve paket listesinde bir satırdan başka maliyeti olmaz.
+`-rc` tag'leriyle registry'de kalır ve paket listesinde bir satırdan başka maliyeti olmaz. Tag'i
+silmek admin'in adımıdır: 5. adımda anlatılan `v*` ruleset'i tag silmeyi herkes için engeller,
+admin'in bypass'ı ise silmeyi geçiren şeydir.
 
 ## Hotfix süreci
 

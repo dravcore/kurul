@@ -260,6 +260,21 @@ docker compose down -v                     # -v: leave no volume behind for the 
 #    `kurul-migrate` needs this on the first release after v0.2.0 — the
 #    first one this workflow ever publishes it from — and any image name
 #    added later needs it again, once, the same way.
+#
+#    The workflow checks two things in its `guard` job before any image is
+#    built, so a slip here fails in a minute instead of publishing:
+#    - where the tag points: a vX.Y.Z tag must be the tip of main (this merge
+#      commit); a pre-release tag (vX.Y.Z-rc.N) must sit on main or on a
+#      release/* or hotfix/* branch;
+#    - what the tree says: every package.json version must equal X.Y.Z and,
+#      for a vX.Y.Z tag, CHANGELOG.md must carry a `## [X.Y.Z] - ` heading.
+#    v* tags should also be protected by a repository ruleset (target: tag,
+#    refs/tags/v*; block create, update, delete and non-fast-forward; bypass:
+#    repository admin only), so that a token with contents:write cannot push,
+#    move or delete a release tag on its own. The ruleset is a repository
+#    setting, not code: creating it is on the operator checklist in
+#    ROADMAP.md, and once it is in place only the admin can push, move or
+#    delete a v* tag.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
@@ -345,7 +360,8 @@ that 404s; but the assertion itself first runs when you cut the version.
 
 A rehearsal tag is disposable. Delete it and its release when the real version ships; the
 images stay in the registry under their exact `-rc` tags and cost nothing but a line in the
-package list.
+package list. Deleting the tag is the admin's step: the `v*` ruleset described in step 5 blocks
+tag deletion for everyone else, and the admin's bypass is what lets it through.
 
 ## Hotfix process
 
