@@ -186,7 +186,8 @@ instance that never touches this block runs: no counting query is issued at all.
 also means unlimited; a negative or non-integer value refuses to boot, and the effective
 numbers are logged at start (`Plan ceilings: …`). These deliberately have no defaults where
 the attachment quotas do: a full disk takes the database down with it, while a tenth board
-costs one row.
+costs one row. The bundled `docker-compose.yml` forwards all four to the `api` container; a
+compose file of your own has to do the same, because the container never reads `.env` itself.
 
 A **seat** is a member _or_ an invitation still waiting to be accepted, so an admin at the
 ceiling cannot queue up acceptances past it; revoking an invitation frees its seat at once, and
@@ -438,9 +439,12 @@ runs exactly the loop described above.
 
 The credentials do **not** go in `.env`: rclone's env keys are named after your remote, so no
 fixed list of them can be declared in `docker-compose.yml`, and the `backup` service reads an
-optional `rclone.env` next to the compose file instead. That file is only read by this one
-container, unlike `.env`, which the api and web containers read too. Create it with `chmod 600`
-and keep it out of git (`.gitignore` already lists it).
+optional `rclone.env` next to the compose file instead. That file is read by this one container
+only. `.env` is not read by any container either: Compose uses it for `${VAR}` interpolation and
+forwards an explicit list of keys to each service. For every setting the API reads, that list is
+the `environment:` block of the `api` service in [`docker-compose.yml`](../docker-compose.yml),
+and a key that is not in that block never reaches the API however it is set in `.env`. Create
+`rclone.env` with `chmod 600` and keep it out of git (`.gitignore` already lists it).
 
 An S3 example, end to end. `KURULOFF` is an arbitrary remote name; it just has to match the one
 in `BACKUP_REMOTE`:

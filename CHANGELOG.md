@@ -208,6 +208,25 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`PLAN_MAX_*`, `INSTANCE_ADMIN_EMAILS`, the retention windows, telemetry, `API_DOCS_ENABLED`,
+  `RATE_LIMIT_ENABLED` and the database pool knobs were inert under the bundled Compose stack.**
+  Compose reads `.env` for `${VAR}` interpolation only and never hands the file to a container,
+  `docker-compose.yml` forwards an explicit list of keys to the `api` service, and the api image
+  carries no `.env` of its own, so a setting missing from that list never reached the process
+  however it was set. Seventeen documented settings were missing: a demo operator writing
+  `PLAN_MAX_USERS=1` got an instance that logged `Plan ceilings: unlimited` and capped nothing,
+  nobody could become an instance admin (the activation dashboard and the GDPR erasure route were
+  unreachable on every curl/GHCR install), and `CLEANUP_ENABLED`, the three `*_RETENTION_DAYS`,
+  `TELEMETRY_ENABLED`/`TELEMETRY_ENDPOINT`/`TELEMETRY_TIMEOUT_MS`, `API_DOCS_ENABLED`,
+  `RATE_LIMIT_ENABLED`, `DATABASE_POOL_MAX`, `DATABASE_POOL_CONNECTION_TIMEOUT_MS` and
+  `DATABASE_STATEMENT_TIMEOUT_MS` kept their defaults whatever `.env` said, with nothing logged
+  about it. All seventeen are now on the `api` service as `${KEY:-}`, which the env helpers treat
+  as unset, so an untouched `.env` runs exactly what it ran before. A new
+  `scripts/lib/compose-env.test.mjs` (`pnpm test:scripts`) fails when a key the API reads and
+  `.env.example` documents is missing from that block, so the next variable cannot repeat this;
+  `docs/self-hosting.md` no longer claims the containers read `.env`, and the "adding an
+  environment variable" rule in `docs/development.md` gained the forwarding step.
+
 - **Every plain `docker compose` invocation on `develop` failed with "required variable
   DEMO_MODE is missing a value".** The `demo-reset` sidecar added for the public demo declared
   `DEMO_MODE` and `DEMO_PASSWORD` in the required form (`${VAR:?message}`), on the reasoning
