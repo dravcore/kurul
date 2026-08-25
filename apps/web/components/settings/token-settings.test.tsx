@@ -108,6 +108,16 @@ describe('TokenSettings: listing', () => {
   });
 });
 
+describe('TokenSettings: copper budget', () => {
+  it('renders the create action as outline, not primary: /settings already spends its one primary button on "Invite member" (docs/design.md §2)', async () => {
+    renderSection();
+
+    const createButton = await screen.findByRole('button', { name: copy.createAction });
+
+    expect(createButton.getAttribute('data-variant')).toBe('outline');
+  });
+});
+
 describe('TokenSettings: creating', () => {
   it('posts only the name when no expiry is chosen', async () => {
     const created: CreatedPersonalAccessTokenDto = {
