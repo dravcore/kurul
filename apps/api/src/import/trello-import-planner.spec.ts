@@ -14,6 +14,8 @@ import {
 const FIXTURE_DIR = join(__dirname, '..', '..', 'test', 'fixtures', 'trello');
 const ACTOR_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51';
 const CONTEXT: TrelloImportContext = { actorId: ACTOR_ID };
+/** The fixture's first attachment on `Import boards from Trello`, the row the name tests edit. */
+const NOTES_URL = 'https://example.invalid/notes/trello-export-format';
 
 type RawExport = Record<string, unknown>;
 
@@ -497,6 +499,64 @@ describe('planTrelloImport', () => {
       // burying it in a bucket that also holds typos would hide the one that matters.
       expect(group(plan, 'attachment', 'malformed')).toMatchObject({ count: 1 });
       expect(group(plan, 'attachment', 'unsupportedScheme')).toMatchObject({ count: 1 });
+    });
+
+    /**
+     * The link label goes through the same cleaning `AttachmentService.createLink` applies, and
+     * the expected strings below are the ones `attachment.service.spec.ts` asserts for that
+     * path. An export is a file somebody else wrote, and a bidi override in an attachment name
+     * renders the same way in the panel whether the row came from a form or from an import.
+     */
+    it('cleans a link name exactly as createLink cleans one', () => {
+      const read = readMutated('synthetic-full-board', (raw) => {
+        const cards = raw.cards as Array<Record<string, unknown>>;
+        const card = cards.find((entry) => entry.name === 'Import boards from Trello');
+        (card?.attachments as Array<Record<string, unknown>>)[0]!.name =
+          'inv\u202egnp.exe\r\nX-Injected: 1';
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+
+      const row = plan.attachments.find((entry) => entry.url === NOTES_URL);
+      expect(row?.filename).toBe('invgnp.exeX-Injected: 1');
+    });
+
+    it('clamps a link name to 255 characters', () => {
+      const read = readMutated('synthetic-full-board', (raw) => {
+        const cards = raw.cards as Array<Record<string, unknown>>;
+        const card = cards.find((entry) => entry.name === 'Import boards from Trello');
+        (card?.attachments as Array<Record<string, unknown>>)[0]!.name = 'a'.repeat(300);
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+
+      const row = plan.attachments.find((entry) => entry.url === NOTES_URL);
+      expect(row?.filename).toBe('a'.repeat(255));
+    });
+
+    it('falls back to the URL when the name was made only of stripped characters', () => {
+      const read = readMutated('synthetic-full-board', (raw) => {
+        const cards = raw.cards as Array<Record<string, unknown>>;
+        const card = cards.find((entry) => entry.name === 'Import boards from Trello');
+        (card?.attachments as Array<Record<string, unknown>>)[0]!.name = '\u202e\u202a\u0000';
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+
+      const row = plan.attachments.find((entry) => entry.url === NOTES_URL);
+      // The same fallback an empty name gets, and the same one `createLink` uses: a URL is the
+      // one label that is always true of a link.
+      expect(row?.filename).toBe(NOTES_URL);
+    });
+
+    // The control: a rule that dropped every non-ASCII character would pass the three above.
+    it('leaves an ordinary non-ASCII link name intact', () => {
+      const read = readMutated('synthetic-full-board', (raw) => {
+        const cards = raw.cards as Array<Record<string, unknown>>;
+        const card = cards.find((entry) => entry.name === 'Import boards from Trello');
+        (card?.attachments as Array<Record<string, unknown>>)[0]!.name = 'ölçüm notları';
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+
+      const row = plan.attachments.find((entry) => entry.url === NOTES_URL);
+      expect(row?.filename).toBe('ölçüm notları');
     });
   });
 
