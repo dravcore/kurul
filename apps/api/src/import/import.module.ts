@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ActivityModule } from '../activity/activity.module';
+import { PlanModule } from '../plan/plan.module';
 import { ImportController } from './import.controller';
 import { readTrelloImportMaxBytes } from './import-config';
 import { TrelloImportService } from './trello-import.service';
@@ -9,6 +10,11 @@ import { TrelloImportService } from './trello-import.service';
 @Module({
   imports: [
     ActivityModule,
+    // `PlanModule` for the board ceiling alone (ADR 0032): an import creates a board, so it asks
+    // the same question `BoardService.create` asks, from the same service. `PlanModule` brings
+    // `StorageModule` with it for the byte quotas, and that is fine here: the importer never
+    // calls `StorageService.write`, so an instance with no `STORAGE_PATH` still imports.
+    PlanModule,
     // ## Its own MulterModule, not AttachmentModule's
     //
     // The two limits govern different costs (ADR 0025, `import-config.ts`): an attachment buys
