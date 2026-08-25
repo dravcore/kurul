@@ -28,6 +28,11 @@ export function ForgotPasswordView(): React.ReactElement {
     event.preventDefault();
     setPending(true);
     setError(null);
+    // Cleared with the error, not only set on success: the endpoint is capped at 3 per minute,
+    // so a second try after the mail did not arrive is a normal thing to do and a likely
+    // refusal. Leaving the previous confirmation up would put "a reset link is on its way"
+    // and "could not send the link" on screen at the same time.
+    setSent(false);
 
     try {
       const result = await authClient.requestPasswordReset({

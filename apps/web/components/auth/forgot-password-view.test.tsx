@@ -5,7 +5,9 @@ import messages from '@/messages/en.json';
 
 const mocks = vi.hoisted(() => ({
   requestPasswordReset:
-    vi.fn<(args: { email: string; redirectTo: string }) => Promise<{ error: unknown }>>(),
+    vi.fn<
+      (args: { email: string; redirectTo: string }) => Promise<{ error: { code?: string } | null }>
+    >(),
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -78,6 +80,22 @@ describe('ForgotPasswordView', () => {
     expect(alert.textContent).toBe('Could not send the link. Try again in a moment.');
     expect(screen.getByRole('status').textContent).toBe('');
     expect(screen.getByRole('button', { name: 'Send reset link' })).toBeTruthy();
+  });
+
+  it('takes the confirmation back down when a later send is refused', async () => {
+    // Three sends a minute is all the endpoint allows, so someone whose mail has not arrived
+    // yet is very likely to submit again and be refused. The success notice has to go with the
+    // send it described, or the page claims a link is on its way and that it could not be sent.
+    renderView();
+    submit('ayse@example.com');
+    const status = await screen.findByRole('status');
+    await waitFor(() => expect(status.textContent).toBe(NEUTRAL_MESSAGE));
+
+    mocks.requestPasswordReset.mockResolvedValue({ error: { code: 'RATE_LIMITED' } });
+    submit('ayse@example.com');
+
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('');
   });
 
   it('treats a thrown request like a refused one', async () => {
