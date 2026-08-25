@@ -108,15 +108,16 @@ describe('TaskCard selection', () => {
     expect(unselected.hasAttribute('aria-current')).toBe(false);
   });
 
-  /** The focus edge stays on every card; the hover pair is single-class and would outrank the
-   * selected tint and rail if it stayed on a selected card too. */
-  it('keeps the focus edge on every card, selected or not', () => {
+  /** Focus is the single `:focus-visible` outline `app/globals.css` draws. A focus utility here
+   * would put a second copper mark around that one, on the state where the card already wears a
+   * rail. */
+  it('draws no focus mark of its own, selected or not', () => {
     for (const selected of [false, true]) {
       cleanup();
       renderCard({}, selected);
-      const classes = classesOf(screen.getByRole('link'));
+      const classes = [...classesOf(screen.getByRole('link'))];
 
-      expect(classes.has('focus-visible:border-ring')).toBe(true);
+      expect(classes.filter((name) => name.startsWith('focus-visible:'))).toEqual([]);
     }
   });
 

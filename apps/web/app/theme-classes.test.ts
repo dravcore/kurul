@@ -88,7 +88,8 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
 
 /**
  * Comments are prose in the same sense test titles are (`board-template-picker.tsx`'s own
- * `// \`border-signature\`, not \`border-ring\`` explains a decision, it is not a class list).
+ * `// \`border-signature\` is selection and nothing else` explains a decision, it is not a class
+ * list).
  * Blanked rather than deleted, character for character with newlines kept, so every match index
  * taken afterwards still lands on its real source line. A `//` is only treated as a comment when
  * it opens the line: `components/ui/select.tsx` carries a data-URI with a literal `http://` in

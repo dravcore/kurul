@@ -63,7 +63,6 @@ const reviewedUtilities = [
   'border-border',
   'border-border-strong',
   'border-input',
-  'border-ring',
   'border-signature',
   'border-destructive',
   'divide-border',
@@ -82,15 +81,6 @@ const stateTokenCallSites: Record<string, string[]> = {
     'components/board/board-list.tsx',
     'components/board/board-template-picker.tsx',
     'components/task/task-card.tsx',
-  ],
-  // Focus only. Selection wears `border-signature`.
-  'border-ring': [
-    'components/board/board-template-picker.tsx',
-    'components/task/task-card.tsx',
-    'components/ui/button.tsx',
-    'components/ui/input.tsx',
-    'components/ui/select.tsx',
-    'components/ui/textarea.tsx',
   ],
   // Selection only.
   'border-signature': [

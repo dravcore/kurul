@@ -233,8 +233,9 @@ components/
   reason not to, stated next to the rule. An unlayered rule outranks every cascade layer whatever
   its specificity, so an unlayered `*` selector repaints the utilities Tailwind emits into
   `@layer utilities` and a class written in the markup stops meaning what it says. The
-  `:focus-visible` outline is the one current exception and carries its reason in place.
-  Guarded by `apps/web/app/globals-css-layers.test.ts`.
+  `:focus-visible` outline was the one rule that carried such a reason; it moved into `base` once
+  the controls stopped carrying focus rings and `outline-none` of their own, and no rule carries
+  one now. Guarded by `apps/web/app/globals-css-layers.test.ts`.
 - Every `text-*`, `bg-*`, `border-*`, `font-*` and `shadow-*` class must resolve against
   `@theme inline` or Tailwind's built-in scale. A class with no counterpart compiles to no CSS at
   all: nothing errors, the element just inherits and the mistake is invisible in review.

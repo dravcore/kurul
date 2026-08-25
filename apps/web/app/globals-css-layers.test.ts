@@ -13,6 +13,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // `new URL('./globals.css', import.meta.url)` is not usable here: Vite rewrites that exact
 // pattern into an asset reference, which resolves to a non-file URL under the test runner.
 const globalsPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'globals.css');
+const webRoot = path.dirname(path.dirname(globalsPath));
 const require = createRequire(import.meta.url);
 const tailwindDir = path.dirname(require.resolve('tailwindcss/package.json'));
 
@@ -245,12 +246,23 @@ function requireRule(
   return found;
 }
 
+/**
+ * The four form primitives, which until Phase 4 each carried an `outline-none` next to a ring
+ * pair of their own. With the outline in `base`, either utility outranks it and the control
+ * focuses with nothing drawn at all, which is the one failure the layer move can cause.
+ */
+const singleIndicatorControls = [
+  'components/ui/button.tsx',
+  'components/ui/input.tsx',
+  'components/ui/select.tsx',
+  'components/ui/textarea.tsx',
+];
+
 const borderUtilities = {
   'border-border': 'var(--border)',
   'border-input': 'var(--input)',
   'border-signature': 'var(--signature)',
   'border-destructive': 'var(--destructive)',
-  'border-ring': 'var(--ring)',
   'border-border-strong': 'var(--border-strong)',
 } as const;
 
@@ -261,8 +273,6 @@ const borderUtilities = {
  * valid field the app marks `aria-invalid="false"`.
  */
 const stateVariants = {
-  'focus-visible:border-ring': { suffix: ':focus-visible', value: 'var(--ring)' },
-  'focus-within:border-ring': { suffix: ':focus-within', value: 'var(--ring)' },
   'focus-within:border-border-strong': { suffix: ':focus-within', value: 'var(--border-strong)' },
   'hover:border-border-strong': { suffix: ':hover', value: 'var(--border-strong)' },
   'aria-invalid:border-destructive': {
@@ -392,17 +402,41 @@ describe('globals.css cascade layers', () => {
     expect(layerRank(sheet, divide.layer)).toBeGreaterThan(layerRank(sheet, 'base'));
   });
 
-  // components/ui/button.tsx carries `outline-none` next to `focus-visible:border-ring` and
-  // `focus-visible:ring-[3px] ring-ring/50`, all @layer utilities rules. Layering this outline
-  // would leave a focused button with the 1px border and the half-opacity ring instead of the
-  // 2px --ring at 2px offset docs/design.md §5 requires, so it stays unlayered until Phase 4
-  // drops `outline-none` and settles the ring utilities together.
-  it('keeps the :focus-visible outline above every utility', () => {
+  // The keyboard baseline is one mark: 2px --ring at 2px offset (docs/design.md §5). It is an
+  // author rule in `base` like every other, which is only safe because no keyboard-reachable
+  // control carries a ring pair or an outline suppressor of its own any more. The utilities that
+  // still suppress it sit on programmatic focus containers and on dropdown rows; the `it.each`
+  // below is what keeps them off the four form primitives.
+  it('layers the :focus-visible outline into base', () => {
     const focus = sheet.rules.filter((rule) => rule.selector === ':focus-visible');
     expect(focus).not.toHaveLength(0);
     for (const rule of focus) {
-      expect(layerRank(sheet, rule.layer)).toBeGreaterThan(layerRank(sheet, 'utilities'));
+      expect(rule.layer).toBe('base');
+      expect(rule.declarations).toContainEqual({
+        property: 'outline',
+        value: '2px solid var(--ring)',
+      });
     }
+  });
+
+  // An invalid field that is focused keeps one mark too, recoloured, rather than growing a
+  // second one beside it.
+  it('recolours that outline for a focused invalid field', () => {
+    const rule = requireRule(sheet, 'an aria-invalid focus outline colour', (candidate) => {
+      return candidate.selector.replaceAll(/['"]/g, '') === '[aria-invalid=true]:focus-visible';
+    });
+
+    expect(rule.layer).toBe('base');
+    expect(rule.declarations).toContainEqual({
+      property: 'outline-color',
+      value: 'var(--destructive)',
+    });
+  });
+
+  it.each(singleIndicatorControls)('leaves no outline suppressor on %s', async (file) => {
+    expect(await readFile(path.join(webRoot, file), 'utf8')).not.toMatch(
+      /\boutline-(none|hidden)\b/,
+    );
   });
 
   // jsdom never computes `color-scheme` (it lays out nothing), so the only thing a test in this

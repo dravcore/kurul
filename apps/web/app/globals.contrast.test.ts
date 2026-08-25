@@ -1266,42 +1266,6 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     worst: { light: 5.04, dark: 4.61 },
   },
   {
-    utility: 'focus-visible:ring-ring/50',
-    files: [
-      'components/task/sortable-task-card.tsx',
-      'components/task/task-card.tsx',
-      'components/ui/button.tsx',
-      'components/ui/input.tsx',
-      'components/ui/select.tsx',
-      'components/ui/textarea.tsx',
-    ],
-    fill: '--ring',
-    alpha: 0.5,
-    over: SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 1.91, dark: 2.25 },
-    reason:
-      'a halo, not the focus mark. `:focus-visible` in globals.css is unlayered, so its 2px ' +
-      'solid --ring outline outranks every utility including the `outline-none` these same ' +
-      'call sites carry, and --ring at full strength is gated at 3:1 on all six surfaces above',
-  },
-  {
-    utility: 'focus-within:ring-ring/50',
-    files: ['components/board/board-template-picker.tsx'],
-    fill: '--ring',
-    alpha: 0.5,
-    over: SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 1.91, dark: 2.25 },
-    reason:
-      'the same halo around a label whose radio child takes the unlayered outline, next to a ' +
-      'full-strength `focus-within:border-ring` on the label itself',
-  },
-  {
     utility: 'aria-invalid:ring-destructive/20',
     files: [
       'components/ui/button.tsx',
@@ -1317,8 +1281,10 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     themes: ['light', 'dark'],
     worst: { light: 1.38, dark: 1.37 },
     reason:
-      'a halo beside `aria-invalid:border-destructive`, which draws the same edge at full ' +
-      'strength and is gated at 3:1 above',
+      'a ring colour with no ring width left beside it since the focus ring went, so nothing ' +
+      'composites it today. Kept because the invalid edge it belongs to is drawn at full ' +
+      'strength by `aria-invalid:border-destructive`, gated at 3:1 above, and a width added ' +
+      'back here would arrive already measured',
   },
   {
     utility: 'dark:aria-invalid:ring-destructive/40',
@@ -1335,31 +1301,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     floor: AA_NON_TEXT,
     themes: ['dark'],
     worst: { dark: 1.99 },
-    reason: 'the dark half of the same halo, beside the same full-strength border',
-  },
-  {
-    utility: 'focus-visible:ring-destructive/20',
-    files: ['components/ui/button.tsx'],
-    fill: '--destructive',
-    alpha: 0.2,
-    over: NEUTRAL_SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 1.38, dark: 1.37 },
-    reason: 'the destructive variant tinting its focus halo, over the unlayered --ring outline',
-  },
-  {
-    utility: 'dark:focus-visible:ring-destructive/40',
-    files: ['components/ui/button.tsx'],
-    fill: '--destructive',
-    alpha: 0.4,
-    over: NEUTRAL_SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['dark'],
-    worst: { dark: 1.99 },
-    reason: 'the dark half of the same halo, over the same unlayered outline',
+    reason: 'the dark half of the same unpainted ring, beside the same full-strength border',
   },
   {
     utility: 'disabled:opacity-50',
@@ -1378,10 +1320,11 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     worst: { light: 3.21, dark: 4.21 },
     reason:
       'WCAG 1.4.3 exempts text in an inactive control, and docs/design.md §9 holds disabled ' +
-      'text to 3:1 anyway, which this clears. It is worth noting rather than hiding that ' +
-      '--foreground-disabled exists, is gated at 3:1 above, and no control reads it: a drawn ' +
-      'disabled colour would be steadier than an alpha over an unknown ground. The last open ' +
-      'gap from task-7-report.md §6; P4 owns components/ui/button.tsx and input.tsx',
+      'text to 3:1 anyway, which this clears. Settled in Phase 4 and not open: the alpha stays ' +
+      'the disabled treatment on controls, because it thins whatever the control already paints ' +
+      '(a filled button and a bare field do not share a resting colour) and a single drawn ' +
+      'token cannot. --foreground-disabled stays declared and gated at 3:1 above as the drawn ' +
+      'token for the surfaces that have no such colour to thin, chart marks and placeholders',
   },
   {
     utility: 'data-[disabled]:opacity-50',

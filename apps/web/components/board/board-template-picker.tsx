@@ -133,10 +133,9 @@ export function BoardTemplatePicker({
             key={template.slug}
             className={cn(
               'flex cursor-pointer gap-2.5 rounded-md border p-2.5 transition-colors',
-              'focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50',
-              // `border-signature`, not `border-ring`: the two tokens hold the same copper
-              // today, so a selected card and a focused one were telling the cascade the same
-              // thing by accident. Selection is the rail; focus is the ring.
+              // `border-signature` is selection and nothing else. The card draws no focus edge
+              // of its own: the radio inside it is a visible control and takes the one
+              // `:focus-visible` outline app/globals.css draws.
               template.slug === value
                 ? 'border-signature bg-signature-subtle'
                 : 'border-border hover:border-border-strong hover:bg-accent',
