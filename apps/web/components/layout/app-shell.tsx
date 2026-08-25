@@ -14,7 +14,7 @@ function AppShellFrame({
   children: React.ReactNode;
 }>): React.ReactElement {
   const t = useTranslations('app');
-  const { sessionPending, hasSession, bootstrapped, loadError, retryBootstrap } =
+  const { workspaces, sessionPending, hasSession, bootstrapped, loadError, retryBootstrap } =
     useWorkspaceContext();
 
   if (sessionPending || !hasSession || !bootstrapped) {
@@ -89,7 +89,12 @@ function AppShellFrame({
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
       <DemoBanner />
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <AppSidebar />
+        {/* No workspace, no sidebar. Every link in `SidebarBody` needs one, and
+            `workspace-provider.tsx`'s bootstrap effect sends a reader with none straight back to
+            `/workspaces/new`, so the whole navigation would be a loop; that route carries its
+            own header instead, and this is what keeps it the only chrome on screen rather than
+            a second wordmark and a second sign-out beside the sidebar's. */}
+        {workspaces.length > 0 ? <AppSidebar /> : null}
         {/* Skip-link target (see app/(app)/layout.tsx): tabIndex={-1} lets the fragment
             navigation move keyboard focus here without adding a tab stop.
 

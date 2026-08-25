@@ -15,6 +15,7 @@ vi.mock('./demo-banner', () => ({
 
 const context = vi.hoisted(() => ({
   value: {
+    workspaces: [{ id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d70' }] as Array<{ id: string }>,
     sessionPending: false,
     hasSession: true,
     bootstrapped: true,
@@ -30,19 +31,24 @@ vi.mock('./workspace-provider', () => ({
 
 import { AppShell } from './app-shell';
 
+function renderShell(): void {
+  render(
+    <NextIntlClientProvider locale="en" messages={messages}>
+      <AppShell>
+        <p>Route content</p>
+      </AppShell>
+    </NextIntlClientProvider>,
+  );
+}
+
 afterEach(() => {
   cleanup();
+  context.value.workspaces = [{ id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d70' }];
 });
 
 describe('AppShell', () => {
   it('marks the main region as the skip-link target', () => {
-    render(
-      <NextIntlClientProvider locale="en" messages={messages}>
-        <AppShell>
-          <p>Route content</p>
-        </AppShell>
-      </NextIntlClientProvider>,
-    );
+    renderShell();
 
     // The (app) layout's skip link points at #main-content; tabIndex -1 lets that
     // fragment navigation move keyboard focus into the region (WCAG 2.4.1).
@@ -50,5 +56,26 @@ describe('AppShell', () => {
     expect(main.id).toBe('main-content');
     expect(main.tabIndex).toBe(-1);
     expect(main.textContent).toBe('Route content');
+  });
+
+  it('shows the sidebar once there is a workspace to navigate', () => {
+    renderShell();
+
+    expect(screen.getByTestId('app-sidebar')).toBeDefined();
+  });
+
+  /**
+   * A reader with no workspace is on `/workspaces/new`, and `workspace-provider.tsx` puts them
+   * back there from anywhere else. Every `SidebarBody` link needs a workspace, so the whole
+   * navigation would be that redirect under a different name, and the route's own header would
+   * be a second wordmark and a second sign-out next to the sidebar's from 768px up.
+   */
+  it('drops the sidebar entirely while the roster is empty', () => {
+    context.value.workspaces = [];
+
+    renderShell();
+
+    expect(screen.queryByTestId('app-sidebar')).toBeNull();
+    expect(screen.getByRole('main').textContent).toBe('Route content');
   });
 });

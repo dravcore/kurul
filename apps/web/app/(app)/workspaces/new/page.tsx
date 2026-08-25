@@ -24,9 +24,11 @@ function slugify(value: string): string {
  * This route's own header, not `Topbar`. `Topbar` renders `MobileNav`, which is `SidebarBody`,
  * and every link there requires a workspace: a reader is on this page precisely because they
  * have none, so that navigation would just redirect back here
- * (`workspace-provider.tsx`'s bootstrap effect) under a different name. `onSignOut` is read
- * from the same context `SidebarBody`'s sign-out button calls, so the sign-out sequence itself
- * stays defined once, in `WorkspaceProvider`.
+ * (`workspace-provider.tsx`'s bootstrap effect) under a different name. `AppShell` drops the
+ * desktop sidebar for the same reason while the roster is empty, which is what leaves this the
+ * only chrome on screen at every width rather than a second wordmark beside the sidebar's.
+ * `onSignOut` is read from the same context `SidebarBody`'s sign-out button calls, so the
+ * sign-out sequence itself stays defined once, in `WorkspaceProvider`.
  */
 function NewWorkspaceHeader(): React.ReactElement {
   const t = useTranslations('app.shell');
