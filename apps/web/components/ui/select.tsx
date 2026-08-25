@@ -17,7 +17,10 @@ import { cn } from '@/lib/utils';
  */
 const selectVariants = cva(
   cn(
-    "w-full min-w-0 appearance-none rounded-md border border-input bg-transparent bg-[url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E\")] bg-[length:1rem_1rem] bg-no-repeat text-body shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+    // `text-base md:text-body`, not `text-body` alone, on the shared base so every size
+    // variant carries it: 16px is the threshold under which iOS Safari zooms the page on
+    // focus, same reasoning as `Input` and `Textarea`.
+    "w-full min-w-0 appearance-none rounded-md border border-input bg-transparent bg-[url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E\")] bg-[length:1rem_1rem] bg-no-repeat text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-body",
     'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
     'aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
   ),
