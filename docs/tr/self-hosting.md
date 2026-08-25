@@ -51,15 +51,15 @@ büyüyen container hangisiyse onun yerine Postgres'i esirgemek için hiçbir se
 için öldürülür ve başka bir servisin yaptığı hiçbir şey Postgres'i onunla birlikte
 düşüremez.
 
-| Servis     | `mem_limit` | Bu sayının nedeni                                                                                |
-| ---------- | ----------- | ------------------------------------------------------------------------------------------------ |
-| `postgres` | 512m        | Küçük bir ekibin board'u için cömert bir taban                                                   |
-| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) ikisi de heap'ine buffer'lar  |
-| `web`      | 512m        | Aynı Next.js SSR process'i, `api` ile aynı "seçilmemiş tavan" sorunu                             |
-| `migrate`  | 512m        | `api` ile aynı — aynı build stage, aynı Prisma CLI, yalnızca startup'ta bir kez                  |
-| `backup`   | 256m        | `pg_dump` buffer'lamak yerine stream eder; bu, process overhead'i ve attachment `tar`'ını kapsar |
-| `redis`    | 128m        | Yalnızca cache, session, rate limit, bildirim — asla board verisi, küçük ve sınırlı working set  |
-| `proxy`    | 128m        | TLS sonlandırır ve proxy'ler; gövdeler `api`'ninki gibi buffer'lanmak yerine Caddy'den geçer     |
+| Servis     | `mem_limit` | Bu sayının nedeni                                                                                  |
+| ---------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| `postgres` | 512m        | Küçük bir ekibin board'u için cömert bir taban; `/dev/shm` 256m'ye çıkarıldı, aşağıya bakın        |
+| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) ikisi de heap'ine buffer'lar    |
+| `web`      | 512m        | Aynı Next.js SSR process'i, `api` ile aynı "seçilmemiş tavan" sorunu                               |
+| `migrate`  | 512m        | `api` ile aynı — aynı build stage, aynı Prisma CLI, yalnızca startup'ta bir kez                    |
+| `backup`   | 256m        | `pg_dump` buffer'lamak yerine stream eder; bu, process overhead'i ve attachment `tar`'ını kapsar   |
+| `redis`    | 128m        | Yalnızca cache, session, rate limit, bildirim, asla board verisi; `maxmemory` 100mb, aşağıya bakın |
+| `proxy`    | 128m        | TLS sonlandırır ve proxy'ler; gövdeler `api`'ninki gibi buffer'lanmak yerine Caddy'den geçer       |
 
 `api` ve `web`, 512m tavanlarının %75'i olan `NODE_OPTIONS=--max-old-space-size=384`'ü de
 ayarlar — böylece V8'in heap'i, Node'un kendi container-belleği sezgisine bırakılmak yerine
@@ -68,6 +68,22 @@ kapsamadığı şeyler içindir (thread stack'leri, native buffer'lar, code spac
 sert limitine varmadan önce kendi yakalanabilir "JavaScript heap out of memory" hatasına çarpar
 — bu da çıplak bir `SIGKILL` yerine `docker compose logs api` (ya da `web`) içinde bir satır
 olarak görünür.
+
+`redis` de 128m'sinin içinde aynı muameleyi görür: komut satırında `--maxmemory 100mb
+--maxmemory-policy noeviction` vardır, yani dolan bir Redis, cgroup tarafından öldürülüp
+döngü halinde yeniden başlatılmak yerine yazmalara
+`OOM command not allowed when used memory > 'maxmemory'` ile cevap verir (`docker compose logs
+api` içinde bir satır; API'nin rate limiter'ları Redis hata verirken process belleğine düşer,
+bir cache miss de bir cache miss'tir). `noeviction`, bildirim ve retention kuyrukları bu
+Redis'te yaşayan BullMQ'nun şart koştuğu politikadır: evict edilen bir iş sessizce hiç
+çalışmayan bir iştir, dolayısıyla dolu bir Redis anahtar düşürmek yerine yazmayı reddeder.
+`postgres` `shm_size: 256m` taşır çünkü Docker'ın `/dev/shm`'i varsayılan olarak 64 MB'dır ve
+Postgres paralel worker'lar ile hash join'ler için dinamik paylaşımlı belleği oraya ayırır;
+bitmesi, ağır bir dashboard sorgusunda
+`could not resize shared memory segment ... No space left on device` olarak görünür. İkisi de
+tablodaki tavanların üstüne bellek değildir: bir `/dev/shm` sayfası container'ın cgroup'una
+diğer her sayfa gibi yazılır ve `maxmemory`, Docker'ın Redis'e uyguladığı limitin altında
+Redis'in kendine uyguladığı bir limittir.
 
 Bunlar birer tavan, rezervasyon değil — `mem_limit`'inden az kullanan bir container hiçbir ek
 maliyete yol açmaz, ve özellikle `migrate`, `api` ile `web` başlamayı bitirmeden önce (başarıyla)

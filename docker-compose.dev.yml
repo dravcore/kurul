@@ -48,6 +48,9 @@ services:
     # (chown on every boot + gosu re-exec, DAC_OVERRIDE only bites on the *second* boot
     # onward once PGDATA is 0700 postgres-owned) — identical image, identical requirement.
     cap_add: [CHOWN, FOWNER, SETUID, SETGID, DAC_OVERRIDE]
+    # Same 256m /dev/shm as docker-compose.yml (see there): Docker's 64 MB default is where
+    # Postgres's parallel workers run out of dynamic shared memory.
+    shm_size: 256m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kurul}
       # Same fail-loud requirement as docker-compose.yml (see there for why): no baked-in
@@ -58,8 +61,13 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql
+    # `-h 127.0.0.1` for the same reason as docker-compose.yml: the official entrypoint's
+    # temporary initdb server answers the Unix socket before anything listens on 5432, and
+    # scripts/bootstrap.mjs's `prisma migrate` has met exactly that window. Probing TCP means
+    # healthy is not reported until the real listener is up.
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-kurul} -d ${POSTGRES_DB:-kurul}']
+      test:
+        ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-kurul} -d ${POSTGRES_DB:-kurul}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -84,8 +92,19 @@ services:
     # Exec form, substituted by Compose itself — see docker-compose.yml's redis service for
     # why this replaced the `sh -c` conditional (that form silently kept the container root
     # for its entire life) and why array form specifically is required (a plain string
-    # would drop the trailing blank argument when REDIS_PASSWORD is unset).
-    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']
+    # would drop the trailing blank argument when REDIS_PASSWORD is unset). `--maxmemory` and
+    # `noeviction` as in docker-compose.yml too: BullMQ warns on any other eviction policy, and
+    # a developer's Redis should refuse writes the same way a self-hoster's does.
+    command:
+      [
+        'redis-server',
+        '--requirepass',
+        '${REDIS_PASSWORD:-}',
+        '--maxmemory',
+        '100mb',
+        '--maxmemory-policy',
+        'noeviction',
+      ]
     ports:
       - '6379:6379'
     volumes:
