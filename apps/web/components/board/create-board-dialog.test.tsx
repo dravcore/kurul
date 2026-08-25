@@ -132,6 +132,18 @@ describe('CreateBoardDialog', () => {
     expect(screen.queryAllByRole('radio')).toHaveLength(0);
   });
 
+  it('names the template it is about to apply while the list is collapsed', async () => {
+    renderDialog();
+
+    // The board comes out seeded with this template's columns and label preset, so the
+    // collapsed line says which one is in force; a bare "Change template" link would leave a
+    // first-time user with a seeded board and nothing on screen admitting a choice was made.
+    expect(await screen.findByText('Starting from Kanban')).toBeTruthy();
+    // The name is the selection's, read back from the catalog rather than assumed: nothing here
+    // knows a slug, so the line has to resolve `value` against what the API sent.
+    expect(screen.getByRole('button', { name: 'Change template' })).toBeTruthy();
+  });
+
   it('creates a board on the catalog default with the picker left collapsed', async () => {
     const { onCreated } = renderDialog();
 

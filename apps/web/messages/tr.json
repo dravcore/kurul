@@ -389,6 +389,7 @@
       "template": "Şununla başla",
       "templateError": "Şablonlar yüklenemedi. Bu board varsayılan column'larla başlayacak.",
       "changeTemplate": "Şablonu değiştir",
+      "changeTemplateWith": "{name} ile başlıyor",
       "boardMenu": "Board işlemleri",
       "import": {
         "action": "Trello'dan içe aktar",

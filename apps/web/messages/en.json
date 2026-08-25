@@ -389,6 +389,7 @@
       "template": "Start from",
       "templateError": "Templates couldn't load. This board will start with the default columns.",
       "changeTemplate": "Change template",
+      "changeTemplateWith": "Starting from {name}",
       "boardMenu": "Board actions",
       "import": {
         "action": "Import from Trello",
