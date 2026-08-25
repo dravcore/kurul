@@ -28,7 +28,7 @@ export function ChecklistBadge({
   const complete = summary.done === summary.total;
   return (
     <span
-      className={cn('inline-flex items-center gap-1', complete && 'text-status-good')}
+      className="inline-flex items-center gap-1"
       aria-label={
         complete
           ? t('complete', { total: summary.total })
@@ -43,7 +43,14 @@ export function ChecklistBadge({
         3 841 it renders with no checklist anywhere. The glyph still says "checklist" and not
         "count", which is why it is not simply dropped.
       */}
-      <SquareCheckBig className="size-3 shrink-0" aria-hidden />
+      {/* The completion colour rides the glyph, not the ratio next to it. `docs/design.md` §3
+          draws a semantic scale as a full-chroma icon plus text, and the icon is a mark held to
+          3:1 while the ratio is 11px text held to 4.5:1, which `--status-good` misses on the
+          selection tint in light (4.33:1), the ground a selected card puts under this badge. */}
+      <SquareCheckBig
+        className={cn('size-3 shrink-0', complete && 'text-status-good')}
+        aria-hidden
+      />
       <span>
         {summary.done}/{summary.total}
       </span>
