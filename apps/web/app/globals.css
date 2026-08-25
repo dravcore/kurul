@@ -21,22 +21,35 @@
   --popover-foreground: #191c1b;
   --primary: #a85a28;
   --primary-foreground: #ffffff;
-  --secondary: #f1f3f1;
+
+  /* --secondary and --accent share one value and --muted holds a different one. --accent is
+     the hover step, so it has to stay a visible step away from both grounds it is painted
+     over (the white card and the column), and --muted is the column ground itself. */
+  --secondary: #eaedea;
   --secondary-foreground: #191c1b;
   --muted: #f1f3f1;
-  --muted-foreground: #6b726e;
-  --accent: #f1f3f1;
+  --muted-foreground: #626965;
+  --accent: #eaedea;
   --accent-foreground: #191c1b;
   --destructive: #c0281f;
   --destructive-foreground: #ffffff;
+
+  /* The one colour token allowed under 3:1: it separates two areas of a single surface and
+     never carries state on its own. Every edge that means something interactive or selected
+     wears --border-strong, --input, --ring or --signature. */
   --border: #d6dad8;
-  --border-strong: #b9bfbc;
-  --input: #d6dad8;
+  --border-strong: #7d8481;
+  /* One value under two names. --input stays only because shadcn primitives read
+     `border-input`; there is no second job for it to do. */
+  --input: var(--border-strong);
   --ring: #a85a28;
   --signature: #a85a28;
-  --signature-subtle: #f6ede5;
+
+  /* Never copper (--signature) text on this tint. Neutral --foreground text is allowed and is
+     measured against it like any other surface. */
+  --signature-subtle: #f2e6da;
   --foreground-secondary: #545a57;
-  --foreground-disabled: #8a918d;
+  --foreground-disabled: #7f8683;
 
   --priority-low: #6b726e;
   --priority-medium: #3f6b99;
@@ -88,30 +101,35 @@
 .dark {
   color-scheme: dark;
 
-  --background: #0e100f;
+  /* Dark depth is a lighter surface, not a shadow (docs/design.md §3), so the ramp is the
+     hierarchy: canvas, column ground (--muted), card, popover, hover step (--accent), each one
+     step above the last. --popover must not meet --accent at either end: a dropdown paints its
+     ground with bg-popover and the highlighted item with bg-accent, and the items carry
+     outline-hidden, so that step is the only thing saying which row is focused. */
+  --background: #131715;
   --foreground: #e8ecea;
-  --card: #161918;
+  --card: #212523;
   --card-foreground: #e8ecea;
-  --popover: #161918;
+  --popover: #272b29;
   --popover-foreground: #e8ecea;
   --primary: #d98a4e;
-  --primary-foreground: #0e100f;
-  --secondary: #1d2120;
+  --primary-foreground: #131715;
+  --secondary: #2f3331;
   --secondary-foreground: #e8ecea;
-  --muted: #1d2120;
-  --muted-foreground: #8a928e;
-  --accent: #1d2120;
+  --muted: #1a1e1c;
+  --muted-foreground: #98a09c;
+  --accent: #2f3331;
   --accent-foreground: #e8ecea;
   --destructive: #f0665c;
-  --destructive-foreground: #0e100f;
-  --border: #2a2f2d;
-  --border-strong: #383e3b;
-  --input: #2a2f2d;
+  --destructive-foreground: #131715;
+  --border: #3a403d;
+  --border-strong: #767d7a;
+  --input: var(--border-strong);
   --ring: #d98a4e;
   --signature: #d98a4e;
-  --signature-subtle: #241a12;
-  --foreground-secondary: #b3bab6;
-  --foreground-disabled: #6e7773;
+  --signature-subtle: #37291d;
+  --foreground-secondary: #bcc3bf;
+  --foreground-disabled: #7b837f;
 
   --priority-low: #8a928e;
   --priority-medium: #6ba3e8;
@@ -127,7 +145,7 @@
   --label-slot-3: #199e70;
   --label-slot-4: #c98500;
   --label-slot-5: #d55181;
-  --label-slot-6: #008300;
+  --label-slot-6: #2a9d3c;
   --label-slot-7: #9085e9;
   --label-slot-8: #e66767;
 }
