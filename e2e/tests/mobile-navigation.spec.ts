@@ -319,9 +319,19 @@ test('every interactive element on the mobile path is at least 44px', async ({ s
     tooSmall(boardTargets),
     `undersized controls on the board at 360px (of ${boardTargets.length} measured)`,
   ).toEqual([]);
-  // The board's only text field is the search box (`board-filter-search.tsx`), which sets its
-  // own compact `text-small` deliberately; it is not one of the three primitives the 16px
-  // check below covers, so the font-size sweep starts at the drawer instead.
+  // The board's only text field is the search box (`board-filter-search.tsx`), which now
+  // carries `md:text-small` rather than a bare `text-small`: below `md` the `Input` primitive's
+  // own `text-base` survives the merge, so at 360px it is held to the same 16px floor as every
+  // other field.
+  const boardFields = await fieldFontSizes(page);
+  expect(
+    boardFields.length,
+    'the board font-size sweep found nothing to measure',
+  ).toBeGreaterThanOrEqual(1);
+  expect(
+    wrongFontSize(boardFields, IOS_ZOOM_THRESHOLD_PX),
+    `text fields on the board below 16px at 360px (of ${boardFields.length} measured)`,
+  ).toEqual([]);
 
   // Now the drawer, whose controls are the ones the finding is actually about.
   await tap(page, page.getByRole('button', { name: 'Open navigation' }));
