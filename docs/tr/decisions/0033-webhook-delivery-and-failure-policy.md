@@ -172,11 +172,11 @@ edilip yalnızca 1.0'da hayata geçirilebilmesinin nedeni de budur.
 
 Tam olarak `${timestamp}.${rawBody}` baytları üzerinde HMAC-SHA256, hex kodlanmış, üç header'da:
 
-| Header              | Değer                                                                     |
-| ------------------- | ------------------------------------------------------------------------- |
-| `X-Kurul-Signature` | `v1=<hex>`, şema önekli, böylece yanına ikinci bir şema eklenebilir       |
-| `X-Kurul-Timestamp` | Unix saniyesi, imzalanan değerin aynısı                                   |
-| `X-Kurul-Delivery`  | Teslim id'si, gövdedeki `id` ile aynı, alıcının kendi idempotency'si için |
+| Header              | Değer                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| `X-Kurul-Signature` | Virgülle ayrılmış bir ya da daha fazla `v1=<hex>` değeri; aşağıdaki rotasyon notuna bakın |
+| `X-Kurul-Timestamp` | Unix saniyesi, imzalanan değerin aynısı                                                   |
+| `X-Kurul-Delivery`  | Teslim id'si, gövdedeki `id` ile aynı, alıcının kendi idempotency'si için                 |
 
 Zaman damgasını gövdeyle birlikte imzalamak, gövdeyi tek başına imzalamak yerine, yakalanmış bir
 isteği tekrar oynatılamaz kılan şeydir: alıcı MAC'i yeniden hesaplar, sonra kendi saatinden **beş
@@ -184,6 +184,16 @@ dakikadan** fazla uzaktaki bir zaman damgasını reddeder. Yalnızca gövdeyi im
 isteği bir kez gözlemleyen herkesin onu sonsuza kadar tekrarlamasına izin verirdi. Alıcı tarafındaki
 karşılaştırma sabit zamanlıdır ve dokümantasyon bunu açıkça söyler, çünkü bunu doğru yapıp yine de
 açık kalmanın en yaygın yolu iki string üzerinde `==`'dir.
+
+**Header bir listedir, çünkü gönderen tarafındaki rotasyon onu liste yapar.** Rotasyon dışında tek
+bir değer taşır. 6. bölümdeki örtüşme penceresi boyunca gönderen aynı baytları hem yeni sırla hem de
+öncekiyle imzalar ve `v1=<hex>,v1=<hex>` gönderir; alıcı, listedeki değerlerden **herhangi biri**
+elindeki sırla eşleşiyorsa teslimi kabul eder. Bu, alıcıların başka sağlayıcılardan zaten bildiği
+biçimdir ve bu rotasyonun kayıpsız olabilmesinin tek yoludur: Kurul MAC'i doğrulamaz, **üretir**,
+dolayısıyla "önceki sır geçerli kalır" ancak "önceki sır hâlâ imzaladıklarımızdan biridir" anlamına
+gelebilir. Örtüşme sırasında tek bir imza göndermek, hâlâ diğer sırrı tutan her alıcıda başarısız
+olurdu; örtüşmenin önlemek için var olduğu kaçırılmış teslim tam olarak budur. `v1=` öneki ikinci
+genişlemeyi, yani algoritma değişikliğini de taşır ve iki tür girdi de aynı listeye sığar.
 
 ### 4. Teslim önce bir outbox satırı, sonra bir job
 
@@ -231,7 +241,9 @@ olurdu ve roadmap'in "ölü bir endpoint'i devre dışı bırakma" ifadesinin ka
 
 **Sunucu üretir, oluşturmada bir kez gösterilir ve `BETTER_AUTH_SECRET`'tan HKDF ile türetilen bir
 anahtarla AES-256-GCM ile şifrelenmiş saklanır.** Rotasyon yeni bir sır verir ve öncekini 24 saat
-geçerli tutar, böylece bir alıcı teslim kaçırmadan güncellenebilir. Yeniden gösterme yoktur:
+geçerli tutar; gönderen tarafında bu, o penceredeki her teslimin ikisiyle birden imzalanması ve
+`X-Kurul-Signature`'da iki değeri birden taşıması demektir (3. bölüm), böylece bir alıcı pencerenin
+herhangi bir anında teslim kaçırmadan güncellenebilir. Yeniden gösterme yoktur:
 kaybedilen bir sır, kaybedilen bir personal access token'ın yeniden üretilmesi gibi rotasyona uğrar.
 
 PAT emsali burada izlenemez ve bu ayrışmanın söylenmesi gerekir. Bir token **doğrulanır**, dolayısıyla

@@ -155,17 +155,26 @@ The only thing that assigns a plan is a provider webhook event: subscription cre
 canceled, and payment failed. Handling one is:
 
 1. Verify the signature over the raw body. An unverified request is `401` and nothing else happens.
-2. Insert into `BillingEvent`. A unique-constraint violation on `(provider, eventId)` means this
-   event was already applied, so answer `200` and stop. Providers retry, and retrying is how
-   at-least-once delivery is supposed to look from the receiving end.
-3. Resolve `planCode` through `PLAN_CATALOG` and **validate the resulting limit object before
+2. Resolve `planCode` through `PLAN_CATALOG` and **validate the resulting limit object before
    writing it**, with the same predicate `parseWorkspacePlanOverride` applies when reading. An
    unknown `planCode`, or a limit that is not a non-negative integer, is refused: log it, answer
-   `5xx` so the provider retries, and write nothing. This step exists because the reader drops what
-   it cannot use, so an unvalidated write of a bad shape does not fail, it grants unlimited.
-4. Upsert `Subscription` and write `Workspace.planLimits` **in one `$transaction`**. A workspace
-   whose row says "team" while its ceilings say "free" is the failure mode this prevents, and it is
-   the one that generates support mail.
+   `5xx` so the provider retries, and write nothing, which at this point is still literally true
+   because nothing has been written yet. This step exists because the reader drops what it cannot
+   use, so an unvalidated write of a bad shape does not fail, it grants unlimited.
+3. **In one `$transaction`:** insert into `BillingEvent`, upsert `Subscription`, and write
+   `Workspace.planLimits`. A unique-constraint violation on `(provider, eventId)` aborts that whole
+   transaction, which is exactly the right outcome: the event was already applied, nothing is
+   written twice, and the handler answers `200` and stops. Providers retry, and retrying is how
+   at-least-once delivery is supposed to look from the receiving end.
+
+**The ledger row is inside the transaction, not in front of it, and that ordering is the decision.**
+An idempotency ledger committed before the write it protects is a promise that the write happened,
+made before it did. Written that way, a refusal in step 2 or a crash between the two commits leaves
+an event marked applied and a workspace that never got its plan, and the retry the provider is being
+asked for is then answered `200` by the ledger row and dropped. Nothing outside the transaction
+records progress, so the only two outcomes are "event recorded and entitlement written" and
+"neither". A workspace whose `Subscription` row says "team" while its ceilings say "free" is the
+other failure mode the single transaction prevents, and it is the one that generates support mail.
 
 **A daily reconcile job** re-reads every active subscription from the provider and re-applies the
 same write, in the `cleanup.worker.ts` shape: BullMQ, one repeating job, no start at all when
@@ -225,10 +234,26 @@ of the product would be able to tell it apart from a bug.
   operator writes by hand.
 
 This is a contract, not an intention, so it is proven the way contracts are: an e2e that boots the
-API with `BILLING_PROVIDER` unset and asserts that the `/config` and `/plan` documents are
-byte-identical to today's, and that both billing paths answer `404`. ADR 0028 promises self-hosters
-the same code with nothing held back; the reverse promise, that the code they run holds nothing
-_extra_, needs a test rather than a paragraph.
+API with `BILLING_PROVIDER` unset and asserts, document by document,
+
+- that `GET /config` is **byte-identical** to the `InstanceConfigDto` the same build serves with a
+  provider configured. Billing publishes no capability there at all, in either direction, so this
+  one is an exact-equality assertion with nothing carved out of it;
+- that `GET /workspaces/{workspaceId}/plan` differs from the document served before this record by
+  **exactly one member and nothing else**: the `plan` key section 8 adds, whose value is `null`.
+  `limits` and `usage` are byte-identical, and no other key appears anywhere in the response;
+- that `POST /billing/webhooks/:provider` and the checkout route both answer `404`.
+
+The second assertion is deliberately narrower than "byte-identical", and the difference is the point
+rather than a concession. `plan` is a member of `WorkspacePlanDto` on **every** instance, not a
+hosted-only key, because a client that has to branch on whether a field exists is a client that has
+to know how the server was deployed. The property worth testing is therefore not that the document
+never changed, it is that turning billing off adds nothing beyond the one `null` the published type
+already promises. Asserting byte-equality on `/plan` would assert the opposite of what section 8
+decides, and a test that cannot pass is worse than no test.
+
+ADR 0028 promises self-hosters the same code with nothing held back; the reverse promise, that the
+code they run holds nothing _extra_, needs a test rather than a paragraph.
 
 ### 8. `WorkspacePlanDto` gains a plan identity, additively
 

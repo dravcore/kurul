@@ -158,17 +158,26 @@ Plan atayan tek şey bir sağlayıcı webhook event'idir: abonelik oluşturuldu,
 ve ödeme başarısız. Birini işlemek şudur:
 
 1. İmzayı ham gövde üzerinde doğrula. Doğrulanmamış bir istek `401`'dir ve başka hiçbir şey olmaz.
-2. `BillingEvent`'e ekle. `(provider, eventId)` üzerinde bir tekillik ihlali, bu event'in zaten
-   uygulandığı anlamına gelir; `200` cevapla ve dur. Sağlayıcılar yeniden dener ve en-az-bir-kere
-   teslim, alıcı tarafından tam olarak böyle görünmelidir.
-3. `planCode`'u `PLAN_CATALOG` üzerinden çöz ve **ortaya çıkan limit nesnesini yazmadan önce
+2. `planCode`'u `PLAN_CATALOG` üzerinden çöz ve **ortaya çıkan limit nesnesini yazmadan önce
    doğrula**, `parseWorkspacePlanOverride`'ın okurken uyguladığı predicate'in aynısıyla. Bilinmeyen
    bir `planCode` ya da negatif olmayan tam sayı olmayan bir limit reddedilir: logla, sağlayıcı
-   yeniden denesin diye `5xx` cevapla ve hiçbir şey yazma. Bu adım, okuyucunun kullanamadığını
-   düşürmesi yüzünden vardır: kötü bir şeklin doğrulanmamış yazımı başarısız olmaz, sınırsız verir.
-4. `Subscription`'ı upsert et ve `Workspace.planLimits`'i **tek bir `$transaction` içinde** yaz.
-   Satırı "team" derken tavanları "free" diyen bir workspace, bunun önlediği hata biçimidir ve destek
-   yazışması üreten de odur.
+   yeniden denesin diye `5xx` cevapla ve hiçbir şey yazma; bu noktada bu ifade harfiyen doğrudur,
+   çünkü henüz hiçbir şey yazılmamıştır. Bu adım, okuyucunun kullanamadığını düşürmesi yüzünden
+   vardır: kötü bir şeklin doğrulanmamış yazımı başarısız olmaz, sınırsız verir.
+3. **Tek bir `$transaction` içinde:** `BillingEvent`'e ekle, `Subscription`'ı upsert et ve
+   `Workspace.planLimits`'i yaz. `(provider, eventId)` üzerindeki bir tekillik ihlali o
+   transaction'ın tamamını geri alır ve doğru sonuç tam olarak budur: event zaten uygulanmıştır,
+   hiçbir şey iki kez yazılmaz, handler `200` cevaplar ve durur. Sağlayıcılar yeniden dener ve
+   en-az-bir-kere teslim, alıcı tarafından tam olarak böyle görünmelidir.
+
+**Ledger satırı transaction'ın önünde değil içindedir ve asıl karar bu sıralamadır.** Koruduğu
+yazmadan önce commit edilen bir idempotency ledger'ı, yazma gerçekleşmeden önce verilmiş "gerçekleşti"
+sözüdür. Öyle yazıldığında 2. adımdaki bir ret ya da iki commit arasındaki bir çökme, uygulanmış
+işaretli bir event ile planını hiç almamış bir workspace bırakır; üstelik sağlayıcıdan istenen
+yeniden deneme de o ledger satırı yüzünden `200` cevaplanıp düşürülür. Transaction'ın dışında hiçbir
+şey ilerleme kaydetmez, dolayısıyla yalnızca iki sonuç vardır: "event kaydedildi ve hak yazıldı" ya
+da "hiçbiri". `Subscription` satırı "team" derken tavanları "free" diyen bir workspace, tek
+transaction'ın önlediği diğer hata biçimidir ve destek yazışması üreten de odur.
 
 **Günlük bir mutabakat job'ı** her aktif aboneliği sağlayıcıdan yeniden okur ve aynı yazımı yeniden
 uygular, `cleanup.worker.ts` biçiminde: BullMQ, tek bir tekrarlayan job, `REDIS_URL` yokken hiç
@@ -227,10 +236,27 @@ en güvenilmez girdi üzerine (bir üçüncü tarafın bir kart hakkındaki gör
   operatörün elle yazdığı bir kolon.
 
 Bu bir niyet değil bir kontrattır, dolayısıyla kontratların kanıtlandığı gibi kanıtlanır: API'yi
-`BILLING_PROVIDER` ayarlı değilken açan ve `/config` ile `/plan` belgelerinin bugünküyle bayt bayt
-aynı olduğunu, iki faturalandırma yolunun da `404` cevapladığını doğrulayan bir e2e. ADR 0028, kendi
-kendine barındıranlara hiçbir şey saklanmadan aynı kodu vaat ediyor; tersi vaat, yani çalıştırdıkları
-kodun **fazladan** hiçbir şey barındırmadığı, bir paragraf değil bir test ister.
+`BILLING_PROVIDER` ayarlı değilken açan ve belge belge şunları doğrulayan bir e2e:
+
+- `GET /config`, aynı build'in sağlayıcı yapılandırılmışken sunduğu `InstanceConfigDto` ile **bayt
+  bayt aynıdır**. Faturalandırma oraya hiçbir yönde hiçbir yetenek yayımlamaz, dolayısıyla bu, hiçbir
+  istisnası olmayan tam eşitlik iddiasıdır;
+- `GET /workspaces/{workspaceId}/plan`, bu kayıttan önce sunulan belgeden **tam olarak tek bir üye
+  kadar ve başka hiçbir şeyle** ayrılır: 8. bölümün eklediği ve değeri `null` olan `plan` anahtarı.
+  `limits` ve `usage` bayt bayt aynıdır ve yanıtın hiçbir yerinde başka bir anahtar görünmez;
+- `POST /billing/webhooks/:provider` ve checkout route'u `404` cevaplar.
+
+İkinci iddia "bayt bayt aynı"dan bilinçli olarak daha dardır ve bu fark bir taviz değil, kararın
+kendisidir. `plan`, yalnızca barındırılana özel bir anahtar değil, **her** instance'ta
+`WorkspacePlanDto`'nun bir üyesidir; çünkü bir alanın var olup olmadığına göre dallanmak zorunda kalan
+bir istemci, sunucunun nasıl kurulduğunu bilmek zorunda kalan bir istemcidir. Dolayısıyla test etmeye
+değer özellik, belgenin hiç değişmemiş olması değil, faturalandırmayı kapatmanın yayımlanan tipin
+zaten vaat ettiği o tek `null`'ın ötesinde hiçbir şey eklememesidir. `/plan` üzerinde bayt eşitliği
+iddia etmek, 8. bölümün kararının tersini iddia etmek olurdu ve geçemeyecek bir test, hiç test
+olmamasından kötüdür.
+
+ADR 0028, kendi kendine barındıranlara hiçbir şey saklanmadan aynı kodu vaat ediyor; tersi vaat, yani
+çalıştırdıkları kodun **fazladan** hiçbir şey barındırmadığı, bir paragraf değil bir test ister.
 
 ### 8. `WorkspacePlanDto` eklemeli biçimde bir plan kimliği kazanır
 
