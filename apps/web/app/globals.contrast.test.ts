@@ -1266,44 +1266,6 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     worst: { light: 5.04, dark: 4.61 },
   },
   {
-    utility: 'aria-invalid:ring-destructive/20',
-    files: [
-      'components/ui/button.tsx',
-      'components/ui/input.tsx',
-      'components/ui/select.tsx',
-      'components/ui/textarea.tsx',
-    ],
-    fill: '--destructive',
-    alpha: 0.2,
-    over: NEUTRAL_SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 1.38, dark: 1.37 },
-    reason:
-      'a ring colour with no ring width left beside it since the focus ring went, so nothing ' +
-      'composites it today. Kept because the invalid edge it belongs to is drawn at full ' +
-      'strength by `aria-invalid:border-destructive`, gated at 3:1 above, and a width added ' +
-      'back here would arrive already measured',
-  },
-  {
-    utility: 'dark:aria-invalid:ring-destructive/40',
-    files: [
-      'components/ui/button.tsx',
-      'components/ui/input.tsx',
-      'components/ui/select.tsx',
-      'components/ui/textarea.tsx',
-    ],
-    fill: '--destructive',
-    alpha: 0.4,
-    over: NEUTRAL_SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['dark'],
-    worst: { dark: 1.99 },
-    reason: 'the dark half of the same unpainted ring, beside the same full-strength border',
-  },
-  {
     utility: 'disabled:opacity-50',
     files: [
       'components/ui/button.tsx',
@@ -1527,8 +1489,9 @@ describe('dark elevation ramp', () => {
   });
 
   // The menu ground is `bg-popover` and the highlighted item is `bg-accent`
-  // (components/ui/dropdown-menu.tsx), and the items carry `outline-hidden`, so the surface step
-  // is the only thing that says which row is focused. Equalising the two tokens would make every
+  // (components/ui/dropdown-menu.tsx), so the surface step is what says which row the pointer is
+  // on. It is not the focus mark: at 1.12:1 dark it could not carry one, which is why the rows
+  // stopped suppressing the `:focus-visible` outline. Equalising the two tokens would make every
   // dark dropdown highlight 1.000:1.
   it('keeps --popover and --accent two different surfaces', () => {
     const popover = hexOf('dark', '--popover');

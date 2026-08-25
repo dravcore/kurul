@@ -247,12 +247,18 @@ function requireRule(
 }
 
 /**
- * The four form primitives, which until Phase 4 each carried an `outline-none` next to a ring
- * pair of their own. With the outline in `base`, either utility outranks it and the control
- * focuses with nothing drawn at all, which is the one failure the layer move can cause.
+ * Every control a keyboard can land on whose own class string could outrank the base outline:
+ * the four form primitives, which until Phase 4 each carried an `outline-none` next to a ring
+ * pair of their own, and the dropdown rows, which carried `outline-hidden` while their
+ * `bg-accent` step was read as the indicator. Both utilities compile into `utilities`, which
+ * outranks `base`, so either one leaves the control focusing with nothing drawn at all: in
+ * Chromium a `:focus-visible` element under that suppressor computes `outline-style: none`.
+ * The scan reads the whole source rather than the class strings alone, so a comment in one of
+ * these files names the utility as `outline-*` instead of spelling it.
  */
 const singleIndicatorControls = [
   'components/ui/button.tsx',
+  'components/ui/dropdown-menu.tsx',
   'components/ui/input.tsx',
   'components/ui/select.tsx',
   'components/ui/textarea.tsx',
@@ -405,8 +411,8 @@ describe('globals.css cascade layers', () => {
   // The keyboard baseline is one mark: 2px --ring at 2px offset (docs/design.md §5). It is an
   // author rule in `base` like every other, which is only safe because no keyboard-reachable
   // control carries a ring pair or an outline suppressor of its own any more. The utilities that
-  // still suppress it sit on programmatic focus containers and on dropdown rows; the `it.each`
-  // below is what keeps them off the four form primitives.
+  // still suppress it sit on programmatic focus containers, which take focus by script rather
+  // than by Tab or an arrow key; the `it.each` below is what keeps them off the controls.
   it('layers the :focus-visible outline into base', () => {
     const focus = sheet.rules.filter((rule) => rule.selector === ':focus-visible');
     expect(focus).not.toHaveLength(0);
@@ -534,6 +540,7 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
       { property: 'forced-color-adjust', value: 'none' },
       { property: 'background', value: 'Highlight' },
       { property: 'color', value: 'HighlightText' },
+      { property: 'outline-color', value: 'CanvasText' },
     ]);
 
     // The icon declares its own `color` (`text-muted-foreground`), so the row's `HighlightText`
@@ -569,6 +576,10 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
       { property: 'forced-color-adjust', value: 'none' },
       { property: 'background', value: 'Highlight' },
       { property: 'color', value: 'HighlightText' },
+      // The opt-out freezes this row's `:focus-visible` outline at its author copper too. The
+      // outline sits at a positive offset, outside the Highlight ground and over the popover,
+      // so the system colour it names is the one that ground forces to.
+      { property: 'outline-color', value: 'CanvasText' },
     ]);
 
     // Separate from identifying which rule opts out: no other rule in the block does.
