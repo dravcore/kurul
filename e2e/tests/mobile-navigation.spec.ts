@@ -176,7 +176,7 @@ function tooSmall(targets: Target[]): Target[] {
   );
 }
 
-/** 16px — the font-size below which iOS Safari zooms the page when a field is focused. */
+/** 16px: the font-size below which iOS Safari zooms the page when a field is focused. */
 const IOS_ZOOM_THRESHOLD_PX = '16px';
 
 interface FieldFontSize {
@@ -185,13 +185,13 @@ interface FieldFontSize {
 }
 
 /**
- * The computed font-size of every text field currently on screen — `input`, `textarea` and
+ * The computed font-size of every text field currently on screen (`input`, `textarea` and
  * `select`, the three primitives `components/ui/input.tsx`, `textarea.tsx` and `select.tsx`
- * all carry `text-base md:text-body` for.
+ * all carry `text-base md:text-body` for).
  *
  * `input[type=checkbox]` and `[type=radio]` are excluded: iOS Safari does not zoom on either,
  * they have no typed text to zoom in on, and the checklist's own checkboxes are bare native
- * inputs styled outside `Input`, so they carry none of the three primitives' sizing at all —
+ * inputs styled outside `Input`, so they carry none of the three primitives' sizing at all;
  * measuring them would be measuring an unrelated element's font-size, not this contract.
  */
 async function fieldFontSizes(scope: Page | Locator): Promise<FieldFontSize[]> {
