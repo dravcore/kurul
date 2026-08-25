@@ -129,7 +129,7 @@
      hierarchy: canvas, column ground (--muted), card, popover, hover step (--accent), each one
      step above the last. --popover must not meet --accent at either end: a dropdown paints its
      ground with bg-popover and the highlighted item with bg-accent, so that step is what says
-     which row the pointer is on. Keyboard focus is the :focus-visible outline below, which the
+     which row the pointer is on. The focus mark is the :focus-visible outline below, which the
      rows no longer suppress: a 1.12:1 surface step cannot carry a focus mark on its own. */
   --background: #131715;
   --foreground: #e8ecea;

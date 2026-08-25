@@ -62,8 +62,12 @@ function DropdownMenuGroup({ ...props }: React.ComponentProps<typeof DropdownMen
  * `:focus-visible` outline in app/globals.css, so a row carrying it drew no focus mark at all and
  * left the `bg-accent` step as the only one: 1.18:1 against `--popover` in light and 1.12:1 in
  * dark, far under the 3:1 docs/design.md §9 holds a focus mark to. Radix focuses a row on
- * pointer move as well as on arrow keys, and pointer-move focus does not match `:focus-visible`
- * once the menu was opened with the mouse, so the outline stays a keyboard mark.
+ * pointer move as well as on arrow keys, and the outline follows the pointer there too: opening
+ * the menu moves focus to the content, that content matches `:focus-visible` even after a real
+ * mouse press, and the row focused by the next pointer move inherits the state. Measured on the
+ * running app, Chromium 151 and Firefox 153 agree. A hovered row therefore wears the same single
+ * outline an arrowed-to row does, which is the safe direction: one mark too many for a mouse,
+ * never one too few for a keyboard.
  */
 function DropdownMenuItem({
   className,
