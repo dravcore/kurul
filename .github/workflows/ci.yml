@@ -44,35 +44,24 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-  test:
+  # `test` used to be one job: the unit suites first, then, against Postgres and Redis service
+  # containers, the migration, the drift check and the integration suite, all back to back
+  # (~250s, and `build` waited for it). Nothing in the first half needs a database. The api unit
+  # suite ran *before* `Migrate test database` in the same job, so it demonstrably passes
+  # against an unmigrated one, and run against a closed port with `REDIS_URL` unset it still
+  # passes (115 suites, 1678 tests); the web suite is jsdom. Two jobs side by side take the
+  # unit work off the critical path, and the one without services also skips the container
+  # pull and the health-check wait.
+  test-unit:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: kurul
-          POSTGRES_PASSWORD: kurul
-          POSTGRES_DB: kurul_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U kurul -d kurul_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-      redis:
-        image: redis:8-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     env:
-      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_test
-      REDIS_URL: redis://localhost:6379
-      API_PORT: 4000
+      # No Postgres or Redis service here, and nothing below dials one. `prisma generate` reads
+      # DATABASE_URL through prisma.config.ts without connecting, and importing the application
+      # evaluates `prisma/database.ts` (a lazy pool) and `auth/auth.ts` (throws without a
+      # secret), the same reason `build` carries these. `REDIS_URL` is left unset: the suite
+      # passes without it, and the auth rate limiter's spec sets and clears it itself.
+      # Placeholders, and they must stay obviously so.
+      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_ci
       WEB_URL: http://localhost:3000
       BETTER_AUTH_SECRET: ci-test-secret
       BETTER_AUTH_URL: http://localhost:4000
@@ -116,6 +105,52 @@ jobs:
           name: web-coverage
           path: apps/web/coverage
           if-no-files-found: ignore
+
+  test-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: kurul
+          POSTGRES_PASSWORD: kurul
+          POSTGRES_DB: kurul_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kurul -d kurul_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_test
+      REDIS_URL: redis://localhost:6379
+      API_PORT: 4000
+      WEB_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ci-test-secret
+      BETTER_AUTH_URL: http://localhost:4000
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      # No shared-package build here either, for the reason given in test-unit: the e2e config
+      # maps `@kurul/*` to the packages' `src` too, and this job is what keeps that true.
       - name: Migrate test database
         run: pnpm db:migrate
       # The database was just built from the checked-in migrations, which is exactly the state
@@ -129,8 +164,11 @@ jobs:
       - name: Integration tests
         run: pnpm --filter @kurul/api test:e2e
 
+  # No `needs:` here. This job installs, generates the Prisma client and builds on its own, so
+  # it never consumed anything `lint` or `test` produced; chaining it behind them only added its
+  # ~60s to the critical path, after the ~250s test job had finished. `ci-ok` is the gate and
+  # still fails if this job does.
   build:
-    needs: [lint, test]
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_ci
@@ -178,10 +216,11 @@ jobs:
   # was discovered at release time, by the workflow whose whole job is to publish it.
   #
   # There is no `needs:` on purpose. Chaining this behind `build` would add its entire duration
-  # to the pipeline's critical path, and the PR pipeline on `develop` already measures
-  # 4m56s-5m18s against the five-minute trigger recorded for OPS-10 in ROADMAP.md. Run beside
-  # `lint` and `test`, it costs runner minutes rather than wall time for as long as the slowest
-  # leg stays under `test`.
+  # to the pipeline's critical path, and the PR pipeline crossed the five-minute trigger
+  # recorded for OPS-10 in ROADMAP.md (15 of 20 `develop` runs at 301-342s) before `build` and
+  # `test` were untangled. Run beside the other jobs, it costs runner minutes rather than wall
+  # time for as long as the slowest leg stays under `test-integration`, which is why the api
+  # leg's cache hit rate matters: on a miss that leg builds for ~210s instead of ~55s.
   #
   # Three legs, not two: apps/api/Dockerfile ships two images. `migrate` is a real published
   # artifact (docker-compose.yml runs it as a one-shot service against the production database)
@@ -314,7 +353,7 @@ jobs:
     # skip the gate job entirely and report it as "passed" — the exact failure mode from
     # PR #89 (https://github.com/dravcore/kurul/pull/89).
     if: always()
-    needs: [lint, test, build, image-scan]
+    needs: [lint, test-unit, test-integration, build, image-scan]
     runs-on: ubuntu-latest
     steps:
       - name: Decide gate result
@@ -325,11 +364,12 @@ jobs:
           # or "cancelled", not "success". The gate must reject both.
           declare -A results
           results[lint]="${{ needs.lint.result }}"
-          results[test]="${{ needs.test.result }}"
-          results[build]="${{ needs.build.result }}"
           # `results` is an associative array (`declare -A`), so a hyphen in the key is a
           # plain character and not an arithmetic subtraction the way it would be in an
           # indexed array.
+          results[test-unit]="${{ needs.test-unit.result }}"
+          results[test-integration]="${{ needs.test-integration.result }}"
+          results[build]="${{ needs.build.result }}"
           results[image-scan]="${{ needs.image-scan.result }}"
 
           # Log each result for diagnosis: if a PR fails, the developer needs to know which
@@ -337,7 +377,7 @@ jobs:
           # or a skip/cancel (GitHub's skipped jobs are not a failure in the normal sense,
           # but they halt the pipeline and must be treated as if they were).
           echo "Gate check results:"
-          for job in lint test build image-scan; do
+          for job in lint test-unit test-integration build image-scan; do
             echo "  $job: ${results[$job]}"
           done
 
@@ -347,7 +387,7 @@ jobs:
           # - cancelled: the workflow was cancelled by the user or timed out.
           # Using contains(needs.*.result, 'failure') would miss skipped and cancelled.
           failure=0
-          for job in lint test build image-scan; do
+          for job in lint test-unit test-integration build image-scan; do
             if [[ "${results[$job]}" != "success" ]]; then
               echo "ERROR: $job did not succeed (result: ${results[$job]})"
               failure=1
