@@ -1,6 +1,6 @@
 name: Browser E2E
 
-# Nightly, and on every pull request into `main`.
+# Nightly on `develop`, and on every pull request into `main`.
 #
 # Deliberately *not* on every pull request, and deliberately not part of the `ci-ok` gate.
 # This suite boots the whole stack — Postgres, Redis, Mailpit, a compiled API and a
@@ -17,7 +17,10 @@ name: Browser E2E
 on:
   schedule:
     # 03:00 UTC. Late enough that the day's merges are in, early enough that a red nightly is
-    # waiting when the working day starts.
+    # waiting when the working day starts. GitHub fires a schedule on the default branch
+    # (`main`), which only changes at a release, so the checkout step below points this event
+    # at `develop`, where the merges actually land. `main` gets its coverage from the pull
+    # requests that change it.
     - cron: '0 3 * * *'
   pull_request:
     branches: [main]
@@ -88,6 +91,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The schedule runs on `main` (see above); check it out on `develop` instead. The
+          # empty string is the action's default, i.e. the pull request's merge ref or the
+          # dispatched ref, so the other two triggers are untouched.
+          ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
+      # The run's own head branch still names the branch the schedule was read from, so this
+      # is the record of which tree actually ran.
+      - name: Show checked-out tree
+        run: |
+          git rev-parse --abbrev-ref HEAD
+          git rev-parse HEAD
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

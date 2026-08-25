@@ -146,6 +146,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   every context (`e2e/support/fixtures.ts`). That check was verified against a build with the
   nonce removed, where it failed on `script-src-elem blocked inline` rather than passing
   quietly — which is how the old `'unsafe-inline'` would otherwise come back unnoticed.
+- **The release workflow no longer trusts a tag's name.** A new `guard` job in
+  `.github/workflows/release-images.yml` runs before any image is built, and every other job
+  waits for it. It checks the two things the release process asks a human to get right by
+  hand: a `vX.Y.Z` tag must point at the tip of `main` (the merge commit step 5 tags), while a
+  pre-release tag must be reachable from `main` or from an open `release/*` or `hotfix/*`
+  branch, the rehearsal path; and every workspace `package.json` must carry the tag's version,
+  with a stable tag also needing its `## [X.Y.Z] - ` heading in `CHANGELOG.md`. Until now a
+  tag typed on `develop`, or on a tree whose version bump was forgotten, would have been built,
+  signed and published, and a stable one would also have moved `latest` under every operator
+  who pulls without `TAG`. A failing guard names the offending file, or the refs it searched,
+  and nothing is pushed; `publish-sbom` waits on the guard explicitly, since its
+  `!cancelled()` condition would otherwise run past a rejected tag with `contents: write`.
+  Every job in the workflow also gained a `timeout-minutes`. The guard catches a slip inside
+  the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
+  repository admin is a repository ruleset, described in
+  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the operator checklist
+  in `ROADMAP.md`.
 
 ### Added
 
@@ -174,6 +191,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **CI now parses the compose files and the Caddyfile on every pull request.** A new
+  `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
+  `docker compose config -q`, without a profile and with `--profile demo`, renders
+  `docker-compose.dev.yml`, and runs `caddy validate` over `docker/Caddyfile` in the
+  `caddy:2-alpine` image the stack ships. The env file is `.env.example` plus `POSTGRES_PASSWORD`
+  and `BETTER_AUTH_SECRET`, the install the docs describe, so the job fails on exactly what an
+  operator would hit: a broken YAML anchor, a renamed Caddy directive, or a required-variable
+  interpolation that a plain `docker compose up -d` cannot satisfy. Until now nothing in CI read
+  either file: `image-scan` builds the images, the browser suite builds its own stack, and
+  `scripts/bootstrap.mjs` validates only `docker-compose.dev.yml`, which is how the `demo-reset`
+  interpolation fixed below reached `develop`. The compose legs need no daemon, the job takes
+  seconds, and it is wired into the `ci-ok` gate like every other job
+  ([testing.md](docs/testing.md#compose-and-caddyfile-parse)).
 - **Better Auth upgraded to 1.7.1, which needs a database migration before the API starts.**
   `Account` gains a required `issuer` column and a unique `(issuer, accountId)` index: identity
   is now keyed on the pair rather than on `accountId` alone, so two providers handing out the
@@ -214,8 +244,62 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   near or over the ceiling does not shrink on its own; it refuses writes until keys expire, so
   raise `REDIS_MAXMEMORY` and the `redis` `mem_limit` together rather than after the fact.
 
+- **The self-hosting guide installs and upgrades from a release tag, with a runbook.**
+  `docs/self-hosting.md` now fetches `docker-compose.yml`, `docker/Caddyfile`,
+  `scripts/backup.sh` and `.env.example` from the `v0.3.0` tag URL rather than from `main`, so
+  the files and the images an install runs come from the same release, and `.env` gets
+  `chmod 600` on the way in. The Upgrading section is an ordered runbook, backup first: read the
+  CHANGELOG, `backup.sh once` and copy the pair off-host, re-fetch the files at the new tag (a
+  `pull` refreshes images and nothing else, so an install that never re-fetched kept a
+  `backup.sh` that ignores `BACKUP_REMOTE`), set `TAG`, `pull`, `up -d --wait`, `ps -a`,
+  `curl /api/health/ready`, then links to the rollback and restore drills in
+  `docs/development.md` instead of copies of them. A short "Release notes for operators" list
+  points at the CHANGELOG entries that ask something before `pull`. Two things moved with it.
+  `TRUST_PROXY` is forwarded by `docker-compose.yml` as `${TRUST_PROXY:-1}` and ships blank in
+  `.env.example`, so a CDN in front of `proxy` is a `.env` line rather than an edit to a file
+  the next upgrade replaces; an existing `.env` that still carries `TRUST_PROXY=false` from an
+  older `.env.example` must drop the line, or the API stops seeing client addresses behind
+  Caddy. And a new "Browser error tracking" section states that `NEXT_PUBLIC_SENTRY_*` are
+  compiled into the web image, that the published GHCR image ships without them, and that
+  enabling browser Sentry means building `web` from a clone, cross-linked from `.env.example`
+  and `docs/development.md`. The release process in `docs/git-strategy.md` gains the step that
+  bumps the tag on the page. Turkish mirrors updated in step.
+
 ### Fixed
 
+- **`PLAN_MAX_*`, `INSTANCE_ADMIN_EMAILS`, the retention windows, telemetry, `API_DOCS_ENABLED`,
+  `RATE_LIMIT_ENABLED` and the database pool knobs were inert under the bundled Compose stack.**
+  Compose reads `.env` for `${VAR}` interpolation only and never hands the file to a container,
+  `docker-compose.yml` forwards an explicit list of keys to the `api` service, and the api image
+  carries no `.env` of its own, so a setting missing from that list never reached the process
+  however it was set. Seventeen documented settings were missing: a demo operator writing
+  `PLAN_MAX_USERS=1` got an instance that logged `Plan ceilings: unlimited` and capped nothing,
+  nobody could become an instance admin (the activation dashboard and the GDPR erasure route were
+  unreachable on every curl/GHCR install), and `CLEANUP_ENABLED`, the three `*_RETENTION_DAYS`,
+  `TELEMETRY_ENABLED`/`TELEMETRY_ENDPOINT`/`TELEMETRY_TIMEOUT_MS`, `API_DOCS_ENABLED`,
+  `RATE_LIMIT_ENABLED`, `DATABASE_POOL_MAX`, `DATABASE_POOL_CONNECTION_TIMEOUT_MS` and
+  `DATABASE_STATEMENT_TIMEOUT_MS` kept their defaults whatever `.env` said, with nothing logged
+  about it. All seventeen are now on the `api` service as `${KEY:-}`, which the env helpers treat
+  as unset, so an untouched `.env` runs exactly what it ran before. A new
+  `scripts/lib/compose-env.test.mjs` (`pnpm test:scripts`) fails when a key the API reads and
+  `.env.example` documents is missing from that block, so the next variable cannot repeat this;
+  `docs/self-hosting.md` no longer claims the containers read `.env`, and the "adding an
+  environment variable" rule in `docs/development.md` gained the forwarding step.
+
+- **Every plain `docker compose` invocation on `develop` failed with "required variable
+  DEMO_MODE is missing a value".** The `demo-reset` sidecar added for the public demo declared
+  `DEMO_MODE` and `DEMO_PASSWORD` in the required form (`${VAR:?message}`), on the reasoning
+  that a service behind `profiles: ['demo']` is never evaluated without the profile. Compose
+  interpolates the whole file before it filters services by profile, and `:?` treats an empty
+  value as missing, so `cp .env.example .env` (both keys ship blank) followed by
+  `docker compose up -d`, `pull`, `ps` or `config` aborted on an install that never asked for a
+  demo, with a message telling that operator to set `DEMO_MODE=true`. No release carries the
+  defect: `v0.3.0` predates the change. Both keys now default to blank (`${VAR:-}`). The refusal
+  the `:?` was standing in for already exists where it can be logged, in
+  `apps/api/src/demo/reset-guard.ts` (any `DEMO_MODE` other than true) and `reset.ts` (a blank
+  or short `DEMO_PASSWORD`), so a demo profile started with either key unset prints "Refusing
+  to reset" in `docker compose --profile demo logs demo-reset` instead of Compose refusing the
+  file for everyone.
 - **`charts.test.tsx` was load-sensitive ([#244](https://github.com/dravcore/kurul/issues/244)),
   reproduced and fixed.** Running `apps/web`'s Vitest suite alongside `apps/api`'s Jest suite
   reproduced it 6/6 tries. The cause: the file's bar-animation poll (`barPaths`) promises to
@@ -273,6 +357,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   dumps immediately, and the hand-run `backup.sh once` is never skipped. `scripts/backup.test.mjs`
   starts the loop twice within seconds and asserts one pair, and the `BACKUP_KEEP` comments in
   `docker-compose.yml` and `.env.example` now say that retention is count-based.
+
+- **`docker/Caddyfile`'s header quoted the nginx body limit the same file warns against.** The
+  bring-your-own-proxy contract at the top of the file said the rule-2 body limit "matches"
+  the API's `ATTACHMENT_MAX_BYTES` (`client_max_body_size 25m;`), while the `request_body`
+  block further down sets `26MiB` and explains that a limit equal to the file size rejects a
+  file of exactly the published size, because the multipart envelope rides on top of it. The
+  header now says one MiB above and `26m`, the same figure as the nginx snippet in
+  `docs/self-hosting.md`.
+- **The nightly browser suite ran on `main`, not on `develop`.** GitHub runs a scheduled
+  workflow on the repository's default branch, and the checkout step in
+  `.github/workflows/e2e.yml` passed no `ref`, so every 03:00 UTC run re-tested the last
+  release's commit while the docs said it covered the day's merges. Between releases that
+  commit never changes: a regression merged to `develop` stayed invisible until the next
+  release pull request, and the socket fix above stayed red in the nightly for days after it
+  had landed. The schedule now checks out `develop` (the `pull_request` and
+  `workflow_dispatch` triggers are unchanged), and a new step prints the branch and commit
+  that actually ran, since the run's own head branch still names the branch the schedule was
+  read from. `main` keeps its coverage where it changes: the release and hotfix pull requests.
 
 ### Changed
 
