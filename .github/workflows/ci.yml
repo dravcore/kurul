@@ -21,9 +21,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Every job carries a `timeout-minutes` ceiling a few multiples above what it measures
-  # (lint ~1m, test-unit ~1m30s, test-integration ~3m, build ~1m, an image-scan leg up to
-  # ~4m30s on a cache miss). Without one a hung socket, a stuck registry pull or a wedged Trivy
+  # Every job carries a `timeout-minutes` ceiling well above what it measures, with more
+  # headroom on jobs whose worst case sits far past their typical case (lint ~1m, test-unit
+  # ~1m30s, test-integration ~3m, build ~1m, an image-scan leg up to ~4m30s on a cache miss).
+  # Without one a hung socket, a stuck registry pull or a wedged Trivy
   # download holds a runner for the six-hour default: two release-candidate runs of
   # release-images.yml did exactly that (4h and 5.7h) before someone cancelled them by hand,
   # and on a public repository that is also how a fork's pull request can burn the project's
