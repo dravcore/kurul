@@ -449,14 +449,17 @@ services:
       BETTER_AUTH_URL: ${SITE_URL:-http://localhost}
       # Exactly one proxy hop stands in front of this service, and there is no route around it:
       # the port below is not published, so nothing outside the compose network can reach the
-      # API directly to forge an X-Forwarded-For. That is what makes a fixed `1` correct here
+      # API directly to forge an X-Forwarded-For. That is what makes a default of `1` correct here
       # and what makes it safe — the warning in `.env.example` is about `true` (trust the whole
       # chain) on a *directly exposed* instance, which this no longer is. Without it every
       # rate-limit bucket and every access-log `ip` would collapse onto the proxy's container
       # address, i.e. one bucket for the entire internet. Add a hop for each additional proxy
-      # you put in front (a CDN in front of `proxy` makes this `2`) — see
-      # docs/self-hosting.md.
-      TRUST_PROXY: 1
+      # you put in front by setting TRUST_PROXY in .env (a CDN in front of `proxy` makes it
+      # `2`); the default applies when the line is blank or absent, so a re-fetched compose
+      # file never loses the value. `false` in .env is forwarded as-is and switches the hop
+      # off, which is the one value not to write there. See
+      # docs/self-hosting.md#bringing-your-own-reverse-proxy.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       # The interactive console at /docs and the document at /openapi.json. Blank follows
       # NODE_ENV, which the image bakes to `production`, so this stack ships with them off
       # until an operator writes `true` (see .env.example for why that default is the decision).
@@ -573,7 +576,7 @@ services:
       - attachment_data:/data/attachments
     # No `ports:` — the API is reached only through `proxy` below, at ${SITE_URL}/api. This is
     # not merely tidiness: an API also published on a host port would be a second, unproxied
-    # way in, which would invalidate the `TRUST_PROXY: 1` above (anyone could connect straight
+    # way in, which would invalidate the `TRUST_PROXY` default above (anyone could connect straight
     # to :4000 and hand themselves a fabricated client IP) and would put a second origin —
     # http://localhost:4000 — in play for cookies that are now scoped to the proxy's. Reach it
     # for debugging with `docker compose exec api wget -qO- http://127.0.0.1:4000/health/ready`
