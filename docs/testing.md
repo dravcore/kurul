@@ -35,11 +35,11 @@ are written where that cost buys real confidence.
 
 ## The pyramid
 
-| Layer           | Tool                                   | Scope                                                                                     | Status                                                      |
-| --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Services, guards, pure functions, board/permission logic, DnD hooks. Dependencies mocked. | Required from day one                                       |
-| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`)    | Required for every endpoint                                 |
-| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | Seven scenarios (`e2e/`) — nightly and before every release |
+| Layer           | Tool                                   | Scope                                                                                     | Status                                                                  |
+| --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Services, guards, pure functions, board/permission logic, DnD hooks. Dependencies mocked. | Required from day one                                                   |
+| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`)    | Required for every endpoint                                             |
+| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | Seven scenarios (`e2e/`): nightly on `develop` and before every release |
 
 ```
         /\        e2e — seven critical flows (Playwright, real Chromium)
@@ -405,24 +405,25 @@ on every run, passing or failing.
 
 Every pull request runs, on `develop` and `main` as well:
 
-| Step                 | Job                | Command                                                                                                                 |
-| -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Build shared pkgs    | `lint`             | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                     |
-| Lint                 | `lint`             | `pnpm lint`                                                                                                             |
-| Format check         | `lint`             | `pnpm format:check`                                                                                                     |
-| Typecheck            | `lint`             | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                                                     |
-| Audit                | `lint`             | `pnpm audit --audit-level high`                                                                                         |
-| Unit tests (api)     | `test-unit`        | `pnpm --filter @kurul/api test:cov`                                                                                     |
-| Unit tests (web)     | `test-unit`        | `pnpm --filter @kurul/web exec vitest run --coverage`                                                                   |
-| Unit tests (pkgs)    | `test-unit`        | `pnpm --filter "./packages/*" test`                                                                                     |
-| Unit tests (scripts) | `test-unit`        | `pnpm test:scripts`                                                                                                     |
-| Migration drift      | `test-integration` | `pnpm db:migrate`, then `pnpm db:drift` against the Postgres service container                                          |
-| Integration tests    | `test-integration` | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers                                       |
-| Build                | `build`            | `pnpm build`                                                                                                            |
-| Image build + scan   | `image-scan`       | The three shipped images, then Trivy over each (see below)                                                              |
-| **Gate** (required)  | `ci-ok`            | Passes only if `lint`, `test-unit`, `test-integration`, `build` and `image-scan` all succeed (not skipped or cancelled) |
+| Step                  | Job                | Command                                                                                                                                           |
+| --------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build shared pkgs     | `lint`             | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                                               |
+| Lint                  | `lint`             | `pnpm lint`                                                                                                                                       |
+| Format check          | `lint`             | `pnpm format:check`                                                                                                                               |
+| Typecheck             | `lint`             | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                                                                               |
+| Audit                 | `lint`             | `pnpm audit --audit-level high`                                                                                                                   |
+| Unit tests (api)      | `test-unit`        | `pnpm --filter @kurul/api test:cov`                                                                                                               |
+| Unit tests (web)      | `test-unit`        | `pnpm --filter @kurul/web exec vitest run --coverage`                                                                                             |
+| Unit tests (pkgs)     | `test-unit`        | `pnpm --filter "./packages/*" test`                                                                                                               |
+| Unit tests (scripts)  | `test-unit`        | `pnpm test:scripts`                                                                                                                               |
+| Migration drift       | `test-integration` | `pnpm db:migrate`, then `pnpm db:drift` against the Postgres service container                                                                    |
+| Integration tests     | `test-integration` | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers                                                                 |
+| Build                 | `build`            | `pnpm build`                                                                                                                                      |
+| Image build + scan    | `image-scan`       | The three shipped images, then Trivy over each (see below)                                                                                        |
+| Compose + Caddy parse | `compose-config`   | `docker compose config -q` over both compose files, with and without the `demo` profile, and `caddy validate` over `docker/Caddyfile` (see below) |
+| **Gate** (required)   | `ci-ok`            | Passes only if `lint`, `test-unit`, `test-integration`, `build`, `image-scan` and `compose-config` all succeed (not skipped or cancelled)         |
 
-The five jobs above the gate run in parallel and none of them `needs` another: `build` installs
+The six jobs above the gate run in parallel and none of them `needs` another: `build` installs
 and generates the Prisma client on its own, and `test-integration` is the only job with Postgres
 and Redis service containers, so the unit suites in `test-unit` start without a container pull.
 The pipeline's wall time is therefore its longest job rather than the sum of them, and it is
@@ -474,17 +475,36 @@ Two choices are worth knowing about:
 Nothing is pushed: `push: false` with `load: true` keeps each image inside its own runner.
 Publishing stays in `release-images.yml`, behind a tag.
 
+### Compose and Caddyfile parse
+
+`compose-config` renders `docker-compose.yml` with `docker compose config -q`, once without a
+profile and once with `--profile demo`, then `docker-compose.dev.yml`, and runs `caddy validate`
+over `docker/Caddyfile` in the same `caddy:2-alpine` image the stack ships. The env file is
+`.env.example` plus the two keys that have no default (`POSTGRES_PASSWORD`,
+`BETTER_AUTH_SECRET`), which is the install [self-hosting.md](self-hosting.md) describes, so
+the job fails on what an operator would hit: a broken YAML anchor, a renamed Caddy directive,
+or a required-variable interpolation (`${VAR:?}`) that a plain `docker compose up -d` cannot
+satisfy. Compose interpolates the whole file before it filters services by profile, so that
+last one bites even inside a profiled service, which is how the `demo-reset` sidecar once broke
+every ordinary install on `develop`. The compose legs talk to no daemon, the whole job takes
+seconds, and it runs beside `lint` and the test jobs with no `needs:`.
+
 ### Browser e2e in CI
 
 The browser suite runs in its own workflow,
 [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml), on a different schedule and
 **outside the `ci-ok` gate**:
 
-| Trigger                   | Why                                                                                                  |
-| ------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Nightly, 03:00 UTC        | Late enough to include the day's merges, early enough that a red run is waiting in the morning       |
-| Pull requests into `main` | Only `release/*` and `hotfix/*` open those, so this is exactly once per release candidate and hotfix |
-| `workflow_dispatch`       | On demand                                                                                            |
+| Trigger                          | Why                                                                                                             |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Nightly, 03:00 UTC, on `develop` | Where the day's merges land: late enough to include them, early enough that a red run is waiting in the morning |
+| Pull requests into `main`        | Only `release/*` and `hotfix/*` open those, so this is exactly once per release candidate and hotfix            |
+| `workflow_dispatch`              | On demand                                                                                                       |
+
+GitHub runs a scheduled workflow on the default branch, so the schedule is declared on `main`'s
+copy of the workflow and its checkout step points at `develop`; the run log prints the branch
+and commit that actually ran. `main` is not tested nightly on purpose: between releases it does
+not change, and the pull requests that change it already run the suite.
 
 It is not a required check on purpose. This suite starts Postgres, Redis, Mailpit, a compiled
 API and a production web build, then drives Chromium through all of it — the project's most
