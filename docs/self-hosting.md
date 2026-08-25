@@ -48,15 +48,15 @@ not just this stack's, and has no reason to spare Postgres over whichever contai
 grew. A `mem_limit` puts that decision back where it belongs: a container is only ever killed
 for outgrowing its own ceiling, and nothing another service does can take Postgres down with it.
 
-| Service    | `mem_limit` | Why this number                                                                                 |
-| ---------- | ----------- | ----------------------------------------------------------------------------------------------- |
-| `postgres` | 512m        | Generous baseline for a small-team board's working set                                          |
-| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) both buffer into its heap    |
-| `web`      | 512m        | Same Next.js SSR process, same "no ceiling chosen" problem as `api`                             |
-| `migrate`  | 512m        | Matches `api` — same build stage, same Prisma CLI, just once at startup                         |
-| `backup`   | 256m        | `pg_dump` streams rather than buffering; this covers process overhead and the attachments `tar` |
-| `redis`    | 128m        | Cache, sessions, rate limits, notifications only — never board data, small bounded working set  |
-| `proxy`    | 128m        | Terminates TLS and proxies; bodies pass through Caddy rather than buffering into it             |
+| Service    | `mem_limit` | Why this number                                                                                  |
+| ---------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| `postgres` | 512m        | Generous baseline for a small-team board's working set; `/dev/shm` raised to 256m, see below     |
+| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) both buffer into its heap     |
+| `web`      | 512m        | Same Next.js SSR process, same "no ceiling chosen" problem as `api`                              |
+| `migrate`  | 512m        | Matches `api`: same build stage, same Prisma CLI, just once at startup                           |
+| `backup`   | 256m        | `pg_dump` streams rather than buffering; this covers process overhead and the attachments `tar`  |
+| `redis`    | 128m        | Cache, sessions, rate limits, notifications only, never board data; `maxmemory` 100mb, see below |
+| `proxy`    | 128m        | Terminates TLS and proxies; bodies pass through Caddy rather than buffering into it              |
 
 `api` and `web` also set `NODE_OPTIONS=--max-old-space-size=384` — 75% of their 512m ceiling —
 so V8's heap is pinned explicitly rather than left to Node's own container-memory heuristic. The
@@ -64,6 +64,28 @@ remaining 128m of headroom below `mem_limit` is for what a heap ceiling alone do
 (thread stacks, native buffers, code space): V8 hits its own catchable "JavaScript heap out of
 memory" before the cgroup's hard limit does, which shows up as a line in `docker compose logs
 api` (or `web`) instead of a bare `SIGKILL`.
+
+`redis` gets the same treatment inside its 128m: `--maxmemory 100mb --maxmemory-policy
+noeviction` on its command line, so a Redis that fills up answers writes with
+`OOM command not allowed when used memory > 'maxmemory'` (a line in `docker compose logs api`;
+the API's rate limiters fall back to process memory while Redis is erroring, and a cache miss is
+a cache miss) instead of being killed by the cgroup and restarted in a loop. `noeviction` is
+what BullMQ, whose notification and retention queues live in this Redis, requires: an evicted
+job is a job that silently never runs, so a full Redis refuses writes rather than dropping keys.
+`postgres` carries `shm_size: 256m` because Docker's `/dev/shm` is 64 MB by default and Postgres
+allocates dynamic shared memory for parallel workers and hash joins there; running out surfaces
+as `could not resize shared memory segment ... No space left on device` on a heavy dashboard
+query. Neither is memory on top of the ceilings in the table: a `/dev/shm` page is charged to
+the container's cgroup like any other, and `maxmemory` is a limit Redis enforces on itself under
+the one Docker enforces on it.
+
+`REDIS_MAXMEMORY` in `.env` raises that ceiling without touching `docker-compose.yml`; raise the
+`redis` `mem_limit` alongside it so Redis still hits its own limit before the cgroup's. Before
+raising it on an instance that is already running, check where the dataset actually sits:
+`docker compose exec redis redis-cli -a "$REDIS_PASSWORD" INFO memory | grep used_memory_human`.
+With `noeviction`, a dataset already over the ceiling does not shrink itself back under it: it
+refuses every write until enough keys expire on their own, which is why the check has to come
+before the number, not after.
 
 These are ceilings, not reservations — a container using less than its `mem_limit` costs nothing
 extra, and `migrate` in particular exits (successfully) before `api` and `web` finish starting,
@@ -415,7 +437,10 @@ The `backup` service is already running: every `BACKUP_INTERVAL` seconds (24h by
 writes **two** archives into the `backup_data` volume — a `pg_dump` of the database and a
 `.tar.gz` of the uploaded attachment files — and keeps `BACKUP_KEEP` of each series. Both
 archives of one cycle carry the **same timestamp**, which is how a restore knows which tar
-belongs to which dump.
+belongs to which dump. `BACKUP_KEEP` is a count, not an age, and a restart does not spend one:
+the sidecar skips its boot-time cycle while a dump younger than half of `BACKUP_INTERVAL`
+exists, so a reboot or a `docker compose up` after a `.env` edit leaves the history you had
+([the scheduled backup sidecar](development.md#the-scheduled-backup-sidecar)).
 
 That covers "I deleted the wrong workspace". It does not cover a dead disk — the archives sit
 on the same host as the database. Copy them off the machine, **both halves of the newest

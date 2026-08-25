@@ -237,6 +237,28 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   along with the non-atomic fallback path that used them; `consume` is the whole interface now,
   and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
   Redis outage fallback and the degraded-mode reporting are all unchanged.
+- **Compose tuning for first boot, Redis and Postgres.** Three small changes, applied to both
+  `docker-compose.yml` and `docker-compose.dev.yml`. The `postgres` healthcheck now probes over
+  TCP (`pg_isready -h 127.0.0.1 ...`): without a host it asked the Unix socket, which the official
+  entrypoint's temporary initdb server also answers on the first boot of an empty volume, so
+  `migrate` could be released before anything listened on 5432 and exit 1 once, which reads to a
+  newcomer as a broken install. `redis` runs with `--maxmemory 100mb --maxmemory-policy
+  noeviction` under its 128m `mem_limit`, so a Redis that fills up answers with a logged
+  `OOM command not allowed` the API already survives (its rate limiters fall back to process
+  memory) instead of a bare exit 137 that `restart: unless-stopped` turns into a loop;
+  `noeviction` is the policy BullMQ requires for the queues that live there. `postgres` gets
+  `shm_size: 256m`, because Docker's default 64 MB `/dev/shm` is where parallel workers and hash
+  joins run out of dynamic shared memory on a heavy dashboard query. None of it is memory on top
+  of the existing ceilings; the sizing notes in
+  [self-hosting.md](docs/self-hosting.md#server-sizing) describe all three.
+
+  `REDIS_MAXMEMORY` in `.env` (default `100mb`, unchanged) now makes that ceiling adjustable
+  without editing the compose file. On an instance that is already running, check where the
+  dataset sits before upgrading into it: `docker compose exec redis redis-cli -a
+  "$REDIS_PASSWORD" INFO memory | grep used_memory_human`. With `noeviction`, a dataset already
+  near or over the ceiling does not shrink on its own; it refuses writes until keys expire, so
+  raise `REDIS_MAXMEMORY` and the `redis` `mem_limit` together rather than after the fact.
+
 - **The self-hosting guide installs and upgrades from a release tag, with a runbook.**
   `docs/self-hosting.md` now fetches `docker-compose.yml`, `docker/Caddyfile`,
   `scripts/backup.sh` and `.env.example` from the `v0.3.0` tag URL rather than from `main`, so
@@ -352,6 +374,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   jittered, doubling retry for exactly those two cases, and a denied room join is retried with
   backoff instead of standing for the life of the socket — so the indicator now describes
   something that is actually happening.
+- **Restarting the `backup` sidecar no longer spends a retention slot.** `scripts/backup.sh`
+  took a dump on entry every time its container started, and every host reboot,
+  `docker compose up` after a `.env` edit and image pull starts it. Retention is a count
+  (`BACKUP_KEEP` newest archives, no age check), so a day of restarts could push a week of
+  history out of the seven default slots, and the API's orphan-file sweep, whose grace window
+  assumes one pair per `BACKUP_INTERVAL`, was quietly covering less than the documented week.
+  The loop now skips its boot-time cycle while a dump younger than half of `BACKUP_INTERVAL`
+  already exists, logs the skip, and sleeps only the remainder of the interval, so both the
+  cadence and the history come through a restart unchanged. A first boot with no dump still
+  dumps immediately, and the hand-run `backup.sh once` is never skipped. `scripts/backup.test.mjs`
+  starts the loop twice within seconds and asserts one pair, and the `BACKUP_KEEP` comments in
+  `docker-compose.yml` and `.env.example` now say that retention is count-based.
+
 - **`docker/Caddyfile`'s header quoted the nginx body limit the same file warns against.** The
   bring-your-own-proxy contract at the top of the file said the rule-2 body limit "matches"
   the API's `ATTACHMENT_MAX_BYTES` (`client_max_body_size 25m;`), while the `request_body`
