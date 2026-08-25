@@ -67,7 +67,7 @@ describe('DialogOverlay', () => {
 
 /**
  * `DialogHeader` and `DialogFooter` are sticky panels that float over the body's own scroll
- * inside `DialogContent` alone (never `DialogDrawerContent`, which does not use them) — a stale
+ * inside `DialogContent` alone (never `DialogDrawerContent`, which does not use them). A stale
  * `bg-background` here would paint a visibly different-toned strip inside the popover surface
  * above.
  */
