@@ -204,11 +204,14 @@ whatever the account count is; unset or `true` keeps registration open, which is
 install ran before the switch existed. Like `PLAN_MAX_USERS` it refuses **sign-up only**:
 signing in, verifying an address and everything else under `/auth` stay open, so closing it
 never locks out the people already on the instance. `GET /config` publishes it as
-`signUpEnabled`. Prefer it to pinning `PLAN_MAX_USERS` at your current head count, which
-blocks your own invitees too and drifts the moment an account is deleted. There is no
-invite-only mode yet: an invited address still needs the door open to create its account, so
-until that lands, open it for the invitee and close it again. The switch is independent of
-`DEMO_MODE` ([Demo instance](#demo-instance)), which keeps registration open.
+`signUpEnabled`, but that document requires a session: it is there for the signed-in screens
+that ask before offering something, and a signed-out register page learns the answer from the
+`403` its own submit receives instead. Prefer the switch to pinning `PLAN_MAX_USERS` at your
+current head count, which blocks your own invitees too and drifts the moment an account is
+deleted. There is no invite-only mode yet: an invited address still needs the door open to
+create its account, so until that lands, open it for the invitee and close it again. The
+switch is independent of `DEMO_MODE` ([Demo instance](#demo-instance)), which keeps
+registration open.
 
 **Trello import needs no line here either.** `TRELLO_IMPORT_MAX_BYTES` (default `20971520`,
 20 MiB) is the largest board export the importer will accept, and the bundled Compose file

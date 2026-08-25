@@ -211,11 +211,13 @@ olursa olsun `POST /auth/sign-up/email`'i JSON gövdesi `error: "Sign-up Disable
 `403` ile reddeder; ayarsız ya da `true` kaydı açık tutar, ki bu, anahtar var olmadan önce her
 kurulumun çalıştığı haldir. `PLAN_MAX_USERS` gibi yalnızca **sign-up'ı** reddeder: sign-in,
 adres doğrulama ve `/auth` altındaki diğer her şey açık kalır, dolayısıyla onu kapatmak
-instance'ta zaten olan kimseyi kilitlemez. `GET /config` onu `signUpEnabled` olarak yayınlar.
-`PLAN_MAX_USERS`'ı mevcut hesap sayınıza sabitlemek yerine bunu tercih edin; o yol kendi
-davetlilerinizi de engeller ve bir hesap silindiği anda kayar. Henüz yalnızca-davetli bir mod
-yok: davet edilen bir adresin hesabını oluşturabilmesi için kapının açık olması gerekir, o mod
-gelene kadar davetli için açıp sonra yeniden kapatın. Anahtar, kaydı açık tutan `DEMO_MODE`'dan
+instance'ta zaten olan kimseyi kilitlemez. `GET /config` onu `signUpEnabled` olarak yayınlar,
+ama o doküman bir oturum ister: bir şey önermeden önce soran, oturum açmış ekranlar içindir ve
+oturum açmamış bir kayıt sayfası cevabı kendi gönderiminin aldığı `403`'ten öğrenir. Anahtarı,
+`PLAN_MAX_USERS`'ı mevcut hesap sayınıza sabitlemeye tercih edin; o yol kendi davetlilerinizi
+de engeller ve bir hesap silindiği anda kayar. Henüz yalnızca-davetli bir mod yok: davet edilen
+bir adresin hesabını oluşturabilmesi için kapının açık olması gerekir, o mod gelene kadar
+davetli için açıp sonra yeniden kapatın. Anahtar, kaydı açık tutan `DEMO_MODE`'dan
 ([Demo instance](#demo-instance)) bağımsızdır.
 
 **Trello import'u için de burada bir satır gerekmiyor.** `TRELLO_IMPORT_MAX_BYTES` (varsayılan
