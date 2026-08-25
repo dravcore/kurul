@@ -80,6 +80,10 @@
   --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
   --elevation-drag: 0 12px 32px rgb(0 0 0 / 0.18), 0 4px 8px rgb(0 0 0 / 0.1);
 
+  /* Pure black is outside the felt family and darkens the whole screen 45 L* points behind a
+     dialog; this tint holds the same family and drops it 30. */
+  --overlay-scrim: rgb(25 28 27 / 0.38);
+
   --sidebar-width: 240px;
   --sidebar-rail-width: 56px;
   --topbar-height: 48px;
@@ -151,6 +155,15 @@
   --label-slot-6: #2a9d3c;
   --label-slot-7: #9085e9;
   --label-slot-8: #e66767;
+
+  /* No alpha of black separates a dialog from a canvas already this dark by shade alone; the
+     dialog's own surface step and its --border-strong ring below carry that job instead. */
+  --overlay-scrim: rgb(5 7 6 / 0.7);
+
+  /* A 12% black shadow reads as nothing once it lands on a surface this dark (it drops to L*
+     7.3), so the separation moves from the shadow's blur to a 1px --border-strong ring. */
+  --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.5), 0 0 0 1px var(--border-strong);
+  --elevation-drag: 0 8px 24px rgb(0 0 0 / 0.5), 0 0 0 1px var(--border-strong);
 }
 
 @theme inline {
@@ -176,6 +189,7 @@
   --color-ring: var(--ring);
   --color-signature: var(--signature);
   --color-signature-subtle: var(--signature-subtle);
+  --color-overlay-scrim: var(--overlay-scrim);
   --color-foreground-secondary: var(--foreground-secondary);
   --color-foreground-disabled: var(--foreground-disabled);
   --color-priority-low: var(--priority-low);

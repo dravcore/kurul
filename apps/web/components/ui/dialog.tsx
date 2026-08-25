@@ -32,7 +32,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        'fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
+        'fixed inset-0 z-50 bg-overlay-scrim data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
         className,
       )}
       {...props}
@@ -96,7 +96,7 @@ function DialogContent({
           opener.focus();
         }}
         className={cn(
-          'fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-4rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-lg border bg-background p-6 shadow-overlay duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+          'fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-4rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-lg border bg-popover p-6 shadow-overlay duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
           className,
         )}
         {...props}
@@ -183,7 +183,10 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="dialog-header"
       className={cn(
-        'sticky top-0 flex flex-col gap-2 bg-background text-center sm:text-left',
+        // Sticky over the body's own scroll, so it needs the surface it floats on, not the
+        // canvas behind it: DialogContent (the only surface this renders inside of) paints
+        // bg-popover.
+        'sticky top-0 flex flex-col gap-2 bg-popover text-center sm:text-left',
         className,
       )}
       {...props}
@@ -204,7 +207,9 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        'sticky bottom-0 flex flex-col-reverse gap-2 bg-background sm:flex-row sm:justify-end',
+        // Same surface as DialogHeader above, for the same reason: this only ever renders
+        // inside DialogContent's bg-popover.
+        'sticky bottom-0 flex flex-col-reverse gap-2 bg-popover sm:flex-row sm:justify-end',
         className,
       )}
       {...props}

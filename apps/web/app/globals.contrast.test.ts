@@ -515,6 +515,17 @@ describe('dark elevation ramp', () => {
       `dark --popover ${popover} against --accent ${accent}`,
     ).toBeGreaterThanOrEqual(SURFACE_STEP);
   });
+
+  // A blurred shadow does not read on a canvas this dark (a 12% black shadow lands at L* 7.3),
+  // so dark elevation carries a 1px --border-strong ring instead; --border-strong's own 3:1
+  // floor on every surface is gated above, this only confirms the ring is actually drawn.
+  it('carries a 1px --border-strong ring on --elevation-overlay and --elevation-drag', () => {
+    for (const token of ['--elevation-overlay', '--elevation-drag']) {
+      const value = darkDeclarations.get(token);
+      expect(value, `.dark declares no ${token}`).toBeDefined();
+      expect(value).toContain('0 0 0 1px var(--border-strong)');
+    }
+  });
 });
 
 describe('light hover step', () => {
