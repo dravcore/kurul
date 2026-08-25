@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import messages from '@/messages/en.json';
 import {
@@ -111,5 +112,42 @@ describe('DialogContent height boundary', () => {
     const drawer = document.querySelector('[data-slot="dialog-drawer-content"]');
     expect(drawer?.className).not.toContain('max-h-[calc(100dvh-4rem)]');
     expect(drawer?.className).not.toContain('overflow-y-auto');
+  });
+});
+
+/**
+ * Radix returns focus to `DialogTrigger`, which none of these dialogs use: they are opened by
+ * setting `open` from a button somewhere else in the tree, and Radix's restore then reaches for
+ * a trigger that was never rendered and leaves the keyboard user on `<body>`.
+ */
+describe('DialogContent focus return', () => {
+  function Harness(): React.ReactElement {
+    const [open, setOpen] = useState(false);
+    return (
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <button type="button" onClick={() => setOpen(true)}>
+          Delete task
+        </button>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent>
+            <DialogTitle>Delete this task?</DialogTitle>
+          </DialogContent>
+        </Dialog>
+      </NextIntlClientProvider>
+    );
+  }
+
+  it('hands focus back to the control that opened it', async () => {
+    render(<Harness />);
+    const opener = screen.getByRole('button', { name: 'Delete task' });
+    opener.focus();
+    fireEvent.click(opener);
+    const content = screen.getByRole('dialog');
+
+    fireEvent.keyDown(content, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // Radix runs the restore on a task of its own rather than inside the keystroke.
+    await waitFor(() => expect(document.activeElement).toBe(opener));
   });
 });

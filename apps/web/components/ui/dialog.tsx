@@ -40,20 +40,46 @@ function DialogOverlay({
   );
 }
 
+/**
+ * Radix hands focus back to `DialogTrigger` on close. Every dialog in this app but the mobile
+ * drawer is driven by an `open` prop instead of a trigger, so there is nothing for it to hand
+ * focus back to and dismissing one drops a keyboard user on `<body>`, against the rule in
+ * `docs/design.md` §5 that `Esc` closes the topmost layer and returns focus to whatever opened
+ * it. The opener is read in `onOpenAutoFocus`, which Radix fires while focus is still outside
+ * the content, and is the trigger itself wherever one is used.
+ */
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
 }) {
   const t = useTranslations('common');
+  const openerRef = React.useRef<HTMLElement | null>(null);
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        onOpenAutoFocus={(event) => {
+          const opener = document.activeElement;
+          openerRef.current =
+            opener instanceof HTMLElement && opener !== document.body ? opener : null;
+          onOpenAutoFocus?.(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          const opener = openerRef.current;
+          if (event.defaultPrevented || !opener?.isConnected) return;
+          // Claims the restore before Radix's own handler, which would reach for the trigger
+          // that is not there and leave focus where it fell.
+          event.preventDefault();
+          opener.focus();
+        }}
         className={cn(
           'fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-4rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-lg border bg-background p-6 shadow-overlay duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
           className,
