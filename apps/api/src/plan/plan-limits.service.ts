@@ -183,13 +183,14 @@ export class PlanLimitsService implements OnModuleInit {
   /**
    * Refuses a board that would take a workspace past its board ceiling.
    *
-   * Called with the transaction client from inside `BoardService.create`'s own transaction, so
-   * the count and the insert are one statement pair against one snapshot. That does not make
-   * the ceiling exact (Postgres reads committed, so two concurrent creates can each count
-   * `n`), and it is deliberately not hardened further, for ADR 0027's reason: the overshoot is
-   * bounded by the number of simultaneous requests, the threat model is unbounded growth, and
-   * an advisory lock keyed on the workspace would serialize every board create in a workspace
-   * to defend an exactness nothing needs.
+   * Called with the transaction client from inside the transaction that creates the board, by
+   * both routes that create one: `BoardService.create` and `TrelloImportService.importBoard`.
+   * The count and the insert are therefore one statement pair against one snapshot. That does
+   * not make the ceiling exact (Postgres reads committed, so two concurrent creates can each
+   * count `n`), and it is deliberately not hardened further, for ADR 0027's reason: the
+   * overshoot is bounded by the number of simultaneous requests, the threat model is unbounded
+   * growth, and an advisory lock keyed on the workspace would serialize every board create in a
+   * workspace to defend an exactness nothing needs.
    */
   async assertBoardAvailable(workspaceId: string, db: PlanLimitsDb = this.prisma): Promise<void> {
     const { boards } = await this.forWorkspace(workspaceId, db);
