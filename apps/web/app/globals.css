@@ -5,6 +5,16 @@
    is language-agnostic and would otherwise treat prose like `bg-[url(...)]` as a real candidate. */
 @source not "../**/*.test.{ts,tsx}";
 
+/* next-themes writes the theme onto the document as a class (components/layout/theme-provider.tsx
+   passes `attribute="class"`) and every token below is declared on `.dark`. Tailwind's own `dark:`
+   variant defaults to `@media (prefers-color-scheme: dark)`, which reports the operating system's
+   preference and not this app's theme, so without this line a `dark:` utility and the `.dark`
+   tokens it was written against disagree for anyone whose chosen theme differs from their OS:
+   `dark:bg-destructive/60` thins a light-theme button to 3.02:1 under its white label, and a
+   dark-theme one keeps the full fill at 3.11:1. app/globals-css-layers.test.ts compiles the sheet
+   and checks which selector the variant actually emits. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Kurul design tokens — values from docs/design.md §3 (Phase 3 validated). */
 
 :root {
@@ -21,29 +31,52 @@
   --popover-foreground: #191c1b;
   --primary: #a85a28;
   --primary-foreground: #ffffff;
-  --secondary: #f1f3f1;
+  /* A hover cannot be an alpha of --primary: thinning the fill toward the page (shadcn's
+     default hover) drops --primary-foreground under 4.5:1 in light (4.17 on a card). This is a
+     solid step instead, moved toward the theme's floor, the same direction the surface ramp
+     moves. --destructive-hover below follows the same reasoning. */
+  --primary-hover: #964f23;
+
+  /* --secondary and --accent share one value and --muted holds a different one. --accent is
+     the hover step, so it has to stay a visible step away from both grounds it is painted
+     over (the white card and the column), and --muted is the column ground itself. */
+  --secondary: #eaedea;
   --secondary-foreground: #191c1b;
   --muted: #f1f3f1;
-  --muted-foreground: #6b726e;
-  --accent: #f1f3f1;
+  --muted-foreground: #626965;
+  --accent: #eaedea;
   --accent-foreground: #191c1b;
   --destructive: #c0281f;
   --destructive-foreground: #ffffff;
+  /* Same reason as --primary-hover above: a thinned --destructive mixes toward the page and
+     takes white under 4.5:1 before the hover finishes fading in. */
+  --destructive-hover: #b0241c;
+
+  /* The one colour token allowed under 3:1: it separates two areas of a single surface and
+     never carries state on its own. Every edge that means something interactive or selected
+     wears --border-strong, --input, --ring or --signature. */
   --border: #d6dad8;
-  --border-strong: #b9bfbc;
-  --input: #d6dad8;
+  --border-strong: #7d8481;
+  /* One value under two names. --input stays only because shadcn primitives read
+     `border-input`; there is no second job for it to do. */
+  --input: var(--border-strong);
   --ring: #a85a28;
   --signature: #a85a28;
-  --signature-subtle: #f6ede5;
+
+  /* Never copper (--signature) text on this tint: it measures 4.11:1 in light, under the 4.5
+     floor. Neutral --foreground text is allowed (13.98:1) and is measured against it like any
+     other surface. No call site breaks the rule today: app/globals.contrast.test.ts rescans the
+     tree on every run, so one cannot arrive unnoticed. */
+  --signature-subtle: #f2e6da;
   --foreground-secondary: #545a57;
-  --foreground-disabled: #8a918d;
+  --foreground-disabled: #7f8683;
 
   --priority-low: #6b726e;
   --priority-medium: #3f6b99;
   --priority-high: #8a5a00;
   --priority-urgent: #c0281f;
   --status-info: #3f6b99;
-  --status-good: #1f7a4d;
+  --status-good: #1d7349;
   --status-warning: #8a5a00;
   --status-danger: #c0281f;
 
@@ -63,6 +96,10 @@
 
   --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
   --elevation-drag: 0 12px 32px rgb(0 0 0 / 0.18), 0 4px 8px rgb(0 0 0 / 0.1);
+
+  /* Pure black is outside the felt family and darkens the whole screen 45 L* points behind a
+     dialog; this tint holds the same family and drops it 30. */
+  --overlay-scrim: rgb(25 28 27 / 0.38);
 
   --sidebar-width: 240px;
   --sidebar-rail-width: 56px;
@@ -88,48 +125,68 @@
 .dark {
   color-scheme: dark;
 
-  --background: #0e100f;
+  /* Dark depth is a lighter surface, not a shadow (docs/design.md §3), so the ramp is the
+     hierarchy: canvas, column ground (--muted), card, popover, hover step (--accent), each one
+     step above the last. --popover must not meet --accent at either end: a dropdown paints its
+     ground with bg-popover and the highlighted item with bg-accent, and the items carry
+     outline-hidden, so that step is the only thing saying which row is focused. */
+  --background: #131715;
   --foreground: #e8ecea;
-  --card: #161918;
+  --card: #212523;
   --card-foreground: #e8ecea;
-  --popover: #161918;
+  --popover: #272b29;
   --popover-foreground: #e8ecea;
   --primary: #d98a4e;
-  --primary-foreground: #0e100f;
-  --secondary: #1d2120;
+  --primary-foreground: #131715;
+  --primary-hover: #e0955b;
+  --secondary: #2f3331;
   --secondary-foreground: #e8ecea;
-  --muted: #1d2120;
-  --muted-foreground: #8a928e;
-  --accent: #1d2120;
+  --muted: #1a1e1c;
+  --muted-foreground: #98a09c;
+  --accent: #2f3331;
   --accent-foreground: #e8ecea;
-  --destructive: #f0665c;
-  --destructive-foreground: #0e100f;
-  --border: #2a2f2d;
-  --border-strong: #383e3b;
-  --input: #2a2f2d;
+  /* #f47a73 is the lowest value that clears 4.5:1 against --accent (4.81), the tightest step
+     this colour sits on as running text: the overdue date on a hovered card
+     (components/task/task-card.tsx) and the dropdown's destructive row. --status-danger and
+     --priority-urgent below share it, being the same severity by another name. */
+  --destructive: #f47a73;
+  --destructive-foreground: #131715;
+  --destructive-hover: #b8524a;
+  --border: #3a403d;
+  --border-strong: #767d7a;
+  --input: var(--border-strong);
   --ring: #d98a4e;
   --signature: #d98a4e;
-  --signature-subtle: #241a12;
-  --foreground-secondary: #b3bab6;
-  --foreground-disabled: #6e7773;
+  --signature-subtle: #37291d;
+  --foreground-secondary: #bcc3bf;
+  --foreground-disabled: #7b837f;
 
   --priority-low: #8a928e;
   --priority-medium: #6ba3e8;
   --priority-high: #d9a227;
-  --priority-urgent: #f0665c;
+  --priority-urgent: #f47a73;
   --status-info: #6ba3e8;
   --status-good: #3fbf85;
   --status-warning: #d9a227;
-  --status-danger: #f0665c;
+  --status-danger: #f47a73;
 
   --label-slot-1: #3987e5;
   --label-slot-2: #d95926;
   --label-slot-3: #199e70;
   --label-slot-4: #c98500;
   --label-slot-5: #d55181;
-  --label-slot-6: #008300;
+  --label-slot-6: #2a9d3c;
   --label-slot-7: #9085e9;
   --label-slot-8: #e66767;
+
+  /* No alpha of black separates a dialog from a canvas already this dark by shade alone; the
+     dialog's own surface step and its --border-strong ring below carry that job instead. */
+  --overlay-scrim: rgb(5 7 6 / 0.7);
+
+  /* A 12% black shadow reads as nothing once it lands on a surface this dark (it drops to L*
+     7.3), so the separation moves from the shadow's blur to a 1px --border-strong ring. */
+  --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.5), 0 0 0 1px var(--border-strong);
+  --elevation-drag: 0 8px 24px rgb(0 0 0 / 0.5), 0 0 0 1px var(--border-strong);
 }
 
 @theme inline {
@@ -141,6 +198,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -149,12 +207,14 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-hover: var(--destructive-hover);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-signature: var(--signature);
   --color-signature-subtle: var(--signature-subtle);
+  --color-overlay-scrim: var(--overlay-scrim);
   --color-foreground-secondary: var(--foreground-secondary);
   --color-foreground-disabled: var(--foreground-disabled);
   --color-priority-low: var(--priority-low);
@@ -382,5 +442,62 @@ body {
 
   [data-slot='dialog-drawer-content'][data-state='closed'] {
     animation-name: drawer-fade-out;
+  }
+}
+
+/* Forced colours replace every author colour with the user's palette, which erases exactly the
+   channel this phase's feedback leans on: a surface step and a tint. Every state built on one
+   carries a border-based twin here, per docs/design.md §9. */
+@media (forced-colors: active) {
+  /* Selection and focus stay two marks. The outline is selection while the card is not focused;
+     the moment it is, `:focus-visible` takes the outline back and this border is what still
+     says the card is the open one. */
+  a[data-selected]:not(:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  a[data-selected] {
+    border-color: Highlight;
+  }
+
+  /* components/board/board-column.tsx marks the column dnd-kit reports as `isOver`. The column
+     has no resting border, so this is the edge, not a thickening of one. Scoped to the `section`
+     it renders and drawn as an outline so the 2px mark does not add to the box and reflow the
+     column's content by 4px each time `isOver` flips. */
+  section[data-drop-target] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  /* Chromium paints a Canvas-coloured backplate behind text runs in forced-colours mode; on this
+     row that plate sits under the label and hides it, so `forced-color-adjust: none` is the only
+     way to suppress it. The pair of system colours stays explicit so the row still follows the
+     user's palette instead of an author colour. The opt-out inherits into every descendant,
+     which is why the `svg` rule below stays: without it the icon would keep its literal grey. */
+  [data-slot='dropdown-menu-item'][data-highlighted],
+  [data-slot='dropdown-menu-checkbox-item'][data-highlighted],
+  [data-slot='dropdown-menu-radio-item'][data-highlighted] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  /* The icon declares its own colour (`text-muted-foreground`), so the row's `HighlightText`
+     never reaches it and the mode forces that grey to CanvasText, unreadable on Highlight. */
+  [data-slot='dropdown-menu-item'][data-highlighted] svg,
+  [data-slot='dropdown-menu-checkbox-item'][data-highlighted] svg,
+  [data-slot='dropdown-menu-radio-item'][data-highlighted] svg {
+    color: HighlightText;
+  }
+}
+
+/* The hairline darkens to a value the ramp already holds instead of thickening or opening a
+   second palette. After `.dark` because both selectors weigh the same and only source order
+   decides which `--border` a dark document ends up with. */
+@media (prefers-contrast: more) {
+  :root,
+  .dark {
+    --border: var(--border-strong);
   }
 }

@@ -39,6 +39,58 @@ describe('DialogContent', () => {
 
     expect(screen.getByRole('button', { name: messages.common.close })).toBeDefined();
   });
+
+  it('paints the popover surface, not the canvas behind it', () => {
+    renderDialog();
+
+    const content = screen.getByRole('dialog');
+    expect(content.className).toContain('bg-popover');
+    expect(content.className).not.toContain('bg-background');
+  });
+});
+
+/**
+ * The overlay used to be a raw `bg-black/50`, half-opaque true black over every theme. It darkens
+ * the light canvas 45 L* points; `--overlay-scrim` is tuned to 30 in light and, honestly, cannot
+ * separate anything on the dark canvas by shade alone (the dialog surface step and its
+ * `--border-strong` ring carry that job there instead, see `globals.contrast.test.ts`).
+ */
+describe('DialogOverlay', () => {
+  it('paints the scrim token, not a raw black', () => {
+    renderDialog();
+
+    const overlay = document.querySelector('[data-slot="dialog-overlay"]');
+    expect(overlay?.className).toContain('bg-overlay-scrim');
+    expect(overlay?.className).not.toContain('bg-black');
+  });
+});
+
+/**
+ * `DialogHeader` and `DialogFooter` are sticky panels that float over the body's own scroll
+ * inside `DialogContent` alone (never `DialogDrawerContent`, which does not use them). A stale
+ * `bg-background` here would paint a visibly different-toned strip inside the popover surface
+ * above.
+ */
+describe('DialogHeader and DialogFooter surface', () => {
+  it('matches the popover surface they float over', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <Dialog open>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Board</DialogTitle>
+            </DialogHeader>
+            <DialogFooter />
+          </DialogContent>
+        </Dialog>
+      </NextIntlClientProvider>,
+    );
+
+    const header = document.querySelector('[data-slot="dialog-header"]');
+    const footer = document.querySelector('[data-slot="dialog-footer"]');
+    expect(header?.className).toContain('bg-popover');
+    expect(footer?.className).toContain('bg-popover');
+  });
 });
 
 describe('DialogFooter', () => {

@@ -10,6 +10,26 @@ import {
   COLUMN_RENDER_BUDGET_STEP,
 } from './board-column';
 
+/**
+ * `isOver` is dnd-kit's, and reaching it for real would mean driving a pointer drag across two
+ * measured rects in a DOM that measures everything as zero. `vi.mock('@dnd-kit/core')` replaces
+ * the module for the whole import graph, not just the one call site: sortable's own internal
+ * `useDroppable` sees the flag too, since it imports the same module this file mocks. The flag is
+ * `false` for every other test in this file, which is what the real hook returns there anyway.
+ */
+let droppableIsOver = false;
+
+vi.mock('@dnd-kit/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@dnd-kit/core')>();
+  return {
+    ...actual,
+    useDroppable: (args: Parameters<typeof actual.useDroppable>[0]) => ({
+      ...actual.useDroppable(args),
+      isOver: droppableIsOver,
+    }),
+  };
+});
+
 const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d10';
 const COLUMN_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d11';
 
@@ -115,6 +135,7 @@ const cardCount = (): number => screen.queryAllByRole('link').length;
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  droppableIsOver = false;
 });
 
 describe('BoardColumn empty drop zone', () => {
@@ -211,5 +232,30 @@ describe('BoardColumn render budget', () => {
     renderColumn(makeTasks(500));
 
     expect(cardCount()).toBe(COLUMN_INITIAL_RENDER_BUDGET);
+  });
+});
+
+describe('BoardColumn drop target', () => {
+  /**
+   * The drop tint is a surface change and nothing else, so it is gone under forced colours. The
+   * attribute is what `app/globals.css` hangs the Highlight border on there; it exists for no
+   * other reason, which is why it is absent rather than `false` while the column is resting.
+   */
+  it('marks nothing while no card is over the column', () => {
+    renderColumn(makeTasks(1));
+
+    const section = screen.getByRole('region', { name: column.name });
+    expect(section.hasAttribute('data-drop-target')).toBe(false);
+  });
+
+  it('marks the column while a card is over it', () => {
+    droppableIsOver = true;
+    renderColumn(makeTasks(1));
+
+    const section = screen.getByRole('region', { name: column.name });
+    expect(section.getAttribute('data-drop-target')).toBe('true');
+    // The tint stays the state's normal-mode mark; the attribute only adds the forced-colours
+    // twin of it.
+    expect(section.className.split(/\s+/)).toContain('bg-signature-subtle');
   });
 });

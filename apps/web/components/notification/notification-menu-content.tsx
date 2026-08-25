@@ -69,7 +69,7 @@ export function NotificationMenuContent({
               key={item.id}
               className={cn(
                 'flex cursor-pointer flex-col items-start gap-0.5 rounded-none px-3 py-2',
-                !item.readAt && 'bg-signature-subtle/40',
+                !item.readAt && 'bg-signature-subtle',
               )}
               onSelect={(event) => {
                 // The row navigates and marks read on its own; letting the menu close first

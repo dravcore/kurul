@@ -43,7 +43,7 @@ type LabelChipProps = {
 
 export function LabelChip({ label, onRemove, removeLabel }: LabelChipProps): React.ReactElement {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-muted/40 px-1.5 py-0.5 text-small text-foreground">
+    <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-muted px-1.5 py-0.5 text-small text-foreground">
       <span className={cn('size-1.5 rounded-full', SLOT_CLASS[label.color])} aria-hidden />
       <span>{label.name}</span>
       {onRemove ? (

@@ -187,12 +187,15 @@ export const BoardColumn = memo(function BoardColumn({
   return (
     <section
       className={cn(
-        'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-[var(--radius-md)] bg-muted/60',
-        isOver && 'bg-signature-subtle/50',
+        'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-[var(--radius-md)] bg-muted',
+        isOver && 'bg-signature-subtle',
         className,
       )}
       style={style}
       aria-label={column.name}
+      // Forced colours erase the tint above, so `app/globals.css` hangs the drop target's
+      // Highlight border on this attribute instead.
+      data-drop-target={isOver || undefined}
     >
       {/* 40px per `docs/design.md` §4, 48px below `md` so the 44px overflow button fits inside
           it rather than spilling over the first card.

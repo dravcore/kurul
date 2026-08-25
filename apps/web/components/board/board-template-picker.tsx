@@ -138,8 +138,8 @@ export function BoardTemplatePicker({
               // today, so a selected card and a focused one were telling the cascade the same
               // thing by accident. Selection is the rail; focus is the ring.
               template.slug === value
-                ? 'border-signature bg-muted/40'
-                : 'border-border hover:border-border-strong hover:bg-muted/40',
+                ? 'border-signature bg-signature-subtle'
+                : 'border-border hover:border-border-strong hover:bg-accent',
             )}
           >
             <input

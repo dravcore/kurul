@@ -59,8 +59,14 @@ export function TaskCard({
         // density and invalidates a performance measurement; it is a real discrepancy and it
         // is not this change's to settle.
         'block rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 text-left transition-colors max-md:min-h-11',
-        'hover:border-border-strong hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
-        selected && 'border-signature bg-signature-subtle/40',
+        'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        // Both are single-class utilities, so whichever is emitted later in the compiled sheet
+        // wins regardless of source order here. Applying the hover pair only while the card is
+        // not selected keeps a hovered selected card on its tint and rail instead of losing them
+        // to the later hover declaration.
+        selected
+          ? 'border-signature bg-signature-subtle'
+          : 'hover:border-border-strong hover:bg-accent',
         className,
       )}
       aria-current={selected ? 'true' : undefined}

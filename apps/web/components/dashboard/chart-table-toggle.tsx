@@ -34,7 +34,7 @@ export function ChartTableToggle({
       {asTable ? (
         <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full text-left text-small">
-            <thead className="border-b border-border bg-muted/40 text-muted-foreground">
+            <thead className="border-b border-border bg-muted text-muted-foreground">
               <tr>
                 {columns.map((column) => (
                   <th key={column} className="px-3 py-2 font-medium">

@@ -46,6 +46,17 @@ function DropdownMenuGroup({ ...props }: React.ComponentProps<typeof DropdownMen
   return <DropdownMenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />;
 }
 
+/**
+ * shadcn's `dark:data-[variant=destructive]:focus:bg-destructive/20` is deliberately absent.
+ *
+ * A destructive row keeps `--destructive` as its text, so every point the focus tint gains it
+ * loses again under the label: on the dark popover the 20% tint measures 3.51:1 against that
+ * text and the 10% one 4.06:1, both under the 4.5 floor, and the thicker tint is the worse of
+ * the two. 10% still reads as a focus ground (1.137:1 against the popover, above the 1.05 step
+ * docs/design.md §3 sets), so one tint serves both themes. The 4.06 that remains is on record
+ * in app/globals.contrast.test.ts as an exemption: dark `--destructive` clears 4.5 on the flat
+ * popover and on nothing raised above it.
+ */
 function DropdownMenuItem({
   className,
   inset,
@@ -61,7 +72,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden max-md:min-h-11 select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:*:[svg]:text-destructive!",
+        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden max-md:min-h-11 select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:*:[svg]:text-destructive!",
         className,
       )}
       {...props}

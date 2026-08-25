@@ -108,16 +108,34 @@ describe('TaskCard selection', () => {
     expect(unselected.hasAttribute('aria-current')).toBe(false);
   });
 
-  /** Hover and focus stay distinct from selection; all three are borders on the same element. */
-  it('keeps the hover and focus edges on every card, selected or not', () => {
+  /** The focus edge stays on every card; the hover pair is single-class and would outrank the
+   * selected tint and rail if it stayed on a selected card too. */
+  it('keeps the focus edge on every card, selected or not', () => {
     for (const selected of [false, true]) {
       cleanup();
       renderCard({}, selected);
       const classes = classesOf(screen.getByRole('link'));
 
-      expect(classes.has('hover:border-border-strong')).toBe(true);
       expect(classes.has('focus-visible:border-ring')).toBe(true);
     }
+  });
+
+  it('drops the hover classes from a selected card so hover cannot outrank its tint and rail', () => {
+    renderCard({}, true);
+    const classes = classesOf(screen.getByRole('link'));
+
+    expect(classes.has('hover:border-border-strong')).toBe(false);
+    expect(classes.has('hover:bg-accent')).toBe(false);
+    expect(classes.has('border-signature')).toBe(true);
+    expect(classes.has('bg-signature-subtle')).toBe(true);
+  });
+
+  it('keeps the hover classes on an unselected card', () => {
+    renderCard();
+    const classes = classesOf(screen.getByRole('link'));
+
+    expect(classes.has('hover:border-border-strong')).toBe(true);
+    expect(classes.has('hover:bg-accent')).toBe(true);
   });
 });
 
