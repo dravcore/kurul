@@ -1521,8 +1521,12 @@ describe('the fifty longest Turkish strings', () => {
     toast.dismiss();
   });
 
+  // The count is written out rather than read off `LONGEST_TURKISH.length`: sizing the
+  // expectation from the list under test would let a deleted row pass, which is the direction a
+  // future edit is likeliest to take.
   it('is the list this file writes down', () => {
-    expect(longestAboveP90(LONGEST_TURKISH.length)).toEqual(LONGEST_TURKISH.map(({ key }) => key));
+    expect(LONGEST_TURKISH).toHaveLength(50);
+    expect(longestAboveP90(50)).toEqual(LONGEST_TURKISH.map(({ key }) => key));
   });
 
   it('truncate and line-clamp are only where this file recorded them', () => {
