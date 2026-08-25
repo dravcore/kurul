@@ -247,16 +247,19 @@ function requireRule(
 }
 
 /**
- * Every control a keyboard can land on whose own class string could outrank the base outline:
+ * Every element a keyboard can land on whose own class string could outrank the base outline:
  * the four form primitives, which until Phase 4 each carried an `outline-none` next to a ring
- * pair of their own, and the dropdown rows, which carried `outline-hidden` while their
- * `bg-accent` step was read as the indicator. Both utilities compile into `utilities`, which
- * outranks `base`, so either one leaves the control focusing with nothing drawn at all: in
- * Chromium a `:focus-visible` element under that suppressor computes `outline-style: none`.
- * The scan reads the whole source rather than the class strings alone, so a comment in one of
- * these files names the utility as `outline-*` instead of spelling it.
+ * pair of their own, the dropdown rows, which carried `outline-hidden` while their `bg-accent`
+ * step was read as the indicator, and the shell `main`, which is where the skip link lands and
+ * which carried one as a programmatic focus container until the phase keyboard tour measured
+ * that element matching `:focus-visible` in both engines. Both utilities compile into
+ * `utilities`, which outranks `base`, so either one leaves the element focusing with nothing
+ * drawn at all: in Chromium a `:focus-visible` element under that suppressor computes
+ * `outline-style: none`. The scan reads the whole source rather than the class strings alone, so
+ * a comment in one of these files names the utility as `outline-*` instead of spelling it.
  */
-const singleIndicatorControls = [
+const singleIndicatorTargets = [
+  'components/layout/app-shell.tsx',
   'components/ui/button.tsx',
   'components/ui/dropdown-menu.tsx',
   'components/ui/input.tsx',
@@ -331,6 +334,7 @@ beforeAll(async () => {
     ...Object.keys(stateVariants),
     'divide-border',
     'dark:bg-accent',
+    'focus-visible:-outline-offset-2',
   ]);
   sheet = parseStylesheet(css);
 }, 30_000);
@@ -411,8 +415,8 @@ describe('globals.css cascade layers', () => {
   // The keyboard baseline is one mark: 2px --ring at 2px offset (docs/design.md §5). It is an
   // author rule in `base` like every other, which is only safe because no keyboard-reachable
   // control carries a ring pair or an outline suppressor of its own any more. The utilities that
-  // still suppress it sit on programmatic focus containers, which take focus by script rather
-  // than by Tab or an arrow key; the `it.each` below is what keeps them off the controls.
+  // still suppress it sit on containers that take focus by script rather than by Tab, an arrow
+  // key or a link; the `it.each` below is what keeps them off everything else.
   it('layers the :focus-visible outline into base', () => {
     const focus = sheet.rules.filter((rule) => rule.selector === ':focus-visible');
     expect(focus).not.toHaveLength(0);
@@ -439,7 +443,56 @@ describe('globals.css cascade layers', () => {
     });
   });
 
-  it.each(singleIndicatorControls)('leaves no outline suppressor on %s', async (file) => {
+  // The skip link's landing (components/layout/app-shell.tsx) is the one focus target that fills
+  // the shell, and the row it sits in is `overflow-hidden`, so an outline drawn 2px outside it is
+  // clipped away. The utility pulls the same single mark inside the region rather than
+  // suppressing it, which only works while it outranks the offset `base` declares.
+  it('pulls the shell main outline inside the region instead of suppressing it', () => {
+    const escaped = escapeClass('focus-visible:-outline-offset-2');
+    const inset = requireRule(sheet, `a rule for ${escaped}`, (rule) => {
+      return rule.selector.startsWith(escaped);
+    });
+
+    expect(inset.selector).toBe(`${escaped}:focus-visible`);
+    expect(inset.declarations.at(-1)).toEqual({
+      property: 'outline-offset',
+      value: 'calc(2px * -1)',
+    });
+    expect(layerRank(sheet, inset.layer)).toBeGreaterThan(layerRank(sheet, 'base'));
+  });
+
+  /**
+   * Why the invalid ring left the four primitives (ledger Ruling 11) instead of being kept as the
+   * task brief first wrote it. Both candidates are compiled here precisely because no source file
+   * carries them any more: a ring colour is only a custom property in this Tailwind, and the ring
+   * is painted by the width utility's `box-shadow`, so the class the primitives kept had nothing
+   * left to colour once the width went. This holds that reasoning to the compiler rather than to
+   * a report, and a Tailwind release that starts painting a bare ring colour fails here rather
+   * than by quietly putting a second mark on a focused invalid field.
+   */
+  it('paints nothing for a ring colour that has no ring width beside it', async () => {
+    const compiled = parseStylesheet(
+      await compileGlobals(['aria-invalid:ring-destructive/20', 'ring-[3px]']),
+    );
+    const rulesFor = (className: string): StyleRule[] =>
+      compiled.rules.filter((rule) => rule.selector.startsWith(escapeClass(className)));
+
+    const colourOnly = rulesFor('aria-invalid:ring-destructive/20');
+    expect(colourOnly).not.toHaveLength(0);
+    for (const rule of colourOnly) {
+      expect(rule.declarations.map((declaration) => declaration.property)).toEqual([
+        '--tw-ring-color',
+      ]);
+    }
+
+    const width = rulesFor('ring-[3px]').flatMap((rule) => {
+      return rule.declarations.map((declaration) => declaration.property);
+    });
+    expect(width).toContain('--tw-ring-shadow');
+    expect(width).toContain('box-shadow');
+  }, 30_000);
+
+  it.each(singleIndicatorTargets)('leaves no outline suppressor on %s', async (file) => {
     expect(await readFile(path.join(webRoot, file), 'utf8')).not.toMatch(
       /\boutline-(none|hidden)\b/,
     );

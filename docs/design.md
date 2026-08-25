@@ -257,9 +257,11 @@ creation, and destructive actions stay **dialogs**; those genuinely need to bloc
 | Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Reconnecting…" bar, never a blocking overlay                                    |
 
 **Keyboard baseline.** Focus is always visible: 2px `--ring` at 2px offset, and `outline: none`
-without a replacement is a review blocker. Tab order follows visual order; the board is a
-composite widget, so `Tab` reaches a column and arrows move within it. `Esc` closes the topmost
-layer only and returns focus to whatever opened it. Reserved now, mapped in Phase 4+: `⌘K`
+without a replacement is a review blocker. The offset turns inward only where the focused region
+fills the shell and an outside offset would be clipped away, which today is the skip link's
+`main`. Tab order follows visual order; the board is a composite widget, so `Tab` reaches a
+column and arrows move within it. `Esc` closes the topmost layer only and returns focus to
+whatever opened it. Reserved now, mapped in Phase 4+: `⌘K`
 command palette, `C` create task, `/` filter, `?` help — nothing else claims a bare letter key.
 
 **Dialogs are bounded and scroll their own body.** A dialog surface is at most

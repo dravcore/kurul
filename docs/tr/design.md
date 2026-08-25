@@ -265,9 +265,11 @@ full-screen bir sheet'e dönüşür. Confirmation'lar, board oluşturma ve destr
 | Presence · disconnect  | Topbar'da avatar'lar, başkasının açık tuttuğu bir kartta küçük bir avatar · sessiz, inline bir "Reconnecting…" ("Yeniden bağlanıyor…") bar'ı, asla blocking bir overlay |
 
 **Keyboard baseline.** Focus her zaman görünürdür: 2px offset'te 2px `--ring`, ve bir
-replacement olmadan `outline: none` bir review blocker'dır. Tab order visual order'ı takip eder;
-board bir composite widget'tır, bu yüzden `Tab` bir column'a ulaşır ve arrow'lar onun içinde
-hareket eder. `Esc` yalnızca en üstteki layer'ı kapatır ve focus'u onu açan şeye geri verir.
+replacement olmadan `outline: none` bir review blocker'dır. Offset yalnızca focus alan bölge
+shell'i doldurduğunda ve dıştaki bir offset kırpılacağında içeri döner; bugün bu yalnızca skip
+link'in `main` hedefidir. Tab order visual order'ı takip eder; board bir composite widget'tır, bu
+yüzden `Tab` bir column'a ulaşır ve arrow'lar onun içinde hareket eder. `Esc` yalnızca en üstteki
+layer'ı kapatır ve focus'u onu açan şeye geri verir.
 Şimdiden reserve edilmiş, Faz 4+'ta map edilecek: `⌘K` command palette, `C` create task, `/`
 filter, `?` help — başka hiçbir şey çıplak bir letter key talep etmez.
 
