@@ -14,6 +14,7 @@ import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useNotificationUnreadContext } from './notification-unread-provider';
 import { useNotificationSocket } from './use-notification-socket';
 import { toast } from 'sonner';
 
@@ -29,6 +30,7 @@ export function NotificationsList(): React.ReactElement {
   const locale = useLocale();
   const router = useRouter();
   const { activeId: workspaceId } = useWorkspaceContext();
+  const { setCount: setUnreadCount } = useNotificationUnreadContext();
 
   const [loadingMore, setLoadingMore] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -123,6 +125,9 @@ export function NotificationsList(): React.ReactElement {
       setItems((current) =>
         current.map((item) => (item.readAt ? item : { ...item, readAt: new Date().toISOString() })),
       );
+      // Zero, not "minus the rows on screen": the server marked every notification in this
+      // workspace, including the pages this screen never loaded.
+      setUnreadCount(0);
     } catch {
       toast.error(t('markReadError'));
     }
