@@ -207,6 +207,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of the existing ceilings; the sizing notes in
   [self-hosting.md](docs/self-hosting.md#server-sizing) describe all three.
 
+  `REDIS_MAXMEMORY` in `.env` (default `100mb`, unchanged) now makes that ceiling adjustable
+  without editing the compose file. On an instance that is already running, check where the
+  dataset sits before upgrading into it: `docker compose exec redis redis-cli -a
+  "$REDIS_PASSWORD" INFO memory | grep used_memory_human`. With `noeviction`, a dataset already
+  near or over the ceiling does not shrink on its own; it refuses writes until keys expire, so
+  raise `REDIS_MAXMEMORY` and the `redis` `mem_limit` together rather than after the fact.
+
 ### Fixed
 
 - **`charts.test.tsx` was load-sensitive ([#244](https://github.com/dravcore/kurul/issues/244)),

@@ -85,6 +85,14 @@ tablodaki tavanların üstüne bellek değildir: bir `/dev/shm` sayfası contain
 diğer her sayfa gibi yazılır ve `maxmemory`, Docker'ın Redis'e uyguladığı limitin altında
 Redis'in kendine uyguladığı bir limittir.
 
+`REDIS_MAXMEMORY`, `.env` içinde bu tavanı `docker-compose.yml`'e dokunmadan yükseltir; `redis`
+`mem_limit`'ini de onunla birlikte yükseltin ki Redis kendi limitine cgroup'unkinden önce
+çarpsın. Zaten çalışan bir instance'ta yükseltmeden önce dataset'in gerçekte nerede durduğunu
+kontrol edin: `docker compose exec redis redis-cli -a "$REDIS_PASSWORD" INFO memory | grep
+used_memory_human`. `noeviction` ile tavanın zaten üzerindeki bir dataset kendini geri
+küçültmez: yeterince key kendiliğinden expire olana kadar her yazmayı reddeder, kontrolün
+sayıdan önce gelmesinin nedeni budur.
+
 Bunlar birer tavan, rezervasyon değil — `mem_limit`'inden az kullanan bir container hiçbir ek
 maliyete yol açmaz, ve özellikle `migrate`, `api` ile `web` başlamayı bitirmeden önce (başarıyla)
 çıkar, dolayısıyla onlarla hiçbir zaman gerçekten eşzamanlı değildir. Uzun süre çalışan servisler

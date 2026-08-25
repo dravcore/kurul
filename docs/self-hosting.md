@@ -79,6 +79,14 @@ query. Neither is memory on top of the ceilings in the table: a `/dev/shm` page 
 the container's cgroup like any other, and `maxmemory` is a limit Redis enforces on itself under
 the one Docker enforces on it.
 
+`REDIS_MAXMEMORY` in `.env` raises that ceiling without touching `docker-compose.yml`; raise the
+`redis` `mem_limit` alongside it so Redis still hits its own limit before the cgroup's. Before
+raising it on an instance that is already running, check where the dataset actually sits:
+`docker compose exec redis redis-cli -a "$REDIS_PASSWORD" INFO memory | grep used_memory_human`.
+With `noeviction`, a dataset already over the ceiling does not shrink itself back under it: it
+refuses every write until enough keys expire on their own, which is why the check has to come
+before the number, not after.
+
 These are ceilings, not reservations — a container using less than its `mem_limit` costs nothing
 extra, and `migrate` in particular exits (successfully) before `api` and `web` finish starting,
 so it is never actually concurrent with them. Summed as if every long-running service hit its
