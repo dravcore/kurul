@@ -36,12 +36,14 @@ export function WorkspaceSwitcher({
             collapsed ? 'w-10 justify-center px-0' : 'w-full',
           )}
         >
-          {/* `bg-accent text-foreground-secondary`, not the signature tint: this initial names
+          {/* `bg-muted text-foreground-secondary`, not the signature tint: this initial names
               which workspace is open, it does not mean "active" the way the sancak rail does
-              (docs/design.md §2), so it wears the same neutral the hover step already uses. */}
+              (docs/design.md §2), so it wears a neutral. `--muted` rather than `--accent`
+              because the enclosing ghost Button paints `hover:bg-accent`, which would dissolve
+              the chip's square into the button for as long as the pointer rests on it. */}
           <span
             aria-hidden
-            className="flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-accent text-small font-strong text-foreground-secondary"
+            className="flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-muted text-small font-strong text-foreground-secondary"
           >
             {initial}
           </span>
