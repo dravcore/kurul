@@ -300,11 +300,12 @@ body {
    Inside `base` like the `*` rule above, which is only correct because no keyboard-reachable
    control carries a focus ring or an outline suppressor of its own any more. Every
    `outline-none` / `outline-hidden` left in the tree is on a container that takes focus by
-   script rather than by Tab, an arrow key or a link (dialog and drawer content, the task panel
-   heading). The shell `main` is not one of them: the skip link puts keyboard focus there, so it
-   keeps this outline and only pulls it inside its own edge, which is the one place the offset
-   is not 2px. Adding either utility to an element a keyboard can land on outranks this rule
-   from `utilities` and leaves it focusing with nothing drawn at all, which
+   script rather than by Tab, an arrow key or a link (dialog and drawer content). The shell
+   `main` and the task panel heading are not among them: the skip link puts keyboard focus on
+   the first and Enter on a task card puts it on the second, so both keep this outline, and
+   `main` only pulls it inside its own edge, which is the one place the offset is not 2px.
+   Adding either utility to an element a keyboard can land on outranks this rule from
+   `utilities` and leaves it focusing with nothing drawn at all, which
    app/globals-css-layers.test.ts holds every target it lists clear of. */
 @layer base {
   :focus-visible {

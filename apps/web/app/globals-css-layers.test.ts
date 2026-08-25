@@ -240,7 +240,7 @@ function winningValue(sheet: Stylesheet, className: string, property: string): s
  * The value that wins for `property` on an element carrying every class in `classNames` at once
  * (e.g. `class="text-title font-strong"`), each contributed by its own single-class Tailwind
  * utility rule. Every candidate here has specificity 1 (one class, no combinator), so a tie on
- * layer falls to source order exactly as `winningValue` already resolves it — the later utility
+ * layer falls to source order exactly as `winningValue` already resolves it: the later utility
  * in Tailwind's compiled order wins outright, with no signal from either utility's use of a CSS
  * custom-property default to fall back on.
  */
@@ -284,16 +284,19 @@ function requireRule(
  * Every element a keyboard can land on whose own class string could outrank the base outline:
  * the four form primitives, which until Phase 4 each carried an `outline-none` next to a ring
  * pair of their own, the dropdown rows, which carried `outline-hidden` while their `bg-accent`
- * step was read as the indicator, and the shell `main`, which is where the skip link lands and
- * which carried one as a programmatic focus container until the phase keyboard tour measured
- * that element matching `:focus-visible` in both engines. Both utilities compile into
- * `utilities`, which outranks `base`, so either one leaves the element focusing with nothing
- * drawn at all: in Chromium a `:focus-visible` element under that suppressor computes
- * `outline-style: none`. The scan reads the whole source rather than the class strings alone, so
- * a comment in one of these files names the utility as `outline-*` instead of spelling it.
+ * step was read as the indicator, the shell `main`, which is where the skip link lands, and the
+ * task panel's heading, which a keyboard user reaches by pressing Enter on a task card. The last
+ * two each carried a suppressor as a programmatic focus container until the phase keyboard tour
+ * measured both of them matching `:focus-visible` in Chromium and Firefox. Both utilities
+ * compile into `utilities`, which outranks `base`, so either one leaves the element focusing
+ * with nothing drawn at all: in Chromium a `:focus-visible` element under that suppressor
+ * computes `outline-style: none`. The scan reads the whole source rather than the class strings
+ * alone, so a comment in one of these files names the utility as `outline-*` instead of
+ * spelling it.
  */
 const singleIndicatorTargets = [
   'components/layout/app-shell.tsx',
+  'components/task/task-panel.tsx',
   'components/ui/button.tsx',
   'components/ui/dropdown-menu.tsx',
   'components/ui/input.tsx',
