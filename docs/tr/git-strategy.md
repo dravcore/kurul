@@ -231,9 +231,12 @@ Release'ler `develop`'tan bir `release/*` branch'i üzerinden kesilir. Versiyonl
 git switch develop && git pull
 git switch -c release/0.2.0
 
-# 2. Her package.json'da versiyonu bump'la (kök, apps/*, packages/*)
+# 2. Her package.json'da versiyonu bump'la (kök, apps/*, packages/*, e2e)
 #    ve CHANGELOG.md'yi finalize et: [Unreleased]'i [0.2.0] - YYYY-MM-DD olarak yeniden adlandır,
 #    en üste yeni bir boş [Unreleased] bölümü ekle.
+#    docs/self-hosting.md'deki release tag'ini de yükselt (kurulum URL'leri, TAG ve
+#    cosign örnekleri) ve docs/tr aynasını da: operatör sayfası dosyalarını tag'den
+#    indirir, bu yüzden sayfa ile release birlikte ilerler.
 git commit -am "chore(release): 0.2.0"
 
 # 3. Bu branch'e yalnızca release'i engelleyen fix'ler girebilir.
@@ -267,6 +270,23 @@ docker compose down -v                     # -v: sonraki koşuya volume bırakma
 #    bunu v0.2.0'dan sonraki ilk release'de gerektirir — bu workflow'un onu
 #    ilk yayınladığı release — ve sonradan eklenen her yeni imaj adı da aynı
 #    şekilde, bir kez, buna ihtiyaç duyar.
+#
+#    Workflow, herhangi bir imaj build edilmeden önce `guard` job'ında iki şeyi
+#    denetler; böylece buradaki bir hata yayınlanmak yerine bir dakika içinde
+#    kırılır:
+#    - tag'in nereyi gösterdiği: bir vX.Y.Z tag'i main'in ucu (bu merge
+#      commit'i) olmak zorundadır; bir ön-sürüm tag'i (vX.Y.Z-rc.N) main'de
+#      ya da bir release/* veya hotfix/* branch'inde durmalıdır;
+#    - ağacın ne söylediği: her package.json versiyonu X.Y.Z'ye eşit olmalı
+#      ve bir vX.Y.Z tag'i için CHANGELOG.md bir `## [X.Y.Z] - ` başlığı
+#      taşımalıdır.
+#    v* tag'leri ayrıca bir repository ruleset ile korunmalıdır (hedef: tag,
+#    refs/tags/v*; create, update, delete ve non-fast-forward engellenir;
+#    bypass: yalnızca repository admin'i); böylece contents:write yetkili bir
+#    token tek başına bir release tag'ini push edemez, taşıyamaz ve silemez.
+#    Ruleset kod değil bir repository ayarıdır: oluşturulması ROADMAP.md'deki
+#    operatör kontrol listesindedir ve yerine oturduğunda bir v* tag'ini
+#    yalnızca admin push edebilir, taşıyabilir ve silebilir.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
@@ -332,13 +352,20 @@ gelirse) tetiklenir ve bunun tek bir sebebi vardır: workflow imaj yayınlar, co
 ve SBOM ekler — bunların **hiçbiri CI'da koşmaz**. Hiç çalışmamış bir workflow'un ilk koşusunu
 gerçek bir sürüm yapmak, sürümün kendisini teste dönüştürür.
 
-Dolayısıyla yayın yolu değiştiyse — yeni bir action major'ı, imzalama veya SBOM adımlarında bir
-değişiklik, yeni bir registry — 5. adımdan önce prova edin:
+Dolayısıyla yayın yolu değiştiyse (yeni bir action major'ı, imzalama veya SBOM adımlarında bir
+değişiklik, yeni bir registry), `release/*` branch'inde, 2. adımdan sonra ve 5. adımdan önce
+prova edin:
 
 ```bash
 git tag -a v0.2.0-rc.1 -m "v0.2.0-rc.1"
 git push origin v0.2.0-rc.1
 ```
+
+Sıra önemlidir: `guard` job'ı package.json denetimini ön-sürüm tag'lerine de uygular (yalnız
+CHANGELOG başlığı kararlı tag'e özeldir); dolayısıyla prova tag'inin altındaki ağaç çoktan
+`X.Y.Z` demelidir. 2. adımdaki bump'tan önce kesilen bir tag guard'da kırılır ve guard eski
+versiyonda kalan dosyaları adıyla söyler. Soy denetimi `main`, `release/*` veya `hotfix/*`
+üzerindeki bir ön-sürüm tag'ini kabul eder; release branch'i bunun için doğal yerdir.
 
 Prova gerçek bir yayındır: gerçek imajlar, gerçek imza, gerçek SBOM asset'leri, ve
 [self-hosting.md](self-hosting.md#çektiğiniz-imajı-doğrulamak)'daki `cosign verify` komutu
@@ -354,7 +381,9 @@ o biçimin üretildiğini doğruluyor; yani bir gerileme, 404 veren belgelenmiş
 yerine sürümü kırar. Ama bu doğrulama da ilk kez sürümü kestiğinizde koşar.
 
 Prova tag'i tek kullanımlıktır. Gerçek sürüm çıkınca tag'i ve release'ini silin; imajlar kendi
-`-rc` tag'leriyle registry'de kalır ve paket listesinde bir satırdan başka maliyeti olmaz.
+`-rc` tag'leriyle registry'de kalır ve paket listesinde bir satırdan başka maliyeti olmaz. Tag'i
+silmek admin'in adımıdır: 5. adımdaki `v*` ruleset'i yerine oturduğunda tag silmeyi herkes için
+engeller, admin'in bypass'ı ise silmeyi geçiren şeydir.
 
 ## Hotfix süreci
 

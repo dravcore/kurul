@@ -95,7 +95,9 @@ atlas findings, not these.)
 
 **Operator checklist before the announcement:** point the repo homepage at `kurul.dev` when it
 answers; close issues [#135](https://github.com/dravcore/kurul/issues/135) and
-[#155](https://github.com/dravcore/kurul/issues/155) (work landed).
+[#155](https://github.com/dravcore/kurul/issues/155) (work landed); create the `v*` tag ruleset
+described in [git-strategy.md, release process step 5](docs/git-strategy.md#release-process),
+so that only the repository admin can push, move or delete a release tag.
 
 ## Shipped MVP (summary)
 
