@@ -405,21 +405,22 @@ on every run, passing or failing.
 
 Every pull request runs, on `develop` and `main` as well:
 
-| Step                 | Command                                                                                                  |
-| -------------------- | -------------------------------------------------------------------------------------------------------- |
-| Build shared pkgs    | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                      |
-| Lint                 | `pnpm lint`                                                                                              |
-| Format check         | `pnpm format:check`                                                                                      |
-| Typecheck            | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                                      |
-| Audit                | `pnpm audit --audit-level high`                                                                          |
-| Unit tests (api)     | `pnpm --filter @kurul/api test:cov`                                                                      |
-| Unit tests (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                                    |
-| Unit tests (pkgs)    | `pnpm --filter "./packages/*" test`                                                                      |
-| Unit tests (scripts) | `pnpm test:scripts`                                                                                      |
-| Integration tests    | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers                        |
-| Build                | `pnpm build`                                                                                             |
-| Image build + scan   | The three shipped images, then Trivy over each (see below)                                               |
-| **Gate** (required)  | `ci-ok` — passes only if `lint`, `test`, `build` and `image-scan` all succeed (not skipped or cancelled) |
+| Step                  | Command                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build shared pkgs     | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                                               |
+| Lint                  | `pnpm lint`                                                                                                                                       |
+| Format check          | `pnpm format:check`                                                                                                                               |
+| Typecheck             | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                                                                               |
+| Audit                 | `pnpm audit --audit-level high`                                                                                                                   |
+| Unit tests (api)      | `pnpm --filter @kurul/api test:cov`                                                                                                               |
+| Unit tests (web)      | `pnpm --filter @kurul/web exec vitest run --coverage`                                                                                             |
+| Unit tests (pkgs)     | `pnpm --filter "./packages/*" test`                                                                                                               |
+| Unit tests (scripts)  | `pnpm test:scripts`                                                                                                                               |
+| Integration tests     | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers                                                                 |
+| Build                 | `pnpm build`                                                                                                                                      |
+| Image build + scan    | The three shipped images, then Trivy over each (see below)                                                                                        |
+| Compose + Caddy parse | `docker compose config -q` over both compose files, with and without the `demo` profile, and `caddy validate` over `docker/Caddyfile` (see below) |
+| **Gate** (required)   | `ci-ok`: passes only if `lint`, `test`, `build`, `image-scan` and `compose-config` all succeed (not skipped or cancelled)                         |
 
 **All steps must pass before merge.** The gate job (`ci-ok`) is the single required status check
 configured in branch protection — if any upstream job fails, is skipped, or is cancelled, the
@@ -463,6 +464,20 @@ Two choices are worth knowing about:
 
 Nothing is pushed: `push: false` with `load: true` keeps each image inside its own runner.
 Publishing stays in `release-images.yml`, behind a tag.
+
+### Compose and Caddyfile parse
+
+`compose-config` renders `docker-compose.yml` with `docker compose config -q`, once without a
+profile and once with `--profile demo`, then `docker-compose.dev.yml`, and runs `caddy validate`
+over `docker/Caddyfile` in the same `caddy:2-alpine` image the stack ships. The env file is
+`.env.example` plus the two keys that have no default (`POSTGRES_PASSWORD`,
+`BETTER_AUTH_SECRET`), which is the install [self-hosting.md](self-hosting.md) describes, so
+the job fails on what an operator would hit: a broken YAML anchor, a renamed Caddy directive,
+or a required-variable interpolation (`${VAR:?}`) that a plain `docker compose up -d` cannot
+satisfy. Compose interpolates the whole file before it filters services by profile, so that
+last one bites even inside a profiled service, which is how the `demo-reset` sidecar once broke
+every ordinary install on `develop`. The compose legs talk to no daemon, the whole job takes
+seconds, and it runs beside `lint` and `test` with no `needs:`.
 
 ### Browser e2e in CI
 
