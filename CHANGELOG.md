@@ -384,6 +384,37 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the bell until the next load. Both now read one shell-level count, and marking everything read
   clears it in the same frame.
 
+### Changed
+
+- **Both themes hold up over hours of reading instead of straining on close text or losing their
+  edges.** Dark mode gets a real surface ramp: canvas, column, card, popover and the hover
+  highlight are five distinguishable steps instead of two or three blurring together, and dark
+  text tokens are measured to the same 4.5:1 floor light already held. Every input, select and
+  textarea now draws a border a viewer can actually see (`--border-strong`, aliased as `--input`),
+  instead of a hairline that only separated a field from itself. Hovering a task card, a button or
+  a menu row moves to a real step (`--accent` in both themes, plus `--primary-hover` and
+  `--destructive-hover` on filled buttons), instead of an alpha thinning that could drop a white
+  label under AA partway through the hover. Opening a dialog dims the page behind it with a themed
+  scrim (`--overlay-scrim`) rather than a flat 50% black, and in dark mode dialogs, popovers and
+  the drag preview carry a 1px `--border-strong` ring inside their shadow, since a shadow alone
+  stops reading once the surface under it is this dark. `forced-colors: active` and
+  `prefers-contrast: more` now have their own fallbacks: a selected card, a drop target and a
+  highlighted menu row draw a system `Highlight` outline instead of leaning on a tint the mode
+  discards, and the hairline border thickens to `--border-strong` under high contrast instead of
+  opening a second palette. A new gate, `app/globals.contrast.test.ts`, measures every text token
+  against six real surfaces and every boundary token at 3:1 on every run, so a future token change
+  that quietly drops a pair under AA fails the build instead of shipping.
+
+### Fixed
+
+- **`dark:` utility classes followed the operating system's colour scheme instead of the theme
+  chosen in the app.** Tailwind's `dark:` variant defaulted to `prefers-color-scheme: dark`, while
+  every dark token lives on the `.dark` class the theme switcher sets, so anyone whose OS and
+  chosen theme disagreed got a mismatched control: a destructive button thinned under its own
+  white label in light mode with a dark OS, and lost its hover step in dark mode with a light OS.
+  `app/globals.css` now declares `@custom-variant dark (&:where(.dark, .dark *))`, so every
+  `dark:` utility follows the theme the app is actually showing.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that

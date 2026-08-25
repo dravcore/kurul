@@ -301,15 +301,30 @@ geçemez. `apps/api/src/workspace-packages.spec.ts`, `apps/api/test/harness.e2e-
 [development.md](development.md#klonlama-ve-kurulum).
 
 `apps/web/workspace-packages.test.ts`, bir component'in yanında değil `apps/web` kökünde (ya da
-`globals.css`'in yanında) duran dört **yapısal koruma** testinden biridir; konuları tek bir modül
-değil uygulamanın bütünü olduğu için oradalar. Diğer üçü cascade katman onarımıyla geldi:
+`globals.css`'in yanında) duran beş **yapısal koruma** testinden biridir; konuları tek bir modül
+değil uygulamanın bütünü olduğu için oradalar. İkisi cascade katman onarımıyla geldi:
 `apps/web/app/globals-css-layers.test.ts`, `app/globals.css`'i kurulu Tailwind üzerinden derler ve
 cascade'i bir tarayıcının çözdüğü gibi çözer, böylece joker `border-color` kuralı fark edilmeden
-`@layer base` dışına çıkamaz; `apps/web/border-utilities.test.ts` ağacı tarar ve incelenmiş token
-kümesinin dışından çizilen her border class'ında kırmızıya döner;
-`apps/web/app/theme-classes.test.ts` ağaçtaki her `text-`, `bg-`, `border-`, `font-` ve `shadow-`
-class'ının CSS'e çözülüp çözülmediğini Tailwind'e sorar. Uyguladıkları kurallar
-[coding-standards.md](coding-standards.md#stil) içinde yazılıdır.
+`@layer base` dışına çıkamaz; token ramp'i onu `dark:` variant'ının kendi selector'ını da derleyecek
+şekilde genişletti, böylece bir `dark:` utility'si `.dark` class'ı yerine `prefers-color-scheme`'e
+karşı çözülüyorsa burada kırmızıya döner, ve `forced-colors: active` ile `prefers-contrast: more`
+bloklarını da derler, böylece yalnızca kağıt üzerinde var olan bir Highlight fallback'i ya da
+high-contrast border değişimi bir screenshot'ta değil burada kırmızıya döner.
+`apps/web/border-utilities.test.ts` ağacı tarar ve incelenmiş token kümesinin dışından çizilen her
+border class'ında kırmızıya döner; `apps/web/app/theme-classes.test.ts` ağaçtaki her `text-`,
+`bg-`, `border-`, `font-` ve `shadow-` class'ının CSS'e çözülüp çözülmediğini Tailwind'e sorar.
+Beşincisi, `apps/web/app/globals.contrast.test.ts`, kontrast gate'idir: her renk token'ını derlenmiş
+`:root` ve `.dark` bloklarından okur ve her metin token'ını altı gerçek surface'e karşı 4.5:1'de,
+her boundary ve state token'ını aynı altısına karşı 3:1'de ölçer; buna ek olarak her run'da
+render edilmiş ağacı bir token adına güvenmek yerine yeniden tarayan üç scanner taşır (gerçek
+ground'u üzerine composite edilmiş her alpha derivative, riskli bir metin rengini riskli bir
+ground'la eşleştiren her call site, token'lanmamış her renk). Tabanının altına düşen bir çift,
+kayıtlı sayısından sapmış bir alpha composite ya da pinned listesinin adlandırmadığı bir call
+site'ta kırmızıya döner. İstisnalar dosyanın kendi içinde, ölçülen sayılarını ve gerekçelerini
+taşıyan adlandırılmış listeler olarak yaşar, asla düşürülmüş bir taban olarak; her biri her run'da
+yeniden ölçülür ve kayıtlı sayısından sapmışsa ya da muaf tutulduğu tabanın üzerine çıkmışsa
+kırmızıya döner. Uyguladıkları kurallar [coding-standards.md](coding-standards.md#stil) içinde
+yazılıdır.
 
 ## Test yazma
 

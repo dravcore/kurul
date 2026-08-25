@@ -86,24 +86,40 @@ is `--primary` and `--accent` stays a quiet neutral tint. Do not rename shadcn's
 A low-chroma green-gray ("felt") ramp. Light mode's canvas is a step of gray and cards are
 white, so elevation reads without shadows.
 
-| Role                                     | Token                          | Light                 | Dark                  |
-| ---------------------------------------- | ------------------------------ | --------------------- | --------------------- |
-| Canvas                                   | `--background`                 | `#F7F8F7`             | `#0E100F`             |
-| Card / panel surface                     | `--card`, `--popover`          | `#FFFFFF`             | `#161918`             |
-| Raised surface (hover, drag preview)     | `--muted`                      | `#F1F3F1`             | `#1D2120`             |
-| Border · border-strong                   | `--border` · `--border-strong` | `#D6DAD8` · `#B9BFBC` | `#2A2F2D` · `#383E3B` |
-| Text, primary                            | `--foreground`                 | `#191C1B`             | `#E8ECEA`             |
-| Text, secondary                          | `--foreground-secondary`       | `#545A57`             | `#B3BAB6`             |
-| Text, muted                              | `--muted-foreground`           | `#6B726E`             | `#8A928E`             |
-| Text, disabled / placeholder             | `--foreground-disabled`        | `#8A918D`             | `#6E7773`             |
-| Primary action surface                   | `--primary`                    | `#A85A28`             | `#D98A4E`             |
-| Text on primary                          | `--primary-foreground`         | `#FFFFFF`             | `#0E100F`             |
-| Rail, focus ring, link                   | `--signature`, `--ring`        | `#A85A28`             | `#D98A4E`             |
-| Signature tint (selected row, drop zone) | `--signature-subtle`           | `#F6EDE5`             | `#241A12`             |
+| Role                                                                 | Token                           | Light                  | Dark                  |
+| -------------------------------------------------------------------- | ------------------------------- | ---------------------- | --------------------- |
+| Canvas                                                               | `--background`                  | `#F7F8F7`              | `#131715`             |
+| Column ground                                                        | `--muted`                       | `#F1F3F1`              | `#1A1E1C`             |
+| Card surface                                                         | `--card`                        | `#FFFFFF`              | `#212523`             |
+| Popover surface                                                      | `--popover`                     | `#FFFFFF`              | `#272B29`             |
+| Hover step (drag preview stays the card surface, `--elevation-drag`) | `--accent`, `--secondary`       | `#EAEDEA`              | `#2F3331`             |
+| Border · border-strong (`--input` reads `--border-strong`)           | `--border` · `--border-strong`  | `#D6DAD8` · `#7D8481`  | `#3A403D` · `#767D7A` |
+| Text, primary                                                        | `--foreground`                  | `#191C1B`              | `#E8ECEA`             |
+| Text, secondary                                                      | `--foreground-secondary`        | `#545A57`              | `#BCC3BF`             |
+| Text, muted                                                          | `--muted-foreground`            | `#626965`              | `#98A09C`             |
+| Text, disabled / placeholder                                         | `--foreground-disabled`         | `#7F8683`              | `#7B837F`             |
+| Primary action surface · hover                                       | `--primary` · `--primary-hover` | `#A85A28` · `#964F23`  | `#D98A4E` · `#E0955B` |
+| Text on primary                                                      | `--primary-foreground`          | `#FFFFFF`              | `#131715`             |
+| Rail, focus ring, link                                               | `--signature`, `--ring`         | `#A85A28`              | `#D98A4E`             |
+| Signature tint (selected row, drop zone)                             | `--signature-subtle`            | `#F2E6DA`              | `#37291D`             |
+| Destructive action hover                                             | `--destructive-hover`           | `#B0241C`              | `#B8524A`             |
+| Dialog and drawer backdrop                                           | `--overlay-scrim`               | `rgb(25 28 27 / 0.38)` | `rgb(5 7 6 / 0.7)`    |
 
-Measured on the card surface — text: light 17.2 / 7.1 / 4.9:1, dark 14.9 / 9.0 / 5.6:1.
-Copper: light carries white text at 5.05:1 and reads as text on canvas at 4.74:1; dark carries
-ink at 7.00:1 and reads on the dark surface at 6.49:1. All clear AA.
+Text worst-surface ratios, named to the surface each measures worst on
+(`app/globals.contrast.test.ts`): light `--foreground` 14.0:1, `--foreground-secondary` 5.8:1 and
+`--muted-foreground` 4.6:1, all worst on `--signature-subtle`; dark `--foreground` 10.8:1,
+`--foreground-secondary` 7.1:1 and `--muted-foreground` 4.8:1, all worst on `--accent`. Copper as
+running text clears every surface but two, both light, both a recorded exemption rather than a
+floor moved: 4.28:1 on the hover step, where no call site draws copper text, and 4.11:1 on the
+signature tint, forbidden outright (below); dark clears all six, 4.70:1 worst on `--accent`. As a
+fill, `--primary-foreground` on `--primary` carries white at 5.05:1 in light and ink at 6.63:1 in
+dark, the same number dark reads on the canvas since `--primary-foreground` and `--background`
+share one hex there.
+
+`--signature-subtle` never carries copper (`--primary`, `--signature`) text: the exemption above
+is the rule, not a design allowance, and `app/globals.contrast.test.ts` rescans every call site on
+each run to keep it that way. Neutral `--foreground` text is allowed and is measured against it
+like any other surface, 14.0:1 in light and 11.8:1 in dark.
 
 ### Semantic scales — status and priority
 
@@ -113,11 +129,11 @@ escalating chroma, so it survives colorblindness, grayscale print, and being des
 
 | Meaning                        | Priority | Token                                 | Light     | Dark      | Contrast L / D | Icon           |
 | ------------------------------ | -------- | ------------------------------------- | --------- | --------- | -------------- | -------------- |
-| Neutral / inactive             | `LOW`    | `--priority-low`                      | `#6B726E` | `#8A928E` | 4.9 / 5.6      | `chevron-down` |
-| Info                           | `MEDIUM` | `--status-info`, `--priority-medium`  | `#3F6B99` | `#6BA3E8` | 5.6 / 6.8      | `minus`        |
-| Good / done                    | —        | `--status-good`                       | `#1F7A4D` | `#3FBF85` | 5.3 / 7.6      | `check`        |
-| Warning / due soon             | `HIGH`   | `--status-warning`, `--priority-high` | `#8A5A00` | `#D9A227` | 5.9 / 7.7      | `chevron-up`   |
-| Danger / overdue / destructive | `URGENT` | `--status-danger`, `--destructive`    | `#C0281F` | `#F0665C` | 5.9 / 5.7      | `chevrons-up`  |
+| Neutral / inactive             | `LOW`    | `--priority-low`                      | `#6B726E` | `#8A928E` | 4.9 / 4.9      | `chevron-down` |
+| Info                           | `MEDIUM` | `--status-info`, `--priority-medium`  | `#3F6B99` | `#6BA3E8` | 5.6 / 5.9      | `minus`        |
+| Good / done                    | —        | `--status-good`                       | `#1D7349` | `#3FBF85` | 5.8 / 6.7      | `check`        |
+| Warning / due soon             | `HIGH`   | `--status-warning`, `--priority-high` | `#8A5A00` | `#D9A227` | 5.9 / 6.8      | `chevron-up`   |
+| Danger / overdue / destructive | `URGENT` | `--status-danger`, `--destructive`    | `#C0281F` | `#F47A73` | 5.9 / 5.8      | `chevrons-up`  |
 
 Priority renders as a full-chroma icon plus text; labels render as a tinted chip with a
 colored dot — different weights, so a red priority and a red label never read alike.
@@ -150,12 +166,12 @@ a stat-tile value.
 
 ### Spacing, radius, elevation
 
-| System    | Values                                                                                                                                                                                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Spacing   | `2 · 4 · 6 · 8 · 12 · 16 · 20 · 24 · 32 · 48` — 4px base with a 2px half-step; the half-step is what makes a dense row survive                                                                                                                               |
-| Radius    | `sm 4` chips · `md 6` buttons, inputs, cards · `lg 10` panels, dialogs · `full` avatars. Tighter than the shadcn default; large radii read soft and cost usable width.                                                                                       |
-| Border    | 1px hairline `--border`; 2px only for the sancak rail and focus rings                                                                                                                                                                                        |
-| Elevation | **Borders first, shadows last.** Light depth = white card on gray canvas + hairline; dark depth = a lighter surface step, because shadows do not read on dark and a glow is worse. Real shadows exist in three places only: dialogs, popovers, drag preview. |
+| System    | Values                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spacing   | `2 · 4 · 6 · 8 · 12 · 16 · 20 · 24 · 32 · 48` — 4px base with a 2px half-step; the half-step is what makes a dense row survive                                                                                                                                                                                                                                                                                                                       |
+| Radius    | `sm 4` chips · `md 6` buttons, inputs, cards · `lg 10` panels, dialogs · `full` avatars. Tighter than the shadcn default; large radii read soft and cost usable width.                                                                                                                                                                                                                                                                               |
+| Border    | 1px hairline `--border`; 2px only for the sancak rail and focus rings                                                                                                                                                                                                                                                                                                                                                                                |
+| Elevation | **Borders first, shadows last.** The card is always one step above the column ground (`--muted`); the column ground itself steps away from the canvas toward that theme's floor, down in light and up in dark. Real shadows exist in three places only, dialogs, popovers, drag preview, and in dark all three also carry a 1px `--border-strong` ring inside the shadow, since a shadow alone does not read once the surface under it is this dark. |
 
 ## 4. Layout and density
 
@@ -411,20 +427,22 @@ never a generated ninth hue — fold the tail into "Other" or facet into small m
 | Column composition over time                   | **Stacked area / column**, ≤ 6 series                                            | categorical                |
 | More than ~7 categories that all matter        | **Table**, or table plus chart                                                   | —                          |
 
-Palette validated against Kurul's own surfaces (`#FFFFFF` light, `#161918` dark). These slots
+Palette validated against Kurul's own surfaces (`#FFFFFF` light, `#212523` dark). These slots
 also back `Label.color`.
 
 | Slot | Hue    | Light     | Dark      |     | Slot | Hue     | Light     | Dark      |
 | ---- | ------ | --------- | --------- | --- | ---- | ------- | --------- | --------- |
 | 1    | blue   | `#2A78D6` | `#3987E5` |     | 5    | magenta | `#E87BA4` | `#D55181` |
-| 2    | orange | `#EB6834` | `#D95926` |     | 6    | green   | `#008300` | `#008300` |
+| 2    | orange | `#EB6834` | `#D95926` |     | 6    | green   | `#008300` | `#2A9D3C` |
 | 3    | aqua   | `#1BAF7A` | `#199E70` |     | 7    | violet  | `#4A3AA7` | `#9085E9` |
 | 4    | yellow | `#EDA100` | `#C98500` |     | 8    | red     | `#E34948` | `#E66767` |
 
 Validator — **light**: lightness band, chroma, CVD (worst adjacent ΔE 9.1) and normal-vision
-(19.6) all PASS; contrast WARN on slots 3/4/5 below 3:1 on white, so **direct labels or the
-table view are mandatory** wherever those appear. **Dark**: all six checks PASS, worst adjacent
-CVD ΔE 8.4.
+(19.6) all PASS; contrast WARN on slots 2, 3, 4, 5 (2.61 / 2.29 / 1.76 / 2.19, below 3:1 as a dot
+on the signature tint, the worst ground `app/globals.contrast.test.ts` measures a label chip
+against). The dot is never the only channel: it is `aria-hidden` and always paired with the
+label's own name, and every chart carrying these slots still offers **direct labels or the table
+view** as the relief route. **Dark**: all six checks PASS, worst adjacent CVD ΔE 8.4.
 
 | Rule                   |                                                                                                                                                                                                                                                                                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -450,23 +468,26 @@ is not good news) and paired with an arrow · optional 12-point sparkline in
 
 Target **WCAG 2.1 AA** in both themes, verified per token pair rather than per screenshot.
 
-| Requirement                       | Floor                              | Applies to                                                         |
-| --------------------------------- | ---------------------------------- | ------------------------------------------------------------------ |
-| Body text on its surface          | 4.5:1                              | Every foreground/surface pair in §3 — all measured above the floor |
-| Large text (≥18.66px bold / 24px) | 3:1                                | Titles, hero figures                                               |
-| Component boundaries and states   | 3:1                                | Input borders, focus ring, sancak rail, chart marks                |
-| Disabled text                     | exempt, held to 3:1 anyway         | Placeholders, disabled controls                                    |
-| Chart marks on the chart surface  | 3:1, or direct labels / table view | Light slots 3, 4, 5 take the relief route                          |
+| Requirement                       | Floor                              | Applies to                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Body text on its surface          | 4.5:1                              | `app/globals.contrast.test.ts`: every text token in §3 against six real surfaces (canvas, column, card, popover, hover step, signature tint); boundary tokens hold the same six at 3:1, `--border` exempt as the decorative hairline that carries no state; the one remaining exemption is disabled text via `opacity-50`, which WCAG exempts outright and the gate still holds to 3:1 |
+| Large text (≥18.66px bold / 24px) | 3:1                                | Titles, hero figures                                                                                                                                                                                                                                                                                                                                                                   |
+| Component boundaries and states   | 3:1                                | Input borders, focus ring, sancak rail, chart marks                                                                                                                                                                                                                                                                                                                                    |
+| Disabled text                     | exempt, held to 3:1 anyway         | Placeholders, disabled controls                                                                                                                                                                                                                                                                                                                                                        |
+| Chart marks on the chart surface  | 3:1, or direct labels / table view | Light slots 3, 4, 5 take the relief route                                                                                                                                                                                                                                                                                                                                              |
 
-| Rule                        |                                                                                                                                                                                                                                  |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Keyboard parity             | Every pointer interaction has a keyboard path, drag and drop included (§5). If a feature can only be done by dragging, it is unfinished.                                                                                         |
-| Color is never alone        | Priority and status ship an icon and a word; labels carry their name in the chip; series get a legend and, at ≤4 series, direct labels; the rail is accompanied by `aria-current` and a weight change                            |
-| Focus management            | The non-modal panel moves focus to its heading on open and returns it to the originating card on close, without trapping. Dialogs _do_ trap, restore focus on close, and close on `Esc`; popovers return focus to their trigger. |
-| Announcements               | Drag transitions, optimistic failures, realtime arrivals, and toasts go through `aria-live="polite"`; only a session-ending error is `assertive`                                                                                 |
-| Reduced motion              | Respected everywhere and never removes a state change — the state still changes, it just stops moving                                                                                                                            |
-| Structure                   | One `h1` per route; landmarks for sidebar, main, panel; the board as a labelled composite widget; column counts exposed as text, not inferred                                                                                    |
-| Zoom, reflow, forced colors | Usable at 200% — the sidebar collapses and the panel becomes a sheet rather than the board scrolling in two directions. `forced-colors: active` keeps borders and focus rings; charts fall back to the table view.               |
+| Rule                         |                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Keyboard parity              | Every pointer interaction has a keyboard path, drag and drop included (§5). If a feature can only be done by dragging, it is unfinished.                                                                                                                                                                                                                                                                                 |
+| Color is never alone         | Priority and status ship an icon and a word; labels carry their name in the chip; series get a legend and, at ≤4 series, direct labels; the rail is accompanied by `aria-current` and a weight change                                                                                                                                                                                                                    |
+| Focus management             | The non-modal panel moves focus to its heading on open and returns it to the originating card on close, without trapping. Dialogs _do_ trap, restore focus on close, and close on `Esc`; popovers return focus to their trigger.                                                                                                                                                                                         |
+| Announcements                | Drag transitions, optimistic failures, realtime arrivals, and toasts go through `aria-live="polite"`; only a session-ending error is `assertive`                                                                                                                                                                                                                                                                         |
+| Reduced motion               | Respected everywhere and never removes a state change — the state still changes, it just stops moving                                                                                                                                                                                                                                                                                                                    |
+| Structure                    | One `h1` per route; landmarks for sidebar, main, panel; the board as a labelled composite widget; column counts exposed as text, not inferred                                                                                                                                                                                                                                                                            |
+| Zoom, reflow, forced colors  | Usable at 200% — the sidebar collapses and the panel becomes a sheet rather than the board scrolling in two directions. `forced-colors: active` keeps borders and focus rings; charts fall back to the table view.                                                                                                                                                                                                       |
+| Forced colors, high contrast | Every state built on a surface step or a tint carries a border-based twin. Under `forced-colors: active`: the selected card takes a `Highlight` outline, the column drop target takes a `Highlight` outline inset, and a highlighted menu row paints `Highlight` / `HighlightText` in place of its tint. Under `prefers-contrast: more`: `--border` takes `--border-strong`'s value instead of opening a second palette. |
+| `--input` alias              | `--input` reads `--border-strong`'s value (`--input: var(--border-strong)` in `app/globals.css`), so every field, select and textarea wearing `border-input` already clears the 3:1 boundary floor without a token of its own.                                                                                                                                                                                           |
+| `dark:` binding              | Tailwind's `dark:` variant is bound to the `.dark` class next-themes writes (`@custom-variant dark (&:where(.dark, .dark *))` in `app/globals.css`), not to `prefers-color-scheme`, so a viewer's chosen theme controls every `dark:` utility in `components/ui/` regardless of the OS setting.                                                                                                                          |
 
 ## 10. Cross-references
 

@@ -295,16 +295,29 @@ compile the same source `pnpm typecheck` reads and cannot pass against a stale b
 required for `pnpm typecheck`, `nest build`, `next build` and `pnpm dev`, see
 [development.md](development.md#clone-and-install).
 
-`apps/web/workspace-packages.test.ts` is one of four **structural guards** that sit at the root of
+`apps/web/workspace-packages.test.ts` is one of five **structural guards** that sit at the root of
 `apps/web` (or beside `globals.css`) instead of next to a component, because their subject is the
-app as a whole. The other three came with the cascade-layer repair:
-`apps/web/app/globals-css-layers.test.ts` compiles `app/globals.css` through the installed
-Tailwind and resolves the cascade the way a browser would, so the wildcard `border-color` rule
-cannot leave `@layer base` unnoticed; `apps/web/border-utilities.test.ts` scans the tree and fails
-on any border class drawn from outside the reviewed token set;
-`apps/web/app/theme-classes.test.ts` asks Tailwind whether every `text-`, `bg-`, `border-`,
-`font-` and `shadow-` class in the tree resolves to CSS at all. The rules they enforce are
-written down in [coding-standards.md](coding-standards.md#styling).
+app as a whole. Two came with the cascade-layer repair: `apps/web/app/globals-css-layers.test.ts`
+compiles `app/globals.css` through the installed Tailwind and resolves the cascade the way a
+browser would, so the wildcard `border-color` rule cannot leave `@layer base` unnoticed; the token
+ramp widened it to also compile the `dark:` variant's own selector, so a `dark:` utility resolving
+against `prefers-color-scheme` instead of the `.dark` class fails here, and to compile the
+`forced-colors: active` and `prefers-contrast: more` blocks, so a Highlight fallback or the
+high-contrast border swap that only exists on paper fails here instead of in a screenshot.
+`apps/web/border-utilities.test.ts` scans the tree and fails on any border class drawn from
+outside the reviewed token set; `apps/web/app/theme-classes.test.ts` asks Tailwind whether every
+`text-`, `bg-`, `border-`, `font-` and `shadow-` class in the tree resolves to CSS at all. The
+fifth, `apps/web/app/globals.contrast.test.ts`, is the contrast gate: it reads every color token
+out of the compiled `:root` and `.dark` blocks and measures every text token against six real
+surfaces at 4.5:1 and every boundary and state token at the same six at 3:1, plus three scanners
+that rescan the rendered tree on each run rather than trust a token name (every alpha derivative
+composited over its real ground, every call site pairing a risky text colour with a risky ground,
+every untokenised colour). It fails on a pair under its floor, an alpha composite that has drifted
+off its recorded number, or a call site its pinned list does not already name. Exemptions live in
+the file itself as named lists carrying their measured number and their reason, never a lowered
+threshold, and each one is re-measured every run and fails if it drifts off its number or rises
+past the floor it was excused from. The rules they enforce are written down in
+[coding-standards.md](coding-standards.md#styling).
 
 ## Writing tests
 
