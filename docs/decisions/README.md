@@ -51,6 +51,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0031](0031-api-versioning.md)                         | API Versioning: a `/v1` URI Prefix Introduced at 1.0, and the Order Things Ship In                       | Accepted                                               | 2026-08-23 |
 | [0032](0032-plan-limits.md)                            | Plan Limits: One Resolver for Every Ceiling, Unlimited Until Configured                                  | Accepted                                               | 2026-08-23 |
 | [0033](0033-webhook-delivery-and-failure-policy.md)    | Webhook Delivery and Failure Policy: Workspace-Owned Endpoints, an Outbox Row, and a Signed Envelope     | Proposed                                               | 2026-08-26 |
+| [0034](0034-hosted-billing-and-plan-assignment.md)     | Hosted Billing and Plan Assignment: a Merchant of Record, One Subscription Row, Inert When Unconfigured  | Proposed                                               | 2026-08-26 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).
