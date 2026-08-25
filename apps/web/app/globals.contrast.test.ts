@@ -168,7 +168,8 @@ const SURFACE_STEP = 1.05;
 
 /**
  * Every surface a colour can land on. `--secondary` is absent because it is `--accent`'s twin
- * value, and `--primary` / `--destructive` are covered as fills by their own `-foreground` pair.
+ * value, which the per-theme block below asserts rather than assumes, and `--primary` /
+ * `--destructive` are covered as fills by their own `-foreground` pair.
  */
 const SURFACES = [
   '--background',
@@ -461,6 +462,17 @@ for (const theme of THEMES) {
 
     it('holds every non-exempt label slot at 3:1 on every surface as a dot', () => {
       expect(belowFloor(theme, LABEL_SLOTS, SURFACES, AA_NON_TEXT)).toEqual([]);
+    });
+
+    // What keeps `--secondary` out of SURFACES. components/ui/button.tsx paints `bg-secondary`
+    // and `hover:bg-secondary/80`, so it is a ground the tree really lands text on; the matrix
+    // covers it only while the two tokens are one value.
+    it("keeps --secondary on --accent's value", () => {
+      expect(
+        hexOf(theme, '--secondary'),
+        'the secondary button paints a ground no surface in SURFACES matches any more: add ' +
+          '--secondary to SURFACES so every text and boundary token is measured against it',
+      ).toBe(hexOf(theme, '--accent'));
     });
   });
 }
