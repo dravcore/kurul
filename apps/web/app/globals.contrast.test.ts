@@ -401,9 +401,10 @@ function paintedCallSites(): string[] {
 }
 
 /**
- * What the tree paints today, with the ratio each pairing measures and who clears it. Two of the
- * three are below the 4.5 floor in light and are named in the phase report as open AA failures:
- * this list is the hand-over, not a blessing.
+ * What the tree paints today, with the ratio each pairing measures and who clears it. The
+ * mention chip and the workspace initial used to be here, both below the 4.5 floor in light;
+ * both now wear `text-foreground` on the tint instead, so the one entry left is never actually
+ * rendered.
  */
 const PINNED_CALL_SITES: {
   file: string;
@@ -413,25 +414,6 @@ const PINNED_CALL_SITES: {
   dark: number;
   note: string;
 }[] = [
-  {
-    file: 'components/layout/workspace-switcher.tsx',
-    text: 'text-signature',
-    ground: 'bg-signature-subtle',
-    light: 4.11,
-    dark: 5.14,
-    // The workspace initial. Light is under the floor and this phase's tint moved it down from
-    // 4.37, so it is a measured failure, not only a rule violation. `text-foreground` on the
-    // same tint measures 13.98 light and 11.77 dark.
-    note: 'P4 moves it to text-foreground with the mention chip',
-  },
-  {
-    file: 'components/task/comment-body.tsx',
-    text: 'text-signature',
-    ground: 'bg-signature-subtle',
-    light: 4.11,
-    dark: 5.14,
-    note: 'the mention chip, already slated to be text-foreground on the tint in P4',
-  },
   {
     file: 'components/ui/dropdown-menu.tsx',
     text: 'text-destructive',
