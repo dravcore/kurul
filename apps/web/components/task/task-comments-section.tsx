@@ -152,13 +152,13 @@ export function TaskCommentsSection({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-small font-medium text-foreground">{t('comments')}</p>
+      <p className="text-small font-strong text-foreground">{t('comments')}</p>
       <ul className="flex flex-col gap-3">
         {comments.map((comment) => (
           <li key={comment.id} className="rounded-md border border-border px-3 py-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-small font-medium text-foreground">
+                <p className="text-small font-strong text-foreground">
                   {authorLabel(comment.author, tCommon('deletedUser'))}
                 </p>
                 <p className="text-micro text-muted-foreground">

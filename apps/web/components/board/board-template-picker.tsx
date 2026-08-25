@@ -126,7 +126,7 @@ export function BoardTemplatePicker({
 
   return (
     <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-small font-medium text-foreground">{t('template')}</legend>
+      <legend className="mb-1.5 text-small font-strong text-foreground">{t('template')}</legend>
       <div className="flex flex-col gap-1.5">
         {templates.map((template, index) => (
           <label
@@ -152,7 +152,7 @@ export function BoardTemplatePicker({
               onChange={() => onChange(template.slug)}
             />
             <span className="flex min-w-0 flex-col gap-1">
-              <span className="text-small font-medium text-foreground">{template.name}</span>
+              <span className="text-small font-strong text-foreground">{template.name}</span>
               <span className="text-small text-muted-foreground">{template.description}</span>
               {/*
                 The columns in board order, which is the order they were sent in. A separator

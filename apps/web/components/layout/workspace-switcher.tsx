@@ -38,7 +38,7 @@ export function WorkspaceSwitcher({
         >
           <span
             aria-hidden
-            className="flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-signature-subtle text-small font-medium text-foreground"
+            className="flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-signature-subtle text-small font-strong text-foreground"
           >
             {initial}
           </span>

@@ -78,7 +78,7 @@ export function TaskAttachments({
 
   return (
     <section aria-label={t('sectionLabel')} className="flex flex-col gap-3">
-      <p className="text-small font-medium text-foreground">{t('sectionLabel')}</p>
+      <p className="text-small font-strong text-foreground">{t('sectionLabel')}</p>
 
       {loading ? (
         <p className="text-small text-muted-foreground">{t('loading')}</p>
