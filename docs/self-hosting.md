@@ -53,7 +53,7 @@ for outgrowing its own ceiling, and nothing another service does can take Postgr
 | `postgres` | 512m        | Generous baseline for a small-team board's working set; `/dev/shm` raised to 256m, see below     |
 | `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) both buffer into its heap     |
 | `web`      | 512m        | Same Next.js SSR process, same "no ceiling chosen" problem as `api`                              |
-| `migrate`  | 512m        | Matches `api` — same build stage, same Prisma CLI, just once at startup                          |
+| `migrate`  | 512m        | Matches `api`: same build stage, same Prisma CLI, just once at startup                           |
 | `backup`   | 256m        | `pg_dump` streams rather than buffering; this covers process overhead and the attachments `tar`  |
 | `redis`    | 128m        | Cache, sessions, rate limits, notifications only, never board data; `maxmemory` 100mb, see below |
 | `proxy`    | 128m        | Terminates TLS and proxies; bodies pass through Caddy rather than buffering into it              |

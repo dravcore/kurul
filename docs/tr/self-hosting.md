@@ -56,7 +56,7 @@ düşüremez.
 | `postgres` | 512m        | Küçük bir ekibin board'u için cömert bir taban; `/dev/shm` 256m'ye çıkarıldı, aşağıya bakın        |
 | `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) ikisi de heap'ine buffer'lar    |
 | `web`      | 512m        | Aynı Next.js SSR process'i, `api` ile aynı "seçilmemiş tavan" sorunu                               |
-| `migrate`  | 512m        | `api` ile aynı — aynı build stage, aynı Prisma CLI, yalnızca startup'ta bir kez                    |
+| `migrate`  | 512m        | `api` ile aynı: aynı build stage, aynı Prisma CLI, yalnızca startup'ta bir kez                     |
 | `backup`   | 256m        | `pg_dump` buffer'lamak yerine stream eder; bu, process overhead'i ve attachment `tar`'ını kapsar   |
 | `redis`    | 128m        | Yalnızca cache, session, rate limit, bildirim, asla board verisi; `maxmemory` 100mb, aşağıya bakın |
 | `proxy`    | 128m        | TLS sonlandırır ve proxy'ler; gövdeler `api`'ninki gibi buffer'lanmak yerine Caddy'den geçer       |
