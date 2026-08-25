@@ -468,7 +468,7 @@ describe('the copper and destructive text exemption', () => {
           ? []
           : [
               `${theme}: ${siteLine(site.file, site.text, site.ground)} measures ` +
-                `${measured.toFixed(2)}:1, recorded ${site[theme].toFixed(2)}:1`,
+                `${measured.toFixed(2)}:1, recorded ${site[theme].toFixed(2)}:1 (${site.note})`,
             ];
       }),
     );
