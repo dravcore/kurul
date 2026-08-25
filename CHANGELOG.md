@@ -9,6 +9,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **ADRs 0033 and 0034, proposed: webhook delivery and hosted billing.** The two undecided pieces of
+  API 1.0 are written down as records rather than as roadmap rows, and both merge as **Proposed**:
+  they exist to be read and argued before either slice starts, and nothing in the running product
+  changes yet. [ADR 0033](docs/decisions/0033-webhook-delivery-and-failure-policy.md) puts webhook
+  endpoints on the workspace instead of in the operator's environment, so the feature exists for a
+  hosted customer and not only for a self-hoster, and settles what follows from that: three events
+  with `task.completed` defined as a move into a completed column, a signed envelope carrying a
+  `/v1` `TaskDto`, a `WebhookDelivery` outbox row written in the same transaction as the activity
+  row, six attempts and then a disabled endpoint, and an egress policy that refuses private
+  addresses and does not follow redirects.
+  [ADR 0034](docs/decisions/0034-hosted-billing-and-plan-assignment.md) gives
+  `Workspace.planLimits` the writer it has never had: a merchant of record (Paddle first, with
+  Stripe and Better Auth's Stripe plugin rejected in writing), one `Subscription` row per workspace,
+  a plan catalogue in code, an entitlement write that is a single transaction with its idempotency
+  ledger inside it, a grace period that deletes nothing, and a test proving that an instance with
+  `BILLING_PROVIDER` unset runs exactly what it runs today.
 - **Plan limits: ceilings on seats, boards, workspaces and accounts, unlimited until an operator
   sets one.** Four variables (`PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
   `PLAN_MAX_WORKSPACES`, `PLAN_MAX_USERS`) put a number on quantities the product never bounded.
