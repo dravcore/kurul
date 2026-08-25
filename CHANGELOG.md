@@ -222,6 +222,26 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   along with the non-atomic fallback path that used them; `consume` is the whole interface now,
   and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
   Redis outage fallback and the degraded-mode reporting are all unchanged.
+- **The self-hosting guide installs and upgrades from a release tag, with a runbook.**
+  `docs/self-hosting.md` now fetches `docker-compose.yml`, `docker/Caddyfile`,
+  `scripts/backup.sh` and `.env.example` from the `v0.3.0` tag URL rather than from `main`, so
+  the files and the images an install runs come from the same release, and `.env` gets
+  `chmod 600` on the way in. The Upgrading section is an ordered runbook, backup first: read the
+  CHANGELOG, `backup.sh once` and copy the pair off-host, re-fetch the files at the new tag (a
+  `pull` refreshes images and nothing else, so an install that never re-fetched kept a
+  `backup.sh` that ignores `BACKUP_REMOTE`), set `TAG`, `pull`, `up -d --wait`, `ps -a`,
+  `curl /api/health/ready`, then links to the rollback and restore drills in
+  `docs/development.md` instead of copies of them. A short "Release notes for operators" list
+  points at the CHANGELOG entries that ask something before `pull`. Two things moved with it.
+  `TRUST_PROXY` is forwarded by `docker-compose.yml` as `${TRUST_PROXY:-1}` and ships blank in
+  `.env.example`, so a CDN in front of `proxy` is a `.env` line rather than an edit to a file
+  the next upgrade replaces; an existing `.env` that still carries `TRUST_PROXY=false` from an
+  older `.env.example` must drop the line, or the API stops seeing client addresses behind
+  Caddy. And a new "Browser error tracking" section states that `NEXT_PUBLIC_SENTRY_*` are
+  compiled into the web image, that the published GHCR image ships without them, and that
+  enabling browser Sentry means building `web` from a clone, cross-linked from `.env.example`
+  and `docs/development.md`. The release process in `docs/git-strategy.md` gains the step that
+  bumps the tag on the page. Turkish mirrors updated in step.
 
 ### Fixed
 
@@ -303,6 +323,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   jittered, doubling retry for exactly those two cases, and a denied room join is retried with
   backoff instead of standing for the life of the socket — so the indicator now describes
   something that is actually happening.
+- **`docker/Caddyfile`'s header quoted the nginx body limit the same file warns against.** The
+  bring-your-own-proxy contract at the top of the file said the rule-2 body limit "matches"
+  the API's `ATTACHMENT_MAX_BYTES` (`client_max_body_size 25m;`), while the `request_body`
+  block further down sets `26MiB` and explains that a limit equal to the file size rejects a
+  file of exactly the published size, because the multipart envelope rides on top of it. The
+  header now says one MiB above and `26m`, the same figure as the nginx snippet in
+  `docs/self-hosting.md`.
 - **The nightly browser suite ran on `main`, not on `develop`.** GitHub runs a scheduled
   workflow on the repository's default branch, and the checkout step in
   `.github/workflows/e2e.yml` passed no `ref`, so every 03:00 UTC run re-tested the last

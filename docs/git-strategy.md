@@ -228,6 +228,9 @@ git switch -c release/0.2.0
 # 2. Bump the version in every package.json (root, apps/*, packages/*, e2e)
 #    and finalize CHANGELOG.md: rename [Unreleased] to [0.2.0] - YYYY-MM-DD,
 #    add a fresh empty [Unreleased] section on top.
+#    Bump the release tag in docs/self-hosting.md as well (the install URLs, the
+#    TAG and cosign examples) and in its docs/tr mirror: the operator page fetches
+#    its files from the tag, so the page and the release move together.
 git commit -am "chore(release): 0.2.0"
 
 # 3. Only release-blocking fixes may land on this branch.

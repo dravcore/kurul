@@ -234,6 +234,9 @@ git switch -c release/0.2.0
 # 2. Her package.json'da versiyonu bump'la (kök, apps/*, packages/*, e2e)
 #    ve CHANGELOG.md'yi finalize et: [Unreleased]'i [0.2.0] - YYYY-MM-DD olarak yeniden adlandır,
 #    en üste yeni bir boş [Unreleased] bölümü ekle.
+#    docs/self-hosting.md'deki release tag'ini de yükselt (kurulum URL'leri, TAG ve
+#    cosign örnekleri) ve docs/tr aynasını da: operatör sayfası dosyalarını tag'den
+#    indirir, bu yüzden sayfa ile release birlikte ilerler.
 git commit -am "chore(release): 0.2.0"
 
 # 3. Bu branch'e yalnızca release'i engelleyen fix'ler girebilir.
