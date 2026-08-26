@@ -77,7 +77,17 @@ describe('closeWorkerWithinTimeout', () => {
     // Read out of docker-compose.yml rather than hardcoded, so lowering `stop_grace_period`
     // without lowering this timeout fails here: the timeout has to leave the rest of the
     // shutdown (pool, Redis, mail, storage) room inside the grace period.
-    const compose = readFileSync(join(__dirname, '../../../../docker-compose.yml'), 'utf8');
+    const composePath = join(__dirname, '../../../../docker-compose.yml');
+    let compose: string;
+    try {
+      compose = readFileSync(composePath, 'utf8');
+    } catch (error) {
+      // This spec deliberately reaches out of apps/api to the repo root, so say which file went
+      // missing instead of leaving a bare ENOENT stack for the next person to decode.
+      throw new Error(`Expected the compose file at ${composePath}; fix this path if it moved`, {
+        cause: error,
+      });
+    }
     const apiStart = compose.indexOf('\n  api:\n');
     expect(apiStart).toBeGreaterThan(-1);
     // Bounded at the next service key so the value cannot be read off a different service.
