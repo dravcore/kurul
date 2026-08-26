@@ -398,7 +398,7 @@ function flatten(value: Record<string, unknown>, prefix = ''): Record<string, st
  * Nearest-rank for the percentile and a codepoint tie-break on the key, so the answer does not
  * move with the host's collation.
  */
-function longestAboveP90(count: number): string[] {
+function longestAboveP90(count: number): Array<{ key: string; ratio: number }> {
   const en = flatten(english as unknown as Record<string, unknown>);
   const tr = flatten(messages as unknown as Record<string, unknown>);
   const rows = Object.keys(en)
@@ -416,7 +416,7 @@ function longestAboveP90(count: number): string[] {
     .filter((row) => row.ratio > p90)
     .sort((a, b) => b.tr.length - a.tr.length || (a.key < b.key ? -1 : 1))
     .slice(0, count)
-    .map((row) => row.key);
+    .map((row) => ({ key: row.key, ratio: Math.round(row.ratio * 100) / 100 }));
 }
 
 interface LongString {
@@ -424,6 +424,11 @@ interface LongString {
   key: string;
   /** The file that puts this string on screen, and the file a case below renders it through. */
   screen: string;
+  /**
+   * `tr.length / en.length`, rounded to two decimals, computed the same way `longestAboveP90`
+   * computes it. Carried here so a reader sees why a short key still sits on this tail list.
+   */
+  ratio: number;
 }
 
 /** Longest Turkish string first; ties broken by key. Checked against the catalogues below. */
@@ -431,104 +436,232 @@ const LONGEST_TURKISH: readonly LongString[] = [
   {
     key: 'app.settings.workspace.renameErrorForbidden',
     screen: 'components/settings/rename-workspace-dialog.tsx',
+    ratio: 1.54,
   },
-  { key: 'app.board.task.labelForbidden', screen: 'components/task/task-metadata-panel.tsx' },
-  { key: 'app.board.column.forbidden', screen: 'components/board/board-placeholders.tsx' },
-  { key: 'app.board.import.forbidden', screen: 'components/board/import-trello-dialog.tsx' },
+  {
+    key: 'app.board.task.labelForbidden',
+    screen: 'components/task/task-metadata-panel.tsx',
+    ratio: 1.5,
+  },
+  {
+    key: 'app.board.column.forbidden',
+    screen: 'components/board/board-placeholders.tsx',
+    ratio: 1.56,
+  },
+  {
+    key: 'app.board.import.forbidden',
+    screen: 'components/board/import-trello-dialog.tsx',
+    ratio: 1.48,
+  },
   {
     key: 'app.board.import.setColumnCategories',
     screen: 'components/board/import-report-panel.tsx',
+    ratio: 1.69,
   },
-  { key: 'app.settings.members.seatUsage', screen: 'components/settings/members-settings.tsx' },
+  {
+    key: 'app.settings.members.seatUsage',
+    screen: 'components/settings/members-settings.tsx',
+    ratio: 1.57,
+  },
   {
     key: 'app.notifications.types.mention',
     screen: 'components/notification/notifications-list.tsx',
+    ratio: 1.55,
   },
-  { key: 'app.dashboard.emptyTitle', screen: 'components/dashboard/dashboard-summary.tsx' },
+  {
+    key: 'app.dashboard.emptyTitle',
+    screen: 'components/dashboard/dashboard-summary.tsx',
+    ratio: 1.55,
+  },
   {
     key: 'app.notifications.types.dueSoon',
     screen: 'components/notification/notifications-list.tsx',
+    ratio: 1.58,
   },
-  { key: 'app.board.column.useDefaults', screen: 'components/board/board-placeholders.tsx' },
-  { key: 'app.shell.confirmEmail', screen: 'components/auth/email-verification-link.tsx' },
-  { key: 'auth.confirmEmail.loading', screen: 'app/(auth)/verify-email/page.tsx' },
-  { key: 'auth.confirmEmail.pendingTitle', screen: 'components/auth/verify-email-view.tsx' },
-  { key: 'app.settings.tokens.createdAt', screen: 'components/settings/token-settings.tsx' },
-  { key: 'app.settings.tokens.expiresAt', screen: 'components/settings/token-settings.tsx' },
-  { key: 'app.settings.tokens.revokeTitle', screen: 'components/settings/revoke-token-dialog.tsx' },
+  {
+    key: 'app.board.column.useDefaults',
+    screen: 'components/board/board-placeholders.tsx',
+    ratio: 1.53,
+  },
+  {
+    key: 'app.shell.confirmEmail',
+    screen: 'components/auth/email-verification-link.tsx',
+    ratio: 1.61,
+  },
+  { key: 'auth.confirmEmail.loading', screen: 'app/(auth)/verify-email/page.tsx', ratio: 1.53 },
+  {
+    key: 'auth.confirmEmail.pendingTitle',
+    screen: 'components/auth/verify-email-view.tsx',
+    ratio: 1.61,
+  },
+  {
+    key: 'app.settings.tokens.createdAt',
+    screen: 'components/settings/token-settings.tsx',
+    ratio: 2.0,
+  },
+  {
+    key: 'app.settings.tokens.expiresAt',
+    screen: 'components/settings/token-settings.tsx',
+    ratio: 2.0,
+  },
+  {
+    key: 'app.settings.tokens.revokeTitle',
+    screen: 'components/settings/revoke-token-dialog.tsx',
+    ratio: 1.56,
+  },
   {
     key: 'app.settings.workspace.renameTitle',
     screen: 'components/settings/rename-workspace-dialog.tsx',
+    ratio: 1.75,
   },
-  { key: 'app.dashboard.assigneeTitle', screen: 'components/dashboard/assignee-chart.tsx' },
-  { key: 'app.settings.members.copiedLink', screen: 'components/settings/members-settings.tsx' },
-  { key: 'app.board.column.emptyDrop', screen: 'components/board/board-column.tsx' },
-  { key: 'app.board.task.dragHandle', screen: 'components/task/sortable-task-card.tsx' },
-  { key: 'app.board.renameTitle', screen: 'components/board/rename-board-dialog.tsx' },
-  { key: 'auth.login.loading', screen: 'app/(auth)/login/page.tsx' },
-  { key: 'auth.register.loading', screen: 'app/(auth)/register/page.tsx' },
-  { key: 'app.dashboard.viewChart', screen: 'components/dashboard/chart-table-toggle.tsx' },
-  { key: 'app.shell.expandSidebar', screen: 'components/layout/app-sidebar.tsx' },
-  { key: 'app.dashboard.viewTable', screen: 'components/dashboard/chart-table-toggle.tsx' },
+  {
+    key: 'app.dashboard.assigneeTitle',
+    screen: 'components/dashboard/assignee-chart.tsx',
+    ratio: 1.59,
+  },
+  {
+    key: 'app.settings.members.copiedLink',
+    screen: 'components/settings/members-settings.tsx',
+    ratio: 1.5,
+  },
+  { key: 'app.board.column.emptyDrop', screen: 'components/board/board-column.tsx', ratio: 1.56 },
+  {
+    key: 'app.board.task.dragHandle',
+    screen: 'components/task/sortable-task-card.tsx',
+    ratio: 1.67,
+  },
+  { key: 'app.board.renameTitle', screen: 'components/board/rename-board-dialog.tsx', ratio: 2.0 },
+  { key: 'auth.login.loading', screen: 'app/(auth)/login/page.tsx', ratio: 1.5 },
+  { key: 'auth.register.loading', screen: 'app/(auth)/register/page.tsx', ratio: 1.5 },
+  {
+    key: 'app.dashboard.viewChart',
+    screen: 'components/dashboard/chart-table-toggle.tsx',
+    ratio: 1.77,
+  },
+  { key: 'app.shell.expandSidebar', screen: 'components/layout/app-sidebar.tsx', ratio: 1.64 },
+  {
+    key: 'app.dashboard.viewTable',
+    screen: 'components/dashboard/chart-table-toggle.tsx',
+    ratio: 1.69,
+  },
   {
     key: 'app.notifications.markAllRead',
     screen: 'components/notification/notifications-list.tsx',
+    ratio: 1.69,
   },
-  { key: 'app.board.column.settingsAction', screen: 'components/board/column-settings-dialog.tsx' },
-  { key: 'app.notifications.unreadOnly', screen: 'components/notification/notifications-list.tsx' },
+  {
+    key: 'app.board.column.settingsAction',
+    screen: 'components/board/column-settings-dialog.tsx',
+    ratio: 1.75,
+  },
+  {
+    key: 'app.notifications.unreadOnly',
+    screen: 'components/notification/notifications-list.tsx',
+    ratio: 1.91,
+  },
   {
     key: 'app.settings.members.removeTitle',
     screen: 'components/settings/remove-member-dialog.tsx',
+    ratio: 1.5,
   },
-  { key: 'app.settings.members.copyLink', screen: 'components/settings/members-settings.tsx' },
-  { key: 'app.settings.tokens.copied', screen: 'components/settings/token-created-dialog.tsx' },
-  { key: 'common.deletedUser', screen: 'components/task/task-activity-section.tsx' },
+  {
+    key: 'app.settings.members.copyLink',
+    screen: 'components/settings/members-settings.tsx',
+    ratio: 2.0,
+  },
+  {
+    key: 'app.settings.tokens.copied',
+    screen: 'components/settings/token-created-dialog.tsx',
+    ratio: 1.5,
+  },
+  { key: 'common.deletedUser', screen: 'components/task/task-activity-section.tsx', ratio: 1.5 },
   {
     key: 'app.notifications.typeDueSoon',
     screen: 'components/notification/notifications-list.tsx',
+    ratio: 2.13,
   },
-  { key: 'app.settings.tokens.expiryLabel', screen: 'components/settings/create-token-dialog.tsx' },
-  { key: 'app.board.renameAction', screen: 'components/board/rename-board-dialog.tsx' },
-  { key: 'app.notifications.loadMore', screen: 'components/notification/notifications-list.tsx' },
-  { key: 'app.settings.tokens.lastUsedNever', screen: 'components/settings/token-settings.tsx' },
+  {
+    key: 'app.settings.tokens.expiryLabel',
+    screen: 'components/settings/create-token-dialog.tsx',
+    ratio: 2.83,
+  },
+  {
+    key: 'app.board.renameAction',
+    screen: 'components/board/rename-board-dialog.tsx',
+    ratio: 2.67,
+  },
+  {
+    key: 'app.notifications.loadMore',
+    screen: 'components/notification/notifications-list.tsx',
+    ratio: 1.78,
+  },
+  {
+    key: 'app.settings.tokens.lastUsedNever',
+    screen: 'components/settings/token-settings.tsx',
+    ratio: 1.6,
+  },
   {
     key: 'app.settings.workspace.renameAction',
     screen: 'components/settings/rename-workspace-dialog.tsx',
+    ratio: 2.67,
   },
-  { key: 'app.board.task.attachments.linkUrl', screen: 'components/task/attachment-add-link.tsx' },
-  { key: 'auth.confirmEmail.registerLink', screen: 'components/auth/verify-email-view.tsx' },
-  { key: 'auth.invite.submitPending', screen: 'components/auth/invite-accept-view.tsx' },
-  { key: 'auth.login.registerLink', screen: 'components/auth/login-view.tsx' },
-  { key: 'auth.emailConfirmation.sending', screen: 'components/auth/verification-resend.tsx' },
+  {
+    key: 'app.board.task.attachments.linkUrl',
+    screen: 'components/task/attachment-add-link.tsx',
+    ratio: 1.88,
+  },
+  {
+    key: 'auth.confirmEmail.registerLink',
+    screen: 'components/auth/verify-email-view.tsx',
+    ratio: 1.5,
+  },
+  {
+    key: 'auth.invite.submitPending',
+    screen: 'components/auth/invite-accept-view.tsx',
+    ratio: 1.5,
+  },
+  { key: 'auth.login.registerLink', screen: 'components/auth/login-view.tsx', ratio: 1.5 },
+  {
+    key: 'auth.emailConfirmation.sending',
+    screen: 'components/auth/verification-resend.tsx',
+    ratio: 1.63,
+  },
   {
     key: 'app.board.column.categoryOption.CANCELED',
     screen: 'components/board/column-settings-dialog.tsx',
+    ratio: 1.5,
   },
-  { key: 'app.dashboard.seriesCreated', screen: 'components/dashboard/completion-chart.tsx' },
-  { key: 'auth.register.loginLink', screen: 'components/auth/register-view.tsx' },
-  { key: 'app.board.task.labels', screen: 'components/task/task-labels-section.tsx' },
-  { key: 'app.dashboard.boardsTitle', screen: 'app/(app)/dashboard/page.tsx' },
+  {
+    key: 'app.dashboard.seriesCreated',
+    screen: 'components/dashboard/completion-chart.tsx',
+    ratio: 1.57,
+  },
+  { key: 'auth.register.loginLink', screen: 'components/auth/register-view.tsx', ratio: 1.57 },
+  { key: 'app.board.task.labels', screen: 'components/task/task-labels-section.tsx', ratio: 1.5 },
+  { key: 'app.dashboard.boardsTitle', screen: 'app/(app)/dashboard/page.tsx', ratio: 1.5 },
 ];
 
 /**
- * Which of those screens clip anything at all, and what the clipped element carries.
+ * Which of those screens clip anything at all.
  *
  * Only one of the fifty sits on a clipping element: the token row's meta line. Everywhere else
  * the ellipsis is over user data, where the length of a Turkish catalogue string cannot make it
  * worse. `truncate and line-clamp are only where this file recorded them` re-derives this from
  * the sources, so a new `truncate` landing on any of the fifty screens fails rather than passing
  * unread.
+ *
+ * `messages/en.json` and `messages/tr.json` were deliberately not edited by this pass: no string
+ * on the list above was found clipped.
  */
-const CLIPPING_SCREENS: Readonly<Record<string, string>> = {
-  'components/board/board-column.tsx': 'the column name, which is user data',
-  'components/settings/members-settings.tsx':
-    'a member name and an invited address, both user data',
-  'components/settings/token-settings.tsx':
-    'the token name (user data) and the meta line, which carries app.settings.tokens.createdAt, .lastUsedNever and .expiresAt',
-  'components/task/sortable-task-card.tsx':
-    'the task title in the drag preview, which is user data',
-  'components/task/task-labels-section.tsx': 'a label name, which is user data',
-};
+const CLIPPING_SCREENS: readonly string[] = [
+  'components/board/board-column.tsx', // the column name, which is user data
+  'components/settings/members-settings.tsx', // a member name and an invited address, both user data
+  // the token name (user data) and the meta line, which carries app.settings.tokens.createdAt,
+  // .lastUsedNever and .expiresAt
+  'components/settings/token-settings.tsx',
+  'components/task/sortable-task-card.tsx', // the task title in the drag preview, which is user data
+  'components/task/task-labels-section.tsx', // a label name, which is user data
+];
 
 /** Fills the simple `{name}` placeholders of an ICU message, so expectations stay derived. */
 function fill(message: string, values: Readonly<Record<string, string | number>>): string {
@@ -540,11 +673,11 @@ function fill(message: string, values: Readonly<Record<string, string | number>>
 
 /** Like `tr`, plus the toast surface the root layout mounts outside every screen. */
 function trToasts(children: React.ReactNode): React.ReactElement {
-  return (
-    <NextIntlClientProvider locale="tr" messages={messages}>
+  return tr(
+    <>
       {children}
       <Toaster />
-    </NextIntlClientProvider>
+    </>,
   );
 }
 
@@ -1526,7 +1659,7 @@ describe('the fifty longest Turkish strings', () => {
   // future edit is likeliest to take.
   it('is the list this file writes down', () => {
     expect(LONGEST_TURKISH).toHaveLength(50);
-    expect(longestAboveP90(50)).toEqual(LONGEST_TURKISH.map(({ key }) => key));
+    expect(longestAboveP90(50)).toEqual(LONGEST_TURKISH.map(({ key, ratio }) => ({ key, ratio })));
   });
 
   it('truncate and line-clamp are only where this file recorded them', () => {
@@ -1537,7 +1670,7 @@ describe('the fifty longest Turkish strings', () => {
       )
       .sort();
 
-    expect(clipping).toEqual(Object.keys(CLIPPING_SCREENS).sort());
+    expect(clipping).toEqual([...CLIPPING_SCREENS].sort());
   });
 
   it.each(SCREEN_CHECKS)('are drawn in Turkish on $screen', async ({ run }) => {

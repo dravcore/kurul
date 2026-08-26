@@ -109,7 +109,11 @@ describe('TokenSettings: listing', () => {
 });
 
 describe('TokenSettings: copper budget', () => {
-  it('renders the create action as outline, not primary: /settings already spends its one primary button on "Invite member" (docs/design.md §2)', async () => {
+  /**
+   * `/settings` already spends its one primary button on "Invite member", so a second primary
+   * button here would break the one-primary-per-screen budget docs/design.md §2 sets.
+   */
+  it('renders the create action as outline, not primary', async () => {
     renderSection();
 
     const createButton = await screen.findByRole('button', { name: copy.createAction });

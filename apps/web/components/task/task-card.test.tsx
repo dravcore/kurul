@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import { DndContext } from '@dnd-kit/core';
 import { NextIntlClientProvider } from 'next-intl';
 import { Priority, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
+import { SortableTaskCard } from './sortable-task-card';
 import { TaskCard } from './task-card';
 
 vi.mock('next/link', () => ({
@@ -177,5 +179,26 @@ describe('TaskCard attachment badge', () => {
     renderCard({ attachmentCount: 0 });
 
     expect(screen.queryByLabelText(/attachment/)).toBeNull();
+  });
+});
+
+describe('SortableTaskCard drag grip', () => {
+  /**
+   * `sortable-task-card.tsx` is not one of the seven files `app/globals-css-layers.test.ts`'s
+   * `singleIndicatorTargets` scans, so nothing else catches a stray outline or ring utility
+   * landing on the grip button; this assertion is what does.
+   */
+  it('draws no outline or ring utility of its own', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <DndContext>
+          <SortableTaskCard task={task()} boardId="board-1" />
+        </DndContext>
+      </NextIntlClientProvider>,
+    );
+
+    const grip = screen.getByRole('button', { name: 'Reorder Task' });
+
+    expect(grip.className).not.toMatch(/outline-(none|hidden)|ring-\[3px\]|ring-ring/);
   });
 });

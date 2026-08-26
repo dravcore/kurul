@@ -47,6 +47,21 @@ describe('DialogContent', () => {
     expect(content.className).toContain('bg-popover');
     expect(content.className).not.toContain('bg-background');
   });
+
+  /**
+   * `dialog.tsx` is not one of the seven files `app/globals-css-layers.test.ts`'s
+   * `singleIndicatorTargets` scans: `DialogContent` itself legitimately carries `outline-none`
+   * (it is a programmatic focus container, docs/design.md's Keyboard baseline), and a whole-file
+   * text scan cannot separate that from a stray suppressor on the close button beside it. This
+   * assertion covers the close button on its own.
+   */
+  it('draws no outline or ring utility of its own on the close button', () => {
+    renderDialog();
+
+    const close = document.querySelector('[data-slot="dialog-close"]');
+
+    expect(close?.className).not.toMatch(/outline-(none|hidden)|ring-\[3px\]|ring-ring/);
+  });
 });
 
 /**

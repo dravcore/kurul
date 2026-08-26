@@ -219,8 +219,13 @@ describe('CreateBoardDialog', () => {
     expect(cardOf('Kanban').has('border-signature')).toBe(false);
   });
 
-  /** The radio is a visible control and takes the outline itself, so the card around it draws
-   * nothing: a `focus-within:` edge on the label would be a second mark around the first. */
+  /**
+   * The radio is a visible control and takes the outline itself, so the card around it draws
+   * nothing: a `focus-within:` edge on the label would be a second mark around the first. Nor is
+   * the label itself covered by `app/globals-css-layers.test.ts`'s `singleIndicatorTargets` scan,
+   * since `create-board-dialog.tsx` is not one of its seven files, so a stray outline or ring
+   * utility landing on the label would pass that scan unnoticed without this assertion.
+   */
   it('leaves the focus mark to the radio on every template card', async () => {
     renderDialog();
     await expandTemplates();
@@ -228,6 +233,7 @@ describe('CreateBoardDialog', () => {
     for (const name of ['Kanban', 'Bug Triage']) {
       const label = radio(name).closest('label');
       expect(label?.className).not.toMatch(/\bfocus-within:/);
+      expect(label?.className).not.toMatch(/outline-(none|hidden)|ring-\[3px\]|ring-ring/);
     }
   });
 

@@ -179,6 +179,9 @@ function tooSmall(targets: Target[]): Target[] {
 /** 16px: the font-size below which iOS Safari zooms the page when a field is focused. */
 const IOS_ZOOM_THRESHOLD_PX = '16px';
 
+/** 12px: `--text-small`, the step the board search box's own `md:text-small` resolves to. */
+const DESKTOP_SEARCH_FONT_SIZE_PX = '12px';
+
 interface FieldFontSize {
   name: string;
   fontSize: string;
@@ -296,6 +299,20 @@ test('at the md boundary the desktop shell is unchanged', async ({ stack, openAs
     'the trigger is rendered at every width, and hidden above md',
   ).toHaveCount(1);
   await expect(hamburger).toBeHidden();
+
+  // The board's only text field at this width is still the search box
+  // (`board-filter-search.tsx`), which carries its own `md:text-small` step rather than the
+  // `Input` primitive's default `md:text-body`: a consumer override that wins the `cn()` merge,
+  // the same fact the 360px sweep's comment below records for the mobile side of that class.
+  const fields = await fieldFontSizes(page);
+  expect(
+    fields.length,
+    'the md-boundary font-size sweep found nothing to measure',
+  ).toBeGreaterThanOrEqual(1);
+  expect(
+    wrongFontSize(fields, DESKTOP_SEARCH_FONT_SIZE_PX),
+    `text fields at the md boundary not at 12px (of ${fields.length} measured)`,
+  ).toEqual([]);
 });
 
 test('every interactive element on the mobile path is at least 44px', async ({ stack, openAs }) => {
