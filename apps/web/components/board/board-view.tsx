@@ -284,7 +284,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
 
         The connection line and `Loading the rest of the tasks…` used to sit in the topbar's
         action slot. At 360px that bar is a hamburger, a back arrow, a title and an overflow menu
-        — three 44px targets and whatever is left — and a sentence dropped in beside them either
+        (three 44px targets and whatever is left), and a sentence dropped in beside them either
         wrapped inside a fixed-height bar or squeezed the board's name to nothing. Here they
         wrap onto their own line when the row runs out of width and cost the title nothing.
 
