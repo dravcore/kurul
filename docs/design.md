@@ -349,21 +349,31 @@ box scrolls away with the content and is clipped by it.
 **Motion.** Purposeful micro-interactions only, **at most one orchestrated moment per view** —
 on the board that is the first paint of the columns, and nothing else.
 
-| Case                                                | Duration             | Curve                                                     |
-| --------------------------------------------------- | -------------------- | --------------------------------------------------------- |
-| Press feedback (`scale(0.97)`) · sancak rail moving | 100–160ms            | `--ease-out`                                              |
-| Tooltip, small popover                              | 125–200ms            | `--ease-out`                                              |
-| Dropdown, select, menu                              | 150–250ms            | `--ease-out`, `transform-origin: var(--transform-origin)` |
-| Detail panel, sheet                                 | 220ms                | `--ease-drawer`                                           |
-| Dialog · toast (`translateY(100%)`)                 | 200ms                | `--ease-out`, dialog origin centered                      |
-| Card returning after a failed drop                  | 220ms                | `--ease-in-out`                                           |
-| Column stagger on first board paint                 | 40ms between columns | `--ease-out`                                              |
+| Case                                                | Duration                      | Curve                                                     |
+| --------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
+| Press feedback (`scale(0.97)`) · sancak rail moving | 100–160ms                     | `--ease-out`                                              |
+| Tooltip, small popover                              | 125–200ms                     | `--ease-out`                                              |
+| Dropdown, select, menu                              | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
+| Detail panel, sheet                                 | 220ms                         | `--ease-drawer`                                           |
+| Dialog · toast (`translateY(100%)`)                 | 200ms                         | `--ease-out`, dialog origin centered                      |
+| Dialog scrim                                        | 200ms                         | `--ease-out`                                              |
+| Card returning after a failed drop                  | 220ms                         | `--ease-in-out`                                           |
+| Column stagger on first board paint                 | 40ms between columns          | `--ease-out`                                              |
+| Skeleton pulse (loop, not a one-shot transition)    | 1.6s, opacity 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
 
 ```css
 --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* entering, exiting, default */
 --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* moving on screen */
 --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* panel and sheet */
 ```
+
+All three curves above are real custom properties in `app/globals.css`, also exposed as
+Tailwind `ease-out`, `ease-in-out` and `ease-drawer` utilities through `@theme inline`, not
+only this table's notation. The dialog surface and its scrim, the dropdown and submenu, and
+the off-canvas drawer all bind their keyframes through `data-slot`/`data-state` in
+`app/globals.css` rather than a Tailwind animation-plugin class, since this project ships
+plain `tailwindcss` with no such plugin: those classes would compile to nothing and every
+open would cut instead of transition.
 
 - **No animation on keyboard-initiated actions** — the command palette opens instantly; it runs
   a hundred times a day and motion makes it feel slow.
@@ -375,6 +385,15 @@ on the board that is the first paint of the columns, and nothing else.
 - Nothing over 300ms except the panel. Gate hover motion behind `@media (hover: hover) and
 (pointer: fine)`. Springs (`{ duration: 0.5, bounce: 0.2 }`) only where a gesture carries
   velocity — drag preview, swipe-to-dismiss.
+- **Loop indicators sit outside the "nothing over 300ms" rule**: a skeleton's pulse (1.6s,
+  opacity 1.0 to 0.6 and back) and a loading button's spinner (700ms per rotation, linear, shown
+  only after 400ms) run continuously while work is in progress instead of once on enter or exit.
+  Both hold still under `prefers-reduced-motion: reduce`, the skeleton at a flat 0.75 opacity and
+  the spinner not spinning at all.
+- **Waiting for a response draws from exactly one mechanism**: `Button`'s `loading` prop,
+  `aria-busy` and `disabled` immediately, spinner after the 400ms threshold, label unchanged
+  throughout (§6 has the full shape). No screen swaps a control's label to a "sending" string of
+  its own.
 - **`prefers-reduced-motion: reduce`** drops movement and keeps opacity and color: the panel
   cross-fades, the rail jumps, the highlight is unchanged. Fewer and gentler, not zero.
 

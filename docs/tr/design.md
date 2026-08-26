@@ -360,21 +360,31 @@ tarafından kırpılır.
 **Motion.** Yalnızca amaçlı micro-interaction'lar, **view başına en fazla bir orchestrated an** —
 board'da bu, column'ların ilk paint'idir, başka hiçbir şey değil.
 
-| Durum                                                      | Süre                  | Curve                                                     |
-| ---------------------------------------------------------- | --------------------- | --------------------------------------------------------- |
-| Press feedback (`scale(0.97)`) · sancak rail'inin hareketi | 100–160ms             | `--ease-out`                                              |
-| Tooltip, küçük popover                                     | 125–200ms             | `--ease-out`                                              |
-| Dropdown, select, menu                                     | 150–250ms             | `--ease-out`, `transform-origin: var(--transform-origin)` |
-| Detay paneli, sheet                                        | 220ms                 | `--ease-drawer`                                           |
-| Dialog · toast (`translateY(100%)`)                        | 200ms                 | `--ease-out`, dialog origin ortalanmış                    |
-| Başarısız bir drop'tan sonra kartın geri dönmesi           | 220ms                 | `--ease-in-out`                                           |
-| İlk board paint'inde column stagger'ı                      | column'lar arası 40ms | `--ease-out`                                              |
+| Durum                                                      | Süre                          | Curve                                                     |
+| ---------------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
+| Press feedback (`scale(0.97)`) · sancak rail'inin hareketi | 100–160ms                     | `--ease-out`                                              |
+| Tooltip, küçük popover                                     | 125–200ms                     | `--ease-out`                                              |
+| Dropdown, select, menu                                     | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
+| Detay paneli, sheet                                        | 220ms                         | `--ease-drawer`                                           |
+| Dialog · toast (`translateY(100%)`)                        | 200ms                         | `--ease-out`, dialog origin ortalanmış                    |
+| Dialog perdesi                                             | 200ms                         | `--ease-out`                                              |
+| Başarısız bir drop'tan sonra kartın geri dönmesi           | 220ms                         | `--ease-in-out`                                           |
+| İlk board paint'inde column stagger'ı                      | column'lar arası 40ms         | `--ease-out`                                              |
+| Skeleton pulse (loop, tek seferlik bir transition değil)   | 1.6s, opaklık 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
 
 ```css
 --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* entering, exiting, default */
 --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* moving on screen */
 --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* panel and sheet */
 ```
+
+Yukarıdaki üç curve artık `app/globals.css` içinde gerçek birer custom property, `@theme
+inline` üzerinden Tailwind `ease-out`, `ease-in-out` ve `ease-drawer` utility'leri olarak da
+erişilebilir, yalnızca bu tablonun notasyonu değil. Dialog yüzeyi ve perdesi, dropdown ve
+submenu, off-canvas drawer, keyframe'lerini bir Tailwind animation plugin class'ı yerine
+`app/globals.css` içinde `data-slot`/`data-state` üzerinden bağlar, çünkü bu proje düz
+`tailwindcss` kullanır, böyle bir plugin yok: o class'lar hiçbir CSS üretmezdi ve her açılış
+transition yerine kesme olurdu.
 
 - **Keyboard-initiated aksiyonlarda animasyon yok** — command palette anında açılır; günde yüz
   kere çalışır ve motion onu yavaş hissettirir.
@@ -387,6 +397,15 @@ board'da bu, column'ların ilk paint'idir, başka hiçbir şey değil.
 - Panel hariç 300ms'i geçen hiçbir şey yok. Hover motion'ı `@media (hover: hover) and
 (pointer: fine)`'ın arkasına gate'le. Spring'ler (`{ duration: 0.5, bounce: 0.2 }`) yalnızca
   bir gesture'ın velocity taşıdığı yerlerde — drag preview, swipe-to-dismiss.
+- **Loop indicator'lar "300ms'i geçen hiçbir şey yok" kuralının dışında**: bir skeleton'un
+  pulse'ı (1.6s, opaklık 1.0'dan 0.6'ya ve geri) ve loading bir button'ın spinner'ı (rotation
+  başına 700ms, linear, yalnızca 400ms sonra görünür), work devam ederken enter veya exit'te bir
+  kez değil sürekli çalışır. İkisi de `prefers-reduced-motion: reduce` altında hareketsiz kalır:
+  skeleton sabit 0.75 opaklıkta, spinner ise hiç dönmeden.
+- **Bir yanıt beklenirken tam olarak tek bir mekanizma çalışır**: `Button`'ın `loading` prop'u,
+  `aria-busy` ve `disabled` anında, spinner 400ms eşiğinden sonra, label boyunca hiç değişmeden
+  (tam şekli §6'da). Hiçbir screen bir control'ün label'ını kendi "sending" ("gönderiliyor")
+  string'ine boyamaz.
 - **`prefers-reduced-motion: reduce`** hareketi düşürür ve opacity ile rengi korur: panel
   cross-fade olur, rail zıplar, highlight değişmeden kalır. Daha az ve daha nazik, sıfır değil.
 
