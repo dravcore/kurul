@@ -445,6 +445,16 @@ services:
     # reboot or daemon restart, not only after an in-container crash. `migrate` is the
     # deliberate exception: it is a one-shot job that must stay exited.
     restart: unless-stopped
+    # How long Docker waits between SIGTERM and SIGKILL. The default is 10s, and this API's
+    # shutdown does real work inside that window: `enableShutdownHooks` (apps/api/src/main.ts)
+    # closes the HTTP listener, then releases the pg pool, the Redis clients, the mail
+    # transport and the two BullMQ workers, and the worker close alone is allowed
+    # WORKER_CLOSE_TIMEOUT_MS (apps/api/src/common/close-worker.ts) before a running job is
+    # abandoned. A SIGKILL part-way through skips every hook that had not run yet, which is
+    # how an ordinary `docker compose up -d` ended up dropping in-flight requests and leaving
+    # a half-closed pool behind. 30s is comfortably above that budget and is still short
+    # enough that a stuck container does not stall an upgrade.
+    stop_grace_period: 30s
     logging: *logging
     <<: *hardened
     # `runner` (apps/api/Dockerfile) already runs as `USER node` (PR #109, SEC-02's other

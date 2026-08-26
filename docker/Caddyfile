@@ -83,7 +83,22 @@
 		request_body {
 			max_size 64KiB
 		}
-		reverse_proxy api:4000
+		reverse_proxy api:4000 {
+			# Hold a request while the upstream is restarting instead of answering 502. `api` is
+			# recreated on every `docker compose up -d`, and its healthcheck alone gives it a 15s
+			# start period (docker-compose.yml), so without this an upgrade is a stretch of errors
+			# for anyone mid-session rather than a stretch of latency. Caddy retries a request when
+			# it cannot reach the upstream, for up to this long, at this interval; a request whose
+			# body has already begun streaming is not retried, which is why an upload can still fail
+			# across a restart. 30s matches `stop_grace_period` on the API container, so the retry
+			# window covers the whole of a graceful shutdown plus the new container's start.
+			#
+			# This is the cheap half of zero-downtime deploys (#160/OPS-11), not the item itself:
+			# there is still one replica, so a request that arrives while nothing is listening waits
+			# rather than being served by a second instance.
+			lb_try_duration 30s
+			lb_try_interval 500ms
+		}
 	}
 
 	# The rest of the API — `/boards`, `/workspaces/*`, `/me`, `/health/*`, `/socket.io/*`.
@@ -128,13 +143,22 @@
 		request_body {
 			max_size 26MiB
 		}
-		reverse_proxy api:4000
+		# Same restart-retry window as the `/auth/*` handle above, which carries the reasoning.
+		reverse_proxy api:4000 {
+			lb_try_duration 30s
+			lb_try_interval 500ms
+		}
 	}
 
 	# Everything else is the Next.js app, including its `_next/*` assets and the auth proxy
 	# (`apps/web/proxy.ts`). Last, and unconditional, so a path that matched neither rule can never
 	# 404 here.
 	handle {
-		reverse_proxy web:3000
+		# Same restart-retry window, for the same reason: `web` is recreated by the same
+		# `docker compose up -d`.
+		reverse_proxy web:3000 {
+			lb_try_duration 30s
+			lb_try_interval 500ms
+		}
 	}
 }
