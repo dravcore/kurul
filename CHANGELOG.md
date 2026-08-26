@@ -358,6 +358,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A local `docker build` sent gigabytes of unrelated files into the build context, because
+  `.dockerignore`'s patterns were root-anchored.** Docker's ignore matcher treats a bare
+  pattern like `node_modules` as anchored to the context root, not as "match anywhere" the way
+  `.gitignore` does, so the old file's `node_modules`, `dist`, `.next` and `coverage` entries
+  only ever caught the repository's own top-level copies; every nested one under `apps/*`,
+  `packages/*` and any git worktree still went in through `COPY . .` in both Dockerfiles. On a
+  machine running several agent worktrees under the gitignored `.claude/` directory, that
+  directory alone measured 34 GB, none of it excluded, and a stale `dist` or `.next` from a
+  local build could get copied in ahead of the fresh one the image builds for itself.
+  `.dockerignore` is rewritten with `**/`-prefixed patterns for `node_modules`, `dist`,
+  `.next`, `coverage`, `.turbo`, `.cache` and `*.tsbuildinfo`, plus explicit entries for
+  `.claude`, `.superpowers`, `.nodeterm`, `.cursor`, `.vscode`, `docs`, `e2e`, `.github`,
+  `docker-compose.override.yml`, `rclone.env` and `rclone.conf`, none of which either
+  Dockerfile reads. Measured on this checkout, the context BuildKit reports for
+  `apps/api/Dockerfile` and `apps/web/Dockerfile` drops from roughly 36.4 GB to 5.9 MB, and
+  both images still build their `build` stage end to end. CI is unaffected: the runner already
+  builds from a clean checkout with none of these directories present.
+
 - **A Trello import no longer steps over the workspace's board ceiling.**
   `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on
   `POST .../boards` but not on `POST .../imports/trello`, which creates its board by its own
