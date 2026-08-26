@@ -266,6 +266,18 @@ disagree (`redis://host:6379/3?db=4`), is refused at connection time rather than
 as 0 — the whole point of the setting is keeping two apps apart, so a typo in it must not put
 them together.
 
+**A Redis 6+ ACL user and `rediss://` (TLS) are both honoured.** `redis://alice:s3cret@host:6379`
+authenticates as `alice` with `s3cret` instead of as `default`, and `rediss://host:6379` opens
+a TLS connection instead of plaintext, for a managed Redis (Upstash, ElastiCache in-transit
+encryption, Redis Cloud) that expects either. Until
+[#204](https://github.com/dravcore/kurul/issues/204) both were silently dropped: the ACL
+username never reached ioredis, so the instance authenticated as `default` with the given
+password instead (which fails outright once `default` has no password of its own to match, and
+otherwise runs as the wrong user's permissions), and `rediss://` connected in plaintext with no
+warning. A scheme other than `redis:` or `rediss:` is refused at connection time, the same way
+an unparsable database index is. The bundled Compose stack is unaffected either way: it always
+builds a plain `redis://:password@redis:6379` for its own `redis` container.
+
 **Changing `POSTGRES_PASSWORD` on an existing `postgres_data` volume does not rotate the
 running database's password.** The official Postgres image only applies
 `POSTGRES_PASSWORD` during `initdb`, i.e. the first time a volume is created — editing `.env`
