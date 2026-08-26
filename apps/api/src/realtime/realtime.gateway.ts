@@ -1,4 +1,4 @@
-import { Logger, type OnModuleDestroy } from '@nestjs/common';
+import { Logger, type OnApplicationShutdown } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -36,7 +36,7 @@ type AuthedSocket = Socket & {
     credentials: true,
   },
 })
-export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnModuleDestroy {
+export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnApplicationShutdown {
   private readonly logger = new Logger(RealtimeGateway.name);
   private redisClients: Redis[] = [];
 
@@ -242,7 +242,13 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnMo
     }
   }
 
-  async onModuleDestroy(): Promise<void> {
+  /**
+   * Shutdown, not destroy: Nest closes the Socket.io server in the same step that closes the
+   * HTTP listener, and that step runs *after* every destroy hook (`main.ts`). Quitting the
+   * adapter's Redis pair from a destroy hook would therefore cut the fan-out under sockets
+   * that are still connected and still being served.
+   */
+  async onApplicationShutdown(): Promise<void> {
     await Promise.all(this.redisClients.map((client) => client.quit().catch(() => undefined)));
     this.redisClients = [];
   }

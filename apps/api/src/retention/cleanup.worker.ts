@@ -1,5 +1,6 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { Queue, Worker, type Job } from 'bullmq';
+import { closeWorkerWithinTimeout } from '../common/close-worker';
 import { envBool, envInt, envString } from '../common/env';
 import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
 import { captureServerError } from '../common/observability/sentry';
@@ -227,7 +228,7 @@ interface CleanupLogLine extends CleanupCounts {
  * Deletes rows the retention policy no longer allows the database to hold.
  *
  * Scheduled the same way as `notification/due-soon.worker.ts` — a BullMQ job scheduler on the
- * shared `REDIS_URL`, closed from `onModuleDestroy` — so the two scheduled jobs in this
+ * shared `REDIS_URL`, closed from `onApplicationShutdown`, so the two scheduled jobs in this
  * codebase behave identically under deploy and shutdown, and so a multi-replica deployment
  * gets one sweep per night rather than one per replica.
  *
@@ -238,7 +239,7 @@ interface CleanupLogLine extends CleanupCounts {
  * reachable by a caller. See ADR 0020.
  */
 @Injectable()
-export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
+export class CleanupWorker implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(CleanupWorker.name);
   private queue: Queue | null = null;
   private worker: Worker | null = null;
@@ -333,8 +334,13 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`retention cleanup worker registered (every ${REPEAT_EVERY_MS / 3600000}h)`);
   }
 
-  async onModuleDestroy(): Promise<void> {
-    await this.worker?.close();
+  /**
+   * Shutdown, not destroy: this worker holds a Redis connection and a Prisma client, and a
+   * destroy hook runs while the listener is still serving (`main.ts`). The wait is bounded
+   * because a sweep in flight can run for minutes - see `common/close-worker.ts`.
+   */
+  async onApplicationShutdown(): Promise<void> {
+    await closeWorkerWithinTimeout(this.worker, this.logger, 'retention cleanup worker');
     await this.queue?.close();
   }
 

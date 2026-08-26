@@ -25,8 +25,9 @@ const prisma = new PrismaClient({ adapter: createSharedPrismaAdapter() });
 
 // Better Auth's client borrows from the same pg pool as PrismaService. Hand its disconnect to
 // the pool's owner (`prisma/database.ts`) instead of tearing it down from AuthModule: Nest
-// does not order `onModuleDestroy` hooks, so a self-managed disconnect could land after the
-// pool had already been ended. `closeSharedDatabase` now drains this client first, always.
+// orders lifecycle hooks by module, not by provider, so a self-managed disconnect could land
+// after the pool had already been ended. `closeSharedDatabase` now drains this client first,
+// always.
 registerPoolConsumer(() => prisma.$disconnect());
 
 const betterAuthUrl = envString('BETTER_AUTH_URL', 'http://localhost:4000');

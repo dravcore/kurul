@@ -34,8 +34,27 @@ async function bootstrap(): Promise<void> {
   // paid for on every run. Off under NODE_ENV=production unless API_DOCS_ENABLED says otherwise
   // — the reasoning is on `openApiDocsEnabled`.
   serveOpenApi(app);
-  // Lets OnModuleDestroy hooks (PrismaService, DueSoonWorker) run on SIGTERM/SIGINT
-  // instead of the process being killed mid-connection.
+  // Runs Nest's close sequence on SIGTERM/SIGINT instead of the process dying mid-connection.
+  //
+  // That sequence has a boundary in the middle of it, and it is the whole reason this API
+  // splits its teardown across two hooks (@nestjs/core `NestApplicationContext.close` and
+  // `NestApplication.dispose`, verified against 11.2.1):
+  //
+  //   onModuleDestroy -> beforeApplicationShutdown -> Socket.io and the HTTP listener close
+  //   -> onApplicationShutdown
+  //
+  // So the rule for this codebase is: anything a live request or an open socket still needs -
+  // the shared pg pool, the Redis clients, the mail transport, the storage backend, the BullMQ
+  // workers - is released in `onApplicationShutdown`, never in `onModuleDestroy`, because a
+  // destroy hook runs while the listener is still accepting and serving. No class is named
+  // here on purpose: `grep -rn onApplicationShutdown apps/api/src` is the current list, and a
+  // list written down in a comment is one that goes stale.
+  //
+  // Within a phase Nest orders modules by their distance from the root, and every global module
+  // is given `Number.MAX_VALUE` for that distance (@nestjs/core `injector/container.js`), so a
+  // global module's hooks run first on startup and last on shutdown. That is what puts
+  // `PrismaModule`'s pool teardown after the workers', which is the order the bounded worker
+  // close in `common/close-worker.ts` relies on.
   app.enableShutdownHooks();
   await app.listen(port);
 }

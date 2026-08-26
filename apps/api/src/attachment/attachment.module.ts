@@ -86,7 +86,7 @@ import { UploadBudgetGuard } from './upload-budget.guard';
   controllers: [AttachmentController],
   // The budget store is a provider here and not a global one: the upload route is its only
   // consumer, and the module that owns the route is the one that should own the connection's
-  // lifecycle (`UploadBudgetService.onModuleDestroy`).
+  // lifecycle (`UploadBudgetService.onApplicationShutdown`).
   providers: [AttachmentService, AttachmentDownloadService, UploadBudgetService, UploadBudgetGuard],
 })
 export class AttachmentModule {}
