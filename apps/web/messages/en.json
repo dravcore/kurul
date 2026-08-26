@@ -315,6 +315,7 @@
         "loadError": "Your account details couldn't load.",
         "deleteSectionTitle": "Delete your account",
         "deleteSectionBody": "Removes you from every workspace on this server and takes your name off everything you wrote. This cannot be undone.",
+        "deletePageTitle": "Delete your account",
         "deleteAction": "Delete account",
         "deleteTitle": "Delete your account?",
         "deleteBody": "You will be signed out and removed from every workspace here. Your name and email are erased. This cannot be undone.",

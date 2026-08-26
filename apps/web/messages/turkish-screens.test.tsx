@@ -55,7 +55,7 @@ import { AppSidebar } from '@/components/layout/app-sidebar';
 import { NotificationUnreadProvider } from '@/components/notification/notification-unread-provider';
 import { NotificationsList } from '@/components/notification/notifications-list';
 import { CreateTokenDialog } from '@/components/settings/create-token-dialog';
-import { DeleteAccountDialog } from '@/components/settings/delete-account-dialog';
+import { DeleteAccountSettings } from '@/components/settings/delete-account-settings';
 import { InviteMemberDialog } from '@/components/settings/invite-member-dialog';
 import { MembersSettings } from '@/components/settings/members-settings';
 import { RemoveMemberDialog } from '@/components/settings/remove-member-dialog';
@@ -258,11 +258,12 @@ describe('the Turkish interface', () => {
   });
 
   /**
-   * The account-deletion dialog, and it is here rather than only in its own spec because both
-   * of its sentences are ICU plurals over a count — `retained` and `ownedWorkspace` — which is
-   * exactly the shape `catalog.test.ts` can prove complete and cannot prove renders.
+   * The account-deletion route's settings surface, and it is here rather than only in its own
+   * spec because both of its sentences are ICU plurals over a count — `retained` and
+   * `ownedWorkspace` — which is exactly the shape `catalog.test.ts` can prove complete and
+   * cannot prove renders.
    */
-  it('renders the account-deletion dialog in Turkish, with Turkish plural forms', async () => {
+  it('renders the account-deletion settings in Turkish, with Turkish plural forms', async () => {
     const { api } = await import('@/lib/api');
     vi.mocked(api.get).mockResolvedValue({
       userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d20',
@@ -280,7 +281,7 @@ describe('the Turkish interface', () => {
       retainedContent: { comments: 3, tasksCreated: 2, attachments: 0, activities: 9 },
     } as never);
 
-    render(tr(<DeleteAccountDialog open onOpenChange={vi.fn()} email="ada@example.com" />));
+    render(tr(<DeleteAccountSettings />));
 
     await waitFor(() => {
       expect(screen.getByText(messages.app.settings.account.ownedTitle)).toBeDefined();

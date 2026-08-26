@@ -1,10 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { MemberRole, type AccountDeletionPreviewDto } from '@kurul/shared-types';
+import { MemberRole, type AccountDeletionPreviewDto, type UserDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { ApiError, api } from '@/lib/api';
-import { DeleteAccountDialog } from './delete-account-dialog';
+import { DeleteAccountSettings } from './delete-account-settings';
 
 const copy = messages.app.settings.account;
 
@@ -27,6 +27,18 @@ const apiDelete = vi.mocked(api.delete);
 const EMAIL = 'ada@example.com';
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00';
 const CANDIDATE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d01';
+
+function user(email = EMAIL): UserDto {
+  return {
+    id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1dee',
+    email,
+    name: 'Ada',
+    avatarUrl: null,
+    locale: null,
+    emailNotifications: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  };
+}
 
 function preview(overrides: Partial<AccountDeletionPreviewDto> = {}): AccountDeletionPreviewDto {
   return {
@@ -60,18 +72,21 @@ function apiFailure(statusCode: number): ApiError {
   return new ApiError({ statusCode, error: 'Conflict', message: 'server wording, never shown' });
 }
 
+/** Routes `api.get` by path, the way the real client dispatches `/me` and the preview. */
+function mockApiGet(previewValue: AccountDeletionPreviewDto, userValue: UserDto = user()): void {
+  apiGet.mockImplementation((path: string) => {
+    if (path === '/me') return Promise.resolve(userValue as never);
+    return Promise.resolve(previewValue as never);
+  });
+}
+
 beforeAll(() => {
-  // Radix Dialog measures its content; jsdom ships none of the APIs it probes for.
-  globalThis.ResizeObserver ??= class {
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
-  };
   Element.prototype.scrollIntoView ??= vi.fn();
 });
 
 beforeEach(() => {
-  apiGet.mockReset().mockResolvedValue(preview() as never);
+  apiGet.mockReset();
+  mockApiGet(preview());
   apiDelete.mockReset();
   routerReplace.mockReset();
   routerRefresh.mockReset();
@@ -83,14 +98,12 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderDialog() {
-  const onOpenChange = vi.fn();
-  render(
+function renderSettings() {
+  return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <DeleteAccountDialog open onOpenChange={onOpenChange} email={EMAIL} />
+      <DeleteAccountSettings />
     </NextIntlClientProvider>,
   );
-  return { onOpenChange };
 }
 
 const confirmField = async (): Promise<HTMLInputElement> =>
@@ -98,9 +111,24 @@ const confirmField = async (): Promise<HTMLInputElement> =>
 const deleteButton = (): HTMLButtonElement =>
   screen.getByRole('button', { name: copy.deleteAction }) as HTMLButtonElement;
 
-describe('DeleteAccountDialog', () => {
+describe('DeleteAccountSettings', () => {
+  it('renders the heading and lead as page content, not dialog chrome', async () => {
+    renderSettings();
+
+    expect(await screen.findByRole('heading', { name: copy.deleteTitle })).toBeTruthy();
+    expect(screen.getByText(copy.deleteBody)).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('cancels back to the settings screen with a link, not a dialog close', async () => {
+    renderSettings();
+
+    const cancel = await screen.findByRole('link', { name: copy.cancel });
+    expect(cancel.getAttribute('href')).toBe('/settings');
+  });
+
   it('keeps the delete button disabled until the address is typed exactly', async () => {
-    renderDialog();
+    renderSettings();
 
     expect(deleteButton().disabled).toBe(true);
 
@@ -113,7 +141,7 @@ describe('DeleteAccountDialog', () => {
 
   it('deletes, drops the socket and sends the user to sign-in', async () => {
     apiDelete.mockResolvedValue(undefined as never);
-    const { onOpenChange } = renderDialog();
+    renderSettings();
 
     fireEvent.change(await confirmField(), { target: { value: EMAIL } });
     fireEvent.click(deleteButton());
@@ -127,15 +155,36 @@ describe('DeleteAccountDialog', () => {
     });
 
     expect(disconnectSocket).toHaveBeenCalled();
-    expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(routerReplace).toHaveBeenCalledWith('/login');
     expect(routerRefresh).toHaveBeenCalled();
   });
 
+  it('marks the delete button busy while the request is out, on Button loading', async () => {
+    let settle = (): void => {};
+    apiDelete.mockReturnValue(
+      new Promise((resolve) => {
+        settle = () => resolve(undefined);
+      }),
+    );
+    renderSettings();
+
+    fireEvent.change(await confirmField(), { target: { value: EMAIL } });
+    fireEvent.click(deleteButton());
+
+    // The waiting state is `Button`'s one mechanism (docs/design.md §5): busy and disabled,
+    // and the label keeps reading `deleteAction` rather than a second string of its own.
+    await waitFor(() => expect(deleteButton().getAttribute('aria-busy')).toBe('true'));
+    expect(deleteButton().disabled).toBe(true);
+    expect(deleteButton().textContent).toBe(copy.deleteAction);
+
+    settle();
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/login'));
+  });
+
   describe('a workspace the user solely owns', () => {
     it('will not submit until the workspace has a decision, even with the address typed', async () => {
-      apiGet.mockResolvedValue(soleOwned([{ userId: CANDIDATE_ID, name: 'Grace' }]) as never);
-      renderDialog();
+      mockApiGet(soleOwned([{ userId: CANDIDATE_ID, name: 'Grace' }]));
+      renderSettings();
 
       fireEvent.change(await confirmField(), { target: { value: EMAIL } });
 
@@ -147,9 +196,9 @@ describe('DeleteAccountDialog', () => {
     });
 
     it('sends a transfer disposition naming the chosen member', async () => {
-      apiGet.mockResolvedValue(soleOwned([{ userId: CANDIDATE_ID, name: 'Grace' }]) as never);
+      mockApiGet(soleOwned([{ userId: CANDIDATE_ID, name: 'Grace' }]));
       apiDelete.mockResolvedValue(undefined as never);
-      renderDialog();
+      renderSettings();
 
       const select = (await screen.findByLabelText(
         copy.ownedWorkspace
@@ -175,9 +224,9 @@ describe('DeleteAccountDialog', () => {
     });
 
     it('sends a delete disposition when that is what was chosen', async () => {
-      apiGet.mockResolvedValue(soleOwned([{ userId: CANDIDATE_ID, name: 'Grace' }]) as never);
+      mockApiGet(soleOwned([{ userId: CANDIDATE_ID, name: 'Grace' }]));
       apiDelete.mockResolvedValue(undefined as never);
-      renderDialog();
+      renderSettings();
 
       const select = (await screen.findAllByRole('combobox'))[0] as HTMLSelectElement;
       fireEvent.change(select, { target: { value: 'delete' } });
@@ -192,8 +241,8 @@ describe('DeleteAccountDialog', () => {
     });
 
     it('says so when there is nobody to hand the workspace to, and offers only deletion', async () => {
-      apiGet.mockResolvedValue(soleOwned([]) as never);
-      renderDialog();
+      mockApiGet(soleOwned([]));
+      renderSettings();
 
       expect(await screen.findByText(copy.ownedNobodyLeft)).toBeTruthy();
       const select = (await screen.findAllByRole('combobox'))[0] as HTMLSelectElement;
@@ -203,10 +252,20 @@ describe('DeleteAccountDialog', () => {
     });
   });
 
+  describe('zero owned workspaces', () => {
+    it('renders no owned-workspace list at all', async () => {
+      renderSettings();
+
+      await confirmField();
+      expect(screen.queryByText(copy.ownedTitle)).toBeNull();
+      expect(screen.queryByRole('combobox')).toBeNull();
+    });
+  });
+
   describe('failures', () => {
     it('shows the scoped 409 wording and never the raw server message', async () => {
       apiDelete.mockRejectedValue(apiFailure(409));
-      renderDialog();
+      renderSettings();
 
       fireEvent.change(await confirmField(), { target: { value: EMAIL } });
       fireEvent.click(deleteButton());
@@ -218,7 +277,7 @@ describe('DeleteAccountDialog', () => {
 
     it('shows the scoped 403 wording when the confirmation address is refused', async () => {
       apiDelete.mockRejectedValue(apiFailure(403));
-      renderDialog();
+      renderSettings();
 
       fireEvent.change(await confirmField(), { target: { value: EMAIL } });
       fireEvent.click(deleteButton());
@@ -228,7 +287,7 @@ describe('DeleteAccountDialog', () => {
 
     it('announces the failed deletion to assistive tech and moves focus to it', async () => {
       apiDelete.mockRejectedValue(apiFailure(403));
-      renderDialog();
+      renderSettings();
 
       fireEvent.change(await confirmField(), { target: { value: EMAIL } });
       fireEvent.click(deleteButton());
@@ -238,9 +297,9 @@ describe('DeleteAccountDialog', () => {
       await waitFor(() => expect(document.activeElement).toBe(alert));
     });
 
-    it('refuses to offer the deletion at all when the preview could not load', async () => {
-      apiGet.mockRejectedValue(apiFailure(500));
-      renderDialog();
+    it('refuses to offer the deletion at all when nothing could load', async () => {
+      apiGet.mockReset().mockRejectedValue(apiFailure(500));
+      renderSettings();
 
       expect(await screen.findByText(copy.loadError)).toBeTruthy();
       // No confirmation field to fill in, so the button cannot be enabled: a deletion whose

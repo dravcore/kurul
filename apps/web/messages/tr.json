@@ -315,6 +315,7 @@
         "loadError": "Hesap bilgileriniz yüklenemedi.",
         "deleteSectionTitle": "Hesabınızı silin",
         "deleteSectionBody": "Sizi bu sunucudaki her workspace'ten çıkarır ve yazdığınız her şeyden adınızı kaldırır. Bu geri alınamaz.",
+        "deletePageTitle": "Hesabınızı silin",
         "deleteAction": "Hesabı sil",
         "deleteTitle": "Hesabınızı sil?",
         "deleteBody": "Oturumunuz kapatılacak ve buradaki her workspace'ten çıkarılacaksınız. Adınız ve e-posta adresiniz silinir. Bu geri alınamaz.",
