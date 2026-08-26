@@ -421,6 +421,10 @@
       "changeTemplate": "Şablonu değiştir",
       "changeTemplateWith": "{name} ile başlıyor",
       "boardMenu": "Board işlemleri",
+      "card": {
+        "dueAndEstimate": "{due} · {estimate}",
+        "moreAssignees": "+{count}"
+      },
       "import": {
         "action": "Trello'dan içe aktar",
         "title": "Trello'dan içe aktar",

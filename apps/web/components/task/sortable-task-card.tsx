@@ -56,11 +56,14 @@ export const SortableTaskCard = memo(function SortableTaskCard({
         //
         // `auto 56px` and not a bare length: `auto` makes Chrome remember each card's real
         // height once it has been rendered, so the column's scroll height settles instead of
-        // drifting as cards with labels or an assignee row turn out taller than the guess.
+        // drifting as cards with more metadata turn out taller than the guess.
         // 56px is the measured median card height on the seeded board (min 36 for a bare
-        // title, 76 with a label row and a due date) — a placeholder that is too tall is not
-        // free: at 76px the seeded column's scroll height came out ~35% longer than the cards
-        // it was standing in for, and the scrollbar visibly shrank as they were scrolled in.
+        // title). As of P6 task 5, label dots moved into the same `flex-nowrap` meta row as the
+        // due date, estimate and assignees, so a card carrying all of them still measures 56 on
+        // one line, not the ~76 a label row of its own used to add as a second row before that
+        // change. A placeholder that is too tall is not free: at that old 76px, the seeded
+        // column's scroll height came out ~35% longer than the cards it was standing in for,
+        // and the scrollbar visibly shrank as they were scrolled in.
         contentVisibility: 'auto',
         containIntrinsicSize: 'auto 56px',
       }}

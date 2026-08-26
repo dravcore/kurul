@@ -33,6 +33,20 @@ function todayUtcCalendarDay(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * One or two letters for an assignee's monogram. Left as-is rather than run through
+ * `toUpperCase()`: a plain `.charAt(0)` on a name that is already capitalized (every seeded and
+ * real name is) sidesteps the Turkish dotless-i case-mapping bug a locale-blind uppercase would
+ * hit on a name like "ilker".
+ */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  const first = parts[0]?.charAt(0) ?? '';
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.charAt(0) ?? '') : '';
+  return `${first}${last}`;
+}
+
 export function TaskCard({
   task,
   boardId,
@@ -40,9 +54,25 @@ export function TaskCard({
   className,
 }: TaskCardProps): React.ReactElement {
   const t = useTranslations('app.board.task');
+  const tCard = useTranslations('app.board.card');
   const locale = useLocale();
   const assigneeNames = task.assignees.map((assignee) => assignee.name).join(', ');
   const overdue = task.dueDate !== null && utcCalendarDay(task.dueDate) < todayUtcCalendarDay();
+
+  // `app.board.card.dueAndEstimate` is one ICU string, not two spans joined by a literal " · ":
+  // `docs/design.md` §7 rules out concatenating sentence fragments, since word order and the
+  // separator itself are language decisions. Falling back to whichever half exists keeps a card
+  // with only a due date or only an estimate exactly as it rendered before this merged.
+  const dueText = task.dueDate ? formatDueDate(task.dueDate, locale) : null;
+  const estimateText =
+    task.estimatedMinutes !== null ? formatEstimate(task.estimatedMinutes, t) : null;
+  const dueAndEstimateText =
+    dueText && estimateText
+      ? tCard('dueAndEstimate', { due: dueText, estimate: estimateText })
+      : (dueText ?? estimateText);
+
+  const visibleAssignees = task.assignees.slice(0, 2);
+  const hiddenAssigneeCount = task.assignees.length - visibleAssignees.length;
 
   return (
     <Link
@@ -52,12 +82,11 @@ export function TaskCard({
         // `max-md:min-h-11`: a title-only card measures 36px, which is a fine density on a
         // desktop board and not a target a thumb can hit. Below `md` it grows to 44px.
         //
-        // Only below `md`, deliberately. `docs/design.md` §4 says a card is "min 56px (title
-        // only)" and the measured figure is 36 — the spec and the code have disagreed since
-        // the card was written, and `board-column.tsx` records the 36 as measured fact in the
-        // reasoning behind its `containIntrinsicSize`. Closing that gap changes desktop
-        // density and invalidates a performance measurement; it is a real discrepancy and it
-        // is not this change's to settle.
+        // Only below `md`, deliberately. The 36-versus-56 gap between the measured title-only
+        // height and `docs/design.md`'s figure for the same card is closed as of this change:
+        // 56px is the measured typical card (one meta line, e.g. an estimate), not the title-only
+        // floor, and `docs/design.md` and `sortable-task-card.tsx`'s `containIntrinsicSize` are
+        // both updated in this commit to say so.
         // `border-l-2` is unconditional so the selected and unselected box are the same size:
         // a rail that only thickens on selection would shift the title text by a pixel the
         // moment a card is opened.
@@ -84,35 +113,58 @@ export function TaskCard({
         />
         <span className="line-clamp-2 min-w-0 flex-1 text-body text-foreground">{task.title}</span>
       </span>
-      <LabelDots labels={task.labels} className="mt-1.5" />
-      {task.dueDate ||
+      {task.labels.length > 0 ||
+      task.dueDate ||
       task.estimatedMinutes !== null ||
       task.assignees.length > 0 ||
       task.checklistSummary.total > 0 ||
       task.attachmentCount > 0 ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro text-muted-foreground">
+        <div
+          data-slot="task-card-meta"
+          className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden text-micro text-muted-foreground"
+        >
           {/*
-            Kept inside the existing meta row rather than given a line of its own: the row is
-            already the card's "everything else" strip, and a card that grows a second row per
-            feature is the shape the column's 56px intrinsic-size guess was measured against.
+            One line, never two: at 300px this row used to hold five signals on `flex-wrap`,
+            which meant a task with a checklist, an attachment, a due date, an estimate and an
+            assignee wrapped onto a second line the column's intrinsic-size guess did not budget
+            for. `flex-nowrap` forces the choice explicit instead, and the shrink priority below
+            is that choice: label dots are the one purely decorative signal here (labels also
+            have their own colour-coded chip in the task panel), so they are the only item that
+            gives up width when the row is tight. Everything else is `shrink-0` and simply stays
+            put: a task detail disappearing because a neighbour's title happened to be long would
+            be a worse failure than a handful of label dots getting clipped.
 
             Every badge here is also a term in the condition above. The row is conditional, so a
             badge added to it without being added to that condition is invisible on exactly the
             card that has nothing else — which is the card it was added for.
           */}
-          <ChecklistBadge summary={task.checklistSummary} />
-          <AttachmentBadge count={task.attachmentCount} />
-          {task.dueDate ? (
-            <span className={cn(overdue && 'text-status-danger')}>
-              {formatDueDate(task.dueDate, locale)}
+          <LabelDots labels={task.labels} className="min-w-0 shrink flex-nowrap overflow-hidden" />
+          <span className="shrink-0">
+            <ChecklistBadge summary={task.checklistSummary} />
+          </span>
+          <span className="shrink-0">
+            <AttachmentBadge count={task.attachmentCount} />
+          </span>
+          {dueAndEstimateText ? (
+            <span className={cn('shrink-0', overdue && 'text-status-danger')}>
+              {dueAndEstimateText}
             </span>
           ) : null}
-          {task.estimatedMinutes !== null ? (
-            <span>{formatEstimate(task.estimatedMinutes, t)}</span>
-          ) : null}
-          {assigneeNames ? (
-            <span className="truncate" title={assigneeNames}>
-              {assigneeNames}
+          {task.assignees.length > 0 ? (
+            <span className="flex shrink-0 items-center gap-1" title={assigneeNames}>
+              <span className="sr-only">{assigneeNames}</span>
+              {visibleAssignees.map((assignee) => (
+                <span
+                  key={assignee.userId}
+                  aria-hidden
+                  className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted leading-none text-foreground"
+                >
+                  {initials(assignee.name)}
+                </span>
+              ))}
+              {hiddenAssigneeCount > 0 ? (
+                <span aria-hidden>{tCard('moreAssignees', { count: hiddenAssigneeCount })}</span>
+              ) : null}
             </span>
           ) : null}
         </div>

@@ -421,6 +421,10 @@
       "changeTemplate": "Change template",
       "changeTemplateWith": "Starting from {name}",
       "boardMenu": "Board actions",
+      "card": {
+        "dueAndEstimate": "{due} · {estimate}",
+        "moreAssignees": "+{count}"
+      },
       "import": {
         "action": "Import from Trello",
         "title": "Import from Trello",

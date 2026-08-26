@@ -204,6 +204,90 @@ describe('TaskCard attachment badge', () => {
   });
 });
 
+describe('TaskCard due date and estimate', () => {
+  it('combines a due date and an estimate into a single string rather than two', () => {
+    renderCard({ dueDate: '2026-01-05T00:00:00.000Z', estimatedMinutes: 150 });
+
+    expect(screen.getByText('Jan 5 · 2h 30m')).toBeDefined();
+    expect(screen.queryByText('Jan 5')).toBeNull();
+    expect(screen.queryByText('2h 30m')).toBeNull();
+  });
+
+  it('shows the due date alone when there is no estimate', () => {
+    renderCard({ dueDate: '2026-01-05T00:00:00.000Z', estimatedMinutes: null });
+
+    expect(screen.getByText('Jan 5')).toBeDefined();
+  });
+
+  it('shows the estimate alone when there is no due date', () => {
+    renderCard({ dueDate: null, estimatedMinutes: 150 });
+
+    expect(screen.getByText('2h 30m')).toBeDefined();
+  });
+});
+
+describe('TaskCard assignees', () => {
+  function assignee(userId: string, name: string) {
+    return { userId, name, avatarUrl: null };
+  }
+
+  it('shows every assignee as an initial when there are two or fewer', () => {
+    renderCard({ assignees: [assignee('u1', 'Ayşe Yıldız'), assignee('u2', 'Mert Kaya')] });
+
+    expect(screen.getByText('AY')).toBeDefined();
+    expect(screen.getByText('MK')).toBeDefined();
+    expect(screen.queryByText(/^\+\d+$/)).toBeNull();
+  });
+
+  it('collapses to two initials and a count once there are more than two assignees', () => {
+    renderCard({
+      assignees: [
+        assignee('u1', 'Ayşe Yıldız'),
+        assignee('u2', 'Mert Kaya'),
+        assignee('u3', 'Zeynep Demir'),
+      ],
+    });
+
+    expect(screen.getByText('AY')).toBeDefined();
+    expect(screen.getByText('MK')).toBeDefined();
+    expect(screen.getByText('+1')).toBeDefined();
+    expect(screen.queryByText('ZD')).toBeNull();
+  });
+
+  it('keeps every assignee in the accessible name even once collapsed', () => {
+    renderCard({
+      assignees: [
+        assignee('u1', 'Ayşe Yıldız'),
+        assignee('u2', 'Mert Kaya'),
+        assignee('u3', 'Zeynep Demir'),
+      ],
+    });
+
+    expect(screen.getByText('Ayşe Yıldız, Mert Kaya, Zeynep Demir')).toBeDefined();
+  });
+});
+
+describe('TaskCard meta row', () => {
+  it('never wraps the meta row onto a second line', () => {
+    renderCard({
+      dueDate: '2026-01-05T00:00:00.000Z',
+      estimatedMinutes: 150,
+      assignees: [
+        { userId: 'u1', name: 'Ayşe Yıldız', avatarUrl: null },
+        { userId: 'u2', name: 'Mert Kaya', avatarUrl: null },
+      ],
+      checklistSummary: { total: 4, done: 1 },
+      attachmentCount: 2,
+    });
+
+    const row = screen.getByRole('link').querySelector('[data-slot="task-card-meta"]');
+
+    expect(row).not.toBeNull();
+    expect(row?.className).not.toMatch(/(^|\s)flex-wrap(\s|$)/);
+    expect(row?.className).toMatch(/(^|\s)flex-nowrap(\s|$)/);
+  });
+});
+
 describe('SortableTaskCard drag grip', () => {
   /**
    * `sortable-task-card.tsx` is not one of the seven files `app/globals-css-layers.test.ts`'s

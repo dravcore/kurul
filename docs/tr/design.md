@@ -235,18 +235,18 @@ figure veya bir stat-tile değeri üzerinde değil.
 App shell, [architecture.md §4](architecture.md#4-appsweb--yapı)'teki `(app)` route group'una
 göre.
 
-| Bölge                | Spec                                                                                                                                          |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell yüksekliği     | Tam olarak `100dvh`, `overflow: hidden` — asla `min-height` değil. Her sayfa kendi scroller'ına sahiptir.                                     |
-| Sidebar              | 240px, üstte pinlenmiş workspace switcher; 1280px altında ve talep üzerine 56px'lik bir icon rail'ine collapse olur; 768px altında off-canvas |
-| Topbar               | 48px sticky — board adı, filter girişi, overflow, presence avatar'ları; **768px altında 56px**, ve orada gezinme trigger'ını da taşır         |
-| Board canvas         | Full-bleed, horizontal scroll; column header'ları vertical scroll'da sticky kalır                                                             |
-| Column               | 300px fixed (geniş ekranlarda 280 min / 320 max), 12px gap, isim + count + `⋯` içeren 40px sticky header (768px altında 48px)                 |
-| Card                 | 10px 12px padding, 8px gap, min 56px (yalnızca title), tipik 72–92px; hiçbir şeyin ~140px'i aşmaması için title 3 satırda clamp'lenir         |
-| Card içerik sırası   | priority ikonu + title · label dot'ları · meta satırı (due date, estimate, assignee'ler)                                                      |
-| List / table satırı  | 36px; 768px altında 44px                                                                                                                      |
-| Settings ve form'lar | 720px max width — prose okunur, taranmaz                                                                                                      |
-| Touch target         | **768px altında 44px minimum**, istisnasız her etkileşimli öğede                                                                              |
+| Bölge                | Spec                                                                                                                                                                                   |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell yüksekliği     | Tam olarak `100dvh`, `overflow: hidden` — asla `min-height` değil. Her sayfa kendi scroller'ına sahiptir.                                                                              |
+| Sidebar              | 240px, üstte pinlenmiş workspace switcher; 1280px altında ve talep üzerine 56px'lik bir icon rail'ine collapse olur; 768px altında off-canvas                                          |
+| Topbar               | 48px sticky — board adı, filter girişi, overflow, presence avatar'ları; **768px altında 56px**, ve orada gezinme trigger'ını da taşır                                                  |
+| Board canvas         | Full-bleed, horizontal scroll; column header'ları vertical scroll'da sticky kalır                                                                                                      |
+| Column               | 300px fixed (geniş ekranlarda 280 min / 320 max), 12px gap, isim + count + `⋯` içeren 40px sticky header (768px altında 48px)                                                          |
+| Card                 | 10px 12px padding, 8px gap, min 36px (yalnızca title), tipik 56px (tek meta satırı, seed'deki board üzerinde ölçüldü); hiçbir şeyin ~140px'i aşmaması için title 3 satırda clamp'lenir |
+| Card içerik sırası   | priority ikonu + title · meta satırı (label dot'ları, birleşik due date + estimate, assignee'ler), tek satır, asla iki değil                                                           |
+| List / table satırı  | 36px; 768px altında 44px                                                                                                                                                               |
+| Settings ve form'lar | 720px max width — prose okunur, taranmaz                                                                                                                                               |
+| Touch target         | **768px altında 44px minimum**, istisnasız her etkileşimli öğede                                                                                                                       |
 
 **Shell tam olarak bir viewport yüksekliğindedir ve bu taşıyıcı bir karardır.**
 `min-height: 100dvh` "en az" der ve altındaki hiçbir şeyi sınırlamaz — yaptığı da buydu, ve

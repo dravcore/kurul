@@ -225,18 +225,18 @@ a stat-tile value.
 
 App shell per the `(app)` route group in [architecture.md §4](architecture.md#4-appsweb--structure).
 
-| Region             | Spec                                                                                                                                                        |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell height       | Exactly `100dvh`, `overflow: hidden` — never `min-height`. Every page owns its own scroller.                                                                |
-| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand; off-canvas below 768px                                   |
-| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet); **56px below 768px**, where it also carries the navigation trigger |
-| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                                                      |
-| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯` (48px below 768px)                                    |
-| Card               | 10px 12px padding, 8px gap, min 56px (title only), typical 72–92px; title clamps at 3 lines so nothing exceeds ~140px                                       |
-| Card content order | Priority icon + title · label dots · meta row (due date, estimate, assignees)                                                                               |
-| List / table row   | 36px; 44px below 768px                                                                                                                                      |
-| Settings and forms | 720px max width — prose is read, not scanned                                                                                                                |
-| Touch target       | **44px minimum below 768px**, on every interactive element without exception                                                                                |
+| Region             | Spec                                                                                                                                                             |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell height       | Exactly `100dvh`, `overflow: hidden` — never `min-height`. Every page owns its own scroller.                                                                     |
+| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand; off-canvas below 768px                                        |
+| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet); **56px below 768px**, where it also carries the navigation trigger      |
+| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                                                           |
+| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯` (48px below 768px)                                         |
+| Card               | 10px 12px padding, 8px gap, min 36px (title only), typical 56px (one meta line, measured on the seeded board); title clamps at 3 lines so nothing exceeds ~140px |
+| Card content order | Priority icon + title · meta row (label dots, due date + estimate combined, assignees), one line, never two                                                      |
+| List / table row   | 36px; 44px below 768px                                                                                                                                           |
+| Settings and forms | 720px max width — prose is read, not scanned                                                                                                                     |
+| Touch target       | **44px minimum below 768px**, on every interactive element without exception                                                                                     |
 
 **The shell is exactly one viewport tall, and this is load-bearing.** `min-height: 100dvh`
 would say "at least" and bound nothing below it — which is what it did, and why a column's
