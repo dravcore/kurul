@@ -176,11 +176,17 @@ so does the cleanup worker in `apps/api`, which is why they are in the table.
 is absent from `.env.example` because `docker-compose.yml` sets it outright rather than
 interpolating it from `.env`.
 
-Generate a secret with:
+Generate `BETTER_AUTH_SECRET` with:
 
 ```bash
 openssl rand -base64 32
 ```
+
+That generator is right for this one variable and wrong for the two that go inside a
+connection URL. The rule, the failure it prevents and the odds are written down once, in
+[Database and cache credentials](#database-and-cache-credentials); `.env.example`,
+[README.md](../README.md) and [self-hosting.md](self-hosting.md) all point there rather than
+carrying their own version of it.
 
 **Adding a new environment variable is a four-step change**, and all four go in the same PR:
 wire it through the env helpers in `apps/api/src/common/env.ts` (or the call site that reads

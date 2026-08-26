@@ -175,11 +175,17 @@ tabloda olmalarının sebebi bu. `INTERNAL_API_URL` ise tersi yönde çalışır
 o yüzden tabloda; ama `.env.example`'da yok, çünkü `docker-compose.yml` onu `.env`'den
 enterpolasyonla değil doğrudan ayarlar.
 
-Bir secret üretmek için:
+`BETTER_AUTH_SECRET`'i şununla üretin:
 
 ```bash
 openssl rand -base64 32
 ```
+
+Bu üretici yalnızca bu değişken için doğru; bir connection URL'in içine giren iki değişken için
+yanlış. Kural, önlediği hata ve olasılıklar tek bir yerde yazılı:
+[Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri). `.env.example`,
+[README.tr.md](../../README.tr.md) ve [self-hosting.md](self-hosting.md) kendi kopyalarını
+taşımak yerine oraya işaret eder.
 
 **Yeni bir ortam değişkeni eklemek dört adımlı bir değişikliktir** ve dördü de aynı PR'a girer:
 `apps/api/src/common/env.ts` yardımcıları üzerinden bağla (veya `process.env` okuyan çağrı
