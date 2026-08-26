@@ -1,5 +1,5 @@
 # Pinned by digest so a build resolves the same base across time and machines; Dependabot
-# bumps this line (see .github/dependabot.yml, directory /apps/api). Dependabot's docker
+# bumps this line (see .github/dependabot.yml, directories /apps/api). Dependabot's docker
 # updater only parses a literal `FROM image:tag` + digest line, not an ARG-substituted one,
 # so the digest is repeated on every FROM below rather than factored into a shared ARG.
 FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS base
