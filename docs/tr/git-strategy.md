@@ -32,7 +32,7 @@ merge sonrası silinir.
 | `hotfix/*`  | kısa ömürlü | `main`           | `main` + `develop` | Acil production fix'i                                                       |
 
 ```
-main     ──●───────────────────────●──────────────●──  tags: v0.1.0, v0.1.1, v0.2.0
+main     ──●───────────────────────●──────────────●──  tags: v0.1.0, v0.2.0, v0.3.0
             \                     /              /
 release      \              ●────●              /      release/0.2.0
               \            /                   /
@@ -238,6 +238,29 @@ git switch -c release/0.2.0
 #    cosign örnekleri) ve docs/tr aynasını da: operatör sayfası dosyalarını tag'den
 #    indirir, bu yüzden sayfa ile release birlikte ilerler.
 git commit -am "chore(release): 0.2.0"
+
+# 2b. Sürüme sabitlenmiş düzyazıyı tazele. Aşağıdakilerin hepsi, yalnızca bir insanın
+#     güncel tuttuğu bir sürüm numarası taşır ve v0.3.0 kesimi bunlardan tam olarak
+#     birine ulaştı. Hafızaya güvenmek yerine listeyi yürü:
+#     - README.md ve README.tr.md, "vX.Y.Z itibarıyla olmayanlar" paragrafı: hem
+#       sürüm hem iddialar, çünkü o günden beri bir özellik inmiş olabilir.
+#     - ROADMAP.md: giriş (hangi sürüm güncel, hangisi sıradaki), Next 2 weeks
+#       tablosu ve Phases listesi.
+#     - .env.example ve docs/tr/development.md#aktivasyon-hunisi-ve-telemetri:
+#       telemetri örneği paket sürümünü basar, dolayısıyla "version" alanı da
+#       diğerleri gibi sürüme sabitlenmiş düzyazıdır.
+#     - docs/self-hosting.md ve docs/tr aynası: yukarıdaki 2. adım kapsıyor, ama
+#       varsaymak yerine doğrula; kurulum URL'leri dosyaları tag'den indiriyor.
+#     - Bu dosyanın başındaki tag diyagramı: var olan tag'leri listeler.
+#     - CHANGELOG.md: az önce yeniden adlandırdığın bölümde, merge edilen PR başına
+#       birer tane olmak üzere iki Added ya da iki Fixed başlığı olabilir. Bölüm
+#       release notu olarak yayımlanmadan önce, her kaydı ve sırasını koruyarak
+#       her türden tek başlığa indir.
+#     - apps/api/openapi.json: `pnpm openapi` yeniden üretir ve info.version
+#       apps/api/package.json'ı izler. `pnpm openapi:check`, yeniden üretilene
+#       kadar build job'ını düşürür, yani bu madde kendini zorunlu kılar; yine de
+#       burada çalıştır ki düzeltme takip PR'ında değil release commit'inde olsun.
+git commit -am "docs(release): refresh release-pinned prose for 0.2.0"
 
 # 3. Bu branch'e yalnızca release'i engelleyen fix'ler girebilir.
 #    Geri kalan her şey her zamanki gibi develop'a gitmeye devam eder.
