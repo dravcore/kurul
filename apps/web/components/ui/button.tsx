@@ -116,7 +116,6 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      data-loading={isLoading ? '' : undefined}
       data-spinner={spinning ? '' : undefined}
       aria-busy={isLoading ? true : undefined}
       disabled={isLoading || disabled}

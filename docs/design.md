@@ -416,7 +416,7 @@ first row. Two identical primary buttons on a first run is a choice the reader d
 | Dashboard, no data    | Damga 64px | Nothing to chart yet         | Charts fill in as tasks are created and moved.                                                        | Open a board                     |
 | Notifications         | —          | You're caught up             | —                                                                                                     | —                                |
 
-**Loading** uses skeletons that match the final layout in `--muted`, with a 1.6s opacity pulse
+**Loading** uses skeletons that match the final layout in `--accent`, with a 1.6s opacity pulse
 (1.0 → 0.6) and no shimmer sweep: the board renders column skeletons at real width with three
 card skeletons at real card heights; the task panel opens immediately with the clicked card's
 title already in place, so it is never blank; inline actions are optimistic. Spinners exist in

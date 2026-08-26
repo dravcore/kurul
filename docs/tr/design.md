@@ -429,7 +429,7 @@ başlığındaki aynı aksiyonun kopyası ekran boşken gizlenir ve ilk satırla
 | Dashboard, veri yok               | Damga 64px | Nothing to chart yet (Henüz grafiklenecek bir şey yok)         | Charts fill in as tasks are created and moved. (Task'lar oluşturuldukça ve taşındıkça grafikler dolar.)                                                                                                                                                           | Open a board (Bir board aç)                                                    |
 | Bildirimler                       | —          | You're caught up (Her şeyi gördünüz)                           | —                                                                                                                                                                                                                                                                 | —                                                                              |
 
-**Loading**, `--muted` içinde final layout'a uyan skeleton'lar kullanır, 1.6s'lik bir opacity
+**Loading**, `--accent` içinde final layout'a uyan skeleton'lar kullanır, 1.6s'lik bir opacity
 pulse'ı ile (1.0 → 0.6) ve shimmer sweep olmadan: board, gerçek genişlikte column skeleton'ları
 render eder, gerçek kart yükseklikte üç kart skeleton'ıyla birlikte; task paneli, tıklanan kartın
 title'ı zaten yerindeyken anında açılır, böylece asla boş görünmez; inline aksiyonlar

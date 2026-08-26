@@ -346,15 +346,6 @@ body {
   }
 }
 
-@keyframes board-column-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 .board-column-enter {
   animation: board-column-enter 200ms var(--ease-out) both;
   animation-delay: calc(var(--stagger-index) * 40ms);
@@ -362,7 +353,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .board-column-enter {
-    animation-name: board-column-fade;
+    animation-name: layer-fade-in;
     animation-delay: 0ms;
   }
 }
@@ -468,7 +459,7 @@ body {
 
    `[data-side]` is here to be counted, not to select: without it these two selectors carry two
    attribute selectors against the side-qualified slide rules' three above, and a rule inside a
-   media query is still just a rule -- it loses that specificity contest outright and the drawer
+   media query is still just a rule: it loses that specificity contest outright and the drawer
    keeps its full slide for a reader who asked for none of it. Written as a bare presence check
    so one pair of rules still covers both docked sides. */
 @media (prefers-reduced-motion: reduce) {

@@ -139,9 +139,9 @@ function DialogContent({
  * The slide is written as real keyframes in `globals.css`, keyed off the `data-slot` and
  * `data-state` attributes below, and not with `animate-in` / `slide-in-from-*` utility
  * classes: this project imports plain `tailwindcss` with no animation plugin, so those class
- * names generate nothing. (The ones already on `DialogContent` and `DialogOverlay` are
- * inert for the same reason — pre-existing, and not this component's to fix.) Writing the
- * keyframes out is also what lets `prefers-reduced-motion` drop the movement and keep the
+ * names generate nothing. `DialogContent` and `DialogOverlay` bind their own keyframes the
+ * same way. Writing the keyframes out is also what lets `prefers-reduced-motion` drop the
+ * movement and keep the
  * fade, which §5 asks for and a utility class could not express.
  *
  * No close button of its own: the drawer's close control is a real, labelled `DialogClose`
