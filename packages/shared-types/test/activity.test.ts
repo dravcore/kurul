@@ -25,6 +25,11 @@ describe('ActivityType', () => {
     // revisited before the constant is added, not after.
     expect(Object.values(ActivityType)).not.toContain('workspace.deleted');
   });
+
+  it('names the label join events `added`/`removed`, matching a join row being written', () => {
+    expect(ActivityType.TaskLabelAdded).toBe('task.label_added');
+    expect(ActivityType.TaskLabelRemoved).toBe('task.label_removed');
+  });
 });
 
 describe('AUDIT_ACTIVITY_TYPES', () => {
@@ -86,6 +91,8 @@ describe('AUDIT_ACTIVITY_TYPES', () => {
       ActivityType.TaskMoved,
       ActivityType.TaskAssigned,
       ActivityType.TaskUnassigned,
+      ActivityType.TaskLabelAdded,
+      ActivityType.TaskLabelRemoved,
       ActivityType.CommentCreated,
     ];
     for (const type of excluded) {

@@ -9,6 +9,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Task activity feed now records label attach and detach.** Attaching or detaching a label on
+  a task writes a `task.label_added` / `task.label_removed` row inside the same transaction as
+  the join-row write, following the pattern `task.assigned` / `task.unassigned` already use on
+  the sibling assignee sub-resource. The payload is a snapshot (`labelId`, `name`, `color`)
+  taken at write time, so the row still describes what happened after the label is renamed,
+  recolored or deleted. Neither type joins `AUDIT_ACTIVITY_TYPES`: like `task.assigned` and
+  `comment.created`, this is a content event, not one an incident query needs to see. The web
+  activity renderer stays untouched here, mid its own rework; an unrecognised type already falls
+  back to a generic line, so the feed keeps reading sensibly until the sentence for these two
+  types lands in a follow-up UI PR. Closes #39.
+
 - **Password reset by email: a forgotten password is now recovered by the person who forgot it.**
   "Forgot your password?" on the sign-in screen leads to `/forgot-password`, which asks for an
   address and mails a single-use link good for one hour; the link lands on `/reset-password`,
