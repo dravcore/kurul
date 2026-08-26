@@ -180,3 +180,39 @@ describe('theme-covered utility classes', () => {
     expect(unresolved).toEqual([]);
   });
 });
+
+/**
+ * This project imports plain `tailwindcss`, with no animation plugin installed, so
+ * `animate-in`/`animate-out` and every `fade-in-*`, `fade-out-*`, `zoom-in-*`, `zoom-out-*`,
+ * `slide-in-from-*` and `slide-out-to-*` utility compiles to nothing at all: not an unresolved
+ * candidate the scan above would catch (those still ask Tailwind to compile the bare prefix,
+ * and `fade`/`zoom`/`slide` are not among `text-`/`bg-`/`border-`/`font-`/`shadow-`), just a
+ * class string sitting on an element with no rule anywhere in the compiled sheet backing it.
+ * P5 Task 1 replaced every real call site with keyframes bound through `data-slot`/`data-state`
+ * (see `app/globals.css`); this scan is what stops the dead classes from coming back silently.
+ *
+ * `animate-spin` and `animate-pulse` are real Tailwind utilities and stay out of this list on
+ * purpose: `animate-pulse` is gated in a later task of this phase and `animate-spin` is a later
+ * task's own choice of spinner keyframe, neither this scan's concern.
+ */
+const DEAD_ANIMATION_CLASS_RE =
+  /\b(animate-in|animate-out|fade-in-[\w-]+|fade-out-[\w-]+|zoom-in-[\w-]+|zoom-out-[\w-]+|slide-in-from-[\w-]+|slide-out-to-[\w-]+)\b/g;
+
+describe('dead animation utility classes', () => {
+  it('finds none of them left under app/ or components/', () => {
+    const hits: string[] = [];
+    for (const dir of SCAN_DIRS) {
+      for (const file of sourceFiles(path.join(webRoot, dir))) {
+        const original = readFileSync(file, 'utf8');
+        const scannable = blankComments(original);
+        const relative = path.relative(webRoot, file);
+        for (const match of scannable.matchAll(DEAD_ANIMATION_CLASS_RE)) {
+          const line = original.slice(0, match.index).split('\n').length;
+          hits.push(`${relative}:${line}  ${match[0]}`);
+        }
+      }
+    }
+
+    expect(hits.sort()).toEqual([]);
+  });
+});

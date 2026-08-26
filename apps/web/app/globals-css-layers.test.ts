@@ -362,6 +362,38 @@ function selectorParts(rule: StyleRule): string[] {
   return rule.selector.split(',').map((part) => part.trim());
 }
 
+/** The body of the sole `@keyframes name` block in the compiled sheet, braces excluded.
+ * `parseStylesheet` above deliberately skips over every `@keyframes` block (`blockEnd` on its
+ * prelude) rather than parsing its `from`/`to` steps as rules, so reading one back has to go
+ * around it and index into the raw compiled text directly, the same way `mediaBody` does for
+ * `@media`. */
+function keyframeBody(name: string): string {
+  const marker = `@keyframes ${name}`;
+  const start = css.indexOf(marker);
+  if (start === -1) throw new Error(`the compiled CSS has no @keyframes ${name}`);
+  const open = css.indexOf('{', start);
+  return css.slice(open + 1, blockEnd(css, open));
+}
+
+/** Every `@media (prefers-reduced-motion: reduce)` block's body, concatenated. Unlike `mediaBody`
+ * above, this does not demand exactly one: `app/globals.css` carries several, each scoped
+ * narrowly to the motion pattern beside it (the global transition-property drop, the column
+ * stagger's twin, the drawer's, and the dialog/menu ones this suite checks), so reading "the"
+ * reduced-motion block is reading all of them at once. */
+function reducedMotionBody(): string {
+  const query = '@media (prefers-reduced-motion: reduce)';
+  let body = '';
+  for (
+    let index = css.indexOf(query);
+    index !== -1;
+    index = css.indexOf(query, index + query.length)
+  ) {
+    const open = css.indexOf('{', index);
+    body += `${css.slice(open + 1, blockEnd(css, open))}\n`;
+  }
+  return body;
+}
+
 let sheet: Stylesheet;
 let css: string;
 
@@ -833,4 +865,66 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
     });
     expect(raised.order).toBeGreaterThan(darkTokens.order);
   });
+});
+
+/**
+ * P5 Task 1: the dialog and dropdown open/close, written as real keyframes bound through
+ * `data-slot`/`data-state` because this project imports plain `tailwindcss` with no animation
+ * plugin (`animate-in`, `fade-in-0`, `zoom-in-95` and their siblings compile to nothing at all).
+ * jsdom never evaluates a `@media` query and never plays a keyframe, so the compiled sheet is
+ * the only place either fact is checkable: that each of the four layered surfaces below carries
+ * a real `animation-name`, and that `prefers-reduced-motion: reduce` retargets every one of them
+ * to a keyframe whose body holds no `transform`, `scale` or `translate` declaration.
+ */
+describe('globals.css dialog and dropdown motion', () => {
+  let reduced: Stylesheet;
+
+  beforeAll(() => {
+    reduced = parseStylesheet(reducedMotionBody());
+  });
+
+  const layeredSelectors = [
+    "[data-slot='dialog-overlay']",
+    "[data-slot='dialog-content']",
+    "[data-slot='dropdown-menu-content']",
+    "[data-slot='dropdown-menu-sub-content']",
+  ];
+
+  it.each(layeredSelectors)('gives %s an animation-name in both data-state', (selector) => {
+    for (const state of ['open', 'closed']) {
+      const target = `${selector}[data-state='${state}']`;
+      const rule = requireRule(sheet, target, (candidate) => {
+        return selectorParts(candidate).includes(target);
+      });
+      const name = rule.declarations.find(
+        (declaration) => declaration.property === 'animation-name',
+      );
+      expect(name?.value).toBeTruthy();
+    }
+  });
+
+  it.each(layeredSelectors)(
+    'switches %s to a fade-only keyframe under prefers-reduced-motion: reduce',
+    (selector) => {
+      for (const state of ['open', 'closed']) {
+        const target = `${selector}[data-state='${state}']`;
+        const rule = requireRule(
+          reduced,
+          `${target} inside prefers-reduced-motion: reduce`,
+          (candidate) => {
+            return selectorParts(candidate).includes(target);
+          },
+        );
+        const name = rule.declarations.find(
+          (declaration) => declaration.property === 'animation-name',
+        );
+        expect(name?.value).toBeTruthy();
+
+        // The fade-only twin never re-declares movement: the reduced keyframe it points at has
+        // no transform, scale or translate step of its own to drop.
+        const body = keyframeBody(name!.value);
+        expect(body).not.toMatch(/\b(transform|scale|translate)\s*:/);
+      }
+    },
+  );
 });
