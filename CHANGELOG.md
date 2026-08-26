@@ -358,6 +358,26 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A Trello import no longer skips the length checks every other write path enforces, and no
+  longer has an unbounded row count.** `trello-import-planner.ts` wrote a card's name and
+  description, a checklist's title, and the export's own board name and description straight
+  through, with no ceiling at all, while `CreateTaskDto`, `CreateBoardDto` and
+  `CreateChecklistDto` refuse the same fields past 500/20000, 120/2000 and 255 characters on
+  every other route. A 20 MiB export could carry one card with a multi-megabyte title, or several
+  hundred thousand tiny cards, and the importer would write all of it inside one transaction. The
+  planner now clamps every one of those fields to the same constant the DTOs use
+  (`task/dto/task-limits.ts`, `board/dto/board-limits.ts`, imported by the DTOs and the planner
+  alike, so the number exists once); a clamped card title or description is reported as a
+  `(card, defaulted)` row and a clamped checklist title as `(checklist, defaulted)`, the report's
+  existing vocabulary for a value that was substituted rather than lost, and the board's own name
+  and description are clamped without a report line, since no `board` scope exists in that
+  vocabulary and a board is one row rather than a class of rows. Two new variables,
+  `TRELLO_IMPORT_MAX_CARDS` (default 50000) and `TRELLO_IMPORT_MAX_LISTS` (default 5000), cap how
+  many cards or lists one import will plan; an export over either cap answers `400` and writes
+  nothing, checked on the export's own raw counts before the planner runs and before the
+  transaction opens. [ADR 0025](docs/decisions/0025-trello-import-mapping.md) carries the
+  amendment.
+
 - **A Trello import no longer steps over the workspace's board ceiling.**
   `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on
   `POST .../boards` but not on `POST .../imports/trello`, which creates its board by its own
