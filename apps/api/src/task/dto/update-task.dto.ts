@@ -10,18 +10,22 @@ import {
   MinLength,
 } from 'class-validator';
 import { OptionalNonNullable, OptionalNullable } from '../../common/validation/optional';
-import { MAX_ESTIMATED_MINUTES } from './task-limits';
+import {
+  MAX_ESTIMATED_MINUTES,
+  MAX_TASK_DESCRIPTION_LENGTH,
+  MAX_TASK_TITLE_LENGTH,
+} from './task-limits';
 
 export class UpdateTaskDto {
   @OptionalNonNullable()
   @IsString()
   @MinLength(1)
-  @MaxLength(500)
+  @MaxLength(MAX_TASK_TITLE_LENGTH)
   title?: string;
 
   @OptionalNullable()
   @IsString()
-  @MaxLength(20_000)
+  @MaxLength(MAX_TASK_DESCRIPTION_LENGTH)
   description?: string | null;
 
   @OptionalNonNullable()
