@@ -503,13 +503,14 @@ olarak verdiği `cross-origin` politikasını override eder) ve
 `POST /workspaces/:workspaceId/imports/trello`, bir Trello board'unun JSON export'unu alır ve
 ondan **yeni bir board** yaratır. API'nin toplu yazma yapan tek ucudur.
 
-| Özellik      | Değer                                                                              |
-| ------------ | ---------------------------------------------------------------------------------- |
-| Gövde        | `multipart/form-data`, **`file`** adında tek bir parça — başka parça yok, JSON yok |
-| Rol          | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                               |
-| Boyut tavanı | `TRELLO_IMPORT_MAX_BYTES` (varsayılan `20971520` — 20 MiB)                         |
-| Rate limit   | **3 / dk**, client IP başına                                                       |
-| Başarı       | `201` ve gövdede bir `TrelloImportReportDto`                                       |
+| Özellik      | Değer                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| Gövde        | `multipart/form-data`, **`file`** adında tek bir parça — başka parça yok, JSON yok            |
+| Rol          | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                                          |
+| Boyut tavanı | `TRELLO_IMPORT_MAX_BYTES` (varsayılan `20971520` — 20 MiB)                                    |
+| Satır tavanı | `TRELLO_IMPORT_MAX_CARDS` (varsayılan `50000`), `TRELLO_IMPORT_MAX_LISTS` (varsayılan `5000`) |
+| Rate limit   | **3 / dk**, client IP başına                                                                  |
+| Başarı       | `201` ve gövdede bir `TrelloImportReportDto`                                                  |
 
 **JSON değil multipart, ve bu bir kolaylık değil bir karar.** Bir board export'u birkaç
 megabayttır, `REQUEST_BODY_MAX_BYTES` ise 1 MiB'dır; onu tek bir uç için yükseltmek aynı maliyeti
@@ -530,7 +531,7 @@ yapamayacağı şeyi tek istekte yapmamalı.
 
 | Durum | Ne zaman                                                                                                                                                                                         |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil                                                                                                          |
+| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil; export'un kart sayısı `TRELLO_IMPORT_MAX_CARDS`'ı ya da liste sayısı `TRELLO_IMPORT_MAX_LISTS`'i aşıyor |
 | `403` | Workspace üyesi, ama rolü `ADMIN`'in altında **ya da** workspace board tavanında (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, bkz. [Plan limitleri](#plan-limitleri)) |
 | `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı                                                                                                              |
 | `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                                                                                                                                 |
@@ -538,8 +539,12 @@ yapamayacağı şeyi tek istekte yapmamalı.
 
 Ayrıştırıcıya ulaşan tek hata `400`'dür ve **ulaştığında hiçbir şey yazılmaz**: export, transaction
 açılmadan önce baştan sona okunup eşlenir, yani reddedilen bir import workspace'i baytı baytına
-olduğu gibi bırakır. Board tavanı `403`'ü de hiçbir şey yazmaz: kontrol, board satırından önce,
-transaction'ın ilk ifadesidir, dolayısıyla ret boş bir transaction'ı geri alır.
+olduğu gibi bırakır. Satır tavanı reddi de aynı `400`'ün bir parçasıdır: export okunduktan sonra,
+planlayıcı tek bir satırı eşlemeden önce liste ve kart sayıları `TRELLO_IMPORT_MAX_LISTS` ve
+`TRELLO_IMPORT_MAX_CARDS`'a karşı kontrol edilir, yani aşırı büyük bir export okunduktan sonra ve
+eşlemeden önce reddedilir, her iki durumda da hiçbir şey yazılmadan. Board tavanı `403`'ü de
+hiçbir şey yazmaz: kontrol, board satırından önce, transaction'ın ilk ifadesidir, dolayısıyla ret
+boş bir transaction'ı geri alır.
 
 **Cevabın gövdesi raporun kendisidir ve hiçbir yerde saklanmaz.**
 
