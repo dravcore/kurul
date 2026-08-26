@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import { InvitationStatus } from '@kurul/shared-types';
 import { Queue, Worker, type Job } from 'bullmq';
 import { closeWorkerWithinTimeout } from '../common/close-worker';
 import { envBool, envInt, envString } from '../common/env';
@@ -529,7 +530,7 @@ export class CleanupWorker implements OnModuleInit, OnApplicationShutdown {
               WHERE "id" IN (
                 SELECT "id" FROM "WorkspaceInvitation"
                 WHERE "createdAt" < ${cutoff}
-                  AND ("status" <> 'pending' OR "expiresAt" < ${now})
+                  AND ("status" <> ${InvitationStatus.pending} OR "expiresAt" < ${now})
                 LIMIT ${CLEANUP_BATCH_SIZE}
               )
             `;

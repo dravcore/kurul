@@ -274,14 +274,17 @@ describe('CleanupWorker', () => {
       const [call] = callsFor(executeRaw, 'WorkspaceInvitation');
       const statement = statementOf(call!);
       expect(statement).toContain('WHERE "createdAt" < ?');
-      // Finished either because somebody decided, or because the clock did.
-      expect(statement).toContain('AND ("status" <> \'pending\' OR "expiresAt" < ?)');
+      // Finished either because somebody decided, or because the clock did. `status` is
+      // parameterised, not concatenated, so it is a placeholder in the statement text and a
+      // separate bound value below.
+      expect(statement).toContain('AND ("status" <> ? OR "expiresAt" < ?)');
       // Default window: 90 days, not the activity year.
       expect(call![1]).toEqual(new Date(NOW.getTime() - 90 * DAY_MS));
+      expect(call![2]).toEqual('pending');
       // The expiry half compares against the sweep instant itself, not against the cutoff — an
       // invitation that expired yesterday is finished today, and the window is what then
       // decides how long the finished record is kept.
-      expect(call![2]).toEqual(NOW);
+      expect(call![3]).toEqual(NOW);
     });
 
     it('honours INVITATION_RETENTION_DAYS independently of the notification window', async () => {
