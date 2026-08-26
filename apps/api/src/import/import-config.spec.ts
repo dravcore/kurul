@@ -1,10 +1,14 @@
 import {
   DEFAULT_TRELLO_IMPORT_MAX_BYTES,
+  DEFAULT_TRELLO_IMPORT_MAX_CARDS,
+  DEFAULT_TRELLO_IMPORT_MAX_LISTS,
   IMPORT_CHUNK_SIZE,
   TRELLO_IMPORT_TRANSACTION_MAX_WAIT_MS,
   TRELLO_IMPORT_TRANSACTION_TIMEOUT_MS,
   chunked,
   readTrelloImportMaxBytes,
+  readTrelloImportMaxCards,
+  readTrelloImportMaxLists,
 } from './import-config';
 
 /**
@@ -59,6 +63,76 @@ describe('import configuration', () => {
 
       expect(readTrelloImportMaxBytes()).toBe(DEFAULT_TRELLO_IMPORT_MAX_BYTES);
       delete process.env.ATTACHMENT_MAX_BYTES;
+    });
+  });
+
+  describe('readTrelloImportMaxCards', () => {
+    const original = process.env.TRELLO_IMPORT_MAX_CARDS;
+
+    afterEach(() => {
+      if (original === undefined) delete process.env.TRELLO_IMPORT_MAX_CARDS;
+      else process.env.TRELLO_IMPORT_MAX_CARDS = original;
+    });
+
+    it('is 50000 by default', () => {
+      delete process.env.TRELLO_IMPORT_MAX_CARDS;
+
+      expect(readTrelloImportMaxCards()).toBe(50_000);
+      expect(DEFAULT_TRELLO_IMPORT_MAX_CARDS).toBe(50_000);
+    });
+
+    it('reads the environment on every call, not once at import time', () => {
+      process.env.TRELLO_IMPORT_MAX_CARDS = '10';
+      expect(readTrelloImportMaxCards()).toBe(10);
+
+      process.env.TRELLO_IMPORT_MAX_CARDS = '20';
+      expect(readTrelloImportMaxCards()).toBe(20);
+    });
+
+    it('refuses a count that is not a positive integer', () => {
+      process.env.TRELLO_IMPORT_MAX_CARDS = '0';
+      expect(() => readTrelloImportMaxCards()).toThrow(/positive count/);
+
+      process.env.TRELLO_IMPORT_MAX_CARDS = '-1';
+      expect(() => readTrelloImportMaxCards()).toThrow(/positive count/);
+
+      process.env.TRELLO_IMPORT_MAX_CARDS = 'plenty';
+      expect(() => readTrelloImportMaxCards()).toThrow(/expected an integer/);
+    });
+  });
+
+  describe('readTrelloImportMaxLists', () => {
+    const original = process.env.TRELLO_IMPORT_MAX_LISTS;
+
+    afterEach(() => {
+      if (original === undefined) delete process.env.TRELLO_IMPORT_MAX_LISTS;
+      else process.env.TRELLO_IMPORT_MAX_LISTS = original;
+    });
+
+    it('is 5000 by default', () => {
+      delete process.env.TRELLO_IMPORT_MAX_LISTS;
+
+      expect(readTrelloImportMaxLists()).toBe(5_000);
+      expect(DEFAULT_TRELLO_IMPORT_MAX_LISTS).toBe(5_000);
+    });
+
+    it('reads the environment on every call, not once at import time', () => {
+      process.env.TRELLO_IMPORT_MAX_LISTS = '3';
+      expect(readTrelloImportMaxLists()).toBe(3);
+
+      process.env.TRELLO_IMPORT_MAX_LISTS = '7';
+      expect(readTrelloImportMaxLists()).toBe(7);
+    });
+
+    it('refuses a count that is not a positive integer', () => {
+      process.env.TRELLO_IMPORT_MAX_LISTS = '0';
+      expect(() => readTrelloImportMaxLists()).toThrow(/positive count/);
+
+      process.env.TRELLO_IMPORT_MAX_LISTS = '-1';
+      expect(() => readTrelloImportMaxLists()).toThrow(/positive count/);
+
+      process.env.TRELLO_IMPORT_MAX_LISTS = 'plenty';
+      expect(() => readTrelloImportMaxLists()).toThrow(/expected an integer/);
     });
   });
 
