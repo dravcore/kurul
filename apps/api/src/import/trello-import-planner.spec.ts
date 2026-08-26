@@ -139,6 +139,25 @@ describe('planTrelloImport', () => {
       expect(plan.columns).toHaveLength(2);
       expect(group(plan, 'list', 'malformed')).toMatchObject({ count: 1 });
     });
+
+    // SEC-04: the importer used to write `list.name` verbatim, with no ceiling: the one write
+    // path into `Column` that skipped the length gate `CreateColumnDto` enforces on every other.
+    it('clamps an oversized list name to the same ceiling CreateColumnDto enforces', () => {
+      const longName = 'F'.repeat(10_000);
+      const read = readMutated('synthetic-full-board', (raw) => {
+        (raw.lists as Array<Record<string, unknown>>)[0]!.name = longName;
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+      const clamped = plan.columns.find((column) => column.name.startsWith('F'));
+
+      expect(clamped?.name).toHaveLength(120);
+      expect(clamped?.name).toBe(longName.slice(0, 120));
+      // Every column is already reported as `defaulted` for its category; this asserts the
+      // *sample* text for that row is the clamped name, not the 10000-character original: a
+      // report about an oversized field must not itself carry an unbounded string.
+      expect(group(plan, 'column', 'defaulted')?.samples).toContain(clamped?.name);
+      expect(JSON.stringify(plan.skipped)).not.toContain(longName);
+    });
   });
 
   describe('cards', () => {
@@ -414,6 +433,37 @@ describe('planTrelloImport', () => {
       // The other three cards keep their labels: one bad reference costs one pairing, not a card.
       expect(plan.taskLabels).toHaveLength(3);
     });
+
+    // SEC-04: the importer used to write `label.name` verbatim, with no ceiling: the one write
+    // path into `Label` that skipped the length gate `CreateLabelDto` enforces on every other.
+    it('clamps an oversized label name to the same ceiling CreateLabelDto enforces, and reports it', () => {
+      const longName = 'G'.repeat(10_000);
+      const read = readMutated('synthetic-full-board', (raw) => {
+        raw.labels = [{ id: '6512a1b2c3d4e5f601020320', name: longName, color: 'blue' }];
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+      const clamped = plan.labels[0];
+
+      expect(clamped?.name).toHaveLength(50);
+      expect(clamped?.name).toBe(longName.slice(0, 50));
+      // A well-formed colour, so nothing else about this label was defaulted: the clamp is the
+      // only reason it is reported.
+      expect(group(plan, 'label', 'defaulted')).toMatchObject({
+        count: 1,
+        samples: [clamped?.name],
+      });
+    });
+
+    it('does not report a label within the limit as a substitution', () => {
+      // The control for the row above. Without it, "clamps and reports" would pass just as
+      // happily if every label were reported.
+      const read = readMutated('synthetic-full-board', (raw) => {
+        raw.labels = [{ id: '6512a1b2c3d4e5f601020320', name: 'F'.repeat(50), color: 'blue' }];
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+
+      expect(group(plan, 'label', 'defaulted')).toBeUndefined();
+    });
   });
 
   describe('checklists', () => {
@@ -522,6 +572,32 @@ describe('planTrelloImport', () => {
         count: 1,
         samples: [clamped?.title],
       });
+    });
+
+    // SEC-04: the importer used to write `checkItem.name` verbatim, with no ceiling: the one
+    // write path into `ChecklistItem` that skipped the length gate `CreateChecklistItemDto`
+    // enforces on every other.
+    it('clamps an oversized checklist item content to the DTO ceiling, and reports it', () => {
+      const longContent = 'H'.repeat(10_000);
+      const read = readMutated('synthetic-full-board', (raw) => {
+        const lists = raw.checklists as Array<Record<string, unknown>>;
+        (lists[0]!.checkItems as Array<Record<string, unknown>>)[0]!.name = longContent;
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+      const clamped = plan.checklistItems.find((item) => item.content.startsWith('H'));
+
+      expect(clamped?.content).toHaveLength(1_000);
+      expect(clamped?.content).toBe(longContent.slice(0, 1_000));
+      expect(group(plan, 'checklistItem', 'defaulted')).toMatchObject({
+        count: 1,
+        samples: [clamped?.content],
+      });
+    });
+
+    it('does not report a checklist item within the limit as a substitution', () => {
+      const plan = planTrelloImport(readFixture('synthetic-full-board'), CONTEXT);
+
+      expect(group(plan, 'checklistItem', 'defaulted')).toBeUndefined();
     });
   });
 
@@ -632,6 +708,31 @@ describe('planTrelloImport', () => {
 
       const row = plan.attachments.find((entry) => entry.url === NOTES_URL);
       expect(row?.filename).toBe('ölçüm notları');
+    });
+
+    // SEC-04: the importer used to write `attachment.url` verbatim, with no ceiling: the one
+    // write path into `Attachment` that skipped the length gate `CreateAttachmentDto` enforces
+    // on every other.
+    it('clamps an oversized attachment URL to the DTO ceiling, and reports it', () => {
+      const read = readMutated('synthetic-full-board', (raw) => {
+        const cards = raw.cards as Array<Record<string, unknown>>;
+        const card = cards.find((entry) => entry.name === 'Import boards from Trello');
+        (card?.attachments as Array<Record<string, unknown>>)[0]!.url =
+          `https://example.invalid/${'I'.repeat(3_000)}`;
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+      const row = plan.attachments.find((entry) =>
+        entry.url.startsWith('https://example.invalid/I'),
+      );
+
+      expect(row?.url).toHaveLength(2_048);
+      expect(group(plan, 'attachment', 'defaulted')).toMatchObject({ count: 1 });
+    });
+
+    it('does not report an attachment URL within the limit as a substitution', () => {
+      const plan = planTrelloImport(readFixture('synthetic-full-board'), CONTEXT);
+
+      expect(group(plan, 'attachment', 'defaulted')).toBeUndefined();
     });
   });
 
