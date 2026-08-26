@@ -236,6 +236,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   person keeps current, which is the root cause of most of the above. Every `docs/` change
   moves with its `docs/tr/` mirror.
 
+  Not documentation, and in the same pass: `.github/dependabot.yml` now holds every bump it
+  proposes until the release is seven days old, fourteen for an npm major (`default-days` is all
+  the `github-actions` and `docker` ecosystems support, so their majors wait the same seven).
+  That window is the supply-chain defence a lockfile cannot give and nothing more: a compromised
+  package is usually pulled within hours to a few days. **Security updates bypass it**, so an
+  advisory-driven bump still opens the day it lands, and a manual `pnpm add` is unaffected. It is
+  the zero-toolchain half of pnpm 10's `minimumReleaseAge`, which this repo cannot use while
+  `packageManager` is pnpm 9.
 
 - **CI now parses the compose files and the Caddyfile on every pull request.** A new
   `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
@@ -400,6 +408,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   that quietly drops a pair under AA fails the build instead of shipping.
 
 ### Fixed
+
+- **The OpenAPI document advertised `0.1.0` from `v0.1.0` all the way through `v0.3.0`.**
+  `openapi.document.ts` explained at length that the spec carries the monorepo version rather
+  than an independent one, because "a second version number here would be a second promise", and
+  then wrote that number as the literal `'0.1.0'` immediately below the paragraph. Nothing in the
+  release process compared the two, so every release since has served, and committed, a spec
+  stamped with the version of the first one. `OPENAPI_VERSION` is now `readAppVersion()`, the
+  helper the telemetry ping already uses: it resolves `apps/api/package.json` from `src/` under
+  Jest and from `dist/` under `pnpm openapi` and the runtime image, so the generator, the
+  committed snapshot and the document served at `/docs` cannot disagree. `apps/api/openapi.json`
+  is regenerated at `0.3.0`, and since `pnpm openapi:check` byte-compares that file in CI, a
+  version bump that forgets to regenerate now fails the gate instead of drifting quietly.
 
 - **A Trello import no longer steps over the workspace's board ceiling.**
   `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on
