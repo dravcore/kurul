@@ -619,6 +619,36 @@ body {
   }
 }
 
+/* The loading placeholder (components/ui/skeleton.tsx). docs/design.md §6 asks for a 1.6s
+   opacity pulse from 1.0 to 0.6, its own keyframe rather than Tailwind's built-in `animate-pulse`
+   (2s, 1.0-0.5, and the one animation in the tree with no `prefers-reduced-motion` twin of its
+   own before this). A board loads dozens of these at once, so the reduced variant does not just
+   slow the loop down, it removes it: a still 0.75 midpoint reads as "loading" without asking
+   dozens of elements to keep animating on a machine that asked for none of them to. */
+@keyframes skeleton-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.6;
+  }
+}
+
+[data-slot='skeleton'] {
+  animation-name: skeleton-pulse;
+  animation-duration: 1.6s;
+  animation-timing-function: var(--ease-in-out);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='skeleton'] {
+    animation: none;
+    opacity: 0.75;
+  }
+}
+
 /* Forced colours replace every author colour with the user's palette, which erases exactly the
    channel this phase's feedback leans on: a surface step and a tint. Every state built on one
    carries a border-based twin here, per docs/design.md §9. */

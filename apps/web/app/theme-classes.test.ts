@@ -191,12 +191,15 @@ describe('theme-covered utility classes', () => {
  * P5 Task 1 replaced every real call site with keyframes bound through `data-slot`/`data-state`
  * (see `app/globals.css`); this scan is what stops the dead classes from coming back silently.
  *
- * `animate-spin` and `animate-pulse` are real Tailwind utilities and stay out of this list on
- * purpose: `animate-pulse` is gated in a later task of this phase and `animate-spin` is a later
- * task's own choice of spinner keyframe, neither this scan's concern.
+ * `animate-pulse` is a real Tailwind utility (it does compile) but is banned here anyway: P5
+ * Task 2 moved the skeleton pulse to its own `skeleton-pulse` keyframe, bound through
+ * `[data-slot='skeleton']`, because `animate-pulse` runs 2s / 1.0-0.5 against docs/design.md
+ * §6's 1.6s / 1.0-0.6 and carries no `prefers-reduced-motion` twin of its own. `animate-spin`
+ * stays out of this list on purpose: it is a later task's own choice of spinner keyframe, not
+ * this scan's concern.
  */
 const DEAD_ANIMATION_CLASS_RE =
-  /\b(animate-in|animate-out|fade-in-[\w-]+|fade-out-[\w-]+|zoom-in-[\w-]+|zoom-out-[\w-]+|slide-in-from-[\w-]+|slide-out-to-[\w-]+)\b/g;
+  /\b(animate-in|animate-out|animate-pulse|fade-in-[\w-]+|fade-out-[\w-]+|zoom-in-[\w-]+|zoom-out-[\w-]+|slide-in-from-[\w-]+|slide-out-to-[\w-]+)\b/g;
 
 describe('dead animation utility classes', () => {
   it('finds none of them left under app/ or components/', () => {

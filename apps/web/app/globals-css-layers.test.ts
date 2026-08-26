@@ -928,3 +928,45 @@ describe('globals.css dialog and dropdown motion', () => {
     },
   );
 });
+
+/**
+ * P5 Task 2: the loading skeleton's own pulse (components/ui/skeleton.tsx), replacing Tailwind's
+ * `animate-pulse` (2s, 1.0-0.5, no reduced-motion twin) with docs/design.md §6's 1.6s, 1.0-0.6
+ * loop. A board renders dozens of these at once, so `prefers-reduced-motion: reduce` does not
+ * retarget the loop to a fade like the dialog and menu above, it removes the animation outright
+ * and holds the midpoint opacity instead — nothing left running on a machine that asked for none
+ * of it, across however many skeletons are on screen at once.
+ */
+describe('globals.css skeleton motion', () => {
+  const target = "[data-slot='skeleton']";
+
+  it('runs a 1.6s pulse between full and 0.6 opacity', () => {
+    const rule = requireRule(sheet, target, (candidate) =>
+      selectorParts(candidate).includes(target),
+    );
+    const name = rule.declarations.find((declaration) => declaration.property === 'animation-name');
+    const duration = rule.declarations.find(
+      (declaration) => declaration.property === 'animation-duration',
+    );
+    expect(name?.value).toBeTruthy();
+    expect(duration?.value).toBe('1.6s');
+
+    const body = keyframeBody(name!.value);
+    expect(body).toMatch(/opacity\s*:\s*1\b/);
+    expect(body).toMatch(/opacity\s*:\s*0\.6\b/);
+  });
+
+  it('stops moving and holds 0.75 opacity under prefers-reduced-motion: reduce', () => {
+    const reduced = parseStylesheet(reducedMotionBody());
+    const rule = requireRule(
+      reduced,
+      `${target} inside prefers-reduced-motion: reduce`,
+      (candidate) => selectorParts(candidate).includes(target),
+    );
+
+    const animation = rule.declarations.find((declaration) => declaration.property === 'animation');
+    const opacity = rule.declarations.find((declaration) => declaration.property === 'opacity');
+    expect(animation?.value).toBe('none');
+    expect(opacity?.value).toBe('0.75');
+  });
+});
