@@ -260,6 +260,16 @@ room for the multipart envelope, for exactly the reason the attachment limit doe
 [the proxy contract below](#bringing-your-own-reverse-proxy). Importing works on an instance with
 no `STORAGE_PATH` at all: an import creates link attachments, which store no bytes.
 
+Two more variables cap the _shape_ of the board rather than the bytes of the export:
+`TRELLO_IMPORT_MAX_CARDS` (default `50000`) and `TRELLO_IMPORT_MAX_LISTS` (default `5000`) refuse
+an export that carries more cards or lists than that, with a `400` and nothing written, before a
+single row is planned. `TRELLO_IMPORT_MAX_BYTES` alone does not bound this: a small card is a few
+dozen bytes, so an export well under the byte ceiling can still be far more rows than any board
+this import is meant to hold. Every name and description the importer writes is also clamped to
+the same length every other write path enforces (a task title to 500 characters, a description to
+20000, and so on); a card whose title had to be cut still imports, and the import report counts
+it as one of the rows that came across changed.
+
 ## 3. Start it
 
 ```bash

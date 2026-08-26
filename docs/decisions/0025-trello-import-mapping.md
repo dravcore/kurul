@@ -263,3 +263,43 @@ them and lose the grouping the user made. One Trello checklist is one `Checklist
 | Flatten a card's checklists into one list                     | Discards the grouping the user made, and contradicts the reason ADR 0023 chose a multi-list model (`:122-127`)                                                            |
 | Store a raw hex for an unmapped Trello colour                 | `Label.color` stores a theme-resolved slot; a hex cannot be resolved by the dark theme, which defines the same slots at different values                                  |
 | Reject the whole file when a field is missing or oddly typed  | No field name here was verified against a real export, so this would turn every schema drift into a total failure instead of a report row                                 |
+
+## Amendment (2026-08-26): field length ceilings and a row cap (SEC-04)
+
+An audit finding (SEC-04) noted that this importer skipped the length checks every other write
+path applies. `Task.title`, `Task.description`, `Board.name`, `Board.description` and
+`Checklist.title` all reach the database through `CreateTaskDto`, `CreateBoardDto` and
+`CreateChecklistDto` on every other route, and each of those decorates its field with
+`@MaxLength`. The planner wrote `card.name`, `card.desc`, the export's own board name and
+description, and `checklist.name` straight through with no such ceiling, so a Trello export was
+the one door into this database those decorators did not guard. Nothing in the export was
+malicious to write this way; the risk was a board nobody could scroll and a database column
+holding more than the product ever intended one to hold.
+
+`trello-import-planner.ts` now clamps every one of those fields to the same constant the DTO
+uses (`task/dto/task-limits.ts` and `board/dto/board-limits.ts`, imported by the DTOs and the
+planner alike, so the number exists once). A task title or description that was cut is reported
+as one `(card, defaulted)` row, the same reason a substitution already uses elsewhere in this
+report (an unknown label colour, a defaulted column category): the card still imports, and the
+question the report answers is "why does my board look different", which a clamp answers as
+well as a colour substitution does. A checklist title that was cut is reported the same way,
+under `(checklist, defaulted)`. The board's own name and description are clamped silently: there
+is no `board` scope in the closed vocabulary above, a board is one row rather than a class of
+rows, and a `(board, defaulted)` line that could only ever say "1" would answer nothing a user
+could act on, the same reasoning `trello-export.ts` already applies to the board's own
+description when it is unusable.
+
+A second gap the same finding named: nothing bounded how many rows an export could ask this API
+to plan. `TRELLO_IMPORT_MAX_BYTES` bounds the parsed object graph's size, not the row count, and
+a small card can be a few dozen bytes, so a 20 MiB export can still be several hundred thousand
+tiny cards. `TrelloImportService` now checks the export's raw `lists.length` and `cards.length`
+against `TRELLO_IMPORT_MAX_CARDS` (default 50000) and `TRELLO_IMPORT_MAX_LISTS` (default 5000)
+before the planner runs and before the transaction opens; an export over either cap answers `400`
+and writes nothing. The counts are taken before archived or malformed entries are filtered out,
+because the cost these ceilings exist for (heap held by the parsed graph, and the length of the
+writer's `createMany` sequence) is paid for every row Trello wrote, not only the ones that end up
+importable.
+
+Neither change touches the Decision section above: the skip vocabulary is unchanged, the
+structure table is unchanged, and the write is still one atomic transaction over a plan built
+with no database access.

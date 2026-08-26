@@ -259,3 +259,44 @@ satırıdır.
 | Bir kartın checklist'lerini tek listeye düzleştirmek       | Kullanıcının kurduğu gruplamayı atar, ve ADR 0023'ün çoklu-liste modelini seçme gerekçesiyle çelişir (`:122-127`)                                                                                |
 | Eşlenemeyen bir Trello rengi için ham hex saklamak         | `Label.color` tema tarafından çözülen bir slot saklar; bir hex'i aynı slotları farklı değerlerle tanımlayan koyu tema çözemez                                                                    |
 | Bir alan eksik ya da tuhaf tipteyken tüm dosyayı reddetmek | Buradaki hiçbir alan adı gerçek bir export'a karşı doğrulanmadı; bu, her şema kaymasını bir rapor satırı yerine tam bir başarısızlığa çevirirdi                                                  |
+
+## Değişiklik (2026-08-26): alan uzunluğu tavanları ve satır sayısı tavanı (SEC-04)
+
+Bir denetim bulgusu (SEC-04), bu importer'ın diğer her yazma yolunun uyguladığı uzunluk
+kontrollerini atladığını gösterdi. `Task.title`, `Task.description`, `Board.name`,
+`Board.description` ve `Checklist.title`, diğer her rotada `CreateTaskDto`, `CreateBoardDto` ve
+`CreateChecklistDto` üzerinden veritabanına ulaşıyor, ve bunların her biri kendi alanını
+`@MaxLength` ile işaretliyor. Planner ise `card.name`, `card.desc`, export'un kendi board adı ve
+açıklaması, ve `checklist.name`'i böyle bir tavan olmadan doğrudan yazıyordu, yani bir Trello
+export'u bu dekoratörlerin korumadığı tek kapıydı. Export'taki hiçbir şey bu şekilde yazılmakla
+kötü niyetli hale gelmiyordu; risk, kimsenin kaydıramayacağı bir board ve ürünün bir kolonun
+tutmasını hiç istemediği kadar veri tutan bir veritabanı sütunuydu.
+
+`trello-import-planner.ts` artık bu alanların her birini DTO'nun kullandığı aynı sabite kısıtlıyor
+(`task/dto/task-limits.ts` ve `board/dto/board-limits.ts`, hem DTO'lar hem planner tarafından
+import ediliyor, yani sayı bir kez var oluyor). Kesilen bir görev başlığı ya da açıklaması, bu
+raporda başka bir yerde zaten kullanılan aynı gerekçeyle tek bir `(card, defaulted)` satırı olarak
+raporlanır (bilinmeyen bir etiket rengi, varsayılan bir sütun kategorisi gibi): kart yine de
+import edilir, ve raporun cevapladığı soru "board'um neden farklı görünüyor" sorusudur, bunu bir
+kısıtlama da bir renk değişimi kadar iyi cevaplar. Kesilen bir checklist başlığı da aynı şekilde,
+`(checklist, defaulted)` altında raporlanır. Board'un kendi adı ve açıklaması sessizce kısıtlanır:
+yukarıdaki kapalı kelime dağarcığında bir `board` kapsamı yok, bir board bir satır sınıfı değil
+tek bir satır, ve yalnızca "1" diyebilecek bir `(board, defaulted)` satırı kullanıcının
+davranabileceği hiçbir şey söylemez, bu da `trello-export.ts`'in board'un kendi açıklaması
+kullanılamaz olduğunda zaten uyguladığı gerekçenin aynısı.
+
+Aynı bulgunun adlandırdığı ikinci bir boşluk: bir export'un bu API'den planlamasını isteyebileceği
+satır sayısını hiçbir şey sınırlamıyordu. `TRELLO_IMPORT_MAX_BYTES` ayrıştırılmış nesne grafiğinin
+boyutunu sınırlar, satır sayısını değil, ve küçük bir kart birkaç düzine bayt olabilir, yani 20
+MiB'lik bir export yine de birkaç yüz bin küçük kart olabilir. `TrelloImportService` artık
+export'un ham `lists.length` ve `cards.length` değerlerini, planner çalışmadan ve transaction
+açılmadan önce `TRELLO_IMPORT_MAX_CARDS` (varsayılan 50000) ve `TRELLO_IMPORT_MAX_LISTS`
+(varsayılan 5000) değerlerine karşı denetler; bu tavanlardan birini aşan bir export `400` döner ve
+hiçbir şey yazmaz. Sayılar, arşivlenmiş ya da bozuk girdiler ayıklanmadan önce alınır, çünkü bu
+tavanların var olma sebebi olan maliyet (ayrıştırılmış grafiğin tuttuğu heap, ve writer'ın
+`createMany` dizisinin uzunluğu), Trello'nun yazdığı her satır için ödenir, yalnızca import
+edilebilir olanlar için değil.
+
+İki değişiklik de yukarıdaki Karar bölümüne dokunmuyor: kapalı kelime dağarcığı değişmedi, yapı
+tablosu değişmedi, ve yazma hâlâ veritabanına hiç erişmeden kurulan bir plan üzerinden tek bir
+atomik transaction.

@@ -270,6 +270,16 @@ zarfına yer bırakacak şekilde **proxy'nin gövde limitinin altında** kalmak 
 ayarlanmadığı bir instance'ta da çalışır: import bağlantı attachment'ları yaratır, onlar da bayt
 saklamaz.
 
+İki değişken daha var, bunlar export'un baytını değil board'un şeklini sınırlıyor:
+`TRELLO_IMPORT_MAX_CARDS` (varsayılan `50000`) ve `TRELLO_IMPORT_MAX_LISTS` (varsayılan `5000`),
+export'un taşıdığı kart veya liste sayısı bu değerleri geçerse tek bir satır bile planlanmadan
+`400` döner ve hiçbir şey yazılmaz. `TRELLO_IMPORT_MAX_BYTES` tek başına bunu sınırlamaz: küçük
+bir kart birkaç düzine bayt olabilir, yani bayt tavanının çok altında kalan bir export yine de bu
+import'un taşımak için var olduğu board'dan çok daha fazla satır taşıyabilir. Importer'ın yazdığı
+her ad ve açıklama da diğer her yazma yolunun uyguladığı aynı uzunlukla sınırlanır (bir görev
+başlığı 500 karaktere, bir açıklama 20000'e kadar, ve benzeri); başlığı kesilmek zorunda kalan bir
+kart yine de import edilir ve import raporu bunu değişerek gelen satırlardan biri olarak sayar.
+
 ## 3. Başlatın
 
 ```bash
