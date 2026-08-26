@@ -834,6 +834,12 @@ let you stop doing that: a **signature** that says this image came out of this r
 release workflow, and an **SBOM** that says what is inside it. Both are optional to use and
 neither protects anyone who never runs the commands below.
 
+The base images underneath the stack, `postgres`, `redis` and `caddy` in `docker-compose.yml`
+and `node` in the api and web Dockerfiles, are pinned `tag@sha256:...` instead of a bare tag for
+a related reason: two builds of the same release then resolve the same bytes, and Dependabot
+bumps each digest weekly so an upstream fix still arrives as a reviewable pull request instead of
+silently, the next time something happens to rebuild.
+
 ### Checking the signature
 
 You need [cosign](https://github.com/sigstore/cosign) **3.0 or newer** — the signatures are
