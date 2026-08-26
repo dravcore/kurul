@@ -242,6 +242,17 @@ describe('useBoardTaskDnd', () => {
     expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_A, index: 1 });
   });
 
+  it('marks the card’s own slot while it is over itself', () => {
+    const tasks = [task('a', COLUMN_A, 1000), task('b', COLUMN_A, 2000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', 'a')));
+
+    // @dnd-kit reports the dragged card as its own target for as long as it has not travelled
+    // past a neighbour, and the slot it would land in is the one it is already in.
+    expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_A, index: 0 });
+  });
+
   it('marks the end of its own column when the empty area under it is hovered', () => {
     const tasks = [task('a', COLUMN_A, 1000), task('b', COLUMN_A, 2000)];
     const { rendered } = setup(tasks);

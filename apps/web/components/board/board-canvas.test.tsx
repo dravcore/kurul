@@ -201,8 +201,8 @@ describe('BoardCanvas drop indicator', () => {
     });
 
     expect(lastColumnProps('col-2').dropIndicatorIndex).toBe(3);
-    // A primitive rather than the indicator object, so the two columns that are not the target
-    // keep the identical prop across a whole drag and the memo holds.
+    // A primitive rather than the indicator object: a column that is not the target is handed a
+    // prop equal in value for the whole drag rather than a fresh object on every change.
     expect(lastColumnProps('col-1').dropIndicatorIndex).toBeNull();
   });
 

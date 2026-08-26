@@ -158,9 +158,10 @@ export const BoardColumn = memo(function BoardColumn({
 
   /**
    * The rail gives back the ten pixels it costs the column: its own two, and the eight the
-   * `gap-2` above adds for one more child. @dnd-kit re-measures every droppable rect on each
-   * pointer move, so an insertion mark that pushed the cards under it down would be hit-tested
-   * against rects it had itself just moved, and the slot it points at would oscillate.
+   * `gap-2` above adds for one more child. @dnd-kit measures each droppable once, when the drag
+   * begins, and it measures with transforms stripped but layout kept, so a mark that reserved
+   * card height would leave every rect below it stale by that height for the rest of the drag
+   * and the hit test would keep resolving to a card the reader is no longer over.
    */
   const rail = (
     <div aria-hidden data-slot="drop-indicator" className="-my-[5px] h-0.5 shrink-0 bg-signature" />

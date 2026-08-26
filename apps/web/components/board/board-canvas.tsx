@@ -120,9 +120,10 @@ export function BoardCanvas({
             composerFocusNonce={composerFocusNonce}
             onComposerOpenChange={(open) => setComposerColumnId(open ? column.id : null)}
             onTaskCreated={onTaskCreated}
-            // A number rather than the indicator itself, so the columns that are not the target
-            // are handed the identical `null` on every move of the drag and the column's `memo`
-            // holds instead of the whole strip re-rendering per pointer event.
+            // A number rather than the indicator object, so a column that is not the target is
+            // handed a prop equal in value for the whole drag instead of a fresh object each
+            // time. How often that happens at all is bounded by @dnd-kit, which raises
+            // `onDragOver` from an effect keyed on the over id rather than per pointer event.
             dropIndicatorIndex={
               dnd.dropIndicator?.columnId === column.id ? dnd.dropIndicator.index : null
             }
