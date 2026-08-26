@@ -961,8 +961,11 @@ const TEXT_UNDER_A_RISKY_GROUND: { file: string; note: string }[] = [
     file: 'components/common/submit-error.tsx',
     note:
       'the destructive submit-failure line, reached from board-list.tsx through the create, ' +
-      'rename, delete and import dialogs. Every caller renders it inside a dialog body or an ' +
-      'auth form, whose grounds are --popover (4.62 dark, the worst of them) and --background',
+      'rename, delete and import dialogs, and from board-column.tsx through the task ' +
+      'composer. Its dialog and auth-form callers put it on --popover (4.62 dark, the worst ' +
+      'of them) and --background; the composer puts it on the column, which is --muted at ' +
+      'rest and the signature tint while a card is over it, and --destructive clears 4.5:1 ' +
+      'on both',
   },
   {
     file: 'components/task/checklist-badge.tsx',

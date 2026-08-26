@@ -1,6 +1,7 @@
 'use client';
 
 import { Plus } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   DndContext,
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { TaskDragPreview } from '@/components/task/sortable-task-card';
 import type { BoardTaskDndController } from '@/components/task/use-board-task-dnd';
 import { BoardColumn } from './board-column';
+import { useCreateTaskShortcut } from './use-create-task-shortcut';
 import { useReducedMotion } from './use-reduced-motion';
 
 const dropAnimation: DropAnimation = {
@@ -25,6 +27,7 @@ const dropAnimation: DropAnimation = {
 
 interface BoardCanvasProps {
   boardId: string;
+  workspaceId: string | null;
   columns: ColumnDto[];
   tasksByColumn: Map<string, TaskDto[]>;
   selectedTaskId: string | null;
@@ -41,12 +44,13 @@ interface BoardCanvasProps {
   onOpenColumnSettings: (column: ColumnDto) => void;
   onDeleteColumn: (column: ColumnDto) => void;
   onMoveColumn: (column: ColumnDto, direction: -1 | 1) => void;
-  onAddTask: (columnId: string) => void;
+  onTaskCreated: (task: TaskDto) => void;
 }
 
 /** The scrollable column strip and everything drag and drop needs around it. */
 export function BoardCanvas({
   boardId,
+  workspaceId,
   columns,
   tasksByColumn,
   selectedTaskId,
@@ -59,10 +63,18 @@ export function BoardCanvas({
   onOpenColumnSettings,
   onDeleteColumn,
   onMoveColumn,
-  onAddTask,
+  onTaskCreated,
 }: BoardCanvasProps): React.ReactElement {
   const t = useTranslations('app.board');
   const reducedMotion = useReducedMotion();
+  const [composerColumnId, setComposerColumnId] = useState<string | null>(null);
+
+  // Every column takes tasks from the same role check, so the first column is the first one a
+  // task can be added to.
+  const firstColumnId = columns[0]?.id ?? null;
+  const openFirstComposer = useCallback(() => setComposerColumnId(firstColumnId), [firstColumnId]);
+  const canAddTask = canMutateTasks && workspaceId !== null && firstColumnId !== null;
+  useCreateTaskShortcut(canAddTask ? openFirstComposer : null);
 
   return (
     <DndContext
@@ -89,7 +101,10 @@ export function BoardCanvas({
             onDelete={() => onDeleteColumn(column)}
             onMoveLeft={() => onMoveColumn(column, -1)}
             onMoveRight={() => onMoveColumn(column, 1)}
-            onAddTask={() => onAddTask(column.id)}
+            workspaceId={workspaceId}
+            composerOpen={composerColumnId === column.id}
+            onComposerOpenChange={(open) => setComposerColumnId(open ? column.id : null)}
+            onTaskCreated={onTaskCreated}
             className={entranceDone ? undefined : 'board-column-enter'}
             style={entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)}
           />

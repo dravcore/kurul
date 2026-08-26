@@ -11,13 +11,10 @@ import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 export type BoardDialogsController = {
   createColumnOpen: boolean;
   setCreateColumnOpen: Dispatch<SetStateAction<boolean>>;
-  createTaskColumnId: string | null;
   columnSettings: ColumnDto | null;
   deleteColumn: ColumnDto | null;
   deleteTask: TaskDto | null;
   openCreateColumn: () => void;
-  openCreateTask: (columnId: string) => void;
-  closeCreateTask: () => void;
   openColumnSettings: (column: ColumnDto) => void;
   closeColumnSettings: () => void;
   openDeleteColumn: (column: ColumnDto) => void;
@@ -28,14 +25,11 @@ export type BoardDialogsController = {
 
 export function useBoardDialogs(): BoardDialogsController {
   const [createColumnOpen, setCreateColumnOpen] = useState(false);
-  const [createTaskColumnId, setCreateTaskColumnId] = useState<string | null>(null);
   const [columnSettings, setColumnSettings] = useState<ColumnDto | null>(null);
   const [deleteColumn, setDeleteColumn] = useState<ColumnDto | null>(null);
   const [deleteTask, setDeleteTask] = useState<TaskDto | null>(null);
 
   const openCreateColumn = useCallback(() => setCreateColumnOpen(true), []);
-  const openCreateTask = useCallback((columnId: string) => setCreateTaskColumnId(columnId), []);
-  const closeCreateTask = useCallback(() => setCreateTaskColumnId(null), []);
   const openColumnSettings = useCallback((column: ColumnDto) => setColumnSettings(column), []);
   const closeColumnSettings = useCallback(() => setColumnSettings(null), []);
   const openDeleteColumn = useCallback((column: ColumnDto) => setDeleteColumn(column), []);
@@ -47,13 +41,10 @@ export function useBoardDialogs(): BoardDialogsController {
     () => ({
       createColumnOpen,
       setCreateColumnOpen,
-      createTaskColumnId,
       columnSettings,
       deleteColumn,
       deleteTask,
       openCreateColumn,
-      openCreateTask,
-      closeCreateTask,
       openColumnSettings,
       closeColumnSettings,
       openDeleteColumn,
@@ -63,13 +54,10 @@ export function useBoardDialogs(): BoardDialogsController {
     }),
     [
       createColumnOpen,
-      createTaskColumnId,
       columnSettings,
       deleteColumn,
       deleteTask,
       openCreateColumn,
-      openCreateTask,
-      closeCreateTask,
       openColumnSettings,
       closeColumnSettings,
       openDeleteColumn,

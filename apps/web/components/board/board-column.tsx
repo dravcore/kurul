@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SortableTaskCard } from '@/components/task/sortable-task-card';
+import { TaskComposer } from './task-composer';
 
 /**
  * How many cards a column mounts before the reader has to scroll for the rest.
@@ -71,6 +72,8 @@ interface BoardColumnProps {
   column: ColumnDto;
   tasks: TaskDto[];
   boardId: string;
+  /** Null until the workspace has bootstrapped; the composer has nowhere to post without it. */
+  workspaceId: string | null;
   selectedTaskId?: string | null;
   canMutateColumns: boolean;
   canMutateTasks: boolean;
@@ -80,7 +83,10 @@ interface BoardColumnProps {
   onDelete: () => void;
   onMoveLeft: () => void;
   onMoveRight: () => void;
-  onAddTask: () => void;
+  /** One composer is open on the board at a time, so the canvas owns which column has it. */
+  composerOpen: boolean;
+  onComposerOpenChange: (open: boolean) => void;
+  onTaskCreated: (task: TaskDto) => void;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -89,6 +95,7 @@ export const BoardColumn = memo(function BoardColumn({
   column,
   tasks,
   boardId,
+  workspaceId,
   selectedTaskId = null,
   canMutateColumns,
   canMutateTasks,
@@ -98,7 +105,9 @@ export const BoardColumn = memo(function BoardColumn({
   onDelete,
   onMoveLeft,
   onMoveRight,
-  onAddTask,
+  composerOpen,
+  onComposerOpenChange,
+  onTaskCreated,
   className,
   style,
 }: BoardColumnProps): React.ReactElement {
@@ -133,6 +142,19 @@ export const BoardColumn = memo(function BoardColumn({
    * drop target under any list.
    */
   const visibleTaskIds = useMemo(() => visibleTasks.map((task) => task.id), [visibleTasks]);
+
+  const addTaskRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusRef = useRef(false);
+
+  /**
+   * Focus goes back to the `Add task` button the composer replaced, once the button is back in
+   * the DOM to receive it.
+   */
+  useEffect(() => {
+    if (composerOpen || !returnFocusRef.current) return;
+    returnFocusRef.current = false;
+    addTaskRef.current?.focus();
+  }, [composerOpen]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const hasMore = renderCount < tasks.length;
@@ -261,17 +283,31 @@ export const BoardColumn = memo(function BoardColumn({
             {t('emptyDrop')}
           </div>
         ) : null}
-        {canMutateTasks ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="justify-start"
-            onClick={onAddTask}
-          >
-            <Plus />
-            {tTask('createAction')}
-          </Button>
+        {canMutateTasks && workspaceId !== null ? (
+          composerOpen ? (
+            <TaskComposer
+              workspaceId={workspaceId}
+              boardId={boardId}
+              columnId={column.id}
+              onCreated={onTaskCreated}
+              onClose={(returnFocus) => {
+                returnFocusRef.current = returnFocus;
+                onComposerOpenChange(false);
+              }}
+            />
+          ) : (
+            <Button
+              ref={addTaskRef}
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="justify-start"
+              onClick={() => onComposerOpenChange(true)}
+            >
+              <Plus />
+              {tTask('createAction')}
+            </Button>
+          )
         ) : null}
       </div>
     </section>

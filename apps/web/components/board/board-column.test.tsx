@@ -1,14 +1,27 @@
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { DndContext } from '@dnd-kit/core';
 import { NextIntlClientProvider } from 'next-intl';
 import { ColumnCategory, Priority, type ColumnDto, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
+import { ApiError, api } from '@/lib/api';
 import {
   BoardColumn,
   COLUMN_INITIAL_RENDER_BUDGET,
   COLUMN_RENDER_BUDGET_STEP,
 } from './board-column';
+
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
+
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>();
+  return { ...actual, api: { ...actual.api, post: vi.fn() } };
+});
+
+const apiPost = vi.mocked(api.post);
 
 /**
  * `isOver` is dnd-kit's, and reaching it for real would mean driving a pointer drag across two
@@ -32,6 +45,7 @@ vi.mock('@dnd-kit/core', async (importOriginal) => {
 
 const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d10';
 const COLUMN_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d11';
+const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d13';
 
 const column: ColumnDto = {
   id: COLUMN_ID,
@@ -105,29 +119,76 @@ function installIntersectionObserver(): StubObserver[] {
   return observers;
 }
 
-function renderColumn(tasks: TaskDto[], selectedTaskId: string | null = null) {
+/**
+ * `BoardCanvas` owns which column has its composer open, so the column is a controlled
+ * component and a test needs the other half of that pair to click anything.
+ */
+function ColumnHarness({
+  tasks,
+  selectedTaskId,
+  onTaskCreated,
+}: {
+  tasks: TaskDto[];
+  selectedTaskId: string | null;
+  onTaskCreated: (task: TaskDto) => void;
+}): React.ReactElement {
+  const [composerOpen, setComposerOpen] = useState(false);
+  return (
+    <BoardColumn
+      column={column}
+      tasks={tasks}
+      boardId={BOARD_ID}
+      workspaceId={WORKSPACE_ID}
+      selectedTaskId={selectedTaskId}
+      canMutateColumns
+      canMutateTasks
+      canMoveLeft={false}
+      canMoveRight={false}
+      onOpenSettings={vi.fn()}
+      onDelete={vi.fn()}
+      onMoveLeft={vi.fn()}
+      onMoveRight={vi.fn()}
+      composerOpen={composerOpen}
+      onComposerOpenChange={setComposerOpen}
+      onTaskCreated={onTaskCreated}
+    />
+  );
+}
+
+function renderColumn(
+  tasks: TaskDto[],
+  selectedTaskId: string | null = null,
+  onTaskCreated: (task: TaskDto) => void = vi.fn(),
+) {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <DndContext>
-        <BoardColumn
-          column={column}
+        <ColumnHarness
           tasks={tasks}
-          boardId={BOARD_ID}
           selectedTaskId={selectedTaskId}
-          canMutateColumns
-          canMutateTasks
-          canMoveLeft={false}
-          canMoveRight={false}
-          onOpenSettings={vi.fn()}
-          onDelete={vi.fn()}
-          onMoveLeft={vi.fn()}
-          onMoveRight={vi.fn()}
-          onAddTask={vi.fn()}
+          onTaskCreated={onTaskCreated}
         />
       </DndContext>
     </NextIntlClientProvider>,
   );
 }
+
+const composerCopy = messages.app.board.column;
+
+const addTaskButton = (): HTMLElement =>
+  screen.getByRole('button', { name: messages.app.board.task.createAction });
+
+const field = (): HTMLInputElement =>
+  screen.getByRole('textbox', { name: composerCopy.composerPlaceholder }) as HTMLInputElement;
+
+const composerForm = (): HTMLFormElement => {
+  const form = document.querySelector('[data-slot="task-composer"]');
+  if (!(form instanceof HTMLFormElement)) throw new Error('the composer is not open');
+  return form;
+};
+
+const openDetailButton = (): HTMLElement =>
+  screen.getByRole('button', { name: composerCopy.composerOpenDetail });
 
 // One link per mounted card — the column renders no other links.
 const cardCount = (): number => screen.queryAllByRole('link').length;
@@ -135,6 +196,7 @@ const cardCount = (): number => screen.queryAllByRole('link').length;
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.clearAllMocks();
   droppableIsOver = false;
 });
 
@@ -257,5 +319,185 @@ describe('BoardColumn drop target', () => {
     // The tint stays the state's normal-mode mark; the attribute only adds the forced-colours
     // twin of it.
     expect(section.className.split(/\s+/)).toContain('bg-signature-subtle');
+  });
+});
+
+describe('BoardColumn task composer', () => {
+  function createdTask(): TaskDto {
+    return makeTasks(1)[0]!;
+  }
+
+  it('turns the Add task button into a focused field', () => {
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+
+    expect(field()).toBe(document.activeElement);
+    expect(screen.queryByRole('button', { name: messages.app.board.task.createAction })).toBeNull();
+  });
+
+  it('creates on Enter and leaves the caret in an emptied field', async () => {
+    const task = createdTask();
+    apiPost.mockResolvedValue(task);
+    const onTaskCreated = vi.fn();
+    renderColumn([], null, onTaskCreated);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.change(field(), { target: { value: '  Ship the composer  ' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+
+    await waitFor(() => expect(onTaskCreated).toHaveBeenCalledWith(task));
+    expect(apiPost).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/boards/${BOARD_ID}/tasks`, {
+      title: 'Ship the composer',
+      columnId: COLUMN_ID,
+    });
+    await waitFor(() => expect(field().value).toBe(''));
+    expect(field()).toBe(document.activeElement);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing for a title that is only whitespace', () => {
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.change(field(), { target: { value: '   ' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+
+    expect(apiPost).not.toHaveBeenCalled();
+  });
+
+  it('returns to the Add task button on Escape', () => {
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.keyDown(field(), { key: 'Escape' });
+
+    expect(addTaskButton()).toBe(document.activeElement);
+  });
+
+  it('returns to the Add task button when an empty field loses focus', () => {
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.blur(field());
+
+    expect(addTaskButton()).toBe(document.activeElement);
+  });
+
+  it('keeps a typed title when the field loses focus', () => {
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.change(field(), { target: { value: 'Half a thought' } });
+    fireEvent.blur(field());
+
+    expect(field().value).toBe('Half a thought');
+  });
+
+  it('marks the form busy and disables the field while the create is in flight', async () => {
+    apiPost.mockReturnValue(new Promise(() => {}));
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.change(field(), { target: { value: 'Slow one' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+
+    await waitFor(() => expect(composerForm().getAttribute('aria-busy')).toBe('true'));
+    expect(field().disabled).toBe(true);
+    // The label is never swapped for a waiting string.
+    expect(openDetailButton().textContent).toBe(composerCopy.composerOpenDetail);
+  });
+
+  it('shows the forbidden line when the create is refused', async () => {
+    apiPost.mockRejectedValue(
+      new ApiError({ statusCode: 403, error: 'Forbidden', message: 'Forbidden' }),
+    );
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.change(field(), { target: { value: 'Not allowed' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      messages.app.board.task.forbidden,
+    );
+    expect(field().value).toBe('Not allowed');
+  });
+
+  it('shows the generic failure line for anything else', async () => {
+    apiPost.mockRejectedValue(new Error('offline'));
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.change(field(), { target: { value: 'Nowhere to go' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      messages.app.board.task.createError,
+    );
+  });
+
+  it('creates the task and opens its panel from Open details', async () => {
+    const task = createdTask();
+    apiPost.mockResolvedValue(task);
+    const onTaskCreated = vi.fn();
+    renderColumn([], null, onTaskCreated);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.change(field(), { target: { value: 'Needs a due date' } });
+    fireEvent.click(openDetailButton());
+
+    await waitFor(() => expect(onTaskCreated).toHaveBeenCalledWith(task));
+    expect(router.push).toHaveBeenCalledWith(`/board/${BOARD_ID}/task/${task.id}`);
+  });
+
+  it('offers Open details only once something is typed', () => {
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    expect(openDetailButton().hasAttribute('disabled')).toBe(true);
+
+    fireEvent.change(field(), { target: { value: 'A title' } });
+    expect(openDetailButton().hasAttribute('disabled')).toBe(false);
+  });
+
+  it('keeps the composer open while focus moves to Open details', () => {
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.blur(field(), { relatedTarget: openDetailButton() });
+
+    expect(composerForm()).toBeDefined();
+  });
+
+  it('offers no composer at all without an active workspace', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <DndContext>
+          <BoardColumn
+            column={column}
+            tasks={[]}
+            boardId={BOARD_ID}
+            workspaceId={null}
+            selectedTaskId={null}
+            canMutateColumns
+            canMutateTasks
+            canMoveLeft={false}
+            canMoveRight={false}
+            onOpenSettings={vi.fn()}
+            onDelete={vi.fn()}
+            onMoveLeft={vi.fn()}
+            onMoveRight={vi.fn()}
+            composerOpen={false}
+            onComposerOpenChange={vi.fn()}
+            onTaskCreated={vi.fn()}
+          />
+        </DndContext>
+      </NextIntlClientProvider>,
+    );
+
+    expect(screen.queryByRole('button', { name: messages.app.board.task.createAction })).toBeNull();
   });
 });

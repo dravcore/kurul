@@ -518,6 +518,8 @@
         "defaultsConflict": "This board already has columns. Reloading the board.",
         "retryAction": "Try again",
         "emptyDrop": "Drop a task here",
+        "composerPlaceholder": "Task title",
+        "composerOpenDetail": "Open details",
         "cancel": "Cancel",
         "forbidden": "You need admin access to change columns. Ask a workspace owner."
       },
@@ -661,7 +663,6 @@
         "panelLabel": "Task details",
         "close": "Close task panel",
         "backToBoard": "Back to board",
-        "createTitle": "Add task",
         "createAction": "Add task",
         "createError": "Could not add this task.",
         "deleteTitle": "Delete this task?",

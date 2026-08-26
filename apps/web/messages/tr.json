@@ -518,6 +518,8 @@
         "defaultsConflict": "Bu board'da zaten column var. Board yeniden yükleniyor.",
         "retryAction": "Tekrar dene",
         "emptyDrop": "Bir task'ı buraya bırakın",
+        "composerPlaceholder": "Task başlığı",
+        "composerOpenDetail": "Detayları aç",
         "cancel": "Vazgeç",
         "forbidden": "Column'ları değiştirmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin."
       },
@@ -661,7 +663,6 @@
         "panelLabel": "Task detayları",
         "close": "Task panelini kapat",
         "backToBoard": "Board'a dön",
-        "createTitle": "Task ekle",
         "createAction": "Task ekle",
         "createError": "Bu task eklenemedi.",
         "deleteTitle": "Bu task'ı sil?",

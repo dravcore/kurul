@@ -546,16 +546,6 @@ describe('BoardView dialog wiring', () => {
     expect(tasksUpdater(fixture.tasks).every((entry) => entry.columnId !== 'col-1')).toBe(true);
   });
 
-  it('appends a task created from the dialog', () => {
-    const fixture = loadedFixture();
-    const data = renderLoadedBoard(fixture);
-
-    act(() => lastBoardDialogsProps().onTaskCreated(task('task-new', 'col-1', 5000)));
-
-    const updater = asUpdater(calls(data.setTasks)[0]);
-    expect(updater(fixture.tasks)).toHaveLength(fixture.tasks.length + 1);
-  });
-
   it('drops the deleted task and returns to the board when it was the selected one', () => {
     const fixture = loadedFixture();
     const data = renderLoadedBoard(fixture, {}, 'task-a');
@@ -591,11 +581,24 @@ describe('BoardView canvas wiring', () => {
     act(() => lastBoardCanvasProps().onDeleteColumn(fixture.columns[1]!));
     expect(lastBoardDialogsProps().dialogs.deleteColumn?.id).toBe('col-2');
 
-    act(() => lastBoardCanvasProps().onAddTask('col-1'));
-    expect(lastBoardDialogsProps().dialogs.createTaskColumnId).toBe('col-1');
-
     act(() => lastBoardCanvasProps().onCreateColumn());
     expect(lastBoardDialogsProps().dialogs.createColumnOpen).toBe(true);
+  });
+
+  it('hands the canvas the workspace the composer posts to', () => {
+    renderLoadedBoard(loadedFixture());
+
+    expect(lastBoardCanvasProps().workspaceId).toBe(WORKSPACE_ID);
+  });
+
+  it('appends a task the composer created', () => {
+    const fixture = loadedFixture();
+    const data = renderLoadedBoard(fixture);
+
+    act(() => lastBoardCanvasProps().onTaskCreated(task('task-new', 'col-1', 5000)));
+
+    const updater = asUpdater(calls(data.setTasks)[0]);
+    expect(updater(fixture.tasks)).toHaveLength(fixture.tasks.length + 1);
   });
 
   it('moves a column through the mutations hook', () => {

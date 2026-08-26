@@ -154,6 +154,13 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     [pathname, router, searchParams],
   );
 
+  const appendTask = useCallback(
+    (task: TaskDto): void => {
+      setTasks((current) => [...current, task]);
+    },
+    [setTasks],
+  );
+
   const applyTaskPatch = useCallback(
     (patch: TaskPatch): void => {
       if (!tasksRef.current.some((task) => task.id === patch.id)) {
@@ -302,6 +309,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
           ) : (
             <BoardCanvas
               boardId={boardId}
+              workspaceId={activeId}
               columns={columns}
               tasksByColumn={tasksByColumn}
               selectedTaskId={selectedTaskId}
@@ -314,7 +322,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
               onOpenColumnSettings={dialogs.openColumnSettings}
               onDeleteColumn={dialogs.openDeleteColumn}
               onMoveColumn={(column, direction) => void moveColumn(column, direction)}
-              onAddTask={dialogs.openCreateTask}
+              onTaskCreated={appendTask}
             />
           )}
         </div>
@@ -354,7 +362,6 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             setColumns((current) => current.filter((item) => item.id !== columnId));
             setTasks((current) => current.filter((task) => task.columnId !== columnId));
           }}
-          onTaskCreated={(task) => setTasks((current) => [...current, task])}
           onTaskDeleted={(taskId) => {
             setTasks((current) => current.filter((task) => task.id !== taskId));
             if (selectedTaskId === taskId) {

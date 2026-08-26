@@ -1312,6 +1312,7 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
               column={COLUMN}
               tasks={[]}
               boardId={BOARD_ID}
+              workspaceId={WORKSPACE_ID}
               selectedTaskId={null}
               canMutateColumns
               canMutateTasks
@@ -1321,7 +1322,9 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
               onDelete={vi.fn()}
               onMoveLeft={vi.fn()}
               onMoveRight={vi.fn()}
-              onAddTask={vi.fn()}
+              composerOpen={false}
+              onComposerOpenChange={vi.fn()}
+              onTaskCreated={vi.fn()}
             />
           </DndContext>,
         ),
