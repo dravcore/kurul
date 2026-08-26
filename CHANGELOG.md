@@ -20,6 +20,29 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   back to a generic line, so the feed keeps reading sensibly until the sentence for these two
   types lands in a follow-up UI PR. Closes #39.
 
+- **Password reset by email: a forgotten password is now recovered by the person who forgot it.**
+  "Forgot your password?" on the sign-in screen leads to `/forgot-password`, which asks for an
+  address and mails a single-use link good for one hour; the link lands on `/reset-password`,
+  where a new password is chosen. Until now the only way back into a locked-out account was an
+  instance admin deleting it, which destroyed the workspace memberships along with it.
+
+  The request endpoint answers the same `200` and the same body for an address with no account
+  as for one with an account, so it cannot be used to find out who has an account here, and
+  Better Auth's built-in `3 / 60s` rule already caps it. Spending the link revokes every session
+  the account held, which is what makes a reset a way to take an account back and not only a way
+  to remember it; a spent or expired link is refused and says so, rather than failing silently.
+  The email is written in the recipient's language, EN and TR, from the same template shape the
+  verification mail uses. Delivery is a hard requirement: with `SMTP_HOST` unset the whole
+  message including the link goes to the API log instead, which is workable on a solo install
+  and is not a recovery path for anyone else, see
+  [self-hosting](docs/self-hosting.md#email-smtp). On a `DEMO_MODE` instance the demo account
+  is skipped, since its password is published and a reset would only lock every visitor out.
+
+  The emailed link is the first URL this API serves with a live secret in its path, so the JSON
+  access log now writes it as `/auth/reset-password/:token`. A reverse proxy of your own in
+  front of it still logs the URL it was asked for unless you filter that route out, see
+  [self-hosting](docs/self-hosting.md#bringing-your-own-reverse-proxy).
+
 - **`SIGNUP_ENABLED`: a switch that closes registration on a self-hosted instance.** Until now
   the only way to stop strangers registering on an internet-facing install was to pin
   `PLAN_MAX_USERS` at the current head count, which blocks the operator's own invitees along
@@ -57,6 +80,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a plan catalogue in code, an entitlement write that is a single transaction with its idempotency
   ledger inside it, a grace period that deletes nothing, and a test proving that an instance with
   `BILLING_PROVIDER` unset runs exactly what it runs today.
+
 - **Plan limits: ceilings on seats, boards, workspaces and accounts, unlimited until an operator
   sets one.** Four variables (`PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
   `PLAN_MAX_WORKSPACES`, `PLAN_MAX_USERS`) put a number on quantities the product never bounded.
@@ -655,6 +679,36 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   opening a second palette. A new gate, `app/globals.contrast.test.ts`, measures every text token
   against six real surfaces and every boundary token at 3:1 on every run, so a future token change
   that quietly drops a pair under AA fails the build instead of shipping.
+- **Text now runs on one type scale, and a focused control draws exactly one indicator.** Every
+  button label, dialog title, form field and menu item used to draw from two competing sources:
+  shadcn's own default text sizes and weights sitting beside Kurul's own scale, so a button and the
+  card title next to it could land at different pixel sizes without either class saying so. The
+  Tailwind defaults are gone from `components/ui/` and the domain tree in favour of Kurul's own
+  steps, and `app/theme-classes.test.ts` fails the build on any class that resolves to nothing, so a
+  stray default cannot slip back in unnoticed. A dialog's title steps down from an unintended 18px
+  to the 16px `title` step the scale actually defines, since there never was an 18px step; a button
+  label and the card title beside it now agree on the same 13px. Fraunces also now loads its
+  optical-size axis (`axes: ['opsz']` in `app/layout.tsx`) so a 40px `.text-display` heading renders
+  with the carved 40pt cut instead of the low-optical-size cut `next/font/google` embeds by
+  default. Below 768px, every text field (`Input`, `Textarea`, `Select`) computes at 16px so iOS
+  Safari stops zooming the page on focus, matched by a new assertion in
+  `e2e/tests/mobile-navigation.spec.ts`, now that `cn()` dedupes the type scale so that 16px
+  override reliably beats any conflicting default reaching the DOM.
+
+  The same pass removed a duplicate focus mark: a focused control used to draw an outline and a
+  separate copper ring on top of it, from two different rules that had never been told about each
+  other. Only the outline is left, 2px `--ring` at 2px offset from a single rule in `@layer base`,
+  and a field that is both invalid and focused recolours that one outline to the destructive token
+  instead of growing a second mark beside its red border.
+- **The copper signature colour now has a written budget instead of an unenforced guideline.** Full
+  strength copper is limited to at most two uses per screen, the sancak rail plus, where a view has
+  one, its single primary action button. The focus ring and any data mark, a meter fill, a progress
+  fill, the dashboard's one copper emphasis series, do not count against that budget: the ring is
+  singular and momentary by construction, and a data mark is showing a value rather than describing
+  the screen around it. The signature tint is bound to exactly one role, active or selected, and
+  neither the tint nor the hover surface carries coloured copper text of its own: identity lives in
+  the sancak rail and the one button, in a dot beside a label, never in a coloured word sitting on
+  a tinted background.
 
 ### Fixed
 
@@ -665,6 +719,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   white label in light mode with a dark OS, and lost its hover step in dark mode with a light OS.
   `app/globals.css` now declares `@custom-variant dark (&:where(.dark, .dark *))`, so every
   `dark:` utility follows the theme the app is actually showing.
+- **Archivo and Fraunces were never actually rendering; the whole app drew in the system font
+  instead.** next/font's `.variable` classes (`--font-archivo`, `--font-fraunces`,
+  `--font-jetbrains`) were defined on `<body>`, but the theme's font stacks (`--font-sans`,
+  `--font-display`, `--font-mono` in `app/globals.css`) resolve their `var()` references on
+  `:root`, and a custom property only resolves against the element that declares it, so every
+  stack fell straight through to its fallback list. The three `.variable` classes now sit on
+  `<html>` instead, next to the tokens that need them, so both faces load and draw as designed.
 
 ## [0.3.0] - 2026-08-22
 

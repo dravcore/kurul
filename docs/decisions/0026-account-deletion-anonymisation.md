@@ -4,6 +4,7 @@
 **Date:** 2026-08-15
 **Updated:** 2026-08-18 — the deletion also removes every `WorkspaceInvitation` addressed to the departing user, in any state: `email` is a literal column anonymising the `User` row never touched, so the real address outlived the erasure request (audit finding DB-01).
 **Updated:** 2026-08-18 — `session.cookieCache.maxAge` (`api/src/auth/auth.ts`) shrank from 5 minutes to 60 seconds, so the "five minutes" figures below describing the deleted-account cookie window are historical: the actual window this ADR accepts is now up to 60 seconds (audit finding SEC-01).
+**Updated:** 2026-08-26: password reset is now configured (`emailAndPassword.sendResetPassword`), so `reset-password:<token>` is a `Verification` row that really gets written. The erasure transaction's `Verification` delete gained a user-id condition beside the address one, and the consequence below is rewritten to match (audit finding SEC-01, feature gap).
 
 > 🌐 English (canonical) | [Türkçe](../tr/decisions/0026-account-deletion-anonymisation.md)
 
@@ -302,14 +303,17 @@ narrower than it sounds and are worth stating rather than discovering:
 - **Deleting an account is a write to other people's workspaces.** Members see a roster shrink
   and an `account.deleted` entry in their feed. That is intended — the alternative is a card
   assigned to nobody and a comment from a name that no longer appears anywhere.
-- **`Verification` is swept by address, and that reaches less than it sounds like.** Measured
-  rather than assumed: on this deployment Better Auth 1.6 puts an address in
+- **`Verification` is swept by user id and by address, and the address half reaches less than it
+  sounds like.** Measured rather than assumed: on this deployment Better Auth puts an address in
   `Verification.identifier` for **no** flow. E-mail verification is a JWT signed with the secret
-  and writes no row at all; password reset stores `reset-password:<opaque token>`. The address
-  only lands in that column through the OTP and magic-link plugins, which are not enabled. So
-  the deletion removes every verification row that names the person — currently none — and the
-  token-shaped rows are left to their own expiry, which ADR 0020's nightly sweep already
-  enforces and which discloses no address in the meantime.
+  and writes no row at all; password reset stores `reset-password:<opaque token>` as the
+  identifier and the _user id_ as the value. The address only lands in that column through the
+  OTP and magic-link plugins, which are not enabled. So the address condition removes every
+  verification row that names the person, currently none, and the user-id condition is what
+  removes a live reset token: left behind, it would let whoever holds that link set a password
+  on the anonymised row until the token expired. Anything else token-shaped is left to its own
+  expiry, which ADR 0020's nightly sweep already enforces and which discloses no address in the
+  meantime.
 - **Data portability (Article 20) is explicitly out of scope**, as the phase plan states. This
   item is erasure. An export is a separate piece of work and pretending otherwise here would
   have produced a worse version of both.

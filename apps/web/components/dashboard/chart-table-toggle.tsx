@@ -37,7 +37,7 @@ export function ChartTableToggle({
             <thead className="border-b border-border bg-muted text-muted-foreground">
               <tr>
                 {columns.map((column) => (
-                  <th key={column} className="px-3 py-2 font-medium">
+                  <th key={column} className="px-3 py-2 font-strong">
                     {column}
                   </th>
                 ))}
