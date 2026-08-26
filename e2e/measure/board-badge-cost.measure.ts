@@ -267,7 +267,7 @@ test('board cost with and without the attachment badge', async ({ stack, openAs 
   //
   // A fresh context per sample was tried first and is the cleaner idea — no carried-over JIT
   // state, no warm cache — but fourteen contexts opened and closed in sequence left the board's
-  // socket stuck on "Reconnecting…" partway through the run, and a measurement rig that flakes
+  // socket stuck showing the connection row partway through the run, and a measurement rig that flakes
   // is worse than one with a named bias. The bias is this: every number below is a *warm* tab's
   // number, and the two arms alternate so the warming is shared. The absolute paint figure is
   // therefore optimistic; the difference between the arms, which is the only thing this file

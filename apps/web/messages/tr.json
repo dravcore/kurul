@@ -399,6 +399,8 @@
       "loadError": "Board yüklenemedi.",
       "unavailable": "Bu board yok ya da erişim yetkiniz yok.",
       "loadingMore": "Task'ların geri kalanı yükleniyor…",
+      "connectionLost": "Bağlantı koptu, değişiklikler görünmüyor olabilir",
+      "dragFailed": "Bu task taşınamadı.",
       "backToBoards": "Board'lara dön",
       "emptyTitle": "Henüz board yok",
       "emptyBody": "Bir board, işin bölüştüğü yerdir. Bir tane ile başlayın.",
@@ -421,6 +423,10 @@
       "changeTemplate": "Şablonu değiştir",
       "changeTemplateWith": "{name} ile başlıyor",
       "boardMenu": "Board işlemleri",
+      "card": {
+        "dueAndEstimate": "{due} · {estimate}",
+        "moreAssignees": "+{count}"
+      },
       "import": {
         "action": "Trello'dan içe aktar",
         "title": "Trello'dan içe aktar",
@@ -477,7 +483,6 @@
         }
       },
       "realtime": {
-        "reconnecting": "Yeniden bağlanıyor…",
         "dragCancelled": "Birisi bu task'ı taşıdı"
       },
       "errors": {
@@ -518,6 +523,8 @@
         "defaultsConflict": "Bu board'da zaten column var. Board yeniden yükleniyor.",
         "retryAction": "Tekrar dene",
         "emptyDrop": "Bir task'ı buraya bırakın",
+        "composerPlaceholder": "Task başlığı",
+        "composerOpenDetail": "Detayları aç",
         "cancel": "Vazgeç",
         "forbidden": "Column'ları değiştirmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin."
       },
@@ -661,7 +668,6 @@
         "panelLabel": "Task detayları",
         "close": "Task panelini kapat",
         "backToBoard": "Board'a dön",
-        "createTitle": "Task ekle",
         "createAction": "Task ekle",
         "createError": "Bu task eklenemedi.",
         "deleteTitle": "Bu task'ı sil?",
@@ -669,8 +675,8 @@
         "deleteAction": "Task'ı sil",
         "deleteError": "Bu task silinemedi.",
         "saveError": "Bu task kaydedilemedi.",
+        "saveConflict": "Bu task'ı başka biri değiştirdi. Düzenlemek için yeniden yükleyin.",
         "missing": "Bu task artık yok. Birisi silmiş olabilir.",
-        "moveError": "Bu task taşınamadı.",
         "retryAction": "Tekrar dene",
         "cancel": "Vazgeç",
         "forbidden": "Task'ları değiştirmek için workspace üyesi olmanız gerekir. Erişim için bir workspace sahibinden isteyin."

@@ -116,10 +116,21 @@
    A token override rather than `max-md:h-14` at each call site because four separate surfaces
    read `var(--topbar-height)` — the shell skeleton, the board's Suspense fallback, `Topbar`
    itself and the board page's own header — and a breakpoint only three of them knew about is
-   exactly the kind of split this variable exists to prevent. */
-@media (max-width: 767px) {
+   exactly the kind of split this variable exists to prevent.
+
+   `width < 48rem` and not `max-width: 767px`: `max-md:` compiles to the former, and the two
+   disagree for anyone whose root font size is not 16px, which would put a token override and
+   the utilities written against it on different sides of the same breakpoint. */
+@media (width < 48rem) {
   :root {
     --topbar-height: 56px;
+
+    /* A column takes 85% of the screen below `md`, so the next one is always visible at the
+       edge and the strip reads as a strip rather than as a page. The strip snaps to column
+       starts at this width (components/board/board-canvas.tsx), which is why the desktop
+       280-320px clamp comes off the column there: a clamped column would leave the snap
+       stopping short of the viewport it is meant to fill. */
+    --column-width: 85vw;
   }
 }
 
@@ -686,6 +697,67 @@ body {
   opacity: 0;
 }
 
+/* The two marks a card wears when the board answers back (docs/design.md §5): the return after a
+   move the server refused, and the tint a card takes when someone else changed it. Keyframes on
+   the card's own `data-state`, not transitions: both the rollback and a socket update re-render
+   the list in a single commit, so there is no intermediate value for a transition to run between.
+
+   `task-card-return` lands the card instead of retracing the drag. The optimistic order is gone
+   by the time it plays and nothing in the DOM still knows where the card was picked up from, so
+   the honest thing to draw is the arrival: 220ms on `--ease-in-out`, the figure docs/design.md §5
+   gives this exact case. Its reduced twin is the shared fade.
+
+   `task-card-remote-change` keeps the same animation under `reduce`: it declares background
+   colour and nothing else, which is what reduced motion preserves rather than removes, and it is
+   the only mark that says a row changed under the reader's hands. It ends on the card's own
+   ground rather than on `transparent`, which would let the column show through it, and both ends
+   are variables because the selected card already sits on the tint this mark fades from: one
+   keyframe serves both cards, and the selected one runs it between the hover step and the tint so
+   the fade is visible there too. */
+@keyframes task-card-return {
+  from {
+    opacity: 0.5;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes task-card-remote-change {
+  from {
+    background-color: var(--task-card-remote-from);
+  }
+  to {
+    background-color: var(--task-card-ground);
+  }
+}
+
+[data-slot='task-card'] {
+  --task-card-ground: var(--card);
+  --task-card-remote-from: var(--signature-subtle);
+}
+
+[data-slot='task-card'][data-selected] {
+  --task-card-ground: var(--signature-subtle);
+  --task-card-remote-from: var(--accent);
+}
+
+[data-slot='task-card'][data-state='returning'] {
+  animation: task-card-return 220ms var(--ease-in-out) both;
+}
+
+[data-slot='task-card'][data-state='remote-changed'] {
+  animation: task-card-remote-change 1200ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='task-card'][data-state='returning'] {
+    animation-name: layer-fade-in;
+  }
+}
+
 /* Forced colours replace every author colour with the user's palette, which erases exactly the
    channel this phase's feedback leans on: a surface step and a tint. Every state built on one
    carries a border-based twin here, per docs/design.md §9. */
@@ -702,6 +774,17 @@ body {
     border-color: Highlight;
   }
 
+  /* The tint a card takes when someone else changed it is a background colour and nothing
+     else, so the mode paints it the same Canvas as every resting card and the mark is gone.
+     A dotted Highlight border is the twin: the same system colour selection uses, in the one
+     channel selection does not, so the two states stay tellable apart on a card wearing both
+     (selection keeps a solid border and its outline). The animation still runs, and the border
+     carries the state for as long as the card holds it. */
+  a[data-state='remote-changed'] {
+    border-color: Highlight;
+    border-style: dotted;
+  }
+
   /* components/board/board-column.tsx marks the column dnd-kit reports as `isOver`. The column
      has no resting border, so this is the edge, not a thickening of one. Scoped to the `section`
      it renders and drawn as an outline so the 2px mark does not add to the box and reflow the
@@ -709,6 +792,14 @@ body {
   section[data-drop-target] {
     outline: 2px solid Highlight;
     outline-offset: -2px;
+  }
+
+  /* The insertion rail components/board/board-column.tsx draws between two cards. It is a
+     `--signature` ground and nothing else, so the mode would give it the same colour it gives
+     the cards around it; it is also the only mark a keyboard drag has, the wash being a second
+     touch rather than the signal. */
+  [data-slot='drop-indicator'] {
+    background: Highlight;
   }
 
   /* Chromium paints a Canvas-coloured backplate behind text runs in forced-colours mode; on this
@@ -744,5 +835,71 @@ body {
   :root,
   .dark {
     --border: var(--border-strong);
+  }
+}
+
+/* The board strip's edge masks (components/board/board-canvas.tsx). Eight columns in, the only
+   thing saying the board continues past the screen is a scrollbar, which a trackpad hides
+   entirely; these are 24px of the page fading back over each edge that still has a column
+   behind it, which is a signal at column scale rather than a new control. Each is drawn only while
+   there is a column in that direction: `data-overflow` is written from the strip's own
+   scrollLeft, scrollWidth and clientWidth, so a board whose columns fit wears no mask at all.
+
+   Pseudo-elements on the wrapper rather than on the scroller, because the scroller's own
+   `::before` would be a flex item inside it and would scroll away with the columns.
+
+   `isolation` keeps the z-index below local to the board: the mask has to sit over the columns'
+   own sticky headers (z-10 in components/board/board-column.tsx), and without a stacking context
+   of its own that number would also be competing with the topbar and the task panel.
+
+   Opacity is the only thing that moves, which is what reduced motion keeps rather than removes
+   (the block above narrows every transition to colour and opacity), so this needs no twin. */
+[data-slot='board-canvas'] {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-slot='board-canvas']::before,
+[data-slot='board-canvas']::after {
+  content: '';
+  position: absolute;
+  z-index: 11;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms var(--ease-out);
+}
+
+[data-slot='board-canvas']::before {
+  left: 0;
+  background: linear-gradient(to right, var(--background), transparent);
+}
+
+[data-slot='board-canvas']::after {
+  right: 0;
+  background: linear-gradient(to left, var(--background), transparent);
+}
+
+[data-slot='board-canvas'][data-overflow='left']::before,
+[data-slot='board-canvas'][data-overflow='both']::before {
+  opacity: 1;
+}
+
+[data-slot='board-canvas'][data-overflow='right']::after,
+[data-slot='board-canvas'][data-overflow='both']::after {
+  opacity: 1;
+}
+
+/* The strip snaps to column starts below `md` (components/board/board-canvas.tsx), and lets go
+   of the snap while a card is being carried: @dnd-kit crosses columns by scrolling this element
+   itself, and a mandatory snap would pull each of those steps back to the column the card left.
+
+   Here rather than as a `snap-none` utility on the element: Tailwind emits `snap-none` ahead of
+   `snap-x`, so the two on one element would leave the snap on. An unlayered rule outranks both. */
+@media (width < 48rem) {
+  [data-slot='board-scroller'][data-dragging] {
+    scroll-snap-type: none;
   }
 }

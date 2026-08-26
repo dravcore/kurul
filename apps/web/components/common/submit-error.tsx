@@ -17,13 +17,21 @@ import { useEffect, useRef } from 'react';
  * same wording still unmounts this node before remounting it. That matters because a
  * `role="alert"` region whose text content does not change is not guaranteed to be
  * re-announced by every screen reader; a fresh mount is announced regardless.
+ *
+ * `focusOnMount={false}` is for the one caller whose failure does not arrive on a submit the
+ * reader is waiting on: the task panel saves on blur, so its error lands after focus has
+ * already moved into the next field, and pulling it back out would interrupt someone who is
+ * mid-sentence. `role="alert"` announces the line either way; only the focus move is dropped.
  */
-export function SubmitError({ message }: Readonly<{ message: string }>): React.ReactElement {
+export function SubmitError({
+  message,
+  focusOnMount = true,
+}: Readonly<{ message: string; focusOnMount?: boolean }>): React.ReactElement {
   const ref = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
-    ref.current?.focus();
-  }, [message]);
+    if (focusOnMount) ref.current?.focus();
+  }, [focusOnMount, message]);
 
   return (
     <p ref={ref} role="alert" tabIndex={-1} className="text-body text-destructive">

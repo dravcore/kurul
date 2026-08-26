@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ArrowLeft, ArrowRight, MoreHorizontal, Plus, Settings2 } from 'lucide-react';
@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SortableTaskCard } from '@/components/task/sortable-task-card';
+import type { TaskCardSignal } from '@/components/task/task-card';
+import { TaskComposer } from './task-composer';
 
 /**
  * How many cards a column mounts before the reader has to scroll for the rest.
@@ -59,6 +61,9 @@ export const COLUMN_RENDER_BUDGET_STEP = 40;
  */
 const REVEAL_MARGIN_PX = 800;
 
+/** Shared empty map, so a board with nothing to report hands every column the same value. */
+const NO_TASK_SIGNALS: ReadonlyMap<string, TaskCardSignal> = new Map();
+
 export function columnDroppableId(columnId: string): string {
   return `column:${columnId}`;
 }
@@ -71,7 +76,19 @@ interface BoardColumnProps {
   column: ColumnDto;
   tasks: TaskDto[];
   boardId: string;
+  /** Null until the workspace has bootstrapped; the composer has nowhere to post without it. */
+  workspaceId: string | null;
   selectedTaskId?: string | null;
+  /** The slot the card in the air would land in, counted in cards; null when none is heading here. */
+  dropIndicatorIndex: number | null;
+  /** What the board last reported about each card, keyed by task id. Empty on a quiet board. */
+  taskSignals?: ReadonlyMap<string, TaskCardSignal>;
+  /**
+   * Whether this column's heading is the strip's single tab stop. The board is a composite
+   * widget (docs/design.md §5), so `BoardCanvas` roves one `tabIndex` 0 across the headings and
+   * every other column carries -1.
+   */
+  headingTabbable: boolean;
   canMutateColumns: boolean;
   canMutateTasks: boolean;
   canMoveLeft: boolean;
@@ -80,7 +97,11 @@ interface BoardColumnProps {
   onDelete: () => void;
   onMoveLeft: () => void;
   onMoveRight: () => void;
-  onAddTask: () => void;
+  /** One composer is open on the board at a time, so the canvas owns which column has it. */
+  composerOpen: boolean;
+  composerFocusNonce: number;
+  onComposerOpenChange: (open: boolean) => void;
+  onTaskCreated: (task: TaskDto) => void;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -89,7 +110,11 @@ export const BoardColumn = memo(function BoardColumn({
   column,
   tasks,
   boardId,
+  workspaceId,
   selectedTaskId = null,
+  dropIndicatorIndex,
+  taskSignals = NO_TASK_SIGNALS,
+  headingTabbable,
   canMutateColumns,
   canMutateTasks,
   canMoveLeft,
@@ -98,7 +123,10 @@ export const BoardColumn = memo(function BoardColumn({
   onDelete,
   onMoveLeft,
   onMoveRight,
-  onAddTask,
+  composerOpen,
+  composerFocusNonce,
+  onComposerOpenChange,
+  onTaskCreated,
   className,
   style,
 }: BoardColumnProps): React.ReactElement {
@@ -133,6 +161,38 @@ export const BoardColumn = memo(function BoardColumn({
    * drop target under any list.
    */
   const visibleTaskIds = useMemo(() => visibleTasks.map((task) => task.id), [visibleTasks]);
+
+  /**
+   * The rail is drawn at the end of what is mounted when the drop lands past it. The render
+   * budget is what the column can address at all, and an unmounted card is not a drop target
+   * under any list, so the last mounted slot is the closest true statement the column can make.
+   */
+  const railIndex =
+    dropIndicatorIndex === null ? null : Math.min(dropIndicatorIndex, visibleTasks.length);
+
+  /**
+   * The rail gives back the ten pixels it costs the column: its own two, and the eight the
+   * `gap-2` above adds for one more child. @dnd-kit measures each droppable once, when the drag
+   * begins, and it measures with transforms stripped but layout kept, so a mark that reserved
+   * card height would leave every rect below it stale by that height for the rest of the drag
+   * and the hit test would keep resolving to a card the reader is no longer over.
+   */
+  const rail = (
+    <div aria-hidden data-slot="drop-indicator" className="-my-[5px] h-0.5 shrink-0 bg-signature" />
+  );
+
+  const addTaskRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusRef = useRef(false);
+
+  /**
+   * Focus goes back to the `Add task` button the composer replaced, once the button is back in
+   * the DOM to receive it.
+   */
+  useEffect(() => {
+    if (composerOpen || !returnFocusRef.current) return;
+    returnFocusRef.current = false;
+    addTaskRef.current?.focus();
+  }, [composerOpen]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const hasMore = renderCount < tasks.length;
@@ -184,18 +244,30 @@ export const BoardColumn = memo(function BoardColumn({
     return () => observer.disconnect();
   }, [hasMore, renderCount]);
 
+  /**
+   * `isOver` is the pointer's half only: a keyboard drag makes the lifted card a sortable item
+   * of the column it moves into, so this column's own droppable never turns over and the wash
+   * would be a mouse-only affordance. The indicator is raised for both devices.
+   */
+  const isDropTarget = isOver || railIndex !== null;
+
   return (
     <section
       className={cn(
         'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-[var(--radius-md)] bg-muted',
-        isOver && 'bg-signature-subtle',
+        // Below `md` the column is 85vw (`--column-width` in app/globals.css) and snaps under
+        // the thumb, so the desktop 280-320px clamp has to come off or a wide phone would be
+        // handed a 320px column inside a 430px viewport and the snap would leave a slice of the
+        // next one showing on every stop.
+        'max-md:max-w-none max-md:min-w-0 max-md:snap-start',
+        isDropTarget && 'bg-signature-subtle',
         className,
       )}
       style={style}
       aria-label={column.name}
       // Forced colours erase the tint above, so `app/globals.css` hangs the drop target's
       // Highlight border on this attribute instead.
-      data-drop-target={isOver || undefined}
+      data-drop-target={isDropTarget || undefined}
     >
       {/* 40px per `docs/design.md` §4, 48px below `md` so the 44px overflow button fits inside
           it rather than spilling over the first card.
@@ -204,7 +276,19 @@ export const BoardColumn = memo(function BoardColumn({
           the column had a scroll container of its own, this header was stuck to a box that
           never moved, and the reader scrolled the whole document past it. */}
       <header className="sticky top-0 z-10 flex h-10 items-center gap-2 border-b border-border bg-muted/90 px-3 backdrop-blur-sm max-md:h-12">
-        <h2 className="min-w-0 flex-1 truncate text-body font-strong">{column.name}</h2>
+        {/* The handle of a composite widget (docs/design.md §5): `Tab` reaches one column and
+            keys move between them from there, so exactly one heading on the board is at 0 and
+            the rest are at -1. `board-canvas.tsx` roves that stop with Home, End and Ctrl plus
+            an arrow. The heading text is the whole announcement, so nothing extra is said. */}
+        <h2
+          data-slot="column-heading"
+          // The rule reads a heading as static; this one is the composite widget's handle.
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+          tabIndex={headingTabbable ? 0 : -1}
+          className="min-w-0 flex-1 truncate text-body font-strong"
+        >
+          {column.name}
+        </h2>
         <span className="font-mono text-small text-muted-foreground tabular-nums">
           {tasks.length}
         </span>
@@ -241,15 +325,19 @@ export const BoardColumn = memo(function BoardColumn({
           strategy={verticalListSortingStrategy}
           disabled={!canMutateTasks}
         >
-          {visibleTasks.map((task) => (
-            <SortableTaskCard
-              key={task.id}
-              task={task}
-              boardId={boardId}
-              selected={task.id === selectedTaskId}
-              disabled={!canMutateTasks}
-            />
+          {visibleTasks.map((task, index) => (
+            <Fragment key={task.id}>
+              {railIndex === index ? rail : null}
+              <SortableTaskCard
+                task={task}
+                boardId={boardId}
+                selected={task.id === selectedTaskId}
+                signal={taskSignals.get(task.id) ?? null}
+                disabled={!canMutateTasks}
+              />
+            </Fragment>
           ))}
+          {railIndex === visibleTasks.length ? rail : null}
         </SortableContext>
         {hasMore ? (
           // Zero-height and aria-hidden: it is a scroll position, not content. The header's
@@ -257,21 +345,36 @@ export const BoardColumn = memo(function BoardColumn({
           <div ref={sentinelRef} aria-hidden className="h-px shrink-0" />
         ) : null}
         {tasks.length === 0 ? (
-          <div className="flex h-14 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-border-strong text-small text-muted-foreground">
+          <div className="flex h-14 items-center justify-center rounded-[var(--radius-md)] border border-border-strong text-small text-muted-foreground">
             {t('emptyDrop')}
           </div>
         ) : null}
-        {canMutateTasks ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="justify-start"
-            onClick={onAddTask}
-          >
-            <Plus />
-            {tTask('createAction')}
-          </Button>
+        {canMutateTasks && workspaceId !== null ? (
+          composerOpen ? (
+            <TaskComposer
+              workspaceId={workspaceId}
+              boardId={boardId}
+              columnId={column.id}
+              focusNonce={composerFocusNonce}
+              onCreated={onTaskCreated}
+              onClose={(returnFocus) => {
+                returnFocusRef.current = returnFocus;
+                onComposerOpenChange(false);
+              }}
+            />
+          ) : (
+            <Button
+              ref={addTaskRef}
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="justify-start"
+              onClick={() => onComposerOpenChange(true)}
+            >
+              <Plus />
+              {tTask('createAction')}
+            </Button>
+          )
         ) : null}
       </div>
     </section>

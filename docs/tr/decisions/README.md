@@ -46,6 +46,7 @@ Kurul, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğunluk
 | [0032](0032-plan-limits.md)                            | Plan Limitleri: Her Tavan İçin Tek Çözümleyici, Ayarlanana Kadar Sınırsız                                                            | Kabul edildi                                          | 2026-08-23 |
 | [0033](0033-webhook-delivery-and-failure-policy.md)    | Webhook Teslimi ve Hata Politikası: Workspace'e Ait Endpoint'ler, Bir Outbox Satırı ve İmzalı Bir Zarf                               | Önerildi                                              | 2026-08-26 |
 | [0034](0034-hosted-billing-and-plan-assignment.md)     | Barındırılan Faturalandırma ve Plan Ataması: Bir Merchant of Record, Tek Bir Subscription Satırı ve Yapılandırılmadığında Hiçbir Şey | Önerildi                                              | 2026-08-26 |
+| [0035](0035-inline-task-composer.md)                   | Satır İçi Task Composer: Column'un Dibinde Tek Bir Oluşturma Yolu ve Bir Başlık İçin Dialog Yok                                      | Kabul edildi                                          | 2026-08-26 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 

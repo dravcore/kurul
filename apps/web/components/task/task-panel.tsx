@@ -96,6 +96,9 @@ export function TaskPanel({
   return (
     <aside
       ref={panelRef}
+      // Read by `components/board/use-create-task-shortcut.ts`: below `md` this panel covers the
+      // board, so a `c` typed inside it must not open a composer behind it.
+      data-slot="task-panel"
       className={cn(
         'flex h-full w-full flex-col border-l border-border bg-card',
         'md:w-[min(480px,100%)] md:max-w-[640px] md:min-w-[420px]',

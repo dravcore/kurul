@@ -50,7 +50,7 @@ test('a move made in one browser appears in another without a reload', async ({
     ownerPage.goto(`/board/${board.id}`),
     observerPage.goto(`/board/${board.id}`),
   ]);
-  // Both sides must have *joined the room*, not merely rendered: `Reconnecting…` is shown
+  // Both sides must have *joined the room*, not merely rendered: the connection row is shown
   // until `board:join` acks `ok`, and a move emitted before the observer joins is a frame
   // nobody was listening for. Waiting on the application's own indicator is what removes the
   // need for a sleep here.

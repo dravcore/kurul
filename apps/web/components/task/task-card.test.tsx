@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { Priority, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { SortableTaskCard } from './sortable-task-card';
-import { TaskCard } from './task-card';
+import { TaskCard, type TaskCardSignal } from './task-card';
 
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
@@ -91,11 +91,16 @@ describe('TaskCard selection', () => {
    * `*` border rule moved into `@layer base` it was repainted the hairline grey, so the card
    * that carried it looked like every other one, and nothing in the suite would have noticed.
    */
-  it('wears the signature border only while it is the selected card', () => {
+  it('wears the signature rail on its left edge only while it is the selected card', () => {
     renderCard({}, true);
     const selected = screen.getByRole('link');
+    const classes = classesOf(selected);
 
-    expect(classesOf(selected).has('border-signature')).toBe(true);
+    expect(classes.has('border-l-signature')).toBe(true);
+    // The other three edges stay on the plain hairline: `border-signature` would paint all
+    // four, which is the whole-card copper edge this rail replaces.
+    expect(classes.has('border-signature')).toBe(false);
+    expect(classes.has('border-border')).toBe(true);
     expect(selected.getAttribute('data-selected')).toBe('true');
     expect(selected.getAttribute('aria-current')).toBe('true');
   });
@@ -104,10 +109,27 @@ describe('TaskCard selection', () => {
     renderCard();
     const unselected = screen.getByRole('link');
 
+    expect(classesOf(unselected).has('border-l-signature')).toBe(false);
     expect(classesOf(unselected).has('border-signature')).toBe(false);
     expect(classesOf(unselected).has('border-border')).toBe(true);
     expect(unselected.hasAttribute('data-selected')).toBe(false);
     expect(unselected.hasAttribute('aria-current')).toBe(false);
+  });
+
+  /**
+   * `border-l-2` has to be unconditional. If only the selected card carried it, opening a task
+   * would grow its box by a pixel and shift the title text, since a 1px and a 2px left border
+   * measure differently even in the same colour.
+   */
+  it('keeps the same left border width selected or not, so opening a card does not shift it', () => {
+    renderCard({}, true);
+    const selectedClasses = classesOf(screen.getByRole('link'));
+    cleanup();
+    renderCard({}, false);
+    const unselectedClasses = classesOf(screen.getByRole('link'));
+
+    expect(selectedClasses.has('border-l-2')).toBe(true);
+    expect(unselectedClasses.has('border-l-2')).toBe(true);
   });
 
   /** Focus is the single `:focus-visible` outline `app/globals.css` draws. A focus utility here
@@ -129,7 +151,7 @@ describe('TaskCard selection', () => {
 
     expect(classes.has('hover:border-border-strong')).toBe(false);
     expect(classes.has('hover:bg-accent')).toBe(false);
-    expect(classes.has('border-signature')).toBe(true);
+    expect(classes.has('border-l-signature')).toBe(true);
     expect(classes.has('bg-signature-subtle')).toBe(true);
   });
 
@@ -139,6 +161,33 @@ describe('TaskCard selection', () => {
 
     expect(classes.has('hover:border-border-strong')).toBe(true);
     expect(classes.has('hover:bg-accent')).toBe(true);
+  });
+});
+
+describe('TaskCard feedback marks', () => {
+  function renderWithSignal(signal: TaskCardSignal | null) {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <TaskCard task={task()} boardId="board-1" signal={signal} />
+      </NextIntlClientProvider>,
+    );
+    return screen.getByRole('link');
+  }
+
+  it('carries the data-slot both feedback keyframes key off', () => {
+    expect(renderWithSignal(null).getAttribute('data-slot')).toBe('task-card');
+  });
+
+  it('marks a card the server refused to move', () => {
+    expect(renderWithSignal('returning').getAttribute('data-state')).toBe('returning');
+  });
+
+  it('marks a card another member just changed', () => {
+    expect(renderWithSignal('remote-changed').getAttribute('data-state')).toBe('remote-changed');
+  });
+
+  it('carries no state at all on a card nothing happened to', () => {
+    expect(renderWithSignal(null).getAttribute('data-state')).toBeNull();
   });
 });
 
@@ -179,6 +228,90 @@ describe('TaskCard attachment badge', () => {
     renderCard({ attachmentCount: 0 });
 
     expect(screen.queryByLabelText(/attachment/)).toBeNull();
+  });
+});
+
+describe('TaskCard due date and estimate', () => {
+  it('combines a due date and an estimate into a single string rather than two', () => {
+    renderCard({ dueDate: '2026-01-05T00:00:00.000Z', estimatedMinutes: 150 });
+
+    expect(screen.getByText('Jan 5 · 2h 30m')).toBeDefined();
+    expect(screen.queryByText('Jan 5')).toBeNull();
+    expect(screen.queryByText('2h 30m')).toBeNull();
+  });
+
+  it('shows the due date alone when there is no estimate', () => {
+    renderCard({ dueDate: '2026-01-05T00:00:00.000Z', estimatedMinutes: null });
+
+    expect(screen.getByText('Jan 5')).toBeDefined();
+  });
+
+  it('shows the estimate alone when there is no due date', () => {
+    renderCard({ dueDate: null, estimatedMinutes: 150 });
+
+    expect(screen.getByText('2h 30m')).toBeDefined();
+  });
+});
+
+describe('TaskCard assignees', () => {
+  function assignee(userId: string, name: string) {
+    return { userId, name, avatarUrl: null };
+  }
+
+  it('shows every assignee as an initial when there are two or fewer', () => {
+    renderCard({ assignees: [assignee('u1', 'Ayşe Yıldız'), assignee('u2', 'Mert Kaya')] });
+
+    expect(screen.getByText('AY')).toBeDefined();
+    expect(screen.getByText('MK')).toBeDefined();
+    expect(screen.queryByText(/^\+\d+$/)).toBeNull();
+  });
+
+  it('collapses to two initials and a count once there are more than two assignees', () => {
+    renderCard({
+      assignees: [
+        assignee('u1', 'Ayşe Yıldız'),
+        assignee('u2', 'Mert Kaya'),
+        assignee('u3', 'Zeynep Demir'),
+      ],
+    });
+
+    expect(screen.getByText('AY')).toBeDefined();
+    expect(screen.getByText('MK')).toBeDefined();
+    expect(screen.getByText('+1')).toBeDefined();
+    expect(screen.queryByText('ZD')).toBeNull();
+  });
+
+  it('keeps every assignee in the accessible name even once collapsed', () => {
+    renderCard({
+      assignees: [
+        assignee('u1', 'Ayşe Yıldız'),
+        assignee('u2', 'Mert Kaya'),
+        assignee('u3', 'Zeynep Demir'),
+      ],
+    });
+
+    expect(screen.getByText('Ayşe Yıldız, Mert Kaya, Zeynep Demir')).toBeDefined();
+  });
+});
+
+describe('TaskCard meta row', () => {
+  it('never wraps the meta row onto a second line', () => {
+    renderCard({
+      dueDate: '2026-01-05T00:00:00.000Z',
+      estimatedMinutes: 150,
+      assignees: [
+        { userId: 'u1', name: 'Ayşe Yıldız', avatarUrl: null },
+        { userId: 'u2', name: 'Mert Kaya', avatarUrl: null },
+      ],
+      checklistSummary: { total: 4, done: 1 },
+      attachmentCount: 2,
+    });
+
+    const row = screen.getByRole('link').querySelector('[data-slot="task-card-meta"]');
+
+    expect(row).not.toBeNull();
+    expect(row?.className).not.toMatch(/(^|\s)flex-wrap(\s|$)/);
+    expect(row?.className).toMatch(/(^|\s)flex-nowrap(\s|$)/);
   });
 });
 

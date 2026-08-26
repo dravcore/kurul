@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { ApiError } from '@/lib/api';
 import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 import type { SetStateAction } from 'react';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
+import { toast } from 'sonner';
 import { useBoardMutations } from './use-board-mutations';
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00';
@@ -21,6 +22,8 @@ vi.mock('@/components/layout/workspace-provider', () => ({
 }));
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
+
+const toastError = vi.mocked(toast.error);
 
 const apiPost = vi.mocked(api.post);
 const apiPatch = vi.mocked(api.patch);
@@ -216,5 +219,118 @@ describe('useBoardMutations commitTaskMove', () => {
     expect(tasksRef.current.map((item) => item.id)).toEqual([TASK_B, TASK_A]);
     expect(reload).toHaveBeenCalled();
     void resolveFirst;
+  });
+
+  it('updates one toast rather than stacking a second when two moves fail', async () => {
+    apiPatch.mockRejectedValue(new Error('network'));
+    const { result, tasksRef } = renderMutations();
+    const initial = [task(TASK_A, 1000), task(TASK_B, 2000)];
+    tasksRef.current = initial;
+
+    await result.current.commitTaskMove({
+      taskId: TASK_A,
+      columnId: COLUMN_ID,
+      beforeTaskId: null,
+      afterTaskId: TASK_B,
+      previousTasks: initial,
+      nextTasks: [task(TASK_A, 500), task(TASK_B, 2000)],
+    });
+    await result.current.commitTaskMove({
+      taskId: TASK_B,
+      columnId: COLUMN_ID,
+      beforeTaskId: TASK_A,
+      afterTaskId: null,
+      previousTasks: initial,
+      nextTasks: [task(TASK_A, 1000), task(TASK_B, 3000)],
+    });
+
+    // Two calls, one toast: sonner replaces a toast that is already on screen under the same id,
+    // so a board that cannot reach the API never buries itself under its own failures.
+    expect(toastError).toHaveBeenCalledTimes(2);
+    const ids = toastError.mock.calls.map((call) => call[1]?.id);
+    expect(ids[0]).toBeDefined();
+    expect(ids[1]).toBe(ids[0]);
+  });
+
+  it('gives the toast that carries a retry the longer life', async () => {
+    apiPatch.mockRejectedValue(new Error('network'));
+    const { result, tasksRef } = renderMutations();
+    const initial = [task(TASK_A, 1000)];
+    tasksRef.current = initial;
+
+    await result.current.commitTaskMove({
+      taskId: TASK_A,
+      columnId: COLUMN_ID,
+      beforeTaskId: null,
+      afterTaskId: null,
+      previousTasks: initial,
+      nextTasks: [task(TASK_A, 500)],
+    });
+
+    expect(toastError).toHaveBeenCalledWith(
+      'Could not move this task.',
+      expect.objectContaining({ duration: 8000 }),
+    );
+  });
+
+  it('marks the rolled-back card as returning until its animation is over', async () => {
+    vi.useFakeTimers();
+    try {
+      apiPatch.mockRejectedValue(new Error('network'));
+      const { result, tasksRef } = renderMutations();
+      const initial = [task(TASK_A, 1000)];
+      tasksRef.current = initial;
+
+      await act(async () => {
+        await result.current.commitTaskMove({
+          taskId: TASK_A,
+          columnId: COLUMN_ID,
+          beforeTaskId: null,
+          afterTaskId: null,
+          previousTasks: initial,
+          nextTasks: [task(TASK_A, 500)],
+        });
+      });
+
+      expect([...result.current.returningTaskIds]).toEqual([TASK_A]);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(220);
+      });
+
+      // The mark is what the keyframe keys off, so it has to go once the card has landed.
+      expect([...result.current.returningTaskIds]).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops a pending return mark when the board unmounts', async () => {
+    vi.useFakeTimers();
+    try {
+      apiPatch.mockRejectedValue(new Error('network'));
+      const { result, tasksRef, unmount } = renderMutations();
+      const initial = [task(TASK_A, 1000)];
+      tasksRef.current = initial;
+
+      await act(async () => {
+        await result.current.commitTaskMove({
+          taskId: TASK_A,
+          columnId: COLUMN_ID,
+          beforeTaskId: null,
+          afterTaskId: null,
+          previousTasks: initial,
+          nextTasks: [task(TASK_A, 500)],
+        });
+      });
+      expect(vi.getTimerCount()).toBe(1);
+
+      unmount();
+
+      // Nothing is left to fire into a hook that is gone.
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

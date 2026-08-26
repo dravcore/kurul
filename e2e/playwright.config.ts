@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { apiEnv, API_URL, webEnv, WEB_URL } from './stack-env';
 
 /**
- * Browser end-to-end suite — seven scenarios, deliberately.
+ * Browser end-to-end suite: eight scenarios, deliberately.
  *
  * `docs/testing.md` deferred browser tests while the board UI was still changing shape every
  * week, and that judgement was right: a full suite written then would have been rewritten
@@ -69,9 +69,26 @@ import { apiEnv, API_URL, webEnv, WEB_URL } from './stack-env';
  * scroll-and-drag scenario at ~2.1s, which seeds 25 cards over HTTP and dispatches a real touch
  * sequence over CDP. Against the five-minute ceiling the whole suite is 2.1% of the budget.
  *
- * That margin is headroom for a cold CI runner and still not an argument for an eighth: the
+ * That margin is headroom for a cold CI runner and still not an argument for a ninth: the
  * paragraph at the top of this file is the admission test, and "there is time" has never been
  * it.
+ *
+ * **Why the number went from seven to eight.** `tests/board-composer.spec.ts` was added for P6,
+ * and it meets the admission criterion for the reason ADR 0035 gives in its own Consequences:
+ * the create dialog is gone, so the inline composer is the only way a task comes into being,
+ * and what makes it usable is a run of focus moves that only a browser performs. `Enter`
+ * activating a focused button, implicit form submission, and the caret staying in an emptied
+ * field across a create are all browser behaviour; jsdom has none of it, so the component suite
+ * has to dispatch each key at the element it assumes will handle it, which is exactly the
+ * assumption at risk. `Open details` is the other half: a client navigation to a route, so the
+ * panel it opens is a page rather than a rendered branch, and an in-process render cannot fail
+ * on it.
+ *
+ * Two tests in one file, and unlike the six additions before it their wall clock was not
+ * measured on a developer machine, because the change that added them did not start this stack.
+ * Each is one board load, two or three writes made through the UI and one reload, which puts
+ * them at the cheap end of the suite; the ceiling below is what holds that claim to account,
+ * and CI is where the first real figure comes from.
  */
 export default defineConfig({
   testDir: './tests',
@@ -114,14 +131,14 @@ export default defineConfig({
   /**
    * Five minutes for the whole suite, enforced rather than aspired to.
    *
-   * The budget is the reason this suite is seven scenarios and not forty: a nightly that takes
+   * The budget is the reason this suite is eight scenarios and not forty: a nightly that takes
    * twenty minutes is a nightly people stop reading. Putting the ceiling here instead of in
    * the workflow's `timeout-minutes` means it also applies locally, so the run that first
    * exceeds it is the one on the author's machine. Measured on a laptop (Apple M3 Max, 14
    * cores, 36 GB, Node 24.18) the five took 4.0–4.5s over 24 runs, the six 4.3–5.6s over 8,
    * and the seven 5.9–7.1s over 8; the margin is for a cold CI runner, not for growth.
    *
-   * Read that margin as headroom for the runner, not as room for an eighth scenario: the
+   * Read that margin as headroom for the runner, not as room for a ninth scenario: the
    * paragraph at the top of this file is the admission test, and "there is time" has never
    * been it.
    */

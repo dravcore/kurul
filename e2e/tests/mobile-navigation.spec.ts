@@ -1,10 +1,12 @@
 import type { BrowserContextOptions, Locator, Page } from '@playwright/test';
 import { expect, test, type TestUser } from '../support/fixtures';
 import {
+  addTaskButton,
   cardHandle,
   centreOf,
   column,
   expectCardOrder,
+  taskComposer,
   touchDragCardOnto,
   waitForBoardReady,
 } from '../support/board-page';
@@ -316,7 +318,7 @@ test('at the md boundary the desktop shell is unchanged', async ({ stack, openAs
 });
 
 test('every interactive element on the mobile path is at least 44px', async ({ stack, openAs }) => {
-  const { boardPath, owner } = await boardWith(stack, ['Alpha card', 'Bravo card']);
+  const { boardPath, columnNames, owner } = await boardWith(stack, ['Alpha card', 'Bravo card']);
   const page = await openAs(owner, PHONE);
 
   // `?q=` puts an active filter chip on the board. The chip is a 24px pill on desktop by
@@ -349,6 +351,41 @@ test('every interactive element on the mobile path is at least 44px', async ({ s
     wrongFontSize(boardFields, IOS_ZOOM_THRESHOLD_PX),
     `text fields on the board below 16px at 360px (of ${boardFields.length} measured)`,
   ).toEqual([]);
+
+  // The column foot's other state. The composer's field and its `Open details` trigger do not
+  // exist until `Add task` is tapped, so a sweep of the board as it loads can never reach
+  // either: they are opened here and measured where a thumb would find them. The field is also
+  // the only place on the board besides the search box where 16px is what stops iOS Safari
+  // zooming the whole column on focus.
+  const todo = column(page, columnNames[0]!);
+  await tap(page, addTaskButton(todo));
+  const composer = taskComposer(todo);
+  await expect(composer).toBeVisible();
+
+  const composerTargets = await visibleTargets(composer);
+  expect(
+    composerTargets.length,
+    'the composer sweep found nothing to measure',
+  ).toBeGreaterThanOrEqual(2);
+  expect(
+    tooSmall(composerTargets),
+    `undersized composer controls at 360px (of ${composerTargets.length} measured)`,
+  ).toEqual([]);
+  const composerFields = await fieldFontSizes(composer);
+  expect(
+    composerFields.length,
+    'the composer font-size sweep found nothing to measure',
+  ).toBeGreaterThanOrEqual(1);
+  expect(
+    wrongFontSize(composerFields, IOS_ZOOM_THRESHOLD_PX),
+    `the composer field below 16px at 360px (of ${composerFields.length} measured)`,
+  ).toEqual([]);
+
+  // Escape puts the button back, which is also what leaves the foot in its resting state for
+  // the drawer half of this test.
+  await page.keyboard.press('Escape');
+  await expect(composer).toBeHidden();
+  await expect(addTaskButton(todo)).toBeVisible();
 
   // Now the drawer, whose controls are the ones the finding is actually about.
   await tap(page, page.getByRole('button', { name: 'Open navigation' }));
@@ -483,9 +520,10 @@ test('the board scrolls its columns, not the page — and a card can be dragged 
    * The drag, with a finger.
    *
    * This is the constraint that was most at risk: a column that scrolls on touch and a
-   * `PointerSensor` want the same gesture. The division is `touch-action` — the card body
-   * belongs to the scroller, the grip declares `touch-action: none` and belongs to dnd-kit —
-   * and both halves are asserted below, because only asserting the drag would let a build ship
+   * `TouchSensor` want the same gesture. The sensor waits out a 250ms press inside a 5px
+   * tolerance before it claims the finger, and the division is `touch-action`: the card body
+   * belongs to the scroller, the grip declares `touch-action: none` and belongs to dnd-kit.
+   * Both halves are asserted below, because only asserting the drag would let a build ship
    * where the column could no longer be scrolled at all.
    */
   const moved = ['Card 03', 'Card 01', 'Card 02', ...titles.slice(3)];

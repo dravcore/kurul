@@ -3,11 +3,13 @@
 import { useMemo, useState } from 'react';
 import {
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCorners,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
@@ -26,6 +28,24 @@ export interface TaskMovePayload {
 
 function sortTasks(tasks: TaskDto[]): TaskDto[] {
   return [...tasks].sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
+}
+
+/**
+ * Which slot of the column the drop lands in, counted in the list the column *renders* rather
+ * than in the list the drop produces. The two differ by one for a downward move inside a single
+ * column, and the rendered one is what the rail has to follow: within a column @dnd-kit has
+ * already translated the hovered card out of its slot and the dragged card into it, so that slot
+ * is the gap, whichever direction the card came from. Across columns nothing is translated and
+ * the slot is simply the hovered card's own.
+ */
+function dropSlotIndex(
+  tasks: TaskDto[],
+  targetColumnId: string,
+  overTaskId: string | null,
+): number {
+  const columnTasks = sortTasks(tasks.filter((task) => task.columnId === targetColumnId));
+  const overIndex = overTaskId ? columnTasks.findIndex((task) => task.id === overTaskId) : -1;
+  return overIndex >= 0 ? overIndex : columnTasks.length;
 }
 
 function applyMove(
@@ -72,10 +92,24 @@ function applyMove(
   };
 }
 
+/**
+ * Where the card in the air would land: one column, and one slot in the list it renders.
+ *
+ * Deliberately not exported: `board-canvas.tsx` reads it as
+ * `BoardTaskDndController['dropIndicator']` and the column takes the slot as a bare number, so
+ * an export here would be a name nothing imports.
+ */
+interface DropIndicator {
+  columnId: string;
+  index: number;
+}
+
 export interface BoardTaskDndController {
   sensors: ReturnType<typeof useSensors>;
   activeTask: TaskDto | null;
+  dropIndicator: DropIndicator | null;
   onDragStart: (event: DragStartEvent) => void;
+  onDragOver: (event: DragOverEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
   onDragCancel: () => void;
   cancelDrag: () => void;
@@ -89,9 +123,19 @@ export function useBoardTaskDnd(
   onMove: (payload: TaskMovePayload) => Promise<void>,
 ): BoardTaskDndController {
   const [activeTask, setActiveTask] = useState<TaskDto | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
 
+  /**
+   * Three sensors rather than one `PointerSensor`, because a touch raises pointer events too:
+   * a single sensor's activation constraint decides for both devices, so a 250ms delay on it
+   * would also make every mouse drag wait, and the 6px distance it replaces would let the first
+   * pixel of a thumb scroll lift a card. Split, each device gets the constraint it needs: the
+   * mouse starts on distance alone with no timer, and a finger has to hold the grip still for
+   * the delay before anything moves, which is what leaves a plain swipe to the scroller.
+   */
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -103,12 +147,46 @@ export function useBoardTaskDnd(
     setActiveTask(task);
   }
 
+  /**
+   * The visible half of what the live region already says.
+   *
+   * It cannot be `useDroppable`'s `isOver`: a keyboard drag moves the lifted card into the
+   * target column's `SortableContext`, so @dnd-kit reports one of that column's *cards* as the
+   * target and the column's own droppable never turns over. `over` is the one signal both
+   * pointer devices raise.
+   */
+  function onDragOver(event: DragOverEvent): void {
+    if (!canMutate) return;
+    const { active, over } = event;
+    const moving = taskById.get(String(active.id));
+    if (!moving || !over) {
+      setDropIndicator(null);
+      return;
+    }
+
+    const overId = String(over.id);
+    const columnFromOver = parseColumnDroppableId(overId);
+    const overTask = columnFromOver ? null : (taskById.get(overId) ?? null);
+    const targetColumnId = columnFromOver ?? overTask?.columnId;
+    if (!targetColumnId) {
+      setDropIndicator(null);
+      return;
+    }
+
+    setDropIndicator({
+      columnId: targetColumnId,
+      index: dropSlotIndex(tasks, targetColumnId, overTask?.id ?? null),
+    });
+  }
+
   function onDragCancel(): void {
     setActiveTask(null);
+    setDropIndicator(null);
   }
 
   function onDragEnd(event: DragEndEvent): void {
     setActiveTask(null);
+    setDropIndicator(null);
     if (!canMutate) return;
     const { active, over } = event;
     if (!over) return;
@@ -148,7 +226,9 @@ export function useBoardTaskDnd(
   return {
     sensors,
     activeTask,
+    dropIndicator,
     onDragStart,
+    onDragOver,
     onDragEnd,
     onDragCancel,
     cancelDrag: onDragCancel,

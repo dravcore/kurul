@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import {
   ColumnCategory,
@@ -50,8 +50,15 @@ vi.mock('@/components/layout/workspace-provider', () => ({
 // or an `api` double to reach either.
 vi.mock('./use-board-realtime', () => ({ useBoardRealtime: vi.fn() }));
 
-const mutations = {
+const mutations: {
+  commitTaskMove: ReturnType<typeof vi.fn>;
+  returningTaskIds: ReadonlySet<string>;
+  moveColumn: ReturnType<typeof vi.fn>;
+  seedDefaults: ReturnType<typeof vi.fn>;
+  defaultsPending: boolean;
+} = {
   commitTaskMove: vi.fn(),
+  returningTaskIds: new Set<string>(),
   moveColumn: vi.fn(),
   seedDefaults: vi.fn(),
   defaultsPending: false,
@@ -78,7 +85,10 @@ const mockedTaskPanel = vi.mocked(TaskPanel);
 mockedBoardCanvas.mockImplementation(() => <div data-testid="board-canvas" />);
 mockedBoardDialogs.mockImplementation(() => <div data-testid="board-dialogs" />);
 mockedTaskPanel.mockImplementation(() => <div data-testid="task-panel" />);
-mockedUseBoardRealtime.mockReturnValue({ connected: true });
+mockedUseBoardRealtime.mockReturnValue({
+  connected: true,
+  remoteChangedTaskIds: new Set<string>(),
+});
 
 function lastBoardCanvasProps(): Parameters<typeof BoardCanvas>[0] {
   const call = mockedBoardCanvas.mock.calls.at(-1);
@@ -251,7 +261,10 @@ afterEach(() => {
   currentSearchParams = new URLSearchParams();
   workspaceState.activeId = WORKSPACE_ID;
   workspaceState.activeRole = MemberRole.MEMBER;
-  mockedUseBoardRealtime.mockReturnValue({ connected: true });
+  mockedUseBoardRealtime.mockReturnValue({
+    connected: true,
+    remoteChangedTaskIds: new Set<string>(),
+  });
 });
 
 /**
@@ -320,18 +333,64 @@ describe('BoardView loaded frame', () => {
     expect(canvasProps.tasksByColumn.get('col-missing')).toHaveLength(1);
   });
 
-  it('shows the reconnecting banner when the realtime socket is disconnected', () => {
-    mockedUseBoardRealtime.mockReturnValue({ connected: false });
+  it('says the connection is lost, as a status region, while the socket is down', () => {
+    mockedUseBoardRealtime.mockReturnValue({
+      connected: false,
+      remoteChangedTaskIds: new Set<string>(),
+    });
 
     renderLoadedBoard(loadedFixture());
 
-    expect(screen.getByText('Reconnecting…')).toBeDefined();
+    const row = screen.getByRole('status');
+    expect(row.textContent).toBe('Connection lost, changes may not be showing');
+    // Nothing to press: the row goes when the socket comes back, not when it is dismissed.
+    expect(within(row).queryByRole('button')).toBeNull();
   });
 
-  it('omits the reconnecting banner once the socket is back', () => {
+  it('takes the connection-lost row away once the socket is back', () => {
     renderLoadedBoard(loadedFixture());
 
-    expect(screen.queryByText('Reconnecting…')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByText('Connection lost, changes may not be showing')).toBeNull();
+  });
+
+  it('marks a card the server refused to move as returning', () => {
+    mutations.returningTaskIds = new Set(['task-a']);
+    try {
+      renderLoadedBoard(loadedFixture());
+
+      expect(lastBoardCanvasProps().taskSignals.get('task-a')).toBe('returning');
+      expect(lastBoardCanvasProps().taskSignals.has('task-b')).toBe(false);
+    } finally {
+      mutations.returningTaskIds = new Set<string>();
+    }
+  });
+
+  it('tints a card another member just changed', () => {
+    mockedUseBoardRealtime.mockReturnValue({
+      connected: true,
+      remoteChangedTaskIds: new Set(['task-b']),
+    });
+
+    renderLoadedBoard(loadedFixture());
+
+    expect(lastBoardCanvasProps().taskSignals.get('task-b')).toBe('remote-changed');
+  });
+
+  it('keeps the return mark on a card that also changed remotely', () => {
+    mutations.returningTaskIds = new Set(['task-a']);
+    mockedUseBoardRealtime.mockReturnValue({
+      connected: true,
+      remoteChangedTaskIds: new Set(['task-a']),
+    });
+    try {
+      renderLoadedBoard(loadedFixture());
+
+      // The reader's own move failing is the thing they need to know about first.
+      expect(lastBoardCanvasProps().taskSignals.get('task-a')).toBe('returning');
+    } finally {
+      mutations.returningTaskIds = new Set<string>();
+    }
   });
 
   it('shows the loading-more banner while later task pages are still streaming in', () => {
@@ -546,16 +605,6 @@ describe('BoardView dialog wiring', () => {
     expect(tasksUpdater(fixture.tasks).every((entry) => entry.columnId !== 'col-1')).toBe(true);
   });
 
-  it('appends a task created from the dialog', () => {
-    const fixture = loadedFixture();
-    const data = renderLoadedBoard(fixture);
-
-    act(() => lastBoardDialogsProps().onTaskCreated(task('task-new', 'col-1', 5000)));
-
-    const updater = asUpdater(calls(data.setTasks)[0]);
-    expect(updater(fixture.tasks)).toHaveLength(fixture.tasks.length + 1);
-  });
-
   it('drops the deleted task and returns to the board when it was the selected one', () => {
     const fixture = loadedFixture();
     const data = renderLoadedBoard(fixture, {}, 'task-a');
@@ -591,11 +640,24 @@ describe('BoardView canvas wiring', () => {
     act(() => lastBoardCanvasProps().onDeleteColumn(fixture.columns[1]!));
     expect(lastBoardDialogsProps().dialogs.deleteColumn?.id).toBe('col-2');
 
-    act(() => lastBoardCanvasProps().onAddTask('col-1'));
-    expect(lastBoardDialogsProps().dialogs.createTaskColumnId).toBe('col-1');
-
     act(() => lastBoardCanvasProps().onCreateColumn());
     expect(lastBoardDialogsProps().dialogs.createColumnOpen).toBe(true);
+  });
+
+  it('hands the canvas the workspace the composer posts to', () => {
+    renderLoadedBoard(loadedFixture());
+
+    expect(lastBoardCanvasProps().workspaceId).toBe(WORKSPACE_ID);
+  });
+
+  it('appends a task the composer created', () => {
+    const fixture = loadedFixture();
+    const data = renderLoadedBoard(fixture);
+
+    act(() => lastBoardCanvasProps().onTaskCreated(task('task-new', 'col-1', 5000)));
+
+    const updater = asUpdater(calls(data.setTasks)[0]);
+    expect(updater(fixture.tasks)).toHaveLength(fixture.tasks.length + 1);
   });
 
   it('moves a column through the mutations hook', () => {

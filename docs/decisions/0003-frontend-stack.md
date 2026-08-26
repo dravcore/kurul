@@ -67,7 +67,7 @@ lightweight enough for a solo/small-team codebase to maintain.
   `pragmatic-drag-and-drop`, costed at "write collision detection", not at
   "rearchitect the board".
 - **Phase 4 re-evaluation (2026-08-09):** classic `@dnd-kit` shipped the
-  multi-column board (`PointerSensor` + `KeyboardSensor`, `closestCorners`,
+  multi-column board (`MouseSensor` + `TouchSensor` + `KeyboardSensor`, `closestCorners`,
   per-column `SortableContext`, optimistic move + toast rollback). No blocker
   appeared; **keep the pinned classic line**. Revisit only if a frozen-line
   bug blocks a later board interaction or `@dnd-kit/react` reaches 1.0 with a

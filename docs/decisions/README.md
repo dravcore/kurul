@@ -52,6 +52,7 @@ debate. These are intentionally short and factual, not design documents.
 | [0032](0032-plan-limits.md)                            | Plan Limits: One Resolver for Every Ceiling, Unlimited Until Configured                                              | Accepted                                               | 2026-08-23 |
 | [0033](0033-webhook-delivery-and-failure-policy.md)    | Webhook Delivery and Failure Policy: Workspace-Owned Endpoints, an Outbox Row, and a Signed Envelope                 | Proposed                                               | 2026-08-26 |
 | [0034](0034-hosted-billing-and-plan-assignment.md)     | Hosted Billing and Plan Assignment: a Merchant of Record, One Subscription Row, and Nothing at All When Unconfigured | Proposed                                               | 2026-08-26 |
+| [0035](0035-inline-task-composer.md)                   | Inline Task Composer: One Creation Path at the Foot of the Column, and No Dialog for a Title                         | Accepted                                               | 2026-08-26 |
 
 A status can later change to **Superseded**, with a link to the ADR that
 replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).
