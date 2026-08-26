@@ -1,7 +1,8 @@
 {
   "common": {
     "close": "Close",
-    "deletedUser": "Deleted user"
+    "deletedUser": "Deleted user",
+    "save": "Save"
   },
   "auth": {
     "login": {
@@ -293,7 +294,6 @@
         "name": "Name",
         "cancel": "Cancel",
         "renameAction": "Rename",
-        "renameTitle": "Rename workspace",
         "renameError": "Could not rename this workspace.",
         "renameErrorForbidden": "You need admin access to rename the workspace. Ask a workspace owner.",
         "renameErrorGone": "This workspace no longer exists.",
@@ -411,7 +411,6 @@
       "createAction": "Create board",
       "planLimitReached": "This workspace has used all {limit} of the boards its plan allows.",
       "createError": "Could not create this board.",
-      "renameTitle": "Rename board",
       "renameAction": "Rename",
       "renameError": "Could not rename this board.",
       "deleteTitle": "Delete this board?",

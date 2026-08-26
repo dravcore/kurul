@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import type { UpdateWorkspaceRequest, WorkspaceDto } from '@kurul/shared-types';
+import { api, resolveApiMessage } from '@/lib/api';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { canDeleteWorkspace, canRenameWorkspace } from '@/lib/workspace-permissions';
+import { InlineRename } from '@/components/common/inline-rename';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DeleteWorkspaceDialog } from './delete-workspace-dialog';
-import { RenameWorkspaceDialog } from './rename-workspace-dialog';
 
 /** Row height matches the list/table row in docs/design.md §4, same as `MembersSettings`. */
 const ROW = 'flex min-h-9 items-center justify-between gap-3 py-1.5';
@@ -23,12 +25,28 @@ const ROW = 'flex min-h-9 items-center justify-between gap-3 py-1.5';
  */
 export function WorkspaceSettings(): React.ReactElement {
   const t = useTranslations('app.settings.workspace');
+  const tCommon = useTranslations('common');
   const tShell = useTranslations('app.shell');
   const { workspaces, activeId, activeRole, bootstrapped, renameActiveWorkspace } =
     useWorkspaceContext();
 
-  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameEditing, setRenameEditing] = useState(false);
+  const [draftName, setDraftName] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const renameTriggerRef = useRef<HTMLButtonElement>(null);
+  // The Rename button lives in the branch of the ternary below that unmounts while editing, so
+  // `renameTriggerRef.current` is still null (or the old node) at the moment a save or cancel
+  // calls `.focus()` synchronously: the fresh button does not exist until the render this same
+  // `setRenameEditing(false)` schedules has actually committed. A ref rather than state, the
+  // same reasoning as `moveFocusToVerifyRef` in `invite-accept-view.tsx`: it is never read while
+  // rendering, and the effect below runs after that commit, when the ref is finally populated.
+  const focusRenameTriggerRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusRenameTriggerRef.current) return;
+    focusRenameTriggerRef.current = false;
+    renameTriggerRef.current?.focus();
+  });
 
   const workspace = workspaces.find((item) => item.id === activeId);
 
@@ -45,20 +63,76 @@ export function WorkspaceSettings(): React.ReactElement {
 
   const canRename = canRenameWorkspace(activeRole);
   const canDelete = canDeleteWorkspace(activeRole);
+  // Read out of the object once, ahead of the closures below: TS does not carry the `!workspace`
+  // guard's narrowing into a nested function, only the id and name that close over it need to.
+  const workspaceId = workspace.id;
+  const workspaceName = workspace.name;
+
+  function startRenaming(): void {
+    setDraftName(workspaceName);
+    setRenameEditing(true);
+  }
+
+  function cancelRenaming(): void {
+    setDraftName(workspaceName);
+    setRenameEditing(false);
+    focusRenameTriggerRef.current = true;
+  }
+
+  async function saveRenaming(): Promise<void> {
+    const body: UpdateWorkspaceRequest = { name: draftName.trim() };
+    const updated = await api.patch<WorkspaceDto, UpdateWorkspaceRequest>(
+      `/workspaces/${workspaceId}`,
+      body,
+    );
+    renameActiveWorkspace(updated);
+    setRenameEditing(false);
+    focusRenameTriggerRef.current = true;
+  }
 
   return (
     <div className="flex flex-col gap-6">
-      <div className={ROW}>
-        <p className="min-w-0 truncate text-body text-foreground">{workspace.name}</p>
-        {/* Never drawn for anyone the API would only ever answer 403 to (see
-            `workspace-permissions.ts`) — the same "no control that can only be refused" rule
-            `MembersSettings` follows for the member-management menu. */}
-        {canRename ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => setRenameOpen(true)}>
-            {t('renameAction')}
-          </Button>
-        ) : null}
-      </div>
+      {renameEditing ? (
+        <InlineRename
+          fields={[
+            {
+              id: 'workspace-name',
+              label: t('name'),
+              value: draftName,
+              onChange: setDraftName,
+              required: true,
+            },
+          ]}
+          saveLabel={tCommon('save')}
+          cancelLabel={t('cancel')}
+          onSave={saveRenaming}
+          onCancel={cancelRenaming}
+          resolveError={(caught) =>
+            resolveApiMessage(caught, t, {
+              fallback: 'renameError',
+              byStatus: { 403: 'renameErrorForbidden', 404: 'renameErrorGone' },
+            })
+          }
+        />
+      ) : (
+        <div className={ROW}>
+          <p className="min-w-0 truncate text-body text-foreground">{workspace.name}</p>
+          {/* Never drawn for anyone the API would only ever answer 403 to (see
+              `workspace-permissions.ts`), the same "no control that can only be refused" rule
+              `MembersSettings` follows for the member-management menu. */}
+          {canRename ? (
+            <Button
+              ref={renameTriggerRef}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={startRenaming}
+            >
+              {t('renameAction')}
+            </Button>
+          ) : null}
+        </div>
+      )}
 
       {canDelete ? (
         <div className={ROW}>
@@ -72,13 +146,7 @@ export function WorkspaceSettings(): React.ReactElement {
         </div>
       ) : null}
 
-      <RenameWorkspaceDialog
-        open={renameOpen}
-        onOpenChange={setRenameOpen}
-        workspace={workspace}
-        onRenamed={renameActiveWorkspace}
-      />
-      {/* Mounted only for an OWNER: unlike `RenameWorkspaceDialog`, whose open state a
+      {/* Mounted only for an OWNER: unlike the rename editor above, whose open state a
           non-manager can never reach because the button above it is already gone, this dialog
           also needs `canDeleteWorkspace` to have been true to construct at all — there is no
           state under which a non-OWNER's `deleteOpen` could become `true`, but keeping the
