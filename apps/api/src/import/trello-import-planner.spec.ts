@@ -349,6 +349,22 @@ describe('planTrelloImport', () => {
 
         expect(group(plan, 'card', 'defaulted')).toMatchObject({ count: 1 });
       });
+
+      it('drops a trailing lone surrogate rather than splitting a character pair at the cut', () => {
+        // U+1F600 is a surrogate pair, two UTF-16 code units. `.slice(0, 500)` on 499 `A`s
+        // followed by it lands exactly between the two halves, leaving a lone lead surrogate
+        // as the last character unless the clamp drops it.
+        const longTitle = 'A'.repeat(499) + '\u{1F600}';
+        const read = readMutated('synthetic-full-board', (raw) => {
+          (raw.cards as Array<Record<string, unknown>>)[0]!.name = longTitle;
+        });
+        const plan = planTrelloImport(read, CONTEXT);
+        const clamped = plan.tasks.find((task) => task.title.startsWith('A'));
+
+        expect(clamped?.title).toBe('A'.repeat(499));
+        expect(clamped?.title).toHaveLength(499);
+        expect(clamped?.title?.isWellFormed()).toBe(true);
+      });
     });
   });
 

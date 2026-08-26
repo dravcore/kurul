@@ -416,7 +416,7 @@ describe('TrelloImportService', () => {
       expect(report.imported.columns).toBe(2);
     });
 
-    it('counts the export s raw lists and cards, not the plan s filtered ones', async () => {
+    it("counts the export's raw lists and cards, not the plan's filtered ones", async () => {
       // A board of six archived cards writes zero tasks, but it is still six rows this API had
       // to hold in memory and would have carried into the planner had the cap not stopped it
       // first: the ceiling is on what Trello sent, not on what survives filtering.
