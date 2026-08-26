@@ -9,6 +9,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Task activity feed now records label attach and detach.** Attaching or detaching a label on
+  a task writes a `task.label_added` / `task.label_removed` row inside the same transaction as
+  the join-row write, following the pattern `task.assigned` / `task.unassigned` already use on
+  the sibling assignee sub-resource. The payload is a snapshot (`labelId`, `name`, `color`)
+  taken at write time, so the row still describes what happened after the label is renamed,
+  recolored or deleted. Neither type joins `AUDIT_ACTIVITY_TYPES`: like `task.assigned` and
+  `comment.created`, this is a content event, not one an incident query needs to see. The web
+  activity renderer stays untouched here, mid its own rework; an unrecognised type already falls
+  back to a generic line, so the feed keeps reading sensibly until the sentence for these two
+  types lands in a follow-up UI PR. Closes #39.
+
 - **Password reset by email: a forgotten password is now recovered by the person who forgot it.**
   "Forgot your password?" on the sign-in screen leads to `/forgot-password`, which asks for an
   address and mails a single-use link good for one hour; the link lands on `/reset-password`,
@@ -290,6 +301,42 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **API coverage: a fresh `develop` baseline, three new per-directory floors, and a cross-workspace
+  case for the activity/notification feeds.** `apps/api/jest.config.cjs`'s dated baseline (last
+  recorded 2026-08-22, on the feature branch before merge rather than on `develop` after it) is
+  replaced with a `develop`-after-merge measurement: 77.06 / 69.96 / 78.95 / 77.91
+  (stmts/branch/funcs/lines), a margin of 2.06 / 3.96 / 1.95 / 1.91 over the unchanged
+  75 / 66 / 77 / 76 global floor. `src/common/guards/`, `src/common/rate-limit/` and
+  `src/account/` each gain their own floor at their measured value (100 / 93.75 / 100 / 100,
+  98.33 / 94.87 / 91.3 / 99.09, and 0 / 0 / 0 / 0), the same directory-scoped pattern
+  `apps/web/vitest.config.ts` already uses; `src/account/`'s floor is 0 across the board because
+  its GDPR-erasure service is deliberately unit-untested and covered end to end instead. The two
+  rules every floor answers to (raise it when the baseline rises; record a drop here rather than
+  lowering the floor to erase it) and the no-exclusions-from-the-denominator rule move out of the
+  config file's comment history into `docs/testing.md`'s Coverage section, which now states the
+  API's real margin and points at the CI `api-coverage` artifact as the source of truth in place
+  of the stale "a few points under" claim. `activity-notifications.e2e-spec.ts` gains a
+  cross-workspace case: a member of one workspace requesting another's task activities,
+  notification list, unread count or mark-read all get `404`, the same convention
+  `comment.e2e-spec.ts` and `trello-import.e2e-spec.ts` already use for cross-tenant access.
+
+- **Base images are pinned by digest, and Dependabot now has a bump path for all of
+  them** ([#157](https://github.com/dravcore/kurul/issues/157)). `postgres:18-alpine`
+  and `redis:8-alpine` in `docker-compose.yml` and `docker-compose.dev.yml`, `caddy:2-alpine`
+  in `docker-compose.yml`, and `node:24-alpine` in `apps/api/Dockerfile` and
+  `apps/web/Dockerfile`, now carry a `@sha256` digest instead of a bare tag, the same pattern
+  `docker-compose.dev.yml` already applied to `mailpit`. Dependabot's docker updater only reads
+  a literal `FROM image:tag@digest` line, not one built from an `ARG`, so both Dockerfiles
+  repeat the digest on every `FROM` instead of factoring it into a shared build argument.
+  `.github/dependabot.yml` gains a `docker` ecosystem block scoped to `directories: [/apps/api,
+  /apps/web]`, so the two Dockerfiles are in its scope for the first time, plus a separate
+  `docker-compose` ecosystem block at `/`, since Dependabot's docker updater never reads a
+  compose file: that new block is what bumps the three compose images. Until now the docker
+  updater only read the repository root and never proposed a base-image bump for either app,
+  and the compose images had no bump path either, since a digest pin only pairs with an
+  ecosystem that can see it. Two builds of the same tag now resolve the same bytes, and an
+  upstream base-image fix arrives as a reviewable pull request instead of silently, whenever
+  something next happens to rebuild.
 - **CI now parses the compose files and the Caddyfile on every pull request.** A new
   `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
   `docker compose config -q`, without a profile and with `--profile demo`, renders
@@ -415,6 +462,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and the bundled Caddy holds a request for up to 30s while an upstream is coming back
   (`lb_try_duration`) instead of answering 502, which turns a recreate into latency rather than
   errors. Related to #160: this is the cheap half of zero-downtime deploys, not the item itself.
+
+- **A local `docker build` sent gigabytes of unrelated files into the build context, because
+  `.dockerignore`'s patterns were root-anchored.** Docker's ignore matcher treats a bare
+  pattern like `node_modules` as anchored to the context root, not as "match anywhere" the way
+  `.gitignore` does, so the old file's `node_modules`, `dist`, `.next` and `coverage` entries
+  only ever caught the repository's own top-level copies; every nested one under `apps/*`,
+  `packages/*` and any git worktree still went in through `COPY . .` in both Dockerfiles. On a
+  machine running several agent worktrees under the gitignored `.claude/` directory, that
+  directory alone measured 34 GB, none of it excluded, and a stale `dist` or `.next` from a
+  local build could get copied in ahead of the fresh one the image builds for itself.
+  `.dockerignore` is rewritten with `**/`-prefixed patterns for `node_modules`, `dist`,
+  `.next`, `coverage`, `.turbo`, `.cache` and `*.tsbuildinfo`, plus explicit entries for
+  `.claude`, `.superpowers`, `.nodeterm`, `.cursor`, `.vscode`, `docs`, `e2e`, `.github`,
+  `docker-compose.override.yml`, `rclone.env` and `rclone.conf`, none of which either
+  Dockerfile reads. Measured on this checkout, the context BuildKit reports for
+  `apps/api/Dockerfile` and `apps/web/Dockerfile` drops from roughly 36.4 GB to 5.9 MB, and
+  both images still build their `build` stage end to end. CI is unaffected: the runner already
+  builds from a clean checkout with none of these directories present.
 
 - **BullMQ's due-soon and cleanup workers, and the Socket.io Redis adapter, now report a Redis
   connection fault instead of losing it to `console.error`.** `queue`/`worker.on('error')` on
@@ -549,6 +614,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `workflow_dispatch` triggers are unchanged), and a new step prints the branch and commit
   that actually ran, since the run's own head branch still names the branch the schedule was
   read from. `main` keeps its coverage where it changes: the release and hotfix pull requests.
+- **`REDIS_URL` now honours a Redis 6+ ACL username and `rediss://` (TLS)
+  ([#204](https://github.com/dravcore/kurul/issues/204)).** `parseRedisUrl` read only host,
+  port, password and the database index; `url.username` and `url.protocol` were never
+  inspected, so a URL naming an ACL user (`redis://alice:s3cret@host`) silently authenticated
+  as `default` instead, and a `rediss://` URL connected in plaintext with no warning. The
+  parser now carries `username` through when the URL names one, sets `tls: {}` for `rediss:`,
+  and rejects any scheme other than `redis:`/`rediss:` with the same `Invalid REDIS_URL` error
+  an unparsable database index already uses. All six ioredis/BullMQ construction sites (auth
+  rate limiting, the upload byte budget, the readiness probe, the Socket.io adapter, and both
+  BullMQ workers) spread the parser's return value straight into their client, so the fix
+  reaches every one of them without a call site changing. The bundled Compose stack is
+  unaffected either way: it always builds a plain `redis://:password@redis:6379` for its own
+  `redis` container, so this only matters for a bring-your-own managed Redis.
 
 ### Changed
 

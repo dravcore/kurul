@@ -880,6 +880,17 @@ bunu bırakmanızı sağlar: bu imajın bu deponun release workflow'undan çıkt
 **imza** ve içinde ne olduğunu söyleyen bir **SBOM**. İkisini de kullanmak isteğe bağlıdır ve
 aşağıdaki komutları hiç çalıştırmayan kimseyi korumazlar.
 
+Yığının altındaki temel imajlar da, `docker-compose.yml` içindeki `postgres`, `redis`, `caddy`
+ve api ile web Dockerfile'larındaki `node`, benzer bir nedenle salt tag yerine `tag@sha256:...`
+ile sabitlenir: aynı sürümün iki ayrı derlemesi böylece aynı byte'ları çözümler. Her digest'i
+güncel tutan iki ayrı Dependabot ekosistemi var: `docker-compose`, compose dosyalarındaki
+`postgres`, `redis` ve `caddy`'yi günceller; `docker` ise iki Dockerfile'daki `node`'u günceller.
+Her iki durumda da üst akıştaki bir düzeltme, bir şeyin yeniden derlenmesini bekleyip sessizce
+gelmek yerine, gözden geçirilebilir bir pull request olarak gelir. Bunun bir yan etkisi var: tek
+başına `docker compose pull`, artık iki Kurul sürümü arasında çıkan bir `postgres`/`redis`/`caddy`
+yama sürümünü almaz, çünkü çözümlediği tag artık bir digest'e sabitlenmiştir; o yama,
+Dependabot'un digest güncellemesini birleştiren bir sonraki Kurul sürümüyle gelir.
+
 ### İmzayı kontrol etmek
 
 [cosign](https://github.com/sigstore/cosign) **3.0 veya üstü** gerekir — imzalar cosign 3'ün
