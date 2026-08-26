@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AttachmentKind, ColumnCategory, LabelColorSlot } from '@kurul/shared-types';
 import type { TrelloImportSkipGroupDto } from '@kurul/shared-types';
-import { SKIP_SAMPLE_LIMIT } from './import-skip';
+import { SKIP_SAMPLE_LIMIT, SKIP_SAMPLE_MAX_LENGTH } from './import-skip';
 import { parseTrelloExport, type TrelloExportReadResult } from './trello-export';
 import {
   importedCounts,
@@ -249,6 +249,28 @@ describe('planTrelloImport', () => {
       expect(group(plan, 'card', 'malformed')?.samples).toContain(
         'Board drag and drop jumps on Safari',
       );
+    });
+
+    // SEC-04 round 2: a card missing `id` is rejected by `readCard` before it becomes a card at
+    // all, so it never reaches the planner's own `skip()` closure and its clamp on `card.name`.
+    // It reaches the report through `read.issues` instead (`trello-export.ts`'s `readSection`),
+    // which quotes `entry.name` straight from the parsed export with no ceiling of its own. This
+    // is the door `SkipCollector.addMany` closes: the sample is clamped there, on the way into
+    // the report, not by anything upstream of it.
+    it('clamps the sample from a card the reader rejected outright, not just the planner s own', () => {
+      const longName = 'G'.repeat(50_000);
+      const read = readMutated('synthetic-full-board', (raw) => {
+        const cards = raw.cards as Array<Record<string, unknown>>;
+        delete cards[0]!.id;
+        cards[0]!.name = longName;
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+
+      const sample = group(plan, 'card', 'malformed')?.samples.find((entry) =>
+        entry.startsWith('G'),
+      );
+      expect(sample).toHaveLength(SKIP_SAMPLE_MAX_LENGTH);
+      expect(JSON.stringify(plan.skipped)).not.toContain(longName);
     });
 
     it('carries the due date and leaves estimatedMinutes and priority to the schema', () => {
