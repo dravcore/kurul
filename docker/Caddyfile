@@ -90,8 +90,9 @@
 			# for anyone mid-session rather than a stretch of latency. Caddy retries a request when
 			# it cannot reach the upstream, for up to this long, at this interval; a request whose
 			# body has already begun streaming is not retried, which is why an upload can still fail
-			# across a restart. 30s matches `stop_grace_period` on the API container, so the retry
-			# window covers the whole of a graceful shutdown plus the new container's start.
+			# across a restart. 30s is `stop_grace_period` on the API container, which covers a
+			# typical shutdown and most of the restart behind it; a request that arrives at the very
+			# start of a shutdown that then uses its whole grace can still run the window out.
 			#
 			# This is the cheap half of zero-downtime deploys (#160/OPS-11), not the item itself:
 			# there is still one replica, so a request that arrives while nothing is listening waits

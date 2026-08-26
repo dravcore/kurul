@@ -962,6 +962,13 @@ kural:
 
 `/api/*` ayrıca WebSocket upgrade'lerini de geçirmelidir — realtime pano akışı odur.
 
+Yönlendirme sözleşmesinin dışında kalan ama yine de taklit etmeye değen bir şey var: pakete
+dahil Caddy, bir upstream yeniden başlarken isteği 502 ile yanıtlamak yerine 30s'ye kadar
+tutuyor; bir upgrade'i hatalar yerine gecikmeye çeviren şey bu. Bunu yapmayan bir proxy yine de
+doğrudur, yalnızca her `docker compose up -d` sırasında daha gürültülüdür. Aynısını yapmanın
+neye mal olduğu ve nginx open source'ta neden birebir karşılığı olmadığı,
+[Upgrade](#upgrade) bölümünün 5. adımında.
+
 #### Proxy'nin sayısı neden 26 MiB, API'ninki neden 25
 
 **Bu bir yazım hatası değil ve ikisi eşitlenmemeli.** Bu instance'ın kabul ettiği en büyük _ek_

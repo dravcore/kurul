@@ -375,10 +375,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   shutdown stops waiting and carries on rather than the run being cut short, the abandoned attempt
   unwinds on its own once the pool behind it is ended, and BullMQ re-delivers it, which is safe
   because both scheduled jobs are idempotent by construction. `api` gained `stop_grace_period: 30s`
-  so the rest of the shutdown has room to finish inside it, and the bundled Caddy holds a request
-  for up to 30s while an upstream is coming back (`lb_try_duration`) instead of answering 502,
-  which turns a recreate into latency rather than errors. Related to #160: this is the cheap half
-  of zero-downtime deploys, not the item itself.
+  so an ordinary shutdown finishes well inside it (the case that can still run it out is an
+  abandoned sweep whose last statement sits on the server for the full
+  `DATABASE_STATEMENT_TIMEOUT_MS`, because ending the pool waits for the client it checked out),
+  and the bundled Caddy holds a request for up to 30s while an upstream is coming back
+  (`lb_try_duration`) instead of answering 502, which turns a recreate into latency rather than
+  errors. Related to #160: this is the cheap half of zero-downtime deploys, not the item itself.
 
 - **A Trello import no longer steps over the workspace's board ceiling.**
   `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on

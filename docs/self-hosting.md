@@ -943,6 +943,12 @@ web app is built against it. Three rules, in this order, all on one hostname:
 
 `/api/*` must also pass WebSocket upgrades through — that is the realtime board feed.
 
+One thing outside the routing contract is worth reproducing anyway: the bundled Caddy holds a
+request for up to 30s while an upstream is restarting instead of answering 502, which is what
+turns an upgrade into latency rather than errors. A proxy without it is still correct, only
+noisier on every `docker compose up -d`. What it takes to match, and why nginx open source has
+no one-to-one equivalent, is in step 5 of [Upgrading](#upgrading).
+
 #### Why the proxy's number is 26 MiB and the API's is 25
 
 **This is not a typo and the two must not be made equal.** The largest _attachment_ this
