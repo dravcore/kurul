@@ -27,6 +27,7 @@ Cutting the tag is now the active P0 item; the announcement wave still waits for
 | 1   | Cut the `v0.3.0` tag now that the gate is green; hold the announcement for Phase 1                                                                                                                     | —       |
 | 2   | PR-time Docker image build + Trivy CVE scan in CI; pin `mailpit` by digest (**both shipped**)                                                                                                          | —       |
 | 3   | Email notifications ([#255](https://github.com/dravcore/kurul/discussions/255)): **shipped 2026-08-22**, one email per Notification row through the existing mail transport, per-user opt-out on `/me` | shipped |
+| 4   | Password reset by email: **shipped**, `/forgot-password` mails a one-hour single-use link and `/reset-password` spends it; a Phase 1 gate, since the announcement wave lands on a sign-in form         | shipped |
 
 **Policy, from 2026-08-21:** external contributions are accepted again under plain AGPL-3.0
 with nothing to sign, and revenue comes from an optional hosted service rather than a
