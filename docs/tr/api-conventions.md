@@ -698,6 +698,15 @@ taşıyabilir; süresi dolmuş biri tıpkı iptal edilmiş biri gibi okunur, o d
 gibi okunur: üçü için de `401`, böylece çalınmış bir sır kendi geçmişi hakkında hiçbir şey
 öğrenmez.
 
+**Unutulmuş bir parola kurtarılır, bir admin tarafından yeniden verilmez.**
+`POST /auth/request-password-reset`, bir saat geçerli ve tek kullanımlık bir bağlantı postalar;
+`POST /auth/reset-password` onu harcar. İkisi de Better Auth'undur ve istek ucu, hesabı olmayan
+bir adres için de hesabı olan bir adres için de aynı `200`'ü ve aynı gövdeyi döner; yani kimin
+hesabı olduğunu öğrenmek için kullanılamaz. Bağlantının harcanması, hesabın sahip olduğu bütün
+oturumları iptal eder (`revokeSessionsOnPasswordReset`); sıfırlamayı yalnızca hatırlamanın değil,
+hesabı geri almanın da yolu yapan budur. İletim zorunludur: SMTP'si olmayan bir kurulumun bunun
+yerine ne yaptığı için [kendi sunucunda barındırma](self-hosting.md#e-posta-smtp).
+
 ```
 POST   /workspaces/:workspaceId/tokens            # bas; plaintext'i taşıyan tek yanıt
 GET    /workspaces/:workspaceId/tokens            # çağıranın canlı token'ları, en yeniden eskiye
@@ -831,6 +840,7 @@ Bütçeler **client IP'si ve route başına**, kayan bir dakikalık pencerede sa
 | `POST /workspaces/:workspaceId/imports/trello` | 3 / dk       | Heap'e ayrıştırılan 20 MiB'lık gövde, ardından tek transaction'da binlerce satır     |
 | `GET .../attachments/:attachmentId/content`    | 300 / dk     | Varsayılanın _üstünde_: on görsel ekli bir panel açılışta on istek üretir            |
 | `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10sn     | Better Auth'un kimlik endpoint'leri için yerleşik kuralı                             |
+| `/auth/request-password-reset`                 | 3 / 60sn     | O da yerleşik: her çağrı, çağıranın sahipliğini kanıtlamadığı adrese bağlantı yollar |
 | Diğer `/auth/*`                                | 100 / dk     | Better Auth'un kendi limiter'ı — `/auth/*` Nest router'ını atlar (ADR 0004)          |
 | `GET /health`, `GET /health/ready`             | muaf         | Throttle edilen bir probe, sağlıklı bir API'yi çökmüş gösterir                       |
 

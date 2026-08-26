@@ -21,7 +21,7 @@ export function CommentBody({ body, className }: CommentBodyProps): React.ReactE
         return (
           <span
             key={`m-${token.userId}-${index}`}
-            className="inline-flex items-center rounded-[var(--radius-sm)] bg-signature-subtle px-1 py-0.5 text-small font-medium text-foreground"
+            className="inline-flex items-center rounded-[var(--radius-sm)] bg-signature-subtle px-1 py-0.5 text-small font-strong text-foreground"
             data-user-id={token.userId}
           >
             @{token.name}

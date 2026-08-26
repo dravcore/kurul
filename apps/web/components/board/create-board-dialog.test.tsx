@@ -194,9 +194,9 @@ describe('CreateBoardDialog', () => {
   });
 
   /**
-   * Selection wears `--signature` and focus wears `--ring`. The two tokens hold the same copper,
-   * so while the unlayered `*` rule was repainting both grey nothing distinguished them and the
-   * selected card carried the focus token by accident.
+   * Selection wears `--signature` and nothing else does. The two copper tokens hold the same
+   * value, so while both were painted on the card the rail and the focus mark were saying the
+   * same thing; focus now lives on the radio inside, as the one outline `app/globals.css` draws.
    */
   it('moves the signature border to whichever template is selected', async () => {
     renderDialog();
@@ -209,7 +209,6 @@ describe('CreateBoardDialog', () => {
     };
 
     expect(cardOf('Kanban').has('border-signature')).toBe(true);
-    expect(cardOf('Kanban').has('border-ring')).toBe(false);
     expect(cardOf('Bug Triage').has('border-signature')).toBe(false);
     expect(cardOf('Bug Triage').has('border-border')).toBe(true);
     expect(cardOf('Bug Triage').has('hover:border-border-strong')).toBe(true);
@@ -220,14 +219,21 @@ describe('CreateBoardDialog', () => {
     expect(cardOf('Kanban').has('border-signature')).toBe(false);
   });
 
-  /** Focus is the other copper edge; it belongs to every card, selected or not. */
-  it('keeps the focus edge on every template card', async () => {
+  /**
+   * The radio is a visible control and takes the outline itself, so the card around it draws
+   * nothing: a `focus-within:` edge on the label would be a second mark around the first. Nor is
+   * the label itself covered by `app/globals-css-layers.test.ts`'s `singleIndicatorTargets` scan,
+   * since `create-board-dialog.tsx` is not one of its seven files, so a stray outline or ring
+   * utility landing on the label would pass that scan unnoticed without this assertion.
+   */
+  it('leaves the focus mark to the radio on every template card', async () => {
     renderDialog();
     await expandTemplates();
 
     for (const name of ['Kanban', 'Bug Triage']) {
       const label = radio(name).closest('label');
-      expect(label?.className).toContain('focus-within:border-ring');
+      expect(label?.className).not.toMatch(/\bfocus-within:/);
+      expect(label?.className).not.toMatch(/outline-(none|hidden)|ring-\[3px\]|ring-ring/);
     }
   });
 

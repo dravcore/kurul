@@ -16,8 +16,16 @@ import {
 
 // `/verify-email` is public because a link can fail before anyone is signed in: Better Auth
 // only signs the user in when the token was *good*, so bouncing an unauthenticated visitor to
-// `/login` would swallow the `?error=…` that explains why their link did not work.
-const PUBLIC_PATHS = new Set(['/login', '/register', '/verify-email']);
+// `/login` would swallow the `?error=…` that explains why their link did not work. The two
+// password-reset pages are public for the plainer reason that their whole audience is signed
+// out: a reset link never signs anyone in, and the form that asks for one cannot.
+const PUBLIC_PATHS = new Set([
+  '/login',
+  '/register',
+  '/verify-email',
+  '/forgot-password',
+  '/reset-password',
+]);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) {

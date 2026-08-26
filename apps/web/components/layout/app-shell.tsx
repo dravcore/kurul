@@ -98,13 +98,20 @@ function AppShellFrame({
         {/* Skip-link target (see app/(app)/layout.tsx): tabIndex={-1} lets the fragment
             navigation move keyboard focus here without adding a tab stop.
 
+            Taking that link is a keyboard action and this element does match `:focus-visible`
+            after it, so the landing has to show the one focus mark app/globals.css draws in
+            `@layer base`; an `outline-*` suppressor here is the only thing that can erase it.
+            The offset is pulled inside instead of left at 2px because this region fills the
+            shell and the row above is `overflow-hidden`, which clips an outline drawn outside
+            the region away entirely.
+
             `min-h-0` is what passes the bound on: a flex child's default `min-height: auto`
             refuses to shrink below its content, which would have let the board push `main`
             taller than the shell and re-opened the chain one level down. */}
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex min-h-0 min-w-0 flex-1 flex-col outline-none"
+          className="flex min-h-0 min-w-0 flex-1 flex-col focus-visible:-outline-offset-2"
         >
           {children}
         </main>

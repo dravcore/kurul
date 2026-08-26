@@ -226,15 +226,19 @@ components/
 ### Styling
 
 - Tailwind utility classes in the markup; no CSS modules, no styled-components.
-- Conditional classes go through the `cn()` helper, never string concatenation.
+- Conditional classes go through the `cn()` helper, never string concatenation. `cn()`
+  (`apps/web/lib/utils.ts`) extends `tailwind-merge` with Kurul's type scale and the
+  `font-strong` weight, so a consumer's `text-*`/`font-*` override deduplicates against a
+  primitive's own default instead of both classes reaching the DOM.
 - Design tokens (colors, spacing, radius) come from the Tailwind theme — no arbitrary hex
   values in components.
 - Author CSS in `apps/web/app/globals.css` goes inside `@layer base` unless there is a written
   reason not to, stated next to the rule. An unlayered rule outranks every cascade layer whatever
   its specificity, so an unlayered `*` selector repaints the utilities Tailwind emits into
   `@layer utilities` and a class written in the markup stops meaning what it says. The
-  `:focus-visible` outline is the one current exception and carries its reason in place.
-  Guarded by `apps/web/app/globals-css-layers.test.ts`.
+  `:focus-visible` outline was the one rule that carried such a reason; it moved into `base` once
+  the controls stopped carrying focus rings and `outline-none` of their own, and no rule carries
+  one now. Guarded by `apps/web/app/globals-css-layers.test.ts`.
 - Every `text-*`, `bg-*`, `border-*`, `font-*` and `shadow-*` class must resolve against
   `@theme inline` or Tailwind's built-in scale. A class with no counterpart compiles to no CSS at
   all: nothing errors, the element just inherits and the mistake is invisible in review.
