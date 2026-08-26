@@ -164,13 +164,17 @@ because a build without them succeeds silently. See
 [Observability](#observability).
 
 `.env.example` also carries `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
-`REDIS_PASSWORD`, `BACKUP_REMOTE` and `TAG`. All six are **compose-only**: `docker-compose.yml`
-interpolates them into its service definitions (`TAG` picks the tag of every published image)
+`REDIS_PASSWORD`, `REDIS_MAXMEMORY`, `BACKUP_REMOTE` and `TAG`. All seven are
+**compose-only**: `docker-compose.yml` interpolates them into its service definitions (`TAG`
+picks the tag of every published image, `REDIS_MAXMEMORY` becomes a `redis-server` argument)
 and no application code reads them, so they are absent from the table above and need no wiring
 in `apps/api`. See [Database and cache credentials](#database-and-cache-credentials) for the
 first four and [Upgrading and backups](#upgrading-and-backups) for `BACKUP_REMOTE`.
 `BACKUP_INTERVAL` and `BACKUP_KEEP` are not on that list: the `backup` service reads them, but
 so does the cleanup worker in `apps/api`, which is why they are in the table.
+`INTERNAL_API_URL` runs the other way: application code reads it, so it is in the table, but it
+is absent from `.env.example` because `docker-compose.yml` sets it outright rather than
+interpolating it from `.env`.
 
 Generate a secret with:
 
@@ -631,10 +635,11 @@ with `docker top` showing `999 ... redis-server` instead of `root ... redis-serv
 `SET` → restart cycle that survives with the value intact in both the password and
 no-password cases.
 
-Out of scope for this hardening pass: a read-only root filesystem (`read_only: true`) and
-seccomp profiles. Both are stricter constraints that need a per-service audit of which
-paths must stay writable (temp dirs, node's own `/tmp` use, etc.); tracked as a follow-up
-in [ROADMAP.md](../ROADMAP.md#hardening-track), not bundled in here.
+Out of scope for this hardening pass: a read-only root filesystem (`read_only: true`),
+`pids_limit` and seccomp profiles. All three are stricter constraints that need a per-service
+audit of which paths must stay writable (temp dirs, node's own `/tmp` use, etc.), which the
+two Dockerfiles have since enumerated. Tracked as the "Container hardening pass 2" row in
+[ROADMAP.md](../ROADMAP.md#hardening-track), not bundled in here.
 
 ## pnpm scripts
 
@@ -656,6 +661,11 @@ Run from the repository root.
 | `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                                                                                                                                                                                                                                                                                               |
 | `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `db:drift`       | `pnpm db:drift`       | Runs `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`: compares the configured database against `schema.prisma` and exits non-zero on any difference. Same command CI runs after `db:migrate` — see [Checking for migration drift](#checking-for-migration-drift)                                                                                                                                                                                                           |
+| `openapi`        | `pnpm openapi`        | Builds `@kurul/api`, then regenerates `apps/api/openapi.json` from the built application. The Swagger CLI plugin runs during `nest build` and nowhere else, which is why the build is not optional here. The document's `info.version` comes from `apps/api/package.json`, so a version bump moves the file                                                                                                                                                                                                                     |
+| `openapi:check`  | `pnpm openapi:check`  | Regenerates the document in memory and byte-compares it against the committed `apps/api/openapi.json`, exiting non-zero on the first line that differs. Same command the `build` CI job runs; run it after any controller, DTO or role-gate change                                                                                                                                                                                                                                                                              |
+| `knip`           | `pnpm knip`           | Reports unused files, exports and types across the workspace, configured by `knip.jsonc`. Not a CI gate today: it is run deliberately, and an export it flags either loses its `export`, is deleted, or becomes an explicitly-reasoned ignore                                                                                                                                                                                                                                                                                   |
+| `test:browser`   | `pnpm test:browser`   | Builds the e2e stack (`e2e/build-stack.mjs`) and runs the Playwright smoke pack against it. Needs Docker; the nightly workflow is what runs it on CI, not the PR gate. See [testing.md](testing.md#browser-end-to-end)                                                                                                                                                                                                                                                                                                          |
+| `test:scripts`   | `pnpm test:scripts`   | Runs the dependency-free `node:test` suites under `scripts/`, including the bootstrap doctor checks and the compose-env guard that fails on a documented API-read key the `api` service does not forward                                                                                                                                                                                                                                                                                                                        |
 
 To target a single workspace, use pnpm's filter flag:
 
@@ -913,7 +923,7 @@ body and **nothing else**:
 ```json
 {
   "event": "instance_started",
-  "version": "0.1.0"
+  "version": "0.3.0"
 }
 ```
 
@@ -922,7 +932,7 @@ Field by field, that is the whole list:
 | Field     | Value                | Notes                                                 |
 | --------- | -------------------- | ----------------------------------------------------- |
 | `event`   | `"instance_started"` | Always this literal string. There is only one event   |
-| `version` | e.g. `"0.1.0"`       | The `@kurul/api` package version this build came from |
+| `version` | e.g. `"0.3.0"`       | The `@kurul/api` package version this build came from |
 
 What is **not** sent, and has no code path to be sent: any instance or installation identifier,
 your hostname, your IP address, your URL, your database, any count of users, workspaces, boards
@@ -932,7 +942,7 @@ schedule. The payload is logged in full before it is sent, so you can read what 
 in your own API log:
 
 ```text
-LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.1.0"} to https://…
+LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.3.0"} to https://…
 ```
 
 A refused connection, a DNS failure, an error from the collector or a timeout
