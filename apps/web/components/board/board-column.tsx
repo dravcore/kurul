@@ -85,6 +85,7 @@ interface BoardColumnProps {
   onMoveRight: () => void;
   /** One composer is open on the board at a time, so the canvas owns which column has it. */
   composerOpen: boolean;
+  composerFocusNonce: number;
   onComposerOpenChange: (open: boolean) => void;
   onTaskCreated: (task: TaskDto) => void;
   className?: string;
@@ -106,6 +107,7 @@ export const BoardColumn = memo(function BoardColumn({
   onMoveLeft,
   onMoveRight,
   composerOpen,
+  composerFocusNonce,
   onComposerOpenChange,
   onTaskCreated,
   className,
@@ -289,6 +291,7 @@ export const BoardColumn = memo(function BoardColumn({
               workspaceId={workspaceId}
               boardId={boardId}
               columnId={column.id}
+              focusNonce={composerFocusNonce}
               onCreated={onTaskCreated}
               onClose={(returnFocus) => {
                 returnFocusRef.current = returnFocus;

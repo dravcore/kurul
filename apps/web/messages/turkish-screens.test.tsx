@@ -1323,6 +1323,7 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
               onMoveLeft={vi.fn()}
               onMoveRight={vi.fn()}
               composerOpen={false}
+              composerFocusNonce={0}
               onComposerOpenChange={vi.fn()}
               onTaskCreated={vi.fn()}
             />

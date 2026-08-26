@@ -149,6 +149,7 @@ function ColumnHarness({
       onMoveLeft={vi.fn()}
       onMoveRight={vi.fn()}
       composerOpen={composerOpen}
+      composerFocusNonce={0}
       onComposerOpenChange={setComposerOpen}
       onTaskCreated={onTaskCreated}
     />
@@ -394,7 +395,7 @@ describe('BoardColumn task composer', () => {
     expect(field().value).toBe('Half a thought');
   });
 
-  it('marks the form busy and disables the field while the create is in flight', async () => {
+  it('marks the form busy and holds the field read-only while the create is in flight', async () => {
     apiPost.mockReturnValue(new Promise(() => {}));
     renderColumn([]);
 
@@ -403,9 +404,25 @@ describe('BoardColumn task composer', () => {
     fireEvent.keyDown(field(), { key: 'Enter' });
 
     await waitFor(() => expect(composerForm().getAttribute('aria-busy')).toBe('true'));
-    expect(field().disabled).toBe(true);
+    // Read-only rather than disabled, which is what keeps the caret in the field.
+    expect(field().readOnly).toBe(true);
+    expect(field().disabled).toBe(false);
+    expect(field()).toBe(document.activeElement);
     // The label is never swapped for a waiting string.
     expect(openDetailButton().textContent).toBe(composerCopy.composerOpenDetail);
+  });
+
+  it('ignores a second Enter while the first create is still in flight', async () => {
+    apiPost.mockReturnValue(new Promise(() => {}));
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.change(field(), { target: { value: 'Twice' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+    await waitFor(() => expect(composerForm().getAttribute('aria-busy')).toBe('true'));
+    fireEvent.keyDown(field(), { key: 'Enter' });
+
+    expect(apiPost).toHaveBeenCalledTimes(1);
   });
 
   it('shows the forbidden line when the create is refused', async () => {
@@ -491,6 +508,7 @@ describe('BoardColumn task composer', () => {
             onMoveLeft={vi.fn()}
             onMoveRight={vi.fn()}
             composerOpen={false}
+            composerFocusNonce={0}
             onComposerOpenChange={vi.fn()}
             onTaskCreated={vi.fn()}
           />

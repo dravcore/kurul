@@ -189,6 +189,19 @@ describe('BoardCanvas create shortcut', () => {
     expect(lastColumnProps('col-1').composerOpen).toBe(false);
   });
 
+  it('leaves an open composer where it is and bumps its focus nonce instead', () => {
+    renderCanvas({ columns: [column('col-1', 1), column('col-2', 2)], canMutateTasks: true });
+
+    act(() => lastColumnProps('col-2').onComposerOpenChange(true));
+    const before = lastColumnProps('col-2').composerFocusNonce;
+
+    act(() => pressC());
+
+    expect(lastColumnProps('col-2').composerOpen).toBe(true);
+    expect(lastColumnProps('col-1').composerOpen).toBe(false);
+    expect(lastColumnProps('col-2').composerFocusNonce).toBe(before + 1);
+  });
+
   it('stays quiet for a role that cannot add tasks', () => {
     renderCanvas({ columns: [column('col-1', 1)], canMutateTasks: false });
 

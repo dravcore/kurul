@@ -68,13 +68,26 @@ export function BoardCanvas({
   const t = useTranslations('app.board');
   const reducedMotion = useReducedMotion();
   const [composerColumnId, setComposerColumnId] = useState<string | null>(null);
+  const [composerFocusNonce, setComposerFocusNonce] = useState(0);
 
   // Every column takes tasks from the same role check, so the first column is the first one a
   // task can be added to.
   const firstColumnId = columns[0]?.id ?? null;
-  const openFirstComposer = useCallback(() => setComposerColumnId(firstColumnId), [firstColumnId]);
+
+  /**
+   * `c` focuses the composer that is already open, wherever it is, and only opens the first
+   * column's when none is: moving an open composer would throw away the title typed into it
+   * (ADR 0035 §2). The nonce is what carries the focus, so the open composer is never
+   * re-mounted and never loses what it holds.
+   */
+  const openOrFocusComposer = useCallback(() => {
+    setComposerColumnId((current) =>
+      current !== null && columns.some((column) => column.id === current) ? current : firstColumnId,
+    );
+    setComposerFocusNonce((current) => current + 1);
+  }, [columns, firstColumnId]);
   const canAddTask = canMutateTasks && workspaceId !== null && firstColumnId !== null;
-  useCreateTaskShortcut(canAddTask ? openFirstComposer : null);
+  useCreateTaskShortcut(canAddTask ? openOrFocusComposer : null);
 
   return (
     <DndContext
@@ -103,6 +116,7 @@ export function BoardCanvas({
             onMoveRight={() => onMoveColumn(column, 1)}
             workspaceId={workspaceId}
             composerOpen={composerColumnId === column.id}
+            composerFocusNonce={composerFocusNonce}
             onComposerOpenChange={(open) => setComposerColumnId(open ? column.id : null)}
             onTaskCreated={onTaskCreated}
             className={entranceDone ? undefined : 'board-column-enter'}

@@ -13,6 +13,11 @@ interface TaskComposerProps {
   workspaceId: string;
   boardId: string;
   columnId: string;
+  /**
+   * Bumped by the canvas to put the caret back in this field without re-mounting it, which is
+   * what the `c` shortcut does to a composer that is already open and carrying a title.
+   */
+  focusNonce: number;
   onCreated: (task: TaskDto) => void;
   /**
    * Closes the composer. `returnFocus` is false when the field lost focus to something the
@@ -33,6 +38,7 @@ export function TaskComposer({
   workspaceId,
   boardId,
   columnId,
+  focusNonce,
   onCreated,
   onClose,
 }: TaskComposerProps): React.ReactElement {
@@ -47,14 +53,13 @@ export function TaskComposer({
   const trimmed = title.trim();
 
   /**
-   * Focus on open, and again once a request settles: the field is `disabled` while the create
-   * is in flight, which is what takes focus off it in the first place. A failure keeps focus on
-   * the alert `SubmitError` moves it to.
+   * Focus on open, and again on every bump of the nonce. Nothing else moves focus into the
+   * field: the create leaves it where it is (the field goes `readOnly`, not `disabled`), and a
+   * failure hands focus to the alert `SubmitError` mounts.
    */
   useEffect(() => {
-    if (pending || error !== null) return;
     inputRef.current?.focus();
-  }, [pending, error]);
+  }, [focusNonce]);
 
   async function create(): Promise<TaskDto | null> {
     if (trimmed.length === 0 || pending) return null;
@@ -100,7 +105,9 @@ export function TaskComposer({
       <Input
         ref={inputRef}
         value={title}
-        disabled={pending}
+        // `readOnly` rather than `disabled`: a disabled field drops focus, and ADR 0035 keeps
+        // the caret where it is for the whole request. `create()` ignores Enter while pending.
+        readOnly={pending}
         placeholder={t('composerPlaceholder')}
         aria-label={t('composerPlaceholder')}
         onChange={(event) => setTitle(event.target.value)}
