@@ -836,12 +836,14 @@ neither protects anyone who never runs the commands below.
 
 The base images underneath the stack, `postgres`, `redis` and `caddy` in `docker-compose.yml`
 and `node` in the api and web Dockerfiles, are pinned `tag@sha256:...` instead of a bare tag for
-a related reason: two builds of the same release then resolve the same bytes, and Dependabot
-bumps each digest weekly so an upstream fix still arrives as a reviewable pull request instead of
-silently, the next time something happens to rebuild. One side effect: `docker compose pull` on
-its own no longer picks up an upstream `postgres`/`redis`/`caddy` patch release between Kurul
-releases, since the tag it resolves is now fixed to a digest; that patch arrives with the next
-Kurul release that merges the Dependabot bump, not before.
+a related reason: two builds of the same release then resolve the same bytes. Two separate
+Dependabot ecosystems keep each digest current: `docker-compose` bumps `postgres`, `redis` and
+`caddy` in the compose files, and `docker` bumps `node` in the two Dockerfiles; either way an
+upstream fix arrives as a reviewable pull request instead of silently, the next time something
+happens to rebuild. One side effect: `docker compose pull` on its own no longer picks up an
+upstream `postgres`/`redis`/`caddy` patch release between Kurul releases, since the tag it
+resolves is now fixed to a digest; that patch arrives with the next Kurul release that merges
+the Dependabot bump, not before.
 
 ### Checking the signature
 
