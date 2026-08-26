@@ -272,6 +272,65 @@ describe('planTrelloImport', () => {
       expect(plan.tasks.every((task) => task.createdById === ACTOR_ID)).toBe(true);
       expect(plan.attachments.every((row) => row.uploadedById === ACTOR_ID)).toBe(true);
     });
+
+    // SEC-04: the importer used to write `card.name` / `card.desc` verbatim, with no ceiling:
+    // the one write path into `Task` that skipped the length gate `CreateTaskDto` enforces on
+    // every other one.
+    describe('field length ceilings', () => {
+      it('clamps an oversized title to the same ceiling CreateTaskDto enforces, and reports it', () => {
+        const longTitle = 'A'.repeat(10_000);
+        const read = readMutated('synthetic-full-board', (raw) => {
+          (raw.cards as Array<Record<string, unknown>>)[0]!.name = longTitle;
+        });
+        const plan = planTrelloImport(read, CONTEXT);
+        const clamped = plan.tasks.find((task) => task.title.startsWith('A'));
+
+        expect(clamped?.title).toHaveLength(500);
+        expect(clamped?.title).toBe(longTitle.slice(0, 500));
+        // The sample is the *clamped* title, not the 10000-character original: a report about an
+        // oversized field must not itself carry an unbounded string back to the caller.
+        expect(group(plan, 'card', 'defaulted')).toMatchObject({
+          count: 1,
+          samples: [clamped?.title],
+        });
+      });
+
+      it('does not report a title within the limit as a substitution', () => {
+        // The control for the row above. Without it, "clamps and reports" would pass just as
+        // happily if every card were reported, and the report would call an untouched title
+        // changed.
+        const plan = planTrelloImport(readFixture('synthetic-full-board'), CONTEXT);
+
+        expect(group(plan, 'card', 'defaulted')).toBeUndefined();
+      });
+
+      it('clamps an oversized description to the DTO ceiling', () => {
+        const longDescription = 'B'.repeat(25_000);
+        const read = readMutated('synthetic-full-board', (raw) => {
+          (raw.cards as Array<Record<string, unknown>>)[0]!.desc = longDescription;
+        });
+        const plan = planTrelloImport(read, CONTEXT);
+        const clamped = plan.tasks.find((task) => task.description?.startsWith('B'));
+
+        expect(clamped?.description).toHaveLength(20_000);
+        expect(clamped?.description).toBe(longDescription.slice(0, 20_000));
+        expect(group(plan, 'card', 'defaulted')).toMatchObject({ count: 1 });
+      });
+
+      it('reports a card once even when both its title and description are clamped', () => {
+        // The same arithmetic the labels loop already applies (`defaulted` there covers both
+        // an unnamed name and an unknown colour in one row): a card is one thing the user does
+        // not recognise, not two, however many of its fields were cut.
+        const read = readMutated('synthetic-full-board', (raw) => {
+          const card = (raw.cards as Array<Record<string, unknown>>)[0]!;
+          card.name = 'A'.repeat(10_000);
+          card.desc = 'B'.repeat(25_000);
+        });
+        const plan = planTrelloImport(read, CONTEXT);
+
+        expect(group(plan, 'card', 'defaulted')).toMatchObject({ count: 1 });
+      });
+    });
   });
 
   describe('labels', () => {
@@ -447,6 +506,22 @@ describe('planTrelloImport', () => {
       expect(plan.checklists).toHaveLength(3);
       expect(plan.checklistItems).toHaveLength(4);
       expect(group(plan, 'checklistItem', 'malformed')).toMatchObject({ count: 1 });
+    });
+
+    it('clamps an oversized checklist title to the DTO ceiling, and reports it (SEC-04)', () => {
+      const longTitle = 'C'.repeat(1_000);
+      const read = readMutated('synthetic-full-board', (raw) => {
+        (raw.checklists as Array<Record<string, unknown>>)[0]!.name = longTitle;
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+      const clamped = plan.checklists.find((entry) => entry.title.startsWith('C'));
+
+      expect(clamped?.title).toHaveLength(255);
+      expect(clamped?.title).toBe(longTitle.slice(0, 255));
+      expect(group(plan, 'checklist', 'defaulted')).toMatchObject({
+        count: 1,
+        samples: [clamped?.title],
+      });
     });
   });
 
@@ -678,6 +753,21 @@ describe('planTrelloImport', () => {
       const plan = planTrelloImport(read, CONTEXT);
 
       expect(plan.board.name).toBe('Imported board');
+    });
+
+    it('clamps an oversized board name and description to the DTO ceilings (SEC-04)', () => {
+      const read = readMutated('edge-empty-board', (raw) => {
+        raw.name = 'D'.repeat(500);
+        raw.desc = 'E'.repeat(3_000);
+      });
+      const plan = planTrelloImport(read, CONTEXT);
+
+      expect(plan.board.name).toHaveLength(120);
+      expect(plan.board.description).toHaveLength(2_000);
+      // No `board` scope exists in `TrelloImportScope` (a board is one row, not a class of
+      // rows): `trello-export.ts` makes the same call for the board's own description already.
+      // The clamp is silent, the same way that one already is.
+      expect(plan.skipped).toEqual([]);
     });
 
     it('survives a drifted export, reporting rather than throwing', () => {

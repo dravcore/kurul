@@ -7,7 +7,13 @@ import {
 } from '@kurul/shared-types';
 import type { LabelColorSlot, TrelloImportSkipGroupDto } from '@kurul/shared-types';
 import { safeDisplayName } from '../attachment/attachment-display-name';
+import { MAX_BOARD_DESCRIPTION_LENGTH, MAX_BOARD_NAME_LENGTH } from '../board/dto/board-limits';
 import { POSITION_GAP, rebalancePositions } from '../common/position/fractional-index';
+import {
+  MAX_CHECKLIST_TITLE_LENGTH,
+  MAX_TASK_DESCRIPTION_LENGTH,
+  MAX_TASK_TITLE_LENGTH,
+} from '../task/dto/task-limits';
 import { SkipCollector } from './import-skip';
 import type {
   TrelloCard,
@@ -131,6 +137,30 @@ function positionsFor(count: number): (index: number) => number {
 function emptyToNull(value: string | null): string | null {
   if (value === null) return null;
   return value.trim() === '' ? null : value;
+}
+
+/**
+ * A string held to the same length ceiling the HTTP write path enforces (SEC-04), with whether
+ * anything had to be cut.
+ *
+ * class-validator's `@MaxLength` counts UTF-16 code units, `String.prototype.length`, and
+ * `.slice` counts the same unit, so a value this function passes through unclamped is one the
+ * DTO would also have accepted, and one it clamps is cut to the exact length the DTO allows.
+ * Without this, a Trello export is the one door into this database `CreateTaskDto` and
+ * `CreateBoardDto` do not guard.
+ */
+function clampToLength(value: string, maxLength: number): { value: string; truncated: boolean } {
+  if (value.length <= maxLength) return { value, truncated: false };
+  return { value: value.slice(0, maxLength), truncated: true };
+}
+
+/** `clampToLength`, through the `null` a description or board description already carries. */
+function clampNullable(
+  value: string | null,
+  maxLength: number,
+): { value: string | null; truncated: boolean } {
+  if (value === null) return { value: null, truncated: false };
+  return clampToLength(value, maxLength);
 }
 
 /**
@@ -354,12 +384,26 @@ export function planTrelloImport(
     cards.forEach((card, index) => {
       const taskId = uuidv7();
       taskIdByTrelloCardId.set(card.id, taskId);
+
+      // SEC-04: `CreateTaskDto` refuses a title or description past these lengths; the importer
+      // is the one write path that used to skip that gate. One row per *card* that arrived
+      // changed, not one per changed field, for the same reason a label that is both unnamed and
+      // uncoloured is reported once (see the labels loop below): a card whose title and
+      // description were both cut is one card the user does not recognise, not two problems. The
+      // sample quotes the already-clamped title, not `card.name`, so a report about an oversized
+      // field cannot itself carry an unbounded string.
+      const title = clampToLength(card.name, MAX_TASK_TITLE_LENGTH);
+      const description = clampNullable(emptyToNull(card.desc), MAX_TASK_DESCRIPTION_LENGTH);
+      if (title.truncated || description.truncated) {
+        skips.add(TrelloImportScope.Card, TrelloImportSkipReason.Defaulted, title.value);
+      }
+
       tasks.push({
         id: taskId,
         boardId,
         columnId: column.id,
-        title: card.name,
-        description: emptyToNull(card.desc),
+        title: title.value,
+        description: description.value,
         position: cardPosition(index),
         dueDate: parseDueDate(card.due),
         // `estimatedMinutes` is absent, so the schema default (`null`) stands. Trello has no such
@@ -449,10 +493,17 @@ export function planTrelloImport(
 
     cardChecklists.forEach((checklist, checklistIndex) => {
       const checklistId = uuidv7();
+
+      // SEC-04: the same clamp the task title gets, against `CreateChecklistDto`'s own ceiling.
+      const title = clampToLength(checklist.name, MAX_CHECKLIST_TITLE_LENGTH);
+      if (title.truncated) {
+        skips.add(TrelloImportScope.Checklist, TrelloImportSkipReason.Defaulted, title.value);
+      }
+
       checklists.push({
         id: checklistId,
         taskId: task.id,
-        title: checklist.name,
+        title: title.value,
         position: checklistPosition(checklistIndex),
       });
 
@@ -482,11 +533,24 @@ export function planTrelloImport(
   skips.addMany(TrelloImportScope.Member, TrelloImportSkipReason.Unmappable, source.memberCount);
   skips.addMany(TrelloImportScope.Comment, TrelloImportSkipReason.OutOfScope, source.commentCount);
 
+  // SEC-04: `CreateBoardDto`'s own ceilings, applied silently rather than through `skips`. There
+  // is no `board` scope in `TrelloImportScope` (`trello-export.ts` makes the same call for the
+  // board's own description already): a board is one row, not a class of rows, and a `(board,
+  // defaulted)` line that can only ever say "1" answers nothing a user could act on.
+  const boardName = clampToLength(
+    isUnnamed(source.name) ? BOARD_NAME_FALLBACK : source.name,
+    MAX_BOARD_NAME_LENGTH,
+  ).value;
+  const boardDescription = clampNullable(
+    emptyToNull(source.desc),
+    MAX_BOARD_DESCRIPTION_LENGTH,
+  ).value;
+
   return {
     board: {
       id: boardId,
-      name: isUnnamed(source.name) ? BOARD_NAME_FALLBACK : source.name,
-      description: emptyToNull(source.desc),
+      name: boardName,
+      description: boardDescription,
     },
     columns,
     labels,
