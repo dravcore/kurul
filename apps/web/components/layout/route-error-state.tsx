@@ -42,9 +42,7 @@ export function RouteErrorState({
       role="alert"
       className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center"
     >
-      <h1 className="font-display text-title-lg font-semibold text-destructive">
-        {t('pageTitle')}
-      </h1>
+      <h1 className="text-title-lg font-semibold text-destructive">{t('pageTitle')}</h1>
       <p className="max-w-md text-body text-muted-foreground">{t('pageBody')}</p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button type="button" onClick={reset}>

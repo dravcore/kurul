@@ -204,7 +204,7 @@ export const BoardColumn = memo(function BoardColumn({
           the column had a scroll container of its own, this header was stuck to a box that
           never moved, and the reader scrolled the whole document past it. */}
       <header className="sticky top-0 z-10 flex h-10 items-center gap-2 border-b border-border bg-muted/90 px-3 backdrop-blur-sm max-md:h-12">
-        <h2 className="min-w-0 flex-1 truncate text-body font-medium">{column.name}</h2>
+        <h2 className="min-w-0 flex-1 truncate text-body font-strong">{column.name}</h2>
         <span className="font-mono text-small text-muted-foreground tabular-nums">
           {tasks.length}
         </span>

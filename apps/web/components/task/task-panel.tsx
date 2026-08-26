@@ -105,11 +105,12 @@ export function TaskPanel({
       aria-busy={loading || undefined}
     >
       <div className="flex h-[var(--topbar-height)] shrink-0 items-center gap-2 border-b border-border px-3">
-        <h2
-          ref={headingRef}
-          tabIndex={-1}
-          className="min-w-0 flex-1 truncate text-title outline-none"
-        >
+        {/* `use-task-panel-focus.ts` focuses this heading on every panel open, which a keyboard
+            user reaches by pressing Enter on a task card, and the element matches
+            `:focus-visible` after it. So it draws the one focus mark app/globals.css sets in
+            `@layer base`; an `outline-*` suppressor here is the only thing that can erase it.
+            The 2px offset fits inside the 48px header without meeting its bottom border. */}
+        <h2 ref={headingRef} tabIndex={-1} className="min-w-0 flex-1 truncate text-title">
           {task?.title ?? t('panelLabel')}
         </h2>
         <Button

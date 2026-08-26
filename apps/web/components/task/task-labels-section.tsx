@@ -51,7 +51,7 @@ export function TaskLabelsSection({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-small font-medium text-foreground">{t('labels')}</p>
+      <p className="text-small font-strong text-foreground">{t('labels')}</p>
       <div className="flex flex-wrap gap-1.5">
         {taskLabels.map((label) =>
           canMutate ? (

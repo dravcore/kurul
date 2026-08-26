@@ -92,7 +92,10 @@ export function TokenSettings(): React.ReactElement {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex justify-start">
-        <Button type="button" onClick={() => setCreateOpen(true)}>
+        {/* outline, not the default primary: /settings has one primary button budget and
+            "Invite member" (MembersSettings, the section above this one) already spends it
+            (docs/design.md §2). */}
+        <Button type="button" variant="outline" onClick={() => setCreateOpen(true)}>
           {t('createAction')}
         </Button>
       </div>

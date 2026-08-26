@@ -94,7 +94,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
           ref={setActivatorNodeRef}
           type="button"
           aria-label={t('dragHandle', { title: task.title })}
-          className="absolute top-1.5 right-1.5 flex size-6 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none max-md:top-1 max-md:right-1 max-md:size-11"
+          className="absolute top-1.5 right-1.5 flex size-6 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground max-md:top-1 max-md:right-1 max-md:size-11"
           {...attributes}
         >
           <GripVertical className="size-3.5" aria-hidden />
