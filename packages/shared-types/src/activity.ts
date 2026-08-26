@@ -26,6 +26,14 @@ export const ActivityType = {
   TaskDeleted: 'task.deleted',
   TaskAssigned: 'task.assigned',
   TaskUnassigned: 'task.unassigned',
+  // `added`/`removed` rather than `attached`/`detached`: the join row itself is created and
+  // deleted, and every other pair on a task's own join tables (`task.assigned`/`unassigned`)
+  // already names the join, not the click. The payload is a snapshot (`labelId`, `name`,
+  // `color`) rather than only an id, because a label can be renamed or recolored after the row
+  // is written and the sentence should describe what happened at the time, not what the label
+  // looks like now.
+  TaskLabelAdded: 'task.label_added',
+  TaskLabelRemoved: 'task.label_removed',
   CommentCreated: 'comment.created',
   // `created`/`deleted` rather than `added`/`removed`: no name in this object uses `added`, and
   // `comment.created` / `task.deleted` are the direct precedents. The names are unrenameable
