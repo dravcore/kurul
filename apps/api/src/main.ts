@@ -36,25 +36,11 @@ async function bootstrap(): Promise<void> {
   serveOpenApi(app);
   // Runs Nest's close sequence on SIGTERM/SIGINT instead of the process dying mid-connection.
   //
-  // That sequence has a boundary in the middle of it, and it is the whole reason this API
-  // splits its teardown across two hooks (@nestjs/core `NestApplicationContext.close` and
-  // `NestApplication.dispose`, verified against 11.2.1):
-  //
-  //   onModuleDestroy -> beforeApplicationShutdown -> Socket.io and the HTTP listener close
-  //   -> onApplicationShutdown
-  //
-  // So the rule for this codebase is: anything a live request or an open socket still needs -
-  // the shared pg pool, the Redis clients, the mail transport, the storage backend, the BullMQ
-  // workers - is released in `onApplicationShutdown`, never in `onModuleDestroy`, because a
-  // destroy hook runs while the listener is still accepting and serving. The classes that do it
-  // are deliberately not enumerated here: `grep -rn onApplicationShutdown apps/api/src` is the
-  // current list, and a list written down in a comment is one that goes stale.
-  //
-  // Within a phase Nest orders modules by their distance from the root, and every global module
-  // is given `Number.MAX_VALUE` for that distance (@nestjs/core `injector/container.js`), so a
-  // global module's hooks run first on startup and last on shutdown. That is the rule the
-  // bounded worker close in `common/close-worker.ts` relies on: a global module holding the
-  // shared pg pool is torn down after the non-global modules that own the workers.
+  // The rule that sequence imposes on this codebase: anything a live request or an open socket
+  // still needs is released in `onApplicationShutdown`, never in `onModuleDestroy`, because a
+  // destroy hook runs while the listener is still accepting and serving. The phase order behind
+  // that rule, and how module distance orders hooks within a phase (which is what the bounded
+  // worker close in `common/close-worker.ts` leans on), are in docs/architecture.md section 9.1.
   app.enableShutdownHooks();
   await app.listen(port);
 }

@@ -134,7 +134,9 @@ Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdı
 böylece iş kurallarını beraberinde sürüklemeden kendi process rolüne çıkarılabilir.
 
 **Zamanlanmış işler.** İki tane; ikisi de `REDIS_URL` üzerinde BullMQ job scheduler'ı, ikisi de
-sahibi olan modülden kaydedilir ve `onModuleDestroy`'da kapatılır.
+sahibi olan modülden kaydedilir ve sınırlı bir beklemeyle `onApplicationShutdown`'da kapatılır
+(`api/src/common/close-worker.ts`); böylece hâlâ süren bir koşu, konteyneri durdurma süresinin
+ötesinde açık tutamaz ([§9.1](#91-kapanış-sırası-fazı-nest-seçer-havuzun-sahibi-tek-modüldür)).
 `notification/due-soon.worker.ts` yaklaşan due date'leri 15 dakikada bir tarar ve yalnızca
 INSERT üretir. `retention/cleanup.worker.ts` saklama penceresini aşmış satırları günde bir kez
 siler ([ADR 0020](decisions/0020-data-retention.md)). `REDIS_URL` boşsa ikisi de başlamaz; bu,
@@ -458,14 +460,32 @@ haklarında bilgi edinmenin tek yolu zaten o dosyayı okuyor olmaktı. Her birin
 ayıracak kadar büyük değiller, ama bir shutdown'ı veya bayat bir oturumu debug eden bir
 operatörün onları kaynaktan yeniden keşfetmek zorunda kalmayacağı kadar önemliler.
 
-### 9.1 Kapanış sırası Nest'e değil, tek bir modüle aittir
+### 9.1 Kapanış sırası: fazı Nest seçer, havuzun sahibi tek modüldür
 
-`PrismaService` ve Better Auth'un kendi `PrismaClient`'ı, süreç genelinde tek bir `pg`
-havuzundan ödünç alır (`api/src/prisma/database.ts`). İki istemci, tek havuz — ve **Nest,
-`onModuleDestroy` hook'ları arasında hiçbir sıra garantisi vermez.** Yani hangi modül önce
-yıkılırsa havuzu diğerinin altından çekip alırdı ve hayatta kalanın `$disconnect()` çağrısı
-her SIGTERM'de `Called end on pool more than once` / `cannot use a pool after calling end`
-fırlatırdı.
+**Bir kaynağın hangi fazda bırakılacağı Nest'in kuralıdır ve asıl önemli sınır o sıranın tam
+ortasındadır.** `NestApplicationContext.close` (@nestjs/core 11.2.1 kaynağından okundu) önce
+`onModuleDestroy`'u, sonra `beforeApplicationShutdown`'ı, sonra Socket.io sunucusunu ve HTTP
+listener'ını kapatan `NestApplication.dispose()`'u, en son da `onApplicationShutdown`'ı koşturur.
+Yani bir destroy hook'u, listener hâlâ istek kabul edip yanıtlarken çalışır. Buradaki kural şu:
+canlı bir isteğin veya açık bir soketin hâlâ ihtiyaç duyduğu her şey (paylaşılan `pg` havuzu,
+Redis istemcileri, mail transport'u, storage backend'i, iki BullMQ worker'ı)
+`onApplicationShutdown`'da bırakılır. Bunu yapan sınıflar, bayatlayacak bir düzyazıya
+yazılmadı: güncel liste `grep -rn onApplicationShutdown apps/api/src`.
+
+Tek bir faz içinde Nest, modülleri köke olan uzaklıklarına göre gezer ve her global modüle bu
+uzaklık için `Number.MAX_VALUE` verir (`injector/container.js`); kapanış fazları bu listeyi ters
+yönde gezdiği için global bir modül en son yıkılır. `common/close-worker.ts`'in zamanında
+durduramadığı bir temizlik taramasını bırakabilmesini sağlayan şey budur: paylaşılan havuz global
+bir modülde yaşar, dolayısıyla (global olmayan) retention modülü döndükten sonra kapatılır ve
+bırakılmış koşunun bir sonraki sorgusu, yarı yıkılmış bir uygulamaya karşı çalışmak yerine hata
+verir.
+
+**Nest, iki provider arasında hâlâ hiçbir sıra garantisi vermez**; ne iki global arasında ne de
+aynı modülün iki provider'ı arasında. `PrismaService` ve Better Auth'un kendi `PrismaClient`'ı,
+süreç genelinde tek bir `pg` havuzundan ödünç alır (`api/src/prisma/database.ts`) ve ikisi de
+global modüllerde yaşar. İki istemci, tek havuz: hangisi önce yıkılırsa havuzu diğerinin altından
+çekip alırdı ve hayatta kalanın `$disconnect()` çağrısı her SIGTERM'de `Called end on pool more
+than once` / `cannot use a pool after calling end` fırlatırdı.
 
 Çözüm şu: hiçbir modül kendi istemcisini kapatmaz. Havuzun yaşam döngüsünün tek sahibi
 `database.ts`'tir: istemciler `registerPoolConsumer` ile bir disconnect callback'i kaydeder ve
