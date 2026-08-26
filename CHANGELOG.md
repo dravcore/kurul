@@ -358,6 +358,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **BullMQ's due-soon and cleanup workers, and the Socket.io Redis adapter, now report a Redis
+  connection fault instead of losing it to `console.error`.** `queue`/`worker.on('error')` on
+  both workers, and `pubClient`/`subClient.on('error')` on the gateway's adapter, had no
+  listener: BullMQ and ioredis's own fallback for an unlistened `error` event prints to
+  `console.error`, invisible to the JSON log format and to Sentry, so a Redis outage taking
+  down a scheduler or the socket fan-out was silent until someone noticed the symptom. All six
+  connections now log at `warn` through the Nest `Logger`, naming the connection, and call
+  `captureServerError` once per outage (throttled to one report per minute so a reconnect storm
+  cannot flood Sentry). Readiness still reports Redis down on its own; this is what says which
+  consumer lost it. Closes audit finding BE-11.
+
 - **A Trello import no longer steps over the workspace's board ceiling.**
   `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on
   `POST .../boards` but not on `POST .../imports/trello`, which creates its board by its own
