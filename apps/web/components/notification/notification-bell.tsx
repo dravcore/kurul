@@ -49,12 +49,14 @@ export function NotificationBell(): React.ReactElement {
           className="relative"
         >
           <Bell className="size-4" />
-          {/* `text-primary-foreground`, not `text-white`: copper is the light theme's ink and the
-              dark theme's paint, so the one colour that stays readable on it is the token that
-              flips with it. White holds 5.05:1 on the light copper and 2.73:1 on the dark one,
-              which is this count unreadable in half the app. */}
+          {/* `bg-foreground text-background`, not the signature: docs/design.md §2 puts badges
+              in the column copper must not touch, and an unread count is not an error either, so
+              `--destructive` is not the answer (that family stays reserved for status and
+              priority, docs/design.md §3). The ink/canvas pair already flips with the theme and
+              holds 16.12:1 light, 15.17:1 dark, against the signature fill's 2.73:1 dark AA
+              fail. */}
           {badgeLabel ? (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-sm)] bg-signature px-0.5 text-[10px] font-medium text-primary-foreground">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-sm)] bg-foreground px-0.5 text-micro font-strong text-background">
               {badgeLabel}
             </span>
           ) : null}

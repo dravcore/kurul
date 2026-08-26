@@ -6,13 +6,14 @@ const mocks = vi.hoisted(() => ({
   getMessages: vi.fn<() => Promise<Record<string, unknown>>>(),
   getTranslations: vi.fn<(ns: string) => Promise<(key: string) => string>>(),
   headers: vi.fn<() => Promise<Headers>>(),
+  fraunces: vi.fn(() => ({ variable: '--font-fraunces' })),
 }));
 
 // `next/font/google` is a build-time transform, not a runtime module — the loaders are
 // invoked at import time, so they have to be stubbed before the layout is loaded at all.
 vi.mock('next/font/google', () => ({
   Archivo: () => ({ variable: '--font-archivo' }),
-  Fraunces: () => ({ variable: '--font-fraunces' }),
+  Fraunces: mocks.fraunces,
   JetBrains_Mono: () => ({ variable: '--font-jetbrains' }),
 }));
 
@@ -63,6 +64,30 @@ function findWithProp(node: unknown, prop: string): ReactElement | undefined {
   }
 
   return findWithProp(props.children, prop);
+}
+
+/** Depth-first search for the first element of the given host type (e.g. `'body'`). */
+function findByType(node: unknown, type: string): ReactElement | undefined {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findByType(child, type);
+      if (hit) {
+        return hit;
+      }
+    }
+    return undefined;
+  }
+
+  if (!isValidElement(node)) {
+    return undefined;
+  }
+
+  if (node.type === type) {
+    return node;
+  }
+
+  const props = node.props as Record<string, unknown>;
+  return findByType(props.children, type);
 }
 
 beforeEach(() => {
@@ -136,5 +161,34 @@ describe('RootLayout', () => {
   it('keeps the English metadata copy in the catalogue', () => {
     expect(messages.app.meta.title).toBe('Kurul');
     expect(messages.app.meta.description).toBe('Open-source Kanban-focused project management');
+  });
+
+  // Without the `opsz` axis, next/font/google embeds only Fraunces' default instance, which is
+  // cut for text-sized rendering (docs/design.md §3). A 40px `display` heading drawn from that
+  // instance carries the low-optical-size cut's thinner strokes instead of the display cut the
+  // scale is meant to look like, and no test that renders the layout in jsdom can tell the two
+  // cuts apart, so this asserts the axis was requested at all.
+  it('loads Fraunces with the opsz axis so the display cut is embedded', () => {
+    // The loader runs once, at module import, so this reads the call captured when this file's
+    // own top-level `import './layout'` first evaluated the module.
+    expect(mocks.fraunces).toHaveBeenCalledWith(expect.objectContaining({ axes: ['opsz'] }));
+  });
+
+  // globals.css's theme font stacks (`--font-sans` etc.) resolve their `var()` reference on
+  // :root, and a custom property only resolves against the element that declares it, so the
+  // next/font `.variable` classes have to live on <html> rather than <body> or every stack falls
+  // through to its fallback list.
+  it('carries every next/font variable on the html element rather than the body', async () => {
+    const tree = await RootLayout({ children: null });
+
+    expect(tree.type).toBe('html');
+    const htmlClassName = (tree.props as { className?: string }).className ?? '';
+    expect(htmlClassName).toContain('--font-archivo');
+    expect(htmlClassName).toContain('--font-fraunces');
+    expect(htmlClassName).toContain('--font-jetbrains');
+
+    const body = findByType(tree, 'body');
+    expect(body).toBeDefined();
+    expect((body?.props as { className?: string }).className).toBeUndefined();
   });
 });

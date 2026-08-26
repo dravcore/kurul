@@ -101,7 +101,7 @@ export function DemoBanner(): React.ReactElement | null {
     // deployment, so it is read in document order rather than interrupting a screen reader.
     // Colour never carries it alone (design.md §3) - the icon and the sentence say the same thing.
     <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted px-3 py-2">
-      <Info className="size-4 shrink-0 text-signature" aria-hidden />
+      <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       <p className="min-w-0 flex-1 text-small text-foreground">{message}</p>
       <button
         type="button"

@@ -21,6 +21,13 @@ const BOARD_PATH = '/board';
  */
 const DEFAULT_VERIFICATION_CALLBACK_PATH = '/verify-email';
 
+/**
+ * Web route a password-reset link lands on when the caller did not name one.
+ * Owned by `apps/web/app/(auth)/reset-password/page.tsx`, which reads the `?token=` Better
+ * Auth appends on the way through, or the `?error=` it appends instead.
+ */
+const DEFAULT_PASSWORD_RESET_CALLBACK_PATH = '/reset-password';
+
 function trimTrailingSlash(url: string): string {
   return url.replace(/\/+$/, '');
 }
@@ -61,23 +68,38 @@ export function buildInviteAcceptUrl(invitationId: string): string {
  *   outside `trustedOrigins`, and second-guessing it here would break a deliberate choice.
  */
 export function resolveVerificationUrl(verificationUrl: string): string {
+  return resolveCallbackToWebApp(verificationUrl, DEFAULT_VERIFICATION_CALLBACK_PATH);
+}
+
+/**
+ * Points a Better Auth password-reset link at the web app.
+ *
+ * Better Auth builds `…/auth/reset-password/<token>?callbackURL=…`, where `callbackURL` is the
+ * `redirectTo` the client passed to request-password-reset and is *empty* when it passed none.
+ * Following the link makes the API check the token and redirect to `callbackURL` with
+ * `?token=<token>` (or `?error=INVALID_TOKEN`), so an untouched link would drop the user on
+ * the API's root with a token nobody reads. The same three cases as `resolveVerificationUrl`,
+ * resolved against `WEB_URL` for the same reason.
+ */
+export function resolvePasswordResetUrl(resetUrl: string): string {
+  return resolveCallbackToWebApp(resetUrl, DEFAULT_PASSWORD_RESET_CALLBACK_PATH);
+}
+
+function resolveCallbackToWebApp(link: string, defaultPath: string): string {
   let url: URL;
   try {
-    url = new URL(verificationUrl);
+    url = new URL(link);
   } catch {
     // Not a URL we can reason about; hand it back untouched rather than drop the email.
-    return verificationUrl;
+    return link;
   }
 
   const callback = url.searchParams.get('callbackURL');
   if (callback !== null && callback !== '' && callback !== '/' && !callback.startsWith('/')) {
-    return verificationUrl;
+    return link;
   }
 
-  const path =
-    callback === null || callback === '' || callback === '/'
-      ? DEFAULT_VERIFICATION_CALLBACK_PATH
-      : callback;
+  const path = callback === null || callback === '' || callback === '/' ? defaultPath : callback;
   url.searchParams.set('callbackURL', `${webAppUrl()}${path}`);
   return url.toString();
 }

@@ -118,7 +118,14 @@ describe('proxy', () => {
   });
 
   it('covers the public pages, which return before the session check', async () => {
-    for (const path of ['/login', '/register', '/verify-email', '/invite/abc']) {
+    for (const path of [
+      '/login',
+      '/register',
+      '/verify-email',
+      '/forgot-password',
+      '/reset-password',
+      '/invite/abc',
+    ]) {
       const response = await proxy(request(`http://localhost:3000${path}`, false));
       expect(nonceOf(response.headers.get('content-security-policy')), path).toBeTruthy();
     }
