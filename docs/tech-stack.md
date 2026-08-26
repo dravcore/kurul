@@ -136,7 +136,8 @@ Projects worth studying for architecture and data modelling:
 
 ## 5. Decision records
 
-Stack and product ADRs are indexed in [decisions/README.md](decisions/README.md), which is the count, so this sentence does not carry a range that goes stale on the next record.
-Start there rather than duplicating the table here.
+Stack and product ADRs are indexed in [decisions/README.md](decisions/README.md); the index is the
+count, so this sentence carries no range to go stale. Start there rather than duplicating the table
+here.
 
 Related: [architecture.md](architecture.md)

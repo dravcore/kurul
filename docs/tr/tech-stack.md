@@ -230,7 +230,7 @@ Mimari ve veri modelleme için incelemeye değer projeler:
 
 ## 5. Karar kayıtları
 
-Stack ve ürün ADR'leri [decisions/README.md](decisions/README.md) indeksinde; sayıyı orası tutuyor, böylece bu cümle bir sonraki kayıtta eskiyecek bir aralık taşımıyor.
-Tabloyu burada çoğaltmak yerine oradan başlayın.
+Stack ve ürün ADR'leri [decisions/README.md](decisions/README.md) indeksinde; sayıyı indeks tutuyor,
+bu yüzden bu cümle eskiyecek bir aralık taşımıyor. Tabloyu burada çoğaltmak yerine oradan başlayın.
 
 İlgili: [architecture.md](architecture.md)
