@@ -675,6 +675,7 @@
         "deleteAction": "Delete task",
         "deleteError": "Could not delete this task.",
         "saveError": "Could not save this task.",
+        "saveConflict": "Someone else changed this task. Reload it to edit again.",
         "missing": "This task no longer exists. Someone may have deleted it.",
         "retryAction": "Try again",
         "cancel": "Cancel",

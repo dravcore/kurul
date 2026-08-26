@@ -675,6 +675,7 @@
         "deleteAction": "Task'ı sil",
         "deleteError": "Bu task silinemedi.",
         "saveError": "Bu task kaydedilemedi.",
+        "saveConflict": "Bu task'ı başka biri değiştirdi. Düzenlemek için yeniden yükleyin.",
         "missing": "Bu task artık yok. Birisi silmiş olabilir.",
         "retryAction": "Tekrar dene",
         "cancel": "Vazgeç",

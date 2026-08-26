@@ -39,7 +39,6 @@ import { Toaster } from '@/components/ui/sonner';
 import { EmailVerificationLink } from '@/components/auth/email-verification-link';
 import { ForgotPasswordView } from '@/components/auth/forgot-password-view';
 import { LoginView } from '@/components/auth/login-view';
-import { RegisterView } from '@/components/auth/register-view';
 import { VerifyEmailView } from '@/components/auth/verify-email-view';
 import { BoardColumn } from '@/components/board/board-column';
 import { BoardList } from '@/components/board/board-list';
@@ -50,6 +49,7 @@ import { ImportTrelloDialog } from '@/components/board/import-trello-dialog';
 import { RenameBoardDialog } from '@/components/board/rename-board-dialog';
 import { AssigneeChart } from '@/components/dashboard/assignee-chart';
 import { ChartTableToggle } from '@/components/dashboard/chart-table-toggle';
+import { ColumnChart } from '@/components/dashboard/column-chart';
 import { CompletionChart } from '@/components/dashboard/completion-chart';
 import { DashboardSummary } from '@/components/dashboard/dashboard-summary';
 import { AppSidebar } from '@/components/layout/app-sidebar';
@@ -554,6 +554,11 @@ const LONGEST_TURKISH: readonly LongString[] = [
   },
   { key: 'app.shell.expandSidebar', screen: 'components/layout/app-sidebar.tsx', ratio: 1.64 },
   {
+    key: 'app.dashboard.columnTitle',
+    screen: 'components/dashboard/column-chart.tsx',
+    ratio: 1.47,
+  },
+  {
     key: 'app.dashboard.viewTable',
     screen: 'components/dashboard/chart-table-toggle.tsx',
     ratio: 1.69,
@@ -640,7 +645,6 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/dashboard/completion-chart.tsx',
     ratio: 1.57,
   },
-  { key: 'auth.register.loginLink', screen: 'components/auth/register-view.tsx', ratio: 1.57 },
 ];
 
 /**
@@ -1135,6 +1139,23 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
+    screen: 'components/dashboard/column-chart.tsx',
+    keys: ['app.dashboard.columnTitle'],
+    run: () => {
+      render(
+        tr(
+          <ColumnChart
+            data={[{ columnId: COLUMN_ID, name: 'Yapılacak', position: 1000, count: 3 }]}
+          />,
+        ),
+      );
+
+      expect(
+        screen.getByRole('heading', { name: messages.app.dashboard.columnTitle }),
+      ).toBeDefined();
+    },
+  },
+  {
     screen: 'components/dashboard/chart-table-toggle.tsx',
     keys: ['app.dashboard.viewTable', 'app.dashboard.viewChart'],
     run: () => {
@@ -1469,15 +1490,6 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
 
       expect(screen.getByRole('link', { name: messages.auth.login.registerLink })).toBeDefined();
       expect(screen.getByText(messages.auth.login.subtitle)).toBeDefined();
-    },
-  },
-  {
-    screen: 'components/auth/register-view.tsx',
-    keys: ['auth.register.loginLink'],
-    run: () => {
-      render(tr(<RegisterView />));
-
-      expect(screen.getByRole('link', { name: messages.auth.register.loginLink })).toBeDefined();
     },
   },
   {

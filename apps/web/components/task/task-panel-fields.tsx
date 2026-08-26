@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { TaskDto, UpdateTaskRequest } from '@kurul/shared-types';
 import { api, apiStatus, resolveApiMessage } from '@/lib/api';
+import { SubmitError } from '@/components/common/submit-error';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,6 +42,7 @@ export function TaskPanelFields({
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
   const [pending, setPending] = useState(false);
+  const [conflict, setConflict] = useState(false);
 
   // Re-seed the editable fields when the panel switches task, or when the stored title or
   // description changes under it (our own PATCH coming back, or a realtime edit). Done during
@@ -69,6 +71,7 @@ export function TaskPanelFields({
     if (nextTitle === task.title && nextDescription === task.description) return;
 
     setPending(true);
+    setConflict(false);
     const previousTitle = task.title;
     const previousDescription = task.description;
     onUpdated({ id: task.id, title: nextTitle, description: nextDescription });
@@ -86,6 +89,13 @@ export function TaskPanelFields({
         description: previousDescription,
       });
       const status = apiStatus(caught);
+      // A conflict is the one failure the reader has to resolve themselves, so it is a line in
+      // the panel rather than a toast: a toast asking them to reload would be gone by the time
+      // they had read the field it is about.
+      if (status === 409) {
+        setConflict(true);
+        return;
+      }
       // A retry only makes sense for a failure the server did not explain; re-sending a
       // rejected write on a 403, or against a task that is gone, just repeats the toast.
       if (status === 403 || status === 404) {
@@ -108,6 +118,7 @@ export function TaskPanelFields({
 
   return (
     <>
+      {conflict ? <SubmitError message={t('saveConflict')} /> : null}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={titleId}>{t('title')}</Label>
         <Input
