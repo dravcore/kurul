@@ -118,7 +118,11 @@ export function TaskPanelFields({
 
   return (
     <>
-      {conflict ? <SubmitError message={t('saveConflict')} /> : null}
+      {/*
+        No focus move: this panel saves on blur, so the line arrives after the reader has already
+        tabbed into the next field. `role="alert"` still announces it.
+      */}
+      {conflict ? <SubmitError message={t('saveConflict')} focusOnMount={false} /> : null}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={titleId}>{t('title')}</Label>
         <Input

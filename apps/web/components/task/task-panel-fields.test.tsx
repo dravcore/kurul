@@ -53,6 +53,9 @@ function renderFields() {
         onUpdated={onUpdated}
         onClose={onClose}
       />
+      {/* Stands in for whatever the reader tabbed to while the save was in flight. It is outside
+          the two fields on purpose: both go `disabled` while pending, which drops focus. */}
+      <button type="button">Elsewhere</button>
     </NextIntlClientProvider>,
   );
   return { onUpdated, onClose };
@@ -96,6 +99,21 @@ describe('TaskPanelFields conflict', () => {
     editTitle('Fix the login redirect once');
 
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+
+  it('leaves focus where the reader moved it', async () => {
+    apiPatch.mockRejectedValue(new ApiError({ statusCode: 409, error: 'Conflict', message: 'no' }));
+    renderFields();
+
+    editTitle('Fix the login redirect');
+    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
+    elsewhere.focus();
+
+    await screen.findByRole('alert');
+
+    // The panel saves on blur, so this line arrives after focus has already moved on. Pulling it
+    // into the alert would interrupt someone mid-sentence; role="alert" announces it anyway.
+    expect(document.activeElement).toBe(elsewhere);
   });
 
   it('leaves every other failure on the toast it already used', async () => {
