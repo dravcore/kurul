@@ -1035,3 +1035,251 @@ describe('globals.css skeleton motion', () => {
     expect(opacity?.value).toBe('0.75');
   });
 });
+
+/**
+ * P5 Task 5: the adversarial pass over every animated surface under
+ * `prefers-reduced-motion: reduce`.
+ *
+ * The suites above check that a reduced-motion rule *exists* for a surface. Existing is not
+ * winning: a reduced twin written with fewer attribute selectors than the movement rule it is
+ * meant to replace loses the cascade outright, and no `@media` query changes that. The drawer
+ * shipped that way, two attribute selectors
+ * (`[data-slot='dialog-drawer-content'][data-state='open']`) against the side-qualified slide
+ * rule's three, so a reader who asked for less motion still got the full 320px slide.
+ *
+ * So this suite resolves the cascade for real instead: for a synthetic element carrying a given
+ * set of attributes or classes, it finds the `animation`/`animation-name` declaration that
+ * actually wins, once with only the unconditional rules in play and once with the
+ * reduced-motion blocks added, exactly as a browser would order them.
+ */
+describe('globals.css reduced-motion cascade', () => {
+  const REDUCED = '@media (prefers-reduced-motion: reduce)';
+
+  type Target = { attrs?: Record<string, string>; classes?: string[] };
+
+  /** One animated surface, the keyframe it plays when nothing is asked for, and whether its
+   * reduced twin still has to leave something on screen when it finishes. */
+  type Surface = { label: string; target: Target; moving: string; visible: boolean };
+
+  /**
+   * The specificity `selector` contributes for `target`, or `null` when it does not match or is
+   * not a plain chain of attribute and class parts. Everything this suite targets is written as
+   * one such chain, and anything else (a type selector, a pseudo-class, a combinator) is a rule
+   * that cannot apply to a bare synthetic element anyway.
+   */
+  function matchSpecificity(selector: string, target: Target): number | null {
+    const parts = selector.match(/\[[^\]]+\]|\.[\w-]+/g);
+    if (parts === null) return null;
+    if (parts.join('') !== selector.trim()) return null;
+
+    const attrs = target.attrs ?? {};
+    const classes = target.classes ?? [];
+    for (const part of parts) {
+      if (part.startsWith('.')) {
+        if (!classes.includes(part.slice(1))) return null;
+        continue;
+      }
+      const inner = part.slice(1, -1);
+      const eq = inner.indexOf('=');
+      if (eq === -1) {
+        if (!(inner in attrs)) return null;
+        continue;
+      }
+      const name = inner.slice(0, eq);
+      const value = inner.slice(eq + 1).replaceAll(/^['"]|['"]$/g, '');
+      if (attrs[name] !== value) return null;
+    }
+    // Every part is a class or an attribute selector, each worth one unit of the `b` column.
+    return parts.length;
+  }
+
+  const ANIMATION_PROPERTIES = ['animation', 'animation-name'];
+
+  /**
+   * The `animation`/`animation-name` declaration that wins for `target`, following layer, then
+   * specificity, then source order. `reduced` decides whether the reduced-motion blocks are in
+   * play; every other at-rule (`hover`, `forced-colors`, `prefers-contrast`) is left out either
+   * way, since none of them is the condition under test.
+   */
+  function winningAnimation(target: Target, { reduced }: { reduced: boolean }): Declaration {
+    let winner: { rule: StyleRule; specificity: number; declaration: Declaration } | undefined;
+
+    for (const rule of sheet.rules) {
+      const conditions = rule.atRules.map((at) => at.replaceAll(/\s+/g, ' '));
+      if (!conditions.every((at) => at === REDUCED)) continue;
+      if (!reduced && conditions.length > 0) continue;
+
+      const declaration = rule.declarations
+        .filter((entry) => ANIMATION_PROPERTIES.includes(entry.property))
+        .at(-1);
+      if (declaration === undefined) continue;
+
+      for (const part of selectorParts(rule)) {
+        const specificity = matchSpecificity(part, target);
+        if (specificity === null) continue;
+        if (winner === undefined) {
+          winner = { rule, specificity, declaration };
+          continue;
+        }
+        const byLayer = layerRank(sheet, rule.layer) - layerRank(sheet, winner.rule.layer);
+        const bySpecificity = specificity - winner.specificity;
+        const byOrder = rule.order - winner.rule.order;
+        if (
+          byLayer > 0 ||
+          (byLayer === 0 && (bySpecificity > 0 || (bySpecificity === 0 && byOrder > 0)))
+        ) {
+          winner = { rule, specificity, declaration };
+        }
+      }
+    }
+
+    if (winner === undefined) {
+      throw new Error(`nothing in the compiled CSS animates ${JSON.stringify(target)}`);
+    }
+    return winner.declaration;
+  }
+
+  /** The keyframe name a winning `animation` shorthand or `animation-name` resolves to. */
+  function keyframeNameOf(declaration: Declaration): string {
+    if (declaration.property === 'animation-name') return declaration.value.trim();
+    const named = declaration.value
+      .split(/\s+/)
+      .find((token) => css.includes(`@keyframes ${token}`));
+    return named ?? 'none';
+  }
+
+  /**
+   * Every animated surface in the tree, with the keyframe that must play when nothing is asked
+   * for. `visible` marks the layers whose reduced twin still has to *arrive*: an open dialog
+   * that ends at anything but full opacity is a state change nobody can see, which is the other
+   * half of what reduced motion must not break.
+   */
+  const surfaces: Surface[] = [
+    {
+      label: 'drawer, docked left, opening',
+      target: {
+        attrs: { 'data-slot': 'dialog-drawer-content', 'data-side': 'left', 'data-state': 'open' },
+      },
+      moving: 'drawer-in-left',
+      visible: true,
+    },
+    {
+      label: 'drawer, docked left, closing',
+      target: {
+        attrs: {
+          'data-slot': 'dialog-drawer-content',
+          'data-side': 'left',
+          'data-state': 'closed',
+        },
+      },
+      moving: 'drawer-out-left',
+      visible: false,
+    },
+    {
+      label: 'drawer, docked right, opening',
+      target: {
+        attrs: { 'data-slot': 'dialog-drawer-content', 'data-side': 'right', 'data-state': 'open' },
+      },
+      moving: 'drawer-in-right',
+      visible: true,
+    },
+    {
+      label: 'drawer, docked right, closing',
+      target: {
+        attrs: {
+          'data-slot': 'dialog-drawer-content',
+          'data-side': 'right',
+          'data-state': 'closed',
+        },
+      },
+      moving: 'drawer-out-right',
+      visible: false,
+    },
+    {
+      label: 'dialog surface, opening',
+      target: { attrs: { 'data-slot': 'dialog-content', 'data-state': 'open' } },
+      moving: 'dialog-content-in',
+      visible: true,
+    },
+    {
+      label: 'dialog surface, closing',
+      target: { attrs: { 'data-slot': 'dialog-content', 'data-state': 'closed' } },
+      moving: 'dialog-content-out',
+      visible: false,
+    },
+    {
+      label: 'dialog scrim, opening',
+      target: { attrs: { 'data-slot': 'dialog-overlay', 'data-state': 'open' } },
+      moving: 'layer-fade-in',
+      visible: true,
+    },
+    {
+      label: 'dialog scrim, closing',
+      target: { attrs: { 'data-slot': 'dialog-overlay', 'data-state': 'closed' } },
+      moving: 'layer-fade-out',
+      visible: false,
+    },
+    {
+      label: 'menu, opening',
+      target: { attrs: { 'data-slot': 'dropdown-menu-content', 'data-state': 'open' } },
+      moving: 'menu-content-in',
+      visible: true,
+    },
+    {
+      label: 'menu, closing',
+      target: { attrs: { 'data-slot': 'dropdown-menu-content', 'data-state': 'closed' } },
+      moving: 'menu-content-out',
+      visible: false,
+    },
+    {
+      label: 'submenu, opening',
+      target: { attrs: { 'data-slot': 'dropdown-menu-sub-content', 'data-state': 'open' } },
+      moving: 'menu-content-in',
+      visible: true,
+    },
+    {
+      label: 'submenu, closing',
+      target: { attrs: { 'data-slot': 'dropdown-menu-sub-content', 'data-state': 'closed' } },
+      moving: 'menu-content-out',
+      visible: false,
+    },
+    {
+      label: 'loading skeleton',
+      target: { attrs: { 'data-slot': 'skeleton' } },
+      moving: 'skeleton-pulse',
+      visible: false,
+    },
+    {
+      label: 'submit spinner',
+      target: { attrs: { 'data-slot': 'button-spinner' } },
+      moving: 'spinner',
+      visible: false,
+    },
+    {
+      label: 'board column entrance',
+      target: { classes: ['board-column-enter'] },
+      moving: 'board-column-enter',
+      visible: true,
+    },
+  ];
+
+  it.each(surfaces)('plays $moving on $label when nothing is asked for', ({ target, moving }) => {
+    expect(keyframeNameOf(winningAnimation(target, { reduced: false }))).toBe(moving);
+  });
+
+  it.each(surfaces)('leaves $label with no movement under reduce', ({ target }) => {
+    const name = keyframeNameOf(winningAnimation(target, { reduced: true }));
+    if (name === 'none') return;
+    expect(keyframeBody(name)).not.toMatch(/\b(transform|scale|translate|rotate)\s*:/);
+  });
+
+  it.each(surfaces.filter((surface) => surface.visible))(
+    'still lets $label finish fully opaque under reduce',
+    ({ target }) => {
+      const name = keyframeNameOf(winningAnimation(target, { reduced: true }));
+      expect(name).not.toBe('none');
+      const body = keyframeBody(name);
+      expect(body.slice(body.lastIndexOf('to'))).toMatch(/opacity\s*:\s*1\b/);
+    },
+  );
+});

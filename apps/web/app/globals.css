@@ -462,15 +462,21 @@ body {
   animation-name: drawer-out-right;
 }
 
-/* Reduced motion keeps the layer's arrival and departure legible — it cross-fades instead of
-   sliding — rather than removing the animation, which would also remove Radix's cue to wait
-   before unmounting and make the drawer disappear a frame early. */
+/* Reduced motion keeps the layer's arrival and departure legible: it cross-fades instead of
+   sliding, rather than removing the animation, which would also remove Radix's cue to wait
+   before unmounting and make the drawer disappear a frame early.
+
+   `[data-side]` is here to be counted, not to select: without it these two selectors carry two
+   attribute selectors against the side-qualified slide rules' three above, and a rule inside a
+   media query is still just a rule -- it loses that specificity contest outright and the drawer
+   keeps its full slide for a reader who asked for none of it. Written as a bare presence check
+   so one pair of rules still covers both docked sides. */
 @media (prefers-reduced-motion: reduce) {
-  [data-slot='dialog-drawer-content'][data-state='open'] {
+  [data-slot='dialog-drawer-content'][data-side][data-state='open'] {
     animation-name: layer-fade-in;
   }
 
-  [data-slot='dialog-drawer-content'][data-state='closed'] {
+  [data-slot='dialog-drawer-content'][data-side][data-state='closed'] {
     animation-name: layer-fade-out;
   }
 }
