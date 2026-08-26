@@ -209,7 +209,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     dndRef.current = { cancelDrag: dnd.cancelDrag, isDragging: dnd.isDragging };
   }, [dnd.cancelDrag, dnd.isDragging]);
 
-  const { connected: socketConnected } = useBoardRealtime({
+  const { connected: socketConnected, remoteChangedTaskIds } = useBoardRealtime({
     boardId,
     loading,
     currentUserId,
@@ -229,9 +229,10 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
    */
   const taskSignals = useMemo(() => {
     const signals = new Map<string, TaskCardSignal>();
+    for (const taskId of remoteChangedTaskIds) signals.set(taskId, 'remote-changed');
     for (const taskId of returningTaskIds) signals.set(taskId, 'returning');
     return signals;
-  }, [returningTaskIds]);
+  }, [remoteChangedTaskIds, returningTaskIds]);
 
   if (loading) {
     return <BoardLoadingState />;

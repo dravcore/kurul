@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { ColumnDto, TaskDto } from '@kurul/shared-types';
@@ -30,6 +37,12 @@ export type UseBoardRealtimeOptions = {
 
 /** How long an id is coalesced before its refetch fires. */
 const UPSERT_DEBOUNCE_MS = 120;
+
+/** The `task-card-remote-change` keyframe's duration in app/globals.css: the mark drives the
+ * tint, so the two have to agree or the card is left carrying an attribute nothing draws. */
+const REMOTE_CHANGE_MS = 1_200;
+
+const NO_REMOTE_CHANGES: ReadonlySet<string> = new Set<string>();
 
 /**
  * How long resync triggers are coalesced. A room join acks on every (re)connection, so a
@@ -66,10 +79,54 @@ export function useBoardRealtime({
   setColumns,
   setMetaRefreshKey,
   reload,
-}: UseBoardRealtimeOptions): { connected: boolean } {
+}: UseBoardRealtimeOptions): {
+  connected: boolean;
+  /** Cards a *different* member just moved or edited, for as long as their tint is fading. */
+  remoteChangedTaskIds: ReadonlySet<string>;
+} {
   const t = useTranslations('app.board');
   const { activeId } = useWorkspaceContext();
   const upsertTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [remoteChangedTaskIds, setRemoteChangedTaskIds] =
+    useState<ReadonlySet<string>>(NO_REMOTE_CHANGES);
+  const remoteChangeTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    const timers = remoteChangeTimersRef.current;
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
+
+  /** True for an event this session caused, echoed back to it off the room. */
+  const isOwnEcho = useCallback(
+    (actorId: string): boolean => currentUserId !== null && actorId === currentUserId,
+    [currentUserId],
+  );
+
+  const markRemoteChanged = useCallback((taskId: string): void => {
+    const pending = remoteChangeTimersRef.current.get(taskId);
+    if (pending) clearTimeout(pending);
+    setRemoteChangedTaskIds((current) => {
+      if (current.has(taskId)) return current;
+      const next = new Set(current);
+      next.add(taskId);
+      return next;
+    });
+    remoteChangeTimersRef.current.set(
+      taskId,
+      setTimeout(() => {
+        remoteChangeTimersRef.current.delete(taskId);
+        setRemoteChangedTaskIds((current) => {
+          if (!current.has(taskId)) return current;
+          const next = new Set(current);
+          next.delete(taskId);
+          return next;
+        });
+      }, REMOTE_CHANGE_MS),
+    );
+  }, []);
 
   const upsertRemoteTask = useCallback(
     (taskId: string): void => {
@@ -183,20 +240,24 @@ export function useBoardRealtime({
     }
   }, [activeId, boardId, setColumns]);
 
-  return useBoardSocket(boardId, Boolean(activeId) && !loading, {
+  const { connected } = useBoardSocket(boardId, Boolean(activeId) && !loading, {
     onResync: requestResync,
     onTaskCreated: (payload) => {
       if (tasksRef.current.some((task) => task.id === payload.taskId)) return;
       void upsertRemoteTask(payload.taskId);
     },
     onTaskUpdated: (payload) => {
+      if (!isOwnEcho(payload.actorId)) markRemoteChanged(payload.taskId);
       void upsertRemoteTask(payload.taskId);
     },
     onTaskMoved: (payload) => {
-      const remoteActor = currentUserId !== null && payload.actorId === currentUserId;
-      if (!remoteActor && dndRef.current?.isDragging) {
-        dndRef.current.cancelDrag();
-        toast.message(t('realtime.dragCancelled'));
+      const ownEcho = isOwnEcho(payload.actorId);
+      if (!ownEcho) {
+        markRemoteChanged(payload.taskId);
+        if (dndRef.current?.isDragging) {
+          dndRef.current.cancelDrag();
+          toast.message(t('realtime.dragCancelled'));
+        }
       }
       setTasks((current) =>
         current.map((task) =>
@@ -205,7 +266,7 @@ export function useBoardRealtime({
             : task,
         ),
       );
-      if (!remoteActor && !tasksRef.current.some((task) => task.id === payload.taskId)) {
+      if (!ownEcho && !tasksRef.current.some((task) => task.id === payload.taskId)) {
         void upsertRemoteTask(payload.taskId);
       }
     },
@@ -221,4 +282,6 @@ export function useBoardRealtime({
       }
     },
   });
+
+  return { connected, remoteChangedTaskIds };
 }

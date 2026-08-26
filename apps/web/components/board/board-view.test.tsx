@@ -85,7 +85,10 @@ const mockedTaskPanel = vi.mocked(TaskPanel);
 mockedBoardCanvas.mockImplementation(() => <div data-testid="board-canvas" />);
 mockedBoardDialogs.mockImplementation(() => <div data-testid="board-dialogs" />);
 mockedTaskPanel.mockImplementation(() => <div data-testid="task-panel" />);
-mockedUseBoardRealtime.mockReturnValue({ connected: true });
+mockedUseBoardRealtime.mockReturnValue({
+  connected: true,
+  remoteChangedTaskIds: new Set<string>(),
+});
 
 function lastBoardCanvasProps(): Parameters<typeof BoardCanvas>[0] {
   const call = mockedBoardCanvas.mock.calls.at(-1);
@@ -258,7 +261,10 @@ afterEach(() => {
   currentSearchParams = new URLSearchParams();
   workspaceState.activeId = WORKSPACE_ID;
   workspaceState.activeRole = MemberRole.MEMBER;
-  mockedUseBoardRealtime.mockReturnValue({ connected: true });
+  mockedUseBoardRealtime.mockReturnValue({
+    connected: true,
+    remoteChangedTaskIds: new Set<string>(),
+  });
 });
 
 /**
@@ -328,7 +334,10 @@ describe('BoardView loaded frame', () => {
   });
 
   it('says the connection is lost, as a status region, while the socket is down', () => {
-    mockedUseBoardRealtime.mockReturnValue({ connected: false });
+    mockedUseBoardRealtime.mockReturnValue({
+      connected: false,
+      remoteChangedTaskIds: new Set<string>(),
+    });
 
     renderLoadedBoard(loadedFixture());
 
@@ -352,6 +361,33 @@ describe('BoardView loaded frame', () => {
 
       expect(lastBoardCanvasProps().taskSignals.get('task-a')).toBe('returning');
       expect(lastBoardCanvasProps().taskSignals.has('task-b')).toBe(false);
+    } finally {
+      mutations.returningTaskIds = new Set<string>();
+    }
+  });
+
+  it('tints a card another member just changed', () => {
+    mockedUseBoardRealtime.mockReturnValue({
+      connected: true,
+      remoteChangedTaskIds: new Set(['task-b']),
+    });
+
+    renderLoadedBoard(loadedFixture());
+
+    expect(lastBoardCanvasProps().taskSignals.get('task-b')).toBe('remote-changed');
+  });
+
+  it('keeps the return mark on a card that also changed remotely', () => {
+    mutations.returningTaskIds = new Set(['task-a']);
+    mockedUseBoardRealtime.mockReturnValue({
+      connected: true,
+      remoteChangedTaskIds: new Set(['task-a']),
+    });
+    try {
+      renderLoadedBoard(loadedFixture());
+
+      // The reader's own move failing is the thing they need to know about first.
+      expect(lastBoardCanvasProps().taskSignals.get('task-a')).toBe('returning');
     } finally {
       mutations.returningTaskIds = new Set<string>();
     }
