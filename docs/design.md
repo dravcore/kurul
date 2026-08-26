@@ -174,7 +174,11 @@ Open-source, self-hostable, complete Latin Extended-A: Turkish (`ı İ ğ ş ç 
 correctly since it is the first translation pack — a requirement that eliminated most of the
 fashionable display faces. All three are self-hosted at build time via `next/font/google`
 (Next downloads and embeds the files — equivalent to `next/font/local` without committing
-binary font assets to the repo).
+binary font assets to the repo). The three faces' `next/font` `.variable` classes live on
+`<html>`, not `<body>`: the token stacks that reference them (`--font-sans`, `--font-display`,
+`--font-mono` in `app/globals.css`) resolve their `var()` calls on `:root`, and a custom
+property resolves only against the element that defines it, so a variable placed on `<body>`
+falls straight through to the fallback fonts.
 
 | Role      | Face                                                       | Where                                                                     | Why this one                                                                                                                                                                                                                             |
 | --------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

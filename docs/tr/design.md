@@ -182,7 +182,11 @@ Open-source, self-hostable, komple Latin Extended-A: Turkish (`ı İ ğ ş ç ö
 edilmelidir çünkü ilk çeviri paketi budur — bu gereksinim, moda display font'larının çoğunu
 elemiştir. Üçü de build time'da `next/font/google` ile self-hosted'dır (Next font dosyalarını
 indirir ve gömer — binary font asset'lerini repoya commit etmeden `next/font/local` ile
-eşdeğer).
+eşdeğer). Üç fontun `next/font` `.variable` sınıfları `<body>`'de değil `<html>`'dedir: bu
+değişkenlere referans veren token stack'leri (`app/globals.css`'teki `--font-sans`,
+`--font-display`, `--font-mono`) `var()` çağrılarını `:root` üzerinde çözer, bir custom property
+da yalnızca kendisini tanımlayan öğeye karşı çözülür, dolayısıyla `<body>`'ye konan bir değişken
+doğrudan fallback fontlara düşer.
 
 | Rol       | Font                                                         | Nerede                                                                      | Neden bu                                                                                                                                                                                                                                          |
 | --------- | ------------------------------------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

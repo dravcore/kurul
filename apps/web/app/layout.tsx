@@ -56,8 +56,16 @@ export default async function RootLayout({
   const nonce = (await headers()).get(CSP_NONCE_HEADER) ?? undefined;
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <body className={`${archivo.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}>
+    // The next/font `.variable` classes live here rather than on <body>: globals.css's theme
+    // font stacks (`--font-sans` etc.) resolve their `var()` reference on :root, and a custom
+    // property only resolves against the element that declares it, so the variable has to sit on
+    // <html> too or every stack falls through to its fallback list.
+    <html
+      lang={locale}
+      className={`${archivo.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
+      <body>
         <ThemeProvider nonce={nonce}>
           <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
           <Toaster />

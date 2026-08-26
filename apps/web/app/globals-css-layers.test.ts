@@ -599,6 +599,45 @@ describe('globals.css cascade layers', () => {
     ).toBe(false);
   });
 
+  // A theme font stack resolves on :root: `@theme inline` compiles `--font-sans` and its
+  // siblings onto `:root, :host` in `@layer theme`, and a custom property's `var()` reference
+  // only resolves against the element that defines it, so the next/font variable each stack
+  // names has to be defined on :root too, not on a descendant.
+  it('points every font-stack property at a next/font variable defined on html', async () => {
+    const nextFontVariables = ['--font-archivo', '--font-fraunces', '--font-jetbrains'];
+    const fontStackProperties = ['--font-sans', '--font-display', '--font-mono'];
+
+    const themeRule = requireRule(sheet, 'the compiled :root, :host theme block', (rule) => {
+      return (
+        rule.layer === 'theme' &&
+        fontStackProperties.every((property) => {
+          return rule.declarations.some((declaration) => declaration.property === property);
+        })
+      );
+    });
+
+    for (const property of fontStackProperties) {
+      const declaration = themeRule.declarations.find((entry) => entry.property === property);
+      expect(declaration).toBeDefined();
+      expect(
+        nextFontVariables.some((variable) => declaration!.value.startsWith(`var(${variable})`)),
+      ).toBe(true);
+    }
+
+    const layoutSource = await readFile(path.join(webRoot, 'app/layout.tsx'), 'utf8');
+    for (const variable of nextFontVariables) {
+      expect(layoutSource).toContain(`variable: '${variable}'`);
+    }
+
+    // `\s` right after `<html` (rather than `\b`) so this cannot match the literal `<html>` that
+    // appears earlier in the file's own prose comments.
+    const htmlTag = layoutSource.match(/<html\s[\s\S]*?>/)?.[0];
+    expect(htmlTag).toBeDefined();
+    expect(htmlTag).toContain('archivo.variable');
+    expect(htmlTag).toContain('fraunces.variable');
+    expect(htmlTag).toContain('jetbrainsMono.variable');
+  });
+
   // `font-strong` writes a direct `font-weight: 550`, so pairing it with `text-title` or
   // `text-title-lg` (whose 600 comes from the `--text-title--font-weight` custom property that
   // `@theme inline` gives those size steps) does not blend the two: Tailwind's compiled order

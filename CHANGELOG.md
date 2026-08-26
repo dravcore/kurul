@@ -444,6 +444,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   white label in light mode with a dark OS, and lost its hover step in dark mode with a light OS.
   `app/globals.css` now declares `@custom-variant dark (&:where(.dark, .dark *))`, so every
   `dark:` utility follows the theme the app is actually showing.
+- **Archivo and Fraunces were never actually rendering; the whole app drew in the system font
+  instead.** next/font's `.variable` classes (`--font-archivo`, `--font-fraunces`,
+  `--font-jetbrains`) were defined on `<body>`, but the theme's font stacks (`--font-sans`,
+  `--font-display`, `--font-mono` in `app/globals.css`) resolve their `var()` references on
+  `:root`, and a custom property only resolves against the element that declares it, so every
+  stack fell straight through to its fallback list. The three `.variable` classes now sit on
+  `<html>` instead, next to the tokens that need them, so both faces load and draw as designed.
 
 ## [0.3.0] - 2026-08-22
 
