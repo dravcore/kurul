@@ -120,6 +120,13 @@
 @media (max-width: 767px) {
   :root {
     --topbar-height: 56px;
+
+    /* A column takes 85% of the screen below `md`, so the next one is always visible at the
+       edge and the strip reads as a strip rather than as a page. The strip snaps to column
+       starts at this width (components/board/board-canvas.tsx), which is why the desktop
+       280-320px clamp comes off the column there: a clamped column would leave the snap
+       stopping short of the viewport it is meant to fill. */
+    --column-width: 85vw;
   }
 }
 
@@ -809,5 +816,71 @@ body {
   :root,
   .dark {
     --border: var(--border-strong);
+  }
+}
+
+/* The board strip's edge masks (components/board/board-canvas.tsx). Eight columns in, the only
+   thing saying the board continues past the screen is a scrollbar, which a trackpad hides
+   entirely; these are 24px of the page fading back over each edge that still has a column
+   behind it, which is a signal at column scale rather than a new control. Each is drawn only while
+   there is a column in that direction: `data-overflow` is written from the strip's own
+   scrollLeft, scrollWidth and clientWidth, so a board whose columns fit wears no mask at all.
+
+   Pseudo-elements on the wrapper rather than on the scroller, because the scroller's own
+   `::before` would be a flex item inside it and would scroll away with the columns.
+
+   `isolation` keeps the z-index below local to the board: the mask has to sit over the columns'
+   own sticky headers (z-10 in components/board/board-column.tsx), and without a stacking context
+   of its own that number would also be competing with the topbar and the task panel.
+
+   Opacity is the only thing that moves, which is what reduced motion keeps rather than removes
+   (the block above narrows every transition to colour and opacity), so this needs no twin. */
+[data-slot='board-canvas'] {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-slot='board-canvas']::before,
+[data-slot='board-canvas']::after {
+  content: '';
+  position: absolute;
+  z-index: 11;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms var(--ease-out);
+}
+
+[data-slot='board-canvas']::before {
+  left: 0;
+  background: linear-gradient(to right, var(--background), transparent);
+}
+
+[data-slot='board-canvas']::after {
+  right: 0;
+  background: linear-gradient(to left, var(--background), transparent);
+}
+
+[data-slot='board-canvas'][data-overflow='left']::before,
+[data-slot='board-canvas'][data-overflow='both']::before {
+  opacity: 1;
+}
+
+[data-slot='board-canvas'][data-overflow='right']::after,
+[data-slot='board-canvas'][data-overflow='both']::after {
+  opacity: 1;
+}
+
+/* The strip snaps to column starts below `md` (components/board/board-canvas.tsx), and lets go
+   of the snap while a card is being carried: @dnd-kit crosses columns by scrolling this element
+   itself, and a mandatory snap would pull each of those steps back to the column the card left.
+
+   Here rather than as a `snap-none` utility on the element: Tailwind emits `snap-none` ahead of
+   `snap-x`, so the two on one element would leave the snap on. An unlayered rule outranks both. */
+@media (max-width: 767px) {
+  [data-slot='board-scroller'][data-dragging] {
+    scroll-snap-type: none;
   }
 }

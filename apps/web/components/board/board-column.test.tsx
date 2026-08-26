@@ -619,3 +619,18 @@ describe('BoardColumn feedback marks', () => {
     expect(cards[1]?.getAttribute('data-state')).toBe('returning');
   });
 });
+
+/**
+ * The column is a composite widget (docs/design.md §5) and its heading is the handle: it is the
+ * tab stop `board-canvas.tsx` moves between with Home, End and Ctrl plus an arrow, and the
+ * `data-slot` is how the canvas finds the set of them.
+ */
+describe('BoardColumn heading', () => {
+  it('is a tab stop the board can move focus to', () => {
+    renderColumn(makeTasks(1));
+
+    const heading = screen.getByRole('heading', { name: column.name });
+    expect(heading.getAttribute('tabindex')).toBe('0');
+    expect(heading.getAttribute('data-slot')).toBe('column-heading');
+  });
+});

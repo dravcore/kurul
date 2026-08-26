@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { closestCorners, type DropAnimation } from '@dnd-kit/core';
 import { NextIntlClientProvider } from 'next-intl';
 import { ColumnCategory, type ColumnDto, type TaskDto } from '@kurul/shared-types';
@@ -47,7 +47,18 @@ const rendered = vi.hoisted(() => ({ columns: [] as unknown[] }));
 vi.mock('./board-column', () => ({
   BoardColumn: (props: unknown) => {
     rendered.columns.push(props);
-    return <div data-testid="board-column" />;
+    // The stub keeps the one piece of the real column the canvas navigates by: the heading, its
+    // `data-slot` and its tab stop. That the real column renders exactly this is asserted in
+    // board-column.test.tsx.
+    return (
+      <div data-testid="board-column">
+        {/* Mirrors the real column's heading, which carries the same suppression. */}
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+        <h2 data-slot="column-heading" tabIndex={0}>
+          {(props as ColumnProps).column.name}
+        </h2>
+      </div>
+    );
   },
 }));
 
@@ -104,9 +115,14 @@ function renderCanvas(
     canMutateTasks?: boolean;
     workspaceId?: string | null;
     dropIndicator?: BoardTaskDndController['dropIndicator'];
+    isDragging?: boolean;
   } = {},
 ): void {
-  dnd = { ...baseDnd, dropIndicator: options.dropIndicator ?? null };
+  dnd = {
+    ...baseDnd,
+    dropIndicator: options.dropIndicator ?? null,
+    isDragging: options.isDragging ?? false,
+  };
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <BoardCanvas
@@ -137,6 +153,13 @@ function renderCanvas(
       />
     </NextIntlClientProvider>,
   );
+}
+
+/** The element that actually scrolls, which is where the overflow is measured. */
+function scroller(): HTMLElement {
+  const node = document.querySelector<HTMLElement>('[data-slot="board-scroller"]');
+  if (node === null) throw new Error('the column strip was not rendered');
+  return node;
 }
 
 /** The `dropAnimation` of the most recent render, once the preference effect has settled. */
@@ -260,5 +283,167 @@ describe('BoardCanvas create shortcut', () => {
     act(() => pressC());
 
     expect(lastColumnProps('col-1').composerOpen).toBe(false);
+  });
+});
+
+const COLUMNS = [column('col-1', 1), column('col-2', 2), column('col-3', 3)];
+
+function headings(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>('[data-slot="column-heading"]'));
+}
+
+describe('BoardCanvas column keyboard navigation', () => {
+  beforeEach(() => {
+    // jsdom implements no scrolling at all, so the method the canvas calls to bring the newly
+    // focused heading into view does not exist on the prototype.
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('moves focus to the first heading on Home', () => {
+    renderCanvas({ columns: COLUMNS });
+    const all = headings();
+    all[2]!.focus();
+
+    fireEvent.keyDown(all[2]!, { key: 'Home' });
+
+    expect(document.activeElement).toBe(all[0]);
+    expect(all[0]!.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('moves focus to the last heading on End', () => {
+    renderCanvas({ columns: COLUMNS });
+    const all = headings();
+    all[0]!.focus();
+
+    fireEvent.keyDown(all[0]!, { key: 'End' });
+
+    expect(document.activeElement).toBe(all[2]);
+  });
+
+  it('moves one column at a time with Ctrl plus an arrow', () => {
+    renderCanvas({ columns: COLUMNS });
+    const all = headings();
+    all[0]!.focus();
+
+    fireEvent.keyDown(all[0]!, { key: 'ArrowRight', ctrlKey: true });
+    expect(document.activeElement).toBe(all[1]);
+
+    fireEvent.keyDown(all[1]!, { key: 'ArrowLeft', ctrlKey: true });
+    expect(document.activeElement).toBe(all[0]);
+  });
+
+  it('stays where it is at either end of the strip', () => {
+    renderCanvas({ columns: COLUMNS });
+    const all = headings();
+    all[0]!.focus();
+
+    fireEvent.keyDown(all[0]!, { key: 'ArrowLeft', ctrlKey: true });
+
+    expect(document.activeElement).toBe(all[0]);
+  });
+
+  /**
+   * A bare arrow inside a column is @dnd-kit's keyboard drag and the caret in the composer; the
+   * canvas only ever answers the modified pair.
+   */
+  it('leaves a bare arrow alone', () => {
+    renderCanvas({ columns: COLUMNS });
+    const all = headings();
+    all[0]!.focus();
+
+    fireEvent.keyDown(all[0]!, { key: 'ArrowRight' });
+
+    expect(document.activeElement).toBe(all[0]);
+  });
+
+  it('answers nothing pressed outside a heading', () => {
+    renderCanvas({ columns: COLUMNS });
+    const strip = scroller();
+    const all = headings();
+    all[1]!.focus();
+
+    fireEvent.keyDown(strip, { key: 'Home' });
+
+    expect(document.activeElement).toBe(all[1]);
+  });
+});
+
+/**
+ * The 24px edge masks are drawn by CSS from this attribute, so what the canvas owns is the
+ * measurement: a mask appears only where there is something to scroll to.
+ */
+describe('BoardCanvas edge masks', () => {
+  function setMetrics(scrollLeft: number, scrollWidth: number, clientWidth: number): void {
+    const node = scroller();
+    for (const [key, value] of Object.entries({ scrollLeft, scrollWidth, clientWidth })) {
+      Object.defineProperty(node, key, { configurable: true, value });
+    }
+    fireEvent.scroll(node);
+  }
+
+  function overflow(): string | null {
+    const strip = document.querySelector('[data-slot="board-canvas"]');
+    if (strip === null) throw new Error('the canvas was not rendered');
+    return strip.getAttribute('data-overflow');
+  }
+
+  it('marks nothing while the columns fit', () => {
+    renderCanvas({ columns: COLUMNS });
+    setMetrics(0, 900, 900);
+
+    expect(overflow()).toBeNull();
+  });
+
+  it('marks the right edge at the start of a strip that overflows', () => {
+    renderCanvas({ columns: COLUMNS });
+    setMetrics(0, 1800, 900);
+
+    expect(overflow()).toBe('right');
+  });
+
+  it('marks the left edge at the end of it', () => {
+    renderCanvas({ columns: COLUMNS });
+    setMetrics(900, 1800, 900);
+
+    expect(overflow()).toBe('left');
+  });
+
+  it('marks both edges in the middle', () => {
+    renderCanvas({ columns: COLUMNS });
+    setMetrics(400, 1800, 900);
+
+    expect(overflow()).toBe('both');
+  });
+
+  it('re-measures when the window changes size', () => {
+    renderCanvas({ columns: COLUMNS });
+    setMetrics(0, 1800, 900);
+    expect(overflow()).toBe('right');
+
+    const node = scroller();
+    Object.defineProperty(node, 'clientWidth', { configurable: true, value: 1800 });
+    fireEvent(window, new Event('resize'));
+
+    expect(overflow()).toBeNull();
+  });
+});
+
+/**
+ * Snap and drag both want the strip's scroll position. A mandatory snap would pull @dnd-kit's
+ * autoscroll back to the column it started from, which is how a card gets stuck one column away
+ * from where it is being carried.
+ */
+describe('BoardCanvas snap during a drag', () => {
+  it('snaps to columns while nothing is being dragged', () => {
+    renderCanvas({ columns: COLUMNS });
+
+    expect(scroller().className.split(/\s+/)).toContain('max-md:snap-mandatory');
+    expect(scroller().hasAttribute('data-dragging')).toBe(false);
+  });
+
+  it('lets go of the snap while a card is in the air', () => {
+    renderCanvas({ columns: COLUMNS, isDragging: true });
+
+    expect(scroller().getAttribute('data-dragging')).toBe('true');
   });
 });

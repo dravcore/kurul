@@ -248,6 +248,11 @@ export const BoardColumn = memo(function BoardColumn({
     <section
       className={cn(
         'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-[var(--radius-md)] bg-muted',
+        // Below `md` the column is 85vw (`--column-width` in app/globals.css) and snaps under
+        // the thumb, so the desktop 280-320px clamp has to come off or a wide phone would be
+        // handed a 320px column inside a 430px viewport and the snap would leave a slice of the
+        // next one showing on every stop.
+        'max-md:max-w-none max-md:min-w-0 max-md:snap-start',
         isDropTarget && 'bg-signature-subtle',
         className,
       )}
@@ -264,7 +269,19 @@ export const BoardColumn = memo(function BoardColumn({
           the column had a scroll container of its own, this header was stuck to a box that
           never moved, and the reader scrolled the whole document past it. */}
       <header className="sticky top-0 z-10 flex h-10 items-center gap-2 border-b border-border bg-muted/90 px-3 backdrop-blur-sm max-md:h-12">
-        <h2 className="min-w-0 flex-1 truncate text-body font-strong">{column.name}</h2>
+        {/* A tab stop, because the column is a composite widget (docs/design.md §5) and this is
+            its handle: `board-canvas.tsx` moves between headings with Home, End and Ctrl plus
+            an arrow, and reaching one of them with Tab is how that path is entered. The heading
+            text is the whole announcement, so nothing extra is said here. */}
+        <h2
+          data-slot="column-heading"
+          // The rule reads a heading as static; this one is the composite widget's handle.
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+          tabIndex={0}
+          className="min-w-0 flex-1 truncate text-body font-strong"
+        >
+          {column.name}
+        </h2>
         <span className="font-mono text-small text-muted-foreground tabular-nums">
           {tasks.length}
         </span>

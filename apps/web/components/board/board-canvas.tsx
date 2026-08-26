@@ -1,7 +1,7 @@
 'use client';
 
 import { Plus } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   DndContext,
@@ -19,6 +19,28 @@ import type { BoardTaskDndController } from '@/components/task/use-board-task-dn
 import { BoardColumn } from './board-column';
 import { useCreateTaskShortcut } from './use-create-task-shortcut';
 import { useReducedMotion } from './use-reduced-motion';
+
+/** Which edge of the column strip still has columns beyond it. */
+type BoardOverflow = 'left' | 'right' | 'both';
+
+const COLUMN_HEADING = '[data-slot="column-heading"]';
+
+/**
+ * A fractional column width leaves a sub-pixel remainder at either end of the strip, which is
+ * not content to scroll to; one pixel of slack is what keeps a mask off a strip that is already
+ * at its end.
+ */
+const SCROLL_EPSILON_PX = 1;
+
+function overflowOf(scroller: HTMLElement): BoardOverflow | null {
+  const left = scroller.scrollLeft > SCROLL_EPSILON_PX;
+  const right =
+    scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - SCROLL_EPSILON_PX;
+  if (left && right) return 'both';
+  if (left) return 'left';
+  if (right) return 'right';
+  return null;
+}
 
 const dropAnimation: DropAnimation = {
   sideEffects: defaultDropAnimationSideEffects({
@@ -93,6 +115,73 @@ export function BoardCanvas({
   const canAddTask = canMutateTasks && workspaceId !== null && firstColumnId !== null;
   useCreateTaskShortcut(canAddTask ? openOrFocusComposer : null);
 
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [overflow, setOverflow] = useState<BoardOverflow | null>(null);
+
+  /**
+   * The edge masks are CSS, hung on `data-overflow` below; what has to be measured is which
+   * direction still holds a column. A scroll event alone is not enough: the strip also changes
+   * shape when the window does, when the sidebar opens, and when a column is added or removed,
+   * and none of those scroll it.
+   */
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (scroller === null) return;
+    const measure = (): void => setOverflow(overflowOf(scroller));
+    measure();
+    scroller.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+    // jsdom has no ResizeObserver, and the server has no layout to observe.
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => measure());
+    observer?.observe(scroller);
+    return () => {
+      scroller.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+      observer?.disconnect();
+    };
+  }, [columns.length]);
+
+  /**
+   * The board-scale half of the column's keyboard path: Home and End reach the first and last
+   * column, Ctrl plus an arrow the neighbouring one. Bare arrows are left alone on purpose,
+   * they belong to @dnd-kit's keyboard drag and to the caret inside the composer. Meta is not
+   * a second binding for this: Command plus an arrow is the browser's own history navigation
+   * on macOS.
+   */
+  const onHeadingKeyDown = useCallback((event: KeyboardEvent): void => {
+    const scroller = scrollerRef.current;
+    const target = event.target;
+    if (scroller === null || !(target instanceof HTMLElement) || !target.matches(COLUMN_HEADING)) {
+      return;
+    }
+    const headings = Array.from(scroller.querySelectorAll<HTMLElement>(COLUMN_HEADING));
+    const index = headings.indexOf(target);
+    if (index < 0) return;
+
+    let next: HTMLElement | undefined;
+    if (event.key === 'Home' && !event.ctrlKey) next = headings[0];
+    else if (event.key === 'End' && !event.ctrlKey) next = headings.at(-1);
+    else if (event.key === 'ArrowLeft' && event.ctrlKey) next = headings[index - 1];
+    else if (event.key === 'ArrowRight' && event.ctrlKey) next = headings[index + 1];
+    if (next === undefined) return;
+
+    // Home and End would otherwise take the strip to its own end without moving focus, leaving
+    // the reader looking at a column their keyboard is not on.
+    event.preventDefault();
+    next.focus();
+    next.scrollIntoView({ block: 'nearest', inline: 'start' });
+  }, []);
+
+  // Bound to the node rather than passed as `onKeyDown`: the strip is a scroll container, not a
+  // control, and the keys below belong to the headings inside it.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (scroller === null) return;
+    scroller.addEventListener('keydown', onHeadingKeyDown);
+    return () => scroller.removeEventListener('keydown', onHeadingKeyDown);
+  }, [onHeadingKeyDown]);
+
   return (
     <DndContext
       accessibility={accessibility}
@@ -103,50 +192,72 @@ export function BoardCanvas({
       onDragEnd={dnd.onDragEnd}
       onDragCancel={dnd.onDragCancel}
     >
-      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
-        {columns.map((column, index) => (
-          <BoardColumn
-            key={column.id}
-            column={column}
-            tasks={tasksByColumn.get(column.id) ?? []}
-            boardId={boardId}
-            selectedTaskId={selectedTaskId}
-            taskSignals={taskSignals}
-            canMutateColumns={canMutateColumns}
-            canMutateTasks={canMutateTasks}
-            canMoveLeft={index > 0}
-            canMoveRight={index < columns.length - 1}
-            onOpenSettings={() => onOpenColumnSettings(column)}
-            onDelete={() => onDeleteColumn(column)}
-            onMoveLeft={() => onMoveColumn(column, -1)}
-            onMoveRight={() => onMoveColumn(column, 1)}
-            workspaceId={workspaceId}
-            composerOpen={composerColumnId === column.id}
-            composerFocusNonce={composerFocusNonce}
-            onComposerOpenChange={(open) => setComposerColumnId(open ? column.id : null)}
-            onTaskCreated={onTaskCreated}
-            // A number rather than the indicator object, so a column that is not the target is
-            // handed a prop equal in value for the whole drag instead of a fresh object each
-            // time. How often that happens at all is bounded by @dnd-kit, which raises
-            // `onDragOver` from an effect keyed on the over id rather than per pointer event.
-            dropIndicatorIndex={
-              dnd.dropIndicator?.columnId === column.id ? dnd.dropIndicator.index : null
-            }
-            className={entranceDone ? undefined : 'board-column-enter'}
-            style={entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)}
-          />
-        ))}
-        {canMutateColumns ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="h-10 w-[var(--column-width)] min-w-[280px] shrink-0"
-            onClick={onCreateColumn}
-          >
-            <Plus />
-            {t('column.createAction')}
-          </Button>
-        ) : null}
+      {/* The strip sits inside a positioned wrapper so the edge masks in `app/globals.css` can
+          be drawn over its edges without scrolling away with the columns. */}
+      <div
+        data-slot="board-canvas"
+        data-overflow={overflow ?? undefined}
+        className="flex min-h-0 flex-1"
+      >
+        <div
+          ref={scrollerRef}
+          data-slot="board-scroller"
+          // The snap comes off for the length of a drag: @dnd-kit carries a card across columns
+          // by scrolling this strip itself, and a mandatory snap would pull each of those steps
+          // back. It is an attribute rather than a `snap-none` utility because Tailwind emits
+          // that one ahead of `snap-x` and it would lose; `app/globals.css` answers it.
+          data-dragging={dnd.isDragging || undefined}
+          // Below `md` a column is 85vw and the strip snaps, so a swipe always lands on one
+          // column rather than between two. `scroll-pl-4` matches the strip's own padding, which
+          // is what keeps a snapped column off the edge of the screen.
+          className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4 max-md:snap-x max-md:snap-mandatory max-md:scroll-pl-4"
+        >
+          {columns.map((column, index) => (
+            <BoardColumn
+              key={column.id}
+              column={column}
+              tasks={tasksByColumn.get(column.id) ?? []}
+              boardId={boardId}
+              selectedTaskId={selectedTaskId}
+              taskSignals={taskSignals}
+              canMutateColumns={canMutateColumns}
+              canMutateTasks={canMutateTasks}
+              canMoveLeft={index > 0}
+              canMoveRight={index < columns.length - 1}
+              onOpenSettings={() => onOpenColumnSettings(column)}
+              onDelete={() => onDeleteColumn(column)}
+              onMoveLeft={() => onMoveColumn(column, -1)}
+              onMoveRight={() => onMoveColumn(column, 1)}
+              workspaceId={workspaceId}
+              composerOpen={composerColumnId === column.id}
+              composerFocusNonce={composerFocusNonce}
+              onComposerOpenChange={(open) => setComposerColumnId(open ? column.id : null)}
+              onTaskCreated={onTaskCreated}
+              // A number rather than the indicator object, so a column that is not the target is
+              // handed a prop equal in value for the whole drag instead of a fresh object each
+              // time. How often that happens at all is bounded by @dnd-kit, which raises
+              // `onDragOver` from an effect keyed on the over id rather than per pointer event.
+              dropIndicatorIndex={
+                dnd.dropIndicator?.columnId === column.id ? dnd.dropIndicator.index : null
+              }
+              className={entranceDone ? undefined : 'board-column-enter'}
+              style={
+                entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)
+              }
+            />
+          ))}
+          {canMutateColumns ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-[var(--column-width)] min-w-[280px] shrink-0 max-md:min-w-0 max-md:snap-start"
+              onClick={onCreateColumn}
+            >
+              <Plus />
+              {t('column.createAction')}
+            </Button>
+          ) : null}
+        </div>
       </div>
       {/* @dnd-kit flies the overlay back to the drop position with `node.animate()`, a Web
           Animations API call the reduced-motion block in `app/globals.css` cannot reach: the
