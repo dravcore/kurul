@@ -9,6 +9,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Task activity feed now records label attach and detach.** Attaching or detaching a label on
+  a task writes a `task.label_added` / `task.label_removed` row inside the same transaction as
+  the join-row write, following the pattern `task.assigned` / `task.unassigned` already use on
+  the sibling assignee sub-resource. The payload is a snapshot (`labelId`, `name`, `color`)
+  taken at write time, so the row still describes what happened after the label is renamed,
+  recolored or deleted. Neither type joins `AUDIT_ACTIVITY_TYPES`: like `task.assigned` and
+  `comment.created`, this is a content event, not one an incident query needs to see. The web
+  activity renderer stays untouched here, mid its own rework; an unrecognised type already falls
+  back to a generic line, so the feed keeps reading sensibly until the sentence for these two
+  types lands in a follow-up UI PR. Closes #39.
+
 - **Password reset by email: a forgotten password is now recovered by the person who forgot it.**
   "Forgot your password?" on the sign-in screen leads to `/forgot-password`, which asks for an
   address and mails a single-use link good for one hour; the link lands on `/reset-password`,
@@ -232,8 +243,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   than seven; `architecture.md` gains the `plan`, `token` and `openapi` modules, the
   `PersonalAccessToken` and `UsagePing` models and ADRs through 0034; `development.md` closes its
   env and pnpm-script tables against `.env.example` and `package.json`; `testing.md` names both
-  required branch-protection contexts and stops calling the API coverage margin "a few points",
-  pointing at the one file that carries the digits instead; `SECURITY.md` no longer implies a
+  required branch-protection contexts; `SECURITY.md` no longer implies a
   direct commit to `develop` or `main`; the secret-generation rule is stated once, in
   `development.md`'s "Database and cache credentials", with `.env.example`, both READMEs and
   `self-hosting.md` trimmed to the one-line generator and a link to it, so the arithmetic behind
@@ -243,13 +253,50 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
   Not documentation, and in the same pass: `.github/dependabot.yml` now holds every bump it
   proposes until the release is seven days old, fourteen for an npm major (`default-days` is all
-  the `github-actions` and `docker` ecosystems support, so their majors wait the same seven).
+  the `github-actions`, `docker` and `docker-compose` ecosystems support, so their majors wait
+  the same seven).
   That window is the supply-chain defence a lockfile cannot give and nothing more: a compromised
   package is usually pulled within hours to a few days. **Security updates bypass it**, so an
   advisory-driven bump still opens the day it lands, and a manual `pnpm add` is unaffected. It is
   the zero-toolchain half of pnpm 10's `minimumReleaseAge`, which this repo cannot use while
   `packageManager` is pnpm 9.
 
+- **API coverage: a fresh `develop` baseline, three new per-directory floors, and a cross-workspace
+  case for the activity/notification feeds.** `apps/api/jest.config.cjs`'s dated baseline (last
+  recorded 2026-08-22, on the feature branch before merge rather than on `develop` after it) is
+  replaced with a `develop`-after-merge measurement: 77.06 / 69.96 / 78.95 / 77.91
+  (stmts/branch/funcs/lines), a margin of 2.06 / 3.96 / 1.95 / 1.91 over the unchanged
+  75 / 66 / 77 / 76 global floor. `src/common/guards/`, `src/common/rate-limit/` and
+  `src/account/` each gain their own floor at their measured value (100 / 93.75 / 100 / 100,
+  98.33 / 94.87 / 91.3 / 99.09, and 0 / 0 / 0 / 0), the same directory-scoped pattern
+  `apps/web/vitest.config.ts` already uses; `src/account/`'s floor is 0 across the board because
+  its GDPR-erasure service is deliberately unit-untested and covered end to end instead. The two
+  rules every floor answers to (raise it when the baseline rises; record a drop here rather than
+  lowering the floor to erase it) and the no-exclusions-from-the-denominator rule move out of the
+  config file's comment history into `docs/testing.md`'s Coverage section, which now states the
+  API's real margin and points at the CI `api-coverage` artifact as the source of truth in place
+  of the stale "a few points under" claim. `activity-notifications.e2e-spec.ts` gains a
+  cross-workspace case: a member of one workspace requesting another's task activities,
+  notification list, unread count or mark-read all get `404`, the same convention
+  `comment.e2e-spec.ts` and `trello-import.e2e-spec.ts` already use for cross-tenant access.
+
+- **Base images are pinned by digest, and Dependabot now has a bump path for all of
+  them** ([#157](https://github.com/dravcore/kurul/issues/157)). `postgres:18-alpine`
+  and `redis:8-alpine` in `docker-compose.yml` and `docker-compose.dev.yml`, `caddy:2-alpine`
+  in `docker-compose.yml`, and `node:24-alpine` in `apps/api/Dockerfile` and
+  `apps/web/Dockerfile`, now carry a `@sha256` digest instead of a bare tag, the same pattern
+  `docker-compose.dev.yml` already applied to `mailpit`. Dependabot's docker updater only reads
+  a literal `FROM image:tag@digest` line, not one built from an `ARG`, so both Dockerfiles
+  repeat the digest on every `FROM` instead of factoring it into a shared build argument.
+  `.github/dependabot.yml` gains a `docker` ecosystem block scoped to `directories: [/apps/api,
+  /apps/web]`, so the two Dockerfiles are in its scope for the first time, plus a separate
+  `docker-compose` ecosystem block at `/`, since Dependabot's docker updater never reads a
+  compose file: that new block is what bumps the three compose images. Until now the docker
+  updater only read the repository root and never proposed a base-image bump for either app,
+  and the compose images had no bump path either, since a digest pin only pairs with an
+  ecosystem that can see it. Two builds of the same tag now resolve the same bytes, and an
+  upstream base-image fix arrives as a reviewable pull request instead of silently, whenever
+  something next happens to rebuild.
 - **CI now parses the compose files and the Caddyfile on every pull request.** A new
   `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
   `docker compose config -q`, without a profile and with `--profile demo`, renders

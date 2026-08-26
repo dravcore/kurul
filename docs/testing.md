@@ -359,36 +359,57 @@ number for its own sake.
   why floors are scoped to code that is already meaningfully tested, never applied globally
   to pull an average up.
 
+### Floor policy
+
+Two rules govern every floor in this repo, `apps/api` and `apps/web` alike:
+
+- **The baseline moves up, the floor follows.** Re-measure, then raise the floor to reflect
+  the new number rather than leaving the old one in place. A new module landing with its own
+  tests is not itself a reason to raise a floor it does not touch; raise a zone's floor when
+  that zone gets warmer, not because something unrelated pulled the average up.
+- **The baseline moves down, the drop is recorded, never hidden.** Re-measure and write the
+  number down (in `apps/api/jest.config.cjs`'s dated history, or here for `apps/web`). Do not
+  lower the floor to restore the old margin: the margin shrinking is the signal, and lowering
+  the floor deletes the signal while leaving the cause in place. A floor is only ever lowered
+  on a deliberate, argued decision, never as bookkeeping after a drop.
+
+Both rules assume the denominator is honest: **no file is ever excluded from coverage to
+raise a percentage.** An excluded file is an invisible one, and excluding it to restore a
+margin is the same move as lowering the floor with one indirection in front of it.
+`collectCoverageFrom` (`apps/api`) and `coverage.exclude` (`apps/web`) only ever drop
+generated code and test files themselves.
+
 ### Where floors do exist
 
 These floors keep already-covered code from sliding back. Each fails CI.
 
-| Scope                                   | Floor                                                 | Set in                      |
-| --------------------------------------- | ----------------------------------------------------- | --------------------------- |
-| `apps/api` global                       | statements 75 / branches 66 / functions 77 / lines 76 | `apps/api/jest.config.cjs`  |
-| `apps/web` `app/**`                     | statements 85 / branches 90 / functions 85 / lines 85 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/board/**`        | statements 65 / branches 54 / functions 54 / lines 70 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/task/**`         | statements 60 / branches 60 / functions 58 / lines 62 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93 | `apps/web/vitest.config.ts` |
-| `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/auth/**`         | statements 94 / branches 91 / functions 95 / lines 94 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/settings/**`     | statements 85 / branches 86 / functions 80 / lines 86 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88 | `apps/web/vitest.config.ts` |
+| Scope                                   | Floor                                                            | Set in                      |
+| --------------------------------------- | ---------------------------------------------------------------- | --------------------------- |
+| `apps/api` global                       | statements 75 / branches 66 / functions 77 / lines 76            | `apps/api/jest.config.cjs`  |
+| `apps/api` `src/common/guards/`         | statements 100 / branches 93.75 / functions 100 / lines 100      | `apps/api/jest.config.cjs`  |
+| `apps/api` `src/common/rate-limit/`     | statements 98.33 / branches 94.87 / functions 91.3 / lines 99.09 | `apps/api/jest.config.cjs`  |
+| `apps/api` `src/account/`               | statements 0 / branches 0 / functions 0 / lines 0                | `apps/api/jest.config.cjs`  |
+| `apps/web` `app/**`                     | statements 85 / branches 90 / functions 85 / lines 85            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/board/**`        | statements 65 / branches 54 / functions 54 / lines 70            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/task/**`         | statements 60 / branches 60 / functions 58 / lines 62            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93            | `apps/web/vitest.config.ts` |
+| `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/auth/**`         | statements 94 / branches 91 / functions 95 / lines 94            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/settings/**`     | statements 85 / branches 86 / functions 80 / lines 86            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88            | `apps/web/vitest.config.ts` |
 
-All sit under the measurement taken when they were introduced, but "a few points" is not true
-of the API row and saying so would hide the signal. The baseline history in
-`apps/api/jest.config.cjs` is the one place in the repository that carries those digits, and
-its **last** entry is the one to read: it leaves the tightest of the four margins under a
-single point. The same file explains why that is not restored by lowering the floor, because
-the margin shrinking is the signal and lowering the floor deletes the signal while keeping the
-cause. Re-measuring it is a tracked row in
-[ROADMAP.md](../ROADMAP.md#post-launch-hardening).
-
-The numbers in this table are the floors, which are configuration. The current coverage is not
-written down here at all, deliberately: the source of truth is the `api-coverage` and
-`web-coverage` artifacts CI publishes on every run, because a percentage copied into prose is
-wrong the day after it is written.
+`apps/api`'s global floor is measured against `develop` after merge, never a feature branch;
+the CI `api-coverage` artifact for the latest `develop` run is the source of truth. As of
+2026-08-26 (`develop` at `017838a`), the measurement is 77.06 / 69.96 / 78.95 / 77.91 against
+the 75 / 66 / 77 / 76 floor, a margin of 2.06 / 3.96 / 1.95 / 1.91. The three `apps/api`
+directory floors above are set at, not under, that same measurement: `src/common/guards/` and
+`src/common/rate-limit/` ratchet zones that already carry real unit tests, and `src/account/`
+records, rather than hides, that its GDPR-erasure flow is deliberately unit-untested and
+covered end to end instead (`apps/api/jest.config.cjs` names the file and its e2e spec). The
+`apps/web` folder floors sit a few points under the measurement taken when they were
+introduced, enough margin that a routine refactor does not trip them, tight enough that
+deleting a test does.
 
 `apps/web` has **no global floor**, deliberately. Overall web coverage is around 85% of
 instrumented statements in recent runs, but that average still mixes heavily-tested hooks with

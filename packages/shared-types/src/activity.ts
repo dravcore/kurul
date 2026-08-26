@@ -26,11 +26,21 @@ export const ActivityType = {
   TaskDeleted: 'task.deleted',
   TaskAssigned: 'task.assigned',
   TaskUnassigned: 'task.unassigned',
+  // `added`/`removed` rather than `attached`/`detached`: the join row itself is created and
+  // deleted, and every other pair on a task's own join tables (`task.assigned`/`unassigned`)
+  // already names the join, not the click. The payload is a snapshot (`labelId`, `name`,
+  // `color`) rather than only an id, because a label can be renamed or recolored after the row
+  // is written and the sentence should describe what happened at the time, not what the label
+  // looks like now.
+  TaskLabelAdded: 'task.label_added',
+  TaskLabelRemoved: 'task.label_removed',
   CommentCreated: 'comment.created',
-  // `created`/`deleted` rather than `added`/`removed`: no name in this object uses `added`, and
-  // `comment.created` / `task.deleted` are the direct precedents. The names are unrenameable
-  // once a row carries one, so matching the existing vocabulary was a one-time free choice
-  // (ADR 0024). Only the second of the two joins the audit subset — see the rule below.
+  // `created`/`deleted` rather than `added`/`removed`: at the time this pair was named, no name
+  // in this object used `added`, and `comment.created` / `task.deleted` were the direct
+  // precedents. (`task.label_added`/`removed` above came later, naming a join row rather than an
+  // upload, and does not reopen this choice.) The names are unrenameable once a row carries one,
+  // so matching the existing vocabulary was a one-time free choice (ADR 0024). Only the second of
+  // the two joins the audit subset (see the rule below).
   AttachmentCreated: 'attachment.created',
   AttachmentDeleted: 'attachment.deleted',
 
