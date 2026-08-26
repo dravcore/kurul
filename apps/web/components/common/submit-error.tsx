@@ -18,10 +18,12 @@ import { useEffect, useRef } from 'react';
  * `role="alert"` region whose text content does not change is not guaranteed to be
  * re-announced by every screen reader; a fresh mount is announced regardless.
  *
- * `focusOnMount={false}` is for the one caller whose failure does not arrive on a submit the
- * reader is waiting on: the task panel saves on blur, so its error lands after focus has
+ * `focusOnMount={false}` is for a caller whose failure must not pull focus away from wherever
+ * it already usefully is: the task panel saves on blur, so its error lands after focus has
  * already moved into the next field, and pulling it back out would interrupt someone who is
- * mid-sentence. `role="alert"` announces the line either way; only the focus move is dropped.
+ * mid-sentence; `components/common/inline-rename.tsx` keeps focus in the field being corrected
+ * so Enter-to-retry still works. `role="alert"` announces the line either way; only the focus
+ * move is dropped.
  */
 export function SubmitError({
   message,

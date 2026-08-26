@@ -480,4 +480,19 @@ describe('BoardList - inline rename (P7 task 6)', () => {
     expect(await screen.findByRole('alert')).toBeDefined();
     expect(nameField()).toBeDefined();
   });
+
+  it('leaves Radix’s own focus return in place when the menu closes without Rename chosen', async () => {
+    // No item was selected, so this hook must get out of the way entirely and let Radix send
+    // focus back to the trigger itself, the way it does for every menu on the page that never
+    // touches `onCloseAutoFocus` at all.
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    const trigger = await screen.findByRole('button', { name: messages.app.board.boardMenu });
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    await screen.findByRole('menuitem', { name: messages.app.board.renameAction });
+
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
 });

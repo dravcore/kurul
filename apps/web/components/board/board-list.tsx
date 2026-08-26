@@ -140,17 +140,18 @@ function BoardCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              // Both items open something that manages its own focus from here on: the inline
-              // editor above and the delete dialog below (Radix traps focus in it once mounted).
-              // Radix's default of returning focus to this trigger on close is prevented for
-              // both; for the editor, this hook also does the focusing itself, in place of
-              // `InlineRename`'s own mount effect. That effect runs before this menu's focus
-              // teardown does (both are triggered by the same click), so it loses the race and
-              // is overwritten. `onCloseAutoFocus` is Radix's own designated "we're done
-              // tearing down, take over" moment, so doing it here is what actually lands.
+              // Only the rename path needs this hook at all: Escape, a click outside, and the
+              // Delete item all close the menu with nothing else claiming focus, so Radix's own
+              // default of returning it to this trigger is exactly right and is left alone.
+              // Choosing Rename is the one close that already has somewhere better for focus to
+              // go: `InlineRename`'s own mount effect focuses its first field, but that effect
+              // runs before this menu's focus teardown does (both are triggered by the same
+              // click), so it loses the race and is overwritten. `onCloseAutoFocus` is Radix's
+              // own designated "we're done tearing down, take over" moment, so doing the
+              // focusing here, only when editing, is what actually lands.
               onCloseAutoFocus={(event) => {
-                event.preventDefault();
                 if (!editing) return;
+                event.preventDefault();
                 const input = document.getElementById(
                   `board-name-${board.id}`,
                 ) as HTMLInputElement | null;
