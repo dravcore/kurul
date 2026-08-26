@@ -112,9 +112,11 @@ export class ImportController {
   })
   @ApiBadRequestResponse({
     description:
-      'No part named `file`; the file is not valid JSON; or the JSON is not a Trello board ' +
-      'export. **Nothing is written when this happens** — the export is read and mapped in ' +
-      'full before the transaction opens.',
+      'No part named `file`; the file is not valid JSON; the JSON is not a Trello board ' +
+      'export; or the export has more cards than `TRELLO_IMPORT_MAX_CARDS` (default `50000`) ' +
+      'or more lists than `TRELLO_IMPORT_MAX_LISTS` (default `5000`), refused after the export ' +
+      'is read and before the planner maps a row. **Nothing is written when this happens**, ' +
+      'since the export is read and mapped in full before the transaction opens.',
     type: ErrorEnvelopeSchema,
   })
   @ApiPayloadTooLargeResponse({
