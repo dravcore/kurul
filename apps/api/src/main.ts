@@ -46,15 +46,15 @@ async function bootstrap(): Promise<void> {
   // So the rule for this codebase is: anything a live request or an open socket still needs -
   // the shared pg pool, the Redis clients, the mail transport, the storage backend, the BullMQ
   // workers - is released in `onApplicationShutdown`, never in `onModuleDestroy`, because a
-  // destroy hook runs while the listener is still accepting and serving. No class is named
-  // here on purpose: `grep -rn onApplicationShutdown apps/api/src` is the current list, and a
-  // list written down in a comment is one that goes stale.
+  // destroy hook runs while the listener is still accepting and serving. The classes that do it
+  // are deliberately not enumerated here: `grep -rn onApplicationShutdown apps/api/src` is the
+  // current list, and a list written down in a comment is one that goes stale.
   //
   // Within a phase Nest orders modules by their distance from the root, and every global module
   // is given `Number.MAX_VALUE` for that distance (@nestjs/core `injector/container.js`), so a
-  // global module's hooks run first on startup and last on shutdown. That is what puts
-  // `PrismaModule`'s pool teardown after the workers', which is the order the bounded worker
-  // close in `common/close-worker.ts` relies on.
+  // global module's hooks run first on startup and last on shutdown. That is the rule the
+  // bounded worker close in `common/close-worker.ts` relies on: a global module holding the
+  // shared pg pool is torn down after the non-global modules that own the workers.
   app.enableShutdownHooks();
   await app.listen(port);
 }

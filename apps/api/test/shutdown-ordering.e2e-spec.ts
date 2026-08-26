@@ -80,9 +80,11 @@ describe('Shutdown ordering (e2e)', () => {
 
     for (const response of responses) {
       expect(response.status).toBe(200);
-      // The precise regression: a pool ended out from under a live request surfaces here as
-      // `down` (the probe catches "Cannot use a pool after calling end" and grades it), not as
-      // a thrown error the assertion above would have caught.
+      // Secondary, not the load-bearing assertion: a pool ended out from under a live request
+      // surfaces here as `down` (the probe catches "Cannot use a pool after calling end" and
+      // grades it) rather than as a thrown error. It only fires when the pool loses the race
+      // outright; the ordering assertion below is what actually pins the fix, because Nest
+      // closing the listener first is the reason a request can never reach an ended pool.
       expect(response.body.checks.database).toBe('up');
     }
 
