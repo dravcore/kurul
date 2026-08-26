@@ -583,6 +583,12 @@ services:
       PLAN_MAX_BOARDS_PER_WORKSPACE: ${PLAN_MAX_BOARDS_PER_WORKSPACE:-}
       PLAN_MAX_WORKSPACES: ${PLAN_MAX_WORKSPACES:-}
       PLAN_MAX_USERS: ${PLAN_MAX_USERS:-}
+      # Registration switch, a policy rather than a ceiling and so not one of the four above:
+      # blank or `true` keeps POST /auth/sign-up/email open, `false` refuses it with a 403
+      # whatever the account count is and leaves sign-in and the rest of /auth alone. Passed
+      # through for the same reason the ceilings are. Independent of DEMO_MODE, which keeps
+      # registration open; see docs/self-hosting.md.
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-}
       # Read by the orphan sweep, which refuses to delete a file while a dump old enough to
       # disown it is still restorable — its grace period is BACKUP_KEEP × BACKUP_INTERVAL, with
       # a 24h floor the API applies whatever these say (the window also covers an upload whose

@@ -303,7 +303,7 @@ nullable bir alanı temizler.
 | `204 No Content`             | Başarılı silme; boş body                                                                                                                                                                                                                                                      |
 | `400 Bad Request`            | Bozuk request veya validation hatası                                                                                                                                                                                                                                          |
 | `401 Unauthorized`           | Eksik veya geçersiz session                                                                                                                                                                                                                                                   |
-| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz, **ya da** bir plan tavanı aşılacak (hangisi olduğunu `error` söyler, bkz. [Plan limitleri](#plan-limitleri))                                                                                                                     |
+| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz, **ya da** bir plan tavanı aşılacak (hangisi olduğunu `error` söyler, bkz. [Plan limitleri](#plan-limitleri)), **ya da** kayıt kapalı (`SIGNUP_ENABLED=false`: yalnızca `POST /auth/sign-up/email`, `error: "Sign-up Disabled"`)  |
 | `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                                                                                                                                                                                 |
 | `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                                                                                                                                                                                   |
 | `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, bir yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor ya da bir depolama kotasını aşacak (hangisi olduğunu `error` söyler — bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)), ya da bir import `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor |
@@ -314,8 +314,9 @@ nullable bir alanı temizler.
 
 **Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
 doğrulardı, ki bu tenant sınırının ötesine bilgi sızdırır. `403`, rolü çok düşük meşru bir
-üye için, ve zarfın `error` alanının birbirinden ayırdığı, aşağıdaki plan tavanları için
-ayrılmıştır.
+üye için, aşağıdaki plan tavanları için, kapalı kayıt (`SIGNUP_ENABLED=false`) için ve bir demo
+instance'ın reddettiği eylemler (`DEMO_MODE=true`) için ayrılmıştır; zarfın `error` alanı
+bunları birbirinden ayırır.
 
 ### Plan limitleri
 

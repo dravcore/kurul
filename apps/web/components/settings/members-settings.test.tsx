@@ -173,6 +173,7 @@ beforeEach(() => {
   loadConfig.mockReset().mockResolvedValue({
     mailEnabled: true,
     attachmentsEnabled: false,
+    signUpEnabled: true,
     demo: NO_DEMO,
     planLimits: NO_PLAN_LIMITS,
   });
@@ -405,6 +406,7 @@ describe('MembersSettings — a deployment that cannot send email', () => {
     loadConfig.mockResolvedValue({
       mailEnabled: false,
       attachmentsEnabled: false,
+      signUpEnabled: true,
       demo: NO_DEMO,
       planLimits: NO_PLAN_LIMITS,
     });
@@ -418,6 +420,7 @@ describe('MembersSettings — a deployment that cannot send email', () => {
     loadConfig.mockResolvedValue({
       mailEnabled: false,
       attachmentsEnabled: false,
+      signUpEnabled: true,
       demo: NO_DEMO,
       planLimits: NO_PLAN_LIMITS,
     });
@@ -437,6 +440,7 @@ describe('MembersSettings — a deployment that cannot send email', () => {
     loadConfig.mockResolvedValue({
       mailEnabled: false,
       attachmentsEnabled: false,
+      signUpEnabled: true,
       demo: NO_DEMO,
       planLimits: NO_PLAN_LIMITS,
     });
@@ -452,6 +456,7 @@ describe('MembersSettings — a deployment that cannot send email', () => {
     loadConfig.mockResolvedValue({
       mailEnabled: false,
       attachmentsEnabled: false,
+      signUpEnabled: true,
       demo: NO_DEMO,
       planLimits: NO_PLAN_LIMITS,
     });
@@ -478,6 +483,7 @@ describe('MembersSettings — a deployment that cannot send email', () => {
     loadConfig.mockResolvedValue({
       mailEnabled: false,
       attachmentsEnabled: false,
+      signUpEnabled: true,
       demo: NO_DEMO,
       planLimits: NO_PLAN_LIMITS,
     });

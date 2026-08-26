@@ -9,6 +9,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`SIGNUP_ENABLED`: a switch that closes registration on a self-hosted instance.** Until now
+  the only way to stop strangers registering on an internet-facing install was to pin
+  `PLAN_MAX_USERS` at the current head count, which blocks the operator's own invitees along
+  with everyone else and drifts the moment an account is deleted. `SIGNUP_ENABLED=false` refuses
+  `POST /auth/sign-up/email` with `403` and `error: "Sign-up Disabled"` whatever the count is,
+  in the same hand-written envelope the plan ceiling uses at the Better Auth mount (`requestId`
+  included), and writes no row. Unset or `true` is open, so every existing install runs exactly
+  as before. It is also read once at boot, alongside `DEMO_MODE`, so a spelling the boolean
+  parser cannot read (`SIGNUP_ENABLED=fasle`) refuses to start the container, the bargain the
+  `PLAN_MAX_*` ceilings already make: below the Nest router no exception filter is listening, so
+  the alternative is the one route the switch governs hanging with no response at all. Like the ceiling it refuses sign-up only: signing in, verifying an address and
+  everything else under `/auth` stay open, so closing it never locks out the people already on
+  the instance. `GET /config` publishes it as `signUpEnabled`, read from the same function the
+  mount consults so the document and the refusal cannot disagree. It is independent of
+  `DEMO_MODE`, which keeps registration open on the demo host. The row lives beside
+  `PLAN_MAX_USERS` in `.env.example`, is forwarded by `docker-compose.yml`, and is documented
+  next to the plan ceilings in [self-hosting.md](docs/self-hosting.md). An invite-only mode
+  (accept the sign-up when a pending invitation names the address) is a follow-up: the mount
+  runs ahead of the body parsers and never sees the sign-up email, so that mode has to live in
+  a Better Auth database hook with the envelope trade the mount's comment describes.
+
 - **ADRs 0033 and 0034, proposed: webhook delivery and hosted billing.** The two undecided pieces of
   API 1.0 are written down as records rather than as roadmap rows, and both merge as **Proposed**:
   they exist to be read and argued before either slice starts, and nothing in the running product
@@ -137,6 +158,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- **A demo instance no longer lets a visitor rotate the shared account's password.** The demo
+  is one published account (`demo@kurul.dev` with `DEMO_PASSWORD`), and Better Auth's
+  `POST /auth/change-password` asks only for the current password, which is public: one request
+  locked every other visitor out until the next reset wrote the password back, up to an hour.
+  `DemoRestrictedGuard` could not cover it because `/auth/*` is served by Express below the Nest
+  router, so the refusal lives at the Better Auth mount (`mount-better-auth.ts`), with the same
+  `403` envelope the guard produces for account and workspace deletion, and the guard's comment
+  now carries the full list: two Nest routes plus this auth path, with `/auth/change-email`
+  listed beside it so it is already refused the day `user.changeEmail` is enabled. Revoking
+  sessions and renaming the account stay open on purpose: both are a sign-in away from
+  recovered, and the list admits what the reset cannot recover, not what is annoying. An
+  ordinary install is untouched; the `DEMO_MODE` table in
+  [self-hosting.md](docs/self-hosting.md#what-demo_modetrue-changes) names the new row.
 - **Request bodies to `/auth/*` are bounded, at the proxy and at the API.** Better Auth reads
   the raw request stream itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on
   every other route, and the bundled `docker/Caddyfile` set `request_body max_size` only on

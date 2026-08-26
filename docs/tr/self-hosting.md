@@ -243,6 +243,20 @@ kimseyi kilitlemez. Tavanı aşan bir yazma, JSON gövdesi `error: "Plan Limit E
 `Workspace.planLimits` JSON kolonunda kendine ait tavanlar verilebilir, ki bu, bunları anahtar
 anahtar override eder; uygulama onu asla kendisi yazmaz.
 
+**Kaydı kapatmak bir tavan değil, bir anahtardır.** `SIGNUP_ENABLED=false`, hesap sayısı ne
+olursa olsun `POST /auth/sign-up/email`'i JSON gövdesi `error: "Sign-up Disabled"` taşıyan bir
+`403` ile reddeder; ayarsız ya da `true` kaydı açık tutar, ki bu, anahtar var olmadan önce her
+kurulumun çalıştığı haldir. `PLAN_MAX_USERS` gibi yalnızca **sign-up'ı** reddeder: sign-in,
+adres doğrulama ve `/auth` altındaki diğer her şey açık kalır, dolayısıyla onu kapatmak
+instance'ta zaten olan kimseyi kilitlemez. `GET /config` onu `signUpEnabled` olarak yayınlar,
+ama o doküman bir oturum ister: bir şey önermeden önce soran, oturum açmış ekranlar içindir ve
+oturum açmamış bir kayıt sayfası cevabı kendi gönderiminin aldığı `403`'ten öğrenir. Anahtarı,
+`PLAN_MAX_USERS`'ı mevcut hesap sayınıza sabitlemeye tercih edin; o yol kendi davetlilerinizi
+de engeller ve bir hesap silindiği anda kayar. Henüz yalnızca-davetli bir mod yok: davet edilen
+bir adresin hesabını oluşturabilmesi için kapının açık olması gerekir, o mod gelene kadar
+davetli için açıp sonra yeniden kapatın. Anahtar, kaydı açık tutan `DEMO_MODE`'dan
+([Demo instance](#demo-instance)) bağımsızdır.
+
 **Trello import'u için de burada bir satır gerekmiyor.** `TRELLO_IMPORT_MAX_BYTES` (varsayılan
 `20971520`, 20 MiB) importer'ın kabul edeceği en büyük board export'udur ve pakete dahil Compose
 dosyası onu zaten geçiriyor. Dokunmadan önce bilmeye değer üç şey var. Bu bir **bellek** tavanıdır,
@@ -602,16 +616,19 @@ ayrıca build edilecek veya çekilecek bir şey yok.
 
 ### `DEMO_MODE=true` neyi değiştirir
 
-| Davranış                                               | Neden                                                                                                                                          |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Uygulamada sıklığı söyleyen kalıcı bir bildirim şeridi | Bir ziyaretçinin, bir saatlik emeğinin silineceğine dair aldığı tek uyarı budur. Sekme boyunca kapatılabilir, sonraki ziyarette geri gelir     |
-| Giden tüm e-posta log'a yazılır                        | `SMTP_HOST` ne derse desin. Herkesin kayıt olabildiği bir demo, bir yabancının yazdığı adrese posta gönderebiliyor olmamalı                    |
-| Hesap silme ve workspace silme `403` döner             | Demo tek bir paylaşılan workspace'tir. Onu ya da sahibi hesabı silmek, bir sonraki reset'e kadar demoyu diğer bütün ziyaretçiler için boşaltır |
-| `GET /config` reset takvimini yayınlar                 | Böylece bildirim şeridi, sidecar'ın gerçekten uyuduğu süreyi söyler; iki kez yazılmış bir sayıyı değil                                         |
+| Davranış                                               | Neden                                                                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Uygulamada sıklığı söyleyen kalıcı bir bildirim şeridi | Bir ziyaretçinin, bir saatlik emeğinin silineceğine dair aldığı tek uyarı budur. Sekme boyunca kapatılabilir, sonraki ziyarette geri gelir                                                 |
+| Giden tüm e-posta log'a yazılır                        | `SMTP_HOST` ne derse desin. Herkesin kayıt olabildiği bir demo, bir yabancının yazdığı adrese posta gönderebiliyor olmamalı                                                                |
+| Hesap silme ve workspace silme `403` döner             | Demo tek bir paylaşılan workspace'tir. Onu ya da sahibi hesabı silmek, bir sonraki reset'e kadar demoyu diğer bütün ziyaretçiler için boşaltır                                             |
+| `POST /auth/change-password` `403` döner               | Demo hesabının şifresi yayınlanmıştır; herhangi bir ziyaretçi onu değiştirip, bir sonraki reset `DEMO_PASSWORD`'ü geri yazana kadar herkesi dışarıda bırakabilirdi. İki silmeyle aynı zarf |
+| `GET /config` reset takvimini yayınlar                 | Böylece bildirim şeridi, sidecar'ın gerçekten uyuduğu süreyi söyler; iki kez yazılmış bir sayıyı değil                                                                                     |
 
 Geri kalan her şey ürünün kendisidir. Kayıt açık kalır (oradaki kötüye kullanımın cevabı bir
-anahtar değil, rate limit'tir), davetler yine oluşturulabilir ve bağlantıları elle
-kopyalanabilir, yüklemeler ise olağan attachment kotalarıyla sınırlıdır
+anahtar değil, rate limit'tir, ve `DEMO_MODE` hiçbir zaman `SIGNUP_ENABLED`'ı okumaz),
+oturumları iptal etmek ve hesabı yeniden adlandırmak açık kalır çünkü ikisi de bir sign-in
+uzağında geri alınır, davetler yine oluşturulabilir ve bağlantıları elle kopyalanabilir,
+yüklemeler ise olağan attachment kotalarıyla sınırlıdır
 ([ADR 0027](decisions/0027-attachment-quotas.md)). Bir demo host'ta başka bir anahtara uzanmak
 yerine bu kotaları düşük tutun.
 

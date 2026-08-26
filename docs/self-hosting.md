@@ -233,6 +233,21 @@ the limit and the current count. One workspace can be given ceilings of its own 
 `Workspace.planLimits` JSON column, which overrides these key by key; the app never writes it
 itself.
 
+**Closing registration is a switch, not a ceiling.** `SIGNUP_ENABLED=false` refuses
+`POST /auth/sign-up/email` with a `403` whose JSON body carries `error: "Sign-up Disabled"`,
+whatever the account count is; unset or `true` keeps registration open, which is how every
+install ran before the switch existed. Like `PLAN_MAX_USERS` it refuses **sign-up only**:
+signing in, verifying an address and everything else under `/auth` stay open, so closing it
+never locks out the people already on the instance. `GET /config` publishes it as
+`signUpEnabled`, but that document requires a session: it is there for the signed-in screens
+that ask before offering something, and a signed-out register page learns the answer from the
+`403` its own submit receives instead. Prefer the switch to pinning `PLAN_MAX_USERS` at your
+current head count, which blocks your own invitees too and drifts the moment an account is
+deleted. There is no invite-only mode yet: an invited address still needs the door open to
+create its account, so until that lands, open it for the invitee and close it again. The
+switch is independent of `DEMO_MODE` ([Demo instance](#demo-instance)), which keeps
+registration open.
+
 **Trello import needs no line here either.** `TRELLO_IMPORT_MAX_BYTES` (default `20971520`,
 20 MiB) is the largest board export the importer will accept, and the bundled Compose file
 already passes it. Three things about it are worth knowing before you touch it. It is a
@@ -584,16 +599,19 @@ API, so there is nothing extra to build or pull.
 
 ### What `DEMO_MODE=true` changes
 
-| Behaviour                                       | Why                                                                                                                                       |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| A standing banner in the app naming the cadence | It is the only warning a visitor gets before an hour of their typing disappears. Dismissible for the browser tab, back on the next visit  |
-| All outbound email goes to the log              | Whatever `SMTP_HOST` says. A demo anyone can sign up to must not be able to send mail to an address a stranger typed in                   |
-| Account deletion and workspace deletion `403`   | The demo is one shared workspace. Deleting it, or the account that owns it, empties the demo for every other visitor until the next reset |
-| `GET /config` publishes the reset schedule      | So the banner names the same cadence the sidecar sleeps for, rather than a number somebody typed twice                                    |
+| Behaviour                                       | Why                                                                                                                                                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A standing banner in the app naming the cadence | It is the only warning a visitor gets before an hour of their typing disappears. Dismissible for the browser tab, back on the next visit                                                 |
+| All outbound email goes to the log              | Whatever `SMTP_HOST` says. A demo anyone can sign up to must not be able to send mail to an address a stranger typed in                                                                  |
+| Account deletion and workspace deletion `403`   | The demo is one shared workspace. Deleting it, or the account that owns it, empties the demo for every other visitor until the next reset                                                |
+| `POST /auth/change-password` `403`              | The demo account's password is published, so any visitor could rotate it and lock everyone else out until the next reset writes `DEMO_PASSWORD` back. Same envelope as the two deletions |
+| `GET /config` publishes the reset schedule      | So the banner names the same cadence the sidecar sleeps for, rather than a number somebody typed twice                                                                                   |
 
 Everything else is the product. Sign-up stays open (rate limits, not a switch, are the answer
-to abuse there), invitations can still be created and their links copied by hand, and uploads
-are bounded by the ordinary attachment quotas
+to abuse there, and `DEMO_MODE` never reads `SIGNUP_ENABLED`), revoking sessions and renaming
+the account stay open because both are a sign-in away from recovered, invitations can still be
+created and their links copied by hand, and uploads are bounded by the ordinary attachment
+quotas
 ([ADR 0027](decisions/0027-attachment-quotas.md)). Set those low on a demo host rather than
 reaching for another switch.
 

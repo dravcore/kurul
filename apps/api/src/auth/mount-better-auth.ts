@@ -1,14 +1,19 @@
-import type { INestApplication } from '@nestjs/common';
+import { Logger, type INestApplication } from '@nestjs/common';
 import { toNodeHandler } from 'better-auth/node';
 import type { Request, Response } from 'express';
 import { STATUS_CODES } from 'node:http';
-import { PLAN_LIMIT_ERROR } from '@kurul/shared-types';
+import { PLAN_LIMIT_ERROR, SIGNUP_DISABLED_ERROR, type PlanLimitDetail } from '@kurul/shared-types';
+import { isProductionEnv } from '../common/env';
 import { REQUEST_BODY_TOO_LARGE_MESSAGE } from '../common/filters/all-exceptions.filter';
 import { getRequestId } from '../common/logging/request-id';
+import { captureServerError } from '../common/observability/sentry';
+import { DEMO_RESTRICTED_MESSAGE } from '../demo/demo-restricted.guard';
+import { demoModeEnabled } from '../demo/demo-mode';
 import { PlanLimitsService } from '../plan/plan-limits.service';
 import { boundStreamedBody, declaresOversizedBody } from './auth-body-limit';
 import { auth } from './auth';
 import { isBlockedOrganizationMutation } from './organization-http-firewall';
+import { signUpEnabled } from './sign-up-policy';
 
 /**
  * The one Better Auth route that creates an account.
@@ -24,39 +29,192 @@ import { isBlockedOrganizationMutation } from './organization-http-firewall';
  * provider, a magic link, anything that mints a `User` row without passing through here).
  * `emailAndPassword` is the only one enabled today (`auth.ts`), so today the two placements
  * cover exactly the same set of requests.
+ *
+ * The same trade bounds what the `SIGNUP_ENABLED` switch can be: the mount runs ahead of the
+ * body parsers (`configure-app.ts`) and never sees the sign-up email, so "closed unless a
+ * pending invitation names the address" cannot be decided here. That mode belongs in the
+ * database hook, and adding it is the second trigger to move.
  */
 const SIGN_UP_PATH = '/auth/sign-up/email';
 
-function isSignUpRequest(req: Request): boolean {
-  return req.method === 'POST' && (req.path.split('?')[0] ?? req.path) === SIGN_UP_PATH;
+/**
+ * The Better Auth routes a demo refuses, for the reason `DemoRestrictedGuard` states: they take
+ * the shared account away from every other visitor, and the reset is not a recovery path.
+ *
+ * `change-password` is the live one: the demo's password is published, so the "current
+ * password" Better Auth asks for is public and one successful request locks everybody out
+ * until the reset writes `DEMO_PASSWORD` back. `change-email` is refused by Better Auth itself
+ * on every instance today (`user.changeEmail` is not enabled in `auth.ts`), and is listed here
+ * so that switching the option on does not silently open it on the demo. The guard's comment
+ * carries the list of what is deliberately *not* here.
+ */
+const DEMO_RESTRICTED_AUTH_PATHS: ReadonlySet<string> = new Set([
+  '/auth/change-password',
+  '/auth/change-email',
+]);
+
+const logger = new Logger('BetterAuthMount');
+
+/**
+ * The two switches this mount refuses on, resolved once and written to the boot log.
+ *
+ * Called for its throw as much as for its line. `envBool` refuses a spelling it cannot read as
+ * a boolean, and both switches are otherwise read only inside the request handler below, where
+ * no exception filter is listening: `SIGNUP_ENABLED=fasle` would leave the very route the
+ * switch exists to close hanging with no response at all, and take the process down with an
+ * unhandled rejection. Reading them here, at bootstrap, turns an operator's typo back into what
+ * it should be, a container that refuses to start, which is the bargain
+ * `PlanLimitsService.onModuleInit` already makes for `PLAN_MAX_*` and `ATTACHMENT_MAX_BYTES`.
+ *
+ * The values are described, not cached. Every read below stays live, which is what lets a test
+ * flip either variable around a single request instead of rebuilding the container.
+ */
+function describeAuthMountPolicy(): string {
+  return `Auth mount policy: signUpEnabled=${signUpEnabled()} demoMode=${demoModeEnabled()}`;
+}
+
+function pathWithoutQuery(req: Request): string {
+  return req.path.split('?')[0] ?? req.path;
+}
+
+export function isSignUpRequest(req: Request): boolean {
+  return req.method === 'POST' && pathWithoutQuery(req) === SIGN_UP_PATH;
+}
+
+export function isDemoRestrictedAuthRequest(req: Request): boolean {
+  return req.method === 'POST' && DEMO_RESTRICTED_AUTH_PATHS.has(pathWithoutQuery(req));
+}
+
+/** What a refusal below the Nest router says, beyond the fields the envelope always carries. */
+interface Refusal {
+  /** Defaults to `403`, the status every policy refusal here answers with. */
+  statusCode?: number;
+  error: string;
+  message: string;
+  planLimit?: PlanLimitDetail;
 }
 
 /**
  * Writes the error envelope the exception filter would have produced.
  *
  * By hand because no exception filter is listening below the Nest router, which is the reason
- * the organization firewall above writes its own. It carries the fields the filter would have
- * produced, `requestId` included: `requestIdMiddleware` runs above this mount, so the id in the
- * response body is the id in the `X-Request-Id` header and in the access log line.
+ * the organization firewall writes its own. It carries the fields the filter would have
+ * produced, `requestId` included: `requestIdMiddleware` runs above this mount, so the id in
+ * the response body is the id in the `X-Request-Id` header and in the access log line.
  */
-function refuse(
-  req: Request,
-  res: Response,
-  statusCode: number,
-  error: string,
-  message: string,
-  extra: Record<string, unknown> = {},
-): void {
+function refuse(req: Request, res: Response, refusal: Refusal): void {
   const requestId = getRequestId(req);
+  const statusCode = refusal.statusCode ?? 403;
   res.status(statusCode).json({
     statusCode,
-    error,
-    message,
-    ...extra,
+    error: refusal.error,
+    message: refusal.message,
+    ...(refusal.planLimit === undefined ? {} : { planLimit: refusal.planLimit }),
     path: req.url,
     timestamp: new Date().toISOString(),
     ...(requestId === undefined ? {} : { requestId }),
   });
+}
+
+/**
+ * Answers a handler that threw with the `500` envelope, by hand.
+ *
+ * Nothing above catches it. `mountBetterAuth` hands the handler straight to Express, so a
+ * rejected promise there is an unhandled rejection: the socket never gets a response, and under
+ * Node's default `--unhandled-rejections=throw` the process exits with it. `AllExceptionsFilter`
+ * only ever sees faults inside the Nest router, so this reproduces the envelope it would have
+ * written for the same fault one layer up, exactly as `refuse` reproduces the refusal envelopes.
+ *
+ * The message follows the filter's rule too: the cause is published outside production and
+ * withheld inside it, so a deployed instance never leaks an internal string to a caller.
+ *
+ * `headersSent` means Better Auth already answered and then failed on the way out. There is no
+ * envelope left to write at that point, so the response is only ended, which is still the
+ * difference between a closed socket and a hung one.
+ */
+function failClosed(req: Request, res: Response, cause: unknown): void {
+  const requestId = getRequestId(req);
+  const error =
+    cause instanceof Error ? cause : new Error(`Non-Error exception thrown: ${String(cause)}`);
+  const suffix = requestId === undefined ? '' : ` (requestId=${requestId})`;
+  logger.error(`${error.message}${suffix}`, error.stack);
+  captureServerError(error, {
+    ...(requestId === undefined ? {} : { requestId }),
+    ...(typeof req.method === 'string' ? { method: req.method } : {}),
+    ...(typeof req.url === 'string' ? { path: req.url } : {}),
+    statusCode: 500,
+  });
+
+  if (res.headersSent) {
+    res.end();
+    return;
+  }
+
+  res.status(500).json({
+    statusCode: 500,
+    error: 'Internal Server Error',
+    message: isProductionEnv() ? 'An unexpected error occurred' : error.message,
+    path: req.url,
+    timestamp: new Date().toISOString(),
+    ...(requestId === undefined ? {} : { requestId }),
+  });
+}
+
+/**
+ * The per-request half of the mount, built apart from the Express wiring so a unit test can
+ * drive it with a fake request and a fake Better Auth handler.
+ *
+ * Three refusals live here, in the order they are cheapest to answer:
+ *
+ * 1. **Demo lock-out.** `POST /auth/change-password` on a demo instance, refused with the
+ *    same envelope `DemoRestrictedGuard` produces for the two Nest routes on its list.
+ * 2. **Registration closed.** `SIGNUP_ENABLED=false` refuses sign-up before anything is
+ *    counted; a closed door needs no head count.
+ * 3. **The account ceiling** (ADR 0032), refused before Better Auth writes a row.
+ *
+ * Every one of them refuses **sign-up or the one named route only**. Signing in, verifying an
+ * address and every other `/auth/*` route stay open whatever the switches say: an instance
+ * that has just closed registration, or been lowered below its own user count, must not lock
+ * out the people already on it.
+ *
+ * The `/auth/*` body ceiling is not among them: it guards the process rather than a policy, so
+ * `mountBetterAuth` applies it above this handler, before anything here reads a request.
+ *
+ * Rejecting is allowed: `mountBetterAuth` answers a thrown handler with `failClosed`, so the
+ * head count query failing on a dead database is a `500` and not a hung socket.
+ */
+export function createAuthRequestHandler(
+  planLimits: Pick<PlanLimitsService, 'signUpRefusal'>,
+  authHandler: (req: Request, res: Response) => Promise<void>,
+): (req: Request, res: Response) => Promise<void> {
+  return async (req, res) => {
+    if (isDemoRestrictedAuthRequest(req) && demoModeEnabled()) {
+      refuse(req, res, { error: 'Forbidden', message: DEMO_RESTRICTED_MESSAGE });
+      return;
+    }
+
+    if (isSignUpRequest(req)) {
+      if (!signUpEnabled()) {
+        refuse(req, res, {
+          error: SIGNUP_DISABLED_ERROR,
+          message: 'Sign-up is disabled on this instance',
+        });
+        return;
+      }
+
+      const refusal = await planLimits.signUpRefusal();
+      if (refusal !== null) {
+        refuse(req, res, {
+          error: PLAN_LIMIT_ERROR,
+          message: 'This instance is not accepting new accounts',
+          planLimit: refusal,
+        });
+        return;
+      }
+    }
+
+    await authHandler(req, res);
+  };
 }
 
 /** Mount Better Auth on the underlying Express instance (escape hatch from ADR 0004). */
@@ -65,8 +223,25 @@ export function mountBetterAuth(app: INestApplication): void {
     all: (path: string, handler: (req: Request, res: Response) => void) => void;
   };
 
+  // Before anything is wired: `describeAuthMountPolicy` reads both switches, and a malformed
+  // one throws out of `bootstrap()` rather than out of a request nobody is catching.
+  logger.log(describeAuthMountPolicy());
+
   const authHandler = toNodeHandler(auth);
-  const planLimits = app.get(PlanLimitsService);
+
+  /**
+   * Better Auth, with the streaming half of the `/auth/*` body ceiling attached.
+   *
+   * Order matters: the auth handler takes the stream first, then the byte counter joins it.
+   * `boundStreamedBody` explains why the other order would starve Better Auth's reader.
+   */
+  async function handOffToBetterAuth(req: Request, res: Response): Promise<void> {
+    const pending = authHandler(req, res);
+    boundStreamedBody(req);
+    await pending;
+  }
+
+  const handle = createAuthRequestHandler(app.get(PlanLimitsService), handOffToBetterAuth);
 
   // Express 5 requires a named wildcard; braces also match the bare `/auth` base.
   expressApp.all('/auth/{*splat}', (req, res) => {
@@ -75,8 +250,9 @@ export function mountBetterAuth(app: INestApplication): void {
     // this mount and never see these requests, and Better Auth reads the raw stream itself, so
     // without this check a sign-in body of any size streamed into the heap. A declared length
     // is refused here with the same envelope those parsers produce, before a byte of the body
-    // is read; the length-less (chunked) case is bounded in `handle` below, once Better Auth
-    // has taken the stream. See `auth-body-limit.ts` for the number and the reasoning.
+    // is read; the length-less (chunked) case is bounded in `handOffToBetterAuth` above, once
+    // Better Auth has taken the stream. See `auth-body-limit.ts` for the number and the
+    // reasoning.
     //
     // Answering before the body has arrived leaves the rest of it on the wire. Node reads and
     // discards it for us, so a client that keeps the connection (every browser, `fetch`, curl)
@@ -85,13 +261,11 @@ export function mountBetterAuth(app: INestApplication): void {
     // finishes on a connection the client itself said it would not reuse. Draining a body of
     // any size to make that case uniform is the cost this check exists to refuse.
     if (declaresOversizedBody(req)) {
-      refuse(
-        req,
-        res,
-        413,
-        STATUS_CODES[413] ?? 'Payload Too Large',
-        REQUEST_BODY_TOO_LARGE_MESSAGE,
-      );
+      refuse(req, res, {
+        statusCode: 413,
+        error: STATUS_CODES[413] ?? 'Payload Too Large',
+        message: REQUEST_BODY_TOO_LARGE_MESSAGE,
+      });
       return;
     }
 
@@ -104,31 +278,8 @@ export function mountBetterAuth(app: INestApplication): void {
       return;
     }
 
-    void handle(req, res);
+    handle(req, res).catch((cause: unknown) => {
+      failClosed(req, res, cause);
+    });
   });
-
-  /**
-   * The account ceiling, refused before Better Auth writes a row (ADR 0032).
-   *
-   * A ceiling refuses **sign-up only**. Signing in, verifying an address and every other
-   * `/auth/*` route stay open at any count: an instance that has just been lowered below its
-   * own user count must not lock out the people already on it.
-   */
-  async function handle(req: Request, res: Response): Promise<void> {
-    if (isSignUpRequest(req)) {
-      const refusal = await planLimits.signUpRefusal();
-      if (refusal !== null) {
-        refuse(req, res, 403, PLAN_LIMIT_ERROR, 'This instance is not accepting new accounts', {
-          planLimit: refusal,
-        });
-        return;
-      }
-    }
-
-    // Order matters: the auth handler takes the stream first, then the byte counter joins it.
-    // `boundStreamedBody` explains why the other order would starve Better Auth's reader.
-    const pending = authHandler(req, res);
-    boundStreamedBody(req);
-    await pending;
-  }
 }
