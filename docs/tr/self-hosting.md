@@ -744,8 +744,10 @@ değil.
    geri gelirken isteği 502 ile yanıtlamak yerine 30s'ye kadar tutar, her 500ms'de yeniden
    dener. Tek replika hâlâ isteklerin başka yerde karşılanmak yerine beklemesi demektir ve
    gövdesini göndermeye başlamış bir yükleme yeniden denenmez. Yerine konan bir reverse
-   proxy'nin aynı davranışı göstermesi için kendi karşılığına ihtiyacı vardır (nginx:
-   `proxy_next_upstream`).
+   proxy'nin aynı davranışı göstermesi için kendi karşılığına ihtiyacı vardır ve nginx open
+   source'ta birebir karşılığı yoktur: `proxy_next_upstream` isteği upstream grubundaki _bir
+   sonraki_ sunucuya devreder, dolayısıyla tek bir `api` girdisi olan grup hiç yeniden
+   denenmez.
 
 6. **Doğrulayın:**
 

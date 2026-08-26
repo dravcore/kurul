@@ -723,8 +723,10 @@ reason. Do the steps in this order, every time; none of them is long.
    what it was doing before Docker kills it, and the bundled Caddy holds a request for up to
    30s while an upstream is coming back instead of answering 502, retrying every 500ms. One
    replica still means requests wait rather than being served elsewhere, and an upload already
-   streaming its body is not retried. A replacement reverse proxy needs its own equivalent
-   (nginx: `proxy_next_upstream`) to behave the same way.
+   streaming its body is not retried. A replacement reverse proxy needs its own equivalent to
+   behave the same way, and nginx open source has no one-to-one match: `proxy_next_upstream`
+   hands the request to the _next_ server in the upstream group, so a group with a single
+   `api` entry is never retried.
 
 6. **Verify:**
 
