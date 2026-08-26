@@ -21,6 +21,27 @@ export function cardHandle(scope: Page | Locator, title: string): Locator {
 }
 
 /**
+ * The `Add task` button at the foot of a column.
+ *
+ * Tracks `app.board.task.createAction` in `apps/web/messages/en.json`, by the same reasoning
+ * as `connectionLostRow` below: the suite reads no catalogue.
+ */
+export function addTaskButton(section: Locator): Locator {
+  return section.getByRole('button', { name: 'Add task', exact: true });
+}
+
+/**
+ * The inline composer that replaces that button while it is open (ADR 0035).
+ *
+ * Addressed by `data-slot` rather than by role: a `<form>` with no accessible name is exposed
+ * as no role at all, so there is nothing to name it by, and its two controls are reached
+ * through it rather than through the column so a sweep cannot pick up the rest of the foot.
+ */
+export function taskComposer(section: Locator): Locator {
+  return section.locator('form[data-slot="task-composer"]');
+}
+
+/**
  * The titles of the cards currently rendered in <column>, top to bottom.
  *
  * Read off the grip buttons' `aria-label` rather than the card text because a card's visible
