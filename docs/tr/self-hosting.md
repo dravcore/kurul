@@ -859,6 +859,10 @@ ve api ile web Dockerfile'larındaki `node`, benzer bir nedenle salt tag yerine 
 ile sabitlenir: aynı sürümün iki ayrı derlemesi böylece aynı byte'ları çözümler, ve Dependabot
 her digest'i haftalık olarak günceller; bu sayede üst akıştaki bir düzeltme, bir şeyin yeniden
 derlenmesini bekleyip sessizce gelmek yerine, gözden geçirilebilir bir pull request olarak gelir.
+Bunun bir yan etkisi var: tek başına `docker compose pull`, artık iki Kurul sürümü arasında
+çıkan bir `postgres`/`redis`/`caddy` yama sürümünü almaz, çünkü çözümlediği tag artık bir
+digest'e sabitlenmiştir; o yama, Dependabot'un digest güncellemesini birleştiren bir sonraki
+Kurul sürümüyle gelir.
 
 ### İmzayı kontrol etmek
 
