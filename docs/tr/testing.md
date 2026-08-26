@@ -290,7 +290,7 @@ pnpm test:browser                         # browser e2e (Mailpit de gerekir)
 
 Integration testler, test setup'ı tarafından oluşturulan ve migrate edilen **ayrı bir
 veritabanına** (`kurul_test`) karşı çalışır. Geliştirme veritabanına asla dokunmazlar.
-Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#izolasyon).
+Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#i̇zolasyon).
 
 Bu komutların hiçbiri `packages/*/dist` gerektirmez. İki Jest config'i ve Vitest config'leri
 `@kurul/shared-types` ile `@kurul/auth-access` paketlerini `src/index.ts` dosyalarına eşler;
@@ -384,8 +384,17 @@ Zaten kapsanmış kodun geri kaymasını mandallar engeller. Hepsi CI'ı kırar.
 | `apps/web` `components/settings/**`     | statements 85 / branches 86 / functions 80 / lines 86 | `apps/web/vitest.config.ts` |
 | `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88 | `apps/web/vitest.config.ts` |
 
-Hepsi konuldukları anda alınan ölçümün birkaç puan altındadır — rutin bir refactor'ın
-takılmayacağı kadar pay bırakan, ama bir testin silinmesini yakalayacak kadar dar.
+Hepsi konuldukları anda alınan ölçümün altındadır; ama "birkaç puan" API satırı için doğru
+değil ve öyle demek sinyali gizler. Kayıtlı son API baseline'ı (2026-08-15,
+`apps/api/jest.config.cjs` içindeki baseline geçmişinde) 76.51 / 66.64 / 78.82 / 77.76 ve taban
+75 / 66 / 77 / 76, yani branch payı birkaç puan değil **0.64**. O sayının neden tabanı
+düşürerek geri kazanılmadığını dosya kendi anlatıyor: payın daralması sinyaldir, tabanı
+düşürmek sinyali siler ve sebebi bırakır. Yeniden ölçmek
+[ROADMAP.md](../../ROADMAP.md#post-launch-hardening) içinde izlenen bir satır.
+
+Bu tablodaki sayılar tabanlardır, yani yapılandırmadır. Güncel coverage burada hiç yazmıyor, ve
+bu bilinçli: doğruluk kaynağı CI'ın her koşuda yayımladığı `api-coverage` ve `web-coverage`
+artifact'larıdır, çünkü düzyazıya kopyalanan bir yüzde yazıldığının ertesi günü yanlıştır.
 
 `apps/web`'in **global bir taban değeri yoktur**, bilinçli olarak. Genel web coverage son
 koşularda instrumented statement'ların ~%85'i civarındadır ama bu ortalama hâlâ yoğun testli
@@ -440,20 +449,25 @@ en uzun job'ıdır ve
 [ROADMAP.md](../../ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit) içindeki
 OPS-10 satırına karşı izlenir.
 
-**Merge öncesi tüm adımlar geçmelidir.** Kapı job'ı (`ci-ok`) branch korumasında yapılandırılan
-tek zorunlu status kontrol — eğer herhangi bir upstream job başarısızsa, atlanırsa ya da iptal
-edilirse, kapı başarısız olur. Bu iki koruma sağlar:
+**Merge öncesi tüm adımlar geçmelidir.** `main` ve `develop` üzerindeki branch koruması iki
+zorunlu context tanıyor: `ci-ok` ve `CodeQL`. `ci-ok` bu workflow'un kapısıdır: herhangi bir
+upstream job başarısızsa, atlanırsa ya da iptal edilirse kapı başarısız olur. `CodeQL` ise
+kendi workflow'u ve kendi context'idir; SEC-06 turundan beri iki branch'ta da zorunlu, bir fork
+PR'ının bu tablodaki her şey yeşilken CodeQL beklemede durabilmesinin sebebi de bu. Kapı iki
+koruma sağlar:
 
 1. **Doğruluk**: hiç koşmamış bir job kapıyı geçemez. Dal koruması _atlanmış_ bir zorunlu
    kontrolü karşılanmış sayar; [#89](https://github.com/dravcore/kurul/pull/89) tam olarak
    böyle merge oldu (`test` kırmızı, `build` atlanmış). `ci-ok` `if: always()` ile koşar ve
    her `needs.*.result` değerinin tam olarak `success` olduğunu doğrular — `failure`, `skipped`
    ve `cancelled` üçü de kapıyı düşürür.
-2. **Dal korumasıyla sabit bir sözleşme**: koruma artık her job adını değil tek bir bağlamı
-   (`ci-ok`) tanıyor. Job eklemek, bölmek veya yeniden adlandırmak ayar değişikliği değil
-   `ci.yml` düzenlemesi; hata yapılırsa sonuç CI'ın içinde kalır — workflow tanımadığı bir
-   `needs` girdisiyle yüklenmeyi reddeder, hiçbir kontrol raporlanmaz ve PR kilitli kalır.
-   Eskiden aynı hata, korumayı artık var olmayan bir bağlamı beklerken bırakıyordu.
+2. **Dal korumasıyla sabit bir sözleşme**: koruma bu workflow için içindeki her job adını
+   değil tek bir bağlamı (`ci-ok`) tanıyor. Job eklemek, bölmek veya yeniden adlandırmak ayar
+   değişikliği değil `ci.yml` düzenlemesi; hata yapılırsa sonuç CI'ın içinde kalır — workflow
+   tanımadığı bir `needs` girdisiyle yüklenmeyi reddeder, hiçbir kontrol raporlanmaz ve PR
+   kilitli kalır. Eskiden aynı hata, korumayı artık var olmayan bir bağlamı beklerken
+   bırakıyordu. `CodeQL` bilinçli olarak istisna: kendi takvimi olan ayrı bir workflow,
+   dolayısıyla bu kapının altına toplamak onu gizlerdi.
 
 CI, `develop` ve `main`'e yapılan push'larda olduğu gibi herhangi bir branch'a yapılan pull
 request'lerde çalışır. Bkz.

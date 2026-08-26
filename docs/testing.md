@@ -376,8 +376,19 @@ These floors keep already-covered code from sliding back. Each fails CI.
 | `apps/web` `components/settings/**`     | statements 85 / branches 86 / functions 80 / lines 86 | `apps/web/vitest.config.ts` |
 | `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88 | `apps/web/vitest.config.ts` |
 
-All sit a few points under the measurement taken when they were introduced — enough margin
-that a routine refactor does not trip them, tight enough that deleting a test does.
+All sit under the measurement taken when they were introduced, but "a few points" is not true
+of the API row and saying so would hide the signal. The last recorded API baseline
+(2026-08-15, in the baseline history in `apps/api/jest.config.cjs`) is
+76.51 / 66.64 / 78.82 / 77.76 against a floor of 75 / 66 / 77 / 76, so the branch margin is
+**0.64**, not a few points. The file explains why that number is not restored by lowering the
+floor: the margin shrinking is the signal, and lowering the floor deletes the signal and keeps
+the cause. Re-measuring it is a tracked row in
+[ROADMAP.md](../ROADMAP.md#post-launch-hardening).
+
+The numbers in this table are the floors, which are configuration. The current coverage is not
+written down here at all, deliberately: the source of truth is the `api-coverage` and
+`web-coverage` artifacts CI publishes on every run, because a percentage copied into prose is
+wrong the day after it is written.
 
 `apps/web` has **no global floor**, deliberately. Overall web coverage is around 85% of
 instrumented statements in recent runs, but that average still mixes heavily-tested hooks with
@@ -430,21 +441,25 @@ The pipeline's wall time is therefore its longest job rather than the sum of the
 tracked against the OPS-10 row in
 [ROADMAP.md](../ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit).
 
-**All steps must pass before merge.** The gate job (`ci-ok`) is the single required status check
-configured in branch protection — if any upstream job fails, is skipped, or is cancelled, the
-gate fails. This provides two protections:
+**All steps must pass before merge.** Branch protection on `main` and `develop` names two
+required contexts, `ci-ok` and `CodeQL`. `ci-ok` is the gate over this workflow: if any upstream
+job fails, is skipped, or is cancelled, the gate fails. `CodeQL` is its own workflow and its own
+context, required on both branches since the SEC-06 pass, which is why a fork PR can sit with
+CodeQL pending while everything in this table is already green. The gate provides two
+protections:
 
 1. **Correctness**: a job that never ran cannot pass the gate. Branch protection treats a
    _skipped_ required check as satisfied, which is how [#89](https://github.com/dravcore/kurul/pull/89)
    merged with `test` red and `build` skipped. `ci-ok` runs under `if: always()` and asserts
    every `needs.*.result` is exactly `success`, so `failure`, `skipped` and `cancelled` all
    fail the gate.
-2. **A stable contract with branch protection**: protection now names one context, `ci-ok`,
-   instead of tracking every job name. Adding, splitting or renaming a job is a `ci.yml` edit
-   with no settings change, and the failure mode of getting it wrong stays inside CI — the
-   workflow refuses to load an unknown `needs` entry, so nothing reports and the PR stays
-   blocked. Previously the same mistake left protection waiting on a context that no longer
-   existed.
+2. **A stable contract with branch protection**: protection names one context for this
+   workflow, `ci-ok`, instead of tracking every job name in it. Adding, splitting or renaming a
+   job is a `ci.yml` edit with no settings change, and the failure mode of getting it wrong
+   stays inside CI — the workflow refuses to load an unknown `needs` entry, so nothing reports
+   and the PR stays blocked. Previously the same mistake left protection waiting on a context
+   that no longer existed. `CodeQL` is deliberately the exception: it is a separate workflow
+   with its own schedule, so collapsing it under this gate would hide it.
 
 CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on pushes to
 `develop` and `main`. See [git-strategy.md](git-strategy.md#pull-request-process).
