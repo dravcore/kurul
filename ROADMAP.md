@@ -53,8 +53,8 @@ commercial license ([ADR 0028](docs/decisions/0028-open-contributions-hosted-ser
 
 The audit that followed `v0.3.0` is mostly merged: the compose interpolation and forwarding
 fixes, the nightly suite moving to `develop`, the release guard, the upgrade runbook, the import
-ceiling, the auth body limit, the compose tuning, the CI split, `SIGNUP_ENABLED` and the demo
-password lock-out are all on `develop` and go out as `v0.4.0`. What is left of it is below, and
+ceiling, the auth body limit, the compose tuning, the CI split, `SIGNUP_ENABLED`, the demo
+password lock-out and password reset by email are all on `develop` and go out as `v0.4.0`. What is left of it is below, and
 this table empties rather than grows: a row leaves it by shipping, not by being re-deferred.
 
 | Item                                                                                           | Prio | Effort | Acceptance criterion                                                                                                                                                                                                                                                                                                                                                                          |
