@@ -321,6 +321,16 @@ because the cost these ceilings exist for (heap held by the parsed graph, and th
 writer's `createMany` sequence) is paid for every row Trello wrote, not only the ones that end up
 importable.
 
+`readTrelloImportMaxCards` and `readTrelloImportMaxLists` throw a plain `Error` on a
+misconfigured value, the same convention `readTrelloImportMaxBytes` already used: a bad value is
+a `500` on the next import, not a refusal to boot. That is a deliberate departure from ADR 0032's
+plan-limit ceilings, which refuse at startup instead, because those are read once by
+`readInstancePlanLimits()` at boot and never again, while every import limit here is already
+read per request for the reason given in `import-config.ts` (a test, or an operator restart, must
+see the value that is actually set). Boot-time validation was not added for these two alongside
+it, so a misconfigured `TRELLO_IMPORT_MAX_CARDS` fails the same way its byte-ceiling sibling
+already did rather than gaining a new failure mode of its own.
+
 Neither change touches the Decision section above: the skip vocabulary is unchanged, the
 structure table is unchanged, and the write is still one atomic transaction over a plan built
 with no database access.

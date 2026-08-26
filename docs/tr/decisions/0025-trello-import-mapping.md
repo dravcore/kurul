@@ -321,6 +321,16 @@ tavanların var olma sebebi olan maliyet (ayrıştırılmış grafiğin tuttuğu
 `createMany` dizisinin uzunluğu), Trello'nun yazdığı her satır için ödenir, yalnızca import
 edilebilir olanlar için değil.
 
+`readTrelloImportMaxCards` ve `readTrelloImportMaxLists`, hatalı yapılandırılmış bir değerde düz
+bir `Error` fırlatıyor, `readTrelloImportMaxBytes`'ın zaten kullandığı aynı gelenekle: hatalı bir
+değer bir sonraki import'ta bir `500`'dür, boot'u reddetmek değil. Bu, ADR 0032'nin plan
+tavanlarından bilinçli bir sapmadır; onlar boot'ta reddediyor, çünkü onlar
+`readInstancePlanLimits()` tarafından boot'ta bir kez okunuyor ve bir daha hiç okunmuyor, oysa
+buradaki her import tavanı `import-config.ts`'de verilen gerekçeyle (bir test ya da bir operatör
+restart'ı, gerçekten ayarlanmış değeri görmeli) zaten her istekte okunuyor. Bu ikisi için boot-time
+doğrulama eklenmedi, yani hatalı yapılandırılmış bir `TRELLO_IMPORT_MAX_CARDS`, kendi yeni bir
+başarısızlık modu kazanmak yerine bayt-tavanı kardeşinin zaten yaptığı şekilde başarısız oluyor.
+
 İki değişiklik de yukarıdaki Karar bölümüne dokunmuyor: kapalı kelime dağarcığı değişmedi, yapı
 tablosu değişmedi, ve yazma hâlâ veritabanına hiç erişmeden kurulan bir plan üzerinden tek bir
 atomik transaction.
