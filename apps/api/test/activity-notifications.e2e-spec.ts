@@ -199,4 +199,44 @@ describe('Activity & notifications (e2e)', () => {
 
     await member.agent.get(`/workspaces/${workspace.id}/notifications?type=not-a-type`).expect(400);
   });
+
+  it('returns 404, never 403, when a member of workspace A requests workspace B activities or notifications', async () => {
+    const ownerA = await signUp(app, { name: 'OwnerA' });
+    const ownerB = await signUp(app, { name: 'OwnerB' });
+    const memberB = await signUp(app, { name: 'MemberB' });
+    const workspaceA = await createWorkspace(ownerA.agent, 'IsoA', `iso-a-${Date.now()}`);
+    const workspaceB = await createWorkspace(ownerB.agent, 'IsoB', `iso-b-${Date.now()}`);
+    const memberBMe = await memberB.agent.get('/me').expect(200);
+    await addMember(prisma, workspaceB.id, memberBMe.body.id as string, MemberRole.MEMBER);
+    const { taskId } = await boardWithTask(ownerB.agent, workspaceB.id);
+
+    await ownerB.agent
+      .post(`/workspaces/${workspaceB.id}/tasks/${taskId}/assignees`)
+      .send({ userId: memberBMe.body.id })
+      .expect(201);
+
+    const memberBNotes = await memberB.agent
+      .get(`/workspaces/${workspaceB.id}/notifications`)
+      .expect(200);
+    const notificationId = memberBNotes.body.items[0].id as string;
+
+    // Control: `ownerA` can read their own (empty) workspace fine, so the 404s below are
+    // tenant isolation, not a broken route.
+    await ownerA.agent.get(`/workspaces/${workspaceA.id}/activities`).expect(200);
+
+    // `ownerA` is not a member of workspace B: the workspace guard answers 404 before any
+    // workspace- or task-scoped read, the same convention `comment.e2e-spec.ts` and
+    // `trello-import.e2e-spec.ts` already use for cross-tenant access.
+    await ownerA.agent.get(`/workspaces/${workspaceB.id}/activities`).expect(404);
+    await ownerA.agent.get(`/workspaces/${workspaceB.id}/tasks/${taskId}/activities`).expect(404);
+    await ownerA.agent.get(`/workspaces/${workspaceB.id}/notifications`).expect(404);
+    await ownerA.agent.get(`/workspaces/${workspaceB.id}/notifications/unread-count`).expect(404);
+    await ownerA.agent
+      .post(`/workspaces/${workspaceB.id}/notifications/${notificationId}/read`)
+      .expect(404);
+    await ownerA.agent.post(`/workspaces/${workspaceB.id}/notifications/read-all`).expect(404);
+
+    const untouched = await prisma.notification.findUnique({ where: { id: notificationId } });
+    expect(untouched?.readAt).toBeNull();
+  });
 });
