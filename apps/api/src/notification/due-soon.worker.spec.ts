@@ -25,6 +25,7 @@ jest.mock('bullmq', () => ({
   Queue: jest.fn().mockImplementation(() => ({
     add: jest.fn(),
     upsertJobScheduler: jest.fn().mockResolvedValue({ id: 'due-soon-scan' }),
+    on: jest.fn(),
     close: jest.fn().mockResolvedValue(undefined),
   })),
   // `close` resolves rather than returning `undefined`: the shutdown hook races it against a
@@ -510,6 +511,117 @@ describe('DueSoonWorker', () => {
       // Must not throw even though nothing is listening on the Sentry side.
       expect(() => handler(job, new Error('boom'))).not.toThrow();
       expect(logError).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * BE-11: a Redis connection fault on either the queue or the worker connection used to have
+   * no listener at all: ioredis's own fallback for an unlistened `error` event is
+   * `console.error`, invisible to the JSON log format and to Sentry. These pin that both
+   * connections are covered, that the report reaches Sentry, and that a retry storm during one
+   * outage is throttled to a single report rather than one per reconnect attempt.
+   */
+  describe('redis connection error handling', () => {
+    const originalRedisUrl = process.env.REDIS_URL;
+
+    beforeEach(() => {
+      resetSentryForTesting();
+      jest.useFakeTimers();
+    });
+
+    afterEach(async () => {
+      if (originalRedisUrl === undefined) delete process.env.REDIS_URL;
+      else process.env.REDIS_URL = originalRedisUrl;
+      jest.clearAllMocks();
+      jest.useRealTimers();
+      resetSentryForTesting();
+    });
+
+    /** Installs a fake Sentry SDK through the loader seam, same pattern as the failed-handler tests. */
+    async function enableFakeSentry(): Promise<{ captureException: jest.Mock }> {
+      const captureException = jest.fn();
+      const api = {
+        init: jest.fn(),
+        captureException,
+        close: jest.fn(() => Promise.resolve(true)),
+        withScope: (callback: (scope: { setTag: jest.Mock; setContext: jest.Mock }) => void) => {
+          callback({ setTag: jest.fn(), setContext: jest.fn() });
+        },
+      } as unknown as typeof import('@sentry/node');
+
+      process.env.SENTRY_DSN = 'https://k@o.ingest.sentry.io/1';
+      try {
+        await initSentry(() => Promise.resolve(api));
+      } finally {
+        delete process.env.SENTRY_DSN;
+      }
+
+      return { captureException };
+    }
+
+    /**
+     * Starts a worker and hands back the `on('error', ...)` callback registered on the given
+     * mocked BullMQ object, read off its own `.on` calls, not a copy the test wrote itself.
+     */
+    async function registerAndGetErrorHandler(
+      of: 'queue' | 'worker',
+    ): Promise<(error: Error) => void> {
+      process.env.REDIS_URL = 'redis://localhost:6379';
+      const prisma = { task: { findMany: jest.fn() } } as unknown as PrismaService;
+      const notifications = {} as NotificationService;
+      const worker = new DueSoonWorker(prisma, notifications, asMailer(mailerStub()));
+
+      await worker.onModuleInit();
+
+      const mock = of === 'queue' ? Queue : Worker;
+      const instance = (mock as unknown as jest.Mock).mock.results[0]!.value as { on: jest.Mock };
+      const [, handler] = instance.on.mock.calls.find(([event]) => event === 'error') as [
+        string,
+        (error: Error) => void,
+      ];
+      return handler;
+    }
+
+    it('registers an error listener on both the queue and the worker connection', async () => {
+      const queueHandler = await registerAndGetErrorHandler('queue');
+      const workerHandler = await registerAndGetErrorHandler('worker');
+
+      expect(queueHandler).toBeInstanceOf(Function);
+      expect(workerHandler).toBeInstanceOf(Function);
+    });
+
+    it('logs at warn, naming the connection, and reports to Sentry', async () => {
+      const { captureException } = await enableFakeSentry();
+      const logWarn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const handler = await registerAndGetErrorHandler('worker');
+
+      const error = new Error('ECONNREFUSED');
+      handler(error);
+
+      expect(logWarn).toHaveBeenCalledWith(expect.stringContaining('due-soon worker Redis error'));
+      expect(captureException).toHaveBeenCalledWith(error);
+    });
+
+    it('reports the first error immediately, then throttles further reports for a minute', async () => {
+      const { captureException } = await enableFakeSentry();
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const handler = await registerAndGetErrorHandler('queue');
+
+      handler(new Error('ECONNRESET'));
+      handler(new Error('ECONNRESET'));
+      handler(new Error('ECONNRESET'));
+      expect(captureException).toHaveBeenCalledTimes(1);
+
+      jest.advanceTimersByTime(60_000);
+      handler(new Error('ECONNRESET'));
+      expect(captureException).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not throw when Sentry is off (no SENTRY_DSN)', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const handler = await registerAndGetErrorHandler('worker');
+
+      expect(() => handler(new Error('boom'))).not.toThrow();
     });
   });
 

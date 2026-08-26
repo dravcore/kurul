@@ -37,6 +37,14 @@ const JOB_ATTEMPTS = 5;
  */
 const JOB_BACKOFF_DELAY_MS = 5 * 60 * 1000;
 
+/**
+ * Minimum time between reports (WARN log + Sentry capture) for a Redis connection error on
+ * this worker's queue or worker client. ioredis retries a broken connection on its own and
+ * re-emits `error` on every failed attempt, so without this a single outage would report once
+ * per retry instead of once for the outage: same shape as `AUTH_RATE_LIMIT_REPORT_DAMPEN_MS`.
+ */
+const REDIS_ERROR_REPORT_DAMPEN_MS = 60 * 1000;
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
@@ -243,6 +251,7 @@ export class CleanupWorker implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(CleanupWorker.name);
   private queue: Queue | null = null;
   private worker: Worker | null = null;
+  private lastRedisErrorReportedAt = 0;
   /**
    * Test seam. Production writes the JSON line to stdout; the unit spec swaps in a collector
    * so it can assert on what a log aggregator would actually receive. Not a constructor
@@ -285,6 +294,13 @@ export class CleanupWorker implements OnModuleInit, OnApplicationShutdown {
 
     this.queue = new Queue(QUEUE_NAME, { connection });
     this.worker = new Worker(QUEUE_NAME, (job) => this.process(job), { connection });
+
+    // `queue.on('error')` and `worker.on('error')` fire on the connection itself (a Redis
+    // outage, a refused reconnect), distinct from `worker.on('failed')` below, which is a
+    // single job's outcome. Without a listener here, BullMQ's own fallback is `console.error`
+    // on an EventEmitter, invisible to the JSON log format and to Sentry (audit BE-11).
+    this.queue.on('error', (error) => this.onRedisError('queue', error));
+    this.worker.on('error', (error) => this.onRedisError('worker', error));
 
     this.worker.on('failed', (job, error) => {
       const message = error instanceof Error ? error.message : String(error);
@@ -342,6 +358,24 @@ export class CleanupWorker implements OnModuleInit, OnApplicationShutdown {
   async onApplicationShutdown(): Promise<void> {
     await closeWorkerWithinTimeout(this.worker, this.logger, 'retention cleanup worker');
     await this.queue?.close();
+  }
+
+  /** Reports a Redis connection error from the queue or the worker, rate-limited. */
+  private onRedisError(source: 'queue' | 'worker', error: Error): void {
+    this.logger.warn(`cleanup ${source} Redis error: ${error.message}`);
+    if (this.shouldReportRedisError()) {
+      captureServerError(error, { path: `cleanup-worker-${source}` });
+    }
+  }
+
+  /** Claims the report slot for a Redis connection error, or says one was claimed too recently. */
+  private shouldReportRedisError(): boolean {
+    const now = Date.now();
+    if (now - this.lastRedisErrorReportedAt < REDIS_ERROR_REPORT_DAMPEN_MS) {
+      return false;
+    }
+    this.lastRedisErrorReportedAt = now;
+    return true;
   }
 
   /**

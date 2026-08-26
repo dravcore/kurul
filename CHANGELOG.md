@@ -182,6 +182,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- **The runtime images upgrade Alpine's own packages at build time.** The three stages that
+  become `kurul-api`, `kurul-migrate` and `kurul-web` now run `apk upgrade --no-cache` before
+  anything is copied in. Alpine publishes fixes for openssl, zlib and busybox days before the
+  Node project rebuilds `node:24-alpine` on top of them, and the `image-scan` gate fails on any
+  fixable HIGH or CRITICAL finding, so until now a new advisory in the base image turned every
+  build red with nothing in this repository to change. The first case was CVE-2026-14456 in
+  `libcrypto3` 3.5.7-r0 (fixed in 3.5.8-r0) on 2026-08-26. The upgrade adds one layer and
+  costs nothing at runtime; a pinned base digest still names the layer everything else is
+  built on.
+
 - **A demo instance no longer lets a visitor rotate the shared account's password.** The demo
   is one published account (`demo@kurul.dev` with `DEMO_PASSWORD`), and Better Auth's
   `POST /auth/change-password` asks only for the current password, which is public: one request
@@ -405,6 +415,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and the bundled Caddy holds a request for up to 30s while an upstream is coming back
   (`lb_try_duration`) instead of answering 502, which turns a recreate into latency rather than
   errors. Related to #160: this is the cheap half of zero-downtime deploys, not the item itself.
+
+- **BullMQ's due-soon and cleanup workers, and the Socket.io Redis adapter, now report a Redis
+  connection fault instead of losing it to `console.error`.** `queue`/`worker.on('error')` on
+  both workers, and `pubClient`/`subClient.on('error')` on the gateway's adapter, had no
+  listener: BullMQ and ioredis's own fallback for an unlistened `error` event prints to
+  `console.error`, invisible to the JSON log format and to Sentry, so a Redis outage taking
+  down a scheduler or the socket fan-out was silent until someone noticed the symptom. All six
+  connections now log at `warn` through the Nest `Logger`, naming the connection, and call
+  `captureServerError` once per outage (throttled to one report per minute so a reconnect storm
+  cannot flood Sentry). Readiness still reports Redis down on its own; this is what says which
+  consumer lost it. Closes audit finding BE-11.
 
 - **A Trello import no longer steps over the workspace's board ceiling.**
   `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on
