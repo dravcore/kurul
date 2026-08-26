@@ -182,6 +182,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- **The runtime images upgrade Alpine's own packages at build time.** The three stages that
+  become `kurul-api`, `kurul-migrate` and `kurul-web` now run `apk upgrade --no-cache` before
+  anything is copied in. Alpine publishes fixes for openssl, zlib and busybox days before the
+  Node project rebuilds `node:24-alpine` on top of them, and the `image-scan` gate fails on any
+  fixable HIGH or CRITICAL finding, so until now a new advisory in the base image turned every
+  build red with nothing in this repository to change. The first case was CVE-2026-14456 in
+  `libcrypto3` 3.5.7-r0 (fixed in 3.5.8-r0) on 2026-08-26. The upgrade adds one layer and
+  costs nothing at runtime; a pinned base digest still names the layer everything else is
+  built on.
+
 - **A demo instance no longer lets a visitor rotate the shared account's password.** The demo
   is one published account (`demo@kurul.dev` with `DEMO_PASSWORD`), and Better Auth's
   `POST /auth/change-password` asks only for the current password, which is public: one request
