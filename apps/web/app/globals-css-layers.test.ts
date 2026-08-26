@@ -989,7 +989,7 @@ describe('globals.css dialog and dropdown motion', () => {
  * `animate-pulse` (2s, 1.0-0.5, no reduced-motion twin) with docs/design.md §6's 1.6s, 1.0-0.6
  * loop. A board renders dozens of these at once, so `prefers-reduced-motion: reduce` does not
  * retarget the loop to a fade like the dialog and menu above, it removes the animation outright
- * and holds the midpoint opacity instead — nothing left running on a machine that asked for none
+ * and holds the midpoint opacity instead: nothing left running on a machine that asked for none
  * of it, across however many skeletons are on screen at once.
  */
 describe('globals.css skeleton motion', () => {
