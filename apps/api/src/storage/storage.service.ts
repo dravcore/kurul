@@ -1,7 +1,7 @@
 import {
   Injectable,
   Logger,
-  OnModuleDestroy,
+  OnApplicationShutdown,
   OnModuleInit,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -28,7 +28,7 @@ import { describeStorageCeilings, storageConfigWarnings } from './storage-config
  * one decision not to imitate (ADR 0022).
  */
 @Injectable()
-export class StorageService implements OnModuleInit, OnModuleDestroy {
+export class StorageService implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(StorageService.name);
 
   /**
@@ -112,7 +112,8 @@ export class StorageService implements OnModuleInit, OnModuleDestroy {
     return this.require().listKeys();
   }
 
-  async onModuleDestroy(): Promise<void> {
+  /** Shutdown, not destroy: an upload or a download in flight still needs the backend. */
+  async onApplicationShutdown(): Promise<void> {
     await closeStorageBackend();
   }
 }

@@ -34,8 +34,13 @@ async function bootstrap(): Promise<void> {
   // paid for on every run. Off under NODE_ENV=production unless API_DOCS_ENABLED says otherwise
   // — the reasoning is on `openApiDocsEnabled`.
   serveOpenApi(app);
-  // Lets OnModuleDestroy hooks (PrismaService, DueSoonWorker) run on SIGTERM/SIGINT
-  // instead of the process being killed mid-connection.
+  // Runs Nest's close sequence on SIGTERM/SIGINT instead of the process dying mid-connection.
+  //
+  // The rule that sequence imposes on this codebase: anything a live request or an open socket
+  // still needs is released in `onApplicationShutdown`, never in `onModuleDestroy`, because a
+  // destroy hook runs while the listener is still accepting and serving. The phase order behind
+  // that rule, and how module distance orders hooks within a phase (which is what the bounded
+  // worker close in `common/close-worker.ts` leans on), are in docs/architecture.md section 9.1.
   app.enableShutdownHooks();
   await app.listen(port);
 }

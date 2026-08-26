@@ -1,4 +1,4 @@
-import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { envString, isTestEnv } from '../env';
 import { captureServerError } from '../observability/sentry';
@@ -224,7 +224,7 @@ export class RedisByteBudget implements ByteBudget {
  * nobody tears down. The client is lazy, so a process that never serves an upload never opens it.
  */
 @Injectable()
-export class UploadBudgetService implements ByteBudget, OnModuleDestroy {
+export class UploadBudgetService implements ByteBudget, OnApplicationShutdown {
   private readonly budget: ByteBudget;
   private client: Redis | undefined;
 
@@ -266,7 +266,8 @@ export class UploadBudgetService implements ByteBudget, OnModuleDestroy {
     return this.budget.charge(key, bytes, limit, windowSeconds);
   }
 
-  async onModuleDestroy(): Promise<void> {
+  /** Shutdown, not destroy: the guard charges this budget on every upload still in flight. */
+  async onApplicationShutdown(): Promise<void> {
     const redis = this.client;
     this.client = undefined;
     await redis?.quit().catch(() => undefined);

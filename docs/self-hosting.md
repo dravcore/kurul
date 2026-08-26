@@ -735,6 +735,15 @@ reason. Do the steps in this order, every time; none of them is long.
    starts, and `--wait` returns once every long-running service reports healthy, non-zero if
    one does not.
 
+   A recreate is a pause, not an outage. `api` is given 30s (`stop_grace_period`) to finish
+   what it was doing before Docker kills it, and the bundled Caddy holds a request for up to
+   30s while an upstream is coming back instead of answering 502, retrying every 500ms. One
+   replica still means requests wait rather than being served elsewhere, and an upload already
+   streaming its body is not retried. A replacement reverse proxy needs its own equivalent to
+   behave the same way, and nginx open source has no one-to-one match: `proxy_next_upstream`
+   hands the request to the _next_ server in the upstream group, so a group with a single
+   `api` entry is never retried.
+
 6. **Verify:**
 
    ```bash
@@ -970,6 +979,12 @@ was asked for. The bundled `docker/Caddyfile` configures no `log` directive and 
 access log at all; nginx's default `combined` format logs `$request`, which is the whole URL. If
 you keep an access log on this hostname, filter or rewrite `/auth/reset-password/*` in it, and
 until you do, treat that log as something that holds live credentials.
+
+One thing outside the routing contract is worth reproducing anyway: the bundled Caddy holds a
+request for up to 30s while an upstream is restarting instead of answering 502, which is what
+turns an upgrade into latency rather than errors. A proxy without it is still correct, only
+noisier on every `docker compose up -d`. What it takes to match, and why nginx open source has
+no one-to-one equivalent, is in step 5 of [Upgrading](#upgrading).
 
 #### Why the proxy's number is 26 MiB and the API's is 25
 
