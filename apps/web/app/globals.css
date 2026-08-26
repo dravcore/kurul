@@ -604,7 +604,7 @@ body {
 [data-slot='dropdown-menu-content'][data-state='closed'],
 [data-slot='dropdown-menu-sub-content'][data-state='closed'] {
   animation-name: menu-content-out;
-  animation-duration: 120ms;
+  animation-duration: 150ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
