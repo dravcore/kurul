@@ -5,6 +5,7 @@ import { DndContext } from '@dnd-kit/core';
 import { NextIntlClientProvider } from 'next-intl';
 import { ColumnCategory, Priority, type ColumnDto, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
+import type { TaskCardSignal } from '@/components/task/task-card';
 import { ApiError, api } from '@/lib/api';
 import {
   BoardColumn,
@@ -128,11 +129,13 @@ function ColumnHarness({
   selectedTaskId,
   onTaskCreated,
   dropIndicatorIndex,
+  taskSignals,
 }: {
   tasks: TaskDto[];
   selectedTaskId: string | null;
   onTaskCreated: (task: TaskDto) => void;
   dropIndicatorIndex: number | null;
+  taskSignals?: ReadonlyMap<string, TaskCardSignal>;
 }): React.ReactElement {
   const [composerOpen, setComposerOpen] = useState(false);
   return (
@@ -155,6 +158,7 @@ function ColumnHarness({
       onComposerOpenChange={setComposerOpen}
       onTaskCreated={onTaskCreated}
       dropIndicatorIndex={dropIndicatorIndex}
+      taskSignals={taskSignals}
     />
   );
 }
@@ -164,6 +168,7 @@ function renderColumn(
   selectedTaskId: string | null = null,
   onTaskCreated: (task: TaskDto) => void = vi.fn(),
   dropIndicatorIndex: number | null = null,
+  taskSignals?: ReadonlyMap<string, TaskCardSignal>,
 ) {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -173,6 +178,7 @@ function renderColumn(
           selectedTaskId={selectedTaskId}
           onTaskCreated={onTaskCreated}
           dropIndicatorIndex={dropIndicatorIndex}
+          taskSignals={taskSignals}
         />
       </DndContext>
     </NextIntlClientProvider>,
@@ -595,5 +601,21 @@ describe('BoardColumn task composer', () => {
     );
 
     expect(screen.queryByRole('button', { name: messages.app.board.task.createAction })).toBeNull();
+  });
+});
+
+describe('BoardColumn feedback marks', () => {
+  it('hands each card only the mark the board reports for it', () => {
+    renderColumn(
+      makeTasks(2),
+      null,
+      vi.fn(),
+      null,
+      new Map<string, TaskCardSignal>([['task-0001', 'returning']]),
+    );
+
+    const cards = screen.getAllByRole('link');
+    expect(cards[0]?.getAttribute('data-state')).toBeNull();
+    expect(cards[1]?.getAttribute('data-state')).toBe('returning');
   });
 });

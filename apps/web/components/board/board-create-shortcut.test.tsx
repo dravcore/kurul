@@ -51,6 +51,7 @@ function renderBoard(): void {
         columns={[column('col-1', 'Backlog', 1), column('col-2', 'In progress', 2)]}
         tasksByColumn={new Map<string, TaskDto[]>()}
         selectedTaskId={null}
+        taskSignals={new Map()}
         canMutateColumns={false}
         canMutateTasks
         entranceDone

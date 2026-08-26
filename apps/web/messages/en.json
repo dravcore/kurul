@@ -399,6 +399,8 @@
       "loadError": "The board couldn't load.",
       "unavailable": "This board doesn't exist, or you don't have access to it.",
       "loadingMore": "Loading the rest of the tasks…",
+      "connectionLost": "Connection lost, changes may not be showing",
+      "dragFailed": "Could not move this task.",
       "backToBoards": "Back to boards",
       "emptyTitle": "No boards yet",
       "emptyBody": "A board is where the work gets divided. Start with one.",
@@ -481,7 +483,6 @@
         }
       },
       "realtime": {
-        "reconnecting": "Reconnecting…",
         "dragCancelled": "Someone else moved this task"
       },
       "errors": {
@@ -675,7 +676,6 @@
         "deleteError": "Could not delete this task.",
         "saveError": "Could not save this task.",
         "missing": "This task no longer exists. Someone may have deleted it.",
-        "moveError": "Could not move this task.",
         "retryAction": "Try again",
         "cancel": "Cancel",
         "forbidden": "You need to be a workspace member to change tasks. Ask a workspace owner for access."

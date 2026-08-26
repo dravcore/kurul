@@ -399,6 +399,8 @@
       "loadError": "Board yüklenemedi.",
       "unavailable": "Bu board yok ya da erişim yetkiniz yok.",
       "loadingMore": "Task'ların geri kalanı yükleniyor…",
+      "connectionLost": "Bağlantı koptu, değişiklikler görünmüyor olabilir",
+      "dragFailed": "Bu task taşınamadı.",
       "backToBoards": "Board'lara dön",
       "emptyTitle": "Henüz board yok",
       "emptyBody": "Bir board, işin bölüştüğü yerdir. Bir tane ile başlayın.",
@@ -481,7 +483,6 @@
         }
       },
       "realtime": {
-        "reconnecting": "Yeniden bağlanıyor…",
         "dragCancelled": "Birisi bu task'ı taşıdı"
       },
       "errors": {
@@ -675,7 +676,6 @@
         "deleteError": "Bu task silinemedi.",
         "saveError": "Bu task kaydedilemedi.",
         "missing": "Bu task artık yok. Birisi silmiş olabilir.",
-        "moveError": "Bu task taşınamadı.",
         "retryAction": "Tekrar dene",
         "cancel": "Vazgeç",
         "forbidden": "Task'ları değiştirmek için workspace üyesi olmanız gerekir. Erişim için bir workspace sahibinden isteyin."

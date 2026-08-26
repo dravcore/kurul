@@ -14,6 +14,7 @@ import {
 import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 import { Button } from '@/components/ui/button';
 import { TaskDragPreview } from '@/components/task/sortable-task-card';
+import type { TaskCardSignal } from '@/components/task/task-card';
 import type { BoardTaskDndController } from '@/components/task/use-board-task-dnd';
 import { BoardColumn } from './board-column';
 import { useCreateTaskShortcut } from './use-create-task-shortcut';
@@ -31,6 +32,8 @@ interface BoardCanvasProps {
   columns: ColumnDto[];
   tasksByColumn: Map<string, TaskDto[]>;
   selectedTaskId: string | null;
+  /** What the board last reported about each card, keyed by task id. */
+  taskSignals: ReadonlyMap<string, TaskCardSignal>;
   canMutateColumns: boolean;
   canMutateTasks: boolean;
   /** Once the stagger has played, columns render without the entrance animation. */
@@ -54,6 +57,7 @@ export function BoardCanvas({
   columns,
   tasksByColumn,
   selectedTaskId,
+  taskSignals,
   canMutateColumns,
   canMutateTasks,
   entranceDone,
@@ -107,6 +111,7 @@ export function BoardCanvas({
             tasks={tasksByColumn.get(column.id) ?? []}
             boardId={boardId}
             selectedTaskId={selectedTaskId}
+            taskSignals={taskSignals}
             canMutateColumns={canMutateColumns}
             canMutateTasks={canMutateTasks}
             canMoveLeft={index > 0}

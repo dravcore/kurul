@@ -10,10 +10,18 @@ import { ChecklistBadge } from './checklist-badge';
 import { LabelDots } from './label-chip';
 import { PriorityIcon } from './priority-icon';
 
+/**
+ * What just happened to this card, as the keyframes in `app/globals.css` name it: `returning` is
+ * the landing after a move the server refused, `remote-changed` the fading tint on a card someone
+ * else moved or edited.
+ */
+export type TaskCardSignal = 'returning' | 'remote-changed';
+
 interface TaskCardProps {
   task: TaskDto;
   boardId: string;
   selected?: boolean;
+  signal?: TaskCardSignal | null;
   className?: string;
 }
 
@@ -51,6 +59,7 @@ export function TaskCard({
   task,
   boardId,
   selected = false,
+  signal = null,
   className,
 }: TaskCardProps): React.ReactElement {
   const t = useTranslations('app.board.task');
@@ -77,7 +86,9 @@ export function TaskCard({
   return (
     <Link
       href={`/board/${boardId}/task/${task.id}`}
+      data-slot="task-card"
       data-selected={selected || undefined}
+      data-state={signal ?? undefined}
       className={cn(
         // `max-md:min-h-11`: a title-only card measures 36px, which is a fine density on a
         // desktop board and not a target a thumb can hit. Below `md` it grows to 44px.

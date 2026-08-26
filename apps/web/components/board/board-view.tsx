@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Topbar } from '@/components/layout/topbar';
 import { TaskPanel } from '@/components/task/task-panel';
+import type { TaskCardSignal } from '@/components/task/task-card';
 import { buildTaskDndAnnouncements } from '@/components/task/task-dnd-announcements';
 import { useBoardTaskDnd } from '@/components/task/use-board-task-dnd';
 import { BoardCanvas } from './board-canvas';
@@ -186,14 +187,15 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     [reload, setTasks, tasksRef],
   );
 
-  const { commitTaskMove, moveColumn, seedDefaults, defaultsPending } = useBoardMutations({
-    boardId,
-    columnsRef,
-    tasksRef,
-    setColumns,
-    setTasks,
-    reload,
-  });
+  const { commitTaskMove, returningTaskIds, moveColumn, seedDefaults, defaultsPending } =
+    useBoardMutations({
+      boardId,
+      columnsRef,
+      tasksRef,
+      setColumns,
+      setTasks,
+      reload,
+    });
 
   const dnd = useBoardTaskDnd(tasks, canMutateTasksFlag, commitTaskMove);
   const dndAccessibility = useMemo(
@@ -219,6 +221,17 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     setMetaRefreshKey,
     reload,
   });
+
+  /**
+   * One mark per card, so a column can read a scalar per task instead of two sets. A card that
+   * just came back from a refused move keeps that mark: the reader's own move failing outranks
+   * telling them someone else touched the same card.
+   */
+  const taskSignals = useMemo(() => {
+    const signals = new Map<string, TaskCardSignal>();
+    for (const taskId of returningTaskIds) signals.set(taskId, 'returning');
+    return signals;
+  }, [returningTaskIds]);
 
   if (loading) {
     return <BoardLoadingState />;
@@ -268,20 +281,26 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
       {/*
         The filter bar, and with it the board's two status lines.
 
-        `Reconnecting…` and `Loading the rest of the tasks…` used to sit in the topbar's action
-        slot. At 360px that bar is a hamburger, a back arrow, a title and an overflow menu —
-        three 44px targets and whatever is left — and a sentence dropped in beside them either
+        The connection line and `Loading the rest of the tasks…` used to sit in the topbar's
+        action slot. At 360px that bar is a hamburger, a back arrow, a title and an overflow menu
+        — three 44px targets and whatever is left — and a sentence dropped in beside them either
         wrapped inside a fixed-height bar or squeezed the board's name to nothing. Here they
         wrap onto their own line when the row runs out of width and cost the title nothing.
 
-        It is also where `docs/design.md` §5 says they belong: "a quiet inline 'Reconnecting…'
-        bar, never a blocking overlay". Same live regions, same wording, one row lower.
+        It is also where `docs/design.md` §5 says they belong: a quiet inline bar, never a
+        blocking overlay. Same live regions, one row lower.
       */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-3 py-2">
         <BoardFilters filters={filters} members={members} labels={labels} onChange={applyFilters} />
+        {/*
+          It says the connection is lost rather than that the app is reconnecting, and it carries
+          no dismiss control: the retry is automatic and invisible, so the only thing worth
+          telling the reader is that what they are looking at may already be out of date. It
+          leaves when the socket is back, which is the only thing that makes it untrue.
+        */}
         {!socketConnected ? (
-          <span className="text-micro text-muted-foreground max-md:w-full" aria-live="polite">
-            {t('realtime.reconnecting')}
+          <span role="status" className="text-micro text-muted-foreground max-md:w-full">
+            {t('connectionLost')}
           </span>
         ) : null}
         {/* The board paints on the first page; later pages stream in behind it. */}
@@ -313,6 +332,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
               columns={columns}
               tasksByColumn={tasksByColumn}
               selectedTaskId={selectedTaskId}
+              taskSignals={taskSignals}
               canMutateColumns={canMutateColumnsFlag}
               canMutateTasks={canMutateTasksFlag}
               entranceDone={entranceDone}

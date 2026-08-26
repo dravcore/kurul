@@ -309,12 +309,12 @@ creation, and destructive actions stay **dialogs**; those genuinely need to bloc
 | Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` lifts, arrows move within and across columns, `Space` drops, `Esc` cancels. Each transition announced via `aria-live="polite"`: "Moved _Fix login redirect_ to In Progress, position 2 of 5." |
 | Autoscroll    | Both axes, 24px edge zone                                                                                                                                                                                                           |
 
-| Realtime change        | Surfacing (never a layout jump)                                                                                                                     |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Remote create / update | `--signature-subtle` background fading out over 1200ms. No movement, no size change. Color-only, so it survives `prefers-reduced-motion` unchanged. |
-| Remote move            | Card animates to its new position over 220ms; during a local drag the update is queued and applied on drop                                          |
-| Remote delete          | Fade to 0 over 160ms, then close the gap over 160ms — two beats, so the eye can follow                                                              |
-| Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Reconnecting…" bar, never a blocking overlay                                    |
+| Realtime change        | Surfacing (never a layout jump)                                                                                                                                                                     |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remote create / update | `--signature-subtle` background fading out over 1200ms. No movement, no size change. Color-only, so it survives `prefers-reduced-motion` unchanged.                                                 |
+| Remote move            | Card animates to its new position over 220ms; during a local drag the update is queued and applied on drop                                                                                          |
+| Remote delete          | Fade to 0 over 160ms, then close the gap over 160ms — two beats, so the eye can follow                                                                                                              |
+| Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Connection lost, changes may not be showing" bar, kept until the socket is back and never dismissible, never a blocking overlay |
 
 **Keyboard baseline.** Focus is always visible, and it is exactly one indicator: 2px `--ring` at 2px
 offset, and `outline: none` without a replacement is a review blocker. That single mark is drawn
@@ -446,16 +446,16 @@ word "Oops".
 
 From the user's side of the screen, active voice, sentence case.
 
-| Instead of                 | Write                      | Why                                 |
-| -------------------------- | -------------------------- | ----------------------------------- |
-| Submit                     | Save changes               | Says what happens                   |
-| Oops! Something went wrong | The board couldn't load.   | Names the object                    |
-| Task successfully created! | Task created               | The button's verb, no exclamation   |
-| Are you sure?              | Delete this board?         | The question is the consequence     |
-| Invalid input              | Title can't be empty       | Specific beats clever               |
-| Users / Org / Entity       | Members / Workspace / Task | Product vocabulary, not schema      |
-| Socket disconnected        | Reconnecting…              | User-side naming                    |
-| Position updated           | Moved to In Progress       | What they did, not what the row did |
+| Instead of                 | Write                                       | Why                                  |
+| -------------------------- | ------------------------------------------- | ------------------------------------ |
+| Submit                     | Save changes                                | Says what happens                    |
+| Oops! Something went wrong | The board couldn't load.                    | Names the object                     |
+| Task successfully created! | Task created                                | The button's verb, no exclamation    |
+| Are you sure?              | Delete this board?                          | The question is the consequence      |
+| Invalid input              | Title can't be empty                        | Specific beats clever                |
+| Users / Org / Entity       | Members / Workspace / Task                  | Product vocabulary, not schema       |
+| Socket disconnected        | Connection lost, changes may not be showing | What it costs them, not what dropped |
+| Position updated           | Moved to In Progress                        | What they did, not what the row did  |
 
 - **One verb through a flow:** button **Create board** → dialog **Create board** → toast **Board
   created**. Buttons name their action, never Yes/No/OK; destructive ones name the object. The

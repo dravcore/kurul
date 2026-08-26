@@ -320,12 +320,12 @@ full-screen bir sheet'e dönüşür. Confirmation'lar, board oluşturma ve destr
 | Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` lift yapar, arrow'lar column içinde ve column'lar arasında taşır, `Space` drop yapar, `Esc` cancel eder. Her transition `aria-live="polite"` üzerinden duyurulur: "Moved _Fix login redirect_ to In Progress, position 2 of 5." ("_Fix login redirect_ In Progress'e taşındı, pozisyon 2 / 5.") |
 | Autoscroll    | Her iki axis, 24px edge zone                                                                                                                                                                                                                                                                                                          |
 
-| Realtime değişikliği   | Surfacing (asla bir layout jump)                                                                                                                                        |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Remote create / update | 1200ms boyunca fade out olan bir `--signature-subtle` background. Hareket yok, size değişimi yok. Yalnızca renk, böylece `prefers-reduced-motion`'dan değişmeden çıkar. |
-| Remote move            | Kart 220ms boyunca yeni pozisyonuna animate olur; local bir drag sırasında update queue'lanır ve drop'ta uygulanır                                                      |
-| Remote delete          | 160ms boyunca 0'a fade olur, ardından gap 160ms boyunca kapanır — iki beat, gözün takip edebilmesi için                                                                 |
-| Presence · disconnect  | Topbar'da avatar'lar, başkasının açık tuttuğu bir kartta küçük bir avatar · sessiz, inline bir "Reconnecting…" ("Yeniden bağlanıyor…") bar'ı, asla blocking bir overlay |
+| Realtime değişikliği   | Surfacing (asla bir layout jump)                                                                                                                                                                                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remote create / update | 1200ms boyunca fade out olan bir `--signature-subtle` background. Hareket yok, size değişimi yok. Yalnızca renk, böylece `prefers-reduced-motion`'dan değişmeden çıkar.                                                                                                                |
+| Remote move            | Kart 220ms boyunca yeni pozisyonuna animate olur; local bir drag sırasında update queue'lanır ve drop'ta uygulanır                                                                                                                                                                     |
+| Remote delete          | 160ms boyunca 0'a fade olur, ardından gap 160ms boyunca kapanır — iki beat, gözün takip edebilmesi için                                                                                                                                                                                |
+| Presence · disconnect  | Topbar'da avatar'lar, başkasının açık tuttuğu bir kartta küçük bir avatar · sessiz, inline bir "Connection lost, changes may not be showing" ("Bağlantı koptu, değişiklikler görünmüyor olabilir") bar'ı, socket geri gelene kadar duruyor ve kapatılamıyor, asla blocking bir overlay |
 
 **Keyboard baseline.** Focus her zaman görünürdür, ve tam olarak tek bir göstergedir: 2px offset'te
 2px `--ring`, ve bir replacement olmadan `outline: none` bir review blocker'dır. O tek işaret,
@@ -461,16 +461,16 @@ yazdırmayın.
 
 Ekranın kullanıcı tarafından, active voice, sentence case.
 
-| Bunun yerine                                             | Şunu yaz                                      | Neden                                 |
-| -------------------------------------------------------- | --------------------------------------------- | ------------------------------------- |
-| Submit (Gönder)                                          | Save changes (Değişiklikleri kaydet)          | Ne olacağını söyler                   |
-| Oops! Something went wrong (Hata! Bir şeyler ters gitti) | The board couldn't load. (Board yüklenemedi.) | Object'i adlandırır                   |
-| Task successfully created! (Task başarıyla oluşturuldu!) | Task created (Task oluşturuldu)               | Button'ın verb'i, ünlem yok           |
-| Are you sure? (Emin misiniz?)                            | Delete this board? (Bu board'u sil?)          | Soru, sonucun kendisidir              |
-| Invalid input (Geçersiz giriş)                           | Title can't be empty (Title boş olamaz)       | Spesifik olmak akıllı olmaktan iyidir |
-| Users / Org / Entity                                     | Members / Workspace / Task                    | Schema değil, product vocabulary'si   |
-| Socket disconnected (Socket bağlantısı kesildi)          | Reconnecting… (Yeniden bağlanıyor…)           | Kullanıcı tarafı adlandırma           |
-| Position updated (Pozisyon güncellendi)                  | Moved to In Progress (In Progress'e taşındı)  | Row'un değil, kullanıcının ne yaptığı |
+| Bunun yerine                                             | Şunu yaz                                                                                        | Neden                                       |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Submit (Gönder)                                          | Save changes (Değişiklikleri kaydet)                                                            | Ne olacağını söyler                         |
+| Oops! Something went wrong (Hata! Bir şeyler ters gitti) | The board couldn't load. (Board yüklenemedi.)                                                   | Object'i adlandırır                         |
+| Task successfully created! (Task başarıyla oluşturuldu!) | Task created (Task oluşturuldu)                                                                 | Button'ın verb'i, ünlem yok                 |
+| Are you sure? (Emin misiniz?)                            | Delete this board? (Bu board'u sil?)                                                            | Soru, sonucun kendisidir                    |
+| Invalid input (Geçersiz giriş)                           | Title can't be empty (Title boş olamaz)                                                         | Spesifik olmak akıllı olmaktan iyidir       |
+| Users / Org / Entity                                     | Members / Workspace / Task                                                                      | Schema değil, product vocabulary'si         |
+| Socket disconnected (Socket bağlantısı kesildi)          | Connection lost, changes may not be showing (Bağlantı koptu, değişiklikler görünmüyor olabilir) | Onlara neye mal olduğu, neyin düştüğü değil |
+| Position updated (Pozisyon güncellendi)                  | Moved to In Progress (In Progress'e taşındı)                                                    | Row'un değil, kullanıcının ne yaptığı       |
 
 - **Bir flow boyunca tek bir verb:** button **Create board** (**Board oluştur**) → dialog
   **Create board** (**Board oluştur**) → toast **Board created** (**Board oluşturuldu**).

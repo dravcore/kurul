@@ -115,6 +115,7 @@ function renderCanvas(
         columns={options.columns ?? ([] as ColumnDto[])}
         tasksByColumn={new Map<string, TaskDto[]>()}
         selectedTaskId={null}
+        taskSignals={new Map()}
         canMutateColumns={false}
         canMutateTasks={options.canMutateTasks ?? false}
         entranceDone

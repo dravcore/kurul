@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SortableTaskCard } from '@/components/task/sortable-task-card';
+import type { TaskCardSignal } from '@/components/task/task-card';
 import { TaskComposer } from './task-composer';
 
 /**
@@ -60,6 +61,9 @@ export const COLUMN_RENDER_BUDGET_STEP = 40;
  */
 const REVEAL_MARGIN_PX = 800;
 
+/** Shared empty map, so a board with nothing to report hands every column the same value. */
+const NO_TASK_SIGNALS: ReadonlyMap<string, TaskCardSignal> = new Map();
+
 export function columnDroppableId(columnId: string): string {
   return `column:${columnId}`;
 }
@@ -77,6 +81,8 @@ interface BoardColumnProps {
   selectedTaskId?: string | null;
   /** The slot the card in the air would land in, counted in cards; null when none is heading here. */
   dropIndicatorIndex: number | null;
+  /** What the board last reported about each card, keyed by task id. Empty on a quiet board. */
+  taskSignals?: ReadonlyMap<string, TaskCardSignal>;
   canMutateColumns: boolean;
   canMutateTasks: boolean;
   canMoveLeft: boolean;
@@ -101,6 +107,7 @@ export const BoardColumn = memo(function BoardColumn({
   workspaceId,
   selectedTaskId = null,
   dropIndicatorIndex,
+  taskSignals = NO_TASK_SIGNALS,
   canMutateColumns,
   canMutateTasks,
   canMoveLeft,
@@ -301,6 +308,7 @@ export const BoardColumn = memo(function BoardColumn({
                 task={task}
                 boardId={boardId}
                 selected={task.id === selectedTaskId}
+                signal={taskSignals.get(task.id) ?? null}
                 disabled={!canMutateTasks}
               />
             </Fragment>

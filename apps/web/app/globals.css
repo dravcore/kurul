@@ -686,6 +686,63 @@ body {
   opacity: 0;
 }
 
+/* The two marks a card wears when the board answers back (docs/design.md §5): the return after a
+   move the server refused, and the tint a card takes when someone else changed it. Keyframes on
+   the card's own `data-state`, not transitions: both the rollback and a socket update re-render
+   the list in a single commit, so there is no intermediate value for a transition to run between.
+
+   `task-card-return` lands the card instead of retracing the drag. The optimistic order is gone
+   by the time it plays and nothing in the DOM still knows where the card was picked up from, so
+   the honest thing to draw is the arrival: 220ms on `--ease-in-out`, the figure docs/design.md §5
+   gives this exact case. Its reduced twin is the shared fade.
+
+   `task-card-remote-change` keeps the same animation under `reduce`: it declares background
+   colour and nothing else, which is what reduced motion preserves rather than removes, and it is
+   the only mark that says a row changed under the reader's hands. It ends on the card's own
+   ground rather than on `transparent`, which would let the column show through it, and that
+   ground is a variable because the selected card's ground is the tint itself. */
+@keyframes task-card-return {
+  from {
+    opacity: 0.5;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes task-card-remote-change {
+  from {
+    background-color: var(--signature-subtle);
+  }
+  to {
+    background-color: var(--task-card-ground);
+  }
+}
+
+[data-slot='task-card'] {
+  --task-card-ground: var(--card);
+}
+
+[data-slot='task-card'][data-selected] {
+  --task-card-ground: var(--signature-subtle);
+}
+
+[data-slot='task-card'][data-state='returning'] {
+  animation: task-card-return 220ms var(--ease-in-out) both;
+}
+
+[data-slot='task-card'][data-state='remote-changed'] {
+  animation: task-card-remote-change 1200ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='task-card'][data-state='returning'] {
+    animation-name: layer-fade-in;
+  }
+}
+
 /* Forced colours replace every author colour with the user's palette, which erases exactly the
    channel this phase's feedback leans on: a surface step and a tint. Every state built on one
    carries a border-based twin here, per docs/design.md §9. */

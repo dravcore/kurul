@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import {
   ColumnCategory,
@@ -50,8 +50,15 @@ vi.mock('@/components/layout/workspace-provider', () => ({
 // or an `api` double to reach either.
 vi.mock('./use-board-realtime', () => ({ useBoardRealtime: vi.fn() }));
 
-const mutations = {
+const mutations: {
+  commitTaskMove: ReturnType<typeof vi.fn>;
+  returningTaskIds: ReadonlySet<string>;
+  moveColumn: ReturnType<typeof vi.fn>;
+  seedDefaults: ReturnType<typeof vi.fn>;
+  defaultsPending: boolean;
+} = {
   commitTaskMove: vi.fn(),
+  returningTaskIds: new Set<string>(),
   moveColumn: vi.fn(),
   seedDefaults: vi.fn(),
   defaultsPending: false,
@@ -320,18 +327,34 @@ describe('BoardView loaded frame', () => {
     expect(canvasProps.tasksByColumn.get('col-missing')).toHaveLength(1);
   });
 
-  it('shows the reconnecting banner when the realtime socket is disconnected', () => {
+  it('says the connection is lost, as a status region, while the socket is down', () => {
     mockedUseBoardRealtime.mockReturnValue({ connected: false });
 
     renderLoadedBoard(loadedFixture());
 
-    expect(screen.getByText('Reconnecting…')).toBeDefined();
+    const row = screen.getByRole('status');
+    expect(row.textContent).toBe('Connection lost, changes may not be showing');
+    // Nothing to press: the row goes when the socket comes back, not when it is dismissed.
+    expect(within(row).queryByRole('button')).toBeNull();
   });
 
-  it('omits the reconnecting banner once the socket is back', () => {
+  it('takes the connection-lost row away once the socket is back', () => {
     renderLoadedBoard(loadedFixture());
 
-    expect(screen.queryByText('Reconnecting…')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByText('Connection lost, changes may not be showing')).toBeNull();
+  });
+
+  it('marks a card the server refused to move as returning', () => {
+    mutations.returningTaskIds = new Set(['task-a']);
+    try {
+      renderLoadedBoard(loadedFixture());
+
+      expect(lastBoardCanvasProps().taskSignals.get('task-a')).toBe('returning');
+      expect(lastBoardCanvasProps().taskSignals.has('task-b')).toBe(false);
+    } finally {
+      mutations.returningTaskIds = new Set<string>();
+    }
   });
 
   it('shows the loading-more banner while later task pages are still streaming in', () => {

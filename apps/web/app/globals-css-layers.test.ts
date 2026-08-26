@@ -1315,6 +1315,22 @@ describe('globals.css reduced-motion cascade', () => {
       moving: 'board-column-enter',
       visible: true,
     },
+    {
+      label: 'card returning from a refused move',
+      target: { attrs: { 'data-slot': 'task-card', 'data-state': 'returning' } },
+      moving: 'task-card-return',
+      visible: true,
+    },
+    // The only surface here whose resting animation is already movement-free, so `reduce` keeps
+    // it rather than retargeting it: it is background colour and nothing else, which is exactly
+    // what reduced motion preserves, and it is the sole mark saying a card moved under the
+    // reader's hands.
+    {
+      label: 'card another member just changed',
+      target: { attrs: { 'data-slot': 'task-card', 'data-state': 'remote-changed' } },
+      moving: 'task-card-remote-change',
+      visible: false,
+    },
   ];
 
   it.each(surfaces)('plays $moving on $label when nothing is asked for', ({ target, moving }) => {

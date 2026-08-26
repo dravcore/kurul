@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { Priority, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { SortableTaskCard } from './sortable-task-card';
-import { TaskCard } from './task-card';
+import { TaskCard, type TaskCardSignal } from './task-card';
 
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
@@ -161,6 +161,33 @@ describe('TaskCard selection', () => {
 
     expect(classes.has('hover:border-border-strong')).toBe(true);
     expect(classes.has('hover:bg-accent')).toBe(true);
+  });
+});
+
+describe('TaskCard feedback marks', () => {
+  function renderWithSignal(signal: TaskCardSignal | null) {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <TaskCard task={task()} boardId="board-1" signal={signal} />
+      </NextIntlClientProvider>,
+    );
+    return screen.getByRole('link');
+  }
+
+  it('carries the data-slot both feedback keyframes key off', () => {
+    expect(renderWithSignal(null).getAttribute('data-slot')).toBe('task-card');
+  });
+
+  it('marks a card the server refused to move', () => {
+    expect(renderWithSignal('returning').getAttribute('data-state')).toBe('returning');
+  });
+
+  it('marks a card another member just changed', () => {
+    expect(renderWithSignal('remote-changed').getAttribute('data-state')).toBe('remote-changed');
+  });
+
+  it('carries no state at all on a card nothing happened to', () => {
+    expect(renderWithSignal(null).getAttribute('data-state')).toBeNull();
   });
 });
 

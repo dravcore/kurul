@@ -9,12 +9,14 @@ import type { TaskDto } from '@kurul/shared-types';
 import { cn } from '@/lib/utils';
 import { LabelDots } from './label-chip';
 import { PriorityIcon } from './priority-icon';
-import { TaskCard } from './task-card';
+import { TaskCard, type TaskCardSignal } from './task-card';
 
 interface SortableTaskCardProps {
   task: TaskDto;
   boardId: string;
   selected?: boolean;
+  /** What the board last reported about this card; drives the keyframes in app/globals.css. */
+  signal?: TaskCardSignal | null;
   disabled?: boolean;
 }
 
@@ -22,6 +24,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
   task,
   boardId,
   selected = false,
+  signal = null,
   disabled = false,
 }: SortableTaskCardProps): React.ReactElement {
   const t = useTranslations('app.board.task');
@@ -76,6 +79,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
         task={task}
         boardId={boardId}
         selected={selected}
+        signal={signal}
         className={cn('pr-8 max-md:pr-12', isDragging && 'shadow-drag')}
       />
       {disabled ? null : (
