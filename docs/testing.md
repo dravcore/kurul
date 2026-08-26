@@ -377,12 +377,12 @@ These floors keep already-covered code from sliding back. Each fails CI.
 | `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88 | `apps/web/vitest.config.ts` |
 
 All sit under the measurement taken when they were introduced, but "a few points" is not true
-of the API row and saying so would hide the signal. The last recorded API baseline
-(2026-08-15, in the baseline history in `apps/api/jest.config.cjs`) is
-76.51 / 66.64 / 78.82 / 77.76 against a floor of 75 / 66 / 77 / 76, so the branch margin is
-**0.64**, not a few points. The file explains why that number is not restored by lowering the
-floor: the margin shrinking is the signal, and lowering the floor deletes the signal and keeps
-the cause. Re-measuring it is a tracked row in
+of the API row and saying so would hide the signal. The baseline history in
+`apps/api/jest.config.cjs` is the one place in the repository that carries those digits, and
+its **last** entry is the one to read: it leaves the tightest of the four margins under a
+single point. The same file explains why that is not restored by lowering the floor, because
+the margin shrinking is the signal and lowering the floor deletes the signal while keeping the
+cause. Re-measuring it is a tracked row in
 [ROADMAP.md](../ROADMAP.md#post-launch-hardening).
 
 The numbers in this table are the floors, which are configuration. The current coverage is not

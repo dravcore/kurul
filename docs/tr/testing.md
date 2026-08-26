@@ -385,11 +385,11 @@ Zaten kapsanmış kodun geri kaymasını mandallar engeller. Hepsi CI'ı kırar.
 | `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88 | `apps/web/vitest.config.ts` |
 
 Hepsi konuldukları anda alınan ölçümün altındadır; ama "birkaç puan" API satırı için doğru
-değil ve öyle demek sinyali gizler. Kayıtlı son API baseline'ı (2026-08-15,
-`apps/api/jest.config.cjs` içindeki baseline geçmişinde) 76.51 / 66.64 / 78.82 / 77.76 ve taban
-75 / 66 / 77 / 76, yani branch payı birkaç puan değil **0.64**. O sayının neden tabanı
-düşürerek geri kazanılmadığını dosya kendi anlatıyor: payın daralması sinyaldir, tabanı
-düşürmek sinyali siler ve sebebi bırakır. Yeniden ölçmek
+değil ve öyle demek sinyali gizler. Bu rakamları depoda taşıyan tek yer
+`apps/api/jest.config.cjs` içindeki baseline geçmişi ve okunacak kayıt onun **son** girdisi:
+dört paydan en darını bir puanın altında bırakıyor. Bunun neden tabanı düşürerek geri
+kazanılmadığını da aynı dosya anlatıyor, çünkü payın daralması sinyaldir; tabanı düşürmek
+sinyali siler, sebebi bırakır. Yeniden ölçmek
 [ROADMAP.md](../../ROADMAP.md#post-launch-hardening) içinde izlenen bir satır.
 
 Bu tablodaki sayılar tabanlardır, yani yapılandırmadır. Güncel coverage burada hiç yazmıyor, ve
