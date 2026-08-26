@@ -135,8 +135,8 @@ export function ResetPasswordView(): React.ReactElement {
           error={fieldError}
         />
         {error ? <SubmitError message={error} /> : null}
-        <Button type="submit" disabled={pending}>
-          {pending ? t('submitting') : t('submit')}
+        <Button type="submit" loading={pending}>
+          {t('submit')}
         </Button>
       </form>
     </>

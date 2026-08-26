@@ -41,7 +41,6 @@ import { ForgotPasswordView } from '@/components/auth/forgot-password-view';
 import { InviteAcceptView } from '@/components/auth/invite-accept-view';
 import { LoginView } from '@/components/auth/login-view';
 import { RegisterView } from '@/components/auth/register-view';
-import { ResetPasswordView } from '@/components/auth/reset-password-view';
 import { VerifyEmailView } from '@/components/auth/verify-email-view';
 import { BoardColumn } from '@/components/board/board-column';
 import { BoardList } from '@/components/board/board-list';
@@ -456,6 +455,7 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/board/import-trello-dialog.tsx',
     ratio: 1.48,
   },
+  { key: 'auth.login.subtitle', screen: 'components/auth/login-view.tsx', ratio: 1.48 },
   {
     key: 'app.board.import.setColumnCategories',
     screen: 'components/board/import-report-panel.tsx',
@@ -630,11 +630,6 @@ const LONGEST_TURKISH: readonly LongString[] = [
     ratio: 1.5,
   },
   { key: 'auth.login.registerLink', screen: 'components/auth/login-view.tsx', ratio: 1.5 },
-  {
-    key: 'auth.resetPassword.submitting',
-    screen: 'components/auth/reset-password-view.tsx',
-    ratio: 1.86,
-  },
   {
     key: 'app.board.column.categoryOption.CANCELED',
     screen: 'components/board/column-settings-dialog.tsx',
@@ -1461,11 +1456,12 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
   },
   {
     screen: 'components/auth/login-view.tsx',
-    keys: ['auth.login.registerLink'],
+    keys: ['auth.login.registerLink', 'auth.login.subtitle'],
     run: () => {
       render(tr(<LoginView />));
 
       expect(screen.getByRole('link', { name: messages.auth.login.registerLink })).toBeDefined();
+      expect(screen.getByText(messages.auth.login.subtitle)).toBeDefined();
     },
   },
   {
@@ -1486,28 +1482,6 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       expect(
         screen.getByRole('button', { name: messages.auth.forgotPassword.submit }),
       ).toBeDefined();
-    },
-  },
-  {
-    screen: 'components/auth/reset-password-view.tsx',
-    keys: ['auth.resetPassword.submitting'],
-    run: async () => {
-      // Without a `token` the view draws the dead-link state instead of the form.
-      nav.searchParams = new URLSearchParams({ token: 'opaque-token' });
-      auth.resetPassword.mockReturnValue(new Promise(() => {}));
-      render(tr(<ResetPasswordView />));
-
-      fireEvent.change(screen.getByLabelText(messages.auth.resetPassword.newPassword), {
-        // Long enough to clear the field's own `minLength`, which jsdom enforces on submit.
-        target: { value: 'dogru-at-pil-koprusu' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: messages.auth.resetPassword.submit }));
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: messages.auth.resetPassword.submitting }),
-        ).toBeDefined();
-      });
     },
   },
   {

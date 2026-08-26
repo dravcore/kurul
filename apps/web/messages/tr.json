@@ -32,7 +32,6 @@
       "subtitle": "En az 8 karakter olmalı.",
       "newPassword": "Yeni parola",
       "submit": "Yeni parolayı kaydet",
-      "submitting": "Kaydediliyor…",
       "successTitle": "Parola değiştirildi",
       "successBody": "Yeni parolanız kaydedildi ve diğer tüm oturumlar kapatıldı. Devam etmek için giriş yapın.",
       "signInCta": "Giriş yap",

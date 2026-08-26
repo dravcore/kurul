@@ -32,7 +32,6 @@
       "subtitle": "It has to be at least 8 characters long.",
       "newPassword": "New password",
       "submit": "Set new password",
-      "submitting": "Saving…",
       "successTitle": "Password changed",
       "successBody": "Your new password is set and every other session was signed out. Sign in to continue.",
       "signInCta": "Sign in",
