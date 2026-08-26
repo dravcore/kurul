@@ -940,7 +940,7 @@ describe('globals.css dialog and dropdown motion', () => {
 describe('globals.css skeleton motion', () => {
   const target = "[data-slot='skeleton']";
 
-  it('runs a 1.6s pulse between full and 0.6 opacity', () => {
+  it('completes a full 1.6s loop between full and 0.6 opacity', () => {
     const rule = requireRule(sheet, target, (candidate) =>
       selectorParts(candidate).includes(target),
     );
@@ -948,12 +948,22 @@ describe('globals.css skeleton motion', () => {
     const duration = rule.declarations.find(
       (declaration) => declaration.property === 'animation-duration',
     );
+    const direction = rule.declarations.find(
+      (declaration) => declaration.property === 'animation-direction',
+    );
     expect(name?.value).toBeTruthy();
     expect(duration?.value).toBe('1.6s');
+    // `animation-duration` must name the full round-trip period, matching Tailwind's own
+    // `pulse` convention (a single mid-loop dip, no alternate). A from/to keyframe combined with
+    // `animation-direction: alternate` would instead spend the whole duration on each one-way
+    // leg, silently doubling the period to 3.2s while this assertion alone still passed.
+    expect(direction?.value ?? 'normal').not.toBe('alternate');
 
     const body = keyframeBody(name!.value);
-    expect(body).toMatch(/opacity\s*:\s*1\b/);
-    expect(body).toMatch(/opacity\s*:\s*0\.6\b/);
+    // The dip must sit at the midpoint (50%) of a single normal-direction loop, not at a `to`
+    // endpoint that only reaches 0.6 by riding an alternated second leg.
+    expect(body).toMatch(/(^|[,\s])0%[,\s].*100%\s*{[^}]*opacity\s*:\s*1\b/s);
+    expect(body).toMatch(/50%\s*{[^}]*opacity\s*:\s*0\.6\b/s);
   });
 
   it('stops moving and holds 0.75 opacity under prefers-reduced-motion: reduce', () => {

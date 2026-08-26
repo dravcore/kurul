@@ -622,14 +622,19 @@ body {
 /* The loading placeholder (components/ui/skeleton.tsx). docs/design.md §6 asks for a 1.6s
    opacity pulse from 1.0 to 0.6, its own keyframe rather than Tailwind's built-in `animate-pulse`
    (2s, 1.0-0.5, and the one animation in the tree with no `prefers-reduced-motion` twin of its
-   own before this). A board loads dozens of these at once, so the reduced variant does not just
-   slow the loop down, it removes it: a still 0.75 midpoint reads as "loading" without asking
-   dozens of elements to keep animating on a machine that asked for none of them to. */
+   own before this). `animation-duration` names the FULL loop period, the same convention
+   Tailwind's own `pulse` keyframe uses (0%/100% implicit at opacity 1, a single 50% stop at the
+   dim value, run once through with no `alternate`): a from/to pair plus `alternate` would instead
+   spend the full duration on each one-way leg, doubling the period to 3.2s. A board loads dozens
+   of these at once, so the reduced variant does not just slow the loop down, it removes it: a
+   still 0.75 midpoint reads as "loading" without asking dozens of elements to keep animating on a
+   machine that asked for none of them to. */
 @keyframes skeleton-pulse {
-  from {
+  0%,
+  100% {
     opacity: 1;
   }
-  to {
+  50% {
     opacity: 0.6;
   }
 }
@@ -639,7 +644,6 @@ body {
   animation-duration: 1.6s;
   animation-timing-function: var(--ease-in-out);
   animation-iteration-count: infinite;
-  animation-direction: alternate;
 }
 
 @media (prefers-reduced-motion: reduce) {
