@@ -9,6 +9,36 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A task is created where it lands: the column foot now opens a title field instead of a
+  dialog.** `Add task` at the foot of a column turns into an inline composer
+  (`components/board/task-composer.tsx`, [ADR 0035](docs/decisions/0035-inline-task-composer.md)):
+  `Enter` creates the task and keeps the caret in the field, so a triage session is one key per
+  card; `Escape` or leaving an empty field closes it and hands focus back to the button that
+  opened it; a typed title is never discarded by a stray click. `Open details` creates the same
+  task and opens its panel, which is where every field the row does not collect already lives.
+  While the request is in flight the field goes `readOnly` rather than `disabled`, so focus
+  stays where the reader put it. `c` anywhere on the board (`use-create-task-shortcut.ts`) opens
+  the composer, or refocuses it if it is already open, and is ignored inside a field or a
+  dialog.
+
+- **A 2px copper rail marks where a dragged card will land.** Both a mouse drag and a keyboard
+  drag now draw the insertion slot: within a column dnd-kit's displacement opens the
+  card-height gap and the rail marks its leading edge, and across columns the rail alone marks
+  the point (nothing shifts). It is keyed on the drop column computed in `onDragOver`
+  (`use-board-task-dnd.ts`), not on `isOver`, because a keyboard drag never makes a column the
+  droppable; the destination column takes the `--signature-subtle` wash and an empty column
+  keeps its solid box. `docs/design.md` §5 records both halves.
+
+- **The column strip is one tab stop, and a phone gets a board it can swipe.** The board is a
+  composite widget: exactly one column heading is at `tabIndex` 0 and `Home`, `End` and
+  `Ctrl`+arrows rove between them (`board-canvas.tsx`), with the strip scrolled so the focused
+  column clears the edge mask instead of sitting under it, and the mask itself cleared at
+  whichever edge has nothing left behind it. Below 48rem a column is 85vw and the strip snaps,
+  so a swipe always lands on one column; the snap is released mid-drag, since dnd-kit crosses
+  columns by scrolling that same element. A touch drag starts from a 250ms press on the grip
+  with 5px of tolerance, which leaves a swipe over the card body to the column's scroller, and
+  a mouse drag still starts from 6px with no delay.
+
 - **Task activity feed now records label attach and detach.** Attaching or detaching a label on
   a task writes a `task.label_added` / `task.label_removed` row inside the same transaction as
   the join-row write, following the pattern `task.assigned` / `task.unassigned` already use on
@@ -226,6 +256,30 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `scripts/lib/doctor.mjs`, tested in `scripts/lib/doctor.test.mjs`.
 
 ### Changed
+
+- **A card says its due date and its estimate on one line, and never grows a second.** The meta
+  row (`components/task/task-card.tsx`) is one flex row that carries the label dots, the due
+  date and estimate joined by a single interpunct (`app.board.card.dueAndEstimate`) and the
+  assignees, with the overflow collapsed to `+N` (`app.board.card.moreAssignees`) rather than
+  wrapping. The figure `docs/design.md` §4 gives for a typical card, 56px, is the one the board
+  now measures.
+
+- **The selected card wears the sancak rail on its own left edge instead of a copper border.**
+  `border-l-2` is unconditional so the selected and unselected boxes are the same size, the
+  selected card takes `--signature` on that edge plus the `--signature-subtle` ground, and it
+  carries `aria-current` so the selection is not colour alone.
+
+- **The board says "Connection lost, changes may not be showing" instead of "Reconnecting…".**
+  The row is what the reader loses, not what the client is attempting, and it is a
+  `role="status"` line in the topbar that leaves when the socket is back
+  (`app.board.connectionLost` replaces `app.board.realtime.reconnecting`).
+
+- **Toasts have a budget: 4s, three at a time, and one line per kind of failure.** `Toaster`
+  passes `duration={4000}` and `visibleToasts={3}` (`components/ui/sonner.tsx`), the figures
+  `docs/design.md` §5 gives. A refused move raises one toast for the whole board
+  (`app.board.dragFailed`, deduplicated by id and given 8s because it carries **Try again**)
+  while the card itself settles back over 220ms, and a save conflict in the task panel is now
+  an inline line in the panel (`task-panel-fields.tsx`) rather than a toast over the board.
 
 - **The canonical docs and the roadmap now describe the release that exists.** `ROADMAP.md`
   still framed cutting `v0.3.0` as the active P0 three days after the tag, carried five
@@ -544,6 +598,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   places that each disabled a button on its own and, on four of them, swapped its text to a
   "Sending…" string of its own; the two `sending` keys and `auth.invite.submitPending` leave
   `messages/en.json` and `messages/tr.json`.
+
+### Removed
+
+- **`CreateTaskDialog` is gone.** Adding a task from a dialog cost a layer, a focus trap and a
+  round trip through the middle of the screen for one field; the inline composer replaces it
+  everywhere, and `components/task/create-task-dialog.tsx`, its state in `use-board-dialogs.ts`
+  and the `app.board.task.createTitle` key leave with it.
 
 ### Fixed
 
