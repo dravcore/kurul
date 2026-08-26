@@ -9,6 +9,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Task activity feed now records label attach and detach.** Attaching or detaching a label on
+  a task writes a `task.label_added` / `task.label_removed` row inside the same transaction as
+  the join-row write, following the pattern `task.assigned` / `task.unassigned` already use on
+  the sibling assignee sub-resource. The payload is a snapshot (`labelId`, `name`, `color`)
+  taken at write time, so the row still describes what happened after the label is renamed,
+  recolored or deleted. Neither type joins `AUDIT_ACTIVITY_TYPES`: like `task.assigned` and
+  `comment.created`, this is a content event, not one an incident query needs to see. The web
+  activity renderer stays untouched here, mid its own rework; an unrecognised type already falls
+  back to a generic line, so the feed keeps reading sensibly until the sentence for these two
+  types lands in a follow-up UI PR. Closes #39.
+
 - **`SIGNUP_ENABLED`: a switch that closes registration on a self-hosted instance.** Until now
   the only way to stop strangers registering on an internet-facing install was to pin
   `PLAN_MAX_USERS` at the current head count, which blocks the operator's own invitees along
