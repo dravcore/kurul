@@ -290,7 +290,7 @@ pnpm test:browser                         # browser e2e (Mailpit de gerekir)
 
 Integration testler, test setup'ı tarafından oluşturulan ve migrate edilen **ayrı bir
 veritabanına** (`kurul_test`) karşı çalışır. Geliştirme veritabanına asla dokunmazlar.
-Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#izolasyon).
+Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#i̇zolasyon).
 
 Bu komutların hiçbiri `packages/*/dist` gerektirmez. İki Jest config'i ve Vitest config'leri
 `@kurul/shared-types` ile `@kurul/auth-access` paketlerini `src/index.ts` dosyalarına eşler;
@@ -367,25 +367,56 @@ yükseltme arzusu da yoktur.
   yüzden taban değerler yalnızca zaten anlamlı biçimde test edilmiş koda uygulanır; bir
   ortalamayı yukarı çekmek için asla global olarak konmaz.
 
+### Taban değer politikası
+
+Bu repodaki her taban değeri (hem `apps/api` hem `apps/web`) aynı iki kural yönetir:
+
+- **Ölçüm yukarı çıkarsa taban değer de yukarı çıkar.** Yeniden ölçün, sonra taban değeri eski
+  sayının değil yeni sayının altına çekin. Kendi testleriyle gelen yeni bir modül, ona dokunmayan
+  bir taban değeri yükseltmek için tek başına bir gerekçe değildir; bir bölgenin taban değerini
+  o bölge gerçekten ısındığında yükseltin, ortalamayı ilgisiz bir şey çektiği için değil.
+- **Ölçüm aşağı inerse düşüş gizlenmez, kaydedilir.** Yeniden ölçün ve sayıyı yazın
+  (`apps/api/jest.config.cjs`'in tarihli geçmişine, `apps/web` için de burada). Eski payı geri
+  getirmek için taban değeri düşürmeyin: payın daralması sinyalin ta kendisidir, taban değeri
+  düşürmek nedeni yerinde bırakırken sinyali siler. Bir taban değer yalnızca bilinçli, gerekçeli
+  bir kararla düşürülür, bir düşüşün ardından muhasebe işlemi olarak asla.
+
+Her iki kural da paydanın dürüst olduğunu varsayar: **bir yüzdeyi yükseltmek için hiçbir dosya
+coverage'dan çıkarılmaz.** Dışlanmış bir dosya görünmez bir dosyadır, ve onu payı geri getirmek
+için dışlamak, önüne bir dolaylama koyulmuş taban değeri düşürmekle aynı harekettir.
+`collectCoverageFrom` (`apps/api`) ve `coverage.exclude` (`apps/web`) yalnızca üretilmiş kodu ve
+testlerin kendisini bırakır.
+
 ### Taban değerlerin bulunduğu yerler
 
 Zaten kapsanmış kodun geri kaymasını mandallar engeller. Hepsi CI'ı kırar.
 
-| Kapsam                                  | Taban değer                                           | Nerede tanımlı              |
-| --------------------------------------- | ----------------------------------------------------- | --------------------------- |
-| `apps/api` global                       | statements 75 / branches 66 / functions 77 / lines 76 | `apps/api/jest.config.cjs`  |
-| `apps/web` `app/**`                     | statements 85 / branches 90 / functions 85 / lines 85 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/board/**`        | statements 65 / branches 54 / functions 54 / lines 70 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/task/**`         | statements 60 / branches 60 / functions 58 / lines 62 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93 | `apps/web/vitest.config.ts` |
-| `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/auth/**`         | statements 94 / branches 91 / functions 95 / lines 94 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/settings/**`     | statements 85 / branches 86 / functions 80 / lines 86 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88 | `apps/web/vitest.config.ts` |
+| Kapsam                                  | Taban değer                                                      | Nerede tanımlı              |
+| --------------------------------------- | ---------------------------------------------------------------- | --------------------------- |
+| `apps/api` global                       | statements 75 / branches 66 / functions 77 / lines 76            | `apps/api/jest.config.cjs`  |
+| `apps/api` `src/common/guards/`         | statements 100 / branches 93.75 / functions 100 / lines 100      | `apps/api/jest.config.cjs`  |
+| `apps/api` `src/common/rate-limit/`     | statements 98.33 / branches 94.87 / functions 91.3 / lines 99.09 | `apps/api/jest.config.cjs`  |
+| `apps/api` `src/account/`               | statements 0 / branches 0 / functions 0 / lines 0                | `apps/api/jest.config.cjs`  |
+| `apps/web` `app/**`                     | statements 85 / branches 90 / functions 85 / lines 85            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/board/**`        | statements 65 / branches 54 / functions 54 / lines 70            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/task/**`         | statements 60 / branches 60 / functions 58 / lines 62            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93            | `apps/web/vitest.config.ts` |
+| `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/auth/**`         | statements 94 / branches 91 / functions 95 / lines 94            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/settings/**`     | statements 85 / branches 86 / functions 80 / lines 86            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88            | `apps/web/vitest.config.ts` |
 
-Hepsi konuldukları anda alınan ölçümün birkaç puan altındadır — rutin bir refactor'ın
-takılmayacağı kadar pay bırakan, ama bir testin silinmesini yakalayacak kadar dar.
+`apps/api`'nin global taban değeri `develop`'da merge sonrası ölçülür, hiçbir zaman bir feature
+branch'inde; en güncel `develop` koşusunun CI `api-coverage` artifact'ı doğruluk kaynağıdır.
+2026-08-26 itibarıyla (`develop`, `017838a`), ölçüm 75 / 66 / 77 / 76 taban değerine karşı
+77.06 / 69.96 / 78.95 / 77.91, yani 2.06 / 3.96 / 1.95 / 1.91 pay. Yukarıdaki üç `apps/api`
+klasör taban değeri aynı ölçümün altında değil, tam üzerinde konur: `src/common/guards/` ve
+`src/common/rate-limit/` zaten gerçek unit testleri olan bölgeleri mandallar, `src/account/` ise
+GDPR silme akışının bilinçli olarak unit testsiz olduğunu ve bunun yerine uçtan uca kapsandığını
+gizlemez, kaydeder (`apps/api/jest.config.cjs` dosyayı ve e2e spec'ini adıyla anar). `apps/web`
+klasör taban değerleri, konuldukları anda alınan ölçümün birkaç puan altındadır, rutin bir
+refactor'ın takılmayacağı kadar pay bırakan, ama bir testin silinmesini yakalayacak kadar dar.
 
 `apps/web`'in **global bir taban değeri yoktur**, bilinçli olarak. Genel web coverage son
 koşularda instrumented statement'ların ~%85'i civarındadır ama bu ortalama hâlâ yoğun testli
@@ -440,20 +471,25 @@ en uzun job'ıdır ve
 [ROADMAP.md](../../ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit) içindeki
 OPS-10 satırına karşı izlenir.
 
-**Merge öncesi tüm adımlar geçmelidir.** Kapı job'ı (`ci-ok`) branch korumasında yapılandırılan
-tek zorunlu status kontrol — eğer herhangi bir upstream job başarısızsa, atlanırsa ya da iptal
-edilirse, kapı başarısız olur. Bu iki koruma sağlar:
+**Merge öncesi tüm adımlar geçmelidir.** `main` ve `develop` üzerindeki branch koruması iki
+zorunlu context tanıyor: `ci-ok` ve `CodeQL`. `ci-ok` bu workflow'un kapısıdır: herhangi bir
+upstream job başarısızsa, atlanırsa ya da iptal edilirse kapı başarısız olur. `CodeQL` ise
+kendi workflow'u ve kendi context'idir; SEC-06 turundan beri iki branch'ta da zorunlu, bir fork
+PR'ının bu tablodaki her şey yeşilken CodeQL beklemede durabilmesinin sebebi de bu. Kapı iki
+koruma sağlar:
 
 1. **Doğruluk**: hiç koşmamış bir job kapıyı geçemez. Dal koruması _atlanmış_ bir zorunlu
    kontrolü karşılanmış sayar; [#89](https://github.com/dravcore/kurul/pull/89) tam olarak
    böyle merge oldu (`test` kırmızı, `build` atlanmış). `ci-ok` `if: always()` ile koşar ve
    her `needs.*.result` değerinin tam olarak `success` olduğunu doğrular — `failure`, `skipped`
    ve `cancelled` üçü de kapıyı düşürür.
-2. **Dal korumasıyla sabit bir sözleşme**: koruma artık her job adını değil tek bir bağlamı
-   (`ci-ok`) tanıyor. Job eklemek, bölmek veya yeniden adlandırmak ayar değişikliği değil
-   `ci.yml` düzenlemesi; hata yapılırsa sonuç CI'ın içinde kalır — workflow tanımadığı bir
-   `needs` girdisiyle yüklenmeyi reddeder, hiçbir kontrol raporlanmaz ve PR kilitli kalır.
-   Eskiden aynı hata, korumayı artık var olmayan bir bağlamı beklerken bırakıyordu.
+2. **Dal korumasıyla sabit bir sözleşme**: koruma bu workflow için içindeki her job adını
+   değil tek bir bağlamı (`ci-ok`) tanıyor. Job eklemek, bölmek veya yeniden adlandırmak ayar
+   değişikliği değil `ci.yml` düzenlemesi; hata yapılırsa sonuç CI'ın içinde kalır — workflow
+   tanımadığı bir `needs` girdisiyle yüklenmeyi reddeder, hiçbir kontrol raporlanmaz ve PR
+   kilitli kalır. Eskiden aynı hata, korumayı artık var olmayan bir bağlamı beklerken
+   bırakıyordu. `CodeQL` bilinçli olarak istisna: kendi takvimi olan ayrı bir workflow,
+   dolayısıyla bu kapının altına toplamak onu gizlerdi.
 
 CI, `develop` ve `main`'e yapılan push'larda olduğu gibi herhangi bir branch'a yapılan pull
 request'lerde çalışır. Bkz.

@@ -5,9 +5,12 @@ How to report a vulnerability in Kurul.
 ## Supported versions
 
 Kurul is pre-1.0: only the latest `0.y` release receives security fixes. There is no
-support matrix beyond that — upgrade to the latest release to stay covered. Fixes for a
-released version ship via `hotfix/*` per [docs/git-strategy.md](docs/git-strategy.md);
-fixes not yet released land on `develop`/`main` directly.
+support matrix beyond that — upgrade to the latest release to stay covered. A fix for an
+already-released version ships as a `hotfix/*` branch merged into `main` and back-merged into
+`develop`; a fix for something not yet released goes to `develop` as an ordinary `fix/*`
+branch and rides the next release. Neither is a direct commit: `main` and `develop` are
+protected and every change arrives through a pull request, security fixes included. See
+[docs/git-strategy.md](docs/git-strategy.md).
 
 ## Reporting a vulnerability
 

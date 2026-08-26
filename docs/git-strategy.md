@@ -32,7 +32,7 @@ deleted after merge.
 | `hotfix/*`  | short-lived | `main`        | `main` + `develop` | Urgent production fix                                   |
 
 ```
-main     ──●───────────────────────●──────────────●──  tags: v0.1.0, v0.1.1, v0.2.0
+main     ──●───────────────────────●──────────────●──  tags: v0.1.0, v0.2.0, v0.3.0
             \                     /              /
 release      \              ●────●              /      release/0.2.0
               \            /                   /
@@ -232,6 +232,28 @@ git switch -c release/0.2.0
 #    TAG and cosign examples) and in its docs/tr mirror: the operator page fetches
 #    its files from the tag, so the page and the release move together.
 git commit -am "chore(release): 0.2.0"
+
+# 2b. Refresh the release-pinned prose. Everything below carries a version number
+#     that only a person keeps current, and the v0.3.0 cut reached exactly one of
+#     them. Walk the list rather than trusting memory:
+#     - README.md and README.tr.md, the "what it is not, at vX.Y.Z" paragraph:
+#       both the version and the claims, since a feature may have landed since.
+#     - ROADMAP.md: the intro (which release is current, which is next), the
+#       Next 2 weeks table, and the Phases list.
+#     - .env.example and docs/development.md#activation-funnel-and-telemetry:
+#       the telemetry example prints the package version, so its "version" field
+#       is release-pinned prose like the rest.
+#     - docs/self-hosting.md and its docs/tr mirror: covered by step 2 above, but
+#       verify rather than assume, since the install URLs fetch from the tag.
+#     - The tag diagram at the top of this file: it lists the tags that exist.
+#     - CHANGELOG.md: the section you just renamed may carry two Added or two
+#       Fixed headings, one per merged PR. Merge them into one of each, keeping
+#       every entry and its order, before the section is published as release notes.
+#     - apps/api/openapi.json: `pnpm openapi` regenerates it, and info.version
+#       follows apps/api/package.json. `pnpm openapi:check` fails the build job
+#       until it is regenerated, so this one enforces itself; run it here anyway
+#       so the fix is in the release commit and not in a follow-up.
+git commit -am "docs(release): refresh release-pinned prose for 0.2.0"
 
 # 3. Only release-blocking fixes may land on this branch.
 #    Everything else keeps going to develop as usual.

@@ -123,6 +123,8 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `ATTACHMENT_INSTANCE_QUOTA_BYTES`     | `21474836480`                                                 | The same ceiling summed over **every** workspace on the instance; unset = 20 GiB, `0` = unlimited. Set it below your volume's real headroom: `STORAGE_PATH` in the shipped Compose stack shares its filesystem with Postgres. The API logs both effective quotas at boot, marking which came from the environment, and warns if this one is set below the workspace quota ([ADR 0027](decisions/0027-attachment-quotas.md))                                                                                                                                                                  |
 | `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`  | `268435456`                                                   | Bytes one client IP may submit to the upload route per fixed minute (256 MiB, about ten max-size uploads), charged from each request's `Content-Length` before multer reads the body; a multipart request without one is charged `ATTACHMENT_MAX_BYTES`. `0` switches it off; negative refuses to boot. Honours `RATE_LIMIT_ENABLED` and `TRUST_PROXY`; counters live in Redis when `REDIS_URL` is set and fall back to process memory on Redis errors. Rejection is `429` with `error: "Upload Budget Exceeded"` and `Retry-After` ([api-conventions.md](api-conventions.md#rate-limiting)) |
 | `TRELLO_IMPORT_MAX_BYTES`             | `20971520`                                                    | Largest Trello export the importer accepts, in bytes (20 MiB). A **heap** ceiling rather than a disk one — the parsed graph is several times the bytes that produced it. Separate from both limits above, and importing needs no `STORAGE_PATH` ([ADR 0025](decisions/0025-trello-import-mapping.md))                                                                                                                                                                                                                                                                                        |
+| `TRELLO_IMPORT_MAX_CARDS`             | `50000`                                                       | Largest number of cards one Trello import will plan, counted before archived or malformed ones are dropped. Over it the answer is `400` and nothing is written ([ADR 0025's amendment](decisions/0025-trello-import-mapping.md#amendment-2026-08-26-field-length-ceilings-and-a-row-cap-sec-04))                                                                                                                                                                                                                                                                                             |
+| `TRELLO_IMPORT_MAX_LISTS`             | `5000`                                                        | Same ceiling, for lists (`Column` rows) ([ADR 0025's amendment](decisions/0025-trello-import-mapping.md#amendment-2026-08-26-field-length-ceilings-and-a-row-cap-sec-04))                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `PLAN_MAX_SEATS_PER_WORKSPACE`        | _(blank)_                                                     | Ceiling on members plus pending invitations in one workspace ([ADR 0032](decisions/0032-plan-limits.md)). **Unset or `0` = unlimited**; a negative or non-integer value refuses to boot. The bundled `docker-compose.yml` forwards all four `PLAN_MAX_*` keys to `api`                                                                                                                                                                                                                                                                                                                       |
 | `PLAN_MAX_BOARDS_PER_WORKSPACE`       | _(blank)_                                                     | Ceiling on boards in one workspace. Same unset/`0` rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `PLAN_MAX_WORKSPACES`                 | _(blank)_                                                     | Ceiling on workspaces on the instance. Same rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -164,19 +166,29 @@ because a build without them succeeds silently. See
 [Observability](#observability).
 
 `.env.example` also carries `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
-`REDIS_PASSWORD`, `BACKUP_REMOTE` and `TAG`. All six are **compose-only**: `docker-compose.yml`
-interpolates them into its service definitions (`TAG` picks the tag of every published image)
+`REDIS_PASSWORD`, `REDIS_MAXMEMORY`, `BACKUP_REMOTE` and `TAG`. All seven are
+**compose-only**: `docker-compose.yml` interpolates them into its service definitions (`TAG`
+picks the tag of every published image, `REDIS_MAXMEMORY` becomes a `redis-server` argument)
 and no application code reads them, so they are absent from the table above and need no wiring
 in `apps/api`. See [Database and cache credentials](#database-and-cache-credentials) for the
 first four and [Upgrading and backups](#upgrading-and-backups) for `BACKUP_REMOTE`.
 `BACKUP_INTERVAL` and `BACKUP_KEEP` are not on that list: the `backup` service reads them, but
 so does the cleanup worker in `apps/api`, which is why they are in the table.
+`INTERNAL_API_URL` runs the other way: application code reads it, so it is in the table, but it
+is absent from `.env.example` because `docker-compose.yml` sets it outright rather than
+interpolating it from `.env`.
 
-Generate a secret with:
+Generate `BETTER_AUTH_SECRET` with:
 
 ```bash
 openssl rand -base64 32
 ```
+
+That generator is right for this one variable and wrong for the two that go inside a
+connection URL. The rule, the failure it prevents and the odds are written down once, in
+[Database and cache credentials](#database-and-cache-credentials); `.env.example`,
+[README.md](../README.md) and [self-hosting.md](self-hosting.md) all point there rather than
+carrying their own version of it.
 
 **Adding a new environment variable is a four-step change**, and all four go in the same PR:
 wire it through the env helpers in `apps/api/src/common/env.ts` (or the call site that reads
@@ -223,9 +235,10 @@ $ openssl rand -hex 32
 1b7c3785ecf7f7bd2ec4826214889d19ff17d518ce44126ab6f07393b39b98a   # 0-9a-f only, always URL-safe
 ```
 
-`-base64 32`'s alphabet includes `/` and `+`; with 43 base64 characters per password, the
-odds of at least one `/` or `+` landing in there are `1 - (63/64)^43 ≈ 51%` — roughly a coin
-flip on whether a freshly generated password silently breaks its own connection string.
+`-base64 32`'s alphabet includes both `/` and `+`, two problem characters out of 64; with 43
+base64 characters per password, the odds of at least one of them landing in there are
+`1 - (62/64)^43 ≈ 74%`, closer to three tries in four than to a coin flip on whether a freshly
+generated password silently breaks its own connection string.
 `openssl rand -hex 32` has no such character to avoid.
 
 | Variable            | Default           | Purpose                                                                                                                 |
@@ -265,6 +278,18 @@ not a plain non-negative integer (`redis://host:6379/staging`), or a path and a 
 disagree (`redis://host:6379/3?db=4`), is refused at connection time rather than quietly read
 as 0 — the whole point of the setting is keeping two apps apart, so a typo in it must not put
 them together.
+
+**A Redis 6+ ACL user and `rediss://` (TLS) are both honoured.** `redis://alice:s3cret@host:6379`
+authenticates as `alice` with `s3cret` instead of as `default`, and `rediss://host:6379` opens
+a TLS connection instead of plaintext, for a managed Redis (Upstash, ElastiCache in-transit
+encryption, Redis Cloud) that expects either. Until
+[#204](https://github.com/dravcore/kurul/issues/204) both were silently dropped: the ACL
+username never reached ioredis, so the instance authenticated as `default` with the given
+password instead (which fails outright once `default` has no password of its own to match, and
+otherwise runs as the wrong user's permissions), and `rediss://` connected in plaintext with no
+warning. A scheme other than `redis:` or `rediss:` is refused at connection time, the same way
+an unparsable database index is. The bundled Compose stack is unaffected either way: it always
+builds a plain `redis://:password@redis:6379` for its own `redis` container.
 
 **Changing `POSTGRES_PASSWORD` on an existing `postgres_data` volume does not rotate the
 running database's password.** The official Postgres image only applies
@@ -631,10 +656,11 @@ with `docker top` showing `999 ... redis-server` instead of `root ... redis-serv
 `SET` → restart cycle that survives with the value intact in both the password and
 no-password cases.
 
-Out of scope for this hardening pass: a read-only root filesystem (`read_only: true`) and
-seccomp profiles. Both are stricter constraints that need a per-service audit of which
-paths must stay writable (temp dirs, node's own `/tmp` use, etc.); tracked as a follow-up
-in [ROADMAP.md](../ROADMAP.md#hardening-track), not bundled in here.
+Out of scope for this hardening pass: a read-only root filesystem (`read_only: true`),
+`pids_limit` and seccomp profiles. All three are stricter constraints that need a per-service
+audit of which paths must stay writable (temp dirs, node's own `/tmp` use, etc.), which the
+two Dockerfiles have since enumerated. Tracked as the "Container hardening pass 2" row in
+[ROADMAP.md](../ROADMAP.md#hardening-track), not bundled in here.
 
 ## pnpm scripts
 
@@ -656,6 +682,11 @@ Run from the repository root.
 | `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                                                                                                                                                                                                                                                                                               |
 | `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `db:drift`       | `pnpm db:drift`       | Runs `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`: compares the configured database against `schema.prisma` and exits non-zero on any difference. Same command CI runs after `db:migrate` — see [Checking for migration drift](#checking-for-migration-drift)                                                                                                                                                                                                           |
+| `openapi`        | `pnpm openapi`        | Builds `@kurul/api`, then regenerates `apps/api/openapi.json` from the built application. The Swagger CLI plugin runs during `nest build` and nowhere else, which is why the build is not optional here. The document's `info.version` comes from `apps/api/package.json`, so a version bump moves the file                                                                                                                                                                                                                     |
+| `openapi:check`  | `pnpm openapi:check`  | Regenerates the document in memory and byte-compares it against the committed `apps/api/openapi.json`, exiting non-zero on the first line that differs. Same command the `build` CI job runs; run it after any controller, DTO or role-gate change                                                                                                                                                                                                                                                                              |
+| `knip`           | `pnpm knip`           | Reports unused files, exports and types across the workspace, configured by `knip.jsonc`. Not a CI gate today: it is run deliberately, and an export it flags either loses its `export`, is deleted, or becomes an explicitly-reasoned ignore                                                                                                                                                                                                                                                                                   |
+| `test:browser`   | `pnpm test:browser`   | Builds the e2e stack (`e2e/build-stack.mjs`) and runs the Playwright smoke pack against it. Needs Docker. On CI the same suite runs in `e2e.yml`, nightly on `develop` and on the `release/*` and `hotfix/*` pull requests into `main`, never on the `ci-ok` gate; that workflow builds the stack in its own steps and calls Playwright directly rather than through this script. See [testing.md](testing.md#browser-end-to-end)                                                                                               |
+| `test:scripts`   | `pnpm test:scripts`   | Runs the dependency-free `node:test` suites under `scripts/`, including the bootstrap doctor checks and the compose-env guard that fails on a documented API-read key the `api` service does not forward                                                                                                                                                                                                                                                                                                                        |
 
 To target a single workspace, use pnpm's filter flag:
 
@@ -913,7 +944,7 @@ body and **nothing else**:
 ```json
 {
   "event": "instance_started",
-  "version": "0.1.0"
+  "version": "0.3.0"
 }
 ```
 
@@ -922,7 +953,7 @@ Field by field, that is the whole list:
 | Field     | Value                | Notes                                                 |
 | --------- | -------------------- | ----------------------------------------------------- |
 | `event`   | `"instance_started"` | Always this literal string. There is only one event   |
-| `version` | e.g. `"0.1.0"`       | The `@kurul/api` package version this build came from |
+| `version` | e.g. `"0.3.0"`       | The `@kurul/api` package version this build came from |
 
 What is **not** sent, and has no code path to be sent: any instance or installation identifier,
 your hostname, your IP address, your URL, your database, any count of users, workspaces, boards
@@ -932,7 +963,7 @@ schedule. The payload is logged in full before it is sent, so you can read what 
 in your own API log:
 
 ```text
-LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.1.0"} to https://…
+LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.3.0"} to https://…
 ```
 
 A refused connection, a DNS failure, an error from the collector or a timeout

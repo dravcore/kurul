@@ -10,12 +10,12 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 ## Durum
 
-Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı) — auth/workspace’ler, board ve
-task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Bkz.
-[ROADMAP.md](ROADMAP.md). Kritik tarayıcı akışlarını yedi senaryoluk bir
-Playwright smoke paketi kapsıyor ([docs/tr/testing.md](docs/tr/testing.md#browser-uçtan-uca)).
-MVP ötesi maddeler (e-posta bildirimleri, presence, ek diller, …) hâlâ MVP ötesi altında
-listelenir.
+Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı): auth/workspace’ler, board ve
+task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Kritik tarayıcı
+akışlarını yedi senaryoluk bir Playwright smoke paketi kapsıyor
+([docs/tr/testing.md](docs/tr/testing.md#browser-uçtan-uca)). O günden bu yana ne sevkedildiği,
+neyin üzerinde çalışıldığı ve neyin bilinçli olarak programa alınmadığı tek bir yerde,
+[ROADMAP.md](ROADMAP.md) içinde; burada ikinci kez listelenip eskimesin diye.
 
 ## Kurul nedir?
 
@@ -57,10 +57,12 @@ Kurul'un cevabı bilinçli olarak dar:
 - **Realtime ve çok-kiracılılık çekirdekte.** Socket.io board senkronu ve workspace'e
   scope'lanmış sorgular sonradan eklenmedi, baştan tasarlandı.
 
-Ve `v0.3.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, public API token'ları ve
-webhook'lar yok. UI hem İngilizce hem Türkçe konuşuyor — her arayüz metni, yeni bir board'un
-başladığı column adları ve size gönderdiğimiz e-posta dahil — ve üçüncü bir dil bir katalog
-uzakta. API token'ları, webhook'lar ve ek dil paketleri
+Ve `v0.3.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, public API token'ı yok,
+webhook yok. Personal access token'lar etiketten sonra `develop`'a indi ve bir sonraki sürümle
+çıkıyor; webhook'ların ise tasarımı var ([ADR 0033](docs/tr/decisions/0033-webhook-delivery-and-failure-policy.md)),
+uygulaması yok. UI hem İngilizce hem Türkçe konuşuyor (her arayüz metni, yeni bir board'un
+başladığı column adları ve size gönderdiğimiz e-posta dahil) ve üçüncü bir dil bir katalog
+uzakta. Webhook'lar ve ek dil paketleri
 [MVP ötesi](ROADMAP.md#beyond-mvp) altında, her biri kendisini bekleten açık soruyla
 listeli; subtask ve zaman takibi ise o listede hiç yok. Bunlara bugün ihtiyacınız varsa
 yukarıdaki daha olgun projelerden biri daha iyi bir seçim.
@@ -194,12 +196,9 @@ için olan `pnpm db:migrate:dev` ikisini birden yapar).
 
 ### Her iki yol için
 
-`POSTGRES_PASSWORD`'ün varsayılanı yoktur — ayarlanmadan compose başlamayı reddeder.
-`BETTER_AUTH_SECRET`'ten farklı olarak bu değer doğrudan bir bağlantı URL'ine gömülür,
-dolayısıyla `openssl rand -base64 32` burada yanlış üreticidir — alfabesi `/` ve `+` içerir,
-ikisi de parolaya düşerse URL'i bozar (`/` authority bölümünü doğrudan sonlandırır; base64-32
-çıktılarının kabaca yarısı en az bir tane içerir). Bunun yerine alfabesi (`0-9a-f`) her zaman
-URL-güvenli olan `openssl rand -hex 32` kullanın; bkz.
+`POSTGRES_PASSWORD`'ün varsayılanı yoktur: ayarlanmadan compose başlamayı reddeder. Doğrudan bir
+bağlantı URL'ine gömüldüğü için `-base64` ile değil `openssl rand -hex 32` ile üretin. Bunun neden
+önemli olduğu tek bir yerde yazılı:
 [docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri](docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri).
 Dev loop'ta `.env.example`'da birkaç satır üstündeki `DATABASE_URL`'in şifre kısmı bununla elle
 eşleştirilmelidir — o host tarafındaki string, `pnpm dev`'in `localhost:5432`'ye ulaşmak için

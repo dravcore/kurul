@@ -60,4 +60,42 @@ describe('parseRedisUrl', () => {
   it('accepts a path and query that agree', () => {
     expect(parseRedisUrl('redis://localhost:6379/3?db=3')).toMatchObject({ db: 3 });
   });
+
+  /**
+   * #204: a Redis 6+ ACL user in the URL used to authenticate as `default` instead, since
+   * `url.username` was never read.
+   */
+  it('carries an ACL username from the URL', () => {
+    expect(parseRedisUrl('redis://alice:s3cret@h/3')).toEqual({
+      host: 'h',
+      port: 6379,
+      username: 'alice',
+      password: 's3cret',
+      db: 3,
+    });
+  });
+
+  it('omits username when the URL names none', () => {
+    expect(parseRedisUrl('redis://:s3cret@h')).not.toHaveProperty('username');
+  });
+
+  it('decodes a percent-encoded username the same way password already is', () => {
+    expect(parseRedisUrl('redis://al%40ice:pw@h')).toMatchObject({ username: 'al@ice' });
+  });
+
+  /**
+   * #204's other half: a `rediss://` URL (Upstash, ElastiCache in-transit, Redis Cloud) used to
+   * connect in plaintext, because the scheme was never inspected.
+   */
+  it('sets tls for a rediss: URL', () => {
+    expect(parseRedisUrl('rediss://h')).toMatchObject({ tls: {} });
+  });
+
+  it('omits tls for a plain redis: URL', () => {
+    expect(parseRedisUrl('redis://h')).not.toHaveProperty('tls');
+  });
+
+  it('rejects a scheme that is neither redis: nor rediss:', () => {
+    expect(() => parseRedisUrl('http://h')).toThrow(/Invalid REDIS_URL/);
+  });
 });

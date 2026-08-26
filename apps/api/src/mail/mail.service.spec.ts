@@ -57,7 +57,7 @@ describe('MailService', () => {
     const service = new MailService();
     const close = jest.spyOn(getMailSender(), 'close');
 
-    await service.onModuleDestroy();
+    await service.onApplicationShutdown();
 
     expect(close).toHaveBeenCalled();
   });

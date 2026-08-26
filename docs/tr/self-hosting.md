@@ -175,10 +175,10 @@ MAIL_FROM=Kurul <kurul@example.com>
 ```
 
 İki gizli değeri de `openssl rand -hex 32` ile üretin. `POSTGRES_PASSWORD` doğrudan bir bağlantı
-URL'inin içine giriyor; `-base64` çıktısındaki bir `/` orada URL'i keser — `-hex`'in alfabesinde
-(`0-9a-f`) böyle bir karakter yok. `BETTER_AUTH_SECRET` yalnızca byte byte karşılaştırılıyor,
-yani bu kısıtı taşımıyor, ama onu da `-hex` ile üretmek, değişken başına ayrı bir kural yerine
-tek bir üreticiyi akılda tutmak demek.
+URL'inin içine giriyor; `-base64`'ün onun için neden yanlış üretici olduğu tek bir yerde yazılı:
+[development.md](development.md#veritabanı-ve-cache-kimlik-bilgileri).
+`BETTER_AUTH_SECRET` yalnızca byte byte karşılaştırılıyor, yani bu kısıtı taşımıyor, ama onu da
+`-hex` ile üretmek, değişken başına ayrı bir kural yerine tek bir üreticiyi akılda tutmak demek.
 
 `SITE_URL` şemayı taşır, çünkü Caddy'nin düz HTTP mi sunacağına yoksa sertifika mı alacağına
 karar veren şey odur. `https://…` otomatik HTTPS'i açar. `http://localhost` (varsayılan) ise
@@ -269,6 +269,20 @@ zarfına yer bırakacak şekilde **proxy'nin gövde limitinin altında** kalmak 
 [aşağıdaki proxy sözleşmesi](#kendi-reverse-proxynizi-kullanmak). Import, `STORAGE_PATH`'in hiç
 ayarlanmadığı bir instance'ta da çalışır: import bağlantı attachment'ları yaratır, onlar da bayt
 saklamaz.
+
+İki değişken daha var, bunlar export'un baytını değil board'un şeklini sınırlıyor:
+`TRELLO_IMPORT_MAX_CARDS` (varsayılan `50000`) ve `TRELLO_IMPORT_MAX_LISTS` (varsayılan `5000`),
+export'un taşıdığı kart veya liste sayısı bu değerleri geçerse tek bir satır bile planlanmadan
+`400` döner ve hiçbir şey yazılmaz. `TRELLO_IMPORT_MAX_BYTES` tek başına bunu sınırlamaz: küçük
+bir kart birkaç düzine bayt olabilir, yani bayt tavanının çok altında kalan bir export yine de bu
+import'un taşımak için var olduğu board'dan çok daha fazla satır taşıyabilir. Importer'ın yazdığı
+her ad, açıklama ve URL de kendi yazma yolunun başka her yerde uyguladığı aynı uzunlukla sınırlanır
+(bir görev başlığı, bir board adı, bir sütun adı ve benzerleri, her biri `CreateTaskDto`,
+`CreateBoardDto` ve geri kalanının zaten uyguladığı tavanı korur); başlığı kesilmek zorunda kalan
+bir kart yine de import edilir ve import raporu bunu değişerek gelen satırlardan biri olarak sayar.
+Kısıtlanan alanların tam listesi ve tavanları
+[ADR 0025'in değişikliğinde](decisions/0025-trello-import-mapping.md#değişiklik-2026-08-26-alan-uzunluğu-tavanları-ve-satır-sayısı-tavanı-sec-04)
+yer alır, burada tekrarlanmıyor.
 
 ## 3. Başlatın
 
@@ -755,6 +769,16 @@ değil.
    uygular ve `--wait`, uzun süreli her servis healthy raporladığında döner, biri raporlamazsa
    sıfırdan farklı kodla.
 
+   Yeniden oluşturma bir kesinti değil, bir duraklamadır. `api`, Docker onu öldürmeden önce
+   yaptığı işi bitirmek için 30s alır (`stop_grace_period`) ve pakete dahil Caddy, bir upstream
+   geri gelirken isteği 502 ile yanıtlamak yerine 30s'ye kadar tutar, her 500ms'de yeniden
+   dener. Tek replika hâlâ isteklerin başka yerde karşılanmak yerine beklemesi demektir ve
+   gövdesini göndermeye başlamış bir yükleme yeniden denenmez. Yerine konan bir reverse
+   proxy'nin aynı davranışı göstermesi için kendi karşılığına ihtiyacı vardır ve nginx open
+   source'ta birebir karşılığı yoktur: `proxy_next_upstream` isteği upstream grubundaki _bir
+   sonraki_ sunucuya devreder, dolayısıyla tek bir `api` girdisi olan grup hiç yeniden
+   denenmez.
+
 6. **Doğrulayın:**
 
    ```bash
@@ -870,6 +894,17 @@ bunu bırakmanızı sağlar: bu imajın bu deponun release workflow'undan çıkt
 **imza** ve içinde ne olduğunu söyleyen bir **SBOM**. İkisini de kullanmak isteğe bağlıdır ve
 aşağıdaki komutları hiç çalıştırmayan kimseyi korumazlar.
 
+Yığının altındaki temel imajlar da, `docker-compose.yml` içindeki `postgres`, `redis`, `caddy`
+ve api ile web Dockerfile'larındaki `node`, benzer bir nedenle salt tag yerine `tag@sha256:...`
+ile sabitlenir: aynı sürümün iki ayrı derlemesi böylece aynı byte'ları çözümler. Her digest'i
+güncel tutan iki ayrı Dependabot ekosistemi var: `docker-compose`, compose dosyalarındaki
+`postgres`, `redis` ve `caddy`'yi günceller; `docker` ise iki Dockerfile'daki `node`'u günceller.
+Her iki durumda da üst akıştaki bir düzeltme, bir şeyin yeniden derlenmesini bekleyip sessizce
+gelmek yerine, gözden geçirilebilir bir pull request olarak gelir. Bunun bir yan etkisi var: tek
+başına `docker compose pull`, artık iki Kurul sürümü arasında çıkan bir `postgres`/`redis`/`caddy`
+yama sürümünü almaz, çünkü çözümlediği tag artık bir digest'e sabitlenmiştir; o yama,
+Dependabot'un digest güncellemesini birleştiren bir sonraki Kurul sürümüyle gelir.
+
 ### İmzayı kontrol etmek
 
 [cosign](https://github.com/sigstore/cosign) **3.0 veya üstü** gerekir — imzalar cosign 3'ün
@@ -977,6 +1012,13 @@ URL'i olduğu gibi log'lar. Paketlenmiş `docker/Caddyfile` hiçbir `log` direkt
 hiç access log yazmaz; nginx'in varsayılan `combined` formatı ise URL'in tamamı olan `$request`'i
 log'lar. Bu hostname'de access log tutuyorsanız `/auth/reset-password/*` yolunu filtreleyin ya da
 yeniden yazın; bunu yapana kadar o log'u canlı kimlik bilgisi tutan bir yer sayın.
+
+Yönlendirme sözleşmesinin dışında kalan ama yine de taklit etmeye değen bir şey var: pakete
+dahil Caddy, bir upstream yeniden başlarken isteği 502 ile yanıtlamak yerine 30s'ye kadar
+tutuyor; bir upgrade'i hatalar yerine gecikmeye çeviren şey bu. Bunu yapmayan bir proxy yine de
+doğrudur, yalnızca her `docker compose up -d` sırasında daha gürültülüdür. Aynısını yapmanın
+neye mal olduğu ve nginx open source'ta neden birebir karşılığı olmadığı,
+[Upgrade](#upgrade) bölümünün 5. adımında.
 
 #### Proxy'nin sayısı neden 26 MiB, API'ninki neden 25
 

@@ -10,6 +10,7 @@ import {
   RATE_LIMIT_WINDOW_SECONDS,
   TASK_SEARCH_RATE_LIMIT,
 } from '../common/rate-limit/rate-limit';
+import { readAppVersion } from '../common/app-version';
 import { ErrorEnvelopeSchema } from './schemas/error.schema';
 
 /**
@@ -33,8 +34,17 @@ type ResponseHeaders = NonNullable<Extract<ResponseOrRef, { description: string 
  * there is no `/v1` prefix before 1.0 and that `@kurul/shared-types` is versioned with the
  * monorepo, so a client that pins the package pins the contract. A second version number here
  * would be a second promise, and the two would disagree the first time one of them moved.
+ *
+ * Read from `apps/api/package.json` rather than written down, because a literal is exactly the
+ * second promise the paragraph above refuses: it said "the monorepo version" while advertising
+ * `0.1.0` from `v0.1.0` all the way through `v0.3.0`, and no step of the release process would
+ * have caught it. `readAppVersion()` resolves the same file the telemetry ping reads, from
+ * `src/` under Jest and from `dist/` under `pnpm openapi` and the runtime image, so the
+ * generator, the snapshot spec and the served document cannot disagree. The committed
+ * `apps/api/openapi.json` is byte-compared by `pnpm openapi:check` in CI, so a version bump
+ * that forgets to regenerate now fails the gate instead of drifting quietly.
  */
-const OPENAPI_VERSION = '0.1.0';
+const OPENAPI_VERSION = readAppVersion();
 
 /** Name of the cookie security scheme every guarded operation references. */
 export const SESSION_SECURITY_SCHEME = 'session';

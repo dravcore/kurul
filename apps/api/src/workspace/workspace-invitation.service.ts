@@ -5,13 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, MemberRole } from '@kurul/shared-types';
-import type {
-  CursorPage,
-  InvitationDto,
-  InvitationStatus,
-  WorkspaceMemberDto,
-} from '@kurul/shared-types';
+import { ActivityType, InvitationStatus, MemberRole } from '@kurul/shared-types';
+import type { CursorPage, InvitationDto, WorkspaceMemberDto } from '@kurul/shared-types';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request } from 'express';
 import { ActivityService } from '../activity/activity.service';
@@ -20,6 +15,7 @@ import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth
 import { buildInviteAcceptUrl } from '../auth/web-urls';
 import { toCursorPage } from '../common/pagination/cursor-page';
 import { MAX_PAGE_LIMIT } from '../common/pagination/page-limit';
+import { pendingInvitationWhere } from '../common/pending-invitation';
 import { captureMailDelivery } from '../mail/mail-delivery-scope';
 import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -139,12 +135,7 @@ export class WorkspaceInvitationService {
     email: string,
   ): Promise<{ id: string; role: string | null }[]> {
     return this.prisma.workspaceInvitation.findMany({
-      where: {
-        workspaceId,
-        email,
-        status: 'pending',
-        expiresAt: { gt: new Date() },
-      },
+      where: { ...pendingInvitationWhere(workspaceId, new Date()), email },
       select: { id: true, role: true },
     });
   }
@@ -176,9 +167,7 @@ export class WorkspaceInvitationService {
 
     const rows = await this.prisma.workspaceInvitation.findMany({
       where: {
-        workspaceId,
-        status: 'pending',
-        expiresAt: { gt: new Date() },
+        ...pendingInvitationWhere(workspaceId, new Date()),
         ...(query.cursor ? { id: { gt: query.cursor } } : {}),
       },
       orderBy: { id: 'asc' },
@@ -367,7 +356,11 @@ export class WorkspaceInvitationService {
     const invitation = await this.prisma.workspaceInvitation.findUnique({
       where: { id: invitationId },
     });
-    if (!invitation || invitation.status !== 'pending' || invitation.workspaceId !== workspaceId) {
+    if (
+      !invitation ||
+      invitation.status !== InvitationStatus.pending ||
+      invitation.workspaceId !== workspaceId
+    ) {
       throw new NotFoundException('Invitation not found');
     }
 

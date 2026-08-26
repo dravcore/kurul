@@ -1,6 +1,6 @@
 name: Release images
 
-# audit/findings/devops.md OPS-04: a self-host product with no published artifact means every
+# OPS-04 (2026-08-18 devops audit): a self-host product with no published artifact means every
 # install *and every upgrade* rebuilds from source (measured: api 52s + web 22s, real OOM risk
 # on a small VPS). This workflow is the fix — it publishes the images to GHCR so `docker
 # compose pull && up -d` (docs/development.md#full-stack-in-docker) replaces

@@ -7,6 +7,7 @@ import {
   type WorkspacePlanDto,
   type WorkspacePlanLimitsDto,
 } from '@kurul/shared-types';
+import { pendingInvitationWhere } from '../common/pending-invitation';
 import { Prisma } from '../generated/prisma';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -126,16 +127,16 @@ export class PlanLimitsService implements OnModuleInit {
    * **A pending invitation holds its seat.** Counting members alone would make the ceiling
    * advisory (an admin at the limit could send twenty invitations and let them all be
    * accepted), and it would move the refusal from the person who can act on it (the admin
-   * inviting) to the person who cannot (the invitee clicking a link they were sent). The same
-   * `status: 'pending'` plus unexpired filter as `findPendingInvitations`, so what the settings
-   * screen shows as revocable and what this counts can never disagree; an expired invitation
-   * frees its seat by the clock, with no sweep required.
+   * inviting) to the person who cannot (the invitee clicking a link they were sent). This
+   * shares `pendingInvitationWhere` with `findPendingInvitations`, so what the settings screen
+   * shows as revocable and what this counts can never disagree; an expired invitation frees
+   * its seat by the clock, with no sweep required.
    */
   private async seatsUsed(workspaceId: string, db: PlanLimitsDb = this.prisma): Promise<number> {
     const [members, invitations] = await Promise.all([
       db.workspaceMember.count({ where: { workspaceId } }),
       db.workspaceInvitation.count({
-        where: { workspaceId, status: 'pending', expiresAt: { gt: new Date() } },
+        where: pendingInvitationWhere(workspaceId, new Date()),
       }),
     ]);
     return members + invitations;

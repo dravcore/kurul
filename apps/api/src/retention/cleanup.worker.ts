@@ -1,5 +1,7 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import { InvitationStatus } from '@kurul/shared-types';
 import { Queue, Worker, type Job } from 'bullmq';
+import { closeWorkerWithinTimeout } from '../common/close-worker';
 import { envBool, envInt, envString } from '../common/env';
 import { stdoutWriter, type LogWriter } from '../common/logging/json-log';
 import { captureServerError } from '../common/observability/sentry';
@@ -35,6 +37,14 @@ const JOB_ATTEMPTS = 5;
  * which is the actual fallback this retry budget exists to make unnecessary.
  */
 const JOB_BACKOFF_DELAY_MS = 5 * 60 * 1000;
+
+/**
+ * Minimum time between reports (WARN log + Sentry capture) for a Redis connection error on
+ * this worker's queue or worker client. ioredis retries a broken connection on its own and
+ * re-emits `error` on every failed attempt, so without this a single outage would report once
+ * per retry instead of once for the outage: same shape as `AUTH_RATE_LIMIT_REPORT_DAMPEN_MS`.
+ */
+const REDIS_ERROR_REPORT_DAMPEN_MS = 60 * 1000;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -227,7 +237,7 @@ interface CleanupLogLine extends CleanupCounts {
  * Deletes rows the retention policy no longer allows the database to hold.
  *
  * Scheduled the same way as `notification/due-soon.worker.ts` — a BullMQ job scheduler on the
- * shared `REDIS_URL`, closed from `onModuleDestroy` — so the two scheduled jobs in this
+ * shared `REDIS_URL`, closed from `onApplicationShutdown`, so the two scheduled jobs in this
  * codebase behave identically under deploy and shutdown, and so a multi-replica deployment
  * gets one sweep per night rather than one per replica.
  *
@@ -238,10 +248,11 @@ interface CleanupLogLine extends CleanupCounts {
  * reachable by a caller. See ADR 0020.
  */
 @Injectable()
-export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
+export class CleanupWorker implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(CleanupWorker.name);
   private queue: Queue | null = null;
   private worker: Worker | null = null;
+  private lastRedisErrorReportedAt = 0;
   /**
    * Test seam. Production writes the JSON line to stdout; the unit spec swaps in a collector
    * so it can assert on what a log aggregator would actually receive. Not a constructor
@@ -284,6 +295,13 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
 
     this.queue = new Queue(QUEUE_NAME, { connection });
     this.worker = new Worker(QUEUE_NAME, (job) => this.process(job), { connection });
+
+    // `queue.on('error')` and `worker.on('error')` fire on the connection itself (a Redis
+    // outage, a refused reconnect), distinct from `worker.on('failed')` below, which is a
+    // single job's outcome. Without a listener here, BullMQ's own fallback is `console.error`
+    // on an EventEmitter, invisible to the JSON log format and to Sentry (audit BE-11).
+    this.queue.on('error', (error) => this.onRedisError('queue', error));
+    this.worker.on('error', (error) => this.onRedisError('worker', error));
 
     this.worker.on('failed', (job, error) => {
       const message = error instanceof Error ? error.message : String(error);
@@ -333,9 +351,32 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`retention cleanup worker registered (every ${REPEAT_EVERY_MS / 3600000}h)`);
   }
 
-  async onModuleDestroy(): Promise<void> {
-    await this.worker?.close();
+  /**
+   * Shutdown, not destroy: this worker holds a Redis connection and a Prisma client, and a
+   * destroy hook runs while the listener is still serving (`main.ts`). The wait is bounded
+   * because a sweep in flight can run for minutes - see `common/close-worker.ts`.
+   */
+  async onApplicationShutdown(): Promise<void> {
+    await closeWorkerWithinTimeout(this.worker, this.logger, 'retention cleanup worker');
     await this.queue?.close();
+  }
+
+  /** Reports a Redis connection error from the queue or the worker, rate-limited. */
+  private onRedisError(source: 'queue' | 'worker', error: Error): void {
+    this.logger.warn(`cleanup ${source} Redis error: ${error.message}`);
+    if (this.shouldReportRedisError()) {
+      captureServerError(error, { path: `cleanup-worker-${source}` });
+    }
+  }
+
+  /** Claims the report slot for a Redis connection error, or says one was claimed too recently. */
+  private shouldReportRedisError(): boolean {
+    const now = Date.now();
+    if (now - this.lastRedisErrorReportedAt < REDIS_ERROR_REPORT_DAMPEN_MS) {
+      return false;
+    }
+    this.lastRedisErrorReportedAt = now;
+    return true;
   }
 
   /**
@@ -489,7 +530,7 @@ export class CleanupWorker implements OnModuleInit, OnModuleDestroy {
               WHERE "id" IN (
                 SELECT "id" FROM "WorkspaceInvitation"
                 WHERE "createdAt" < ${cutoff}
-                  AND ("status" <> 'pending' OR "expiresAt" < ${now})
+                  AND ("status" <> ${InvitationStatus.pending} OR "expiresAt" < ${now})
                 LIMIT ${CLEANUP_BATCH_SIZE}
               )
             `;

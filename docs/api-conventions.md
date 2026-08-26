@@ -493,13 +493,14 @@ globally) and `Cache-Control: private, max-age=0, must-revalidate`. Asking for t
 `POST /workspaces/:workspaceId/imports/trello` takes a Trello board's JSON export and creates a
 **new board** from it. It is the API's only bulk-write endpoint.
 
-| Property     | Value                                                                           |
-| ------------ | ------------------------------------------------------------------------------- |
-| Body         | `multipart/form-data`, one part named **`file`** — no other part, no JSON shape |
-| Role         | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                            |
-| Size ceiling | `TRELLO_IMPORT_MAX_BYTES` (default `20971520` — 20 MiB)                         |
-| Rate limit   | **3 / min** per client IP                                                       |
-| Success      | `201` with a `TrelloImportReportDto`                                            |
+| Property     | Value                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------- |
+| Body         | `multipart/form-data`, one part named **`file`** — no other part, no JSON shape         |
+| Role         | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                                    |
+| Size ceiling | `TRELLO_IMPORT_MAX_BYTES` (default `20971520` — 20 MiB)                                 |
+| Row ceiling  | `TRELLO_IMPORT_MAX_CARDS` (default `50000`), `TRELLO_IMPORT_MAX_LISTS` (default `5000`) |
+| Rate limit   | **3 / min** per client IP                                                               |
+| Success      | `201` with a `TrelloImportReportDto`                                                    |
 
 **Multipart rather than JSON, and that is a decision rather than a convenience.** A board export
 is several megabytes and `REQUEST_BODY_MAX_BYTES` is 1 MiB; raising that to fit this one endpoint
@@ -520,7 +521,7 @@ its caller could not do in several.
 
 | Status | When                                                                                                                                                                                                |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export                                                                                                             |
+| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export; the export has more cards than `TRELLO_IMPORT_MAX_CARDS` or more lists than `TRELLO_IMPORT_MAX_LISTS`      |
 | `403`  | Workspace member whose role is below `ADMIN`, **or** the workspace is at its board ceiling (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, see [Plan limits](#plan-limits)) |
 | `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it                                                                                                |
 | `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                                                                                                                     |
@@ -528,9 +529,12 @@ its caller could not do in several.
 
 A `400` is the only failure that reaches the parser, and **nothing is written when it does**: the
 export is read and mapped entirely before the transaction opens, so a rejected import leaves the
-workspace byte-for-byte as it was. The board-ceiling `403` writes nothing either: the check is the
-first statement inside the transaction, before the board row, so the refusal rolls back an empty
-transaction.
+workspace byte-for-byte as it was. The row-cap refusal is part of that same `400`: once the export
+is read, its list and card counts are checked against `TRELLO_IMPORT_MAX_LISTS` and
+`TRELLO_IMPORT_MAX_CARDS` before the planner maps a single row, so an oversized export is refused
+after reading and before mapping, with nothing written either way. The board-ceiling `403` writes
+nothing either: the check is the first statement inside the transaction, before the board row, so
+the refusal rolls back an empty transaction.
 
 **The response body is the whole report, and it is not stored anywhere.**
 

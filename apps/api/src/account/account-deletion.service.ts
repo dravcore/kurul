@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, MemberRole } from '@kurul/shared-types';
+import { ActivityType, InvitationStatus, MemberRole } from '@kurul/shared-types';
 import type {
   AccountDeletionPreviewDto,
   DepartingMembershipDto,
@@ -434,7 +434,7 @@ export class AccountDeletionService {
         // that a deleted account would still be vouching for.
         result.invitationsRevoked = (
           await tx.workspaceInvitation.deleteMany({
-            where: { inviterId: userId, status: 'pending' },
+            where: { inviterId: userId, status: InvitationStatus.pending },
           })
         ).count;
 

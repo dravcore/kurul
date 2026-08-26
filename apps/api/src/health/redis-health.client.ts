@@ -1,4 +1,4 @@
-import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { envString } from '../common/env';
 import { parseRedisUrl } from '../common/redis-url';
@@ -18,7 +18,7 @@ interface RedisProbe {
  * client whose failure mode is "adapter never attached" rather than on Redis itself.
  */
 @Injectable()
-export class RedisHealthClient implements RedisProbe, OnModuleDestroy {
+export class RedisHealthClient implements RedisProbe, OnApplicationShutdown {
   private readonly logger = new Logger(RedisHealthClient.name);
   private client: Redis | null = null;
 
@@ -63,7 +63,8 @@ export class RedisHealthClient implements RedisProbe, OnModuleDestroy {
     return this.client;
   }
 
-  async onModuleDestroy(): Promise<void> {
+  /** Shutdown, not destroy: `/health/ready` is served right up to the listener closing. */
+  async onApplicationShutdown(): Promise<void> {
     const client = this.client;
     this.client = null;
     await client?.quit().catch(() => undefined);

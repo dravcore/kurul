@@ -167,10 +167,11 @@ MAIL_FROM=Kurul <kurul@example.com>
 ```
 
 Generate both secrets with `openssl rand -hex 32`. `POSTGRES_PASSWORD` is embedded directly in
-a connection URL, where a `/` from `-base64` output would truncate it — `-hex`'s alphabet
-(`0-9a-f`) has none. `BETTER_AUTH_SECRET` is only ever byte-compared, so it carries no such
-constraint, but generating it with `-hex` too means one generator to remember instead of a
-per-variable rule.
+a connection URL, which is why `-base64` is the wrong generator for it; the reason is written
+down once, in
+[development.md](development.md#database-and-cache-credentials). `BETTER_AUTH_SECRET` is only
+ever byte-compared and carries no such constraint, but generating it with `-hex` too means one
+generator to remember instead of a per-variable rule.
 
 `SITE_URL` carries the scheme because that is what decides whether Caddy serves plain HTTP or
 obtains a certificate. `https://…` switches automatic HTTPS on. `http://localhost` (the
@@ -259,6 +260,20 @@ And it must stay **below the proxy's body limit** (26 MiB in the bundled `docker
 room for the multipart envelope, for exactly the reason the attachment limit does — see
 [the proxy contract below](#bringing-your-own-reverse-proxy). Importing works on an instance with
 no `STORAGE_PATH` at all: an import creates link attachments, which store no bytes.
+
+Two more variables cap the _shape_ of the board rather than the bytes of the export:
+`TRELLO_IMPORT_MAX_CARDS` (default `50000`) and `TRELLO_IMPORT_MAX_LISTS` (default `5000`) refuse
+an export that carries more cards or lists than that, with a `400` and nothing written, before a
+single row is planned. `TRELLO_IMPORT_MAX_BYTES` alone does not bound this: a small card is a few
+dozen bytes, so an export well under the byte ceiling can still be far more rows than any board
+this import is meant to hold. Every name, description and URL the importer writes is also clamped
+to the same ceiling its own write path enforces everywhere else: a task title, a board name, a
+column name and so on each keep the same limit `CreateTaskDto`, `CreateBoardDto` and the other
+DTOs already apply on every other route; a card whose title had to be cut still imports, and the
+import report counts it as one of the rows that came across changed. The full list of clamped
+fields and their ceilings is in
+[ADR 0025's amendment](decisions/0025-trello-import-mapping.md#amendment-2026-08-26-field-length-ceilings-and-a-row-cap-sec-04),
+not repeated here.
 
 ## 3. Start it
 
@@ -735,6 +750,15 @@ reason. Do the steps in this order, every time; none of them is long.
    starts, and `--wait` returns once every long-running service reports healthy, non-zero if
    one does not.
 
+   A recreate is a pause, not an outage. `api` is given 30s (`stop_grace_period`) to finish
+   what it was doing before Docker kills it, and the bundled Caddy holds a request for up to
+   30s while an upstream is coming back instead of answering 502, retrying every 500ms. One
+   replica still means requests wait rather than being served elsewhere, and an upload already
+   streaming its body is not retried. A replacement reverse proxy needs its own equivalent to
+   behave the same way, and nginx open source has no one-to-one match: `proxy_next_upstream`
+   hands the request to the _next_ server in the upstream group, so a group with a single
+   `api` entry is never retried.
+
 6. **Verify:**
 
    ```bash
@@ -850,6 +874,17 @@ let you stop doing that: a **signature** that says this image came out of this r
 release workflow, and an **SBOM** that says what is inside it. Both are optional to use and
 neither protects anyone who never runs the commands below.
 
+The base images underneath the stack, `postgres`, `redis` and `caddy` in `docker-compose.yml`
+and `node` in the api and web Dockerfiles, are pinned `tag@sha256:...` instead of a bare tag for
+a related reason: two builds of the same release then resolve the same bytes. Two separate
+Dependabot ecosystems keep each digest current: `docker-compose` bumps `postgres`, `redis` and
+`caddy` in the compose files, and `docker` bumps `node` in the two Dockerfiles; either way an
+upstream fix arrives as a reviewable pull request instead of silently, the next time something
+happens to rebuild. One side effect: `docker compose pull` on its own no longer picks up an
+upstream `postgres`/`redis`/`caddy` patch release between Kurul releases, since the tag it
+resolves is now fixed to a digest; that patch arrives with the next Kurul release that merges
+the Dependabot bump, not before.
+
 ### Checking the signature
 
 You need [cosign](https://github.com/sigstore/cosign) **3.0 or newer** — the signatures are
@@ -959,6 +994,12 @@ was asked for. The bundled `docker/Caddyfile` configures no `log` directive and 
 access log at all; nginx's default `combined` format logs `$request`, which is the whole URL. If
 you keep an access log on this hostname, filter or rewrite `/auth/reset-password/*` in it, and
 until you do, treat that log as something that holds live credentials.
+
+One thing outside the routing contract is worth reproducing anyway: the bundled Caddy holds a
+request for up to 30s while an upstream is restarting instead of answering 502, which is what
+turns an upgrade into latency rather than errors. A proxy without it is still correct, only
+noisier on every `docker compose up -d`. What it takes to match, and why nginx open source has
+no one-to-one equivalent, is in step 5 of [Upgrading](#upgrading).
 
 #### Why the proxy's number is 26 MiB and the API's is 25
 

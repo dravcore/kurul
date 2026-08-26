@@ -6,8 +6,18 @@ import {
   TrelloImportSkipReason,
 } from '@kurul/shared-types';
 import type { LabelColorSlot, TrelloImportSkipGroupDto } from '@kurul/shared-types';
+import { MAX_ATTACHMENT_URL_LENGTH } from '../attachment/dto/attachment-limits';
 import { safeDisplayName } from '../attachment/attachment-display-name';
+import { MAX_BOARD_DESCRIPTION_LENGTH, MAX_BOARD_NAME_LENGTH } from '../board/dto/board-limits';
+import { MAX_COLUMN_NAME_LENGTH } from '../board/dto/column-limits';
 import { POSITION_GAP, rebalancePositions } from '../common/position/fractional-index';
+import { MAX_LABEL_NAME_LENGTH } from '../label/dto/label-limits';
+import { MAX_CHECKLIST_ITEM_CONTENT_LENGTH } from '../task/dto/checklist-item-limits';
+import {
+  MAX_CHECKLIST_TITLE_LENGTH,
+  MAX_TASK_DESCRIPTION_LENGTH,
+  MAX_TASK_TITLE_LENGTH,
+} from '../task/dto/task-limits';
 import { SkipCollector } from './import-skip';
 import type {
   TrelloCard,
@@ -16,6 +26,7 @@ import type {
   TrelloList,
 } from './trello-export';
 import { trelloColorToSlot } from './trello-label-color';
+import { clampNullable, clampToLength } from './trello-text';
 
 /** Who ran the import. Every row written records them (ADR 0025 — accountability, not mapping). */
 export interface TrelloImportContext {
@@ -241,9 +252,16 @@ export function planTrelloImport(
   for (const list of source.lists) {
     if (list.closed) {
       // ADR 0025: Kurul has no archive, so an archived list could only arrive as a live one —
-      // putting back in front of the user what they deliberately removed.
+      // putting back in front of the user what they deliberately removed. The sample is clamped
+      // the same way a written column's name is (SEC-04): this row is never stored, but its name
+      // still reaches the 201 body, and a report about a dropped list must not itself carry an
+      // unbounded string.
       archivedListIds.add(list.id);
-      skips.add(TrelloImportScope.List, TrelloImportSkipReason.Archived, list.name);
+      skips.add(
+        TrelloImportScope.List,
+        TrelloImportSkipReason.Archived,
+        clampToLength(list.name, MAX_COLUMN_NAME_LENGTH).value,
+      );
     } else if (isUnnamed(list.name)) {
       skips.add(TrelloImportScope.List, TrelloImportSkipReason.Malformed, null);
     } else {
@@ -257,10 +275,13 @@ export function planTrelloImport(
   const columns = orderedLists.map((list, index) => {
     const id = uuidv7();
     columnIdByTrelloId.set(list.id, id);
+    // SEC-04: `CreateColumnDto` refuses a name past this length; the importer used to write
+    // `list.name` straight through. Clamping here, before the row is built, is also what keeps
+    // the `addMany` sample below bounded: it reads `column.name`, not `list.name`.
     return {
       id,
       boardId,
-      name: list.name,
+      name: clampToLength(list.name, MAX_COLUMN_NAME_LENGTH).value,
       position: columnPosition(index),
       // ADR 0019 rejects inferring completion from a name and from a position by name, and a
       // Trello export offers nothing else. So there is no `if` here at all, and its absence *is*
@@ -281,11 +302,14 @@ export function planTrelloImport(
   const labels = source.labels.map((label) => {
     const mapping = trelloColorToSlot(label.color);
     const trelloColorName = label.color?.trim() ?? '';
-    const name = isUnnamed(label.name)
+    const rawName = isUnnamed(label.name)
       ? trelloColorName === ''
         ? LABEL_NAME_FALLBACK
         : trelloColorName
       : label.name;
+    // SEC-04: `CreateLabelDto` refuses a name past this length; the importer used to write it
+    // straight through, whichever of the three sources above it came from.
+    const { value: name, truncated } = clampToLength(rawName, MAX_LABEL_NAME_LENGTH);
     const id = uuidv7();
     labelIdByTrelloId.set(label.id, id);
 
@@ -295,8 +319,9 @@ export function planTrelloImport(
     //
     // ADR 0025 spells out the colour half of this; the name half is here for the same reason it
     // gives for the colour half — the question after an import is "why does my board look
-    // different", and a label that was renamed answers it just as much as one that was recoloured.
-    if (mapping.defaulted || isUnnamed(label.name)) {
+    // different", and a label that was renamed or cut answers it just as much as one that was
+    // recoloured.
+    if (mapping.defaulted || isUnnamed(label.name) || truncated) {
       skips.add(TrelloImportScope.Label, TrelloImportSkipReason.Defaulted, name);
     }
 
@@ -313,7 +338,14 @@ export function planTrelloImport(
   for (const card of source.cards) {
     const skip = (reason: TrelloImportSkipReason): void => {
       skippedCardReasons.set(card.id, reason);
-      skips.add(TrelloImportScope.Card, reason, card.name);
+      // This card is dropped, never written, but its name still reaches the 201 body as a
+      // sample. Clamped the same way a written task's title is (SEC-04): a report about a
+      // skipped card must not itself carry an unbounded string.
+      skips.add(
+        TrelloImportScope.Card,
+        reason,
+        clampToLength(card.name, MAX_TASK_TITLE_LENGTH).value,
+      );
     };
 
     if (card.closed) {
@@ -354,12 +386,26 @@ export function planTrelloImport(
     cards.forEach((card, index) => {
       const taskId = uuidv7();
       taskIdByTrelloCardId.set(card.id, taskId);
+
+      // SEC-04: `CreateTaskDto` refuses a title or description past these lengths; the importer
+      // is the one write path that used to skip that gate. One row per *card* that arrived
+      // changed, not one per changed field, for the same reason a label that is both unnamed and
+      // uncoloured is reported once (see the labels loop below): a card whose title and
+      // description were both cut is one card the user does not recognise, not two problems. The
+      // sample quotes the already-clamped title, not `card.name`, so a report about an oversized
+      // field cannot itself carry an unbounded string.
+      const title = clampToLength(card.name, MAX_TASK_TITLE_LENGTH);
+      const description = clampNullable(emptyToNull(card.desc), MAX_TASK_DESCRIPTION_LENGTH);
+      if (title.truncated || description.truncated) {
+        skips.add(TrelloImportScope.Card, TrelloImportSkipReason.Defaulted, title.value);
+      }
+
       tasks.push({
         id: taskId,
         boardId,
         columnId: column.id,
-        title: card.name,
-        description: emptyToNull(card.desc),
+        title: title.value,
+        description: description.value,
         position: cardPosition(index),
         dueDate: parseDueDate(card.due),
         // `estimatedMinutes` is absent, so the schema default (`null`) stands. Trello has no such
@@ -375,7 +421,9 @@ export function planTrelloImport(
       for (const trelloLabelId of card.idLabels) {
         const labelId = labelIdByTrelloId.get(trelloLabelId);
         if (labelId === undefined) {
-          skips.add(TrelloImportScope.Label, TrelloImportSkipReason.Malformed, card.name);
+          // The already-clamped title, not `card.name`: the same reason the card's own report
+          // row above quotes `title.value`.
+          skips.add(TrelloImportScope.Label, TrelloImportSkipReason.Malformed, title.value);
           continue;
         }
         if (attached.has(labelId)) continue;
@@ -386,9 +434,22 @@ export function planTrelloImport(
       for (const attachment of card.attachments) {
         const verdict = classifyUrl(attachment.url);
         if (!verdict.storable) {
-          skips.add(TrelloImportScope.Attachment, verdict.reason, attachment.name);
+          // Cleaned the same way a stored attachment's `filename` is, not the raw export string:
+          // this row is dropped, but its name still reaches the 201 body as a sample, and the same
+          // bidi/control-character rule applies wherever a Trello name is shown back to a user.
+          skips.add(TrelloImportScope.Attachment, verdict.reason, safeDisplayName(attachment.name));
           continue;
         }
+
+        // SEC-04: `CreateAttachmentDto` refuses a URL past this length; the importer used to
+        // write `verdict.url` straight through. One row per attachment that arrived changed, the
+        // same arithmetic the card and label loops above apply.
+        const url = clampToLength(verdict.url, MAX_ATTACHMENT_URL_LENGTH);
+        const filename = safeDisplayName(attachment.name) || url.value;
+        if (url.truncated) {
+          skips.add(TrelloImportScope.Attachment, TrelloImportSkipReason.Defaulted, filename);
+        }
+
         attachments.push({
           id: uuidv7(),
           taskId,
@@ -403,8 +464,8 @@ export function planTrelloImport(
           // attachment name reaches the same panel the HTTP path refuses it from, so the panel's
           // guarantee (ADR 0024) is only true if every writer applies the rule. Empty after
           // cleaning, or empty to begin with, falls back to the URL exactly as `createLink` does.
-          filename: safeDisplayName(attachment.name) || verdict.url,
-          url: verdict.url,
+          filename,
+          url: url.value,
           storageKey: null,
           mimeType: null,
           size: null,
@@ -421,18 +482,21 @@ export function planTrelloImport(
   for (const checklist of source.checklists) {
     const taskId =
       checklist.idCard === null ? undefined : taskIdByTrelloCardId.get(checklist.idCard);
+    // Neither branch below stores this checklist, but its name still reaches the 201 body as a
+    // sample; clamped for the same reason every other dropped-row sample in this file is.
+    const droppedName = clampToLength(checklist.name, MAX_CHECKLIST_TITLE_LENGTH).value;
     if (taskId === undefined) {
       const inherited =
         checklist.idCard === null ? undefined : skippedCardReasons.get(checklist.idCard);
       skips.add(
         TrelloImportScope.Checklist,
         inherited ?? TrelloImportSkipReason.Malformed,
-        checklist.name,
+        droppedName,
       );
       continue;
     }
     if (isUnnamed(checklist.name) || checklist.checkItems.length === 0) {
-      skips.add(TrelloImportScope.Checklist, TrelloImportSkipReason.Malformed, checklist.name);
+      skips.add(TrelloImportScope.Checklist, TrelloImportSkipReason.Malformed, droppedName);
       continue;
     }
 
@@ -449,10 +513,17 @@ export function planTrelloImport(
 
     cardChecklists.forEach((checklist, checklistIndex) => {
       const checklistId = uuidv7();
+
+      // SEC-04: the same clamp the task title gets, against `CreateChecklistDto`'s own ceiling.
+      const title = clampToLength(checklist.name, MAX_CHECKLIST_TITLE_LENGTH);
+      if (title.truncated) {
+        skips.add(TrelloImportScope.Checklist, TrelloImportSkipReason.Defaulted, title.value);
+      }
+
       checklists.push({
         id: checklistId,
         taskId: task.id,
-        title: checklist.name,
+        title: title.value,
         position: checklistPosition(checklistIndex),
       });
 
@@ -466,10 +537,21 @@ export function planTrelloImport(
       const itemPosition = positionsFor(usableItems.length);
 
       usableItems.forEach((item, itemIndex) => {
+        // SEC-04: `CreateChecklistItemDto` refuses content past this length; the importer used
+        // to write `item.name` straight through.
+        const content = clampToLength(item.name, MAX_CHECKLIST_ITEM_CONTENT_LENGTH);
+        if (content.truncated) {
+          skips.add(
+            TrelloImportScope.ChecklistItem,
+            TrelloImportSkipReason.Defaulted,
+            content.value,
+          );
+        }
+
         checklistItems.push({
           id: uuidv7(),
           checklistId,
-          content: item.name,
+          content: content.value,
           // Trello writes `'complete'` / `'incomplete'`; anything else is not "done".
           isDone: item.state === 'complete',
           position: itemPosition(itemIndex),
@@ -482,11 +564,24 @@ export function planTrelloImport(
   skips.addMany(TrelloImportScope.Member, TrelloImportSkipReason.Unmappable, source.memberCount);
   skips.addMany(TrelloImportScope.Comment, TrelloImportSkipReason.OutOfScope, source.commentCount);
 
+  // SEC-04: `CreateBoardDto`'s own ceilings, applied silently rather than through `skips`. There
+  // is no `board` scope in `TrelloImportScope` (`trello-export.ts` makes the same call for the
+  // board's own description already): a board is one row, not a class of rows, and a `(board,
+  // defaulted)` line that can only ever say "1" answers nothing a user could act on.
+  const boardName = clampToLength(
+    isUnnamed(source.name) ? BOARD_NAME_FALLBACK : source.name,
+    MAX_BOARD_NAME_LENGTH,
+  ).value;
+  const boardDescription = clampNullable(
+    emptyToNull(source.desc),
+    MAX_BOARD_DESCRIPTION_LENGTH,
+  ).value;
+
   return {
     board: {
       id: boardId,
-      name: isUnnamed(source.name) ? BOARD_NAME_FALLBACK : source.name,
-      description: emptyToNull(source.desc),
+      name: boardName,
+      description: boardDescription,
     },
     columns,
     labels,

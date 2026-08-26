@@ -12,6 +12,24 @@ updates:
     # Majors now arrive as one PR per package, so the cap has to leave room for a
     # week that lands several of them alongside the two grouped PRs.
     open-pull-requests-limit: 15
+    # Never take a release younger than a week. This is the supply-chain window and nothing
+    # else: a compromised package is typically pulled within hours to a few days, and holding
+    # every bump behind that window is the whole defence a lockfile cannot give. It is *not* a
+    # regression net, and pretending otherwise would be wrong here: the one dependency
+    # regression this repository has had (next 16.3.1 breaking the standalone bundle, fixed by
+    # hand in 390699f) came from a nine-day-old release, and a seven-day cooldown would have
+    # delayed its fix by a week instead of preventing anything.
+    #
+    # `cooldown` is the zero-toolchain half of pnpm 10's `minimumReleaseAge`, which this repo
+    # cannot use while `packageManager` is pnpm 9. Two differences worth knowing: it governs
+    # only what Dependabot proposes (a manual `pnpm add` is unaffected), and **security updates
+    # bypass it entirely**: an advisory-driven bump still opens the day it lands. A release
+    # blocked by an advisory is still bumped by hand, exactly as 390699f was.
+    cooldown:
+      default-days: 7
+      # Longer for majors: a major is reviewed and migrated on its own timeline anyway, so the
+      # extra week costs nothing and buys the ecosystem time to find the breakage first.
+      semver-major-days: 14
     ignore:
       # TypeScript 7 is held, not skipped — see ADR 0030
       # (docs/decisions/0030-typescript-7-hold.md) for the full picture, the maintainer
@@ -80,6 +98,11 @@ updates:
     # patch release of any of the fifteen actions in use is a diff. The grouping below keeps
     # the usual week to one PR, but a week where several actions cut majors needs the headroom.
     open-pull-requests-limit: 10
+    # Same window and the same reasoning as the npm block above. Only `default-days` is
+    # supported outside npm, so majors wait the same seven days as everything else here.
+    # Security updates bypass the cooldown.
+    cooldown:
+      default-days: 7
 
     groups:
       # Same reasoning as the npm groups above, and the same split: minor/patch batched into
@@ -91,20 +114,52 @@ updates:
           - minor
           - patch
 
-  # `mailpit` in `docker-compose.dev.yml` is now pinned `tag@sha256:...` instead of `:latest`
-  # (roadmap Hardening: "mailpit pinned by digest"), which is what gives this ecosystem
-  # something to bump. `directory: /` also covers `docker-compose.yml` in the same directory:
-  # its `postgres`/`redis`/`caddy` tags may get bump PRs too, which is fine, and its
-  # `ghcr.io/dravcore/kurul-*` images resolve the `${TAG:-latest}` build arg through the
-  # release pipeline rather than a literal tag, so Dependabot has nothing to propose there.
+  # `node` in both Dockerfiles is pinned `tag@sha256:...` instead of a bare tag, which is what
+  # gives this ecosystem something to bump. Dependabot's `docker` updater only reads Dockerfiles
+  # (plus Helm charts and Kubernetes manifests) in the directory it is pointed at, and never a
+  # compose file, so `directories` lists the two Dockerfile locations, not the repo root: a
+  # `directory: /` entry here would match nothing in this repo and fail the job.
   #
-  # The e2e workflow's own `services: mailpit` image is a separate pin this ecosystem does not
-  # see at all — Dependabot's `docker` ecosystem only reads Dockerfiles and compose files, not
-  # a `uses:`-adjacent `services:` block in a workflow — so that one stays a manual bump; see
-  # the comment on it in `.github/workflows/e2e.yml`.
+  # The compose files are a separate Dependabot ecosystem, `docker-compose`, registered in the
+  # block right after this one. `mailpit` in `docker-compose.dev.yml` and every other base image
+  # (`postgres` and `redis` in both compose files, `caddy` in `docker-compose.yml`) are pinned
+  # the same way, and it is that block, not this one, that bumps them.
+  #
+  # The `ghcr.io/dravcore/kurul-*` images resolve the `${TAG:-latest}` build arg through the
+  # release pipeline rather than a literal tag, so neither ecosystem has anything to propose
+  # there.
   - package-ecosystem: docker
+    directories:
+      - /apps/api
+      - /apps/web
+    schedule:
+      interval: weekly
+    # Same reasoning as the other two blocks: `main` takes only release/* and hotfix/* merges.
+    target-branch: develop
+    # Same window and the same reasoning as the npm block above; `default-days` only, and
+    # security updates bypass it.
+    cooldown:
+      default-days: 7
+
+  # Bumps the base images pinned in the compose files: `postgres` and `redis` in both
+  # `docker-compose.yml` and `docker-compose.dev.yml`, `caddy` in `docker-compose.yml`, and
+  # `mailpit` in `docker-compose.dev.yml`. `docker-compose` is a distinct Dependabot ecosystem
+  # from `docker` above, not a directory of it: the `docker` updater never reads a compose
+  # file, so putting `/` in its `directories` list (as an earlier version of this file did)
+  # silently bumps nothing for these images and errors instead, since `/` then has no
+  # Dockerfile for `docker` to find either.
+  #
+  # The e2e workflow's own `services: mailpit` image is a separate pin that neither ecosystem
+  # sees, since Dependabot's docker ecosystems read Dockerfiles and compose files only, not a
+  # `uses:`-adjacent `services:` block in a workflow, so that one stays a manual bump; see the
+  # comment on it in `.github/workflows/e2e.yml`.
+  - package-ecosystem: docker-compose
     directory: /
     schedule:
       interval: weekly
     # Same reasoning as the other two blocks: `main` takes only release/* and hotfix/* merges.
     target-branch: develop
+    # Same window and the same reasoning as the npm block above; `default-days` only, and
+    # security updates bypass it.
+    cooldown:
+      default-days: 7
