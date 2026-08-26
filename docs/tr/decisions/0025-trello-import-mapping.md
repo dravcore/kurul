@@ -264,26 +264,50 @@ satırıdır.
 
 Bir denetim bulgusu (SEC-04), bu importer'ın diğer her yazma yolunun uyguladığı uzunluk
 kontrollerini atladığını gösterdi. `Task.title`, `Task.description`, `Board.name`,
-`Board.description` ve `Checklist.title`, diğer her rotada `CreateTaskDto`, `CreateBoardDto` ve
-`CreateChecklistDto` üzerinden veritabanına ulaşıyor, ve bunların her biri kendi alanını
-`@MaxLength` ile işaretliyor. Planner ise `card.name`, `card.desc`, export'un kendi board adı ve
-açıklaması, ve `checklist.name`'i böyle bir tavan olmadan doğrudan yazıyordu, yani bir Trello
-export'u bu dekoratörlerin korumadığı tek kapıydı. Export'taki hiçbir şey bu şekilde yazılmakla
-kötü niyetli hale gelmiyordu; risk, kimsenin kaydıramayacağı bir board ve ürünün bir kolonun
-tutmasını hiç istemediği kadar veri tutan bir veritabanı sütunuydu.
+`Board.description`, `Checklist.title`, `Column.name`, `Label.name`, `ChecklistItem.content` ve
+`Attachment.url`, diğer her rotada `CreateTaskDto`, `CreateBoardDto`, `CreateChecklistDto`,
+`CreateColumnDto`, `CreateLabelDto`, `CreateChecklistItemDto` ve `CreateAttachmentDto` üzerinden
+veritabanına ulaşıyor, ve bunların her biri kendi alanını `@MaxLength` ile işaretliyor. Planner
+ise `card.name`, `card.desc`, export'un kendi board adı ve açıklaması, `checklist.name`,
+`list.name`, `label.name`, bir check item'ın `name` alanı ve bir ekin `url` alanını böyle bir
+tavan olmadan doğrudan yazıyordu, yani bir Trello export'u bu dekoratörlerin korumadığı tek
+kapıydı. Export'taki hiçbir şey bu şekilde yazılmakla kötü niyetli hale gelmiyordu; risk,
+kimsenin kaydıramayacağı bir board ve ürünün bir kolonun tutmasını hiç istemediği kadar veri
+tutan bir veritabanı sütunuydu.
 
-`trello-import-planner.ts` artık bu alanların her birini DTO'nun kullandığı aynı sabite kısıtlıyor
-(`task/dto/task-limits.ts` ve `board/dto/board-limits.ts`, hem DTO'lar hem planner tarafından
-import ediliyor, yani sayı bir kez var oluyor). Kesilen bir görev başlığı ya da açıklaması, bu
-raporda başka bir yerde zaten kullanılan aynı gerekçeyle tek bir `(card, defaulted)` satırı olarak
-raporlanır (bilinmeyen bir etiket rengi, varsayılan bir sütun kategorisi gibi): kart yine de
-import edilir, ve raporun cevapladığı soru "board'um neden farklı görünüyor" sorusudur, bunu bir
-kısıtlama da bir renk değişimi kadar iyi cevaplar. Kesilen bir checklist başlığı da aynı şekilde,
-`(checklist, defaulted)` altında raporlanır. Board'un kendi adı ve açıklaması sessizce kısıtlanır:
-yukarıdaki kapalı kelime dağarcığında bir `board` kapsamı yok, bir board bir satır sınıfı değil
-tek bir satır, ve yalnızca "1" diyebilecek bir `(board, defaulted)` satırı kullanıcının
-davranabileceği hiçbir şey söylemez, bu da `trello-export.ts`'in board'un kendi açıklaması
-kullanılamaz olduğunda zaten uyguladığı gerekçenin aynısı.
+`trello-import-planner.ts` artık bu alanların her birini DTO'nun kullandığı aynı sabite kısıtlıyor.
+Her DTO çifti (create ve update), tavanını yanındaki tek dosyadan import ediyor, toplam altı dosya
+(`task/dto/task-limits.ts`, `board/dto/board-limits.ts`, `board/dto/column-limits.ts`,
+`label/dto/label-limits.ts`, `task/dto/checklist-item-limits.ts` ve
+`attachment/dto/attachment-limits.ts`), ve planner da aynı altı dosyayı import ediyor, yani her
+sayı bir kez var oluyor. Kesilen bir görev başlığı ya da açıklaması, bu raporda başka bir yerde
+zaten kullanılan aynı gerekçeyle tek bir `(card, defaulted)` satırı olarak raporlanır (bilinmeyen
+bir etiket rengi, varsayılan bir sütun kategorisi gibi): kart yine de import edilir, ve raporun
+cevapladığı soru "board'um neden farklı görünüyor" sorusudur, bunu bir kısıtlama da bir renk
+değişimi kadar iyi cevaplar. Kesilen bir checklist başlığı ya da bir checklist item'ın içeriği de
+aynı şekilde, sırasıyla `(checklist, defaulted)` ve `(checklistItem, defaulted)` altında
+raporlanır. Kesilen bir label adı, bilinmeyen bir rengin zaten ürettiği `(label, defaulted)`
+satırına katılır; Karar tablosunun bunları birleştirme gerekçesiyle aynı gerekçeyle: kullanıcının
+tanımadığı bir label tek bir sorundur, kaç alanı değişmiş olursa olsun. Kesilen bir ek URL'si
+`(attachment, defaulted)` altında raporlanır. Bir sütunun adı, her import edilen sütunun zaten
+aldığı kategori varsayımıyla aynı rapor satırını paylaşır (`(column, defaulted)`, sayı sütun
+sayısına eşit): aynı sütun için ayrı, ikinci bir satır onu iki kez saymış olurdu, bu yüzden
+kısıtlama ayrı bir satır eklemek yerine o satırın örnek metninin ne söyleyebileceğini değiştirir.
+Board'un kendi adı ve açıklaması sessizce kısıtlanır: yukarıdaki kapalı kelime dağarcığında bir
+`board` kapsamı yok, bir board bir satır sınıfı değil tek bir satır, ve yalnızca "1" diyebilecek
+bir `(board, defaulted)` satırı kullanıcının davranabileceği hiçbir şey söylemez, bu da
+`trello-export.ts`'in board'un kendi açıklaması kullanılamaz olduğunda zaten uyguladığı
+gerekçenin aynısı.
+
+Aynı tavan, yalnızca yazmayı değil _raporu_ da sınırlıyor. Planner'ın yazmak yerine düşürdüğü bir
+satır (arşivlenmiş bir liste ya da kart, export'ta bulunmayan bir label id'sine işaret eden bir
+kart, reddedilen bir ek, kartı düşürüldüğü için düşen bir checklist) yine de bir adı yanıt
+gövdesinde örnek olarak alıntılıyor, ve o ad export'tan geliyor, kısıtlanmamış olarak, tıpkı
+yukarıdaki alanlar gibi. Bu örnek noktalarının her biri artık metnini, tanımladığı satır yazılmış
+olsaydı nasıl kısıtlanacak ya da temizlenecek idiyse öyle kısıtlıyor ya da temizliyor (label-id
+durumunda kabul edilen kartın kendi zaten kısıtlanmış başlığı; reddedilen bir ek için
+`safeDisplayName`; düşen bir liste ya da checklist için sütun/checklist tavanları), yani oversized
+bir alan hakkındaki bir rapor, hiçbir yolda kendisi sınırsız bir string taşıyamaz.
 
 Aynı bulgunun adlandırdığı ikinci bir boşluk: bir export'un bu API'den planlamasını isteyebileceği
 satır sayısını hiçbir şey sınırlamıyordu. `TRELLO_IMPORT_MAX_BYTES` ayrıştırılmış nesne grafiğinin

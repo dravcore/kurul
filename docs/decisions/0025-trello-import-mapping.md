@@ -266,28 +266,49 @@ them and lose the grouping the user made. One Trello checklist is one `Checklist
 
 ## Amendment (2026-08-26): field length ceilings and a row cap (SEC-04)
 
-An audit finding (SEC-04) noted that this importer skipped the length checks every other write
-path applies. `Task.title`, `Task.description`, `Board.name`, `Board.description` and
-`Checklist.title` all reach the database through `CreateTaskDto`, `CreateBoardDto` and
-`CreateChecklistDto` on every other route, and each of those decorates its field with
-`@MaxLength`. The planner wrote `card.name`, `card.desc`, the export's own board name and
-description, and `checklist.name` straight through with no such ceiling, so a Trello export was
-the one door into this database those decorators did not guard. Nothing in the export was
-malicious to write this way; the risk was a board nobody could scroll and a database column
-holding more than the product ever intended one to hold.
+An audit finding (SEC-04) noted that this importer skipped the length checks every other write path
+applies. `Task.title`, `Task.description`, `Board.name`, `Board.description`, `Checklist.title`,
+`Column.name`, `Label.name`, `ChecklistItem.content` and `Attachment.url` all reach the database
+through `CreateTaskDto`, `CreateBoardDto`, `CreateChecklistDto`, `CreateColumnDto`,
+`CreateLabelDto`, `CreateChecklistItemDto` and `CreateAttachmentDto` on every other route, and each
+of those decorates its field with `@MaxLength`. The planner wrote `card.name`, `card.desc`, the
+export's own board name and description, `checklist.name`, `list.name`, `label.name`, a check item's
+`name` and an attachment's `url` straight through with no such ceiling, so a Trello export was the
+one door into this database those decorators did not guard. Nothing in the export was malicious to
+write this way; the risk was a board nobody could scroll and a database column holding more than the
+product ever intended one to hold.
 
-`trello-import-planner.ts` now clamps every one of those fields to the same constant the DTO
-uses (`task/dto/task-limits.ts` and `board/dto/board-limits.ts`, imported by the DTOs and the
-planner alike, so the number exists once). A task title or description that was cut is reported
-as one `(card, defaulted)` row, the same reason a substitution already uses elsewhere in this
-report (an unknown label colour, a defaulted column category): the card still imports, and the
-question the report answers is "why does my board look different", which a clamp answers as
-well as a colour substitution does. A checklist title that was cut is reported the same way,
-under `(checklist, defaulted)`. The board's own name and description are clamped silently: there
-is no `board` scope in the closed vocabulary above, a board is one row rather than a class of
-rows, and a `(board, defaulted)` line that could only ever say "1" would answer nothing a user
-could act on, the same reasoning `trello-export.ts` already applies to the board's own
-description when it is unusable.
+`trello-import-planner.ts` now clamps every one of those fields to the same constant the DTO uses.
+Each pair of DTOs (create and update) imports its ceiling from one file next to it, six files in all
+(`task/dto/task-limits.ts`, `board/dto/board-limits.ts`, `board/dto/column-limits.ts`,
+`label/dto/label-limits.ts`, `task/dto/checklist-item-limits.ts` and
+`attachment/dto/attachment-limits.ts`), and the planner imports the same six, so each number exists
+once. A task title or description that was cut is reported as one `(card, defaulted)` row, the same
+reason a substitution already uses elsewhere in this report (an unknown label colour, a defaulted
+column category): the card still imports, and the question the report answers is "why does my board
+look different", which a clamp answers as well as a colour substitution does. A checklist title or a
+checklist item's content that was cut is reported the same way, under `(checklist, defaulted)` and
+`(checklistItem, defaulted)`. A label name that was cut folds into the same `(label, defaulted)` row
+an unknown colour already produces, for the reason the Decision table gives for combining them: a
+label the user does not recognise is one problem, however many of its fields changed. An attachment
+URL that was cut is reported under `(attachment, defaulted)`. A column's name shares its report row
+with the category default every imported column already gets (`(column, defaulted)`, count equal to
+the number of columns): a second, separate row for the same column would double-count it, so the
+clamp changes what that row's sample text can say rather than adding a row of its own. The board's
+own name and description are clamped silently: there is no `board` scope in the closed vocabulary
+above, a board is one row rather than a class of rows, and a `(board, defaulted)` line that could
+only ever say "1" would answer nothing a user could act on, the same reasoning `trello-export.ts`
+already applies to the board's own description when it is unusable.
+
+The same ceiling also bounds the _report_, not only the write. A row the planner drops rather than
+writes (an archived list or card, a card pointing at a label id the export does not contain, a
+rejected attachment, a checklist left off because its card was dropped) still quotes a name as a
+sample in the response body, and that name comes from the export, unclamped, just like the fields
+above. Every one of those sample sites now clamps or cleans its text the same way the row it
+describes would have (the accepted card's own already-clamped title, in the label-id case;
+`safeDisplayName` for a rejected attachment; the column/checklist ceilings for a dropped list or
+checklist), so a report about an oversized field cannot itself carry an unbounded string back to the
+caller, on any path.
 
 A second gap the same finding named: nothing bounded how many rows an export could ask this API
 to plan. `TRELLO_IMPORT_MAX_BYTES` bounds the parsed object graph's size, not the row count, and
