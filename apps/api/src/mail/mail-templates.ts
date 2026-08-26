@@ -81,6 +81,20 @@ interface MailCopy {
     action: string;
     closing: string;
   };
+  passwordReset: {
+    subject: string;
+    heading: string;
+    /** Used when the account has a display name. */
+    greeting: (name: string) => string;
+    /** Used when it does not. */
+    greetingAnonymous: string;
+    lead: string;
+    action: string;
+    /** How long the link works; `hours` is what `resetPasswordTokenExpiresIn` amounts to. */
+    expiry: (hours: number) => string;
+    /** The one sentence a person who did not ask for this needs: nothing has changed. */
+    closing: string;
+  };
   invitation: {
     subject: (workspaceName: string) => string;
     heading: (workspaceName: string) => string;
@@ -148,6 +162,20 @@ const MAIL_COPY: Record<Locale, MailCopy> = {
       action: 'Confirm email address',
       closing: 'If you did not create this account, you can ignore this email.',
     },
+    passwordReset: {
+      subject: `Reset your ${PRODUCT_NAME} password`,
+      heading: 'Reset your password',
+      greeting: (name) => `Hi ${name},`,
+      greetingAnonymous: 'Hi,',
+      lead: `Someone asked to reset the password of your ${PRODUCT_NAME} account. Open the link below to choose a new one.`,
+      action: 'Choose a new password',
+      expiry: (hours) =>
+        hours === 1
+          ? 'The link works for one hour and can be used once.'
+          : `The link works for ${hours} hours and can be used once.`,
+      closing:
+        'If you did not ask for this, you can ignore this email: your password stays as it is.',
+    },
     invitation: {
       subject: (workspaceName) =>
         `You have been invited to join ${workspaceName} on ${PRODUCT_NAME}`,
@@ -199,6 +227,20 @@ const MAIL_COPY: Record<Locale, MailCopy> = {
       lead: `${PRODUCT_NAME} hesabınızı tamamlamak için bu adresi doğrulayın. Bir workspace davetini kabul edebilmeniz için adresinizin doğrulanmış olması gerekiyor.`,
       action: 'E-posta adresini doğrula',
       closing: 'Bu hesabı siz oluşturmadıysanız bu e-postayı yok sayabilirsiniz.',
+    },
+    passwordReset: {
+      subject: `${PRODUCT_NAME} parolanızı sıfırlayın`,
+      heading: 'Parolanızı sıfırlayın',
+      greeting: (name) => `Merhaba ${name},`,
+      greetingAnonymous: 'Merhaba,',
+      lead: `${PRODUCT_NAME} hesabınızın parolasını sıfırlamak için bir istek geldi. Yeni bir parola seçmek için aşağıdaki bağlantıyı açın.`,
+      action: 'Yeni parola seç',
+      expiry: (hours) =>
+        hours === 1
+          ? 'Bağlantı bir saat geçerlidir ve yalnızca bir kez kullanılabilir.'
+          : `Bağlantı ${hours} saat geçerlidir ve yalnızca bir kez kullanılabilir.`,
+      closing:
+        'Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz: parolanız olduğu gibi kalır.',
     },
     invitation: {
       subject: (workspaceName) =>
@@ -270,6 +312,37 @@ export function buildVerificationEmail(params: VerificationEmailParams): MailMes
       `<p>${escapeHtml(greeting)}</p><p>${escapeHtml(copy.lead)}</p>` +
         actionHtml(copy.action, params.verificationUrl, copyFor(params.locale).linkFallback) +
         `<p>${escapeHtml(copy.closing)}</p>`,
+    ),
+  };
+}
+
+export interface PasswordResetEmailParams {
+  to: string;
+  /** The recipient's display name; may be blank for accounts created without one. */
+  name: string;
+  /** The Better Auth `/auth/reset-password/<token>?callbackURL=…` link, already pointed at the web app. */
+  resetUrl: string;
+  /** How long the link works, so the email and `resetPasswordTokenExpiresIn` cannot drift. */
+  expiresInHours: number;
+  /** The recipient's language, see `recipient-locale.ts` for how it is resolved. */
+  locale: Locale;
+}
+
+export function buildPasswordResetEmail(params: PasswordResetEmailParams): MailMessage {
+  const copy = copyFor(params.locale).passwordReset;
+  const name = singleLine(params.name);
+  const greeting = name === '' ? copy.greetingAnonymous : copy.greeting(name);
+  const expiry = copy.expiry(params.expiresInHours);
+
+  return {
+    to: params.to,
+    subject: singleLine(copy.subject),
+    text: [greeting, '', copy.lead, '', params.resetUrl, '', expiry, '', copy.closing].join('\n'),
+    html: htmlDocument(
+      copy.heading,
+      `<p>${escapeHtml(greeting)}</p><p>${escapeHtml(copy.lead)}</p>` +
+        actionHtml(copy.action, params.resetUrl, copyFor(params.locale).linkFallback) +
+        `<p>${escapeHtml(expiry)}</p><p>${escapeHtml(copy.closing)}</p>`,
     ),
   };
 }

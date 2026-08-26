@@ -432,6 +432,22 @@ nobody can join your workspace. The Members screen says so in the product, too. 
 email (assignment, mention, due-soon) uses the same settings and simply stays off without
 them; once SMTP works, each user can switch it off for themselves under Settings.
 
+**Password reset needs SMTP too, and fails quietly without it.** `POST /auth/request-password-reset`
+answers `200` whatever happens (it answers the same for an address that has no account, so
+nobody can enumerate accounts with it), and with `SMTP_HOST` unset the whole message, reset
+link included, goes to the API log instead of to the person:
+
+```
+Email not sent (no SMTP): from=Kurul <noreply@localhost> to=you@example.com subject=Reset your Kurul password
+...
+http://localhost:4000/auth/reset-password/<token>?callbackURL=http%3A%2F%2Flocalhost%3A3000%2Freset-password
+```
+
+That is workable on a solo install (copy the link out of `docker compose logs api` within the
+hour it is valid) and is not a recovery path for anyone else, because a locked-out user cannot
+read your logs. On a `DEMO_MODE` instance no reset mail is written even to the log for the demo
+account itself, whose password is published anyway.
+
 Any SMTP provider works. Two things go wrong most often:
 
 - **`SMTP_SECURE`.** `true` means implicit TLS, which is port 465 only. Port 587 and 25 use
@@ -933,6 +949,16 @@ web app is built against it. Three rules, in this order, all on one hostname:
 | everything | web:3000 | kept as-is          | proxy default is fine         |
 
 `/api/*` must also pass WebSocket upgrades through — that is the realtime board feed.
+
+**One route carries a secret in its path, so keep it out of the proxy's access log.**
+`GET /auth/reset-password/<token>` is a URL a real browser follows, and the token in it is live
+until the form on the other side is submitted. The API's own access log writes that path as
+`/auth/reset-password/:token` and never the token itself
+(`apps/api/src/common/logging/access-log.middleware.ts`), but a proxy in front logs the URL it
+was asked for. The bundled `docker/Caddyfile` configures no `log` directive and so writes no
+access log at all; nginx's default `combined` format logs `$request`, which is the whole URL. If
+you keep an access log on this hostname, filter or rewrite `/auth/reset-password/*` in it, and
+until you do, treat that log as something that holds live credentials.
 
 #### Why the proxy's number is 26 MiB and the API's is 25
 

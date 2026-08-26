@@ -66,7 +66,7 @@ export function TaskChecklists({
 
   return (
     <section aria-label={t('sectionLabel')} className="flex flex-col gap-3">
-      <p className="text-small font-medium text-foreground">{t('sectionLabel')}</p>
+      <p className="text-small font-strong text-foreground">{t('sectionLabel')}</p>
 
       {loading ? (
         <p className="text-small text-muted-foreground">{t('loading')}</p>
@@ -79,7 +79,7 @@ export function TaskChecklists({
             return (
               <div key={list.id} className="flex flex-col gap-1.5">
                 <div className="flex items-baseline gap-2">
-                  <h4 className="min-w-0 flex-1 text-body font-medium break-words">{list.title}</h4>
+                  <h4 className="min-w-0 flex-1 text-body font-strong break-words">{list.title}</h4>
                   {/*
                     The ratio is for the eye; a screen reader announcing "1 slash 2" is not a
                     sentence. The visible node is hidden from the accessibility tree and the

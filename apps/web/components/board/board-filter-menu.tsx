@@ -70,7 +70,7 @@ export function BoardFilterMenu({
           <Filter className="size-3.5" />
           {t('filters')}
           {activeCount > 0 ? (
-            <span className="rounded-sm bg-muted px-1 text-micro font-medium tabular-nums">
+            <span className="rounded-sm bg-muted px-1 text-micro font-strong tabular-nums">
               {activeCount}
             </span>
           ) : null}
