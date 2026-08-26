@@ -408,6 +408,36 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   opening a second palette. A new gate, `app/globals.contrast.test.ts`, measures every text token
   against six real surfaces and every boundary token at 3:1 on every run, so a future token change
   that quietly drops a pair under AA fails the build instead of shipping.
+- **Text now runs on one type scale, and a focused control draws exactly one indicator.** Every
+  button label, dialog title, form field and menu item used to draw from two competing sources:
+  shadcn's own default text sizes and weights sitting beside Kurul's own scale, so a button and the
+  card title next to it could land at different pixel sizes without either class saying so. The
+  Tailwind defaults are gone from `components/ui/` and the domain tree in favour of Kurul's own
+  steps, and `app/theme-classes.test.ts` fails the build on any class that resolves to nothing, so a
+  stray default cannot slip back in unnoticed. A dialog's title steps down from an unintended 18px
+  to the 16px `title` step the scale actually defines, since there never was an 18px step; a button
+  label and the card title beside it now agree on the same 13px. Fraunces also now loads its
+  optical-size axis (`axes: ['opsz']` in `app/layout.tsx`) so a 40px `.text-display` heading renders
+  with the carved 40pt cut instead of the low-optical-size cut `next/font/google` embeds by
+  default. Below 768px, every text field (`Input`, `Textarea`, `Select`) computes at 16px so iOS
+  Safari stops zooming the page on focus, matched by a new assertion in
+  `e2e/tests/mobile-navigation.spec.ts`, now that `cn()` dedupes the type scale so that 16px
+  override reliably beats any conflicting default reaching the DOM.
+
+  The same pass removed a duplicate focus mark: a focused control used to draw an outline and a
+  separate copper ring on top of it, from two different rules that had never been told about each
+  other. Only the outline is left, 2px `--ring` at 2px offset from a single rule in `@layer base`,
+  and a field that is both invalid and focused recolours that one outline to the destructive token
+  instead of growing a second mark beside its red border.
+- **The copper signature colour now has a written budget instead of an unenforced guideline.** Full
+  strength copper is limited to at most two uses per screen, the sancak rail plus, where a view has
+  one, its single primary action button. The focus ring and any data mark, a meter fill, a progress
+  fill, the dashboard's one copper emphasis series, do not count against that budget: the ring is
+  singular and momentary by construction, and a data mark is showing a value rather than describing
+  the screen around it. The signature tint is bound to exactly one role, active or selected, and
+  neither the tint nor the hover surface carries coloured copper text of its own: identity lives in
+  the sancak rail and the one button, in a dot beside a label, never in a coloured word sitting on
+  a tinted background.
 
 ### Fixed
 
@@ -632,6 +662,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   white label in light mode with a dark OS, and lost its hover step in dark mode with a light OS.
   `app/globals.css` now declares `@custom-variant dark (&:where(.dark, .dark *))`, so every
   `dark:` utility follows the theme the app is actually showing.
+- **Archivo and Fraunces were never actually rendering; the whole app drew in the system font
+  instead.** next/font's `.variable` classes (`--font-archivo`, `--font-fraunces`,
+  `--font-jetbrains`) were defined on `<body>`, but the theme's font stacks (`--font-sans`,
+  `--font-display`, `--font-mono` in `app/globals.css`) resolve their `var()` references on
+  `:root`, and a custom property only resolves against the element that declares it, so every
+  stack fell straight through to its fallback list. The three `.variable` classes now sit on
+  `<html>` instead, next to the tokens that need them, so both faces load and draw as designed.
 
 ### Security
 
