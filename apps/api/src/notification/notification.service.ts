@@ -115,17 +115,11 @@ export class NotificationService {
     });
   }
 
-  async createAssignment(
-    db: NotificationDb,
-    input: Omit<CreateNotificationInput, 'type'> & { type?: string },
-  ) {
+  async createAssignment(db: NotificationDb, input: Omit<CreateNotificationInput, 'type'>) {
     return this.create(db, { ...input, type: NotificationType.Assignment });
   }
 
-  async createMention(
-    db: NotificationDb,
-    input: Omit<CreateNotificationInput, 'type'> & { type?: string },
-  ) {
+  async createMention(db: NotificationDb, input: Omit<CreateNotificationInput, 'type'>) {
     return this.create(db, { ...input, type: NotificationType.Mention });
   }
 
