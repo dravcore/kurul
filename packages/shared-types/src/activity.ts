@@ -40,7 +40,7 @@ export const ActivityType = {
   // precedents. (`task.label_added`/`removed` above came later, naming a join row rather than an
   // upload, and does not reopen this choice.) The names are unrenameable once a row carries one,
   // so matching the existing vocabulary was a one-time free choice (ADR 0024). Only the second of
-  // the two joins the audit subset — see the rule below.
+  // the two joins the audit subset (see the rule below).
   AttachmentCreated: 'attachment.created',
   AttachmentDeleted: 'attachment.deleted',
 
