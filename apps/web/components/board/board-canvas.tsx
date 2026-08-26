@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { TaskDragPreview } from '@/components/task/sortable-task-card';
 import type { BoardTaskDndController } from '@/components/task/use-board-task-dnd';
 import { BoardColumn } from './board-column';
+import { useReducedMotion } from './use-reduced-motion';
 
 const dropAnimation: DropAnimation = {
   sideEffects: defaultDropAnimationSideEffects({
@@ -61,6 +62,7 @@ export function BoardCanvas({
   onAddTask,
 }: BoardCanvasProps): React.ReactElement {
   const t = useTranslations('app.board');
+  const reducedMotion = useReducedMotion();
 
   return (
     <DndContext
@@ -104,7 +106,12 @@ export function BoardCanvas({
           </Button>
         ) : null}
       </div>
-      <DragOverlay dropAnimation={dropAnimation}>
+      {/* @dnd-kit flies the overlay back to the drop position with `node.animate()`, a Web
+          Animations API call the reduced-motion block in `app/globals.css` cannot reach: the
+          browser pass measured a 250ms `translate3d` keyframe pair still running under
+          `prefers-reduced-motion: reduce`. `null` is @dnd-kit's own way to say the overlay
+          simply goes away, which is the movement-free landing docs/design.md §5 asks for. */}
+      <DragOverlay dropAnimation={reducedMotion ? null : dropAnimation}>
         {dnd.activeTask ? <TaskDragPreview task={dnd.activeTask} /> : null}
       </DragOverlay>
     </DndContext>
