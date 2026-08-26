@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { TrelloImportScope, TrelloImportSkipReason } from '../src/entities.js';
+import {
+  PLAN_LIMIT_ERROR,
+  SIGNUP_DISABLED_ERROR,
+  TrelloImportScope,
+  TrelloImportSkipReason,
+} from '../src/entities.js';
 
 /**
  * These two vocabularies are a wire format twice over: they are serialised into the import
@@ -62,5 +67,24 @@ describe('TrelloImportSkipReason', () => {
     // rejected that split: a user asking why their board looks different needs the defaulted
     // colours and the defaulted categories in the same list as the losses, not in a second one.
     expect(Object.values(TrelloImportSkipReason)).toContain('defaulted');
+  });
+});
+
+/**
+ * The `error` strings a client branches on for a `403` that is not an insufficient role. They
+ * are a wire format: the API writes them by hand at the Better Auth mount and the exception
+ * filter, the web compares against them, and nothing at compile time notices a rename on either
+ * side.
+ */
+describe('the 403 reason phrases', () => {
+  it('keeps the plan ceiling and the closed door apart', () => {
+    // A ceiling is a number somebody can raise; a closed door is a policy. A client that
+    // suggests "free a seat" for the second is wrong, so the two must never share a string.
+    expect(SIGNUP_DISABLED_ERROR).not.toBe(PLAN_LIMIT_ERROR);
+  });
+
+  it('never collides with the plain HTTP reason phrase a role refusal carries', () => {
+    expect(PLAN_LIMIT_ERROR).not.toBe('Forbidden');
+    expect(SIGNUP_DISABLED_ERROR).not.toBe('Forbidden');
   });
 });

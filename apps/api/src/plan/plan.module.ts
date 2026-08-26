@@ -5,9 +5,9 @@ import { PlanLimitsService } from './plan-limits.service';
 /**
  * The plan-limit layer (ADR 0032).
  *
- * Global-ish in reach but not `@Global()`: five modules import it explicitly (workspace,
- * board, attachment, config, and the Better Auth mount through `app.get`), and naming them is
- * how the dependency stays visible in the import lists rather than appearing out of the
+ * Global-ish in reach but not `@Global()`: six modules import it explicitly (workspace,
+ * board, import, attachment, config, and the Better Auth mount through `app.get`), and naming
+ * them is how the dependency stays visible in the import lists rather than appearing out of the
  * ambient container. It imports `StorageModule` because the byte quotas are members of the
  * same object as the counts.
  */

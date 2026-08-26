@@ -35,11 +35,11 @@ Testler, bu maliyetin gerçek güven satın aldığı yerlerde yazılır.
 
 ## Piramit
 
-| Katman          | Araç                                   | Kapsam                                                                                               | Durum                                                |
-| --------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Servisler, guard'lar, saf fonksiyonlar, board/izin logic'i, DnD hook'ları. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu                              |
-| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden)       | Her endpoint için zorunlu                            |
-| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | Yedi senaryo (`e2e/`) — her gece ve her sürüm öncesi |
+| Katman          | Araç                                   | Kapsam                                                                                               | Durum                                                                  |
+| --------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Servisler, guard'lar, saf fonksiyonlar, board/izin logic'i, DnD hook'ları. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu                                                |
+| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden)       | Her endpoint için zorunlu                                              |
+| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | Yedi senaryo (`e2e/`): her gece `develop` üzerinde ve her sürüm öncesi |
 
 ```
         /\        e2e — yedi kritik akış (Playwright, gerçek Chromium)
@@ -414,21 +414,31 @@ yayımlar (`api-coverage`, `web-coverage`).
 
 Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalıştırır:
 
-| Adım                   | Komut                                                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Shared paket build     | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                 |
-| Lint                   | `pnpm lint`                                                                                                         |
-| Format kontrolü        | `pnpm format:check`                                                                                                 |
-| Typecheck              | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                                           |
-| Audit                  | `pnpm audit --audit-level high`                                                                                     |
-| Unit testler (api)     | `pnpm --filter @kurul/api test:cov`                                                                                 |
-| Unit testler (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                                               |
-| Unit testler (pkgs)    | `pnpm --filter "./packages/*" test`                                                                                 |
-| Unit testler (scripts) | `pnpm test:scripts`                                                                                                 |
-| Integration testler    | Postgres ve Redis service container'larına karşı `pnpm --filter @kurul/api test:e2e`                                |
-| Build                  | `pnpm build`                                                                                                        |
-| Imaj build + tarama    | Yayımlanan üç imaj, ardından her birine Trivy (aşağıya bakın)                                                       |
-| **Kapı** (zorunlu)     | `ci-ok` — tüm upstream job'lar (`lint`, `test`, `build`, `image-scan`) başarıysa geçer (atlanmamış/iptal edilmemiş) |
+| Adım                   | Job                | Komut                                                                                                                                                         |
+| ---------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shared paket build     | `lint`             | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                                                           |
+| Lint                   | `lint`             | `pnpm lint`                                                                                                                                                   |
+| Format kontrolü        | `lint`             | `pnpm format:check`                                                                                                                                           |
+| Typecheck              | `lint`             | `pnpm typecheck` (workspace'ler genelinde `tsc --noEmit`)                                                                                                     |
+| Audit                  | `lint`             | `pnpm audit --audit-level high`                                                                                                                               |
+| Unit testler (api)     | `test-unit`        | `pnpm --filter @kurul/api test:cov`                                                                                                                           |
+| Unit testler (web)     | `test-unit`        | `pnpm --filter @kurul/web exec vitest run --coverage`                                                                                                         |
+| Unit testler (pkgs)    | `test-unit`        | `pnpm --filter "./packages/*" test`                                                                                                                           |
+| Unit testler (scripts) | `test-unit`        | `pnpm test:scripts`                                                                                                                                           |
+| Migrasyon drift'i      | `test-integration` | `pnpm db:migrate`, ardından Postgres service container'ına karşı `pnpm db:drift`                                                                              |
+| Integration testler    | `test-integration` | Postgres ve Redis service container'larına karşı `pnpm --filter @kurul/api test:e2e`                                                                          |
+| Build                  | `build`            | `pnpm build`                                                                                                                                                  |
+| Imaj build + tarama    | `image-scan`       | Yayımlanan üç imaj, ardından her birine Trivy (aşağıya bakın)                                                                                                 |
+| Compose + Caddy parse  | `compose-config`   | İki compose dosyası üzerinde, `demo` profile'ı ile ve profile'sız `docker compose config -q`, ve `docker/Caddyfile` üzerinde `caddy validate` (aşağıya bakın) |
+| **Kapı** (zorunlu)     | `ci-ok`            | Yalnızca `lint`, `test-unit`, `test-integration`, `build`, `image-scan` ve `compose-config` job'larının tümü başarıysa geçer (atlanmamış/iptal edilmemiş)     |
+
+Kapının üstündeki altı job paralel koşar ve hiçbiri bir diğerine `needs` ile bağlı değildir:
+`build` kurulumunu ve Prisma client üretimini kendi yapar; Postgres ve Redis service
+container'ı olan tek job `test-integration`'dır, bu yüzden `test-unit` içindeki unit suite'ler
+container çekmeden başlar. Pipeline'ın duvar saati süresi dolayısıyla job'ların toplamı değil
+en uzun job'ıdır ve
+[ROADMAP.md](../../ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit) içindeki
+OPS-10 satırına karşı izlenir.
 
 **Merge öncesi tüm adımlar geçmelidir.** Kapı job'ı (`ci-ok`) branch korumasında yapılandırılan
 tek zorunlu status kontrol — eğer herhangi bir upstream job başarısızsa, atlanırsa ya da iptal
@@ -466,12 +476,31 @@ Bilinmeye değer iki tercih:
   halde her PR'ı düşürürdü; sürekli kırmızı duran bir kontrolü de kimse okumaz. Geriye tam
   olarak aksiyon alınabilir küme kalır: bir base imaj yükseltmesi ya da bir bağımlılık
   yükseltmesi.
-- **`build`'den sonra değil, `lint` ve `test`'in yanında koşar.** Job bilinçli olarak kritik
-  yolun dışında; böylece pipeline duvar saatine değil runner dakikalarına mal olur ve aynı
-  workflow'un `develop` koşularının yazdığı buildx katman cache'ini (`type=gha`) okur.
+- **`lint`, `test-unit`, `test-integration` ve `build`'den sonra değil, onların yanında
+  koşar.** Job bilinçli olarak kritik yolun dışında; böylece pipeline duvar saatine değil runner
+  dakikalarına mal olur ve yalnızca aynı workflow'un `develop` ve `main` koşularının yazdığı
+  buildx katman cache'ini (`type=gha`) okur. Pull request koşuları o cache'i okur ama hiçbir şey
+  yazmaz; böylece kendi cache'leri `develop`'ınkini deponun 10 GB'lık cache payının dışına
+  itemez.
 
 Hiçbir şey push edilmez: `push: false` ve `load: true` ile her imaj kendi runner'ının içinde
 kalır. Yayımlama, tag'in arkasında, `release-images.yml`'de kalır.
+
+### Compose ve Caddyfile parse
+
+`compose-config`, `docker-compose.yml`'i `docker compose config -q` ile bir kez profile'sız,
+bir kez `--profile demo` ile render eder, ardından `docker-compose.dev.yml`'i render eder ve
+stack'in gönderdiği `caddy:2-alpine` imajında `docker/Caddyfile` üzerinde `caddy validate`
+çalıştırır. Env dosyası, `.env.example` artı varsayılanı olmayan iki anahtardır
+(`POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`); bu, [self-hosting.md](self-hosting.md)'nin
+anlattığı kurulumun kendisidir, dolayısıyla job tam olarak bir operatörün çarpacağı şeyde
+düşer: bozuk bir YAML anchor'ı, adı değişmiş bir Caddy direktifi ya da düz bir
+`docker compose up -d`'nin karşılayamayacağı bir zorunlu değişken interpolasyonu (`${VAR:?}`).
+Compose, servisleri profile'a göre filtrelemeden önce dosyanın tamamını interpolasyondan
+geçirir; bu yüzden sonuncusu profile arkasındaki bir serviste bile ısırır, `demo-reset`
+sidecar'ı `develop` üzerindeki her sıradan kurulumu tam da böyle bozmuştu. Compose bacakları
+hiçbir daemon'la konuşmaz, job'ın tamamı saniyeler sürer ve `needs:` olmadan `lint` ve test
+job'larının yanında koşar.
 
 ### CI'da browser e2e
 
@@ -479,11 +508,16 @@ Browser suite'i kendi workflow'unda,
 [`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml), farklı bir takvimle ve
 **`ci-ok` kapısının dışında** koşar:
 
-| Tetikleyici                      | Neden                                                                                                |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Her gece 03:00 UTC               | Günün merge'lerini içerecek kadar geç, kırmızı bir koşu sabah sizi beklesin diye yeterince erken     |
-| `main`'e açılan pull request'ler | Onları yalnızca `release/*` ve `hotfix/*` açar, yani tam olarak sürüm adayı ve hotfix başına bir kez |
-| `workflow_dispatch`              | İhtiyaç oldukça                                                                                      |
+| Tetikleyici                            | Neden                                                                                                                |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Her gece 03:00 UTC, `develop` üzerinde | Günün merge'lerinin indiği dal: onları içerecek kadar geç, kırmızı bir koşu sabah sizi beklesin diye yeterince erken |
+| `main`'e açılan pull request'ler       | Onları yalnızca `release/*` ve `hotfix/*` açar, yani tam olarak sürüm adayı ve hotfix başına bir kez                 |
+| `workflow_dispatch`                    | İhtiyaç oldukça                                                                                                      |
+
+GitHub zamanlanmış bir workflow'u varsayılan dalda çalıştırır; bu yüzden takvim workflow'un
+`main`'deki kopyasında tanımlıdır ve checkout adımı `develop`'ı çeker; koşu logu gerçekte hangi
+dalın ve commit'in koştuğunu yazar. `main` bilerek her gece test edilmez: sürümler arasında
+değişmez ve onu değiştiren pull request'ler suite'i zaten koşturur.
 
 Zorunlu kontrol olmaması bilinçli. Bu suite Postgres, Redis, Mailpit, derlenmiş bir API ve
 production web build'i başlatır, sonra Chromium'u hepsinin içinden geçirir — projenin en

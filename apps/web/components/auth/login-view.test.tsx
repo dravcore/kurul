@@ -56,6 +56,14 @@ describe('LoginView', () => {
     expect(screen.getByRole('link', { name: 'Create one' }).getAttribute('href')).toBe('/register');
   });
 
+  it('offers the reset route to a visitor who forgot their password', () => {
+    renderView();
+
+    expect(screen.getByRole('link', { name: 'Forgot your password?' }).getAttribute('href')).toBe(
+      '/forgot-password',
+    );
+  });
+
   it('signs in with the typed credentials and lands on the dashboard', async () => {
     renderView();
     fillCredentials();

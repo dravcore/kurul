@@ -290,26 +290,27 @@ Action segments are the exception and each one needs a reason. Do not invent
 genuinely the operation (reordering an entire column, for example). A `PATCH` that omits a
 field leaves it untouched; sending `null` explicitly clears a nullable field.
 
-| Status                       | When                                                                                                                                                                                                                                                                 |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `200 OK`                     | Successful read, update, or action                                                                                                                                                                                                                                   |
-| `201 Created`                | Resource created; body is the created resource                                                                                                                                                                                                                       |
-| `204 No Content`             | Successful delete; empty body                                                                                                                                                                                                                                        |
-| `400 Bad Request`            | Malformed request or validation failure                                                                                                                                                                                                                              |
-| `401 Unauthorized`           | Missing or invalid session                                                                                                                                                                                                                                           |
-| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient, **or** a plan ceiling would be exceeded (its `error` says which, see [Plan limits](#plan-limits))                                                                                                         |
-| `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                                                                                                                                                          |
-| `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                                                                                                                                            |
-| `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, an upload is over `ATTACHMENT_MAX_BYTES` or would exceed a storage quota (its `error` says which — see [File uploads and downloads](#file-uploads-and-downloads)), or an import is over `TRELLO_IMPORT_MAX_BYTES` |
-| `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted                                                                                                                            |
-| `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                                                                                                                                            |
-| `429 Too Many Requests`      | Rate limited: over a route's request budget, or over the upload route's per-IP byte budget (its `error` says which, see [Rate limiting](#rate-limiting))                                                                                                             |
-| `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                                                                                                                                                        |
+| Status                       | When                                                                                                                                                                                                                                                                               |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200 OK`                     | Successful read, update, or action                                                                                                                                                                                                                                                 |
+| `201 Created`                | Resource created; body is the created resource                                                                                                                                                                                                                                     |
+| `204 No Content`             | Successful delete; empty body                                                                                                                                                                                                                                                      |
+| `400 Bad Request`            | Malformed request or validation failure                                                                                                                                                                                                                                            |
+| `401 Unauthorized`           | Missing or invalid session                                                                                                                                                                                                                                                         |
+| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient, **or** a plan ceiling would be exceeded (its `error` says which, see [Plan limits](#plan-limits)), **or** registration is closed (`SIGNUP_ENABLED=false`: `POST /auth/sign-up/email` only, `error: "Sign-up Disabled"`) |
+| `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                                                                                                                                                                        |
+| `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                                                                                                                                                          |
+| `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, an upload is over `ATTACHMENT_MAX_BYTES` or would exceed a storage quota (its `error` says which — see [File uploads and downloads](#file-uploads-and-downloads)), or an import is over `TRELLO_IMPORT_MAX_BYTES`               |
+| `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted                                                                                                                                          |
+| `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                                                                                                                                                          |
+| `429 Too Many Requests`      | Rate limited: over a route's request budget, or over the upload route's per-IP byte budget (its `error` says which, see [Rate limiting](#rate-limiting))                                                                                                                           |
+| `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                                                                                                                                                                      |
 
 **Cross-workspace access returns `404`, not `403`.** A `403` would confirm that the resource
 exists, which leaks information across the tenant boundary. `403` is reserved for a
-legitimate member whose role is too low, and for the plan ceilings below, which the envelope's
-`error` field tells apart.
+legitimate member whose role is too low, for the plan ceilings below, for a closed registration
+(`SIGNUP_ENABLED=false`) and for the actions a demo instance refuses (`DEMO_MODE=true`), which
+the envelope's `error` field tells apart.
 
 ### Plan limits
 
@@ -336,12 +337,12 @@ free a seat or raise a number.
 `planLimit` is the only optional envelope member besides `details`. `current` is what was
 counted at the moment of the refusal, so it can equal or exceed `limit`.
 
-| `planLimit.code`        | Refuses                                   | Counts                                             |
-| ----------------------- | ----------------------------------------- | -------------------------------------------------- |
-| `PLAN_LIMIT_SEATS`      | `POST .../invitations`, and accepting one | Members plus invitations still pending             |
-| `PLAN_LIMIT_BOARDS`     | `POST .../boards`                         | Boards in the workspace                            |
-| `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                        | Workspaces on the instance                         |
-| `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                | Accounts on the instance, anonymised ones excluded |
+| `planLimit.code`        | Refuses                                      | Counts                                             |
+| ----------------------- | -------------------------------------------- | -------------------------------------------------- |
+| `PLAN_LIMIT_SEATS`      | `POST .../invitations`, and accepting one    | Members plus invitations still pending             |
+| `PLAN_LIMIT_BOARDS`     | `POST .../boards`, `POST .../imports/trello` | Boards in the workspace                            |
+| `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                           | Workspaces on the instance                         |
+| `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                   | Accounts on the instance, anonymised ones excluded |
 
 Accepting an invitation counts members only, since the invitation being accepted is already
 holding its seat. Attachment bytes are a plan ceiling too, but they keep the `413` and the
@@ -517,17 +518,19 @@ its caller could not do in several.
 
 **Errors:**
 
-| Status | When                                                                                                 |
-| ------ | ---------------------------------------------------------------------------------------------------- |
-| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export              |
-| `403`  | Workspace member whose role is below `ADMIN`                                                         |
-| `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it |
-| `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                      |
-| `429`  | More than three imports in a rolling minute                                                          |
+| Status | When                                                                                                                                                                                                |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export                                                                                                             |
+| `403`  | Workspace member whose role is below `ADMIN`, **or** the workspace is at its board ceiling (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, see [Plan limits](#plan-limits)) |
+| `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it                                                                                                |
+| `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                                                                                                                     |
+| `429`  | More than three imports in a rolling minute                                                                                                                                                         |
 
 A `400` is the only failure that reaches the parser, and **nothing is written when it does**: the
 export is read and mapped entirely before the transaction opens, so a rejected import leaves the
-workspace byte-for-byte as it was.
+workspace byte-for-byte as it was. The board-ceiling `403` writes nothing either: the check is the
+first statement inside the transaction, before the board row, so the refusal rolls back an empty
+transaction.
 
 **The response body is the whole report, and it is not stored anywhere.**
 
@@ -678,6 +681,15 @@ who minted it. A token may carry an expiry; an expired one reads exactly like a 
 which reads exactly like one that never existed: `401` for all three, so a stolen secret learns
 nothing about its own history.
 
+**A forgotten password is recovered, not reissued by an admin.**
+`POST /auth/request-password-reset` mails a single-use link that is good for one hour, and
+`POST /auth/reset-password` spends it. Both are Better Auth's, and the request endpoint answers
+the same `200` and the same body for an address with no account as for one with an account, so
+it cannot be used to find out who has one. Spending the link revokes every session the account
+held (`revokeSessionsOnPasswordReset`), which is what makes a reset a way to take an account
+back rather than only a way to remember it. Delivery is a hard requirement: see
+[self-hosting](self-hosting.md#email-smtp) for what an instance without SMTP does instead.
+
 ```
 POST   /workspaces/:workspaceId/tokens            # mint; the only response carrying the plaintext
 GET    /workspaces/:workspaceId/tokens            # the caller's live tokens, newest first
@@ -807,6 +819,7 @@ running hot never spends another endpoint's allowance.
 | `POST /workspaces/:workspaceId/imports/trello` | 3 / min       | A 20 MiB body parsed into heap, then thousands of rows in one transaction              |
 | `GET .../attachments/:attachmentId/content`    | 300 / min     | _Above_ the default: a panel with ten image attachments issues ten requests on open    |
 | `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10s       | Better Auth's built-in rule for credential endpoints                                   |
+| `/auth/request-password-reset`                 | 3 / 60s       | Built-in too: each call mails a link to an address the caller did not prove they own   |
 | `/auth/*` otherwise                            | 100 / min     | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004)              |
 | `GET /health`, `GET /health/ready`             | exempt        | A throttled probe would report a healthy API as down                                   |
 

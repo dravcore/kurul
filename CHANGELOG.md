@@ -9,6 +9,67 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Password reset by email: a forgotten password is now recovered by the person who forgot it.**
+  "Forgot your password?" on the sign-in screen leads to `/forgot-password`, which asks for an
+  address and mails a single-use link good for one hour; the link lands on `/reset-password`,
+  where a new password is chosen. Until now the only way back into a locked-out account was an
+  instance admin deleting it, which destroyed the workspace memberships along with it.
+
+  The request endpoint answers the same `200` and the same body for an address with no account
+  as for one with an account, so it cannot be used to find out who has an account here, and
+  Better Auth's built-in `3 / 60s` rule already caps it. Spending the link revokes every session
+  the account held, which is what makes a reset a way to take an account back and not only a way
+  to remember it; a spent or expired link is refused and says so, rather than failing silently.
+  The email is written in the recipient's language, EN and TR, from the same template shape the
+  verification mail uses. Delivery is a hard requirement: with `SMTP_HOST` unset the whole
+  message including the link goes to the API log instead, which is workable on a solo install
+  and is not a recovery path for anyone else, see
+  [self-hosting](docs/self-hosting.md#email-smtp). On a `DEMO_MODE` instance the demo account
+  is skipped, since its password is published and a reset would only lock every visitor out.
+
+  The emailed link is the first URL this API serves with a live secret in its path, so the JSON
+  access log now writes it as `/auth/reset-password/:token`. A reverse proxy of your own in
+  front of it still logs the URL it was asked for unless you filter that route out, see
+  [self-hosting](docs/self-hosting.md#bringing-your-own-reverse-proxy).
+
+- **`SIGNUP_ENABLED`: a switch that closes registration on a self-hosted instance.** Until now
+  the only way to stop strangers registering on an internet-facing install was to pin
+  `PLAN_MAX_USERS` at the current head count, which blocks the operator's own invitees along
+  with everyone else and drifts the moment an account is deleted. `SIGNUP_ENABLED=false` refuses
+  `POST /auth/sign-up/email` with `403` and `error: "Sign-up Disabled"` whatever the count is,
+  in the same hand-written envelope the plan ceiling uses at the Better Auth mount (`requestId`
+  included), and writes no row. Unset or `true` is open, so every existing install runs exactly
+  as before. It is also read once at boot, alongside `DEMO_MODE`, so a spelling the boolean
+  parser cannot read (`SIGNUP_ENABLED=fasle`) refuses to start the container, the bargain the
+  `PLAN_MAX_*` ceilings already make: below the Nest router no exception filter is listening, so
+  the alternative is the one route the switch governs hanging with no response at all. Like the ceiling it refuses sign-up only: signing in, verifying an address and
+  everything else under `/auth` stay open, so closing it never locks out the people already on
+  the instance. `GET /config` publishes it as `signUpEnabled`, read from the same function the
+  mount consults so the document and the refusal cannot disagree. It is independent of
+  `DEMO_MODE`, which keeps registration open on the demo host. The row lives beside
+  `PLAN_MAX_USERS` in `.env.example`, is forwarded by `docker-compose.yml`, and is documented
+  next to the plan ceilings in [self-hosting.md](docs/self-hosting.md). An invite-only mode
+  (accept the sign-up when a pending invitation names the address) is a follow-up: the mount
+  runs ahead of the body parsers and never sees the sign-up email, so that mode has to live in
+  a Better Auth database hook with the envelope trade the mount's comment describes.
+
+- **ADRs 0033 and 0034, proposed: webhook delivery and hosted billing.** The two undecided pieces of
+  API 1.0 are written down as records rather than as roadmap rows, and both merge as **Proposed**:
+  they exist to be read and argued before either slice starts, and nothing in the running product
+  changes yet. [ADR 0033](docs/decisions/0033-webhook-delivery-and-failure-policy.md) puts webhook
+  endpoints on the workspace instead of in the operator's environment, so the feature exists for a
+  hosted customer and not only for a self-hoster, and settles what follows from that: three events
+  with `task.completed` defined as a move into a completed column, a signed envelope carrying a
+  `/v1` `TaskDto`, a `WebhookDelivery` outbox row written in the same transaction as the activity
+  row, six attempts and then a disabled endpoint, and an egress policy that refuses private
+  addresses and does not follow redirects.
+  [ADR 0034](docs/decisions/0034-hosted-billing-and-plan-assignment.md) gives
+  `Workspace.planLimits` the writer it has never had: a merchant of record (Paddle first, with
+  Stripe and Better Auth's Stripe plugin rejected in writing), one `Subscription` row per workspace,
+  a plan catalogue in code, an entitlement write that is a single transaction with its idempotency
+  ledger inside it, a grace period that deletes nothing, and a test proving that an instance with
+  `BILLING_PROVIDER` unset runs exactly what it runs today.
+
 - **Plan limits: ceilings on seats, boards, workspaces and accounts, unlimited until an operator
   sets one.** Four variables (`PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
   `PLAN_MAX_WORKSPACES`, `PLAN_MAX_USERS`) put a number on quantities the product never bounded.
@@ -121,6 +182,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- **A demo instance no longer lets a visitor rotate the shared account's password.** The demo
+  is one published account (`demo@kurul.dev` with `DEMO_PASSWORD`), and Better Auth's
+  `POST /auth/change-password` asks only for the current password, which is public: one request
+  locked every other visitor out until the next reset wrote the password back, up to an hour.
+  `DemoRestrictedGuard` could not cover it because `/auth/*` is served by Express below the Nest
+  router, so the refusal lives at the Better Auth mount (`mount-better-auth.ts`), with the same
+  `403` envelope the guard produces for account and workspace deletion, and the guard's comment
+  now carries the full list: two Nest routes plus this auth path, with `/auth/change-email`
+  listed beside it so it is already refused the day `user.changeEmail` is enabled. Revoking
+  sessions and renaming the account stay open on purpose: both are a sign-in away from
+  recovered, and the list admits what the reset cannot recover, not what is annoying. An
+  ordinary install is untouched; the `DEMO_MODE` table in
+  [self-hosting.md](docs/self-hosting.md#what-demo_modetrue-changes) names the new row.
+- **Request bodies to `/auth/*` are bounded, at the proxy and at the API.** Better Auth reads
+  the raw request stream itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on
+  every other route, and the bundled `docker/Caddyfile` set `request_body max_size` only on
+  `/api/*`, so a `POST /auth/sign-in/email` could stream a body of any size into the API
+  container's heap (512 MB, `--max-old-space-size=384`) at the built-in attempt budget of 3 per
+  10 seconds per IP and path on sign-in, sign-up and change-password, and 100 per minute on the
+  other auth routes. `handle /auth/*` now carries `max_size 64KiB`, and the mount refuses a
+  declared `Content-Length` over the same `AUTH_BODY_MAX_BYTES` (`65536`, a constant in
+  `apps/api/src/auth/auth-body-limit.ts`) with the standard `413` envelope before a byte is
+  read; a chunked body, which has no length to check, is counted as it streams and the
+  connection is closed past the ceiling. The largest legitimate auth body is a few hundred bytes
+  of JSON. The nginx contract in `docs/self-hosting.md` gains `client_max_body_size 64k;` for
+  `location /auth/`, and `two-layer-limit.spec.ts` pins the Caddyfile figure, the nginx row and
+  the API constant to each other; unlike the upload pair, the two may be equal, since there is
+  no multipart envelope between them.
 - **The web app's `script-src` no longer allows `'unsafe-inline'`.** Inline script is admitted
   by a per-request nonce instead: `apps/web/proxy.ts` — Next 16's replacement for the
   `middleware.ts` convention, which is where the old file moved — draws 16 bytes from the
@@ -146,6 +235,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   every context (`e2e/support/fixtures.ts`). That check was verified against a build with the
   nonce removed, where it failed on `script-src-elem blocked inline` rather than passing
   quietly — which is how the old `'unsafe-inline'` would otherwise come back unnoticed.
+- **The release workflow no longer trusts a tag's name.** A new `guard` job in
+  `.github/workflows/release-images.yml` runs before any image is built, and every other job
+  waits for it. It checks the two things the release process asks a human to get right by
+  hand: a `vX.Y.Z` tag must point at the tip of `main` (the merge commit step 5 tags), while a
+  pre-release tag must be reachable from `main` or from an open `release/*` or `hotfix/*`
+  branch, the rehearsal path; and every workspace `package.json` must carry the tag's version,
+  with a stable tag also needing its `## [X.Y.Z] - ` heading in `CHANGELOG.md`. Until now a
+  tag typed on `develop`, or on a tree whose version bump was forgotten, would have been built,
+  signed and published, and a stable one would also have moved `latest` under every operator
+  who pulls without `TAG`. A failing guard names the offending file, or the refs it searched,
+  and nothing is pushed; `publish-sbom` waits on the guard explicitly, since its
+  `!cancelled()` condition would otherwise run past a rejected tag with `contents: write`.
+  Every job in the workflow also gained a `timeout-minutes`. The guard catches a slip inside
+  the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
+  repository admin is a repository ruleset, described in
+  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the operator checklist
+  in `ROADMAP.md`.
 
 ### Added
 
@@ -174,6 +280,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **CI now parses the compose files and the Caddyfile on every pull request.** A new
+  `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
+  `docker compose config -q`, without a profile and with `--profile demo`, renders
+  `docker-compose.dev.yml`, and runs `caddy validate` over `docker/Caddyfile` in the
+  `caddy:2-alpine` image the stack ships. The env file is `.env.example` plus `POSTGRES_PASSWORD`
+  and `BETTER_AUTH_SECRET`, the install the docs describe, so the job fails on exactly what an
+  operator would hit: a broken YAML anchor, a renamed Caddy directive, or a required-variable
+  interpolation that a plain `docker compose up -d` cannot satisfy. Until now nothing in CI read
+  either file: `image-scan` builds the images, the browser suite builds its own stack, and
+  `scripts/bootstrap.mjs` validates only `docker-compose.dev.yml`, which is how the `demo-reset`
+  interpolation fixed below reached `develop`. The compose legs need no daemon, the job takes
+  seconds, and it is wired into the `ci-ok` gate like every other job
+  ([testing.md](docs/testing.md#compose-and-caddyfile-parse)).
 - **Better Auth upgraded to 1.7.1, which needs a database migration before the API starts.**
   `Account` gains a required `issuer` column and a unique `(issuer, accountId)` index: identity
   is now keyed on the pair rather than on `accountId` alone, so two providers handing out the
@@ -192,9 +311,124 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   along with the non-atomic fallback path that used them; `consume` is the whole interface now,
   and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
   Redis outage fallback and the degraded-mode reporting are all unchanged.
+- **The PR pipeline is a flat graph of six jobs, and its wall time is the longest of them.**
+  `ci.yml` ran `build` behind `lint` and `test` although it uses nothing they produce, and
+  `test` ran the unit suites and then, against Postgres and Redis service containers, the
+  migration, the drift check and the integration suite, back to back. Measured over the last
+  twenty `develop` runs, fifteen took 301-342 s, past the five-minute trigger `ROADMAP.md`
+  records for OPS-10; install and `prisma generate` were not the cost (about 20 runner-seconds
+  per run), the job graph was. `build` now has no `needs`, `test` is split into `test-unit`
+  (shared packages, `scripts/`, the api and web suites with coverage, and no services: the api
+  suite passes against a closed port with `REDIS_URL` unset) and `test-integration` (the
+  services, `db:migrate`, `db:drift`, `test:e2e`), and `ci-ok` waits on all six with the same
+  skipped-or-cancelled handling. Branch protection names only `ci-ok` and `CodeQL`, so the
+  renamed jobs need no settings change.
+
+  Two cache changes travel with it, because the image-scan leg becomes the critical path once
+  `test` is untangled. Pull request runs no longer write the BuildKit `type=gha` cache: every
+  PR stored a full `mode=max` copy of the build stage under its own ref, the repository sat at
+  10.87 GB against GitHub's 10 GB cache limit, and eviction by last access took `develop`'s
+  entries with it, so the leg designed to read a warm cache built cold (212 s against 54 s).
+  Only `push` runs write now. `concurrency.cancel-in-progress` is true for pull requests only,
+  so a merge burst cannot cancel the `develop` run that writes the cache every PR reads. Every
+  job also carries a `timeout-minutes` ceiling (lint 15, test-unit 20, test-integration 25,
+  build 20, image-scan 40, compose-config 5, ci-ok 5): the default is six hours, and two
+  release-candidate runs of `release-images.yml` once held a runner for 4 h and 5.7 h before
+  being cancelled by hand.
+  Target: `ci-ok` under 3m30s, tracked in the OPS-10 row of `ROADMAP.md`.
+
+- **Compose tuning for first boot, Redis and Postgres.** Three small changes, applied to both
+  `docker-compose.yml` and `docker-compose.dev.yml`. The `postgres` healthcheck now probes over
+  TCP (`pg_isready -h 127.0.0.1 ...`): without a host it asked the Unix socket, which the official
+  entrypoint's temporary initdb server also answers on the first boot of an empty volume, so
+  `migrate` could be released before anything listened on 5432 and exit 1 once, which reads to a
+  newcomer as a broken install. `redis` runs with `--maxmemory 100mb --maxmemory-policy
+  noeviction` under its 128m `mem_limit`, so a Redis that fills up answers with a logged
+  `OOM command not allowed` the API already survives (its rate limiters fall back to process
+  memory) instead of a bare exit 137 that `restart: unless-stopped` turns into a loop;
+  `noeviction` is the policy BullMQ requires for the queues that live there. `postgres` gets
+  `shm_size: 256m`, because Docker's default 64 MB `/dev/shm` is where parallel workers and hash
+  joins run out of dynamic shared memory on a heavy dashboard query. None of it is memory on top
+  of the existing ceilings; the sizing notes in
+  [self-hosting.md](docs/self-hosting.md#server-sizing) describe all three.
+
+  `REDIS_MAXMEMORY` in `.env` (default `100mb`, unchanged) now makes that ceiling adjustable
+  without editing the compose file. On an instance that is already running, check where the
+  dataset sits before upgrading into it: `docker compose exec redis redis-cli -a
+  "$REDIS_PASSWORD" INFO memory | grep used_memory_human`. With `noeviction`, a dataset already
+  near or over the ceiling does not shrink on its own; it refuses writes until keys expire, so
+  raise `REDIS_MAXMEMORY` and the `redis` `mem_limit` together rather than after the fact.
+
+- **The self-hosting guide installs and upgrades from a release tag, with a runbook.**
+  `docs/self-hosting.md` now fetches `docker-compose.yml`, `docker/Caddyfile`,
+  `scripts/backup.sh` and `.env.example` from the `v0.3.0` tag URL rather than from `main`, so
+  the files and the images an install runs come from the same release, and `.env` gets
+  `chmod 600` on the way in. The Upgrading section is an ordered runbook, backup first: read the
+  CHANGELOG, `backup.sh once` and copy the pair off-host, re-fetch the files at the new tag (a
+  `pull` refreshes images and nothing else, so an install that never re-fetched kept a
+  `backup.sh` that ignores `BACKUP_REMOTE`), set `TAG`, `pull`, `up -d --wait`, `ps -a`,
+  `curl /api/health/ready`, then links to the rollback and restore drills in
+  `docs/development.md` instead of copies of them. A short "Release notes for operators" list
+  points at the CHANGELOG entries that ask something before `pull`. Two things moved with it.
+  `TRUST_PROXY` is forwarded by `docker-compose.yml` as `${TRUST_PROXY:-1}` and ships blank in
+  `.env.example`, so a CDN in front of `proxy` is a `.env` line rather than an edit to a file
+  the next upgrade replaces; an existing `.env` that still carries `TRUST_PROXY=false` from an
+  older `.env.example` must drop the line, or the API stops seeing client addresses behind
+  Caddy. And a new "Browser error tracking" section states that `NEXT_PUBLIC_SENTRY_*` are
+  compiled into the web image, that the published GHCR image ships without them, and that
+  enabling browser Sentry means building `web` from a clone, cross-linked from `.env.example`
+  and `docs/development.md`. The release process in `docs/git-strategy.md` gains the step that
+  bumps the tag on the page. Turkish mirrors updated in step.
 
 ### Fixed
 
+- **A Trello import no longer steps over the workspace's board ceiling.**
+  `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on
+  `POST .../boards` but not on `POST .../imports/trello`, which creates its board by its own
+  `tx.board.create`, so an `OWNER` or `ADMIN` at the limit could keep adding boards by importing
+  any small export. `TrelloImportService` now asks `PlanLimitsService` for room as the first
+  statement of its transaction, with the same transaction client and the same `403`
+  `PLAN_LIMIT_BOARDS` refusal `BoardService.create` gives, and a refused import writes nothing.
+  Imported link attachment names also go through the display-name cleaning `createLink` applies
+  (bidi overrides, control characters, quotes and backslashes stripped, 255-character clamp,
+  URL fallback for a name that is empty afterwards), which the importer had skipped; the rule
+  moved to `attachment-display-name.ts` so both writers of `Attachment.filename` share one
+  function. [ADR 0032](docs/decisions/0032-plan-limits.md) names the importer in its
+  enforcement list.
+
+- **`PLAN_MAX_*`, `INSTANCE_ADMIN_EMAILS`, the retention windows, telemetry, `API_DOCS_ENABLED`,
+  `RATE_LIMIT_ENABLED` and the database pool knobs were inert under the bundled Compose stack.**
+  Compose reads `.env` for `${VAR}` interpolation only and never hands the file to a container,
+  `docker-compose.yml` forwards an explicit list of keys to the `api` service, and the api image
+  carries no `.env` of its own, so a setting missing from that list never reached the process
+  however it was set. Seventeen documented settings were missing: a demo operator writing
+  `PLAN_MAX_USERS=1` got an instance that logged `Plan ceilings: unlimited` and capped nothing,
+  nobody could become an instance admin (the activation dashboard and the GDPR erasure route were
+  unreachable on every curl/GHCR install), and `CLEANUP_ENABLED`, the three `*_RETENTION_DAYS`,
+  `TELEMETRY_ENABLED`/`TELEMETRY_ENDPOINT`/`TELEMETRY_TIMEOUT_MS`, `API_DOCS_ENABLED`,
+  `RATE_LIMIT_ENABLED`, `DATABASE_POOL_MAX`, `DATABASE_POOL_CONNECTION_TIMEOUT_MS` and
+  `DATABASE_STATEMENT_TIMEOUT_MS` kept their defaults whatever `.env` said, with nothing logged
+  about it. All seventeen are now on the `api` service as `${KEY:-}`, which the env helpers treat
+  as unset, so an untouched `.env` runs exactly what it ran before. A new
+  `scripts/lib/compose-env.test.mjs` (`pnpm test:scripts`) fails when a key the API reads and
+  `.env.example` documents is missing from that block, so the next variable cannot repeat this;
+  `docs/self-hosting.md` no longer claims the containers read `.env`, and the "adding an
+  environment variable" rule in `docs/development.md` gained the forwarding step.
+
+- **Every plain `docker compose` invocation on `develop` failed with "required variable
+  DEMO_MODE is missing a value".** The `demo-reset` sidecar added for the public demo declared
+  `DEMO_MODE` and `DEMO_PASSWORD` in the required form (`${VAR:?message}`), on the reasoning
+  that a service behind `profiles: ['demo']` is never evaluated without the profile. Compose
+  interpolates the whole file before it filters services by profile, and `:?` treats an empty
+  value as missing, so `cp .env.example .env` (both keys ship blank) followed by
+  `docker compose up -d`, `pull`, `ps` or `config` aborted on an install that never asked for a
+  demo, with a message telling that operator to set `DEMO_MODE=true`. No release carries the
+  defect: `v0.3.0` predates the change. Both keys now default to blank (`${VAR:-}`). The refusal
+  the `:?` was standing in for already exists where it can be logged, in
+  `apps/api/src/demo/reset-guard.ts` (any `DEMO_MODE` other than true) and `reset.ts` (a blank
+  or short `DEMO_PASSWORD`), so a demo profile started with either key unset prints "Refusing
+  to reset" in `docker compose --profile demo logs demo-reset` instead of Compose refusing the
+  file for everyone.
 - **`charts.test.tsx` was load-sensitive ([#244](https://github.com/dravcore/kurul/issues/244)),
   reproduced and fixed.** Running `apps/web`'s Vitest suite alongside `apps/api`'s Jest suite
   reproduced it 6/6 tries. The cause: the file's bar-animation poll (`barPaths`) promises to
@@ -240,6 +474,36 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   jittered, doubling retry for exactly those two cases, and a denied room join is retried with
   backoff instead of standing for the life of the socket — so the indicator now describes
   something that is actually happening.
+- **Restarting the `backup` sidecar no longer spends a retention slot.** `scripts/backup.sh`
+  took a dump on entry every time its container started, and every host reboot,
+  `docker compose up` after a `.env` edit and image pull starts it. Retention is a count
+  (`BACKUP_KEEP` newest archives, no age check), so a day of restarts could push a week of
+  history out of the seven default slots, and the API's orphan-file sweep, whose grace window
+  assumes one pair per `BACKUP_INTERVAL`, was quietly covering less than the documented week.
+  The loop now skips its boot-time cycle while a dump younger than half of `BACKUP_INTERVAL`
+  already exists, logs the skip, and sleeps only the remainder of the interval, so both the
+  cadence and the history come through a restart unchanged. A first boot with no dump still
+  dumps immediately, and the hand-run `backup.sh once` is never skipped. `scripts/backup.test.mjs`
+  starts the loop twice within seconds and asserts one pair, and the `BACKUP_KEEP` comments in
+  `docker-compose.yml` and `.env.example` now say that retention is count-based.
+
+- **`docker/Caddyfile`'s header quoted the nginx body limit the same file warns against.** The
+  bring-your-own-proxy contract at the top of the file said the rule-2 body limit "matches"
+  the API's `ATTACHMENT_MAX_BYTES` (`client_max_body_size 25m;`), while the `request_body`
+  block further down sets `26MiB` and explains that a limit equal to the file size rejects a
+  file of exactly the published size, because the multipart envelope rides on top of it. The
+  header now says one MiB above and `26m`, the same figure as the nginx snippet in
+  `docs/self-hosting.md`.
+- **The nightly browser suite ran on `main`, not on `develop`.** GitHub runs a scheduled
+  workflow on the repository's default branch, and the checkout step in
+  `.github/workflows/e2e.yml` passed no `ref`, so every 03:00 UTC run re-tested the last
+  release's commit while the docs said it covered the day's merges. Between releases that
+  commit never changes: a regression merged to `develop` stayed invisible until the next
+  release pull request, and the socket fix above stayed red in the nightly for days after it
+  had landed. The schedule now checks out `develop` (the `pull_request` and
+  `workflow_dispatch` triggers are unchanged), and a new step prints the branch and commit
+  that actually ran, since the run's own head branch still names the branch the schedule was
+  read from. `main` keeps its coverage where it changes: the release and hotfix pull requests.
 
 ### Changed
 

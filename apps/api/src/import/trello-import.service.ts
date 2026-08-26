@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ActivityType } from '@kurul/shared-types';
 import type { TrelloImportReportDto } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   IMPORT_CHUNK_SIZE,
@@ -19,7 +20,9 @@ import { importedCounts, planTrelloImport } from './trello-import-planner';
  * decision-making happens *before* the transaction opens, in `parseTrelloExport` and
  * `planTrelloImport`, neither of which touches a database. Inside the transaction there are no
  * branches, no lookups and no "skip this one and carry on" — every row that reaches it is already
- * known to be writable (ADR 0025).
+ * known to be writable (ADR 0025). The one read inside it is the board ceiling (ADR 0032), and it
+ * is there for the same reason `BoardService.create` keeps it there: the count and the insert
+ * share a snapshot, and a refusal rolls back a transaction that has written nothing yet.
  *
  * That is what makes the board atomic while the *coverage* is partial: a failure rolls back a
  * whole board rather than leaving a half-imported one, and the report describes what was never
@@ -36,6 +39,7 @@ export class TrelloImportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activity: ActivityService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   /**
@@ -59,6 +63,12 @@ export class TrelloImportService {
 
     await this.prisma.$transaction(
       async (tx) => {
+        // First, before a single row: an import is a board create by another route, and a
+        // workspace at its board ceiling (ADR 0032) does not get one more by posting an export
+        // instead of a name. Same call, same transaction client and same 403 as
+        // `BoardService.create`, so the ceiling is one rule rather than one per endpoint.
+        await this.planLimits.assertBoardAvailable(workspaceId, tx);
+
         await tx.board.create({
           data: {
             id: plan.board.id,

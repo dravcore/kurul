@@ -82,6 +82,15 @@ export class InstanceConfigSchema implements InstanceConfigDto {
   attachmentsEnabled!: boolean;
 
   /**
+   * `false` when the operator has closed registration with `SIGNUP_ENABLED=false`.
+   *
+   * A policy switch beside the `planLimits.users` head count: `POST /auth/sign-up/email` then
+   * answers `403` with `error: "Sign-up Disabled"` whatever the count is, and signing in stays
+   * open. Independent of `demo.enabled`.
+   */
+  signUpEnabled!: boolean;
+
+  /**
    * The demo-instance section. `enabled` is `false` on every ordinary self-hosted install, and
    * the web renders a standing "data resets every hour" banner from it when it is not.
    */

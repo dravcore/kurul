@@ -6,6 +6,7 @@ import {
   TrelloImportSkipReason,
 } from '@kurul/shared-types';
 import type { LabelColorSlot, TrelloImportSkipGroupDto } from '@kurul/shared-types';
+import { safeDisplayName } from '../attachment/attachment-display-name';
 import { POSITION_GAP, rebalancePositions } from '../common/position/fractional-index';
 import { SkipCollector } from './import-skip';
 import type {
@@ -396,7 +397,13 @@ export function planTrelloImport(
           // will (ADR 0024 K7) — which is also why `storageKey`, `mimeType` and `size` are null:
           // there are no bytes, so there is nothing true to put in them.
           kind: AttachmentKind.Link,
-          filename: isUnnamed(attachment.name) ? verdict.url : attachment.name,
+          // The same cleaning `AttachmentService.createLink` applies, and it has to be the same
+          // function: this is the other branch that writes `Attachment.filename`, and an export
+          // is a file somebody else wrote. A bidi override or a control character in a Trello
+          // attachment name reaches the same panel the HTTP path refuses it from, so the panel's
+          // guarantee (ADR 0024) is only true if every writer applies the rule. Empty after
+          // cleaning, or empty to begin with, falls back to the URL exactly as `createLink` does.
+          filename: safeDisplayName(attachment.name) || verdict.url,
           url: verdict.url,
           storageKey: null,
           mimeType: null,

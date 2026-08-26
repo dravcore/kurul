@@ -133,13 +133,23 @@ function mapPrismaError(error: Prisma.PrismaClientKnownRequestError): {
 }
 
 /**
+ * The one sentence every oversized body gets, whichever ceiling it hit.
+ *
+ * Exported because the `/auth/*` mount writes its own 413 (`auth/mount-better-auth.ts`): Better
+ * Auth sits below the Nest router, so no filter runs there, and a second spelling of the same
+ * refusal would give `docs/self-hosting.md` two messages to tell apart where the envelope's
+ * `path` already does that job.
+ */
+export const REQUEST_BODY_TOO_LARGE_MESSAGE = 'Request body is too large';
+
+/**
  * Wording for a mapped `http-errors` client failure. Only `413` earns a sentence of its own —
  * it is the one an ordinary user can trigger by accident and the one they can act on. Every
  * other status falls back to its reason phrase rather than to copy invented for a case nobody
  * has measured.
  */
 const HTTP_CLIENT_ERROR_MESSAGES: Readonly<Record<number, string>> = {
-  [HttpStatus.PAYLOAD_TOO_LARGE]: 'Request body is too large',
+  [HttpStatus.PAYLOAD_TOO_LARGE]: REQUEST_BODY_TOO_LARGE_MESSAGE,
 };
 
 /**
