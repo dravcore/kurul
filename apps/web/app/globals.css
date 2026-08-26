@@ -116,8 +116,12 @@
    A token override rather than `max-md:h-14` at each call site because four separate surfaces
    read `var(--topbar-height)` — the shell skeleton, the board's Suspense fallback, `Topbar`
    itself and the board page's own header — and a breakpoint only three of them knew about is
-   exactly the kind of split this variable exists to prevent. */
-@media (max-width: 767px) {
+   exactly the kind of split this variable exists to prevent.
+
+   `width < 48rem` and not `max-width: 767px`: `max-md:` compiles to the former, and the two
+   disagree for anyone whose root font size is not 16px, which would put a token override and
+   the utilities written against it on different sides of the same breakpoint. */
+@media (width < 48rem) {
   :root {
     --topbar-height: 56px;
 
@@ -879,7 +883,7 @@ body {
 
    Here rather than as a `snap-none` utility on the element: Tailwind emits `snap-none` ahead of
    `snap-x`, so the two on one element would leave the snap on. An unlayered rule outranks both. */
-@media (max-width: 767px) {
+@media (width < 48rem) {
   [data-slot='board-scroller'][data-dragging] {
     scroll-snap-type: none;
   }

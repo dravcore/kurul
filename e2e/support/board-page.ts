@@ -162,10 +162,10 @@ export function watchSocketHandshake(page: Page): () => SocketHandshakeReport {
  *    like a passing one right up until the order assertion. The grip is a `<button
  *    type="button">` and pointer listeners sit on the wrapper both share, so the drag starts
  *    either way — only the failure mode differs.
- * 2. **A move past the activation distance before anything else.** The PointerSensor is
- *    configured with `activationConstraint: { distance: 6 }`, so a `dragTo()` or a single
- *    jump to the destination never starts a drag at all: dnd-kit sees one pointer event, not
- *    a gesture.
+ * 2. **A move past the activation distance before anything else.** The mouse half of the
+ *    board's sensors is a `MouseSensor` with `activationConstraint: { distance: 6 }`, so a
+ *    `dragTo()` or a single jump to the destination never starts a drag at all: dnd-kit sees
+ *    one event, not a gesture.
  * 3. **Coordinates measured before the press.** dnd-kit's sortable snapshots every
  *    droppable's rect at drag start and detects collisions against that snapshot, so the
  *    pre-drag layout is the correct frame of reference — even though cards visibly slide out
@@ -197,15 +197,17 @@ export async function dragCardOnto(
 /**
  * Drags one card onto another with a **finger**, and waits for the drop to be applied.
  *
- * Everything `dragCardOnto` says about coordinates and the activation distance holds here
- * too. Two things are different, and both are the point of having a second helper:
+ * Everything `dragCardOnto` says about coordinates holds here too. Three things are different,
+ * and they are the point of having a second helper:
  *
  * 1. **Real touch events, dispatched over CDP.** `page.mouse` in a `hasTouch` context still
  *    produces *mouse* events, and a mouse event is exactly what a phone does not send.
- *    `Input.dispatchTouchEvent` is what makes Chromium synthesise `pointerdown` with
- *    `pointerType: 'touch'` — which is the input dnd-kit's `PointerSensor` has to cope with,
- *    and the one where `touch-action` decides whether the gesture becomes a drag or a scroll.
- * 2. **The grip, and only the grip.** On touch the card body belongs to the column's
+ *    `Input.dispatchTouchEvent` is what reaches the board's `TouchSensor`, and it is where
+ *    `touch-action` decides whether the gesture becomes a drag or a scroll.
+ * 2. **A held press, not a distance.** The touch sensor activates on a 250ms hold inside a 5px
+ *    tolerance, so the finger waits where it landed instead of crossing a threshold first. That
+ *    is what leaves a plain swipe over a card body to the column's scroller.
+ * 3. **The grip, and only the grip.** On touch the card body belongs to the column's
  *    scroller: the wrapper carrying dnd-kit's listeners has no `touch-action` of its own, so
  *    the browser claims a vertical drag there and cancels the pointer. The grip declares
  *    `touch-action: none` (`components/task/sortable-task-card.tsx`) and is the one place the

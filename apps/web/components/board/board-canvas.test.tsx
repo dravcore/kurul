@@ -51,13 +51,13 @@ vi.mock('./board-column', () => ({
     // `data-slot` and its tab stop. That the real column renders exactly this is asserted in
     // board-column.test.tsx.
     return (
-      <div data-testid="board-column">
+      <section data-testid="board-column">
         {/* Mirrors the real column's heading, which carries the same suppression. */}
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-        <h2 data-slot="column-heading" tabIndex={0}>
+        <h2 data-slot="column-heading" tabIndex={(props as ColumnProps).headingTabbable ? 0 : -1}>
           {(props as ColumnProps).column.name}
         </h2>
-      </div>
+      </section>
     );
   },
 }));
@@ -307,7 +307,49 @@ describe('BoardCanvas column keyboard navigation', () => {
     fireEvent.keyDown(all[2]!, { key: 'Home' });
 
     expect(document.activeElement).toBe(all[0]);
-    expect(all[0]!.scrollIntoView).toHaveBeenCalled();
+    expect(all[0]!.closest('section')!.scrollIntoView).toHaveBeenCalled();
+  });
+
+  /**
+   * The heading sits inside its column's header padding, so scrolling the heading itself would
+   * stop 12px short and leave the column's leading edge, and the focus outline around it, under
+   * the edge mask. What is brought into view is the column.
+   */
+  it('brings the whole column into view, not just the heading', () => {
+    renderCanvas({ columns: COLUMNS });
+    const all = headings();
+    const headingScroll = vi.fn();
+    const columnScroll = vi.fn();
+    Object.defineProperty(all[0]!, 'scrollIntoView', {
+      configurable: true,
+      value: headingScroll,
+    });
+    Object.defineProperty(all[0]!.closest('section')!, 'scrollIntoView', {
+      configurable: true,
+      value: columnScroll,
+    });
+    all[2]!.focus();
+
+    fireEvent.keyDown(all[2]!, { key: 'Home' });
+
+    expect(columnScroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'start' });
+    expect(headingScroll).not.toHaveBeenCalled();
+  });
+
+  /**
+   * `focus()` scrolls the element just inside the scrollport and ignores `scroll-padding`, which
+   * would leave the first column at the strip's own padding rather than at 0 and light an edge
+   * mask with nothing behind it. `scrollIntoView` is the only scroll this path performs.
+   */
+  it('scrolls through scrollIntoView alone, never through focus', () => {
+    renderCanvas({ columns: COLUMNS });
+    const all = headings();
+    const focus = vi.spyOn(all[0]!, 'focus');
+    all[2]!.focus();
+
+    fireEvent.keyDown(all[2]!, { key: 'Home' });
+
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 
   it('moves focus to the last heading on End', () => {
@@ -445,5 +487,54 @@ describe('BoardCanvas snap during a drag', () => {
     renderCanvas({ columns: COLUMNS, isDragging: true });
 
     expect(scroller().getAttribute('data-dragging')).toBe('true');
+  });
+});
+
+/**
+ * The board is a composite widget (docs/design.md §5): `Tab` reaches one column, and the keys
+ * above move between them. Eight columns must therefore cost one tab stop, not eight.
+ */
+describe('BoardCanvas roving tab stop', () => {
+  const tabIndexes = (): (string | null)[] =>
+    headings().map((heading) => heading.getAttribute('tabindex'));
+
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('puts exactly one heading in the tab order, the first by default', () => {
+    renderCanvas({ columns: COLUMNS });
+
+    expect(tabIndexes()).toEqual(['0', '-1', '-1']);
+  });
+
+  it('moves the tab stop with Ctrl plus an arrow', () => {
+    renderCanvas({ columns: COLUMNS });
+    const all = headings();
+    all[0]!.focus();
+
+    fireEvent.keyDown(all[0]!, { key: 'ArrowRight', ctrlKey: true });
+
+    expect(tabIndexes()).toEqual(['-1', '0', '-1']);
+  });
+
+  it('moves it to either end with Home and End', () => {
+    renderCanvas({ columns: COLUMNS });
+    const all = headings();
+    all[0]!.focus();
+
+    fireEvent.keyDown(all[0]!, { key: 'End' });
+    expect(tabIndexes()).toEqual(['-1', '-1', '0']);
+
+    fireEvent.keyDown(headings()[2]!, { key: 'Home' });
+    expect(tabIndexes()).toEqual(['0', '-1', '-1']);
+  });
+
+  it('follows focus arriving on a heading any other way', () => {
+    renderCanvas({ columns: COLUMNS });
+
+    act(() => headings()[2]!.focus());
+
+    expect(tabIndexes()).toEqual(['-1', '-1', '0']);
   });
 });

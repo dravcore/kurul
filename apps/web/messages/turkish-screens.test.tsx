@@ -1336,6 +1336,7 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
               workspaceId={WORKSPACE_ID}
               selectedTaskId={null}
               dropIndicatorIndex={null}
+              headingTabbable
               canMutateColumns
               canMutateTasks
               canMoveLeft={false}

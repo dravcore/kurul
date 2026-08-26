@@ -83,6 +83,12 @@ interface BoardColumnProps {
   dropIndicatorIndex: number | null;
   /** What the board last reported about each card, keyed by task id. Empty on a quiet board. */
   taskSignals?: ReadonlyMap<string, TaskCardSignal>;
+  /**
+   * Whether this column's heading is the strip's single tab stop. The board is a composite
+   * widget (docs/design.md §5), so `BoardCanvas` roves one `tabIndex` 0 across the headings and
+   * every other column carries -1.
+   */
+  headingTabbable: boolean;
   canMutateColumns: boolean;
   canMutateTasks: boolean;
   canMoveLeft: boolean;
@@ -108,6 +114,7 @@ export const BoardColumn = memo(function BoardColumn({
   selectedTaskId = null,
   dropIndicatorIndex,
   taskSignals = NO_TASK_SIGNALS,
+  headingTabbable,
   canMutateColumns,
   canMutateTasks,
   canMoveLeft,
@@ -269,15 +276,15 @@ export const BoardColumn = memo(function BoardColumn({
           the column had a scroll container of its own, this header was stuck to a box that
           never moved, and the reader scrolled the whole document past it. */}
       <header className="sticky top-0 z-10 flex h-10 items-center gap-2 border-b border-border bg-muted/90 px-3 backdrop-blur-sm max-md:h-12">
-        {/* A tab stop, because the column is a composite widget (docs/design.md §5) and this is
-            its handle: `board-canvas.tsx` moves between headings with Home, End and Ctrl plus
-            an arrow, and reaching one of them with Tab is how that path is entered. The heading
-            text is the whole announcement, so nothing extra is said here. */}
+        {/* The handle of a composite widget (docs/design.md §5): `Tab` reaches one column and
+            keys move between them from there, so exactly one heading on the board is at 0 and
+            the rest are at -1. `board-canvas.tsx` roves that stop with Home, End and Ctrl plus
+            an arrow. The heading text is the whole announcement, so nothing extra is said. */}
         <h2
           data-slot="column-heading"
           // The rule reads a heading as static; this one is the composite widget's handle.
           // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-          tabIndex={0}
+          tabIndex={headingTabbable ? 0 : -1}
           className="min-w-0 flex-1 truncate text-body font-strong"
         >
           {column.name}

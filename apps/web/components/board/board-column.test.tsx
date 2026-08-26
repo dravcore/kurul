@@ -130,12 +130,14 @@ function ColumnHarness({
   onTaskCreated,
   dropIndicatorIndex,
   taskSignals,
+  headingTabbable = true,
 }: {
   tasks: TaskDto[];
   selectedTaskId: string | null;
   onTaskCreated: (task: TaskDto) => void;
   dropIndicatorIndex: number | null;
   taskSignals?: ReadonlyMap<string, TaskCardSignal>;
+  headingTabbable?: boolean;
 }): React.ReactElement {
   const [composerOpen, setComposerOpen] = useState(false);
   return (
@@ -145,6 +147,7 @@ function ColumnHarness({
       boardId={BOARD_ID}
       workspaceId={WORKSPACE_ID}
       selectedTaskId={selectedTaskId}
+      headingTabbable={headingTabbable}
       canMutateColumns
       canMutateTasks
       canMoveLeft={false}
@@ -169,6 +172,7 @@ function renderColumn(
   onTaskCreated: (task: TaskDto) => void = vi.fn(),
   dropIndicatorIndex: number | null = null,
   taskSignals?: ReadonlyMap<string, TaskCardSignal>,
+  headingTabbable = true,
 ) {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -179,6 +183,7 @@ function renderColumn(
           onTaskCreated={onTaskCreated}
           dropIndicatorIndex={dropIndicatorIndex}
           taskSignals={taskSignals}
+          headingTabbable={headingTabbable}
         />
       </DndContext>
     </NextIntlClientProvider>,
@@ -583,6 +588,7 @@ describe('BoardColumn task composer', () => {
             workspaceId={null}
             selectedTaskId={null}
             dropIndicatorIndex={null}
+            headingTabbable
             canMutateColumns
             canMutateTasks
             canMoveLeft={false}
@@ -621,16 +627,22 @@ describe('BoardColumn feedback marks', () => {
 });
 
 /**
- * The column is a composite widget (docs/design.md §5) and its heading is the handle: it is the
- * tab stop `board-canvas.tsx` moves between with Home, End and Ctrl plus an arrow, and the
- * `data-slot` is how the canvas finds the set of them.
+ * The board is a composite widget (docs/design.md §5): `Tab` reaches one column and keys move
+ * between them from there, so the heading is a roving tab stop rather than a permanent one.
+ * `board-canvas.tsx` owns which column holds it; the `data-slot` is how it finds the set.
  */
 describe('BoardColumn heading', () => {
-  it('is a tab stop the board can move focus to', () => {
+  it('is the tab stop while it is the current column', () => {
     renderColumn(makeTasks(1));
 
     const heading = screen.getByRole('heading', { name: column.name });
     expect(heading.getAttribute('tabindex')).toBe('0');
     expect(heading.getAttribute('data-slot')).toBe('column-heading');
+  });
+
+  it('stays focusable but out of the tab order everywhere else', () => {
+    renderColumn(makeTasks(1), null, vi.fn(), null, undefined, false);
+
+    expect(screen.getByRole('heading', { name: column.name }).getAttribute('tabindex')).toBe('-1');
   });
 });

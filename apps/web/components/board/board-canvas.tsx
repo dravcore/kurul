@@ -143,11 +143,21 @@ export function BoardCanvas({
   }, [columns.length]);
 
   /**
-   * The board-scale half of the column's keyboard path: Home and End reach the first and last
-   * column, Ctrl plus an arrow the neighbouring one. Bare arrows are left alone on purpose,
-   * they belong to @dnd-kit's keyboard drag and to the caret inside the composer. Meta is not
-   * a second binding for this: Command plus an arrow is the browser's own history navigation
-   * on macOS.
+   * Which column heading is the strip's single tab stop.
+   *
+   * docs/design.md §5: the board is a composite widget, so `Tab` reaches *a* column and keys
+   * move between them from there. One heading at `tabIndex` 0 and the rest at -1 is that
+   * sentence: an eight-column board costs the reader one tab stop, not eight. The index is
+   * clamped at render, so deleting the last column cannot leave the strip with no tab stop.
+   */
+  const [currentColumn, setCurrentColumn] = useState(0);
+  const currentColumnIndex = Math.min(currentColumn, Math.max(columns.length - 1, 0));
+
+  /**
+   * Home and End reach the first and last column, Ctrl plus an arrow the neighbouring one, and
+   * the roving tab stop follows. Bare arrows are left alone on purpose, they belong to
+   * @dnd-kit's keyboard drag and to the caret inside the composer. Meta is not a second binding
+   * for this: Command plus an arrow is the browser's own history navigation on macOS.
    */
   const onHeadingKeyDown = useCallback((event: KeyboardEvent): void => {
     const scroller = scrollerRef.current;
@@ -159,28 +169,58 @@ export function BoardCanvas({
     const index = headings.indexOf(target);
     if (index < 0) return;
 
-    let next: HTMLElement | undefined;
-    if (event.key === 'Home' && !event.ctrlKey) next = headings[0];
-    else if (event.key === 'End' && !event.ctrlKey) next = headings.at(-1);
-    else if (event.key === 'ArrowLeft' && event.ctrlKey) next = headings[index - 1];
-    else if (event.key === 'ArrowRight' && event.ctrlKey) next = headings[index + 1];
-    if (next === undefined) return;
+    let nextIndex: number | undefined;
+    if (event.key === 'Home' && !event.ctrlKey) nextIndex = 0;
+    else if (event.key === 'End' && !event.ctrlKey) nextIndex = headings.length - 1;
+    else if (event.key === 'ArrowLeft' && event.ctrlKey) nextIndex = index - 1;
+    else if (event.key === 'ArrowRight' && event.ctrlKey) nextIndex = index + 1;
+    const next = nextIndex === undefined ? undefined : headings[nextIndex];
+    if (next === undefined || nextIndex === undefined) return;
 
     // Home and End would otherwise take the strip to its own end without moving focus, leaving
     // the reader looking at a column their keyboard is not on.
     event.preventDefault();
-    next.focus();
-    next.scrollIntoView({ block: 'nearest', inline: 'start' });
+    setCurrentColumn(nextIndex);
+    // `preventScroll`, because `focus()` scrolls the heading just inside the scrollport with no
+    // regard for `scroll-padding`: the first column would land at the strip's own 16px of
+    // padding rather than at 0, which is a scroll position the edge mask reads as a column
+    // hidden to the left. The `scrollIntoView` below honours it and is the only scroll here.
+    next.focus({ preventScroll: true });
+    // The column, not the heading. The heading sits 12px inside its column (the header's own
+    // padding), so aligning the heading to the scroll padding would leave the column's leading
+    // edge, and the focus outline drawn around the heading, under the 24px edge mask.
+    (next.closest('section') ?? next).scrollIntoView({ block: 'nearest', inline: 'start' });
   }, []);
 
-  // Bound to the node rather than passed as `onKeyDown`: the strip is a scroll container, not a
+  /**
+   * Focus arriving on a heading any other way, a click above all, moves the tab stop with it:
+   * the tab stop has to be the column the reader is actually on, or Tab would take them back to
+   * a column they left.
+   */
+  const onHeadingFocusIn = useCallback((event: FocusEvent): void => {
+    const scroller = scrollerRef.current;
+    const target = event.target;
+    if (scroller === null || !(target instanceof HTMLElement) || !target.matches(COLUMN_HEADING)) {
+      return;
+    }
+    const index = Array.from(scroller.querySelectorAll<HTMLElement>(COLUMN_HEADING)).indexOf(
+      target,
+    );
+    if (index >= 0) setCurrentColumn(index);
+  }, []);
+
+  // Bound to the node rather than passed as React props: the strip is a scroll container, not a
   // control, and the keys below belong to the headings inside it.
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (scroller === null) return;
     scroller.addEventListener('keydown', onHeadingKeyDown);
-    return () => scroller.removeEventListener('keydown', onHeadingKeyDown);
-  }, [onHeadingKeyDown]);
+    scroller.addEventListener('focusin', onHeadingFocusIn);
+    return () => {
+      scroller.removeEventListener('keydown', onHeadingKeyDown);
+      scroller.removeEventListener('focusin', onHeadingFocusIn);
+    };
+  }, [onHeadingKeyDown, onHeadingFocusIn]);
 
   return (
     <DndContext
@@ -208,9 +248,11 @@ export function BoardCanvas({
           // that one ahead of `snap-x` and it would lose; `app/globals.css` answers it.
           data-dragging={dnd.isDragging || undefined}
           // Below `md` a column is 85vw and the strip snaps, so a swipe always lands on one
-          // column rather than between two. `scroll-pl-4` matches the strip's own padding, which
-          // is what keeps a snapped column off the edge of the screen.
-          className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4 max-md:snap-x max-md:snap-mandatory max-md:scroll-pl-4"
+          // column rather than between two. The scroll padding is not part of that and applies
+          // at every width, because `scrollIntoView` reads it too: 16px matches the strip's own
+          // padding below `md`, and 24px above it is the width of the edge mask, so a column
+          // scrolled to the start sits clear of the mask rather than under it.
+          className="flex min-h-0 flex-1 gap-3 overflow-x-auto scroll-pl-4 p-4 max-md:snap-x max-md:snap-mandatory md:scroll-pl-6"
         >
           {columns.map((column, index) => (
             <BoardColumn
@@ -222,6 +264,7 @@ export function BoardCanvas({
               taskSignals={taskSignals}
               canMutateColumns={canMutateColumns}
               canMutateTasks={canMutateTasks}
+              headingTabbable={index === currentColumnIndex}
               canMoveLeft={index > 0}
               canMoveRight={index < columns.length - 1}
               onOpenSettings={() => onOpenColumnSettings(column)}
