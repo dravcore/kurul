@@ -278,6 +278,20 @@ kanalları değil. Bir de: indeks negatif olmayan düz bir tam sayı değilse
 ayarın tüm amacı iki uygulamayı ayrı tutmak olduğuna göre, içindeki bir yazım hatası onları bir
 araya getirmemelidir.
 
+**Bir Redis 6+ ACL kullanıcısı ve `rediss://` (TLS) da dikkate alınır.**
+`redis://alice:s3cret@host:6379`, `default` yerine `alice` olarak `s3cret` şifresiyle kimlik
+doğrular; `rediss://host:6379` ise düz metin yerine TLS bağlantısı açar. Bunlardan biri, ACL
+kullanıcısı veya TLS isteyen yönetilen bir Redis (Upstash, ElastiCache aktarımda şifreleme,
+Redis Cloud) için gereklidir.
+[#204](https://github.com/dravcore/kurul/issues/204) öncesinde ikisi de sessizce
+düşürülüyordu: ACL kullanıcı adı ioredis'e hiç ulaşmıyordu, dolayısıyla instance verilen
+şifreyle `default` olarak kimlik doğruluyordu (bu, `default`'un eşleşecek kendi şifresi
+olmadığında tamamen başarısız olur, aksi halde yanlış kullanıcının izinleriyle çalışır) ve
+`rediss://` hiçbir uyarı vermeden düz metin bağlanıyordu. `redis:` veya `rediss:` dışındaki bir
+şema, ayrıştırılamayan bir veritabanı indeksiyle aynı şekilde bağlantı anında reddedilir.
+Bundle edilmiş Compose stack'i her iki durumda da etkilenmez: kendi `redis` konteyneri için
+her zaman düz bir `redis://:password@redis:6379` oluşturur.
+
 **`POSTGRES_PASSWORD`'ü mevcut bir `postgres_data` volume'unda değiştirmek, çalışan
 veritabanının şifresini döndürmez.** Resmi Postgres image'ı `POSTGRES_PASSWORD`'ü yalnızca
 `initdb` sırasında, yani bir volume ilk oluşturulduğunda uygular — `.env`'i düzenleyip zaten
