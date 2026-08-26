@@ -121,6 +121,33 @@ describe('TaskPropertiesPanel', () => {
     expect(within(region).getByText(messages.app.board.task.labels)).toBeDefined();
   });
 
+  it('hands both sections the counts the threshold is read off', () => {
+    // The workspace roster and the board palette are read once, by the panel above this one, so
+    // this is the only place the two counts the threshold turns on actually come from.
+    renderPanel(
+      metaStub({
+        members: Array.from({ length: 8 }, (_, index) => ({
+          id: `m${index + 1}`,
+          workspaceId: WORKSPACE_ID,
+          userId: `${MEMBER_USER_ID.slice(0, -1)}${index}`,
+          role: MemberRole.MEMBER,
+          name: `Member ${index + 1}`,
+          avatarUrl: null,
+        })),
+        boardLabels: Array.from({ length: 8 }, (_, index) => ({
+          id: `l${index + 1}`,
+          boardId: BOARD_ID,
+          name: `Label ${index + 1}`,
+          color: 'slot-1' as const,
+        })),
+      }),
+    );
+    const region = propertiesRegion();
+
+    expect(within(region).getByRole('button', { name: /^Assign/ })).toBeDefined();
+    expect(within(region).getByRole('button', { name: /^Add label/ })).toBeDefined();
+  });
+
   it('leaves the comment thread and the history to the discussion panel', () => {
     renderPanel();
 

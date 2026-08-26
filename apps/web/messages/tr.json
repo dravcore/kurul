@@ -562,7 +562,13 @@
           "minutes": "{minutes}dk"
         },
         "assignees": "Atananlar",
+        "noAssignees": "Kimse atanmadı",
+        "assignAction": "Ata ({count})",
+        "searchMembers": "Üye ara",
         "labels": "Label'lar",
+        "addLabelAction": "Label ekle ({count})",
+        "searchLabels": "Label ara",
+        "noMatches": "Eşleşme yok",
         "noLabels": "Bu task'ta label yok",
         "removeLabel": "{name} label'ını kaldır",
         "newLabel": "Yeni label",

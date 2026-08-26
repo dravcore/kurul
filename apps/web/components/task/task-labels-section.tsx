@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { LabelChip, labelSlotClass } from './label-chip';
+import { INLINE_PICKER_MAX, SearchablePicker } from './searchable-picker';
 
 const SLOTS = Object.values(LabelColorSlot);
 
@@ -49,6 +50,70 @@ export function TaskLabelsSection({
     if (created) setNewLabelName('');
   }
 
+  function slotDot(color: LabelDto['color']): React.ReactElement {
+    return (
+      <span className={cn('size-2 shrink-0 rounded-full', labelSlotClass(color))} aria-hidden />
+    );
+  }
+
+  function deleteButton(labelId: string): React.ReactElement {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={pending}
+        onClick={() => onDeleteBoardLabel(labelId)}
+      >
+        {t('deleteLabel')}
+      </Button>
+    );
+  }
+
+  /**
+   * The board's palette, drawn flat while it still fits and behind a searchable popover once it
+   * does not. `INLINE_PICKER_MAX` is the same number the assignee list reads, so the two never
+   * disagree about what counts as a long list.
+   */
+  const palette =
+    boardLabels.length > INLINE_PICKER_MAX ? (
+      <SearchablePicker
+        triggerLabel={t('addLabelAction', { count: taskLabels.length })}
+        searchLabel={t('searchLabels')}
+        emptyLabel={t('noMatches')}
+        disabled={pending}
+        options={boardLabels.map((label) => ({
+          id: label.id,
+          name: label.name,
+          selected: taskLabelIds.has(label.id),
+          accent: slotDot(label.color),
+          trailing: canManageLabels ? deleteButton(label.id) : undefined,
+        }))}
+        onToggle={onToggleLabel}
+      />
+    ) : (
+      <ul className="flex flex-col gap-1">
+        {boardLabels.map((label) => {
+          const assigned = taskLabelIds.has(label.id);
+          return (
+            <li key={label.id} className="flex items-center gap-2">
+              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-body max-md:min-h-11">
+                <input
+                  type="checkbox"
+                  checked={assigned}
+                  disabled={pending}
+                  onChange={() => onToggleLabel(label.id, assigned)}
+                />
+                {slotDot(label.color)}
+                <span className="truncate">{label.name}</span>
+              </label>
+              {canManageLabels ? deleteButton(label.id) : null}
+            </li>
+          );
+        })}
+      </ul>
+    );
+
   return (
     <div className="flex flex-col gap-2">
       <p className="text-small font-strong text-foreground">{t('labels')}</p>
@@ -69,41 +134,7 @@ export function TaskLabelsSection({
           <span className="text-small text-muted-foreground">{t('noLabels')}</span>
         ) : null}
       </div>
-      {canMutate ? (
-        <ul className="flex flex-col gap-1">
-          {boardLabels.map((label) => {
-            const assigned = taskLabelIds.has(label.id);
-            return (
-              <li key={label.id} className="flex items-center gap-2">
-                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-body max-md:min-h-11">
-                  <input
-                    type="checkbox"
-                    checked={assigned}
-                    disabled={pending}
-                    onChange={() => onToggleLabel(label.id, assigned)}
-                  />
-                  <span
-                    className={cn('size-2 shrink-0 rounded-full', labelSlotClass(label.color))}
-                    aria-hidden
-                  />
-                  <span className="truncate">{label.name}</span>
-                </label>
-                {canManageLabels ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => onDeleteBoardLabel(label.id)}
-                  >
-                    {t('deleteLabel')}
-                  </Button>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+      {canMutate ? palette : null}
       {canManageLabels ? (
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex min-w-40 flex-1 flex-col gap-1.5">

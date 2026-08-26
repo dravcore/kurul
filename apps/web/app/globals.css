@@ -570,13 +570,17 @@ body {
 }
 
 /* The dropdown menu's open and close (components/ui/dropdown-menu.tsx `DropdownMenuContent` and
-   `DropdownMenuSubContent`). Same dead-utility reason as the dialog above.
+   `DropdownMenuSubContent`), and the popover's (components/ui/popover.tsx `PopoverContent`).
+   Same dead-utility reason as the dialog above.
 
    Radix writes `--radix-dropdown-menu-content-transform-origin` from whichever side the menu
    actually opened on, and both components already carry the Tailwind utility that reads it
    (`origin-(--radix-dropdown-menu-content-transform-origin)`), so scaling from `scale` here grows
    the menu out of the corner nearest its trigger instead of its own centre, docs/design.md §5's
-   `transform-origin: var(--transform-origin)` for this row of the table. */
+   `transform-origin: var(--transform-origin)` for this row of the table. The popover reads its
+   own `--radix-popover-content-transform-origin` and joins the same keyframes: it is the same
+   gesture (a surface growing out of the control that opened it), so a second pair of keyframes
+   would only be a second thing to keep in step. */
 @keyframes menu-content-in {
   from {
     opacity: 0;
@@ -600,31 +604,36 @@ body {
 }
 
 [data-slot='dropdown-menu-content'],
-[data-slot='dropdown-menu-sub-content'] {
+[data-slot='dropdown-menu-sub-content'],
+[data-slot='popover-content'] {
   animation-timing-function: var(--ease-out);
   animation-fill-mode: both;
 }
 
 [data-slot='dropdown-menu-content'][data-state='open'],
-[data-slot='dropdown-menu-sub-content'][data-state='open'] {
+[data-slot='dropdown-menu-sub-content'][data-state='open'],
+[data-slot='popover-content'][data-state='open'] {
   animation-name: menu-content-in;
   animation-duration: 150ms;
 }
 
 [data-slot='dropdown-menu-content'][data-state='closed'],
-[data-slot='dropdown-menu-sub-content'][data-state='closed'] {
+[data-slot='dropdown-menu-sub-content'][data-state='closed'],
+[data-slot='popover-content'][data-state='closed'] {
   animation-name: menu-content-out;
   animation-duration: 150ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
   [data-slot='dropdown-menu-content'][data-state='open'],
-  [data-slot='dropdown-menu-sub-content'][data-state='open'] {
+  [data-slot='dropdown-menu-sub-content'][data-state='open'],
+  [data-slot='popover-content'][data-state='open'] {
     animation-name: layer-fade-in;
   }
 
   [data-slot='dropdown-menu-content'][data-state='closed'],
-  [data-slot='dropdown-menu-sub-content'][data-state='closed'] {
+  [data-slot='dropdown-menu-sub-content'][data-state='closed'],
+  [data-slot='popover-content'][data-state='closed'] {
     animation-name: layer-fade-out;
   }
 }

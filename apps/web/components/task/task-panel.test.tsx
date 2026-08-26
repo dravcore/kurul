@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { Priority, type TaskDto } from '@kurul/shared-types';
@@ -385,6 +385,49 @@ describe('TaskPanel Escape', () => {
 
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The assignee picker is the first Radix layer the panel grew that is not a dialog, which is
+   * exactly the case the layer-aware `Esc` fix was written for: the panel has to recognise an
+   * open popover as the topmost layer or one press dismisses two things.
+   */
+  describe('with the assignee popover open', () => {
+    const oneMember = taskMeta.members;
+
+    beforeEach(() => {
+      taskMeta.members = Array.from({ length: 8 }, (_, index) => ({
+        id: `m${index + 1}`,
+        workspaceId: 'w1',
+        userId: `0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d5${index}`,
+        role: 'MEMBER',
+        name: `Member ${index + 1}`,
+        avatarUrl: null,
+      }));
+    });
+
+    afterEach(() => {
+      taskMeta.members = oneMember;
+    });
+
+    function openPicker(): void {
+      fireEvent.click(screen.getByRole('button', { name: /^Assign/ }));
+    }
+
+    it('gives the popover the first Escape and the panel the second', () => {
+      render(<Board open />);
+      openPicker();
+      expect(screen.getByLabelText(messages.app.board.task.searchMembers)).toBeDefined();
+
+      pressEscape();
+
+      expect(screen.queryByLabelText(messages.app.board.task.searchMembers)).toBeNull();
+      expect(push).not.toHaveBeenCalled();
+
+      pressEscape();
+
+      expect(push).toHaveBeenCalledWith('/board/b1', { scroll: false });
+    });
   });
 });
 

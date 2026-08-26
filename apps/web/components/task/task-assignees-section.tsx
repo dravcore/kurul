@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import type { WorkspaceMemberDto } from '@kurul/shared-types';
+import { INLINE_PICKER_MAX, SearchablePicker } from './searchable-picker';
 
 interface TaskAssigneesSectionProps {
   members: WorkspaceMemberDto[];
@@ -19,27 +20,57 @@ export function TaskAssigneesSection({
 }: TaskAssigneesSectionProps): React.ReactElement {
   const t = useTranslations('app.board.task');
 
+  const assigned = members.filter((member) => assignedUserIds.has(member.userId));
+
   return (
     <div className="flex flex-col gap-2">
       <p className="text-small font-strong text-foreground">{t('assignees')}</p>
-      <ul className="flex flex-col gap-1">
-        {members.map((member) => {
-          const assigned = assignedUserIds.has(member.userId);
-          return (
-            <li key={member.id}>
-              <label className="flex cursor-pointer items-center gap-2 text-body max-md:min-h-11">
-                <input
-                  type="checkbox"
-                  checked={assigned}
-                  disabled={disabled}
-                  onChange={() => onToggle(member.userId, assigned)}
-                />
-                <span>{member.name}</span>
-              </label>
-            </li>
-          );
-        })}
-      </ul>
+      {members.length > INLINE_PICKER_MAX ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {/* The checkbox list was the only thing saying who is on the task. Behind a popover it
+              no longer is, so the names come out in front of the trigger. */}
+          {assigned.length === 0 ? (
+            <span className="text-small text-muted-foreground">{t('noAssignees')}</span>
+          ) : (
+            <ul className="flex flex-wrap gap-x-2 gap-y-1 text-body">
+              {assigned.map((member) => (
+                <li key={member.id}>{member.name}</li>
+              ))}
+            </ul>
+          )}
+          <SearchablePicker
+            triggerLabel={t('assignAction', { count: assigned.length })}
+            searchLabel={t('searchMembers')}
+            emptyLabel={t('noMatches')}
+            disabled={disabled}
+            options={members.map((member) => ({
+              id: member.userId,
+              name: member.name,
+              selected: assignedUserIds.has(member.userId),
+            }))}
+            onToggle={onToggle}
+          />
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {members.map((member) => {
+            const isAssigned = assignedUserIds.has(member.userId);
+            return (
+              <li key={member.id}>
+                <label className="flex cursor-pointer items-center gap-2 text-body max-md:min-h-11">
+                  <input
+                    type="checkbox"
+                    checked={isAssigned}
+                    disabled={disabled}
+                    onChange={() => onToggle(member.userId, isAssigned)}
+                  />
+                  <span>{member.name}</span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

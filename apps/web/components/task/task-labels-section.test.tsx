@@ -3,7 +3,17 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import type { LabelDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
+import { INLINE_PICKER_MAX } from './searchable-picker';
 import { TaskLabelsSection } from './task-labels-section';
+
+function boardLabels(count: number): LabelDto[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `l${index + 1}`,
+    boardId: 'b1',
+    name: `Label ${index + 1}`,
+    color: 'slot-1' as LabelDto['color'],
+  }));
+}
 
 function renderSection(
   overrides: {
@@ -102,5 +112,59 @@ describe('TaskLabelsSection colour picker', () => {
     renderSection({ pending: true });
 
     expect(picker().disabled).toBe(true);
+  });
+});
+
+/**
+ * The same threshold the assignee list uses, counted over the board's palette. Both boundaries
+ * are their own case: the whole point of the number is that one side of it stays a single click.
+ */
+describe('TaskLabelsSection palette threshold', () => {
+  const trigger = (): HTMLElement => screen.getByRole('button', { name: /^Add label/ });
+
+  it(`keeps the palette a flat list at ${INLINE_PICKER_MAX} board labels`, () => {
+    const { onToggleLabel } = renderSection({ boardLabels: boardLabels(INLINE_PICKER_MAX) });
+
+    expect(screen.getAllByRole('checkbox')).toHaveLength(INLINE_PICKER_MAX);
+    expect(screen.queryByRole('button', { name: /^Add label/ })).toBeNull();
+
+    fireEvent.click(screen.getByLabelText('Label 3'));
+
+    expect(onToggleLabel).toHaveBeenCalledWith('l3', false);
+  });
+
+  it(`moves the palette into a searchable popover at ${INLINE_PICKER_MAX + 1}`, () => {
+    renderSection({ boardLabels: boardLabels(INLINE_PICKER_MAX + 1) });
+
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+
+    fireEvent.click(trigger());
+
+    expect(screen.getAllByRole('checkbox')).toHaveLength(INLINE_PICKER_MAX + 1);
+  });
+
+  it('filters the palette as the reader types', () => {
+    renderSection({ boardLabels: boardLabels(INLINE_PICKER_MAX + 1) });
+    fireEvent.click(trigger());
+
+    fireEvent.change(screen.getByLabelText(messages.app.board.task.searchLabels), {
+      target: { value: 'label 8' },
+    });
+
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.getByLabelText('Label 8')).toBeDefined();
+  });
+
+  it('keeps the per-label delete inside the popover for an admin', () => {
+    const { onDeleteBoardLabel } = renderSection({
+      boardLabels: boardLabels(INLINE_PICKER_MAX + 1),
+    });
+    fireEvent.click(trigger());
+
+    fireEvent.click(
+      screen.getAllByRole('button', { name: messages.app.board.task.deleteLabel })[1]!,
+    );
+
+    expect(onDeleteBoardLabel).toHaveBeenCalledWith('l2');
   });
 });
