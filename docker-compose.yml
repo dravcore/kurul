@@ -426,8 +426,7 @@ services:
         condition: service_healthy
 
   api:
-    # OPS-04 (2026-08-18 devops audit, dashboard not in the repo): `image:` alongside `build:`
-    # is not an either/or —
+    # OPS-04 (2026-08-18 devops audit): `image:` alongside `build:` is not an either/or —
     # Compose's default pull_policy (`missing`) means `docker compose up -d` only builds when
     # the tag below isn't already resolvable, so `docker compose pull && docker compose up -d`
     # (docs/development.md#full-stack-in-docker) now installs and upgrades from a published
