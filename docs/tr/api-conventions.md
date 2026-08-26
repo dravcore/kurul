@@ -303,7 +303,7 @@ nullable bir alanı temizler.
 | `204 No Content`             | Başarılı silme; boş body                                                                                                                                                                                                                                                      |
 | `400 Bad Request`            | Bozuk request veya validation hatası                                                                                                                                                                                                                                          |
 | `401 Unauthorized`           | Eksik veya geçersiz session                                                                                                                                                                                                                                                   |
-| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz, **ya da** bir plan tavanı aşılacak (hangisi olduğunu `error` söyler, bkz. [Plan limitleri](#plan-limitleri))                                                                                                                     |
+| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz, **ya da** bir plan tavanı aşılacak (hangisi olduğunu `error` söyler, bkz. [Plan limitleri](#plan-limitleri)), **ya da** kayıt kapalı (`SIGNUP_ENABLED=false`: yalnızca `POST /auth/sign-up/email`, `error: "Sign-up Disabled"`)  |
 | `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                                                                                                                                                                                 |
 | `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                                                                                                                                                                                   |
 | `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, bir yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor ya da bir depolama kotasını aşacak (hangisi olduğunu `error` söyler — bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)), ya da bir import `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor |
@@ -314,8 +314,9 @@ nullable bir alanı temizler.
 
 **Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
 doğrulardı, ki bu tenant sınırının ötesine bilgi sızdırır. `403`, rolü çok düşük meşru bir
-üye için, ve zarfın `error` alanının birbirinden ayırdığı, aşağıdaki plan tavanları için
-ayrılmıştır.
+üye için, aşağıdaki plan tavanları için, kapalı kayıt (`SIGNUP_ENABLED=false`) için ve bir demo
+instance'ın reddettiği eylemler (`DEMO_MODE=true`) için ayrılmıştır; zarfın `error` alanı
+bunları birbirinden ayırır.
 
 ### Plan limitleri
 
@@ -345,7 +346,7 @@ sayılan şeydir, dolayısıyla `limit`'e eşit ya da onu aşabilir.
 | `planLimit.code`        | Reddeder                                     | Sayar                                                   |
 | ----------------------- | -------------------------------------------- | ------------------------------------------------------- |
 | `PLAN_LIMIT_SEATS`      | `POST .../invitations`, ve birini kabul etme | Üyeler artı hâlâ bekleyen davetler                      |
-| `PLAN_LIMIT_BOARDS`     | `POST .../boards`                            | Workspace'teki board'lar                                |
+| `PLAN_LIMIT_BOARDS`     | `POST .../boards`, `POST .../imports/trello` | Workspace'teki board'lar                                |
 | `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                           | Instance'taki workspace'ler                             |
 | `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                   | Instance'taki hesaplar, anonimleştirilmiş olanlar hariç |
 
@@ -527,17 +528,18 @@ yapamayacağı şeyi tek istekte yapmamalı.
 
 **Hatalar:**
 
-| Durum | Ne zaman                                                                                |
-| ----- | --------------------------------------------------------------------------------------- |
-| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil |
-| `403` | Workspace üyesi, ama rolü `ADMIN`'in altında                                            |
-| `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı     |
-| `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                        |
-| `429` | Bir dakikalık pencerede üçten fazla import                                              |
+| Durum | Ne zaman                                                                                                                                                                                         |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil                                                                                                          |
+| `403` | Workspace üyesi, ama rolü `ADMIN`'in altında **ya da** workspace board tavanında (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, bkz. [Plan limitleri](#plan-limitleri)) |
+| `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı                                                                                                              |
+| `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                                                                                                                                 |
+| `429` | Bir dakikalık pencerede üçten fazla import                                                                                                                                                       |
 
 Ayrıştırıcıya ulaşan tek hata `400`'dür ve **ulaştığında hiçbir şey yazılmaz**: export, transaction
 açılmadan önce baştan sona okunup eşlenir, yani reddedilen bir import workspace'i baytı baytına
-olduğu gibi bırakır.
+olduğu gibi bırakır. Board tavanı `403`'ü de hiçbir şey yazmaz: kontrol, board satırından önce,
+transaction'ın ilk ifadesidir, dolayısıyla ret boş bir transaction'ı geri alır.
 
 **Cevabın gövdesi raporun kendisidir ve hiçbir yerde saklanmaz.**
 

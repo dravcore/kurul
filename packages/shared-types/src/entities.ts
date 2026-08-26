@@ -37,6 +37,18 @@ export interface InstanceConfigDto {
    */
   attachmentsEnabled: boolean;
   /**
+   * Whether `POST /auth/sign-up/email` accepts new accounts, i.e. whether `SIGNUP_ENABLED` is
+   * anything but `false`.
+   *
+   * A policy switch, not a ceiling: `planLimits.users` refuses sign-up once a head count is
+   * reached, this refuses it whatever the count is. Both are capability, identical for every
+   * caller. A refused sign-up answers `403` with `error: "Sign-up Disabled"`
+   * ({@link SIGNUP_DISABLED_ERROR}); signing in and every other `/auth/*` route stay open.
+   * Independent of `demo.enabled`: a demo keeps registration open, an ordinary install may
+   * close it.
+   */
+  signUpEnabled: boolean;
+  /**
    * Whether this deployment is a public demo whose data is wiped on a schedule.
    *
    * A nested object rather than three sibling booleans, because the two schedule fields are
@@ -116,6 +128,17 @@ export interface WorkspacePlanUsageDto {
  * `planLimit.code` when they need to know *which* ceiling.
  */
 export const PLAN_LIMIT_ERROR = 'Plan Limit Exceeded';
+
+/**
+ * The `error` field of the 403 `POST /auth/sign-up/email` answers when the operator has closed
+ * registration with `SIGNUP_ENABLED=false`.
+ *
+ * Its own string rather than {@link PLAN_LIMIT_ERROR} with a `planLimit` object, because the two
+ * refusals call for different fixes and a client branches on `error`: a ceiling is a number
+ * somebody can raise, a closed door is a policy nobody can count their way past. There is no
+ * `planLimit` member on this refusal.
+ */
+export const SIGNUP_DISABLED_ERROR = 'Sign-up Disabled';
 
 /**
  * Which ceiling refused the write. Carried in the error envelope's `planLimit.code`, because

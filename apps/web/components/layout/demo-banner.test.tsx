@@ -18,6 +18,7 @@ function resolveWith(demo: DemoConfigDto): void {
   loadConfig.mockResolvedValue({
     mailEnabled: false,
     attachmentsEnabled: false,
+    signUpEnabled: true,
     demo,
     // Nothing here reads the ceilings; the banner needs the document to be complete, not capped.
     planLimits: {

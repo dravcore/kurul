@@ -81,6 +81,11 @@ services:
     # with it. See docs/self-hosting.md#server-sizing for how this and the other ceilings below
     # add up against that budget.
     mem_limit: 512m
+    # Docker's /dev/shm is 64 MB by default and Postgres puts dynamic shared memory (parallel
+    # workers, hash joins) there; 256m keeps a heavy dashboard query from failing with "could not
+    # resize shared memory segment". Charged to this container's cgroup, so it is inside the
+    # 512m above, not on top of it.
+    shm_size: 256m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kurul}
       # No baked-in default: compose fails loudly instead of initializing (or, on every later
@@ -93,8 +98,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-kurul}
     volumes:
       - postgres_data:/var/lib/postgresql
+    # `-h 127.0.0.1`, so the probe goes over TCP. Without a host, pg_isready asks the Unix socket,
+    # and on the very first boot of an empty postgres_data volume the official entrypoint runs
+    # initdb behind a temporary, socket-only server (`listen_addresses=''`) that answers that
+    # probe as readily as the real one: the check turned healthy, `migrate` below started, and
+    # its one `prisma migrate deploy` failed with a connection refused because nothing was
+    # listening on 5432 yet, which reads to a newcomer as a broken install. Probing the TCP
+    # listener means healthy is not reported until the server the other containers will actually
+    # talk to is up. scripts/bootstrap.mjs names the same race for the dev stack.
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-kurul} -d ${POSTGRES_DB:-kurul}']
+      test:
+        ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-kurul} -d ${POSTGRES_DB:-kurul}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -157,7 +171,33 @@ services:
     # stay array form: a single command *string* here would go through `sh -c` again (the
     # same trap this replaces) and a string with a trailing blank argument silently loses
     # it, whereas the array passes an explicit empty element through to `redis-server`.
-    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']
+    #
+    # `--maxmemory ${REDIS_MAXMEMORY:-100mb}` under the 128m `mem_limit` above, for the reason
+    # api's NODE_OPTIONS pins V8's heap under its own ceiling: a limit Redis knows about ends in
+    # a logged `OOM command not allowed when used memory > 'maxmemory'` that the API already
+    # survives (its rate limiters fall back to process memory while Redis is erroring, and a
+    # cache miss is a cache miss), where the cgroup's ends in a bare exit 137 that `restart:
+    # unless-stopped` turns into a loop. `noeviction` rather than an LRU policy because BullMQ's
+    # queues (the notification and retention workers in apps/api) live here, BullMQ requires it,
+    # and an evicted job is a job that silently never runs: a full Redis must refuse writes, not
+    # drop keys. The 28m between the two, at the default, is for what maxmemory does not count,
+    # mostly the RDB save fork's copy-on-write pages and client buffers.
+    #
+    # `REDIS_MAXMEMORY` in `.env` raises the ceiling without editing this file; raise `mem_limit`
+    # above alongside it. Check `used_memory_human` first on an instance that is already running
+    # (docs/self-hosting.md#server-sizing): with `noeviction`, a dataset already over the ceiling
+    # does not shrink itself back under it, it refuses every write until keys expire, so the
+    # check comes before the number, not after.
+    command:
+      [
+        'redis-server',
+        '--requirepass',
+        '${REDIS_PASSWORD:-}',
+        '--maxmemory',
+        '${REDIS_MAXMEMORY:-100mb}',
+        '--maxmemory-policy',
+        'noeviction',
+      ]
     volumes:
       - redis_data:/data
     # Still branches on REDIS_PASSWORD, even though `redis-cli -a "" ping` was confirmed to
@@ -216,6 +256,13 @@ services:
       PGUSER: ${POSTGRES_USER:-kurul}
       PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
       PGDATABASE: ${POSTGRES_DB:-kurul}
+      # Retention is a COUNT: backup.sh keeps the newest BACKUP_KEEP archives of each series and
+      # never looks at their age. A container start used to spend one of those slots (the loop
+      # dumped on entry, every reboot, `up` and image pull included), so a day of restarts could
+      # push a week of history out; backup.sh now skips its boot-time cycle while a dump younger
+      # than BACKUP_INTERVAL/2 exists, and restarts no longer consume retention. The two values
+      # are also handed to `api` above, whose orphan-file sweep waits BACKUP_KEEP × BACKUP_INTERVAL
+      # on the assumption of one pair per interval, which that skip is what keeps true.
       BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
       # Where the read-only attachments mount lands. Blank would skip the file archive
@@ -306,7 +353,11 @@ services:
     # starts immediately at container boot (see backup.sh's main loop below `mkdir -p
     # "$BACKUP_DIR"`), not after one BACKUP_INTERVAL has elapsed, so how long it takes is a
     # function of database size, not of the configured cadence — sizing it off a 24h default
-    # would hide a genuinely broken first cycle for most of a day. 10 minutes is generous for
+    # would hide a genuinely broken first cycle for most of a day. A RESTART is the other case:
+    # backup.sh skips that boot-time cycle when a dump younger than BACKUP_INTERVAL/2 already
+    # exists (so restarts stop eating count-based retention, see BACKUP_KEEP above), and the
+    # dump it leaves in place is exactly what the `find -mmin` below reads, so the check is
+    # healthy from the first probe. 10 minutes is generous for
     # the databases a single-host Compose install runs (this file's whole premise, and
     # self-hosting.md's); an instance with an unusually large first dump that still needs
     # longer can raise `start_period` with a compose override file, same as any other
@@ -532,6 +583,12 @@ services:
       PLAN_MAX_BOARDS_PER_WORKSPACE: ${PLAN_MAX_BOARDS_PER_WORKSPACE:-}
       PLAN_MAX_WORKSPACES: ${PLAN_MAX_WORKSPACES:-}
       PLAN_MAX_USERS: ${PLAN_MAX_USERS:-}
+      # Registration switch, a policy rather than a ceiling and so not one of the four above:
+      # blank or `true` keeps POST /auth/sign-up/email open, `false` refuses it with a 403
+      # whatever the account count is and leaves sign-in and the rest of /auth alone. Passed
+      # through for the same reason the ceilings are. Independent of DEMO_MODE, which keeps
+      # registration open; see docs/self-hosting.md.
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-}
       # Read by the orphan sweep, which refuses to delete a file while a dump old enough to
       # disown it is still restorable — its grace period is BACKUP_KEEP × BACKUP_INTERVAL, with
       # a 24h floor the API applies whatever these say (the window also covers an upload whose

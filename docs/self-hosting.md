@@ -48,15 +48,15 @@ not just this stack's, and has no reason to spare Postgres over whichever contai
 grew. A `mem_limit` puts that decision back where it belongs: a container is only ever killed
 for outgrowing its own ceiling, and nothing another service does can take Postgres down with it.
 
-| Service    | `mem_limit` | Why this number                                                                                 |
-| ---------- | ----------- | ----------------------------------------------------------------------------------------------- |
-| `postgres` | 512m        | Generous baseline for a small-team board's working set                                          |
-| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) both buffer into its heap    |
-| `web`      | 512m        | Same Next.js SSR process, same "no ceiling chosen" problem as `api`                             |
-| `migrate`  | 512m        | Matches `api` — same build stage, same Prisma CLI, just once at startup                         |
-| `backup`   | 256m        | `pg_dump` streams rather than buffering; this covers process overhead and the attachments `tar` |
-| `redis`    | 128m        | Cache, sessions, rate limits, notifications only — never board data, small bounded working set  |
-| `proxy`    | 128m        | Terminates TLS and proxies; bodies pass through Caddy rather than buffering into it             |
+| Service    | `mem_limit` | Why this number                                                                                  |
+| ---------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| `postgres` | 512m        | Generous baseline for a small-team board's working set; `/dev/shm` raised to 256m, see below     |
+| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) both buffer into its heap     |
+| `web`      | 512m        | Same Next.js SSR process, same "no ceiling chosen" problem as `api`                              |
+| `migrate`  | 512m        | Matches `api`: same build stage, same Prisma CLI, just once at startup                           |
+| `backup`   | 256m        | `pg_dump` streams rather than buffering; this covers process overhead and the attachments `tar`  |
+| `redis`    | 128m        | Cache, sessions, rate limits, notifications only, never board data; `maxmemory` 100mb, see below |
+| `proxy`    | 128m        | Terminates TLS and proxies; bodies pass through Caddy rather than buffering into it              |
 
 `api` and `web` also set `NODE_OPTIONS=--max-old-space-size=384` — 75% of their 512m ceiling —
 so V8's heap is pinned explicitly rather than left to Node's own container-memory heuristic. The
@@ -64,6 +64,28 @@ remaining 128m of headroom below `mem_limit` is for what a heap ceiling alone do
 (thread stacks, native buffers, code space): V8 hits its own catchable "JavaScript heap out of
 memory" before the cgroup's hard limit does, which shows up as a line in `docker compose logs
 api` (or `web`) instead of a bare `SIGKILL`.
+
+`redis` gets the same treatment inside its 128m: `--maxmemory 100mb --maxmemory-policy
+noeviction` on its command line, so a Redis that fills up answers writes with
+`OOM command not allowed when used memory > 'maxmemory'` (a line in `docker compose logs api`;
+the API's rate limiters fall back to process memory while Redis is erroring, and a cache miss is
+a cache miss) instead of being killed by the cgroup and restarted in a loop. `noeviction` is
+what BullMQ, whose notification and retention queues live in this Redis, requires: an evicted
+job is a job that silently never runs, so a full Redis refuses writes rather than dropping keys.
+`postgres` carries `shm_size: 256m` because Docker's `/dev/shm` is 64 MB by default and Postgres
+allocates dynamic shared memory for parallel workers and hash joins there; running out surfaces
+as `could not resize shared memory segment ... No space left on device` on a heavy dashboard
+query. Neither is memory on top of the ceilings in the table: a `/dev/shm` page is charged to
+the container's cgroup like any other, and `maxmemory` is a limit Redis enforces on itself under
+the one Docker enforces on it.
+
+`REDIS_MAXMEMORY` in `.env` raises that ceiling without touching `docker-compose.yml`; raise the
+`redis` `mem_limit` alongside it so Redis still hits its own limit before the cgroup's. Before
+raising it on an instance that is already running, check where the dataset actually sits:
+`docker compose exec redis redis-cli -a "$REDIS_PASSWORD" INFO memory | grep used_memory_human`.
+With `noeviction`, a dataset already over the ceiling does not shrink itself back under it: it
+refuses every write until enough keys expire on their own, which is why the check has to come
+before the number, not after.
 
 These are ceilings, not reservations — a container using less than its `mem_limit` costs nothing
 extra, and `migrate` in particular exits (successfully) before `api` and `web` finish starting,
@@ -210,6 +232,21 @@ the code (`PLAN_LIMIT_SEATS`, `PLAN_LIMIT_BOARDS`, `PLAN_LIMIT_WORKSPACES`, `PLA
 the limit and the current count. One workspace can be given ceilings of its own in the
 `Workspace.planLimits` JSON column, which overrides these key by key; the app never writes it
 itself.
+
+**Closing registration is a switch, not a ceiling.** `SIGNUP_ENABLED=false` refuses
+`POST /auth/sign-up/email` with a `403` whose JSON body carries `error: "Sign-up Disabled"`,
+whatever the account count is; unset or `true` keeps registration open, which is how every
+install ran before the switch existed. Like `PLAN_MAX_USERS` it refuses **sign-up only**:
+signing in, verifying an address and everything else under `/auth` stay open, so closing it
+never locks out the people already on the instance. `GET /config` publishes it as
+`signUpEnabled`, but that document requires a session: it is there for the signed-in screens
+that ask before offering something, and a signed-out register page learns the answer from the
+`403` its own submit receives instead. Prefer the switch to pinning `PLAN_MAX_USERS` at your
+current head count, which blocks your own invitees too and drifts the moment an account is
+deleted. There is no invite-only mode yet: an invited address still needs the door open to
+create its account, so until that lands, open it for the invitee and close it again. The
+switch is independent of `DEMO_MODE` ([Demo instance](#demo-instance)), which keeps
+registration open.
 
 **Trello import needs no line here either.** `TRELLO_IMPORT_MAX_BYTES` (default `20971520`,
 20 MiB) is the largest board export the importer will accept, and the bundled Compose file
@@ -431,7 +468,10 @@ The `backup` service is already running: every `BACKUP_INTERVAL` seconds (24h by
 writes **two** archives into the `backup_data` volume — a `pg_dump` of the database and a
 `.tar.gz` of the uploaded attachment files — and keeps `BACKUP_KEEP` of each series. Both
 archives of one cycle carry the **same timestamp**, which is how a restore knows which tar
-belongs to which dump.
+belongs to which dump. `BACKUP_KEEP` is a count, not an age, and a restart does not spend one:
+the sidecar skips its boot-time cycle while a dump younger than half of `BACKUP_INTERVAL`
+exists, so a reboot or a `docker compose up` after a `.env` edit leaves the history you had
+([the scheduled backup sidecar](development.md#the-scheduled-backup-sidecar)).
 
 That covers "I deleted the wrong workspace". It does not cover a dead disk — the archives sit
 on the same host as the database. Copy them off the machine, **both halves of the newest
@@ -575,16 +615,19 @@ API, so there is nothing extra to build or pull.
 
 ### What `DEMO_MODE=true` changes
 
-| Behaviour                                       | Why                                                                                                                                       |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| A standing banner in the app naming the cadence | It is the only warning a visitor gets before an hour of their typing disappears. Dismissible for the browser tab, back on the next visit  |
-| All outbound email goes to the log              | Whatever `SMTP_HOST` says. A demo anyone can sign up to must not be able to send mail to an address a stranger typed in                   |
-| Account deletion and workspace deletion `403`   | The demo is one shared workspace. Deleting it, or the account that owns it, empties the demo for every other visitor until the next reset |
-| `GET /config` publishes the reset schedule      | So the banner names the same cadence the sidecar sleeps for, rather than a number somebody typed twice                                    |
+| Behaviour                                       | Why                                                                                                                                                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A standing banner in the app naming the cadence | It is the only warning a visitor gets before an hour of their typing disappears. Dismissible for the browser tab, back on the next visit                                                 |
+| All outbound email goes to the log              | Whatever `SMTP_HOST` says. A demo anyone can sign up to must not be able to send mail to an address a stranger typed in                                                                  |
+| Account deletion and workspace deletion `403`   | The demo is one shared workspace. Deleting it, or the account that owns it, empties the demo for every other visitor until the next reset                                                |
+| `POST /auth/change-password` `403`              | The demo account's password is published, so any visitor could rotate it and lock everyone else out until the next reset writes `DEMO_PASSWORD` back. Same envelope as the two deletions |
+| `GET /config` publishes the reset schedule      | So the banner names the same cadence the sidecar sleeps for, rather than a number somebody typed twice                                                                                   |
 
 Everything else is the product. Sign-up stays open (rate limits, not a switch, are the answer
-to abuse there), invitations can still be created and their links copied by hand, and uploads
-are bounded by the ordinary attachment quotas
+to abuse there, and `DEMO_MODE` never reads `SIGNUP_ENABLED`), revoking sessions and renaming
+the account stay open because both are a sign-in away from recovered, invitations can still be
+created and their links copied by hand, and uploads are bounded by the ordinary attachment
+quotas
 ([ADR 0027](decisions/0027-attachment-quotas.md)). Set those low on a demo host rather than
 reaching for another switch.
 
@@ -901,7 +944,7 @@ web app is built against it. Three rules, in this order, all on one hostname:
 
 | Path       | Goes to  | Prefix              | Max request body              |
 | ---------- | -------- | ------------------- | ----------------------------- |
-| `/auth/*`  | api:4000 | kept as-is          | proxy default is fine         |
+| `/auth/*`  | api:4000 | kept as-is          | **64 KiB** (`65536` bytes)    |
 | `/api/*`   | api:4000 | `/api` **stripped** | **26 MiB** (`27262976` bytes) |
 | everything | web:3000 | kept as-is          | proxy default is fine         |
 
@@ -958,6 +1001,33 @@ never sees and never logs. Caddy imposes no body limit of its own, which is why 
 **1 MB**, so a replacement proxy that omits the row rejects every attachment larger than a
 megabyte.
 
+#### Why `/auth/*` has a ceiling of its own, and why it is 64 KiB
+
+Rule 1 carries a limit too, and a much smaller one. Better Auth reads the raw request stream
+itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on every other route, so that
+ceiling never applied to `/auth/*`: a `POST /auth/sign-in/email` was read to completion at any
+size, and the built-in attempt budget (3 per 10 seconds per IP and path on sign-in, sign-up and
+change-password, 100 per minute on the other auth routes) counts requests, not bytes. Every body
+those routes take is a JSON object of a few hundred bytes, so 64 KiB is two orders of magnitude
+of headroom.
+
+The API enforces the same number as `AUTH_BODY_MAX_BYTES` (`65536`, a constant in
+`apps/api/src/auth/auth-body-limit.ts`, not an environment variable): a request that declares a
+`Content-Length` above it is answered with the `Request body is too large` `413` envelope before
+a byte of the body is read. Here the proxy and the API **may be equal**, unlike the pair above:
+an auth body has no multipart envelope, both layers count the same bytes, and the ordering rule
+holds at equality.
+
+A body sent without a `Content-Length` (chunked transfer encoding, which a browser never uses
+for a JSON string body) is the one case the two layers answer differently. The proxy is the
+layer that bounds it with a status: `request_body max_size` cuts the body at the same 64 KiB.
+The API cannot answer a body it is already streaming to Better Auth, so it counts the bytes as
+they arrive and closes the connection past the ceiling, which keeps an instance exposed without
+a proxy bounded too, but as a dropped connection rather than a `413`. That is one more reason
+the proxy is part of the default stack rather than an optional extra.
+`apps/api/src/storage/two-layer-limit.spec.ts` pins the Caddyfile figure, the nginx row below
+and the API constant to each other.
+
 ### Telling the 413s apart
 
 Both layers answer an oversized upload with `413` — and so does a third limit that has nothing
@@ -977,8 +1047,10 @@ proxy's ceiling is too low (see "Why the proxy's number is 26 MiB and the API's 
 
 The third row is a different limit that happens to share the status code: `REQUEST_BODY_MAX_BYTES`
 (default `1048576`, 1 MiB) caps the **JSON and form-encoded** bodies every other endpoint takes,
-and no attachment ever passes through it. If you see it, nothing about your storage or your proxy
-is misconfigured — some request simply sent more JSON than the API accepts.
+and no attachment ever passes through it. The same sentence under a `path` starting with `/auth/`
+is the smaller `AUTH_BODY_MAX_BYTES` (64 KiB) instead; see rule 1 above. If you see either,
+nothing about your storage or your proxy is misconfigured: some request simply sent more JSON
+than the API accepts.
 
 The fourth row is a different failure again: the file is under `ATTACHMENT_MAX_BYTES`, but storing
 it would push a workspace or the instance over its quota. See "Attachment storage is unbounded
@@ -1020,7 +1092,12 @@ on the server, in the browser and in the verification links it emails; the rest 
 mounted at its own root and gets the prefix removed on the way in. In nginx:
 
 ```nginx
-location /auth/ { proxy_pass http://api:4000;  }   # no trailing slash → path preserved
+location /auth/ {
+  proxy_pass http://api:4000;                      # no trailing slash → path preserved
+  client_max_body_size 64k;                        # EQUAL to AUTH_BODY_MAX_BYTES (64 KiB): an
+                                                   # auth body has no multipart envelope, so the
+                                                   # two layers count the same bytes.
+}
 location /api/  {
   proxy_pass http://api:4000/;                     # trailing slash    → /api stripped
   client_max_body_size 26m;                        # ABOVE ATTACHMENT_MAX_BYTES (25 MiB), not

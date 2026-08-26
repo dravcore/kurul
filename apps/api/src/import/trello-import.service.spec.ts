@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BadRequestException } from '@nestjs/common';
-import { ActivityType } from '@kurul/shared-types';
+import { ActivityType, PlanLimitCode } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
+import { planLimitRefusal } from '../plan/plan-limit.exception';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   IMPORT_CHUNK_SIZE,
@@ -78,6 +80,13 @@ function buildService() {
     calls.push('board');
     return Promise.resolve({});
   });
+  /** The ceiling check joins the same list: its place in the order is the claim under test. */
+  const planLimits = {
+    assertBoardAvailable: jest.fn().mockImplementation(() => {
+      calls.push('planLimit');
+      return Promise.resolve();
+    }),
+  };
 
   const prisma = {
     $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) =>
@@ -90,9 +99,11 @@ function buildService() {
     service: new TrelloImportService(
       prisma as unknown as PrismaService,
       activity as unknown as ActivityService,
+      planLimits as unknown as PlanLimitsService,
     ),
     prisma,
     activity,
+    planLimits,
     tx,
     calls,
   };
@@ -144,8 +155,10 @@ describe('TrelloImportService', () => {
 
     // `Task.column` is a composite foreign key on `(boardId, columnId)`, so this order is a
     // constraint rather than a style. `taskLabel` after `task` and `label` for the same reason,
-    // and `checklistItem` after `checklist`.
+    // and `checklistItem` after `checklist`. The ceiling check is first because a refusal must
+    // find nothing to roll back (ADR 0032).
     expect(calls).toEqual([
+      'planLimit',
       'board',
       'column',
       'label',
@@ -206,6 +219,40 @@ describe('TrelloImportService', () => {
       report.skipped.reduce((total, group) => total + group.count, 0),
     );
     expect(payload.payload.skippedTotal).toBeGreaterThan(0);
+  });
+
+  it('asks the plan layer for room with the transaction client, before the board row', async () => {
+    const { service, planLimits, tx } = buildService();
+
+    await service.importBoard(WORKSPACE_ID, ACTOR_ID, fixtureBytes('synthetic-full-board'));
+
+    // The same client as the insert, so the count and the write read one snapshot; the base
+    // client would count outside the transaction and make the check a separate statement.
+    expect(planLimits.assertBoardAvailable).toHaveBeenCalledTimes(1);
+    expect(planLimits.assertBoardAvailable).toHaveBeenCalledWith(WORKSPACE_ID, tx);
+  });
+
+  it('writes nothing when the workspace is at its board ceiling', async () => {
+    const { service, planLimits, tx, activity } = buildService();
+    planLimits.assertBoardAvailable.mockRejectedValueOnce(
+      planLimitRefusal(PlanLimitCode.Boards, 1, 1, 'This workspace has reached its boards'),
+    );
+
+    await expect(
+      service.importBoard(WORKSPACE_ID, ACTOR_ID, fixtureBytes('synthetic-full-board')),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: expect.objectContaining({
+        planLimit: expect.objectContaining({ code: PlanLimitCode.Boards }),
+      }),
+    });
+
+    // Not "rolled back" but never issued: the refusal is the first statement, so a board that
+    // was refused costs the transaction nothing but the count.
+    expect(tx.board.create).not.toHaveBeenCalled();
+    expect(tx.column.createMany).not.toHaveBeenCalled();
+    expect(tx.attachment.createMany).not.toHaveBeenCalled();
+    expect(activity.record).not.toHaveBeenCalled();
   });
 
   it('never broadcasts: the board it creates has no room to broadcast into', () => {
