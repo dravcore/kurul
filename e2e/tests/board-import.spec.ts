@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { BoardDto } from '@kurul/shared-types';
 import { repoRoot } from '../load-env.mjs';
-import { column, expectCardOrder } from '../support/board-page';
+import { column, connectionLostRow, expectCardOrder } from '../support/board-page';
 import { expect, test } from '../support/fixtures';
 
 /**
@@ -144,7 +144,7 @@ test('a Trello export imported in a browser writes a board and shows what did no
   // imported board has the export's own columns. The two halves of it are, though — a column has
   // painted, and the socket has joined the board room, so no resync can land mid-assertion.
   await expect(column(page, 'Backlog')).toBeVisible();
-  await expect(page.getByText('Reconnecting…')).toBeHidden();
+  await expect(connectionLostRow(page)).toBeHidden();
 
   // The report said "4 tasks"; here are the four, in the columns and the order the export implies.
   // `pos` is read for order and re-issued as a value (ADR 0025), and the fixture writes `Import

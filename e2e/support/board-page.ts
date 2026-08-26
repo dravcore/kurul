@@ -69,16 +69,28 @@ export async function expectCardOrder(
 const BOARD_READY_TIMEOUT_MS = 25_000;
 
 /**
+ * The board's connection row, which is the application's own word for "the room is not joined
+ * yet": it is rendered until the `board:join` ack comes back `ok`.
+ *
+ * One definition, because `toBeHidden()` passes instantly on a locator that matches nothing, so
+ * a copy of this string left behind by a rewording turns a real gate into a no-op with no test
+ * failing. It has to track `app.board.connectionLost` in `apps/web/messages/en.json`; the suite
+ * reads no catalogue, by the same reasoning as the note at the top of this file.
+ */
+export function connectionLostRow(page: Page): Locator {
+  return page.getByText('Connection lost, changes may not be showing');
+}
+
+/**
  * Waits until the board has painted and its socket has joined the board room.
  *
  * The room join matters even for the tests that never assert on realtime: joining acks with a
  * full resync, and a resync landing in the middle of a drag assertion is a race the suite
- * would otherwise have to out-run. `Reconnecting…` is the application's own word for "the
- * room is not joined yet" — it is rendered until the `board:join` ack comes back `ok`.
+ * would otherwise have to out-run.
  */
 export async function waitForBoardReady(page: Page): Promise<void> {
   await expect(column(page, 'To Do')).toBeVisible({ timeout: BOARD_READY_TIMEOUT_MS });
-  await expect(page.getByText('Reconnecting…')).toBeHidden({ timeout: BOARD_READY_TIMEOUT_MS });
+  await expect(connectionLostRow(page)).toBeHidden({ timeout: BOARD_READY_TIMEOUT_MS });
 }
 
 /** What `watchSocketHandshake` collected off the wire, for a test to assert on. */
@@ -103,7 +115,7 @@ export type SocketHandshakeReport = {
  *   state and closes the whole client, killing the connection mid-handshake.
  * - **No denied join.** Authenticating the handshake in an async `connection` hook let
  *   `board:join` be answered `unauthenticated` before the session read landed — a denial the
- *   client never retried, so "Reconnecting…" stayed on screen for the life of the tab.
+ *   client never retried, so the connection row stayed on screen for the life of the tab.
  *
  * Call it before the navigation that opens the socket; the returned reader may be read at any
  * point after.
