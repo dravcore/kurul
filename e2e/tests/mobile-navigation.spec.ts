@@ -176,6 +176,48 @@ function tooSmall(targets: Target[]): Target[] {
   );
 }
 
+/** 16px: the font-size below which iOS Safari zooms the page when a field is focused. */
+const IOS_ZOOM_THRESHOLD_PX = '16px';
+
+/** 12px: `--text-small`, the step the board search box's own `md:text-small` resolves to. */
+const DESKTOP_SEARCH_FONT_SIZE_PX = '12px';
+
+interface FieldFontSize {
+  name: string;
+  fontSize: string;
+}
+
+/**
+ * The computed font-size of every text field currently on screen (`input`, `textarea` and
+ * `select`, the three primitives `components/ui/input.tsx`, `textarea.tsx` and `select.tsx`
+ * all carry `text-base md:text-body` for).
+ *
+ * `input[type=checkbox]` and `[type=radio]` are excluded: iOS Safari does not zoom on either,
+ * they have no typed text to zoom in on, and the checklist's own checkboxes are bare native
+ * inputs styled outside `Input`, so they carry none of the three primitives' sizing at all;
+ * measuring them would be measuring an unrelated element's font-size, not this contract.
+ */
+async function fieldFontSizes(scope: Page | Locator): Promise<FieldFontSize[]> {
+  const selector = [
+    'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])',
+    'textarea',
+    'select',
+  ].join(', ');
+
+  return scope.locator(selector).evaluateAll((nodes) =>
+    nodes
+      .filter((node) => !node.closest('[aria-hidden="true"]'))
+      .map((node) => ({
+        name: node.getAttribute('aria-label') || node.id || node.tagName.toLowerCase(),
+        fontSize: getComputedStyle(node).fontSize,
+      })),
+  );
+}
+
+function wrongFontSize(fields: FieldFontSize[], expected: string): FieldFontSize[] {
+  return fields.filter((field) => field.fontSize !== expected);
+}
+
 test('at 360px the sidebar is a drawer, and it behaves like a modal layer', async ({
   stack,
   openAs,
@@ -257,6 +299,20 @@ test('at the md boundary the desktop shell is unchanged', async ({ stack, openAs
     'the trigger is rendered at every width, and hidden above md',
   ).toHaveCount(1);
   await expect(hamburger).toBeHidden();
+
+  // The board's only text field at this width is still the search box
+  // (`board-filter-search.tsx`), which carries its own `md:text-small` step rather than the
+  // `Input` primitive's default `md:text-body`: a consumer override that wins the `cn()` merge,
+  // the same fact the 360px sweep's comment below records for the mobile side of that class.
+  const fields = await fieldFontSizes(page);
+  expect(
+    fields.length,
+    'the md-boundary font-size sweep found nothing to measure',
+  ).toBeGreaterThanOrEqual(1);
+  expect(
+    wrongFontSize(fields, DESKTOP_SEARCH_FONT_SIZE_PX),
+    `text fields at the md boundary not at 12px (of ${fields.length} measured)`,
+  ).toEqual([]);
 });
 
 test('every interactive element on the mobile path is at least 44px', async ({ stack, openAs }) => {
@@ -280,6 +336,19 @@ test('every interactive element on the mobile path is at least 44px', async ({ s
     tooSmall(boardTargets),
     `undersized controls on the board at 360px (of ${boardTargets.length} measured)`,
   ).toEqual([]);
+  // The board's only text field is the search box (`board-filter-search.tsx`), which now
+  // carries `md:text-small` rather than a bare `text-small`: below `md` the `Input` primitive's
+  // own `text-base` survives the merge, so at 360px it is held to the same 16px floor as every
+  // other field.
+  const boardFields = await fieldFontSizes(page);
+  expect(
+    boardFields.length,
+    'the board font-size sweep found nothing to measure',
+  ).toBeGreaterThanOrEqual(1);
+  expect(
+    wrongFontSize(boardFields, IOS_ZOOM_THRESHOLD_PX),
+    `text fields on the board below 16px at 360px (of ${boardFields.length} measured)`,
+  ).toEqual([]);
 
   // Now the drawer, whose controls are the ones the finding is actually about.
   await tap(page, page.getByRole('button', { name: 'Open navigation' }));
@@ -293,6 +362,13 @@ test('every interactive element on the mobile path is at least 44px', async ({ s
   expect(
     tooSmall(drawerTargets),
     `undersized controls in the navigation drawer (of ${drawerTargets.length} measured)`,
+  ).toEqual([]);
+  // No `input`, `textarea` or `select` lives in the drawer today (nav links and buttons only);
+  // `wrongFontSize` still runs so the day one is added, it is held to the same 16px floor
+  // without anyone having to remember to wire the check up.
+  expect(
+    wrongFontSize(await fieldFontSizes(drawer), IOS_ZOOM_THRESHOLD_PX),
+    'text fields in the navigation drawer below 16px would let iOS Safari zoom on focus',
   ).toEqual([]);
 
   // And the task panel, which below `md` is a fullscreen sheet and is where the second half of
@@ -313,6 +389,20 @@ test('every interactive element on the mobile path is at least 44px', async ({ s
   expect(
     tooSmall(panelTargets),
     `undersized controls in the task panel (of ${panelTargets.length} measured)`,
+  ).toEqual([]);
+
+  // The panel is where every one of `Input`, `Textarea` and `Select` shows up with its default
+  // sizing (title, due date and estimate; description and the comment box; priority): the
+  // right place to prove the 16px contract those three primitives share, below the width iOS
+  // Safari zooms on focus.
+  const panelFields = await fieldFontSizes(panel);
+  expect(
+    panelFields.length,
+    'the panel font-size sweep found nothing to measure',
+  ).toBeGreaterThanOrEqual(5);
+  expect(
+    wrongFontSize(panelFields, IOS_ZOOM_THRESHOLD_PX),
+    `text fields in the task panel below 16px at 360px (of ${panelFields.length} measured)`,
   ).toEqual([]);
 });
 

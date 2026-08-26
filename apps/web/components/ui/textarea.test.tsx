@@ -10,21 +10,22 @@ function renderTextarea(props: React.ComponentProps<typeof Textarea> = {}) {
 }
 
 describe('Textarea', () => {
-  it('keeps a visible focus ring', () => {
+  /** The one focus mark is the `:focus-visible` outline in `app/globals.css`; a ring pair here
+   * would double it and an `outline-none` would erase it. */
+  it('draws no focus mark of its own', () => {
     const element = renderTextarea();
 
-    expect(element.className).toContain('focus-visible:ring-[3px]');
-    expect(element.className).toContain('focus-visible:ring-ring/50');
-    expect(element.className).toContain('focus-visible:border-ring');
+    expect(element.className).not.toMatch(/\bfocus-visible:/);
+    expect(element.className).not.toMatch(/\boutline-(none|hidden)\b/);
   });
 
   /** The two call sites differ only in how tall they start; nothing else may drift with it. */
-  it('lets a caller raise the height floor without losing the focus ring', () => {
+  it('lets a caller raise the height floor without losing the shared base', () => {
     const element = renderTextarea({ className: 'min-h-32' });
 
     expect(element.className).toContain('min-h-32');
     expect(element.className).not.toContain('min-h-20');
-    expect(element.className).toContain('focus-visible:ring-[3px]');
+    expect(element.className).toContain('aria-invalid:border-destructive');
   });
 
   it('styles the disabled state', () => {

@@ -49,10 +49,14 @@ const nonColorSuffixes = new Set([
 
 /**
  * The leading lookbehind admits a variant's `:` and rejects `-`, which is what keeps
- * `var(--border)`, `bg-border` and `--normal-border` out of a scan for border *colours*.
+ * `var(--border)`, `bg-border` and `--normal-border` out of a scan for border *colours*. It also
+ * rejects a leading `,`, which is what keeps the raw CSS property name inside a sibling
+ * utility's arbitrary value (`transition-[color,background-color,border-color,box-shadow,
+ * opacity]`) from reading as a `border-color` utility of its own: a real call site is never
+ * comma-separated.
  */
 const utilityPattern =
-  /(?<![\w./-])(border|divide)-([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?:\/\d+)?(?![\w-])/g;
+  /(?<![\w.,/-])(border|divide)-([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?:\/\d+)?(?![\w-])/g;
 
 /**
  * Every colour utility the sweep reviewed. Which token each one resolves to is proved against
@@ -63,7 +67,6 @@ const reviewedUtilities = [
   'border-border',
   'border-border-strong',
   'border-input',
-  'border-ring',
   'border-signature',
   'border-destructive',
   'divide-border',
@@ -82,15 +85,6 @@ const stateTokenCallSites: Record<string, string[]> = {
     'components/board/board-list.tsx',
     'components/board/board-template-picker.tsx',
     'components/task/task-card.tsx',
-  ],
-  // Focus only. Selection wears `border-signature`.
-  'border-ring': [
-    'components/board/board-template-picker.tsx',
-    'components/task/task-card.tsx',
-    'components/ui/button.tsx',
-    'components/ui/input.tsx',
-    'components/ui/select.tsx',
-    'components/ui/textarea.tsx',
   ],
   // Selection only.
   'border-signature': [

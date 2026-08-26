@@ -448,6 +448,20 @@ for (const theme of THEMES) {
       expect(failures).toEqual([]);
     });
 
+    // components/notification/notification-bell.tsx paints its unread badge `bg-foreground
+    // text-background`, which neither SURFACES nor TEXT_TOKENS covers: `--foreground` is a text
+    // token everywhere else in this file and never a ground. A single dedicated pair rather than
+    // widening either array, because adding `--foreground` to SURFACES would ask every other
+    // text and boundary token to clear AA against ink as a ground too, which is not a pairing
+    // anything else in the tree paints.
+    it('holds --background against --foreground at 4.5:1 (the unread badge)', () => {
+      const ratio = round(
+        contrastRatio(hexOf(theme, '--background'), hexOf(theme, '--foreground')),
+        2,
+      );
+      expect(ratio).toBeGreaterThanOrEqual(AA_TEXT);
+    });
+
     // `--destructive-hover` carries the button's literal `text-white`, not the
     // `--destructive-foreground` token: the button never reads that token in dark mode (see
     // `RAW_COLOUR_CALL_SITES` below), so `text-white` is what the hover actually paints under.
@@ -1266,102 +1280,6 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     worst: { light: 5.04, dark: 4.61 },
   },
   {
-    utility: 'focus-visible:ring-ring/50',
-    files: [
-      'components/task/sortable-task-card.tsx',
-      'components/task/task-card.tsx',
-      'components/ui/button.tsx',
-      'components/ui/input.tsx',
-      'components/ui/select.tsx',
-      'components/ui/textarea.tsx',
-    ],
-    fill: '--ring',
-    alpha: 0.5,
-    over: SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 1.91, dark: 2.25 },
-    reason:
-      'a halo, not the focus mark. `:focus-visible` in globals.css is unlayered, so its 2px ' +
-      'solid --ring outline outranks every utility including the `outline-none` these same ' +
-      'call sites carry, and --ring at full strength is gated at 3:1 on all six surfaces above',
-  },
-  {
-    utility: 'focus-within:ring-ring/50',
-    files: ['components/board/board-template-picker.tsx'],
-    fill: '--ring',
-    alpha: 0.5,
-    over: SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 1.91, dark: 2.25 },
-    reason:
-      'the same halo around a label whose radio child takes the unlayered outline, next to a ' +
-      'full-strength `focus-within:border-ring` on the label itself',
-  },
-  {
-    utility: 'aria-invalid:ring-destructive/20',
-    files: [
-      'components/ui/button.tsx',
-      'components/ui/input.tsx',
-      'components/ui/select.tsx',
-      'components/ui/textarea.tsx',
-    ],
-    fill: '--destructive',
-    alpha: 0.2,
-    over: NEUTRAL_SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 1.38, dark: 1.37 },
-    reason:
-      'a halo beside `aria-invalid:border-destructive`, which draws the same edge at full ' +
-      'strength and is gated at 3:1 above',
-  },
-  {
-    utility: 'dark:aria-invalid:ring-destructive/40',
-    files: [
-      'components/ui/button.tsx',
-      'components/ui/input.tsx',
-      'components/ui/select.tsx',
-      'components/ui/textarea.tsx',
-    ],
-    fill: '--destructive',
-    alpha: 0.4,
-    over: NEUTRAL_SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['dark'],
-    worst: { dark: 1.99 },
-    reason: 'the dark half of the same halo, beside the same full-strength border',
-  },
-  {
-    utility: 'focus-visible:ring-destructive/20',
-    files: ['components/ui/button.tsx'],
-    fill: '--destructive',
-    alpha: 0.2,
-    over: NEUTRAL_SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 1.38, dark: 1.37 },
-    reason: 'the destructive variant tinting its focus halo, over the unlayered --ring outline',
-  },
-  {
-    utility: 'dark:focus-visible:ring-destructive/40',
-    files: ['components/ui/button.tsx'],
-    fill: '--destructive',
-    alpha: 0.4,
-    over: NEUTRAL_SURFACES,
-    text: 'self',
-    floor: AA_NON_TEXT,
-    themes: ['dark'],
-    worst: { dark: 1.99 },
-    reason: 'the dark half of the same halo, over the same unlayered outline',
-  },
-  {
     utility: 'disabled:opacity-50',
     files: [
       'components/ui/button.tsx',
@@ -1378,10 +1296,11 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     worst: { light: 3.21, dark: 4.21 },
     reason:
       'WCAG 1.4.3 exempts text in an inactive control, and docs/design.md §9 holds disabled ' +
-      'text to 3:1 anyway, which this clears. It is worth noting rather than hiding that ' +
-      '--foreground-disabled exists, is gated at 3:1 above, and no control reads it: a drawn ' +
-      'disabled colour would be steadier than an alpha over an unknown ground. The last open ' +
-      'gap from task-7-report.md §6; P4 owns components/ui/button.tsx and input.tsx',
+      'text to 3:1 anyway, which this clears. Settled in Phase 4 and not open: the alpha stays ' +
+      'the disabled treatment on controls, because it thins whatever the control already paints ' +
+      '(a filled button and a bare field do not share a resting colour) and a single drawn ' +
+      'token cannot. --foreground-disabled stays declared and gated at 3:1 above as the drawn ' +
+      'token for the surfaces that have no such colour to thin, chart marks and placeholders',
   },
   {
     utility: 'data-[disabled]:opacity-50',
@@ -1584,8 +1503,9 @@ describe('dark elevation ramp', () => {
   });
 
   // The menu ground is `bg-popover` and the highlighted item is `bg-accent`
-  // (components/ui/dropdown-menu.tsx), and the items carry `outline-hidden`, so the surface step
-  // is the only thing that says which row is focused. Equalising the two tokens would make every
+  // (components/ui/dropdown-menu.tsx), so the surface step is what says which row the pointer is
+  // on. It is not the focus mark: at 1.12:1 dark it could not carry one, which is why the rows
+  // stopped suppressing the `:focus-visible` outline. Equalising the two tokens would make every
   // dark dropdown highlight 1.000:1.
   it('keeps --popover and --accent two different surfaces', () => {
     const popover = hexOf('dark', '--popover');
