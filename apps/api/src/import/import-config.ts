@@ -71,6 +71,47 @@ export function readTrelloImportMaxBytes(): number {
   return maxBytes;
 }
 
+/**
+ * Largest number of Trello cards one import will plan, counted before archived or malformed
+ * ones are filtered out.
+ *
+ * `TRELLO_IMPORT_MAX_BYTES` bounds how large the parsed export can be, not how many rows it can
+ * ask this API to write. A 20 MiB export can still be several hundred thousand tiny cards, each
+ * one a row `TrelloImportService` would otherwise carry into the transaction (SEC-04): a board
+ * nobody can scroll, and a `createMany` sequence sized to match. 50000 is comfortably above any
+ * board a person maintains by hand and comfortably below the size that turns the transaction
+ * into the resource problem `TRELLO_IMPORT_TRANSACTION_TIMEOUT_MS` exists for.
+ */
+export const DEFAULT_TRELLO_IMPORT_MAX_CARDS = 50_000;
+
+/**
+ * Largest number of Trello lists (`Column` rows) one import will plan, counted the same way
+ * `DEFAULT_TRELLO_IMPORT_MAX_CARDS` is: before `closed` or unnamed ones are filtered out.
+ */
+export const DEFAULT_TRELLO_IMPORT_MAX_LISTS = 5_000;
+
+/** `readTrelloImportMaxBytes`'s own shape, for the card ceiling. */
+export function readTrelloImportMaxCards(): number {
+  const maxCards = envInt('TRELLO_IMPORT_MAX_CARDS', DEFAULT_TRELLO_IMPORT_MAX_CARDS);
+  if (maxCards <= 0) {
+    throw new Error(
+      `Invalid TRELLO_IMPORT_MAX_CARDS: expected a positive count, received "${maxCards}"`,
+    );
+  }
+  return maxCards;
+}
+
+/** `readTrelloImportMaxBytes`'s own shape, for the list ceiling. */
+export function readTrelloImportMaxLists(): number {
+  const maxLists = envInt('TRELLO_IMPORT_MAX_LISTS', DEFAULT_TRELLO_IMPORT_MAX_LISTS);
+  if (maxLists <= 0) {
+    throw new Error(
+      `Invalid TRELLO_IMPORT_MAX_LISTS: expected a positive count, received "${maxLists}"`,
+    );
+  }
+  return maxLists;
+}
+
 /** Splits `rows` into runs of at most `size`. An empty input yields nothing at all. */
 export function chunked<T>(rows: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];

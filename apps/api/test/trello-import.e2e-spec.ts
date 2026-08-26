@@ -122,6 +122,88 @@ function archivedCardExport(count: number): Buffer {
   );
 }
 
+/** An export whose only content is `count` live cards, for the row-cap tests (SEC-04). */
+function manyCardsExport(count: number): Buffer {
+  const listId = '6512a1b1c3d4e5f601020310';
+  return Buffer.from(
+    JSON.stringify({
+      name: 'Card heavy',
+      desc: '',
+      lists: [{ id: listId, name: 'Backlog', closed: false, pos: 16384 }],
+      cards: Array.from({ length: count }, (_, index) => ({
+        id: `6512a1b3c3d4e5f6010205${String(index).padStart(2, '0')}`,
+        name: `Card ${index + 1}`,
+        desc: '',
+        closed: false,
+        due: null,
+        idList: listId,
+        idLabels: [],
+        idMembers: [],
+        pos: (index + 1) * 1024,
+        attachments: [],
+      })),
+      labels: [],
+      checklists: [],
+      members: [],
+      actions: [],
+    }),
+    'utf8',
+  );
+}
+
+/** An export whose only content is `count` live, empty lists, for the row-cap tests (SEC-04). */
+function manyListsExport(count: number): Buffer {
+  return Buffer.from(
+    JSON.stringify({
+      name: 'List heavy',
+      desc: '',
+      lists: Array.from({ length: count }, (_, index) => ({
+        id: `6512a1b1c3d4e5f602030${String(index).padStart(3, '0')}`,
+        name: `List ${index + 1}`,
+        closed: false,
+        pos: (index + 1) * 1024,
+      })),
+      cards: [],
+      labels: [],
+      checklists: [],
+      members: [],
+      actions: [],
+    }),
+    'utf8',
+  );
+}
+
+/** A minimal valid export whose one card's title is `titleLength` characters long (SEC-04). */
+function oversizedTitleExport(titleLength: number): Buffer {
+  const listId = '6512a1b1c3d4e5f601020310';
+  return Buffer.from(
+    JSON.stringify({
+      name: 'Oversized field board',
+      desc: '',
+      lists: [{ id: listId, name: 'Backlog', closed: false, pos: 16384 }],
+      cards: [
+        {
+          id: '6512a1b3c3d4e5f601020610',
+          name: 'A'.repeat(titleLength),
+          desc: '',
+          closed: false,
+          due: null,
+          idList: listId,
+          idLabels: [],
+          idMembers: [],
+          pos: 1024,
+          attachments: [],
+        },
+      ],
+      labels: [],
+      checklists: [],
+      members: [],
+      actions: [],
+    }),
+    'utf8',
+  );
+}
+
 function groupFor(
   report: TrelloImportReportDto,
   scope: TrelloImportScope,
@@ -398,6 +480,44 @@ describe('Trello import (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------------------
+  // SEC-04: field length ceilings
+  // ---------------------------------------------------------------------------------------
+
+  describe('field length ceilings', () => {
+    it('clamps a 10000-character card title to the DTO limit and counts it in the report', async () => {
+      const response = await admin.agent
+        .post(importUrl(workspaceId))
+        .attach('file', oversizedTitleExport(10_000), 'trello.json');
+
+      expect(response.status).toBe(201);
+      const report = response.body as TrelloImportReportDto;
+
+      const task = await prisma.task.findFirstOrThrow({ where: { boardId: report.boardId } });
+      // `CreateTaskDto.title` refuses anything past 500 characters; the importer used to write
+      // `card.name` straight through, with no ceiling at all.
+      expect(task.title).toHaveLength(500);
+      expect(task.title).toBe('A'.repeat(500));
+
+      expect(
+        groupFor(report, TrelloImportScope.Card, TrelloImportSkipReason.Defaulted),
+      ).toMatchObject({ count: 1 });
+    });
+
+    it('does not report a title within the limit as a substitution', async () => {
+      const response = await admin.agent
+        .post(importUrl(workspaceId))
+        .attach('file', oversizedTitleExport(500), 'trello.json');
+
+      expect(response.status).toBe(201);
+      const report = response.body as TrelloImportReportDto;
+
+      expect(
+        groupFor(report, TrelloImportScope.Card, TrelloImportSkipReason.Defaulted),
+      ).toBeUndefined();
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------
   // Report arithmetic
   // ---------------------------------------------------------------------------------------
 
@@ -455,6 +575,70 @@ describe('Trello import (e2e)', () => {
         .expect(413);
 
       expect(await prisma.board.count()).toBe(before);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------
+  // SEC-04: the row cap
+  // ---------------------------------------------------------------------------------------
+
+  describe('the row cap', () => {
+    const originalMaxCards = process.env.TRELLO_IMPORT_MAX_CARDS;
+    const originalMaxLists = process.env.TRELLO_IMPORT_MAX_LISTS;
+
+    afterEach(() => {
+      if (originalMaxCards === undefined) delete process.env.TRELLO_IMPORT_MAX_CARDS;
+      else process.env.TRELLO_IMPORT_MAX_CARDS = originalMaxCards;
+      if (originalMaxLists === undefined) delete process.env.TRELLO_IMPORT_MAX_LISTS;
+      else process.env.TRELLO_IMPORT_MAX_LISTS = originalMaxLists;
+    });
+
+    it('answers 400 for an export over the card cap, and writes nothing', async () => {
+      // Read per call, like `TRELLO_IMPORT_MAX_BYTES` (`import-config.ts`), so setting the
+      // variable here reaches the very next request rather than needing a fresh app.
+      process.env.TRELLO_IMPORT_MAX_CARDS = '5';
+      const before = await prisma.board.count();
+
+      const response = await admin.agent
+        .post(importUrl(workspaceId))
+        .attach('file', manyCardsExport(6), 'trello.json');
+
+      expect(response.status).toBe(400);
+      expect(await prisma.board.count()).toBe(before);
+    });
+
+    it('accepts an export exactly at the card cap', async () => {
+      process.env.TRELLO_IMPORT_MAX_CARDS = '6';
+
+      const response = await admin.agent
+        .post(importUrl(workspaceId))
+        .attach('file', manyCardsExport(6), 'trello.json');
+
+      expect(response.status).toBe(201);
+      expect((response.body as TrelloImportReportDto).imported.tasks).toBe(6);
+    });
+
+    it('answers 400 for an export over the list cap, and writes nothing', async () => {
+      process.env.TRELLO_IMPORT_MAX_LISTS = '3';
+      const before = await prisma.board.count();
+
+      const response = await admin.agent
+        .post(importUrl(workspaceId))
+        .attach('file', manyListsExport(4), 'trello.json');
+
+      expect(response.status).toBe(400);
+      expect(await prisma.board.count()).toBe(before);
+    });
+
+    it('accepts an export exactly at the list cap', async () => {
+      process.env.TRELLO_IMPORT_MAX_LISTS = '4';
+
+      const response = await admin.agent
+        .post(importUrl(workspaceId))
+        .attach('file', manyListsExport(4), 'trello.json');
+
+      expect(response.status).toBe(201);
+      expect((response.body as TrelloImportReportDto).imported.columns).toBe(4);
     });
   });
 

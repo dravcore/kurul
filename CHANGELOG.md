@@ -439,6 +439,42 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A Trello import no longer skips the length checks every other write path enforces, and no
+  longer has an unbounded row count.** `trello-import-planner.ts` wrote a card's name and
+  description, a checklist's title, a checklist item's content, a list's name, a label's name, an
+  attachment's URL, and the export's own board name and description straight through, with no
+  ceiling at all, while `CreateTaskDto`, `CreateBoardDto`, `CreateChecklistDto`,
+  `CreateChecklistItemDto`, `CreateColumnDto`, `CreateLabelDto` and `CreateAttachmentDto` refuse
+  the same fields past 500/20000, 120/2000, 255, 1000, 120, 50 and 2048 characters (in that
+  order) on every other route. A 20 MiB export could carry one card with a multi-megabyte title,
+  or several hundred thousand tiny cards, and the importer would write all of it inside one
+  transaction. The planner now clamps every one of those fields to the same constant the DTOs
+  use, one limits file per DTO pair next to it (`task/dto/task-limits.ts`,
+  `task/dto/checklist-item-limits.ts`, `board/dto/board-limits.ts`, `board/dto/column-limits.ts`,
+  `label/dto/label-limits.ts` and `attachment/dto/attachment-limits.ts`, imported by the DTOs and
+  the planner alike, so each number exists once). A clamped card title or description is reported
+  as a `(card, defaulted)` row, a clamped checklist title or checklist item content as
+  `(checklist, defaulted)` or `(checklistItem, defaulted)`, a clamped label name folds into the
+  `(label, defaulted)` row an unknown colour already produces, a clamped attachment URL is
+  reported as `(attachment, defaulted)`, and a clamped column name shares the `(column,
+  defaulted)` row every imported column already gets for its default category, all the report's
+  existing vocabulary for a value that was substituted rather than lost. The board's own name and
+  description are clamped without a report line, since no `board` scope exists in that vocabulary
+  and a board is one row rather than a class of rows. A row the planner drops instead of writing
+  (an archived list or card, a card pointing at a label id the export does not contain, a
+  rejected attachment) quotes its name as a report sample the same bounded or cleaned way. An
+  entry the reader itself rejects before it becomes a row at all (a card or list missing its
+  `id`, or carrying a field of the wrong type) has no such row to borrow a ceiling from, so
+  `SkipCollector.addMany` now clamps every sample to a flat `SKIP_SAMPLE_MAX_LENGTH` on the way
+  into the report, whichever call site it came from: an oversized field cannot reach the
+  response body through a report sample either way. Two new variables,
+  `TRELLO_IMPORT_MAX_CARDS` (default 50000) and `TRELLO_IMPORT_MAX_LISTS` (default
+  5000), cap how many cards or lists one import will plan; an export over either cap answers
+  `400` and writes nothing, checked on the reader's own row counts (which still include archived
+  cards and lists) before the planner runs and before the transaction opens. Checklists, check
+  items, labels, task-label rows and attachments have no such ceiling yet.
+  [ADR 0025](docs/decisions/0025-trello-import-mapping.md) carries the amendment.
+
 - **A restart no longer drops the requests that were in flight.** Every connection the API owns
   (the shared Postgres pool, the Redis clients behind the realtime fan-out, the readiness probe
   and the upload budget, the mail transport, the storage backend and the two BullMQ workers)
