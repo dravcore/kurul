@@ -1,9 +1,8 @@
 # Pinned by digest so a build resolves the same base across time and machines; Dependabot
-# bumps this line (see .github/dependabot.yml, directory /apps/api). One ARG shared by every
-# stage below avoids repeating the digest on each FROM line.
-ARG NODE_IMAGE=node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43
-
-FROM ${NODE_IMAGE} AS base
+# bumps this line (see .github/dependabot.yml, directory /apps/api). Dependabot's docker
+# updater only parses a literal `FROM image:tag` + digest line, not an ARG-substituted one,
+# so the digest is repeated on every FROM below rather than factored into a shared ARG.
+FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS base
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 
@@ -47,7 +46,7 @@ RUN pnpm --filter @kurul/shared-types build \
 # `prisma` is invoked directly rather than through `pnpm db:migrate`: with the workspace gone
 # there is no root package.json to hold that script, and no reason to ship a package manager into
 # an image that installs nothing. The arguments are the same ones that script expands to.
-FROM ${NODE_IMAGE} AS migrate
+FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS migrate
 WORKDIR /app
 ENV NODE_ENV=production
 # Same removal, same reasons, written out beside the `runner` stage below. This stage invokes the
@@ -65,7 +64,7 @@ COPY --from=build --chown=node:node /app/apps/api/prisma ./apps/api/prisma
 USER node
 CMD ["node_modules/.bin/prisma", "migrate", "deploy"]
 
-FROM ${NODE_IMAGE} AS runner
+FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 # node:24-alpine ships two package managers, npm and yarn, and none of the three images built

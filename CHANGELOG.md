@@ -257,17 +257,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - **Base images are pinned by digest, and Dependabot now sees the two application
-  Dockerfiles** ([#157](https://github.com/dravcore/kurul/issues/157)). `postgres:18-alpine`,
-  `redis:8-alpine` and `caddy:2-alpine` in `docker-compose.yml` and `docker-compose.dev.yml`,
-  and `node:24-alpine` in `apps/api/Dockerfile` and `apps/web/Dockerfile`, now carry a
-  `@sha256` digest instead of a bare tag, the same pattern `docker-compose.dev.yml` already
-  applied to `mailpit`. Both Dockerfiles resolve theirs through one `ARG NODE_IMAGE` per file
-  rather than repeating the digest on every `FROM` line. `.github/dependabot.yml`'s `docker`
-  ecosystem block gains `directories: [/, /apps/api, /apps/web]`, so the two Dockerfiles are in
-  its scope for the first time; until now the updater only read the root directory and never
-  proposed a base-image bump for either app. Two builds of the same tag now resolve the same
-  bytes, and an upstream base-image fix arrives as a reviewable pull request instead of
-  silently, whenever something next happens to rebuild.
+  Dockerfiles** ([#157](https://github.com/dravcore/kurul/issues/157)). `postgres:18-alpine`
+  and `redis:8-alpine` in `docker-compose.yml` and `docker-compose.dev.yml`, `caddy:2-alpine`
+  in `docker-compose.yml`, and `node:24-alpine` in `apps/api/Dockerfile` and
+  `apps/web/Dockerfile`, now carry a `@sha256` digest instead of a bare tag, the same pattern
+  `docker-compose.dev.yml` already applied to `mailpit`. Dependabot's docker updater only reads
+  a literal `FROM image:tag@digest` line, not one built from an `ARG`, so both Dockerfiles
+  repeat the digest on every `FROM` instead of factoring it into a shared build argument.
+  `.github/dependabot.yml`'s `docker` ecosystem block gains `directories: [/, /apps/api,
+  /apps/web]`, so the two Dockerfiles are in its scope for the first time; until now the
+  updater only read the root directory and never proposed a base-image bump for either app.
+  Two builds of the same tag now resolve the same bytes, and an upstream base-image fix
+  arrives as a reviewable pull request instead of silently, whenever something next happens
+  to rebuild.
 - **CI now parses the compose files and the Caddyfile on every pull request.** A new
   `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
   `docker compose config -q`, without a profile and with `--profile demo`, renders

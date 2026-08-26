@@ -91,9 +91,10 @@ updates:
           - minor
           - patch
 
-  # `mailpit` in `docker-compose.dev.yml` and every other base image (`postgres`, `redis`,
-  # `caddy` in both compose files, `node` in both Dockerfiles) are now pinned `tag@sha256:...`
-  # instead of a bare tag, which is what gives this ecosystem something to bump. `directories`
+  # `mailpit` in `docker-compose.dev.yml` and every other base image (`postgres` and `redis`
+  # in both compose files, `caddy` in `docker-compose.yml`, `node` in both Dockerfiles) are now
+  # pinned `tag@sha256:...` instead of a bare tag, which is what gives this ecosystem something
+  # to bump. `directories`
   # lists three roots so all of it is in scope: `/` covers both compose files, `/apps/api` and
   # `/apps/web` cover their Dockerfiles, which a single `directory: /` cannot see because the
   # docker updater only reads the directory it is pointed at, not the tree beneath it. The
