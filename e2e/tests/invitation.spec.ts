@@ -28,7 +28,7 @@ test('an invitation sent from settings arrives by email and can be accepted', as
   const workspace = await stack.createWorkspace(owner);
 
   const ownerPage = await openAs(owner);
-  await ownerPage.goto('/settings');
+  await ownerPage.goto('/settings/members');
 
   await ownerPage.getByRole('button', { name: 'Invite member' }).click();
   const dialog = ownerPage.getByRole('dialog');

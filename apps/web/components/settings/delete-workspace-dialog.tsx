@@ -41,14 +41,15 @@ interface DeleteWorkspaceDialogProps {
  * caller has to type the workspace's exact name before the button will even accept a click,
  * the same friction GitHub and similar tools put in front of an unrecoverable delete.
  *
- * Unlike `RemoveMemberDialog`, `RevokeInvitationDialog`, and `ChangeMemberRoleDialog`, this
- * dialog does not report an outcome back to a list — there is no roster row for "the workspace
- * that no longer exists" to disappear from. It owns its own aftermath instead, the same way
- * `LeaveWorkspaceDialog` does and for the same reason: `setActive(null)` clears Better Auth's
- * session store (what the shell bootstraps from) so the client stops asking a workspace that is
- * gone for anything, and `disconnectSocket()` drops a socket still authenticated to rooms the
- * server has already torn down. Deleting is leaving with extra consequences for everyone else
- * who was in it, not a different kind of exit for the caller who just did it.
+ * Unlike `RemoveMemberDialog`, `RevokeInvitationDialog`, and the roster row's own inline role
+ * control, this dialog does not report an outcome back to a list: there is no roster row for
+ * "the workspace that no longer exists" to disappear from. It owns its own aftermath instead,
+ * the same way `LeaveWorkspaceDialog` does and for the same reason: `setActive(null)` clears
+ * Better Auth's session store (what the shell bootstraps from) so the client stops asking a
+ * workspace that is gone for anything, and `disconnectSocket()` drops a socket still
+ * authenticated to rooms the server has already torn down. Deleting is leaving with extra
+ * consequences for everyone else who was in it, not a different kind of exit for the caller
+ * who just did it.
  */
 export function DeleteWorkspaceDialog({
   open,

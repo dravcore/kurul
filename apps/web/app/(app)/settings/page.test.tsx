@@ -26,10 +26,6 @@ vi.mock('@/components/settings/notification-settings', () => ({
   NotificationSettings: (): React.ReactElement => <div data-testid="notification-settings" />,
 }));
 
-vi.mock('@/components/settings/members-settings', () => ({
-  MembersSettings: (): React.ReactElement => <div data-testid="members-settings" />,
-}));
-
 vi.mock('@/components/settings/token-settings', () => ({
   TokenSettings: (): React.ReactElement => <div data-testid="token-settings" />,
 }));
@@ -87,10 +83,17 @@ describe('SettingsPage', () => {
     expect(screen.getByText(messages.app.settings.account.description)).toBeTruthy();
   });
 
-  it('mounts every section body', async () => {
+  it('links the members section out to its own route, rather than mounting the roster here', async () => {
     render(await SettingsPage());
 
-    expect(screen.getByTestId('members-settings')).toBeTruthy();
+    const link = screen.getByRole('link', { name: messages.app.settings.members.manageAction });
+    expect(link.getAttribute('href')).toBe('/settings/members');
+    expect(screen.queryByTestId('members-settings')).toBeNull();
+  });
+
+  it('mounts every remaining section body', async () => {
+    render(await SettingsPage());
+
     expect(screen.getByTestId('language-settings')).toBeTruthy();
     expect(screen.getByTestId('notification-settings')).toBeTruthy();
     expect(screen.getByTestId('token-settings')).toBeTruthy();
@@ -108,6 +111,7 @@ describe('SettingsPage', () => {
       messages.app.settings.title,
       messages.app.settings.members.title,
       messages.app.settings.members.description,
+      messages.app.settings.members.manageAction,
       messages.app.settings.language.title,
       messages.app.settings.language.description,
       messages.app.settings.notifications.title,

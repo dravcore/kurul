@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { toast } from 'sonner';
 import {
@@ -155,6 +155,16 @@ function clickLastButton(label: string): void {
   fireEvent.click(buttons[buttons.length - 1] as HTMLElement);
 }
 
+/**
+ * The role `<select>` on a specific member's row, scoped by the row it sits in: every
+ * manageable row carries one, all sharing the same `Role` accessible name.
+ */
+function roleSelectFor(name: string): HTMLSelectElement {
+  const row = screen.getByText(name).closest('li');
+  if (!row) throw new Error(`no row found for ${name}`);
+  return within(row).getByLabelText(copy.inviteRole) as HTMLSelectElement;
+}
+
 beforeAll(() => {
   // Radix Dialog and Popper both measure their content; jsdom ships neither.
   globalThis.ResizeObserver ??= class {
@@ -198,13 +208,14 @@ describe('MembersSettings — inviting', () => {
     renderSection();
 
     fireEvent.click(await screen.findByRole('button', { name: copy.inviteAction }));
-    fireEvent.change(screen.getByLabelText(copy.inviteEmail), {
+    const dialog = within(screen.getByRole('dialog'));
+    fireEvent.change(dialog.getByLabelText(copy.inviteEmail), {
       target: { value: '  yeni@kurul.test  ' },
     });
-    fireEvent.change(screen.getByLabelText(copy.inviteRole), {
+    fireEvent.change(dialog.getByLabelText(copy.inviteRole), {
       target: { value: MemberRole.ADMIN },
     });
-    fireEvent.click(screen.getByRole('button', { name: copy.inviteSubmit }));
+    fireEvent.click(dialog.getByRole('button', { name: copy.inviteSubmit }));
 
     await waitFor(() => expect(apiPost).toHaveBeenCalled());
     expect(apiPost).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/invitations`, {
@@ -280,7 +291,7 @@ describe('MembersSettings — inviting', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: copy.inviteAction }));
     const options = Array.from(
-      screen.getByLabelText(copy.inviteRole).querySelectorAll('option'),
+      within(screen.getByRole('dialog')).getByLabelText(copy.inviteRole).querySelectorAll('option'),
     ).map((option) => option.textContent);
 
     expect(options).toEqual([copy.roles.ADMIN, copy.roles.MEMBER, copy.roles.GUEST]);
@@ -305,22 +316,49 @@ describe('MembersSettings — revoking an invitation', () => {
 });
 
 describe('MembersSettings — changing a role', () => {
-  it('patches the role sub-resource and shows the new role on the row', async () => {
+  it('patches the role sub-resource the moment a non-owner role is chosen, with no dialog', async () => {
     apiPatch.mockResolvedValue(member(BORA_ID, 'Bora', MemberRole.ADMIN) as never);
     renderSection();
+    await screen.findByText('Bora');
 
-    await openRowMenu('Bora');
-    clickMenuItem(copy.changeRoleAction);
-    fireEvent.change(screen.getByLabelText(copy.inviteRole), {
-      target: { value: MemberRole.ADMIN },
-    });
-    clickLastButton(copy.changeRoleSubmit);
+    fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.ADMIN } });
 
     await waitFor(() => expect(apiPatch).toHaveBeenCalled());
     expect(apiPatch).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/members/${BORA_ID}/role`, {
       role: MemberRole.ADMIN,
     });
-    await waitFor(() => expect(screen.getAllByText(copy.roles.ADMIN).length).toBeGreaterThan(0));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(roleSelectFor('Bora').value).toBe(MemberRole.ADMIN));
+  });
+
+  it('shows the hint for the role the select is currently showing, under the control', async () => {
+    apiPatch.mockResolvedValue(member(BORA_ID, 'Bora', MemberRole.ADMIN) as never);
+    renderSection();
+    await screen.findByText('Bora');
+
+    fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.ADMIN } });
+
+    expect(await screen.findByText(copy.roleHints.ADMIN)).toBeTruthy();
+  });
+
+  it('disables the select while its own patch is in flight, and re-enables it after', async () => {
+    let resolvePatch: (value: WorkspaceMemberDto) => void = () => {};
+    apiPatch.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePatch = resolve;
+        }),
+    );
+    renderSection();
+    await screen.findByText('Bora');
+
+    fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.ADMIN } });
+
+    expect(roleSelectFor('Bora').disabled).toBe(true);
+    expect(roleSelectFor('Bora').getAttribute('aria-busy')).toBe('true');
+
+    resolvePatch(member(BORA_ID, 'Bora', MemberRole.ADMIN));
+    await waitFor(() => expect(roleSelectFor('Bora').disabled).toBe(false));
   });
 
   /**
@@ -328,20 +366,65 @@ describe('MembersSettings — changing a role', () => {
    * explained failure carries its own way out — so the user must read "make someone else an
    * owner first", never the server's own wording and never a generic "could not save".
    */
-  it('turns the last-OWNER 409 into the move that would make it work', async () => {
+  it('turns the last-OWNER 409 into the move that would make it work, and reverts the select', async () => {
     apiPatch.mockRejectedValue(apiFailure(409));
     renderSection();
+    await screen.findByText('Ceren');
 
-    await openRowMenu('Ceren');
-    clickMenuItem(copy.changeRoleAction);
-    fireEvent.change(screen.getByLabelText(copy.inviteRole), {
-      target: { value: MemberRole.MEMBER },
-    });
-    clickLastButton(copy.changeRoleSubmit);
+    fireEvent.change(roleSelectFor('Ceren'), { target: { value: MemberRole.MEMBER } });
 
     expect(await screen.findByText(copy.changeRoleErrorLastOwner)).toBeTruthy();
     expect(screen.queryByText(copy.changeRoleError)).toBeNull();
     expect(screen.queryByText('server wording, never shown')).toBeNull();
+    await waitFor(() => expect(roleSelectFor('Ceren').value).toBe(MemberRole.OWNER));
+  });
+
+  describe('promoting someone to owner', () => {
+    it('asks first, and applies only once the promotion is confirmed', async () => {
+      apiPatch.mockResolvedValue(member(BORA_ID, 'Bora', MemberRole.OWNER) as never);
+      renderSection();
+      await screen.findByText('Bora');
+
+      fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.OWNER } });
+
+      expect(apiPatch).not.toHaveBeenCalled();
+      expect(screen.getByRole('dialog')).toBeTruthy();
+      expect(screen.getByText(copy.confirmOwnerBody)).toBeTruthy();
+
+      clickLastButton(copy.changeRoleSubmit);
+
+      await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+      expect(apiPatch).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/members/${BORA_ID}/role`, {
+        role: MemberRole.OWNER,
+      });
+    });
+
+    it('reverts the select when the owner confirmation is cancelled', async () => {
+      renderSection();
+      await screen.findByText('Bora');
+
+      fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.OWNER } });
+      expect(screen.getByText(copy.confirmOwnerBody)).toBeTruthy();
+
+      fireEvent.click(screen.getByRole('button', { name: copy.cancel }));
+
+      expect(apiPatch).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(roleSelectFor('Bora').value).toBe(MemberRole.MEMBER);
+    });
+
+    it('keeps the confirmation open and shows the failure inside it, rather than closing', async () => {
+      apiPatch.mockRejectedValue(apiFailure(403));
+      renderSection();
+      await screen.findByText('Bora');
+
+      fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.OWNER } });
+      clickLastButton(copy.changeRoleSubmit);
+
+      expect(await screen.findByText(copy.changeRoleErrorForbidden)).toBeTruthy();
+      expect(screen.getByRole('dialog')).toBeTruthy();
+      expect(roleSelectFor('Bora').value).toBe(MemberRole.OWNER);
+    });
   });
 });
 

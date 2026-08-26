@@ -50,7 +50,6 @@ import { RenameBoardDialog } from '@/components/board/rename-board-dialog';
 import { AssigneeChart } from '@/components/dashboard/assignee-chart';
 import { ChartTableToggle } from '@/components/dashboard/chart-table-toggle';
 import { ColumnChart } from '@/components/dashboard/column-chart';
-import { CompletionChart } from '@/components/dashboard/completion-chart';
 import { DashboardSummary } from '@/components/dashboard/dashboard-summary';
 import { AppSidebar } from '@/components/layout/app-sidebar';
 import { NotificationUnreadProvider } from '@/components/notification/notification-unread-provider';
@@ -461,6 +460,11 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/settings/invite-member-dialog.tsx',
     ratio: 1.47,
   },
+  {
+    key: 'app.settings.members.changeRoleErrorForbidden',
+    screen: 'components/settings/members-settings.tsx',
+    ratio: 1.47,
+  },
   { key: 'auth.login.subtitle', screen: 'components/auth/login-view.tsx', ratio: 1.48 },
   {
     key: 'app.board.import.setColumnCategories',
@@ -640,11 +644,6 @@ const LONGEST_TURKISH: readonly LongString[] = [
     key: 'app.board.column.categoryOption.CANCELED',
     screen: 'components/board/column-settings-dialog.tsx',
     ratio: 1.5,
-  },
-  {
-    key: 'app.dashboard.seriesCreated',
-    screen: 'components/dashboard/completion-chart.tsx',
-    ratio: 1.57,
   },
 ];
 
@@ -1000,14 +999,24 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       'app.settings.members.seatUsage',
       'app.settings.members.copyLink',
       'app.settings.members.copiedLink',
+      'app.settings.members.changeRoleErrorForbidden',
     ],
     run: async () => {
       auth.session = {
         data: { user: { id: USER_ID, email: 'ayla@example.com', emailVerified: true } },
         isPending: false,
       };
-      loadMembers.mockResolvedValue([MEMBER]);
+      const bora: WorkspaceMemberDto = {
+        id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d21',
+        workspaceId: WORKSPACE_ID,
+        userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d22',
+        role: MemberRole.MEMBER,
+        name: 'Bora',
+        avatarUrl: null,
+      };
+      loadMembers.mockResolvedValue([MEMBER, bora]);
       loadInvitations.mockResolvedValue([INVITATION]);
+      apiPatch.mockRejectedValue(forbidden());
       routeGet([
         ['/config', { mailEnabled: true }],
         [
@@ -1033,6 +1042,18 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       await waitFor(() => {
         expect(screen.getByText(messages.app.settings.members.copiedLink)).toBeDefined();
       });
+
+      // The roster row's own inline role control, and the one failure copy this case's
+      // happy-path assertions above never exercise.
+      const row = screen.getByText('Bora').closest('li');
+      if (!row) throw new Error('no row for Bora');
+      fireEvent.change(within(row).getByLabelText(messages.app.settings.members.inviteRole), {
+        target: { value: MemberRole.ADMIN },
+      });
+
+      expect(
+        await screen.findByText(messages.app.settings.members.changeRoleErrorForbidden),
+      ).toBeDefined();
     },
   },
   {
@@ -1175,18 +1196,6 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       const toggle = screen.getByRole('button', { name: messages.app.dashboard.viewTable });
       fireEvent.click(toggle);
       expect(screen.getByRole('button', { name: messages.app.dashboard.viewChart })).toBeDefined();
-    },
-  },
-  {
-    screen: 'components/dashboard/completion-chart.tsx',
-    keys: ['app.dashboard.seriesCreated'],
-    run: () => {
-      render(tr(<CompletionChart data={[{ date: '2026-08-01', created: 2, completed: 1 }]} />));
-
-      fireEvent.click(screen.getByRole('button', { name: messages.app.dashboard.viewTable }));
-      expect(
-        screen.getByRole('columnheader', { name: messages.app.dashboard.seriesCreated }),
-      ).toBeDefined();
     },
   },
   {
