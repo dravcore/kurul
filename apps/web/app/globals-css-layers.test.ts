@@ -814,6 +814,18 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
     ]);
   });
 
+  /**
+   * The rail is a `--signature` ground and nothing else, so the mode replaces it with the same
+   * colour it gives every other surface and the drop point disappears. It is the one mark a
+   * keyboard drag has, which is why it gets a system colour rather than being left to the wash.
+   */
+  it('repaints the insertion rail in Highlight so the drop point survives', () => {
+    const railRule = requireRule(forced, 'the insertion rail', (rule) => {
+      return rule.selector === "[data-slot='drop-indicator']";
+    });
+    expect(railRule.declarations).toEqual([{ property: 'background', value: 'Highlight' }]);
+  });
+
   it('paints the highlighted menu row with the palette pair the mode provides', () => {
     const row = requireRule(forced, 'the highlighted menu row', (rule) => {
       return selectorParts(rule).includes("[data-slot='dropdown-menu-item'][data-highlighted]");
@@ -887,6 +899,7 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
     'a[data-selected]',
     'a[data-selected]:not(:focus-visible)',
     'section[data-drop-target]',
+    "[data-slot='drop-indicator']",
   ])('keeps %s above every utility', (selector) => {
     const rule = requireRule(sheet, `a rule for ${selector}`, (candidate) => {
       return candidate.selector === selector;

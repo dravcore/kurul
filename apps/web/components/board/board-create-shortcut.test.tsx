@@ -20,7 +20,9 @@ const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00';
 const dnd: BoardTaskDndController = {
   sensors: [],
   activeTask: null,
+  dropIndicator: null,
   onDragStart: vi.fn(),
+  onDragOver: vi.fn(),
   onDragEnd: vi.fn(),
   onDragCancel: vi.fn(),
   cancelDrag: vi.fn(),

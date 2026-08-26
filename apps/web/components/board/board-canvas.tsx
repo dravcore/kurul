@@ -95,6 +95,7 @@ export function BoardCanvas({
       sensors={dnd.sensors}
       collisionDetection={dnd.collisionDetection}
       onDragStart={dnd.onDragStart}
+      onDragOver={dnd.onDragOver}
       onDragEnd={dnd.onDragEnd}
       onDragCancel={dnd.onDragCancel}
     >
@@ -119,6 +120,12 @@ export function BoardCanvas({
             composerFocusNonce={composerFocusNonce}
             onComposerOpenChange={(open) => setComposerColumnId(open ? column.id : null)}
             onTaskCreated={onTaskCreated}
+            // A number rather than the indicator itself, so the columns that are not the target
+            // are handed the identical `null` on every move of the drag and the column's `memo`
+            // holds instead of the whole strip re-rendering per pointer event.
+            dropIndicatorIndex={
+              dnd.dropIndicator?.columnId === column.id ? dnd.dropIndicator.index : null
+            }
             className={entranceDone ? undefined : 'board-column-enter'}
             style={entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)}
           />

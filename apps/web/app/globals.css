@@ -711,6 +711,14 @@ body {
     outline-offset: -2px;
   }
 
+  /* The insertion rail components/board/board-column.tsx draws between two cards. It is a
+     `--signature` ground and nothing else, so the mode would give it the same colour it gives
+     the cards around it; it is also the only mark a keyboard drag has, the wash being a second
+     touch rather than the signal. */
+  [data-slot='drop-indicator'] {
+    background: Highlight;
+  }
+
   /* Chromium paints a Canvas-coloured backplate behind text runs in forced-colours mode; on this
      row that plate sits under the label and hides it, so `forced-color-adjust: none` is the only
      way to suppress it. The pair of system colours stays explicit so the row still follows the

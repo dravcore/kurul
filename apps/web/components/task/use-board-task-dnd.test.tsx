@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
 import { Priority, type TaskDto } from '@kurul/shared-types';
 import { columnDroppableId } from '@/components/board/board-column';
 import { useBoardTaskDnd, type TaskMovePayload } from './use-board-task-dnd';
@@ -40,6 +40,13 @@ function dragEnd(activeId: string, overId: string | null): DragEndEvent {
     active: { id: activeId },
     over: overId === null ? null : { id: overId },
   } as unknown as DragEndEvent;
+}
+
+function dragOver(activeId: string, overId: string | null): DragOverEvent {
+  return {
+    active: { id: activeId },
+    over: overId === null ? null : { id: overId },
+  } as unknown as DragOverEvent;
 }
 
 function setup(tasks: TaskDto[], canMutate = true) {
@@ -166,6 +173,130 @@ describe('useBoardTaskDnd', () => {
 
     act(() => rendered.result.current.onDragEnd(dragEnd('a', 'b')));
     expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it('reports no drop indicator until a card is over something', () => {
+    const tasks = [task('a', COLUMN_A, 1000)];
+    const { rendered } = setup(tasks);
+
+    expect(rendered.result.current.dropIndicator).toBeNull();
+
+    act(() => rendered.result.current.onDragStart(dragStart('a')));
+
+    expect(rendered.result.current.dropIndicator).toBeNull();
+  });
+
+  it('marks the hovered card’s slot in another column', () => {
+    const tasks = [task('a', COLUMN_A, 1000), task('d', COLUMN_B, 1000), task('e', COLUMN_B, 2000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', 'd')));
+    expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_B, index: 0 });
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', 'e')));
+    expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_B, index: 1 });
+  });
+
+  it('marks the end of a column hovered by its empty area', () => {
+    const tasks = [task('a', COLUMN_A, 1000), task('d', COLUMN_B, 1000), task('e', COLUMN_B, 2000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', columnDroppableId(COLUMN_B))));
+
+    expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_B, index: 2 });
+  });
+
+  it('marks an empty column at its first slot', () => {
+    const tasks = [task('a', COLUMN_A, 1000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', columnDroppableId(COLUMN_B))));
+
+    expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_B, index: 0 });
+  });
+
+  /**
+   * Within one column the index is the hovered card's own slot in the list the column still
+   * renders, in both directions of travel: @dnd-kit has already translated that card out of the
+   * slot and the dragged card into it, so that slot is where the drop lands and its leading edge
+   * is where the rail belongs. It is deliberately not the index the drop produces in the list
+   * without the dragged card, which for a downward move is one further on.
+   */
+  it('marks the slot the hovered card vacates when the move is down its own column', () => {
+    const tasks = [task('a', COLUMN_A, 1000), task('b', COLUMN_A, 2000), task('c', COLUMN_A, 3000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', 'b')));
+    expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_A, index: 1 });
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', 'c')));
+    expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_A, index: 2 });
+  });
+
+  it('marks the same slot when the move is up its own column', () => {
+    const tasks = [task('a', COLUMN_A, 1000), task('b', COLUMN_A, 2000), task('c', COLUMN_A, 3000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('c', 'b')));
+
+    expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_A, index: 1 });
+  });
+
+  it('marks the end of its own column when the empty area under it is hovered', () => {
+    const tasks = [task('a', COLUMN_A, 1000), task('b', COLUMN_A, 2000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', columnDroppableId(COLUMN_A))));
+
+    expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_A, index: 2 });
+  });
+
+  it('orders the slots by position rather than by array order', () => {
+    const tasks = [task('b', COLUMN_A, 2000), task('a', COLUMN_A, 1000), task('d', COLUMN_B, 1000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('d', 'b')));
+
+    expect(rendered.result.current.dropIndicator).toEqual({ columnId: COLUMN_A, index: 1 });
+  });
+
+  it('drops the indicator when the pointer leaves every column', () => {
+    const tasks = [task('a', COLUMN_A, 1000), task('d', COLUMN_B, 1000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', 'd')));
+    act(() => rendered.result.current.onDragOver(dragOver('a', null)));
+
+    expect(rendered.result.current.dropIndicator).toBeNull();
+  });
+
+  it('drops the indicator when the drag ends', () => {
+    const tasks = [task('a', COLUMN_A, 1000), task('d', COLUMN_B, 1000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', 'd')));
+    act(() => rendered.result.current.onDragEnd(dragEnd('a', 'd')));
+
+    expect(rendered.result.current.dropIndicator).toBeNull();
+  });
+
+  it('drops the indicator when the drag is cancelled', () => {
+    const tasks = [task('a', COLUMN_A, 1000), task('d', COLUMN_B, 1000)];
+    const { rendered } = setup(tasks);
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', 'd')));
+    act(() => rendered.result.current.onDragCancel());
+
+    expect(rendered.result.current.dropIndicator).toBeNull();
+  });
+
+  it('shows no indicator at all for a role that cannot move tasks', () => {
+    const tasks = [task('a', COLUMN_A, 1000), task('d', COLUMN_B, 1000)];
+    const { rendered } = setup(tasks, false);
+
+    act(() => rendered.result.current.onDragOver(dragOver('a', 'd')));
+
+    expect(rendered.result.current.dropIndicator).toBeNull();
   });
 
   // Previously failed: applyMove compared raw array indices instead of position.

@@ -127,10 +127,12 @@ function ColumnHarness({
   tasks,
   selectedTaskId,
   onTaskCreated,
+  dropIndicatorIndex,
 }: {
   tasks: TaskDto[];
   selectedTaskId: string | null;
   onTaskCreated: (task: TaskDto) => void;
+  dropIndicatorIndex: number | null;
 }): React.ReactElement {
   const [composerOpen, setComposerOpen] = useState(false);
   return (
@@ -152,6 +154,7 @@ function ColumnHarness({
       composerFocusNonce={0}
       onComposerOpenChange={setComposerOpen}
       onTaskCreated={onTaskCreated}
+      dropIndicatorIndex={dropIndicatorIndex}
     />
   );
 }
@@ -160,6 +163,7 @@ function renderColumn(
   tasks: TaskDto[],
   selectedTaskId: string | null = null,
   onTaskCreated: (task: TaskDto) => void = vi.fn(),
+  dropIndicatorIndex: number | null = null,
 ) {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -168,10 +172,23 @@ function renderColumn(
           tasks={tasks}
           selectedTaskId={selectedTaskId}
           onTaskCreated={onTaskCreated}
+          dropIndicatorIndex={dropIndicatorIndex}
         />
       </DndContext>
     </NextIntlClientProvider>,
   );
+}
+
+const rail = (): HTMLElement | null => document.querySelector('[data-slot="drop-indicator"]');
+
+/** How many cards the rail is drawn after, which is the slot the drop lands in. */
+function railSlot(): number {
+  const element = rail();
+  if (element === null) throw new Error('no drop indicator is rendered');
+  const siblings = Array.from(element.parentElement?.children ?? []);
+  return siblings
+    .slice(0, siblings.indexOf(element))
+    .filter((sibling) => sibling.querySelector('a') !== null).length;
 }
 
 const composerCopy = messages.app.board.column;
@@ -205,15 +222,15 @@ describe('BoardColumn empty drop zone', () => {
   /**
    * The one resting border in the tree that changed colour when the `*` rule moved into
    * `@layer base`: it had been drawing the hairline grey rather than `--border-strong`. It is
-   * the empty-column affordance of docs/design.md §7, not a live drop target, which is why it
-   * is allowed the dashed outline §5 forbids while a card is in the air.
+   * solid because docs/design.md §5 allows the board no dashed outline, and §7's own "56px
+   * dashed drop zone" was the document contradicting itself rather than a second rule.
    */
-  it('draws the empty column its dashed border-strong outline', () => {
+  it('draws the empty column a solid border-strong box', () => {
     renderColumn([]);
     const zone = screen.getByText(messages.app.board.column.emptyDrop);
     const classes = new Set(zone.className.split(/\s+/).filter(Boolean));
 
-    expect(classes.has('border-dashed')).toBe(true);
+    expect(classes.has('border-dashed')).toBe(false);
     expect(classes.has('border-border-strong')).toBe(true);
     expect(classes.has('border')).toBe(true);
   });
@@ -320,6 +337,66 @@ describe('BoardColumn drop target', () => {
     // The tint stays the state's normal-mode mark; the attribute only adds the forced-colours
     // twin of it.
     expect(section.className.split(/\s+/)).toContain('bg-signature-subtle');
+  });
+
+  /**
+   * A keyboard drag never sets `isOver`: the lifted card becomes a sortable item of the column
+   * it is moving into, so @dnd-kit reports a card as the target and the column's own droppable
+   * stays cold. The indicator is what the wash and the forced-colours attribute hang on so the
+   * two pointer devices show the same thing.
+   */
+  it('marks the column from the indicator alone, with no droppable ever over it', () => {
+    renderColumn(makeTasks(2), null, vi.fn(), 1);
+
+    const section = screen.getByRole('region', { name: column.name });
+    expect(section.getAttribute('data-drop-target')).toBe('true');
+    expect(section.className.split(/\s+/)).toContain('bg-signature-subtle');
+  });
+});
+
+describe('BoardColumn insertion rail', () => {
+  it('draws nothing while no card is heading for the column', () => {
+    renderColumn(makeTasks(3));
+
+    expect(rail()).toBeNull();
+  });
+
+  it('draws the rail at the indicated slot', () => {
+    renderColumn(makeTasks(3), null, vi.fn(), 2);
+
+    expect(railSlot()).toBe(2);
+  });
+
+  it('draws the rail above the first card', () => {
+    renderColumn(makeTasks(3), null, vi.fn(), 0);
+
+    expect(railSlot()).toBe(0);
+  });
+
+  it('draws the rail after the last card when the drop appends', () => {
+    renderColumn(makeTasks(3), null, vi.fn(), 3);
+
+    expect(railSlot()).toBe(3);
+  });
+
+  /**
+   * The column mounts a budget of cards, not all of them, so an index past the mounted set has
+   * no slot to sit in. The end of what is mounted is the closest true statement about where the
+   * card lands, and it is also the only part of the column the reader can see.
+   */
+  it('clamps an index past the mounted cards to the end of them', () => {
+    renderColumn(makeTasks(3), null, vi.fn(), 400);
+
+    expect(railSlot()).toBe(3);
+  });
+
+  it('draws a copper rule that carries no text and no accessible name', () => {
+    renderColumn(makeTasks(2), null, vi.fn(), 1);
+
+    const element = rail()!;
+    expect(element.getAttribute('aria-hidden')).toBe('true');
+    expect(element.textContent).toBe('');
+    expect(element.className.split(/\s+/)).toContain('bg-signature');
   });
 });
 
@@ -499,6 +576,7 @@ describe('BoardColumn task composer', () => {
             boardId={BOARD_ID}
             workspaceId={null}
             selectedTaskId={null}
+            dropIndicatorIndex={null}
             canMutateColumns
             canMutateTasks
             canMoveLeft={false}

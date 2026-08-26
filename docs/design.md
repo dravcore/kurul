@@ -411,7 +411,7 @@ first row. Two identical primary buttons on a first run is a choice the reader d
 | --------------------- | ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------- |
 | No boards yet         | Damga 96px | No boards yet                | A board is where the work gets divided. Start with one.                                               | Create board                     |
 | Board has no columns  | Damga 96px | This board has no columns    | Columns are the stages work moves through. Start with To Do, In Progress, and Done, or name your own. | Add column · Use default columns |
-| Empty column          | —          | —                            | 56px dashed drop zone: "Drop a task here"                                                             | Add task                         |
+| Empty column          | —          | —                            | 56px solid `--border-strong` drop zone: "Drop a task here"                                            | Add task                         |
 | Filters match nothing | —          | No tasks match these filters | Three filters are active.                                                                             | Clear filters                    |
 | Dashboard, no data    | Damga 64px | Nothing to chart yet         | Charts fill in as tasks are created and moved.                                                        | Open a board                     |
 | Notifications         | —          | You're caught up             | —                                                                                                     | —                                |

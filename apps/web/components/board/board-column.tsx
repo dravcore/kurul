@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ArrowLeft, ArrowRight, MoreHorizontal, Plus, Settings2 } from 'lucide-react';
@@ -75,6 +75,8 @@ interface BoardColumnProps {
   /** Null until the workspace has bootstrapped; the composer has nowhere to post without it. */
   workspaceId: string | null;
   selectedTaskId?: string | null;
+  /** The slot the card in the air would land in, counted in cards; null when none is heading here. */
+  dropIndicatorIndex: number | null;
   canMutateColumns: boolean;
   canMutateTasks: boolean;
   canMoveLeft: boolean;
@@ -98,6 +100,7 @@ export const BoardColumn = memo(function BoardColumn({
   boardId,
   workspaceId,
   selectedTaskId = null,
+  dropIndicatorIndex,
   canMutateColumns,
   canMutateTasks,
   canMoveLeft,
@@ -144,6 +147,24 @@ export const BoardColumn = memo(function BoardColumn({
    * drop target under any list.
    */
   const visibleTaskIds = useMemo(() => visibleTasks.map((task) => task.id), [visibleTasks]);
+
+  /**
+   * The rail is drawn at the end of what is mounted when the drop lands past it. The render
+   * budget is what the column can address at all, and an unmounted card is not a drop target
+   * under any list, so the last mounted slot is the closest true statement the column can make.
+   */
+  const railIndex =
+    dropIndicatorIndex === null ? null : Math.min(dropIndicatorIndex, visibleTasks.length);
+
+  /**
+   * The rail gives back the ten pixels it costs the column: its own two, and the eight the
+   * `gap-2` above adds for one more child. @dnd-kit re-measures every droppable rect on each
+   * pointer move, so an insertion mark that pushed the cards under it down would be hit-tested
+   * against rects it had itself just moved, and the slot it points at would oscillate.
+   */
+  const rail = (
+    <div aria-hidden data-slot="drop-indicator" className="-my-[5px] h-0.5 shrink-0 bg-signature" />
+  );
 
   const addTaskRef = useRef<HTMLButtonElement | null>(null);
   const returnFocusRef = useRef(false);
@@ -208,18 +229,25 @@ export const BoardColumn = memo(function BoardColumn({
     return () => observer.disconnect();
   }, [hasMore, renderCount]);
 
+  /**
+   * `isOver` is the pointer's half only: a keyboard drag makes the lifted card a sortable item
+   * of the column it moves into, so this column's own droppable never turns over and the wash
+   * would be a mouse-only affordance. The indicator is raised for both devices.
+   */
+  const isDropTarget = isOver || railIndex !== null;
+
   return (
     <section
       className={cn(
         'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-[var(--radius-md)] bg-muted',
-        isOver && 'bg-signature-subtle',
+        isDropTarget && 'bg-signature-subtle',
         className,
       )}
       style={style}
       aria-label={column.name}
       // Forced colours erase the tint above, so `app/globals.css` hangs the drop target's
       // Highlight border on this attribute instead.
-      data-drop-target={isOver || undefined}
+      data-drop-target={isDropTarget || undefined}
     >
       {/* 40px per `docs/design.md` §4, 48px below `md` so the 44px overflow button fits inside
           it rather than spilling over the first card.
@@ -265,15 +293,18 @@ export const BoardColumn = memo(function BoardColumn({
           strategy={verticalListSortingStrategy}
           disabled={!canMutateTasks}
         >
-          {visibleTasks.map((task) => (
-            <SortableTaskCard
-              key={task.id}
-              task={task}
-              boardId={boardId}
-              selected={task.id === selectedTaskId}
-              disabled={!canMutateTasks}
-            />
+          {visibleTasks.map((task, index) => (
+            <Fragment key={task.id}>
+              {railIndex === index ? rail : null}
+              <SortableTaskCard
+                task={task}
+                boardId={boardId}
+                selected={task.id === selectedTaskId}
+                disabled={!canMutateTasks}
+              />
+            </Fragment>
           ))}
+          {railIndex === visibleTasks.length ? rail : null}
         </SortableContext>
         {hasMore ? (
           // Zero-height and aria-hidden: it is a scroll position, not content. The header's
@@ -281,7 +312,7 @@ export const BoardColumn = memo(function BoardColumn({
           <div ref={sentinelRef} aria-hidden className="h-px shrink-0" />
         ) : null}
         {tasks.length === 0 ? (
-          <div className="flex h-14 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-border-strong text-small text-muted-foreground">
+          <div className="flex h-14 items-center justify-center rounded-[var(--radius-md)] border border-border-strong text-small text-muted-foreground">
             {t('emptyDrop')}
           </div>
         ) : null}

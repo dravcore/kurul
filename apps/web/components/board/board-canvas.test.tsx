@@ -20,13 +20,19 @@ type ColumnProps = Parameters<typeof BoardColumn>[0];
  */
 const overlay = vi.hoisted(() => ({ props: vi.fn() }));
 
+/** The props `DndContext` was handed, so the `onDragOver` the insertion rail rides on is visible. */
+const context = vi.hoisted(() => ({ props: vi.fn() }));
+
 vi.mock('@dnd-kit/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@dnd-kit/core')>();
   return {
     ...actual,
     // The context and the columns are stubbed out because a drag is not what is under test:
     // what is, is the single prop below.
-    DndContext: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+    DndContext: (props: { children?: React.ReactNode }) => {
+      context.props(props);
+      return <>{props.children}</>;
+    },
     DragOverlay: (props: { dropAnimation?: DropAnimation | null }) => {
       overlay.props(props);
       return null;
@@ -77,10 +83,12 @@ function stubMatchMedia(matches: boolean): void {
   })) as unknown as typeof window.matchMedia;
 }
 
-const dnd: BoardTaskDndController = {
+const baseDnd: BoardTaskDndController = {
   sensors: [],
   activeTask: null,
+  dropIndicator: null,
   onDragStart: vi.fn(),
+  onDragOver: vi.fn(),
   onDragEnd: vi.fn(),
   onDragCancel: vi.fn(),
   cancelDrag: vi.fn(),
@@ -88,9 +96,17 @@ const dnd: BoardTaskDndController = {
   collisionDetection: closestCorners,
 };
 
+let dnd: BoardTaskDndController = baseDnd;
+
 function renderCanvas(
-  options: { columns?: ColumnDto[]; canMutateTasks?: boolean; workspaceId?: string | null } = {},
+  options: {
+    columns?: ColumnDto[];
+    canMutateTasks?: boolean;
+    workspaceId?: string | null;
+    dropIndicator?: BoardTaskDndController['dropIndicator'];
+  } = {},
 ): void {
+  dnd = { ...baseDnd, dropIndicator: options.dropIndicator ?? null };
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <BoardCanvas
@@ -132,6 +148,8 @@ function lastDropAnimation(): DropAnimation | null | undefined {
 afterEach(() => {
   cleanup();
   overlay.props.mockClear();
+  context.props.mockClear();
+  dnd = baseDnd;
   rendered.columns.length = 0;
   // jsdom ships no `matchMedia`, and the hook treats that absence as its own case: putting the
   // property back would leave the next test reading this one's stub.
@@ -159,6 +177,39 @@ describe('BoardCanvas drop animation', () => {
     renderCanvas();
 
     expect(lastDropAnimation()).toBeTruthy();
+  });
+});
+
+describe('BoardCanvas drop indicator', () => {
+  /** The props `DndContext` was last rendered with. */
+  function lastContextProps(): Record<string, unknown> {
+    const call = context.props.mock.calls.at(-1);
+    if (call === undefined) throw new Error('DndContext was not rendered');
+    return call[0] as Record<string, unknown>;
+  }
+
+  it('hands the drag-over handler to DndContext', () => {
+    renderCanvas({ columns: [column('col-1', 1)] });
+
+    expect(lastContextProps().onDragOver).toBe(baseDnd.onDragOver);
+  });
+
+  it('gives the slot to the targeted column and nothing to the others', () => {
+    renderCanvas({
+      columns: [column('col-1', 1), column('col-2', 2)],
+      dropIndicator: { columnId: 'col-2', index: 3 },
+    });
+
+    expect(lastColumnProps('col-2').dropIndicatorIndex).toBe(3);
+    // A primitive rather than the indicator object, so the two columns that are not the target
+    // keep the identical prop across a whole drag and the memo holds.
+    expect(lastColumnProps('col-1').dropIndicatorIndex).toBeNull();
+  });
+
+  it('gives every column nothing while no drag is over the board', () => {
+    renderCanvas({ columns: [column('col-1', 1)] });
+
+    expect(lastColumnProps('col-1').dropIndicatorIndex).toBeNull();
   });
 });
 
