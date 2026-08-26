@@ -290,6 +290,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Base images are pinned by digest, and Dependabot now has a bump path for all of
+  them** ([#157](https://github.com/dravcore/kurul/issues/157)). `postgres:18-alpine`
+  and `redis:8-alpine` in `docker-compose.yml` and `docker-compose.dev.yml`, `caddy:2-alpine`
+  in `docker-compose.yml`, and `node:24-alpine` in `apps/api/Dockerfile` and
+  `apps/web/Dockerfile`, now carry a `@sha256` digest instead of a bare tag, the same pattern
+  `docker-compose.dev.yml` already applied to `mailpit`. Dependabot's docker updater only reads
+  a literal `FROM image:tag@digest` line, not one built from an `ARG`, so both Dockerfiles
+  repeat the digest on every `FROM` instead of factoring it into a shared build argument.
+  `.github/dependabot.yml` gains a `docker` ecosystem block scoped to `directories: [/apps/api,
+  /apps/web]`, so the two Dockerfiles are in its scope for the first time, plus a separate
+  `docker-compose` ecosystem block at `/`, since Dependabot's docker updater never reads a
+  compose file: that new block is what bumps the three compose images. Until now the docker
+  updater only read the repository root and never proposed a base-image bump for either app,
+  and the compose images had no bump path either, since a digest pin only pairs with an
+  ecosystem that can see it. Two builds of the same tag now resolve the same bytes, and an
+  upstream base-image fix arrives as a reviewable pull request instead of silently, whenever
+  something next happens to rebuild.
 - **CI now parses the compose files and the Caddyfile on every pull request.** A new
   `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
   `docker compose config -q`, without a profile and with `--profile demo`, renders
