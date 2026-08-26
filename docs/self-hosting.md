@@ -167,10 +167,11 @@ MAIL_FROM=Kurul <kurul@example.com>
 ```
 
 Generate both secrets with `openssl rand -hex 32`. `POSTGRES_PASSWORD` is embedded directly in
-a connection URL, where a `/` from `-base64` output would truncate it — `-hex`'s alphabet
-(`0-9a-f`) has none. `BETTER_AUTH_SECRET` is only ever byte-compared, so it carries no such
-constraint, but generating it with `-hex` too means one generator to remember instead of a
-per-variable rule.
+a connection URL, which is why `-base64` is the wrong generator for it; the reason is written
+down once, in
+[development.md](development.md#database-and-cache-credentials). `BETTER_AUTH_SECRET` is only
+ever byte-compared and carries no such constraint, but generating it with `-hex` too means one
+generator to remember instead of a per-variable rule.
 
 `SITE_URL` carries the scheme because that is what decides whether Caddy serves plain HTTP or
 obtains a certificate. `https://…` switches automatic HTTPS on. `http://localhost` (the

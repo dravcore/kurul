@@ -196,12 +196,9 @@ için olan `pnpm db:migrate:dev` ikisini birden yapar).
 
 ### Her iki yol için
 
-`POSTGRES_PASSWORD`'ün varsayılanı yoktur — ayarlanmadan compose başlamayı reddeder.
-`BETTER_AUTH_SECRET`'ten farklı olarak bu değer doğrudan bir bağlantı URL'ine gömülür,
-dolayısıyla `openssl rand -base64 32` burada yanlış üreticidir — alfabesi `/` ve `+` içerir,
-ikisi de parolaya düşerse URL'i bozar (`/` authority bölümünü doğrudan sonlandırır; base64-32
-çıktılarının kabaca yarısı en az bir tane içerir). Bunun yerine alfabesi (`0-9a-f`) her zaman
-URL-güvenli olan `openssl rand -hex 32` kullanın; bkz.
+`POSTGRES_PASSWORD`'ün varsayılanı yoktur: ayarlanmadan compose başlamayı reddeder. Doğrudan bir
+bağlantı URL'ine gömüldüğü için `-base64` ile değil `openssl rand -hex 32` ile üretin. Bunun neden
+önemli olduğu tek bir yerde yazılı:
 [docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri](docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri).
 Dev loop'ta `.env.example`'da birkaç satır üstündeki `DATABASE_URL`'in şifre kısmı bununla elle
 eşleştirilmelidir — o host tarafındaki string, `pnpm dev`'in `localhost:5432`'ye ulaşmak için

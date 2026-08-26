@@ -234,7 +234,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   env and pnpm-script tables against `.env.example` and `package.json`; `testing.md` names both
   required branch-protection contexts and stops calling the API coverage margin "a few points",
   pointing at the one file that carries the digits instead; `SECURITY.md` no longer implies a
-  direct commit to `develop` or `main`; and `git-strategy.md` gains a release step for the
+  direct commit to `develop` or `main`; the secret-generation rule is stated once, in
+  `development.md`'s "Database and cache credentials", with `.env.example`, both READMEs and
+  `self-hosting.md` trimmed to the one-line generator and a link to it, so the arithmetic behind
+  `-hex` over `-base64` lives in one file instead of five; and `git-strategy.md` gains a release step for the
   version-pinned prose that only a person keeps current, which is the root cause of most of the
   above. Every `docs/` change moves with its `docs/tr/` mirror.
 

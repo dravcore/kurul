@@ -190,12 +190,9 @@ the client (`pnpm db:migrate:dev`, the command for your _own_ schema edits, does
 
 ### Both paths
 
-`POSTGRES_PASSWORD` has no default — compose refuses to start until it's set. Unlike
-`BETTER_AUTH_SECRET`, this value is embedded directly in a connection URL, so
-`openssl rand -base64 32` is the wrong generator here — its alphabet includes `/` and `+`,
-either of which breaks the URL if it lands in the password (`/` ends the authority section
-outright; roughly half of all base64-32 outputs contain at least one). Use
-`openssl rand -hex 32` instead, whose alphabet (`0-9a-f`) is always URL-safe; see
+`POSTGRES_PASSWORD` has no default: compose refuses to start until it's set. Generate it with
+`openssl rand -hex 32`, not `-base64`, because it is embedded directly in a connection URL. Why
+that matters is written down once, in
 [docs/development.md#database-and-cache-credentials](docs/development.md#database-and-cache-credentials).
 In the dev loop the password segment of `DATABASE_URL` a few lines above it in `.env.example`
 must match it by hand — that host-side string is what `pnpm dev` uses to reach `localhost:5432`,
