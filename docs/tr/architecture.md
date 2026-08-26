@@ -507,6 +507,7 @@ Etkilenmeyenler, etkilenenlerden daha önemlidir:
 | Rol değişti (ör. ADMIN → GUEST)                 | **Anında** — `WorkspaceGuard`, her istekte `WorkspaceMember`'ı veritabanından okur           |
 | Workspace'ten çıkarıldı                         | **Anında** — aynı guard, aynı okuma; üyelik satırı yok ve istek 404 döner                    |
 | E-posta doğrulandı                              | Anında — `autoSignInAfterVerification` çerezi yeniden yazar, o seçenek zaten bunun için açık |
+| E-postayla gelen bağlantıdan parola sıfırlandı  | 60 saniyeye kadar geç: `revokeSessionsOnPasswordReset` hesabın bütün oturumlarını siler      |
 
 Yani bu pencere bir _yetkilendirme_ penceresi değil, bir _oturum kimliği_ penceresidir. Rolü
 düşürülmüş veya atılmış bir üye 60 saniye boyunca eski rolüyle işlem yapamaz; yalnızca çıkış

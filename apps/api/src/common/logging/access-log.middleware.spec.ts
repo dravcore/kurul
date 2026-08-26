@@ -141,6 +141,52 @@ describe('createAccessLogMiddleware', () => {
     expect(lines[0]).not.toContain('assigneeId');
   });
 
+  describe('secrets carried in the path itself', () => {
+    // Better Auth mails `GET /auth/reset-password/<token>` and the recipient's browser follows
+    // it, so unlike every other secret this API mints, this one is not in the query string that
+    // the rule above throws away. A live token in stdout is spendable by anyone who reads the
+    // log, for as long as the user takes to fill in the form.
+    const TOKEN = 'gPsdiGDIlo68Stksnai06nuU';
+
+    it('never writes the reset token, in the line or in the parsed path', () => {
+      const { lines, parsed } = emit({
+        originalUrl: `/auth/reset-password/${TOKEN}?callbackURL=http%3A%2F%2Flocalhost%3A3000%2Freset-password`,
+      });
+
+      expect(parsed.path).toBe('/auth/reset-password/:token');
+      expect(lines[0]).not.toContain(TOKEN);
+    });
+
+    it('redacts whatever follows the route, not just a single tidy segment', () => {
+      expect(emit({ originalUrl: `/auth/reset-password/${TOKEN}/extra` }).parsed.path).toBe(
+        '/auth/reset-password/:token',
+      );
+    });
+
+    it('redacts the route however Express happened to case it', () => {
+      const { lines, parsed } = emit({ originalUrl: `/auth/Reset-Password/${TOKEN}` });
+
+      // The prefix keeps the casing it arrived with, so an oddly-cased request still reads as
+      // the odd thing it is; only the secret is replaced.
+      expect(parsed.path).toBe('/auth/Reset-Password/:token');
+      expect(lines[0]).not.toContain(TOKEN);
+    });
+
+    it('leaves the tokenless route alone, so a 404 still reads as the path it was', () => {
+      expect(emit({ originalUrl: '/auth/reset-password/' }, 404).parsed.path).toBe(
+        '/auth/reset-password/',
+      );
+      // `POST /auth/reset-password` carries its token in the body, which is never logged.
+      expect(emit({ method: 'POST', originalUrl: '/auth/reset-password' }).parsed.path).toBe(
+        '/auth/reset-password',
+      );
+    });
+
+    it('leaves ordinary paths untouched', () => {
+      expect(emit({ originalUrl: '/auth/sign-in/email' }).parsed.path).toBe('/auth/sign-in/email');
+    });
+  });
+
   it('logs no field beyond the closed set — no headers, cookies or body', () => {
     const { parsed } = emit({ requestId: 'req-abcdefgh', user: { id: 'u_1' } });
 

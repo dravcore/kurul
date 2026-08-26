@@ -1,6 +1,14 @@
-import { buildInviteAcceptUrl, buildTaskUrl, resolveVerificationUrl, webAppUrl } from './web-urls';
+import {
+  buildInviteAcceptUrl,
+  buildTaskUrl,
+  resolvePasswordResetUrl,
+  resolveVerificationUrl,
+  webAppUrl,
+} from './web-urls';
 
 const VERIFY_BASE = 'http://localhost:4000/auth/verify-email?token=a-jwt';
+/** The exact shape Better Auth 1.7 hands `sendResetPassword` when no `redirectTo` was given. */
+const RESET_BASE = 'http://localhost:4000/auth/reset-password/opaque-token?callbackURL=';
 
 describe('web app URLs', () => {
   const original = process.env.WEB_URL;
@@ -69,6 +77,36 @@ describe('web app URLs', () => {
 
     it('returns a non-URL untouched rather than dropping the email', () => {
       expect(resolveVerificationUrl('not a url')).toBe('not a url');
+    });
+  });
+
+  describe('resolvePasswordResetUrl', () => {
+    it('sends the user to the web reset page when the client named no redirect', () => {
+      const resolved = new URL(resolvePasswordResetUrl(RESET_BASE));
+
+      // The token stays in the path: the API still checks it before redirecting.
+      expect(resolved.pathname).toBe('/auth/reset-password/opaque-token');
+      expect(resolved.searchParams.get('callbackURL')).toBe(
+        'https://app.example.test/reset-password',
+      );
+    });
+
+    it('resolves a relative redirect against the web app, not the API', () => {
+      const resolved = new URL(resolvePasswordResetUrl(`${RESET_BASE}%2Freset-password`));
+
+      expect(resolved.searchParams.get('callbackURL')).toBe(
+        'https://app.example.test/reset-password',
+      );
+    });
+
+    it('leaves an absolute redirect for the Better Auth origin check to judge', () => {
+      const url = `${RESET_BASE}${encodeURIComponent('https://app.example.test/reset-password')}`;
+
+      expect(resolvePasswordResetUrl(url)).toBe(url);
+    });
+
+    it('returns a non-URL untouched rather than dropping the email', () => {
+      expect(resolvePasswordResetUrl('not a url')).toBe('not a url');
     });
   });
 

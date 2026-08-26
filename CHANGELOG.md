@@ -9,6 +9,29 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Password reset by email: a forgotten password is now recovered by the person who forgot it.**
+  "Forgot your password?" on the sign-in screen leads to `/forgot-password`, which asks for an
+  address and mails a single-use link good for one hour; the link lands on `/reset-password`,
+  where a new password is chosen. Until now the only way back into a locked-out account was an
+  instance admin deleting it, which destroyed the workspace memberships along with it.
+
+  The request endpoint answers the same `200` and the same body for an address with no account
+  as for one with an account, so it cannot be used to find out who has an account here, and
+  Better Auth's built-in `3 / 60s` rule already caps it. Spending the link revokes every session
+  the account held, which is what makes a reset a way to take an account back and not only a way
+  to remember it; a spent or expired link is refused and says so, rather than failing silently.
+  The email is written in the recipient's language, EN and TR, from the same template shape the
+  verification mail uses. Delivery is a hard requirement: with `SMTP_HOST` unset the whole
+  message including the link goes to the API log instead, which is workable on a solo install
+  and is not a recovery path for anyone else, see
+  [self-hosting](docs/self-hosting.md#email-smtp). On a `DEMO_MODE` instance the demo account
+  is skipped, since its password is published and a reset would only lock every visitor out.
+
+  The emailed link is the first URL this API serves with a live secret in its path, so the JSON
+  access log now writes it as `/auth/reset-password/:token`. A reverse proxy of your own in
+  front of it still logs the URL it was asked for unless you filter that route out, see
+  [self-hosting](docs/self-hosting.md#bringing-your-own-reverse-proxy).
+
 - **`SIGNUP_ENABLED`: a switch that closes registration on a self-hosted instance.** Until now
   the only way to stop strangers registering on an internet-facing install was to pin
   `PLAN_MAX_USERS` at the current head count, which blocks the operator's own invitees along
@@ -46,6 +69,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a plan catalogue in code, an entitlement write that is a single transaction with its idempotency
   ledger inside it, a grace period that deletes nothing, and a test proving that an instance with
   `BILLING_PROVIDER` unset runs exactly what it runs today.
+
 - **Plan limits: ceilings on seats, boards, workspaces and accounts, unlimited until an operator
   sets one.** Four variables (`PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
   `PLAN_MAX_WORKSPACES`, `PLAN_MAX_USERS`) put a number on quantities the product never bounded.
