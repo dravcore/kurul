@@ -88,8 +88,14 @@ Kurul sends two classes of email: transactional (the verification link an invite
 `next-intl` is wired from Phase 1 — user-facing strings go through `useTranslations()` /
 `messages/<locale>.json` rather than being hardcoded. Locale resolution is
 `User.locale → locale cookie → Accept-Language → 'en'` ([ADR 0018](decisions/0018-localization-strategy.md));
-**Settings → Language** can set a preference or “Match my browser”. English is still the only
-catalog on offer — additional UI language packs remain [Beyond MVP](../ROADMAP.md#beyond-mvp).
+**Settings → Language** can set a preference or “Match my browser”. Two catalogs ship, `en` and
+`tr`, and `messages/catalog.test.ts` fails the build on a key one of them has and the other does
+not, so parity is a gate rather than a claim. A third language needs no new mechanism: a catalog
+file plus one row in each of the two `Record<Locale, …>` copy tables (`MAIL_COPY` in
+`apps/api/src/mail/mail-templates.ts` and the board-template catalogue in
+`apps/api/src/common/board-templates.ts`), both of which are compile errors until they exist.
+Only a translator is missing, which is why the row stays under
+[Beyond MVP](../ROADMAP.md#beyond-mvp).
 
 ### File uploads — `multer` + `file-type`
 
@@ -97,7 +103,7 @@ Two endpoints take `multipart/form-data`: an attachment upload and a Trello impo
 
 ### Deployment — Docker Compose
 
-Seven services: the four that carry the product — `api`, `web`, `postgres`, `redis` — plus `proxy` (Caddy, the only one publishing a port, terminating TLS and serving the whole stack from one origin), `migrate` (a one-shot `prisma migrate deploy`) and `backup` (a `pg_dump` sidecar that also archives the attachment volume). This matches the existing self-managed Linux server setup. The path to Kubernetes stays open for when scale demands it (both ClickUp and Linear ended up there), but Compose on a single host is the right size for now.
+Seven services always: the four that carry the product (`api`, `web`, `postgres`, `redis`) plus `proxy` (Caddy, the only one publishing a port, terminating TLS and serving the whole stack from one origin), `migrate` (a one-shot `prisma migrate deploy`) and `backup` (a `pg_dump` sidecar that also archives the attachment volume). An eighth, `demo-reset`, sits behind the `demo` Compose profile and starts only with `--profile demo`. This matches the existing self-managed Linux server setup. The path to Kubernetes stays open for when scale demands it (both ClickUp and Linear ended up there), but Compose on a single host is the right size for now.
 
 ---
 
@@ -130,7 +136,7 @@ Projects worth studying for architecture and data modelling:
 
 ## 5. Decision records
 
-Stack and product ADRs are indexed in [decisions/README.md](decisions/README.md) (0001-0028).
+Stack and product ADRs are indexed in [decisions/README.md](decisions/README.md), which is the count, so this sentence does not carry a range that goes stale on the next record.
 Start there rather than duplicating the table here.
 
 Related: [architecture.md](architecture.md)
