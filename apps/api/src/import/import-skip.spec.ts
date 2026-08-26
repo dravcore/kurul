@@ -1,5 +1,5 @@
 import { TrelloImportScope, TrelloImportSkipReason } from '@kurul/shared-types';
-import { SKIP_SAMPLE_LIMIT, SkipCollector } from './import-skip';
+import { SKIP_SAMPLE_LIMIT, SKIP_SAMPLE_MAX_LENGTH, SkipCollector } from './import-skip';
 
 describe('SkipCollector', () => {
   it('groups by (scope, reason) and counts', () => {
@@ -50,6 +50,22 @@ describe('SkipCollector', () => {
     // A group reading "0 members were dropped" is a line that says nothing happened, and a report
     // made mostly of those is one nobody reads.
     expect(skips.toReport()).toEqual([]);
+  });
+
+  it('clamps a sample to SKIP_SAMPLE_MAX_LENGTH, whichever call added it', () => {
+    // The one place every sample passes through, so it is where an unbounded string stops being
+    // possible at all: a call site that forgot to clamp its own sample (or one that cannot, like
+    // an entry the reader rejected before it became a row) still cannot hand this collector more
+    // than SKIP_SAMPLE_MAX_LENGTH characters.
+    const longName = 'x'.repeat(SKIP_SAMPLE_MAX_LENGTH + 1000);
+    const skips = new SkipCollector();
+    skips.add(TrelloImportScope.Card, TrelloImportSkipReason.Malformed, longName);
+    skips.addMany(TrelloImportScope.List, TrelloImportSkipReason.Malformed, 1, [longName]);
+
+    for (const group of skips.toReport()) {
+      expect(group.samples[0]).toHaveLength(SKIP_SAMPLE_MAX_LENGTH);
+      expect(group.samples[0]).toBe(longName.slice(0, SKIP_SAMPLE_MAX_LENGTH));
+    }
   });
 
   it('does not quote an empty name as a sample', () => {

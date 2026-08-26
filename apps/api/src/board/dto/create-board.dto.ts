@@ -1,15 +1,16 @@
 import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { BOARD_TEMPLATE_SLUGS, type BoardTemplateSlug } from '../../common/board-templates';
+import { MAX_BOARD_DESCRIPTION_LENGTH, MAX_BOARD_NAME_LENGTH } from './board-limits';
 
 export class CreateBoardDto {
   @IsString()
   @MinLength(1)
-  @MaxLength(120)
+  @MaxLength(MAX_BOARD_NAME_LENGTH)
   name!: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(2000)
+  @MaxLength(MAX_BOARD_DESCRIPTION_LENGTH)
   description?: string;
 
   /**

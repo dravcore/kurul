@@ -583,6 +583,12 @@ services:
       # ATTACHMENT_MAX_BYTES, which is why it is a separate number rather than a derived one, and
       # it needs no STORAGE_PATH — an import writes link rows and stores no bytes.
       TRELLO_IMPORT_MAX_BYTES: ${TRELLO_IMPORT_MAX_BYTES:-20971520}
+      # Row caps for the same import (SEC-04): the largest number of cards and lists it will
+      # plan, checked before a row is planned or a transaction is opened. TRELLO_IMPORT_MAX_BYTES
+      # bounds the parsed export's size, not how many rows it asks this API to write, so these
+      # are the ceiling on that separately.
+      TRELLO_IMPORT_MAX_CARDS: ${TRELLO_IMPORT_MAX_CARDS:-50000}
+      TRELLO_IMPORT_MAX_LISTS: ${TRELLO_IMPORT_MAX_LISTS:-5000}
       # Plan ceilings (docs/decisions/0032-plan-limits.md): quantities rather than bytes. Blank
       # and `0` both mean unlimited, which is what every install runs until an operator writes a
       # number; a negative or non-integer value refuses to boot. Passed through for the same

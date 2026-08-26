@@ -1,5 +1,6 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 import { AttachmentKind } from '@kurul/shared-types';
+import { MAX_ATTACHMENT_URL_LENGTH } from './attachment-limits';
 
 /**
  * The body of `POST .../attachments`, for both shapes it accepts.
@@ -24,7 +25,7 @@ export class CreateAttachmentDto {
   @ValidateIf((dto: CreateAttachmentDto) => dto.kind === AttachmentKind.Link)
   @IsString()
   @IsNotEmpty()
-  @MaxLength(2048)
+  @MaxLength(MAX_ATTACHMENT_URL_LENGTH)
   url?: string;
 
   /**

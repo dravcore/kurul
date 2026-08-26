@@ -54,6 +54,32 @@ function largeExportBytes(cardCount: number): Buffer {
   );
 }
 
+/**
+ * A synthetic export with `listCount` empty lists and no cards.
+ *
+ * Built here rather than committed as a fixture, for the same reason `largeExportBytes` is: it
+ * measures the row cap (SEC-04), not Trello's schema.
+ */
+function manyListsExportBytes(listCount: number): Buffer {
+  return Buffer.from(
+    JSON.stringify({
+      name: 'A wide board',
+      desc: null,
+      lists: Array.from({ length: listCount }, (_unused, index) => ({
+        id: `6512d000000000000000${(index + 4096).toString(16).padStart(4, '0')}`,
+        name: `List ${index}`,
+        closed: false,
+        pos: (index + 1) * 1024,
+      })),
+      cards: [],
+      labels: [],
+      checklists: [],
+      members: [],
+      actions: [],
+    }),
+  );
+}
+
 type CreateManyMock = { createMany: jest.Mock };
 
 function buildService() {
@@ -335,5 +361,77 @@ describe('TrelloImportService', () => {
     // drift into an accident.
     expect(first.boardId).not.toBe(second.boardId);
     expect(second.imported).toEqual(first.imported);
+  });
+
+  describe('the row cap (SEC-04)', () => {
+    const originalMaxCards = process.env.TRELLO_IMPORT_MAX_CARDS;
+    const originalMaxLists = process.env.TRELLO_IMPORT_MAX_LISTS;
+
+    afterEach(() => {
+      if (originalMaxCards === undefined) delete process.env.TRELLO_IMPORT_MAX_CARDS;
+      else process.env.TRELLO_IMPORT_MAX_CARDS = originalMaxCards;
+      if (originalMaxLists === undefined) delete process.env.TRELLO_IMPORT_MAX_LISTS;
+      else process.env.TRELLO_IMPORT_MAX_LISTS = originalMaxLists;
+    });
+
+    it('refuses an export over the card cap before opening a transaction, and writes nothing', async () => {
+      process.env.TRELLO_IMPORT_MAX_CARDS = '5';
+      const { service, prisma } = buildService();
+
+      await expect(
+        service.importBoard(WORKSPACE_ID, ACTOR_ID, largeExportBytes(6)),
+      ).rejects.toThrow(BadRequestException);
+
+      // Refused before a single statement, not rolled back after one: the cost of an oversized
+      // export is the parse, not a connection.
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('accepts an export exactly at the card cap', async () => {
+      process.env.TRELLO_IMPORT_MAX_CARDS = '5';
+      const { service } = buildService();
+
+      const report = await service.importBoard(WORKSPACE_ID, ACTOR_ID, largeExportBytes(5));
+
+      expect(report.imported.tasks).toBe(5);
+    });
+
+    it('refuses an export over the list cap before opening a transaction, and writes nothing', async () => {
+      process.env.TRELLO_IMPORT_MAX_LISTS = '2';
+      const { service, prisma } = buildService();
+
+      await expect(
+        service.importBoard(WORKSPACE_ID, ACTOR_ID, manyListsExportBytes(3)),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('accepts an export exactly at the list cap', async () => {
+      process.env.TRELLO_IMPORT_MAX_LISTS = '2';
+      const { service } = buildService();
+
+      const report = await service.importBoard(WORKSPACE_ID, ACTOR_ID, manyListsExportBytes(2));
+
+      expect(report.imported.columns).toBe(2);
+    });
+
+    it("counts the export's raw lists and cards, not the plan's filtered ones", async () => {
+      // A board of six archived cards writes zero tasks, but it is still six rows this API had
+      // to hold in memory and would have carried into the planner had the cap not stopped it
+      // first: the ceiling is on what Trello sent, not on what survives filtering.
+      process.env.TRELLO_IMPORT_MAX_CARDS = '5';
+      const { service, prisma } = buildService();
+      const raw = JSON.parse(largeExportBytes(6).toString('utf8')) as {
+        cards: Array<Record<string, unknown>>;
+      };
+      for (const card of raw.cards) card.closed = true;
+
+      await expect(
+        service.importBoard(WORKSPACE_ID, ACTOR_ID, Buffer.from(JSON.stringify(raw))),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
   });
 });

@@ -261,6 +261,20 @@ room for the multipart envelope, for exactly the reason the attachment limit doe
 [the proxy contract below](#bringing-your-own-reverse-proxy). Importing works on an instance with
 no `STORAGE_PATH` at all: an import creates link attachments, which store no bytes.
 
+Two more variables cap the _shape_ of the board rather than the bytes of the export:
+`TRELLO_IMPORT_MAX_CARDS` (default `50000`) and `TRELLO_IMPORT_MAX_LISTS` (default `5000`) refuse
+an export that carries more cards or lists than that, with a `400` and nothing written, before a
+single row is planned. `TRELLO_IMPORT_MAX_BYTES` alone does not bound this: a small card is a few
+dozen bytes, so an export well under the byte ceiling can still be far more rows than any board
+this import is meant to hold. Every name, description and URL the importer writes is also clamped
+to the same ceiling its own write path enforces everywhere else: a task title, a board name, a
+column name and so on each keep the same limit `CreateTaskDto`, `CreateBoardDto` and the other
+DTOs already apply on every other route; a card whose title had to be cut still imports, and the
+import report counts it as one of the rows that came across changed. The full list of clamped
+fields and their ceilings is in
+[ADR 0025's amendment](decisions/0025-trello-import-mapping.md#amendment-2026-08-26-field-length-ceilings-and-a-row-cap-sec-04),
+not repeated here.
+
 ## 3. Start it
 
 ```bash

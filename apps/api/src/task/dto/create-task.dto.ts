@@ -12,12 +12,16 @@ import {
 } from 'class-validator';
 import { OptionalNullable } from '../../common/validation/optional';
 import { IsUuidV7 } from '../../common/uuid';
-import { MAX_ESTIMATED_MINUTES } from './task-limits';
+import {
+  MAX_ESTIMATED_MINUTES,
+  MAX_TASK_DESCRIPTION_LENGTH,
+  MAX_TASK_TITLE_LENGTH,
+} from './task-limits';
 
 export class CreateTaskDto {
   @IsString()
   @MinLength(1)
-  @MaxLength(500)
+  @MaxLength(MAX_TASK_TITLE_LENGTH)
   title!: string;
 
   @IsUuidV7()
@@ -25,7 +29,7 @@ export class CreateTaskDto {
 
   @OptionalNullable()
   @IsString()
-  @MaxLength(20_000)
+  @MaxLength(MAX_TASK_DESCRIPTION_LENGTH)
   description?: string | null;
 
   /** Omit to fall back to the column default (`Priority.MEDIUM`). */
