@@ -10,11 +10,12 @@ Open-source, Kanban-focused project management tool.
 
 ## Status
 
-Kurul’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards) — auth/workspaces, boards and
-tasks, filtering, dashboard, activity/notifications, and realtime board sync. See
-[ROADMAP.md](ROADMAP.md). A seven-scenario Playwright smoke pack covers the critical
-browser flows ([docs/testing.md](docs/testing.md#browser-end-to-end)). Beyond-MVP items (email
-notifications, presence, extra locales, …) remain listed under Beyond MVP.
+Kurul’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards): auth/workspaces, boards and
+tasks, filtering, dashboard, activity/notifications, and realtime board sync. A seven-scenario
+Playwright smoke pack covers the critical browser flows
+([docs/testing.md](docs/testing.md#browser-end-to-end)). What has shipped since, what is being
+worked on, and what is deliberately unscheduled all live in one place,
+[ROADMAP.md](ROADMAP.md), rather than being listed twice and going out of date here.
 
 ## What is Kurul?
 
@@ -54,10 +55,12 @@ Kurul's answer is deliberately narrow:
 - **Realtime and multi-tenancy in the core.** Socket.io board sync and workspace-scoped queries
   were designed in, not added on top.
 
-And what it is not, at `v0.3.0`: no subtasks, no time tracking, no public API tokens or
-webhooks. The UI speaks English and Turkish — every interface string, the columns a new board
-is seeded with, and the email we send you — and a third language is a catalog away. API tokens,
-webhooks and further language packs are listed under
+And what it is not, at `v0.3.0`: no subtasks, no time tracking, no public API tokens, no
+webhooks. Personal access tokens landed on `develop` after the tag and ship in the next
+release; webhooks have a design ([ADR 0033](docs/decisions/0033-webhook-delivery-and-failure-policy.md))
+and no implementation. The UI speaks English and Turkish (every interface string, the columns a
+new board is seeded with, and the email we send you) and a third language is a catalog away.
+Webhooks and further language packs are listed under
 [Beyond MVP](ROADMAP.md#beyond-mvp), each with the open question holding it up; subtasks
 and time tracking are not on that list at all. If you need them today, one of the more mature
 projects above is the better choice.

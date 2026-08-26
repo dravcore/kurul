@@ -10,12 +10,12 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 ## Durum
 
-Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı) — auth/workspace’ler, board ve
-task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Bkz.
-[ROADMAP.md](ROADMAP.md). Kritik tarayıcı akışlarını yedi senaryoluk bir
-Playwright smoke paketi kapsıyor ([docs/tr/testing.md](docs/tr/testing.md#browser-uçtan-uca)).
-MVP ötesi maddeler (e-posta bildirimleri, presence, ek diller, …) hâlâ MVP ötesi altında
-listelenir.
+Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı): auth/workspace’ler, board ve
+task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Kritik tarayıcı
+akışlarını yedi senaryoluk bir Playwright smoke paketi kapsıyor
+([docs/tr/testing.md](docs/tr/testing.md#browser-uçtan-uca)). O günden bu yana ne sevkedildiği,
+neyin üzerinde çalışıldığı ve neyin bilinçli olarak programa alınmadığı tek bir yerde,
+[ROADMAP.md](ROADMAP.md) içinde; burada ikinci kez listelenip eskimesin diye.
 
 ## Kurul nedir?
 
@@ -57,10 +57,12 @@ Kurul'un cevabı bilinçli olarak dar:
 - **Realtime ve çok-kiracılılık çekirdekte.** Socket.io board senkronu ve workspace'e
   scope'lanmış sorgular sonradan eklenmedi, baştan tasarlandı.
 
-Ve `v0.3.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, public API token'ları ve
-webhook'lar yok. UI hem İngilizce hem Türkçe konuşuyor — her arayüz metni, yeni bir board'un
-başladığı column adları ve size gönderdiğimiz e-posta dahil — ve üçüncü bir dil bir katalog
-uzakta. API token'ları, webhook'lar ve ek dil paketleri
+Ve `v0.3.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, public API token'ı yok,
+webhook yok. Personal access token'lar etiketten sonra `develop`'a indi ve bir sonraki sürümle
+çıkıyor; webhook'ların ise tasarımı var ([ADR 0033](docs/tr/decisions/0033-webhook-delivery-and-failure-policy.md)),
+uygulaması yok. UI hem İngilizce hem Türkçe konuşuyor (her arayüz metni, yeni bir board'un
+başladığı column adları ve size gönderdiğimiz e-posta dahil) ve üçüncü bir dil bir katalog
+uzakta. Webhook'lar ve ek dil paketleri
 [MVP ötesi](ROADMAP.md#beyond-mvp) altında, her biri kendisini bekleten açık soruyla
 listeli; subtask ve zaman takibi ise o listede hiç yok. Bunlara bugün ihtiyacınız varsa
 yukarıdaki daha olgun projelerden biri daha iyi bir seçim.
