@@ -589,7 +589,10 @@ export const TrelloImportSkipReason = {
   /**
    * Not a skip at all — a *substitution*, reported in the same list because the user needs to
    * know it happened. An unknown Trello colour fell back to `slot-1`, and every imported column
-   * took the default category.
+   * took the default category. A name or description past its DTO length ceiling (a card, board,
+   * checklist, checklist item, column, label or attachment field cut to fit) is folded in here
+   * too (SEC-04): the value was substituted with a shorter one, not lost, the same as a colour
+   * fallback.
    *
    * Putting a substitution in a list called "skipped" is deliberate. A separate `substitutions`
    * array was considered and rejected: the question a user asks after an import is not "what did

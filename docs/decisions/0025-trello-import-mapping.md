@@ -300,26 +300,69 @@ above, a board is one row rather than a class of rows, and a `(board, defaulted)
 only ever say "1" would answer nothing a user could act on, the same reasoning `trello-export.ts`
 already applies to the board's own description when it is unusable.
 
+Three honest limitations in the report this produces, rather than a fourth new skip reason. The
+brief for this amendment asked for a dedicated `truncated` reason; the branch reuses `Defaulted`
+instead, because the web report panel renders `t('skip.reason.' + group.reason)` from a fixed
+translation table (`apps/web/messages/{en,tr}.json`) that this worktree is not allowed to touch,
+and a new enum member with no matching key breaks that render. The consequence is that the
+existing `Defaulted` copy ("Kurul had no matching value, so the default was used") is now shown
+for five group kinds where nothing was defaulted and nothing failed to match, only cut: it
+misdescribes a clamp until a follow-up PR adds the `truncated` reason and both translations.
+
+Second, a clamped column name is reported only if it happens to land among the first
+`SKIP_SAMPLE_LIMIT` samples in `(column, defaulted)`, since that row's count is `columns.length`
+whether or not any name was cut and its samples are capped the same way every group's are; past
+that cap a clamped column name leaves no trace in the report at all.
+
+Third, `filename: safeDisplayName(attachment.name) || url.value` falls back to the URL (already
+clamped, up to `MAX_ATTACHMENT_URL_LENGTH`, 2048 characters) when a name is empty or cleans to
+nothing, which can store a `filename` past the 255 characters `CreateAttachmentDto` caps it at on
+every other route. `AttachmentService.createLink` builds its own `filename` the identical way
+(`safeDisplayName(dto.filename ?? '') || url`), so this is not the importer diverging from its
+HTTP twin, it is a pre-existing exception in both, and "every field the importer writes is held
+to its DTO ceiling" should be read with that one exception in mind.
+
 The same ceiling also bounds the _report_, not only the write. A row the planner drops rather than
 writes (an archived list or card, a card pointing at a label id the export does not contain, a
 rejected attachment, a checklist left off because its card was dropped) still quotes a name as a
 sample in the response body, and that name comes from the export, unclamped, just like the fields
-above. Every one of those sample sites now clamps or cleans its text the same way the row it
-describes would have (the accepted card's own already-clamped title, in the label-id case;
-`safeDisplayName` for a rejected attachment; the column/checklist ceilings for a dropped list or
-checklist), so a report about an oversized field cannot itself carry an unbounded string back to the
+above. Every one of those sample sites clamps or cleans its text the same way the row it describes
+would have (the accepted card's own already-clamped title, in the label-id case; `safeDisplayName`
+for a rejected attachment; the column/checklist ceilings for a dropped list or checklist).
+
+One case has no row to borrow a ceiling from at all: an entry `readCard`, `readList`, `readLabel`
+or `readChecklist` rejects outright, for a missing `id` or a field of the wrong type, never
+becomes a plan row, so `trello-export.ts` reports it with whatever string sat in its `name` field,
+unclamped, and there is no accepted row's ceiling for the planner to reuse. That is the door the
+per-site clamps above do not cover, and it is closed one level lower instead: `SkipCollector`
+(`import-skip.ts`) clamps every sample to a flat `SKIP_SAMPLE_MAX_LENGTH` on the way into the
+report, whichever call site handed it the string, present or future. The per-site clamps above are
+still worth doing, since each cuts a name to the length the row it describes would actually have
+had rather than to the collector's one flat ceiling, but they are belt-and-braces now, not the
+only guard: a report about an oversized field cannot itself carry an unbounded string back to the
 caller, on any path.
 
-A second gap the same finding named: nothing bounded how many rows an export could ask this API
-to plan. `TRELLO_IMPORT_MAX_BYTES` bounds the parsed object graph's size, not the row count, and
+A second gap the same finding named: nothing bounded how many _cards or lists_ an export could
+ask this API to plan (the two row kinds a real export is dominated by, and the two the finding
+named). `TRELLO_IMPORT_MAX_BYTES` bounds the parsed object graph's size, not the row count, and
 a small card can be a few dozen bytes, so a 20 MiB export can still be several hundred thousand
-tiny cards. `TrelloImportService` now checks the export's raw `lists.length` and `cards.length`
+tiny cards. `TrelloImportService` now checks the reader's `lists.length` and `cards.length`
 against `TRELLO_IMPORT_MAX_CARDS` (default 50000) and `TRELLO_IMPORT_MAX_LISTS` (default 5000)
 before the planner runs and before the transaction opens; an export over either cap answers `400`
-and writes nothing. The counts are taken before archived or malformed entries are filtered out,
-because the cost these ceilings exist for (heap held by the parsed graph, and the length of the
-writer's `createMany` sequence) is paid for every row Trello wrote, not only the ones that end up
-importable.
+and writes nothing. Those are the reader's counts, not the export's raw arrays: an archived list
+or card is still in them, since the planner is what drops those, not the reader, but an entry the
+reader could not parse into a row at all (no `id`, or a field of the wrong type) is already gone,
+because that is what makes it a reader issue rather than a row in the first place. That still
+covers the cost these ceilings exist for, heap held by the parsed graph and the length of the
+writer's `createMany` sequence, since both are paid for every row the reader kept, whether or not
+the planner goes on to write it.
+
+Checklists, check items, labels, task-label rows and attachments have no ceiling of their own: a
+card carries as many of each as its export does, uncapped, so an export with few cards and lists
+but a very large number of checklist items would still plan and chunk that many rows inside the
+one transaction. `TRELLO_IMPORT_MAX_CARDS` and `TRELLO_IMPORT_MAX_LISTS` bound the two row kinds
+SEC-04 named and the two a real export scales with; a ceiling on the other five is left to a
+follow-up if an export turns up that needs one.
 
 `readTrelloImportMaxCards` and `readTrelloImportMaxLists` throw a plain `Error` on a
 misconfigured value, the same convention `readTrelloImportMaxBytes` already used: a bad value is

@@ -381,13 +381,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   description are clamped without a report line, since no `board` scope exists in that vocabulary
   and a board is one row rather than a class of rows. A row the planner drops instead of writing
   (an archived list or card, a card pointing at a label id the export does not contain, a
-  rejected attachment) quotes its name as a report sample the same bounded or cleaned way, so an
-  oversized field cannot reach the response body through a report sample either. Two new
-  variables, `TRELLO_IMPORT_MAX_CARDS` (default 50000) and `TRELLO_IMPORT_MAX_LISTS` (default
+  rejected attachment) quotes its name as a report sample the same bounded or cleaned way. An
+  entry the reader itself rejects before it becomes a row at all (a card or list missing its
+  `id`, or carrying a field of the wrong type) has no such row to borrow a ceiling from, so
+  `SkipCollector.addMany` now clamps every sample to a flat `SKIP_SAMPLE_MAX_LENGTH` on the way
+  into the report, whichever call site it came from: an oversized field cannot reach the
+  response body through a report sample either way. Two new variables,
+  `TRELLO_IMPORT_MAX_CARDS` (default 50000) and `TRELLO_IMPORT_MAX_LISTS` (default
   5000), cap how many cards or lists one import will plan; an export over either cap answers
-  `400` and writes nothing, checked on the export's own raw counts before the planner runs and
-  before the transaction opens. [ADR 0025](docs/decisions/0025-trello-import-mapping.md) carries
-  the amendment.
+  `400` and writes nothing, checked on the reader's own row counts (which still include archived
+  cards and lists) before the planner runs and before the transaction opens. Checklists, check
+  items, labels, task-label rows and attachments have no such ceiling yet.
+  [ADR 0025](docs/decisions/0025-trello-import-mapping.md) carries the amendment.
 
 - **A Trello import no longer steps over the workspace's board ceiling.**
   `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on

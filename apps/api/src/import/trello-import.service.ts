@@ -65,11 +65,14 @@ export class TrelloImportService {
     // transaction is opened. `TRELLO_IMPORT_MAX_BYTES` bounds the parsed object graph's size, not
     // how many rows it asks this API to write, and a small card can be a few dozen bytes: an
     // export well under the byte ceiling can still carry far more lists or cards than any board
-    // this import could produce is meant to hold. The counts are the export's raw `lists` and
-    // `cards` arrays, before archived or malformed entries are filtered out, because the cost
-    // this ceiling exists for (heap held by the parsed graph, and the length of the
-    // `createMany` sequence a valid subset of it would still produce) is paid for every entry
-    // Trello wrote, not only the ones that end up importable.
+    // this import could produce is meant to hold. `read.source.lists` and `read.source.cards`
+    // are the reader's own counts, so an archived list or card is still in them (the planner is
+    // what drops those, not the reader); an entry the reader could not parse into a row at all
+    // (no id, or a field of the wrong type) is already gone by this point, since that is what
+    // makes it a reader issue rather than a row. Checking the reader's counts rather than the
+    // plan's is still the point: the cost this ceiling exists for (heap held by the parsed
+    // graph, and the length of the `createMany` sequence a valid subset of it would produce) is
+    // paid for every row the reader kept, whether or not the planner goes on to write it.
     const maxLists = readTrelloImportMaxLists();
     const maxCards = readTrelloImportMaxCards();
     if (read.source.lists.length > maxLists || read.source.cards.length > maxCards) {
