@@ -327,7 +327,12 @@ focused recolors that one outline to `--destructive` (`[aria-invalid='true']:foc
 of growing a second mark beside the border; keeping a colored ring alongside the border was the
 earlier plan, dropped once Tailwind v4 turned out to paint nothing from a ring-color utility with no
 ring-width utility beside it. The offset turns inward only where the focused region fills the shell
-and an outside offset would be clipped away, which today is the skip link's `main`. Tab order
+and an outside offset would be clipped away, which today is the skip link's `main`. That mark is
+also never transitioned: Tailwind v4 folds `outline-color` into `transition-colors` (v3 did not),
+so a shortcut like `transition-colors` or `transition-all` fades the outline from `currentColor`
+to copper over the transition duration while its width and offset appear at once. Every
+transition in the tree therefore names its properties, and none of those lists names the
+outline. Tab order
 follows visual order; the board is a composite widget, so `Tab` reaches a column and arrows move
 within it. `Esc` closes the topmost layer only and returns focus to whatever opened it. Reserved
 now, mapped in Phase 4+: `⌘K` command palette, `C` create task, `/` filter, `?` help; nothing else

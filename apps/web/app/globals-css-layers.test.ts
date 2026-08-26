@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -394,6 +395,23 @@ function reducedMotionBody(): string {
   return body;
 }
 
+/** Every non-test `.ts`/`.tsx` under `dir`, recursively. A test file is prose as much as it is
+ * code (a title can name the very class the scan forbids), and Tailwind does not scan them
+ * either, so they are not part of what ships. */
+function sourceFiles(dir: string, acc: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === '.next') continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      sourceFiles(full, acc);
+      continue;
+    }
+    if (/\.test\.tsx?$/.test(entry.name)) continue;
+    if (/\.tsx?$/.test(entry.name)) acc.push(full);
+  }
+  return acc;
+}
+
 let sheet: Stylesheet;
 let css: string;
 
@@ -571,14 +589,51 @@ describe('globals.css cascade layers', () => {
     );
   });
 
-  // transition-all also animates the outline; the focus ring must draw instantly.
-  it('keeps components/ui/button.tsx off transition-all so its focus outline draws instantly', async () => {
-    const source = await readFile(path.join(webRoot, 'components/ui/button.tsx'), 'utf8');
-    expect(source).not.toMatch(/\btransition-all\b/);
+  /**
+   * docs/design.md §5 draws the focus indicator once and instantly, and calls a keyboard-
+   * initiated action the one case that gets no motion at all. Tailwind v4 puts `outline-color`
+   * inside `transition-colors` (v3 did not), so any element wearing that shortcut fades its
+   * outline from `currentColor` to copper over the transition duration while the width and
+   * offset appear at once: the browser pass traced eighteen intermediate colours over 150ms on a
+   * sidebar nav link in dark. `transition-all` has the same effect for the same reason, which is
+   * what this test used to check on `components/ui/button.tsx` alone.
+   *
+   * The property list is compiled rather than quoted so this stays true against whatever
+   * Tailwind is installed: a release that drops `outline-color` from the shortcut again turns
+   * the scan below from a rule into dead weight, and this is where that shows up.
+   */
+  it('still compiles outline-color into transition-colors and transition-all', async () => {
+    const compiled = parseStylesheet(await compileGlobals(['transition-colors', 'transition-all']));
+    const shortcut = requireRule(compiled, 'a rule for transition-colors', (rule) => {
+      return rule.selector === '.transition-colors';
+    });
+    expect(
+      shortcut.declarations.find((entry) => entry.property === 'transition-property')?.value,
+    ).toContain('outline-color');
 
-    const transitionList = source.match(/transition-\[([^\]]*)\]/);
-    expect(transitionList).not.toBeNull();
-    expect(transitionList![1]).not.toMatch(/\boutline\b/);
+    const all = requireRule(compiled, 'a rule for transition-all', (rule) => {
+      return rule.selector === '.transition-all';
+    });
+    expect(all.declarations.find((entry) => entry.property === 'transition-property')?.value).toBe(
+      'all',
+    );
+  }, 30_000);
+
+  it('names every transitioned property explicitly, and never the outline', () => {
+    const offenders: string[] = [];
+    for (const directory of ['app', 'components', 'lib']) {
+      for (const file of sourceFiles(path.join(webRoot, directory))) {
+        const source = readFileSync(file, 'utf8');
+        const relative = path.relative(webRoot, file);
+        for (const match of source.matchAll(/\btransition-(all|colors|\[([^\]]*)\])/g)) {
+          const line = source.slice(0, match.index).split('\n').length;
+          if (match[1] === 'all' || match[1] === 'colors' || /\boutline/.test(match[2] ?? '')) {
+            offenders.push(`${relative}:${line}  ${match[0]}`);
+          }
+        }
+      }
+    }
+    expect(offenders.sort()).toEqual([]);
   });
 
   // jsdom never computes `color-scheme` (it lays out nothing), so the only thing a test in this

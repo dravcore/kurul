@@ -338,7 +338,11 @@ outline'ı `--destructive`'e boyar (`[aria-invalid='true']:focus-visible`); bord
 bir ring'i de tutmak önceki plandı, Tailwind v4'ün bir ring-width class'ı yanında olmadan bir
 ring-color class'ından hiçbir şey boyamadığı ortaya çıkınca bu plandan vazgeçildi. Offset yalnızca
 focus alan bölge shell'i doldurduğunda ve dıştaki bir offset kırpılacağında içeri döner; bugün bu
-yalnızca skip link'in `main` hedefidir. Tab order visual order'ı takip eder; board bir composite
+yalnızca skip link'in `main` hedefidir. O işaret ayrıca hiçbir zaman transition edilmez: Tailwind
+v4, `outline-color`'ı `transition-colors`'ın içine koyar (v3 koymuyordu), yani `transition-colors`
+veya `transition-all` gibi bir kısayol, outline'ın genişliği ve offset'i tek karede belirirken
+rengini `currentColor`'dan bakıra transition süresi boyunca yavaşça geçirir. Bu yüzden ağaçtaki
+her transition kendi property'lerini tek tek yazar ve o listelerin hiçbirinde outline yoktur. Tab order visual order'ı takip eder; board bir composite
 widget'tır, bu yüzden `Tab` bir column'a ulaşır ve arrow'lar onun içinde hareket eder. `Esc`
 yalnızca en üstteki layer'ı kapatır ve focus'u onu açan şeye geri verir. Şimdiden reserve edilmiş,
 Faz 4+'ta map edilecek: `⌘K` command palette, `C` create task, `/` filter, `?` help; başka hiçbir

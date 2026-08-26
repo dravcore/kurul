@@ -220,7 +220,7 @@ export function NotificationsList(): React.ReactElement {
               <button
                 type="button"
                 className={cn(
-                  'flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors hover:bg-accent',
+                  'flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-[color,background-color,border-color] hover:bg-accent',
                   !item.readAt && 'bg-signature-subtle',
                 )}
                 onClick={() => void openNotification(item)}

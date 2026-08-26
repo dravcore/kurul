@@ -132,7 +132,7 @@ export function BoardTemplatePicker({
           <label
             key={template.slug}
             className={cn(
-              'flex cursor-pointer gap-2.5 rounded-md border p-2.5 transition-colors',
+              'flex cursor-pointer gap-2.5 rounded-md border p-2.5 transition-[color,background-color,border-color]',
               // `border-signature` is selection and nothing else. The card draws no focus edge
               // of its own: the radio inside it is a visible control and takes the one
               // `:focus-visible` outline app/globals.css draws.
