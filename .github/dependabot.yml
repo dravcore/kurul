@@ -23,7 +23,7 @@ updates:
     # `cooldown` is the zero-toolchain half of pnpm 10's `minimumReleaseAge`, which this repo
     # cannot use while `packageManager` is pnpm 9. Two differences worth knowing: it governs
     # only what Dependabot proposes (a manual `pnpm add` is unaffected), and **security updates
-    # bypass it entirely** — an advisory-driven bump still opens the day it lands. A release
+    # bypass it entirely**: an advisory-driven bump still opens the day it lands. A release
     # blocked by an advisory is still bumped by hand, exactly as 390699f was.
     cooldown:
       default-days: 7
