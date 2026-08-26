@@ -23,9 +23,33 @@ function mount(node: HTMLElement): HTMLElement {
   return node;
 }
 
+/** The panel as the guard reads it: one `data-slot`, and whatever is focused inside it. */
+function mountTaskPanel(): HTMLElement {
+  const panel = mount(document.createElement('aside'));
+  panel.setAttribute('data-slot', 'task-panel');
+  return panel;
+}
+
+/**
+ * A `matchMedia` double answering `matches` for the width query and nothing else.
+ *
+ * jsdom implements no `matchMedia` at all, which is itself one of the cases the hook handles, so
+ * the tests that do not stub it are testing the wide board as much as the missing API.
+ */
+function stubViewportBelowMd(matches: boolean): void {
+  window.matchMedia = ((query: string) => ({
+    matches: query === '(width < 48rem)' ? matches : false,
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
+}
+
 afterEach(() => {
   cleanup();
   document.body.replaceChildren();
+  Reflect.deleteProperty(window, 'matchMedia');
+  vi.restoreAllMocks();
 });
 
 describe('useCreateTaskShortcut', () => {
@@ -81,6 +105,53 @@ describe('useCreateTaskShortcut', () => {
 
     expect(press(inside, 'c')).toBe(false);
     expect(onTrigger).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The panel is an `<aside>`, not a dialog, so the `role="dialog"` guard above never sees it.
+   * At any width, a `c` pressed on one of its controls belongs to the task being read.
+   */
+  it('stays out of the task panel at any width', () => {
+    const onTrigger = vi.fn();
+    renderHook(() => useCreateTaskShortcut(onTrigger));
+    const inside = document.createElement('button');
+    mountTaskPanel().append(inside);
+
+    expect(press(inside, 'c')).toBe(false);
+    expect(onTrigger).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Below `md` the panel is `fixed inset-0` over the whole board, so a composer opened from
+   * anywhere would put the caret in a field behind it. The key is unarmed while it is mounted.
+   */
+  it('unarms the key while the panel covers the board below md', () => {
+    const onTrigger = vi.fn();
+    stubViewportBelowMd(true);
+    renderHook(() => useCreateTaskShortcut(onTrigger));
+    mountTaskPanel();
+
+    expect(press(document.body, 'c')).toBe(false);
+    expect(onTrigger).not.toHaveBeenCalled();
+  });
+
+  it('still opens the composer beside an open panel on a wide board', () => {
+    const onTrigger = vi.fn();
+    stubViewportBelowMd(false);
+    renderHook(() => useCreateTaskShortcut(onTrigger));
+    mountTaskPanel();
+
+    expect(press(document.body, 'c')).toBe(true);
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the composer on a narrow board with no panel open', () => {
+    const onTrigger = vi.fn();
+    stubViewportBelowMd(true);
+    renderHook(() => useCreateTaskShortcut(onTrigger));
+
+    expect(press(document.body, 'c')).toBe(true);
+    expect(onTrigger).toHaveBeenCalledTimes(1);
   });
 
   it('does nothing for a board with nothing to add a task to', () => {

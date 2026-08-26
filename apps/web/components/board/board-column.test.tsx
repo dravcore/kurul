@@ -544,6 +544,26 @@ describe('BoardColumn task composer', () => {
     );
   });
 
+  /**
+   * The failure line takes focus when a create is refused, so it is where the reader is standing
+   * when they give up on the composer. Escape is handled on the form rather than on the field
+   * for exactly this: the way out has to work from wherever the composer put them.
+   */
+  it('returns to the Add task button on Escape from the failure line', async () => {
+    apiPost.mockRejectedValue(new Error('offline'));
+    renderColumn([]);
+
+    fireEvent.click(addTaskButton());
+    fireEvent.change(field(), { target: { value: 'Nowhere to go' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+    const alert = await screen.findByRole('alert');
+    expect(alert).toBe(document.activeElement);
+
+    fireEvent.keyDown(alert, { key: 'Escape' });
+
+    expect(addTaskButton()).toBe(document.activeElement);
+  });
+
   it('creates the task and opens its panel from Open details', async () => {
     const task = createdTask();
     apiPost.mockResolvedValue(task);

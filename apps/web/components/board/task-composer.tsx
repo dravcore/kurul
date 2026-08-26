@@ -30,9 +30,10 @@ interface TaskComposerProps {
 /**
  * The foot-of-column task composer (ADR 0035): a title field where the `Add task` button was.
  *
- * `Enter` creates and stays, `Escape` and an empty blur close, and a typed title is never
- * discarded by a stray click. `Open details` creates the same task and opens its panel, which is
- * where every field this row does not collect already lives.
+ * `Enter` creates and stays, `Escape` (from anywhere in the form, the failure line included) and
+ * an empty blur close, and a typed title is never discarded by a stray click. `Open details`
+ * creates the same task and opens its panel, which is where every field this row does not
+ * collect already lives.
  */
 export function TaskComposer({
   workspaceId,
@@ -93,6 +94,10 @@ export function TaskComposer({
   }
 
   return (
+    // The rule reads a `form` as static and asks for a role; nothing here is made interactive.
+    // The `onKeyDown` below only catches Escape on its way up from the controls inside, and
+    // those keep every affordance they had.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <form
       data-slot="task-composer"
       aria-busy={pending ? true : undefined}
@@ -100,6 +105,15 @@ export function TaskComposer({
       onSubmit={(event) => {
         event.preventDefault();
         void create();
+      }}
+      // Escape on the form, not on the field: a failed create hands focus to the alert
+      // `SubmitError` mounts, and the reader's way out of the composer has to work from there
+      // too. Keydown bubbles, so the field is still covered by this one handler.
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        // The board's own Escape layer is behind this one, and only the top layer closes.
+        event.stopPropagation();
+        onClose(true);
       }}
     >
       <Input
@@ -112,12 +126,6 @@ export function TaskComposer({
         aria-label={t('composerPlaceholder')}
         onChange={(event) => setTitle(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            // The board's own Escape layer is behind this one, and only the top layer closes.
-            event.stopPropagation();
-            onClose(true);
-            return;
-          }
           if (event.key !== 'Enter' || event.shiftKey) return;
           // Implicit submission is not something jsdom performs, so the one key gesture the
           // composer has is dispatched here rather than left to the browser.
