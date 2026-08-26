@@ -660,7 +660,7 @@ body {
 }
 
 /* The submit spinner (components/ui/button.tsx) is the one place docs/design.md §6 puts a
-   spinner: 14px, inside a pressed button, replacing the icon, after 400ms. A custom
+   spinner: 14px, inside a pressed button, over the label, after 400ms. A custom
    keyframe rather than Tailwind's built-in `animate-spin` so the reduced-motion twin sits right
    beside it instead of depending on a second rule finding this one. Reduced motion holds the
    spinner still rather than swapping in an opacity pulse: `aria-busy` and `disabled` already
@@ -679,6 +679,20 @@ body {
   [data-slot='button-spinner'] {
     animation: none;
   }
+}
+
+/* The spinner sits over the button's content instead of beside it, so a button keeps its exact
+   box while it waits: nothing enters the flex flow, no control widens and no centred label
+   slides. These two rules clear what is underneath it. The label goes out through
+   `-webkit-text-fill-color` rather than `color` because the spinner's own stroke reads
+   `currentColor` and has to keep the variant's colour; the leading icon goes to `opacity: 0`
+   rather than `display: none` because leaving the flow is exactly the shift being avoided. */
+[data-slot='button'][data-spinner] {
+  -webkit-text-fill-color: transparent;
+}
+
+[data-slot='button'][data-spinner] > svg {
+  opacity: 0;
 }
 
 /* Forced colours replace every author colour with the user's palette, which erases exactly the

@@ -738,13 +738,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   holds flat at 0.75 opacity under reduced motion instead of pulsing at all.
 - **A loading button now shows a spinner instead of swapping its label, and the ad hoc
   "sending" text is gone.** `Button` takes a `loading` prop: `aria-busy` and `disabled` apply
-  the instant loading starts, and a 14px spinner replaces the icon slot once a 400ms threshold
-  passes, short enough to catch a slow request and long enough that a fast one never flickers
-  one in; the label itself never changes underneath it. `FormDialog`, `ConfirmDialog`,
-  `verification-resend`, `forgot-password-view` and `reset-password-view` all move onto this one
-  mechanism, replacing five places that each disabled a button on its own and, on three of them,
-  swapped its text to a "Sending…" string of its own; both `sending` keys leave
-  `messages/en.json` and `messages/tr.json`.
+  the instant loading starts, and a 14px spinner is drawn over the button's own content once a
+  400ms threshold passes, short enough to catch a slow request and long enough that a fast one
+  never flickers one in. The spinner sits outside the layout flow, so the control keeps its exact
+  box and its label never moves, and the label text is never swapped for a waiting string.
+  `FormDialog`, `ConfirmDialog`, `verification-resend`, `forgot-password-view` and
+  `reset-password-view` all move onto this one mechanism, replacing five places that each
+  disabled a button on its own and, on three of them, swapped its text to a "Sending…" string of
+  its own; both `sending` keys leave `messages/en.json` and `messages/tr.json`.
 
 ### Fixed
 

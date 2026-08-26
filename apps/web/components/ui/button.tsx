@@ -5,7 +5,7 @@ import { Slot } from 'radix-ui';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-body font-strong whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&[data-loading]>svg]:hidden",
+  "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-body font-strong whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -83,11 +83,12 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
     /**
-     * After 400ms, replaces the leading icon (or, on an icon-less button, an always-present
-     * reserved slot) with a 14px spinner, and marks the button `aria-busy` and `disabled`
-     * meanwhile. The label text never changes and the icon slot is reserved from the moment
-     * `loading` turns true, so the 400ms delay against flicker on a fast response does not
-     * also cost a layout shift on a slow one.
+     * Marks the button `aria-busy` and `disabled` the moment it turns true, and after 400ms
+     * covers the button's own content with a centred 14px spinner. The spinner is taken out of
+     * flex flow (`absolute inset-0` against the base variant's `relative`) and the content keeps
+     * its box, so the control never changes width and the label never slides, whether or not the
+     * caller passed a leading icon. The label text itself is never swapped for a waiting string.
+     * `app/globals.css` carries the two rules that clear the content underneath.
      *
      * Ignored on `asChild`: the rendered element is the caller's own (typically a link), which
      * has no button disabled/aria-busy story for this component to add to.
@@ -97,6 +98,7 @@ function Button({
   const Comp = asChild ? Slot.Root : 'button';
   const isLoading = loading && !asChild;
   const [showSpinner, setShowSpinner] = React.useState(false);
+  const spinning = isLoading && showSpinner;
 
   React.useEffect(() => {
     if (!isLoading) return;
@@ -115,6 +117,7 @@ function Button({
       data-variant={variant}
       data-size={size}
       data-loading={isLoading ? '' : undefined}
+      data-spinner={spinning ? '' : undefined}
       aria-busy={isLoading ? true : undefined}
       disabled={isLoading || disabled}
       className={cn(buttonVariants({ variant, size, className }))}
@@ -122,15 +125,12 @@ function Button({
     >
       {isLoading ? (
         <>
-          <span
-            className={cn(
-              'inline-flex size-4 shrink-0 items-center justify-center',
-              !showSpinner && 'invisible',
-            )}
-          >
-            {showSpinner ? <ButtonSpinner /> : null}
-          </span>
           {children}
+          {spinning ? (
+            <span className="absolute inset-0 inline-flex items-center justify-center">
+              <ButtonSpinner />
+            </span>
+          ) : null}
         </>
       ) : (
         // `asChild` hands `children` straight to `Slot.Root`, which requires exactly one

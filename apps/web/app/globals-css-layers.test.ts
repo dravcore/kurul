@@ -1037,6 +1037,47 @@ describe('globals.css skeleton motion', () => {
 });
 
 /**
+ * P5 Task 4: the submit spinner covers the button's content instead of joining it.
+ *
+ * The spinner is positioned out of flex flow (components/ui/button.tsx), and these two rules
+ * clear what sits under it. Both halves matter to the geometry: a button with no leading icon
+ * would otherwise widen by the spinner's own box plus the flex gap the moment `loading` turns
+ * true, sliding its centred label by half that and sliding it back when the response lands, and
+ * an icon dropped with `display: none` would leave the flow and shrink the button by the same
+ * amount. jsdom computes no Tailwind output, so this is the only place the pair is checkable.
+ */
+describe('globals.css button spinner cover', () => {
+  const target = "[data-slot='button'][data-spinner]";
+
+  /** Selector match, whitespace around a combinator normalised away. */
+  function matches(rule: StyleRule, selector: string): boolean {
+    const tight = (part: string): string => part.replace(/\s+/g, '');
+    return selectorParts(rule).some((part) => tight(part) === tight(selector));
+  }
+
+  it('clears the label through text-fill, leaving `color` for the spinner stroke', () => {
+    const rule = requireRule(sheet, target, (candidate) => matches(candidate, target));
+
+    const fill = rule.declarations.find(
+      (declaration) => declaration.property === '-webkit-text-fill-color',
+    );
+    expect(fill?.value).toBe('transparent');
+    // `color` itself has to stay put: the spinner draws its stroke in `currentColor`, so a
+    // `color: transparent` here would hide the spinner along with the label it replaces.
+    expect(rule.declarations.some((declaration) => declaration.property === 'color')).toBe(false);
+  });
+
+  it('hides a leading icon without taking it out of the flow', () => {
+    const icon = `${target} > svg`;
+    const rule = requireRule(sheet, icon, (candidate) => matches(candidate, icon));
+
+    const opacity = rule.declarations.find((declaration) => declaration.property === 'opacity');
+    expect(opacity?.value).toBe('0');
+    expect(rule.declarations.some((declaration) => declaration.property === 'display')).toBe(false);
+  });
+});
+
+/**
  * P5 Task 5: the adversarial pass over every animated surface under
  * `prefers-reduced-motion: reduce`.
  *

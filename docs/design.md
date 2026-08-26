@@ -391,8 +391,9 @@ open would cut instead of transition.
   Both hold still under `prefers-reduced-motion: reduce`, the skeleton at a flat 0.75 opacity and
   the spinner not spinning at all.
 - **Waiting for a response draws from exactly one mechanism**: `Button`'s `loading` prop,
-  `aria-busy` and `disabled` immediately, spinner after the 400ms threshold, label unchanged
-  throughout (§6 has the full shape). No screen swaps a control's label to a "sending" string of
+  `aria-busy` and `disabled` immediately, spinner after the 400ms threshold, drawn over the
+  control's own content and out of its layout flow, so the button keeps its exact box and no
+  label moves (§6 has the full shape). No screen swaps a control's label to a "sending" string of
   its own.
 - **`prefers-reduced-motion: reduce`** drops movement and keeps opacity and color: the panel
   cross-fades, the rail jumps, the highlight is unchanged. Fewer and gentler, not zero.
@@ -419,7 +420,7 @@ first row. Two identical primary buttons on a first run is a choice the reader d
 (1.0 → 0.6) and no shimmer sweep: the board renders column skeletons at real width with three
 card skeletons at real card heights; the task panel opens immediately with the clicked card's
 title already in place, so it is never blank; inline actions are optimistic. Spinners exist in
-exactly one place — inside a pressed button, 14px, replacing the icon, after 400ms. List
+exactly one place: inside a pressed button, 14px, over its content, after 400ms. List
 content never gets one. Unknown-length work (import, export) gets a progress bar with a count.
 
 **Errors** derive from the problem-JSON shape in [api-conventions.md](api-conventions.md#errors).

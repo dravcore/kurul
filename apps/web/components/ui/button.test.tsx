@@ -29,7 +29,38 @@ describe('Button loading', () => {
     });
 
     expect(button.querySelector("[data-slot='button-spinner']")).toBeNull();
-    // The label never moves while the icon slot fills in underneath it.
+    expect(button.getAttribute('data-spinner')).toBeNull();
+    expect(button.textContent).toBe('Save');
+  });
+
+  it('puts nothing in the flow when loading turns true, so a label cannot shift', async () => {
+    vi.useFakeTimers();
+    const { container, rerender } = render(<Button>Save</Button>);
+    const button = container.querySelector('button') as HTMLButtonElement;
+    const idle = button.innerHTML;
+
+    rerender(<Button loading>Save</Button>);
+
+    // Byte-for-byte the resting content: no reserved slot, no gap, so an icon-less button keeps
+    // its width and its centred label keeps its position from the first frame of the wait.
+    expect(button.innerHTML).toBe(idle);
+  });
+
+  it('keeps the spinner out of flex flow once it appears', async () => {
+    vi.useFakeTimers();
+    const { container } = render(<Button loading>Save</Button>);
+    const button = container.querySelector('button') as HTMLButtonElement;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    const slot = button.querySelector("[data-slot='button-spinner']")?.parentElement;
+    expect(slot?.className).toContain('absolute');
+    expect(button.className).toContain('relative');
+    // The label is still the label; `app/globals.css` clears it visually off `data-spinner`,
+    // which is checked in app/globals-css-layers.test.ts where the compiled CSS exists.
+    expect(button.getAttribute('data-spinner')).toBe('');
     expect(button.textContent).toBe('Save');
   });
 
@@ -65,6 +96,7 @@ describe('Button loading', () => {
     rerender(<Button loading={false}>Save</Button>);
 
     expect(button.getAttribute('aria-busy')).toBeNull();
+    expect(button.getAttribute('data-spinner')).toBeNull();
     expect(button.disabled).toBe(false);
 
     await act(async () => {

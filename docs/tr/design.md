@@ -403,9 +403,10 @@ transition yerine kesme olurdu.
   kez değil sürekli çalışır. İkisi de `prefers-reduced-motion: reduce` altında hareketsiz kalır:
   skeleton sabit 0.75 opaklıkta, spinner ise hiç dönmeden.
 - **Bir yanıt beklenirken tam olarak tek bir mekanizma çalışır**: `Button`'ın `loading` prop'u,
-  `aria-busy` ve `disabled` anında, spinner 400ms eşiğinden sonra, label boyunca hiç değişmeden
-  (tam şekli §6'da). Hiçbir screen bir control'ün label'ını kendi "sending" ("gönderiliyor")
-  string'ine boyamaz.
+  `aria-busy` ve `disabled` anında, spinner 400ms eşiğinden sonra, control'ün kendi içeriğinin
+  üzerine ve layout akışının dışına çizilerek, böylece button kutusunu birebir korur ve hiçbir
+  label kaymaz (tam şekli §6'da). Hiçbir screen bir control'ün label'ını kendi "sending"
+  ("gönderiliyor") string'ine boyamaz.
 - **`prefers-reduced-motion: reduce`** hareketi düşürür ve opacity ile rengi korur: panel
   cross-fade olur, rail zıplar, highlight değişmeden kalır. Daha az ve daha nazik, sıfır değil.
 
@@ -432,8 +433,8 @@ başlığındaki aynı aksiyonun kopyası ekran boşken gizlenir ve ilk satırla
 pulse'ı ile (1.0 → 0.6) ve shimmer sweep olmadan: board, gerçek genişlikte column skeleton'ları
 render eder, gerçek kart yükseklikte üç kart skeleton'ıyla birlikte; task paneli, tıklanan kartın
 title'ı zaten yerindeyken anında açılır, böylece asla boş görünmez; inline aksiyonlar
-optimistic'tir. Spinner'lar tam olarak tek bir yerde var — basılı bir button'ın içinde, 14px,
-400ms sonra ikonun yerine geçerek. List içeriği asla bir tane almaz. Bilinmeyen uzunluktaki iş
+optimistic'tir. Spinner'lar tam olarak tek bir yerde var: basılı bir button'ın içinde, 14px,
+400ms sonra içeriğinin üzerine geçerek. List içeriği asla bir tane almaz. Bilinmeyen uzunluktaki iş
 (import, export) count'lu bir progress bar alır.
 
 **Error'lar**, [api-conventions.md](api-conventions.md#hatalar)'daki problem-JSON şeklinden
