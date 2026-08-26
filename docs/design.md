@@ -310,25 +310,24 @@ creation, and destructive actions stay **dialogs**; those genuinely need to bloc
 | Remote delete          | Fade to 0 over 160ms, then close the gap over 160ms — two beats, so the eye can follow                                                              |
 | Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Reconnecting…" bar, never a blocking overlay                                    |
 
-**Keyboard baseline.** Focus is always visible, and it is exactly one indicator: 2px `--ring` at
-2px offset, and `outline: none` without a replacement is a review blocker. That single mark is
-drawn once, from `@layer base`, on every keyboard-reachable control: the
-`focus-visible:ring-[3px] ring-ring/50` and `focus-visible:border-ring` utilities that used to
-sit beside it on the primitives are gone, and so is every `outline-none` / `outline-hidden` that
-would otherwise outrank the layered rule. What survives them is a short, named list of
-programmatic focus containers that take focus by script rather than by Tab, an arrow key or a
-link (a dialog's content, the drawer), plus a dropdown row, the skip link's `main` target and
-the task panel's heading, all three of which draw the same base outline as everything else
-rather than a suppressed one. A field that is both invalid and focused recolors that one outline to
-`--destructive` (`[aria-invalid='true']:focus-visible`) instead of growing a second mark beside
-the border; keeping a colored ring alongside the border was the earlier plan, dropped once
-Tailwind v4 turned out to paint nothing from a ring-color utility with no ring-width utility
-beside it. The offset turns inward only where the focused region fills the shell and an outside
-offset would be clipped away, which today is the skip link's `main`. Tab order follows visual
-order; the board is a composite widget, so `Tab` reaches a
-column and arrows move within it. `Esc` closes the topmost layer only and returns focus to
-whatever opened it. Reserved now, mapped in Phase 4+: `⌘K`
-command palette, `C` create task, `/` filter, `?` help — nothing else claims a bare letter key.
+**Keyboard baseline.** Focus is always visible, and it is exactly one indicator: 2px `--ring` at 2px
+offset, and `outline: none` without a replacement is a review blocker. That single mark is drawn
+once, from `@layer base`, on every keyboard-reachable control: the `focus-visible:ring-[3px]
+ring-ring/50` and `focus-visible:border-ring` utilities that used to sit beside it on the primitives
+are gone, and so is every `outline-none` / `outline-hidden` that would otherwise outrank the layered
+rule. What survives them is a short, named list of programmatic focus containers that take focus by
+script rather than by Tab, an arrow key or a link (a dialog's content, the drawer), plus a dropdown
+row, the skip link's `main` target and the task panel's heading, all three of which draw the same
+base outline as everything else rather than a suppressed one. A field that is both invalid and
+focused recolors that one outline to `--destructive` (`[aria-invalid='true']:focus-visible`) instead
+of growing a second mark beside the border; keeping a colored ring alongside the border was the
+earlier plan, dropped once Tailwind v4 turned out to paint nothing from a ring-color utility with no
+ring-width utility beside it. The offset turns inward only where the focused region fills the shell
+and an outside offset would be clipped away, which today is the skip link's `main`. Tab order
+follows visual order; the board is a composite widget, so `Tab` reaches a column and arrows move
+within it. `Esc` closes the topmost layer only and returns focus to whatever opened it. Reserved
+now, mapped in Phase 4+: `⌘K` command palette, `C` create task, `/` filter, `?` help — nothing else
+claims a bare letter key.
 
 **Dialogs are bounded and scroll their own body.** A dialog surface is at most
 `calc(100dvh - 4rem)` tall; its body scrolls, and the header and footer stay pinned outside that

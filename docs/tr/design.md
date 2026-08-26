@@ -321,25 +321,24 @@ full-screen bir sheet'e dönüşür. Confirmation'lar, board oluşturma ve destr
 | Remote delete          | 160ms boyunca 0'a fade olur, ardından gap 160ms boyunca kapanır — iki beat, gözün takip edebilmesi için                                                                 |
 | Presence · disconnect  | Topbar'da avatar'lar, başkasının açık tuttuğu bir kartta küçük bir avatar · sessiz, inline bir "Reconnecting…" ("Yeniden bağlanıyor…") bar'ı, asla blocking bir overlay |
 
-**Keyboard baseline.** Focus her zaman görünürdür, ve tam olarak tek bir göstergedir: 2px
-offset'te 2px `--ring`, ve bir replacement olmadan `outline: none` bir review blocker'dır. O tek
-işaret, `@layer base`'den, her keyboard'la ulaşılabilir kontrolde bir kez çizilir: primitiflerin
-yanında duran `focus-visible:ring-[3px] ring-ring/50` ve `focus-visible:border-ring` class'ları
-kalktı, ve katmanlı kuralı ezecek her `outline-none` / `outline-hidden` de kalktı. Bunlardan
-geriye kalan, script ile focus alan (Tab, bir arrow key veya bir link ile değil) kısa bir
-programmatic focus container listesidir (bir dialog'un content'i, drawer), artı bir dropdown
-row'u, skip link'in `main` hedefi ve task panel'in heading'i; üçü de bastırılmış değil, herkesle
-aynı base outline'ı çizer. Hem invalid hem focus'ta olan bir field, kenarın yanına
-ikinci bir işaret büyütmek yerine o tek outline'ı `--destructive`'e boyar
-(`[aria-invalid='true']:focus-visible`); border'ın yanında renkli bir ring'i de tutmak önceki
-plandı, Tailwind v4'ün bir ring-width class'ı yanında olmadan bir ring-color class'ından hiçbir
-şey boyamadığı ortaya çıkınca bu plandan vazgeçildi. Offset yalnızca focus alan bölge
-shell'i doldurduğunda ve dıştaki bir offset kırpılacağında içeri döner; bugün bu yalnızca skip
-link'in `main` hedefidir. Tab order visual order'ı takip eder; board bir composite widget'tır, bu
-yüzden `Tab` bir column'a ulaşır ve arrow'lar onun içinde hareket eder. `Esc` yalnızca en üstteki
-layer'ı kapatır ve focus'u onu açan şeye geri verir.
-Şimdiden reserve edilmiş, Faz 4+'ta map edilecek: `⌘K` command palette, `C` create task, `/`
-filter, `?` help — başka hiçbir şey çıplak bir letter key talep etmez.
+**Keyboard baseline.** Focus her zaman görünürdür, ve tam olarak tek bir göstergedir: 2px offset'te
+2px `--ring`, ve bir replacement olmadan `outline: none` bir review blocker'dır. O tek işaret,
+`@layer base`'den, her keyboard'la ulaşılabilir kontrolde bir kez çizilir: primitiflerin yanında
+duran `focus-visible:ring-[3px] ring-ring/50` ve `focus-visible:border-ring` class'ları kalktı, ve
+katmanlı kuralı ezecek her `outline-none` / `outline-hidden` de kalktı. Bunlardan geriye kalan,
+script ile focus alan (Tab, bir arrow key veya bir link ile değil) kısa bir programmatic focus
+container listesidir (bir dialog'un content'i, drawer), artı bir dropdown row'u, skip link'in `main`
+hedefi ve task panel'in heading'i; üçü de bastırılmış değil, herkesle aynı base outline'ı çizer. Hem
+invalid hem focus'ta olan bir field, kenarın yanına ikinci bir işaret büyütmek yerine o tek
+outline'ı `--destructive`'e boyar (`[aria-invalid='true']:focus-visible`); border'ın yanında renkli
+bir ring'i de tutmak önceki plandı, Tailwind v4'ün bir ring-width class'ı yanında olmadan bir
+ring-color class'ından hiçbir şey boyamadığı ortaya çıkınca bu plandan vazgeçildi. Offset yalnızca
+focus alan bölge shell'i doldurduğunda ve dıştaki bir offset kırpılacağında içeri döner; bugün bu
+yalnızca skip link'in `main` hedefidir. Tab order visual order'ı takip eder; board bir composite
+widget'tır, bu yüzden `Tab` bir column'a ulaşır ve arrow'lar onun içinde hareket eder. `Esc`
+yalnızca en üstteki layer'ı kapatır ve focus'u onu açan şeye geri verir. Şimdiden reserve edilmiş,
+Faz 4+'ta map edilecek: `⌘K` command palette, `C` create task, `/` filter, `?` help — başka hiçbir
+şey çıplak bir letter key talep etmez.
 
 **Dialog'lar sınırlıdır ve kendi gövdelerini scroll eder.** Bir dialog yüzeyi en fazla
 `calc(100dvh - 4rem)` yüksekliğindedir; gövdesi scroll olur, header ve footer o scroll'un dışında
