@@ -108,12 +108,15 @@ function blankComments(source: string): string {
 /**
  * One `text-*` / `bg-*` / `border-*` / `font-*` / `shadow-*` token, variants (`hover:`, `dark:`,
  * stacked or not) and an optional opacity modifier included. The lookbehind's excluded set is
- * word characters, `.`, `/` and `-`: it admits `:` (every variant separator) and rejects `-`,
- * which is what keeps `border-border-strong` from also being read as a second, standalone
- * `border-strong` starting after its own first segment.
+ * word characters, `.`, `/`, `,` and `-`: it admits `:` (every variant separator) and rejects
+ * `-`, which is what keeps `border-border-strong` from also being read as a second, standalone
+ * `border-strong` starting after its own first segment. It also rejects a leading `,`, which is
+ * what keeps a raw CSS property name inside a sibling utility's arbitrary value (`transition-
+ * [color,background-color,border-color,box-shadow,opacity]`) from being read as a `border-color`
+ * class of its own: nothing this scanner is meant to catch is ever comma-separated.
  */
 const CLASS_TOKEN_RE =
-  /(?<![\w./-])(text|bg|border|font|shadow)-(\[[^\]]*\]|[a-z0-9]+(?:-[a-z0-9]+)*)(?:\/(\d{1,3}|\[[^\]]*\]))?(?![\w-])/g;
+  /(?<![\w.,/-])(text|bg|border|font|shadow)-(\[[^\]]*\]|[a-z0-9]+(?:-[a-z0-9]+)*)(?:\/(\d{1,3}|\[[^\]]*\]))?(?![\w-])/g;
 
 interface Occurrence {
   bareClass: string;

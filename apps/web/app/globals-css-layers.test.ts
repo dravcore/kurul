@@ -539,6 +539,16 @@ describe('globals.css cascade layers', () => {
     );
   });
 
+  // transition-all also animates the outline; the focus ring must draw instantly.
+  it('keeps components/ui/button.tsx off transition-all so its focus outline draws instantly', async () => {
+    const source = await readFile(path.join(webRoot, 'components/ui/button.tsx'), 'utf8');
+    expect(source).not.toMatch(/\btransition-all\b/);
+
+    const transitionList = source.match(/transition-\[([^\]]*)\]/);
+    expect(transitionList).not.toBeNull();
+    expect(transitionList![1]).not.toMatch(/\boutline\b/);
+  });
+
   // jsdom never computes `color-scheme` (it lays out nothing), so the only thing a test in this
   // runner can check is that the declaration reaches the compiled stylesheet at all. Whether the
   // browser actually honours it was checked separately, in a real Chromium, against
