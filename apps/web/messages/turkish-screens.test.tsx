@@ -23,7 +23,6 @@ import {
   type ColumnDto,
   type CreatedPersonalAccessTokenDto,
   type InvitationDto,
-  type LabelDto,
   type NotificationDto,
   type PersonalAccessTokenDto,
   type TaskDto,
@@ -38,9 +37,10 @@ import { fetchAllWorkspaceMembers, fetchPendingInvitations } from '@/lib/member-
 import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { Toaster } from '@/components/ui/sonner';
 import { EmailVerificationLink } from '@/components/auth/email-verification-link';
+import { ForgotPasswordView } from '@/components/auth/forgot-password-view';
 import { InviteAcceptView } from '@/components/auth/invite-accept-view';
 import { LoginView } from '@/components/auth/login-view';
-import { RegisterView } from '@/components/auth/register-view';
+import { ResetPasswordView } from '@/components/auth/reset-password-view';
 import { VerificationResend } from '@/components/auth/verification-resend';
 import { VerifyEmailView } from '@/components/auth/verify-email-view';
 import { BoardColumn } from '@/components/board/board-column';
@@ -48,7 +48,6 @@ import { BoardList } from '@/components/board/board-list';
 import { BoardColumnsEmptyState } from '@/components/board/board-placeholders';
 import { ColumnSettingsDialog } from '@/components/board/column-settings-dialog';
 import { ImportReportPanel } from '@/components/board/import-report-panel';
-import { ImportTrelloDialog } from '@/components/board/import-trello-dialog';
 import { RenameBoardDialog } from '@/components/board/rename-board-dialog';
 import { AssigneeChart } from '@/components/dashboard/assignee-chart';
 import { ChartTableToggle } from '@/components/dashboard/chart-table-toggle';
@@ -69,7 +68,6 @@ import { AttachmentAddLink } from '@/components/task/attachment-add-link';
 import { SortableTaskCard } from '@/components/task/sortable-task-card';
 import { TaskActivitySection } from '@/components/task/task-activity-section';
 import { TaskCommentsSection } from '@/components/task/task-comments-section';
-import { TaskLabelsSection } from '@/components/task/task-labels-section';
 import { TaskMetadataPanel } from '@/components/task/task-metadata-panel';
 
 /**
@@ -112,6 +110,8 @@ const auth = vi.hoisted(() => ({
     isPending: boolean;
   },
   sendVerificationEmail: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  resetPassword: vi.fn(),
   getInvitation: vi.fn(),
   setActive: vi.fn(),
 }));
@@ -172,6 +172,8 @@ vi.mock('@/lib/auth', () => ({
   authClient: {
     useSession: () => auth.session,
     sendVerificationEmail: auth.sendVerificationEmail,
+    requestPasswordReset: auth.requestPasswordReset,
+    resetPassword: auth.resetPassword,
     organization: { getInvitation: auth.getInvitation, setActive: auth.setActive },
   },
 }));
@@ -357,7 +359,7 @@ describe('the Turkish interface', () => {
  *
  * Measured rather than assumed. `docs/design.md` §7 tells a layout to assume a translation up
  * to 35% longer than the English it was built against; the Turkish catalogue clears that on
- * average (+4.9%) and does not clear it in the tail (p90 +47.5%, max +183.3% at
+ * average (+5.5%) and does not clear it in the tail (p90 +47.6%, max +183.3% at
  * `app.settings.tokens.expiryLabel`, "Expiry" against "Geçerlilik süresi"). So the risk is not
  * the average string, it is the tail, and the tail is what this section pins.
  *
@@ -371,7 +373,7 @@ describe('the Turkish interface', () => {
  * seen. What it can prove is that the whole Turkish string reaches the DOM of the screen that
  * shows it, and that is what every case below asserts. Nothing here needed the "cannot be
  * mounted" escape: the three keys that live on a toast are read off a real `Toaster`, and the
- * three that only appear while a route streams are read off the very `Suspense` fallback the
+ * four that only appear while a route streams are read off the very `Suspense` fallback the
  * page hands React.
  */
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -449,11 +451,6 @@ const LONGEST_TURKISH: readonly LongString[] = [
     ratio: 1.56,
   },
   {
-    key: 'app.board.import.forbidden',
-    screen: 'components/board/import-trello-dialog.tsx',
-    ratio: 1.48,
-  },
-  {
     key: 'app.board.import.setColumnCategories',
     screen: 'components/board/import-report-panel.tsx',
     ratio: 1.69,
@@ -494,6 +491,7 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/auth/verify-email-view.tsx',
     ratio: 1.61,
   },
+  { key: 'auth.resetPassword.loading', screen: 'app/(auth)/reset-password/page.tsx', ratio: 1.53 },
   {
     key: 'app.settings.tokens.createdAt',
     screen: 'components/settings/token-settings.tsx',
@@ -523,6 +521,11 @@ const LONGEST_TURKISH: readonly LongString[] = [
     key: 'app.settings.members.copiedLink',
     screen: 'components/settings/members-settings.tsx',
     ratio: 1.5,
+  },
+  {
+    key: 'auth.forgotPassword.submit',
+    screen: 'components/auth/forgot-password-view.tsx',
+    ratio: 1.8,
   },
   { key: 'app.board.column.emptyDrop', screen: 'components/board/board-column.tsx', ratio: 1.56 },
   {
@@ -627,6 +630,16 @@ const LONGEST_TURKISH: readonly LongString[] = [
     ratio: 1.63,
   },
   {
+    key: 'auth.forgotPassword.sending',
+    screen: 'components/auth/forgot-password-view.tsx',
+    ratio: 1.63,
+  },
+  {
+    key: 'auth.resetPassword.submitting',
+    screen: 'components/auth/reset-password-view.tsx',
+    ratio: 1.86,
+  },
+  {
     key: 'app.board.column.categoryOption.CANCELED',
     screen: 'components/board/column-settings-dialog.tsx',
     ratio: 1.5,
@@ -636,9 +649,6 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/dashboard/completion-chart.tsx',
     ratio: 1.57,
   },
-  { key: 'auth.register.loginLink', screen: 'components/auth/register-view.tsx', ratio: 1.57 },
-  { key: 'app.board.task.labels', screen: 'components/task/task-labels-section.tsx', ratio: 1.5 },
-  { key: 'app.dashboard.boardsTitle', screen: 'app/(app)/dashboard/page.tsx', ratio: 1.5 },
 ];
 
 /**
@@ -660,7 +670,6 @@ const CLIPPING_SCREENS: readonly string[] = [
   // .lastUsedNever and .expiresAt
   'components/settings/token-settings.tsx',
   'components/task/sortable-task-card.tsx', // the task title in the drag preview, which is user data
-  'components/task/task-labels-section.tsx', // a label name, which is user data
 ];
 
 /** Fills the simple `{name}` placeholders of an ICU message, so expectations stay derived. */
@@ -713,11 +722,6 @@ function routeGet(routes: ReadonlyArray<readonly [string, unknown]>): void {
     return Promise.reject(new Error(`no route for GET ${requested}`)) as never;
   });
 }
-
-const NO_CEILINGS = {
-  limits: { seats: null, boards: null, storageBytes: null },
-  usage: { seats: 1, boards: 0, storageBytes: 0 },
-};
 
 const EMPTY_SUMMARY = {
   totalTasks: 0,
@@ -935,54 +939,6 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
-    screen: 'components/task/task-labels-section.tsx',
-    keys: ['app.board.task.labels'],
-    run: () => {
-      render(
-        tr(
-          <TaskLabelsSection
-            taskLabels={[]}
-            boardLabels={[] as LabelDto[]}
-            canMutate
-            canManageLabels
-            pending={false}
-            onToggleLabel={vi.fn()}
-            onDeleteBoardLabel={vi.fn()}
-            onCreateLabel={vi.fn().mockResolvedValue(true)}
-          />,
-        ),
-      );
-
-      expect(screen.getByText(messages.app.board.task.labels)).toBeDefined();
-    },
-  },
-  {
-    screen: 'components/board/import-trello-dialog.tsx',
-    keys: ['app.board.import.forbidden'],
-    run: async () => {
-      apiPostForm.mockRejectedValue(forbidden());
-      render(
-        tr(
-          <ImportTrelloDialog
-            open
-            onOpenChange={vi.fn()}
-            workspaceId={WORKSPACE_ID}
-            onImported={vi.fn()}
-          />,
-        ),
-      );
-
-      fireEvent.change(screen.getByLabelText(messages.app.board.import.file), {
-        target: { files: [new File(['{}'], 'trello.json', { type: 'application/json' })] },
-      });
-      fireEvent.click(screen.getByRole('button', { name: messages.app.board.import.submit }));
-
-      await waitFor(() => {
-        expect(screen.getByText(messages.app.board.import.forbidden)).toBeDefined();
-      });
-    },
-  },
-  {
     screen: 'components/board/import-report-panel.tsx',
     keys: ['app.board.import.setColumnCategories'],
     run: () => {
@@ -1145,30 +1101,6 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
         expect(nav.replace).toHaveBeenCalledWith(`/dashboard?boardId=${BOARD_ID}`, {
           scroll: false,
         });
-      });
-    },
-  },
-  {
-    screen: 'app/(app)/dashboard/page.tsx',
-    keys: ['app.dashboard.boardsTitle'],
-    run: async () => {
-      fetchBoards.mockResolvedValue([]);
-      routeGet([
-        [`/workspaces/${WORKSPACE_ID}/dashboard/summary`, EMPTY_SUMMARY],
-        [`/workspaces/${WORKSPACE_ID}/plan`, NO_CEILINGS],
-      ]);
-
-      const { default: DashboardPage } = await import('@/app/(app)/dashboard/page');
-      render(tr(await DashboardPage()));
-
-      expect(
-        screen.getByRole('heading', { name: messages.app.dashboard.boardsTitle }),
-      ).toBeDefined();
-      // Lets the two client sections under this page settle before the case ends.
-      await waitFor(() => {
-        expect(
-          screen.getByRole('heading', { name: messages.app.dashboard.emptyTitle }),
-        ).toBeDefined();
       });
     },
   },
@@ -1531,12 +1463,45 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
-    screen: 'components/auth/register-view.tsx',
-    keys: ['auth.register.loginLink'],
-    run: () => {
-      render(tr(<RegisterView />));
+    screen: 'components/auth/forgot-password-view.tsx',
+    keys: ['auth.forgotPassword.submit', 'auth.forgotPassword.sending'],
+    run: async () => {
+      // The request never settles, so the button keeps the pending label for the assertion.
+      auth.requestPasswordReset.mockReturnValue(new Promise(() => {}));
+      render(tr(<ForgotPasswordView />));
 
-      expect(screen.getByRole('link', { name: messages.auth.register.loginLink })).toBeDefined();
+      fireEvent.change(screen.getByLabelText(messages.auth.forgotPassword.email), {
+        target: { value: 'ayla@example.com' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: messages.auth.forgotPassword.submit }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: messages.auth.forgotPassword.sending }),
+        ).toBeDefined();
+      });
+    },
+  },
+  {
+    screen: 'components/auth/reset-password-view.tsx',
+    keys: ['auth.resetPassword.submitting'],
+    run: async () => {
+      // Without a `token` the view draws the dead-link state instead of the form.
+      nav.searchParams = new URLSearchParams({ token: 'opaque-token' });
+      auth.resetPassword.mockReturnValue(new Promise(() => {}));
+      render(tr(<ResetPasswordView />));
+
+      fireEvent.change(screen.getByLabelText(messages.auth.resetPassword.newPassword), {
+        // Long enough to clear the field's own `minLength`, which jsdom enforces on submit.
+        target: { value: 'dogru-at-pil-koprusu' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: messages.auth.resetPassword.submit }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: messages.auth.resetPassword.submitting }),
+        ).toBeDefined();
+      });
     },
   },
   {
@@ -1601,6 +1566,16 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       expect(screen.getByText(messages.auth.confirmEmail.loading)).toBeDefined();
     },
   },
+  {
+    screen: 'app/(auth)/reset-password/page.tsx',
+    keys: ['auth.resetPassword.loading'],
+    run: async () => {
+      const { default: ResetPasswordPage } = await import('@/app/(auth)/reset-password/page');
+      render(tr(suspenseFallback(await ResetPasswordPage())));
+
+      expect(screen.getByText(messages.auth.resetPassword.loading)).toBeDefined();
+    },
+  },
 ];
 
 describe('the fifty longest Turkish strings', () => {
@@ -1641,6 +1616,8 @@ describe('the fifty longest Turkish strings', () => {
     };
     auth.session = { data: null, isPending: false };
     auth.sendVerificationEmail.mockReset();
+    auth.requestPasswordReset.mockReset();
+    auth.resetPassword.mockReset();
     auth.getInvitation.mockReset();
     auth.setActive.mockReset().mockResolvedValue(undefined);
     nav.searchParams = new URLSearchParams();
