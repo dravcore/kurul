@@ -39,6 +39,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with 5px of tolerance, which leaves a swipe over the card body to the column's scroller, and
   a mouse drag still starts from 6px with no delay.
 
+- **A card someone else moves or edits says so for a moment.** A `task:moved` or `task:updated`
+  frame from another member's browser leaves the card it touched wearing a `--signature-subtle`
+  ground that fades back to the card's own over 1200ms (`use-board-realtime.ts`, the
+  `task-card-remote-change` keyframe in `app/globals.css`), so a row that changed under the
+  reader's hands is not a silent redraw. On the selected card, whose resting ground is already
+  that tint, the same keyframe runs from `--accent` and settles on the tint, so the mark is
+  visible there too. It is colour and nothing else, which is what reduced motion keeps rather
+  than removes, and under `forced-colors: active` it takes a dotted `Highlight` border, distinct
+  from the solid one selection wears. Your own edits are never marked: the board tells its own
+  echo apart by actor.
+
 - **Task activity feed now records label attach and detach.** Attaching or detaching a label on
   a task writes a `task.label_added` / `task.label_removed` row inside the same transaction as
   the join-row write, following the pattern `task.assigned` / `task.unassigned` already use on
