@@ -28,6 +28,9 @@ function PopoverAnchor({ ...props }: React.ComponentProps<typeof PopoverPrimitiv
  * `position: fixed`, so staying in the tree costs nothing in clipping as long as no ancestor
  * establishes a containing block for fixed descendants.
  *
+ * Radix gives this content `role="dialog"`, and a dialog with no accessible name is announced as
+ * nothing at all, so every caller owes it an `aria-label` or an `aria-labelledby`.
+ *
  * No `outline-*` suppressor and no ring pair: the `@layer base` `:focus-visible` rule in
  * `app/globals.css` is the one focus mark, and a utility here would compile into `utilities` and
  * outrank it.

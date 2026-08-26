@@ -3,28 +3,36 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { MemberRole, type WorkspaceMemberDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
+import trMessages from '@/messages/tr.json';
 import { INLINE_PICKER_MAX } from './searchable-picker';
 import { TaskAssigneesSection } from './task-assignees-section';
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1f00';
 
-function members(count: number): WorkspaceMemberDto[] {
-  return Array.from({ length: count }, (_, index) => ({
+function member(index: number, name: string): WorkspaceMemberDto {
+  return {
     id: `m${index + 1}`,
     workspaceId: WORKSPACE_ID,
     userId: `u${index + 1}`,
     role: MemberRole.MEMBER,
-    name: `Member ${index + 1}`,
+    name,
     avatarUrl: null,
-  }));
+  };
 }
 
-function renderSection(count: number, assigned: string[] = []) {
+function members(count: number): WorkspaceMemberDto[] {
+  return Array.from({ length: count }, (_, index) => member(index, `Member ${index + 1}`));
+}
+
+function renderMembers(
+  roster: WorkspaceMemberDto[],
+  { assigned = [] as string[], locale = 'en' } = {},
+) {
   const onToggle = vi.fn();
   render(
-    <NextIntlClientProvider locale="en" messages={messages}>
+    <NextIntlClientProvider locale={locale} messages={locale === 'tr' ? trMessages : messages}>
       <TaskAssigneesSection
-        members={members(count)}
+        members={roster}
         assignedUserIds={new Set(assigned)}
         disabled={false}
         onToggle={onToggle}
@@ -34,9 +42,17 @@ function renderSection(count: number, assigned: string[] = []) {
   return { onToggle };
 }
 
+function renderSection(count: number, assigned: string[] = []) {
+  return renderMembers(members(count), { assigned });
+}
+
 const trigger = (): HTMLElement => screen.getByRole('button', { name: /^Assign/ });
+// By role rather than by label text: the popover surface carries the same name, so that the
+// reader who lands on it is told what it holds.
 const search = (): HTMLInputElement =>
-  screen.getByLabelText(messages.app.board.task.searchMembers) as HTMLInputElement;
+  screen.getByRole('searchbox', {
+    name: messages.app.board.task.searchMembers,
+  }) as HTMLInputElement;
 const rows = (): HTMLInputElement[] => screen.queryAllByRole('checkbox') as HTMLInputElement[];
 
 function openPicker(): void {
@@ -126,6 +142,17 @@ describe('TaskAssigneesSection over the threshold', () => {
     expect(onToggle).toHaveBeenCalledWith('u4', false);
   });
 
+  it('names the popover surface, which Radix exposes as a dialog', () => {
+    // Without this the reader lands in an unnamed `role="dialog"` and is told nothing about
+    // what it holds.
+    renderSection(INLINE_PICKER_MAX + 1);
+    openPicker();
+
+    expect(
+      screen.getByRole('dialog', { name: messages.app.board.task.searchMembers }),
+    ).toBeDefined();
+  });
+
   it('leaves every row reachable as a native checkbox', () => {
     // Space, the focus ring and the checked state all come from the native control; a div-based
     // listbox would have to re-earn all three.
@@ -138,5 +165,51 @@ describe('TaskAssigneesSection over the threshold', () => {
     expect(boxes.every((box) => box.tagName === 'INPUT')).toBe(true);
     expect(boxes[0]!.checked).toBe(true);
     expect(boxes.every((box) => box.tabIndex >= 0)).toBe(true);
+  });
+});
+
+/**
+ * Turkish has two `i` letters and two `I` letters, and the pairing crosses the ASCII ones:
+ * `İ` folds to `i`, `I` folds to `ı`. A locale-invariant fold breaks both directions, and it
+ * breaks them silently, as an empty result the reader can only read as "nobody by that name".
+ */
+describe('TaskAssigneesSection filtering under tr', () => {
+  const turkishRoster = [
+    member(0, 'İbrahim Öz'),
+    member(1, 'Işıl Kaya'),
+    ...Array.from({ length: INLINE_PICKER_MAX - 1 }, (_, index) =>
+      member(index + 2, `Üye ${index + 1}`),
+    ),
+  ];
+
+  function openTurkishPicker(): void {
+    fireEvent.click(screen.getByRole('button', { name: /^Ata/ }));
+  }
+
+  function typeQuery(value: string): void {
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: trMessages.app.board.task.searchMembers }),
+      { target: { value } },
+    );
+  }
+
+  it('finds İbrahim from a dotless-typed ibrahim', () => {
+    renderMembers(turkishRoster, { locale: 'tr' });
+    openTurkishPicker();
+
+    typeQuery('ibrahim');
+
+    expect(rows()).toHaveLength(1);
+    expect(screen.getByLabelText('İbrahim Öz')).toBeDefined();
+  });
+
+  it('finds Işıl from a dotless-typed ışıl', () => {
+    renderMembers(turkishRoster, { locale: 'tr' });
+    openTurkishPicker();
+
+    typeQuery('ışıl');
+
+    expect(rows()).toHaveLength(1);
+    expect(screen.getByLabelText('Işıl Kaya')).toBeDefined();
   });
 });

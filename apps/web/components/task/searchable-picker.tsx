@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -28,7 +29,7 @@ export interface PickerOption {
 interface SearchablePickerProps {
   /** Already-translated trigger copy, count included. */
   triggerLabel: string;
-  /** Names the filter field and stands in as its placeholder. */
+  /** Names the filter field, stands in as its placeholder, and names the popover surface. */
   searchLabel: string;
   emptyLabel: string;
   options: PickerOption[];
@@ -55,16 +56,19 @@ export function SearchablePicker({
   disabled,
   onToggle,
 }: SearchablePickerProps): React.ReactElement {
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  const needle = query.trim().toLowerCase();
+  // Folded in the reader's own locale, not with `toLowerCase()`. Turkish pairs `İ` with `i` and
+  // `I` with `ı`, so the invariant fold turns "İbrahim" into `i` + U+0307 and leaves "Işıl" as
+  // "işıl": a member typing their colleague's name gets an empty list and no reason for it.
+  const fold = (value: string): string => value.toLocaleLowerCase(locale);
+  const needle = fold(query.trim());
   const shown =
-    needle === ''
-      ? options
-      : options.filter((option) => option.name.toLowerCase().includes(needle));
+    needle === '' ? options : options.filter((option) => fold(option.name).includes(needle));
 
   function boxes(): HTMLInputElement[] {
     return Array.from(
@@ -110,7 +114,7 @@ export function SearchablePicker({
           {triggerLabel}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="flex flex-col gap-2">
+      <PopoverContent aria-label={searchLabel} className="flex flex-col gap-2">
         <Input
           ref={searchRef}
           type="search"

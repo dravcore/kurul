@@ -147,9 +147,10 @@ describe('TaskLabelsSection palette threshold', () => {
     renderSection({ boardLabels: boardLabels(INLINE_PICKER_MAX + 1) });
     fireEvent.click(trigger());
 
-    fireEvent.change(screen.getByLabelText(messages.app.board.task.searchLabels), {
-      target: { value: 'label 8' },
-    });
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: messages.app.board.task.searchLabels }),
+      { target: { value: 'label 8' } },
+    );
 
     expect(screen.getAllByRole('checkbox')).toHaveLength(1);
     expect(screen.getByLabelText('Label 8')).toBeDefined();

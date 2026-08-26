@@ -415,13 +415,14 @@ describe('TaskPanel Escape', () => {
     }
 
     it('gives the popover the first Escape and the panel the second', () => {
+      const named = { name: messages.app.board.task.searchMembers };
       render(<Board open />);
       openPicker();
-      expect(screen.getByLabelText(messages.app.board.task.searchMembers)).toBeDefined();
+      expect(screen.getByRole('searchbox', named)).toBeDefined();
 
       pressEscape();
 
-      expect(screen.queryByLabelText(messages.app.board.task.searchMembers)).toBeNull();
+      expect(screen.queryByRole('searchbox', named)).toBeNull();
       expect(push).not.toHaveBeenCalled();
 
       pressEscape();
