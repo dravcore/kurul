@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { LabelColorSlot, MemberRole, Priority } from '@kurul/shared-types';
+import { ActivityType, LabelColorSlot, MemberRole, Priority } from '@kurul/shared-types';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './helpers/app';
@@ -130,6 +130,26 @@ describe('Task metadata (e2e)', () => {
     await member.agent
       .delete(`/workspaces/${workspace.id}/tasks/${taskId}/labels/${label.body.id}`)
       .expect(200);
+
+    const activities = await owner.agent
+      .get(`/workspaces/${workspace.id}/tasks/${taskId}/activities`)
+      .expect(200);
+    const rows = activities.body.items as Array<{
+      type: string;
+      payload: Record<string, unknown>;
+    }>;
+    const added = rows.find((row) => row.type === ActivityType.TaskLabelAdded);
+    const removed = rows.find((row) => row.type === ActivityType.TaskLabelRemoved);
+    // The label was renamed and recolored (`api` / `slot-3`) after being attached, so both rows
+    // are asserted against that later state: it is the snapshot taken at write time, not the
+    // label's own values re-fetched, which the label deletion right below would zero out anyway.
+    expect(added).toMatchObject({
+      payload: { labelId: label.body.id, name: 'api', color: 'slot-3' },
+    });
+    expect(removed).toMatchObject({
+      payload: { labelId: label.body.id, name: 'api', color: 'slot-3' },
+    });
+
     await owner.agent.delete(`/workspaces/${workspace.id}/comments/${comment.body.id}`).expect(204);
     await owner.agent.delete(`/workspaces/${workspace.id}/labels/${label.body.id}`).expect(204);
   });
