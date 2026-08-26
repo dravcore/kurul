@@ -57,6 +57,13 @@ ENV HOSTNAME=0.0.0.0
 # the `runner` stage of apps/api/Dockerfile: nothing in this image runs either (the CMD is `node
 # apps/web/server.js` over a Next.js standalone bundle), and npm's bundled dependencies are where
 # every fixable HIGH/CRITICAL finding of the `image-scan` job came from.
+# Alpine ships security fixes for its own packages (openssl, zlib, busybox) days before the Node
+# project rebuilds `node:24-alpine` on top of them, and the `image-scan` job in
+# .github/workflows/ci.yml fails on any fixable HIGH/CRITICAL finding. Upgrading the base
+# packages at build time closes that window here rather than waiting on the upstream tag:
+# the first case was CVE-2026-14456 in libcrypto3 3.5.7-r0 (fixed in 3.5.8-r0) on
+# 2026-08-26, which turned every image build red with no change in this repository.
+RUN apk upgrade --no-cache
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
   /opt/yarn-v* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./

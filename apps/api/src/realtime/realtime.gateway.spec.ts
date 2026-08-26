@@ -1,7 +1,10 @@
+import { EventEmitter } from 'node:events';
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { SocketClientEvents, SOCKET_UNAUTHORIZED } from '@kurul/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 import { auth } from '../auth/auth';
+import { initSentry, resetSentryForTesting } from '../common/observability/sentry';
 import { RealtimeGateway } from './realtime.gateway';
 import { boardRoom, RealtimeService, userRoom } from './realtime.service';
 
@@ -340,5 +343,122 @@ describe('RealtimeGateway notification rooms', () => {
       gateway.onNotificationsLeave(socket as never, { workspaceId: '' }),
     ).resolves.toEqual({ ok: true });
     expect(socket.leave).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * BE-11: `attachRedisAdapter` itself never runs under Jest (`isTestEnv()` refuses to open a
+ * real Redis socket a unit test would never close), so the error-reporting logic it wires up
+ * is exercised directly through `attachRedisErrorListener`, exactly the way the mocked
+ * `Queue`/`Worker` tests exercise `due-soon.worker.ts` and `cleanup.worker.ts`'s own `'error'`
+ * handlers. Before this fix neither `pubClient` nor `subClient` had a listener at all, so a
+ * connection fault fell through to ioredis's own `console.error` fallback: invisible to the
+ * JSON log format and to Sentry.
+ */
+describe('RealtimeGateway Redis adapter error handling', () => {
+  function fakeRedisClient(): EventEmitter {
+    return new EventEmitter();
+  }
+
+  function errorListener(
+    gateway: RealtimeGateway,
+  ): (client: EventEmitter, label: 'pubClient' | 'subClient') => void {
+    return (
+      gateway as unknown as {
+        attachRedisErrorListener: (client: EventEmitter, label: 'pubClient' | 'subClient') => void;
+      }
+    ).attachRedisErrorListener.bind(gateway);
+  }
+
+  beforeEach(() => {
+    resetSentryForTesting();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+    resetSentryForTesting();
+  });
+
+  /** Installs a fake Sentry SDK through the loader seam, same pattern as the worker specs. */
+  async function enableFakeSentry(): Promise<{ captureException: jest.Mock }> {
+    const captureException = jest.fn();
+    const api = {
+      init: jest.fn(),
+      captureException,
+      close: jest.fn(() => Promise.resolve(true)),
+      withScope: (callback: (scope: { setTag: jest.Mock; setContext: jest.Mock }) => void) => {
+        callback({ setTag: jest.fn(), setContext: jest.fn() });
+      },
+    } as unknown as typeof import('@sentry/node');
+
+    process.env.SENTRY_DSN = 'https://k@o.ingest.sentry.io/1';
+    try {
+      await initSentry(() => Promise.resolve(api));
+    } finally {
+      delete process.env.SENTRY_DSN;
+    }
+
+    return { captureException };
+  }
+
+  it('logs at warn, naming pubClient or subClient, and reports to Sentry', async () => {
+    const { captureException } = await enableFakeSentry();
+    const logWarn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { gateway } = await buildGateway(null);
+    const attach = errorListener(gateway);
+    const sub = fakeRedisClient();
+    attach(sub, 'subClient');
+
+    const error = new Error('ECONNREFUSED');
+    sub.emit('error', error);
+
+    expect(logWarn).toHaveBeenCalledWith(expect.stringContaining('subClient'));
+    expect(captureException).toHaveBeenCalledWith(error);
+  });
+
+  it('reports the first error immediately, then throttles further reports for a minute', async () => {
+    const { captureException } = await enableFakeSentry();
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { gateway } = await buildGateway(null);
+    const attach = errorListener(gateway);
+    const pub = fakeRedisClient();
+    attach(pub, 'pubClient');
+
+    pub.emit('error', new Error('ECONNRESET'));
+    pub.emit('error', new Error('ECONNRESET'));
+    pub.emit('error', new Error('ECONNRESET'));
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(60_000);
+    pub.emit('error', new Error('ECONNRESET'));
+    expect(captureException).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares the report throttle across pubClient and subClient, one outage, one report', async () => {
+    const { captureException } = await enableFakeSentry();
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { gateway } = await buildGateway(null);
+    const attach = errorListener(gateway);
+    const pub = fakeRedisClient();
+    const sub = fakeRedisClient();
+    attach(pub, 'pubClient');
+    attach(sub, 'subClient');
+
+    pub.emit('error', new Error('ECONNRESET'));
+    sub.emit('error', new Error('ECONNRESET'));
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw when Sentry is off (no SENTRY_DSN)', async () => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { gateway } = await buildGateway(null);
+    const attach = errorListener(gateway);
+    const pub = fakeRedisClient();
+    attach(pub, 'pubClient');
+
+    expect(() => pub.emit('error', new Error('boom'))).not.toThrow();
   });
 });
