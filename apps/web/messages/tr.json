@@ -666,6 +666,8 @@
         },
         "openTask": "Task'ı aç",
         "panelLabel": "Task detayları",
+        "propertiesTitle": "Özellikler",
+        "discussionTitle": "Tartışma",
         "close": "Task panelini kapat",
         "backToBoard": "Board'a dön",
         "createAction": "Task ekle",

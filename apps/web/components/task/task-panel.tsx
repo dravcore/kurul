@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { TaskAttachments } from './task-attachments';
 import { TaskChecklists } from './task-checklists';
-import { TaskMetadataPanel } from './task-metadata-panel';
+import { TaskDiscussionPanel } from './task-discussion-panel';
 import { TaskPanelFields } from './task-panel-fields';
 import { TaskPanelStatus } from './task-panel-status';
+import { TaskPropertiesPanel } from './task-properties-panel';
 import { useTaskAttachments } from './use-task-attachments';
 import { useTaskChecklists } from './use-task-checklists';
+import { useTaskMetadata } from './use-task-metadata';
 import { useTaskPanelFocus } from './use-task-panel-focus';
 
 interface TaskPanelProps {
@@ -93,6 +95,18 @@ export function TaskPanel({
     onCountChanged: onAttachmentCountChanged,
   });
 
+  // Read here rather than inside either section that renders it: the properties section and the
+  // discussion section are separated by the checklists and the attachments, and they share one
+  // fetch. Held by the panel is what keeps that one round of requests one round.
+  const meta = useTaskMetadata({
+    workspaceId,
+    boardId,
+    taskId: task?.id ?? null,
+    members,
+    labels,
+    metaRefreshKey,
+  });
+
   return (
     <aside
       ref={panelRef}
@@ -144,6 +158,19 @@ export function TaskPanel({
               onUpdated={onUpdated}
               onClose={close}
             />
+            {/*
+              Properties before the content, the same order the card itself reads in: what the
+              task is, then what is in it, then what was said about it.
+            */}
+            <TaskPropertiesPanel
+              workspaceId={workspaceId}
+              boardId={boardId}
+              task={task}
+              canMutate={canMutate}
+              canManageLabels={canManageLabels}
+              meta={meta}
+              onUpdated={onUpdated}
+            />
             <TaskChecklists
               checklists={checklists.checklists}
               canMutate={canMutate}
@@ -156,11 +183,6 @@ export function TaskPanel({
               onAddItem={checklists.addItem}
               onRemoveItem={(itemId) => void checklists.removeItem(itemId)}
             />
-            {/*
-              Between the checklists and the metadata panel, not at the end: the delete footer
-              below is `mt-auto` and only reaches the bottom of the panel while it is the last
-              child of this flex column.
-            */}
             <TaskAttachments
               workspaceId={workspaceId}
               attachments={attachments.attachments}
@@ -173,16 +195,16 @@ export function TaskPanel({
               onAddLink={attachments.addLink}
               onRemove={(attachmentId) => void attachments.remove(attachmentId)}
             />
-            <TaskMetadataPanel
+            {/*
+              The last section, and nothing may be appended after it: the delete footer below is
+              `mt-auto` and only reaches the bottom of the panel while it is the last child of
+              this flex column.
+            */}
+            <TaskDiscussionPanel
               workspaceId={workspaceId}
-              boardId={boardId}
               task={task}
               canMutate={canMutate}
-              canManageLabels={canManageLabels}
-              members={members}
-              labels={labels}
-              metaRefreshKey={metaRefreshKey}
-              onUpdated={onUpdated}
+              meta={meta}
             />
             {canMutate ? (
               <div className="mt-auto flex justify-end border-t border-border pt-4">

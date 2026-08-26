@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { toast } from 'sonner';
-import { Priority, type TaskDto } from '@kurul/shared-types';
+import { MemberRole, Priority, type TaskDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
+import type { UseTaskMetadataResult } from './use-task-metadata';
 
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1e00';
 const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1e01';
 const TASK_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1e02';
 const LABEL_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1e03';
+const MEMBER_USER_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1e06';
 
 // `vi.mock` factories are hoisted above every `const` in this file, so the doubles they close
 // over have to be hoisted with them.
@@ -23,25 +25,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   return { ...actual, api: { ...actual.api, post: mocks.post, delete: mocks.delete } };
 });
 
-// The panel's own reads are not what these tests are about.
-vi.mock('./use-task-metadata', () => ({
-  useTaskMetadata: () => ({
-    members: [],
-    boardLabels: [{ id: LABEL_ID, boardId: BOARD_ID, name: 'Bug', color: 'slot-8' }],
-    setBoardLabels: vi.fn(),
-    comments: [],
-    setComments: vi.fn(),
-    hasMoreComments: false,
-    loadingMoreComments: false,
-    loadMoreComments: vi.fn(),
-    activities: [],
-    refreshActivities: vi.fn().mockResolvedValue(undefined),
-    loadingMeta: false,
-    metaFailed: false,
-  }),
-}));
-
-import { TaskMetadataPanel } from './task-metadata-panel';
+import { TaskPropertiesPanel } from './task-properties-panel';
 
 const task: TaskDto = {
   id: TASK_ID,
@@ -63,20 +47,53 @@ const task: TaskDto = {
   updatedAt: '2026-08-12T09:00:00.000Z',
 };
 
-function renderPanel(): void {
+/** The shared read `TaskPanel` owns; this panel only consumes it. */
+function metaStub(overrides: Partial<UseTaskMetadataResult> = {}): UseTaskMetadataResult {
+  return {
+    members: [
+      {
+        id: 'm1',
+        workspaceId: WORKSPACE_ID,
+        userId: MEMBER_USER_ID,
+        role: MemberRole.MEMBER,
+        name: 'Ayşe Yıldız',
+        avatarUrl: null,
+      },
+    ],
+    boardLabels: [{ id: LABEL_ID, boardId: BOARD_ID, name: 'Bug', color: 'slot-8' }],
+    setBoardLabels: vi.fn(),
+    comments: [],
+    setComments: vi.fn(),
+    hasMoreComments: false,
+    loadingMoreComments: false,
+    loadMoreComments: vi.fn().mockResolvedValue(undefined),
+    activities: [],
+    refreshActivities: vi.fn().mockResolvedValue(undefined),
+    loadingMeta: false,
+    metaFailed: false,
+    ...overrides,
+  };
+}
+
+function renderPanel(meta: UseTaskMetadataResult = metaStub()): UseTaskMetadataResult {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <TaskMetadataPanel
+      <TaskPropertiesPanel
         workspaceId={WORKSPACE_ID}
         boardId={BOARD_ID}
         task={task}
         canMutate
         canManageLabels
+        meta={meta}
         onUpdated={vi.fn()}
       />
     </NextIntlClientProvider>,
   );
+  return meta;
 }
+
+const propertiesRegion = (): HTMLElement =>
+  screen.getByRole('region', { name: messages.app.board.task.propertiesTitle });
 
 beforeEach(() => {
   mocks.post.mockReset();
@@ -88,20 +105,36 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('TaskMetadataPanel error copy', () => {
-  it('names the comment, not the task, when posting a comment fails', async () => {
-    // These used to fall through to `saveError` — "Could not save this task." — which reports
-    // a write the user never made and leaves the one they did make unexplained.
-    mocks.post.mockRejectedValue(new Error('network'));
+/**
+ * The properties half of the old `TaskMetadataPanel`. It has to stand on its own because the
+ * checklist and attachment surfaces now sit between it and the discussion below.
+ */
+describe('TaskPropertiesPanel', () => {
+  it('gathers the task properties under one named region', () => {
+    renderPanel();
+    const region = propertiesRegion();
+
+    expect(within(region).getByLabelText(messages.app.board.task.priority)).toBeDefined();
+    expect(within(region).getByLabelText(messages.app.board.task.dueDate)).toBeDefined();
+    expect(within(region).getByLabelText(messages.app.board.task.estimate)).toBeDefined();
+    expect(within(region).getByText(messages.app.board.task.assignees)).toBeDefined();
+    expect(within(region).getByText(messages.app.board.task.labels)).toBeDefined();
+  });
+
+  it('leaves the comment thread and the history to the discussion panel', () => {
     renderPanel();
 
-    fireEvent.change(screen.getByLabelText(messages.app.board.task.addComment), {
-      target: { value: 'Looks right to me' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: messages.app.board.task.postComment }));
+    expect(screen.queryByLabelText(messages.app.board.task.addComment)).toBeNull();
+    expect(screen.queryByText(messages.app.board.task.activity.title)).toBeNull();
+  });
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(toast.error).toHaveBeenCalledWith(messages.app.board.task.commentError);
+  it('refreshes the shared history after an assignee changes', async () => {
+    mocks.post.mockResolvedValue(task);
+    const meta = renderPanel();
+
+    fireEvent.click(screen.getByLabelText('Ayşe Yıldız'));
+
+    await waitFor(() => expect(meta.refreshActivities).toHaveBeenCalled());
   });
 
   it('confirms a label delete, because its blast radius is off screen', async () => {

@@ -108,6 +108,21 @@ describe('useTaskMetadata', () => {
     expect(result.current.activities).toHaveLength(1);
   });
 
+  it('reads nothing until there is a task to read about', async () => {
+    // The panel opens before the board has fetched a deep-linked task, and it owns this read for
+    // both of the sections that show it. Firing it against a task id that is not there yet would
+    // spend a round of requests on `/tasks/null/comments`.
+    stubMeta();
+    const { rerender, result } = renderMeta({ taskId: null });
+
+    expect(apiGet).not.toHaveBeenCalled();
+    expect(fetchMembers).not.toHaveBeenCalled();
+
+    rerender({ taskId: TASK_ID });
+
+    await waitFor(() => expect(result.current.comments.map((entry) => entry.id)).toEqual(['c1']));
+  });
+
   /** The one guard that is easy to forget: a panel that closes mid-load must not write back. */
   it('aborts the in-flight load on unmount', async () => {
     stubMeta();

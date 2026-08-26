@@ -68,7 +68,8 @@ import { AttachmentAddLink } from '@/components/task/attachment-add-link';
 import { SortableTaskCard } from '@/components/task/sortable-task-card';
 import { TaskActivitySection } from '@/components/task/task-activity-section';
 import { TaskCommentsSection } from '@/components/task/task-comments-section';
-import { TaskMetadataPanel } from '@/components/task/task-metadata-panel';
+import { TaskPropertiesPanel } from '@/components/task/task-properties-panel';
+import type { UseTaskMetadataResult } from '@/components/task/use-task-metadata';
 
 /**
  * Renders real screens against `tr.json`.
@@ -125,24 +126,25 @@ const nav = vi.hoisted(() => ({
 }));
 
 /**
- * `TaskMetadataPanel`'s own reads. What the panel *writes* is what the case below drives.
+ * The shared read `TaskPanel` hands to its properties and discussion sections. What the section
+ * below *writes* is what the case drives.
  *
- * One frozen object rather than a fresh one per call: the panel holds these across renders.
+ * One frozen object rather than a fresh one per render: the section holds these across renders.
  */
-const taskMeta = vi.hoisted(() => ({
-  members: [] as unknown[],
-  boardLabels: [] as unknown[],
+const taskMeta = {
+  members: [],
+  boardLabels: [],
   setBoardLabels: vi.fn(),
-  comments: [] as unknown[],
+  comments: [],
   setComments: vi.fn(),
   hasMoreComments: false,
   loadingMoreComments: false,
-  loadMoreComments: vi.fn(),
-  activities: [] as unknown[],
+  loadMoreComments: vi.fn().mockResolvedValue(undefined),
+  activities: [],
   refreshActivities: vi.fn().mockResolvedValue(undefined),
   loadingMeta: false,
   metaFailed: false,
-}));
+} satisfies UseTaskMetadataResult;
 
 vi.mock('@/lib/workspace-boards', () => ({ fetchWorkspaceBoards: vi.fn() }));
 vi.mock('@/components/layout/workspace-provider', () => ({
@@ -186,7 +188,6 @@ vi.mock('@/lib/member-query', async () => {
 vi.mock('@/components/notification/use-notification-socket', () => ({
   useNotificationSocket: () => ({ connected: true }),
 }));
-vi.mock('@/components/task/use-task-metadata', () => ({ useTaskMetadata: () => taskMeta }));
 // The bell needs the unread context the shell provides; the sidebar case below is about the
 // collapse control's label, not about the bell.
 vi.mock('@/components/notification/notification-bell', () => ({
@@ -442,7 +443,7 @@ const LONGEST_TURKISH: readonly LongString[] = [
   },
   {
     key: 'app.board.task.labelForbidden',
-    screen: 'components/task/task-metadata-panel.tsx',
+    screen: 'components/task/task-properties-panel.tsx',
     ratio: 1.5,
   },
   {
@@ -907,18 +908,19 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
-    screen: 'components/task/task-metadata-panel.tsx',
+    screen: 'components/task/task-properties-panel.tsx',
     keys: ['app.board.task.labelForbidden'],
     run: async () => {
       apiPost.mockRejectedValue(forbidden());
       render(
         trToasts(
-          <TaskMetadataPanel
+          <TaskPropertiesPanel
             workspaceId={WORKSPACE_ID}
             boardId={BOARD_ID}
             task={TASK}
             canMutate
             canManageLabels
+            meta={taskMeta}
             onUpdated={vi.fn()}
           />,
         ),

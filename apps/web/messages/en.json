@@ -666,6 +666,8 @@
         },
         "openTask": "Open task",
         "panelLabel": "Task details",
+        "propertiesTitle": "Properties",
+        "discussionTitle": "Discussion",
         "close": "Close task panel",
         "backToBoard": "Back to board",
         "createAction": "Add task",
