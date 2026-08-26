@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { closeWorkerWithinTimeout, WORKER_CLOSE_TIMEOUT_MS } from './close-worker';
 import type { ClosableWorker } from './close-worker';
 
@@ -22,9 +25,14 @@ describe('closeWorkerWithinTimeout', () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
-  it('resolves within the timeout and forces the close when the job never finishes', async () => {
+  it('resolves within the timeout and stops waiting when the job never finishes', async () => {
     // The shape this exists for: BullMQ's `close()` waits for the running job with no ceiling
     // of its own, so a retention sweep mid-run leaves this promise pending indefinitely.
+    //
+    // The `close(true)` below is asserted as a request, not as proof the run was aborted: this
+    // is a plain mock, and against the real BullMQ a forced close during a close already in
+    // flight returns that pending promise untouched. What the helper guarantees, and what the
+    // elapsed-time assertion pins, is that the shutdown stops waiting.
     const close = jest.fn().mockReturnValue(new Promise<void>(() => {}));
     const logger = loggerStub();
 
@@ -66,8 +74,21 @@ describe('closeWorkerWithinTimeout', () => {
   });
 
   it('keeps the default budget under the api container stop grace period', () => {
-    // docker-compose.yml gives `api` `stop_grace_period: 30s`; this timeout has to leave the
-    // rest of the shutdown (pool, Redis, mail, storage) room inside it.
-    expect(WORKER_CLOSE_TIMEOUT_MS).toBeLessThan(30_000);
+    // Read out of docker-compose.yml rather than hardcoded, so lowering `stop_grace_period`
+    // without lowering this timeout fails here: the timeout has to leave the rest of the
+    // shutdown (pool, Redis, mail, storage) room inside the grace period.
+    const compose = readFileSync(join(__dirname, '../../../../docker-compose.yml'), 'utf8');
+    const apiStart = compose.indexOf('\n  api:\n');
+    expect(apiStart).toBeGreaterThan(-1);
+    // Bounded at the next service key so the value cannot be read off a different service.
+    const nextService = /\n {2}[a-z][a-z0-9_-]*:\n/.exec(compose.slice(apiStart + 1));
+    const apiService = compose.slice(
+      apiStart,
+      nextService ? apiStart + 1 + nextService.index : undefined,
+    );
+    const graceSeconds = /\n {4}stop_grace_period: (\d+)s\n/.exec(apiService)?.[1];
+
+    expect(graceSeconds).toBeDefined();
+    expect(WORKER_CLOSE_TIMEOUT_MS).toBeLessThan(Number(graceSeconds) * 1_000);
   });
 });
