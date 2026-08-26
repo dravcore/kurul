@@ -22,6 +22,7 @@ import {
 import type { Server, Socket } from 'socket.io';
 import { auth } from '../auth/auth';
 import { envString, isTestEnv } from '../common/env';
+import { captureServerError } from '../common/observability/sentry';
 import { parseRedisUrl } from '../common/redis-url';
 import { PrismaService } from '../prisma/prisma.service';
 import { boardRoom, RealtimeService, userRoom, type SocketRoomState } from './realtime.service';
@@ -29,6 +30,14 @@ import { boardRoom, RealtimeService, userRoom, type SocketRoomState } from './re
 type AuthedSocket = Socket & {
   data: SocketRoomState;
 };
+
+/**
+ * Minimum time between reports (WARN log + Sentry capture) for a `pubClient`/`subClient`
+ * connection error. ioredis retries a broken connection on its own and re-emits `error` on
+ * every failed attempt, so without this a single outage would report once per retry instead
+ * of once for the outage: same shape as `AUTH_RATE_LIMIT_REPORT_DAMPEN_MS`.
+ */
+const REDIS_ERROR_REPORT_DAMPEN_MS = 60 * 1000;
 
 @WebSocketGateway({
   cors: {
@@ -39,6 +48,7 @@ type AuthedSocket = Socket & {
 export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnModuleDestroy {
   private readonly logger = new Logger(RealtimeGateway.name);
   private redisClients: Redis[] = [];
+  private lastRedisErrorReportedAt = 0;
 
   @WebSocketServer()
   server!: Server;
@@ -232,6 +242,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnMo
       const connection = parseRedisUrl(redisUrl);
       const pubClient = new Redis(connection);
       const subClient = pubClient.duplicate();
+      this.attachRedisErrorListener(pubClient, 'pubClient');
+      this.attachRedisErrorListener(subClient, 'subClient');
       this.redisClients = [pubClient, subClient];
       server.adapter(createAdapter(pubClient, subClient));
       this.logger.log('Socket.io Redis adapter attached');
@@ -240,6 +252,32 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnMo
         `Failed to attach Socket.io Redis adapter: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  /**
+   * Registers the `error` listener a `pubClient`/`subClient` needs so a reconnect failure is
+   * reported instead of becoming an unhandled `error` event on the underlying `EventEmitter`
+   * (ioredis's own fallback is `console.error`, invisible to the JSON log format and to
+   * Sentry: audit BE-11). Kept as its own method, separate from `attachRedisAdapter`, so a
+   * unit test can drive it directly without opening a real socket `isTestEnv()` would refuse.
+   */
+  private attachRedisErrorListener(client: Redis, label: 'pubClient' | 'subClient'): void {
+    client.on('error', (error: Error) => {
+      this.logger.warn(`Socket.io Redis adapter ${label} error: ${error.message}`);
+      if (this.shouldReportRedisError()) {
+        captureServerError(error, { path: `realtime-gateway-${label}` });
+      }
+    });
+  }
+
+  /** Claims the report slot for a Redis connection error, or says one was claimed too recently. */
+  private shouldReportRedisError(): boolean {
+    const now = Date.now();
+    if (now - this.lastRedisErrorReportedAt < REDIS_ERROR_REPORT_DAMPEN_MS) {
+      return false;
+    }
+    this.lastRedisErrorReportedAt = now;
+    return true;
   }
 
   async onModuleDestroy(): Promise<void> {
