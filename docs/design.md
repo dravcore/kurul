@@ -330,7 +330,7 @@ ring-width utility beside it. The offset turns inward only where the focused reg
 and an outside offset would be clipped away, which today is the skip link's `main`. Tab order
 follows visual order; the board is a composite widget, so `Tab` reaches a column and arrows move
 within it. `Esc` closes the topmost layer only and returns focus to whatever opened it. Reserved
-now, mapped in Phase 4+: `⌘K` command palette, `C` create task, `/` filter, `?` help — nothing else
+now, mapped in Phase 4+: `⌘K` command palette, `C` create task, `/` filter, `?` help; nothing else
 claims a bare letter key.
 
 **Dialogs are bounded and scroll their own body.** A dialog surface is at most

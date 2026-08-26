@@ -341,7 +341,7 @@ focus alan bölge shell'i doldurduğunda ve dıştaki bir offset kırpılacağı
 yalnızca skip link'in `main` hedefidir. Tab order visual order'ı takip eder; board bir composite
 widget'tır, bu yüzden `Tab` bir column'a ulaşır ve arrow'lar onun içinde hareket eder. `Esc`
 yalnızca en üstteki layer'ı kapatır ve focus'u onu açan şeye geri verir. Şimdiden reserve edilmiş,
-Faz 4+'ta map edilecek: `⌘K` command palette, `C` create task, `/` filter, `?` help — başka hiçbir
+Faz 4+'ta map edilecek: `⌘K` command palette, `C` create task, `/` filter, `?` help; başka hiçbir
 şey çıplak bir letter key talep etmez.
 
 **Dialog'lar sınırlıdır ve kendi gövdelerini scroll eder.** Bir dialog yüzeyi en fazla
