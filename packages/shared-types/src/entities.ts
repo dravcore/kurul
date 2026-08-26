@@ -511,6 +511,12 @@ export interface ActivityDto {
   workspaceId: string;
   taskId: string | null;
   userId: string;
+  /**
+   * One of `ActivityType`'s values today (see `./activity.ts`), kept as `string` here rather
+   * than narrowed: this is read straight off the `Activity` row, whose `type` column is a
+   * `String`, not a Prisma enum, on purpose, so a row written by an older server build with a
+   * since-removed type stays representable instead of failing to decode.
+   */
   type: string;
   payload: Record<string, unknown>;
   createdAt: string;
@@ -527,6 +533,9 @@ export interface NotificationDto {
   id: string;
   workspaceId: string;
   userId: string;
+  /** One of `NotificationType`'s values today (see `./activity.ts`); `string` for the same
+   * reason as {@link ActivityDto.type}, and for the same reason the `Notification.type`
+   * column is not a Prisma enum. */
   type: string;
   taskId: string | null;
   activityId: string | null;

@@ -235,10 +235,11 @@ $ openssl rand -hex 32
 1b7c3785ecf7f7bd2ec4826214889d19ff17d518ce44126ab6f07393b39b98a   # yalnızca 0-9a-f, her zaman URL-güvenli
 ```
 
-`-base64 32`'nin alfabesi `/` ve `+` içerir; parola başına 43 base64 karakteriyle, en az bir
-`/` veya `+`'nin düşme olasılığı `1 - (63/64)^43 ≈ %51` — yeni üretilen bir parolanın kendi
-bağlantı string'ini sessizce bozup bozmayacağı kabaca yazı tura. `openssl rand -hex 32`'de
-kaçınılması gereken böyle bir karakter yok.
+`-base64 32`'nin alfabesi hem `/` hem `+` içerir, 64 karakter içinde iki sorunlu karakter;
+parola başına 43 base64 karakteriyle, ikisinden en az birinin düşme olasılığı
+`1 - (62/64)^43 ≈ %74` - yeni üretilen bir parolanın kendi bağlantı string'ini sessizce bozup
+bozmayacağı, yazı turadan çok, dörtte üçe yakın bir ihtimal. `openssl rand -hex 32`'de kaçınılması
+gereken böyle bir karakter yok.
 
 | Değişken            | Varsayılan      | Amaç                                                                                                                   |
 | ------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------- |

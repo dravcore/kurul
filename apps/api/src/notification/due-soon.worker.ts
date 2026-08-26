@@ -292,7 +292,7 @@ export class DueSoonWorker implements OnModuleInit, OnApplicationShutdown {
     const rows: Array<{
       workspaceId: string;
       userId: string;
-      type: string;
+      type: NotificationType;
       taskId: string;
       payload: { title: string; dueDate: string; type: string };
     }> = [];

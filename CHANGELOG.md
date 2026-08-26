@@ -489,6 +489,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the sancak rail and the one button, in a dot beside a label, never in a coloured word sitting on
   a tinted background.
 
+- **Two loose ends from the previous docs sweep are closed, and its Turkish mirrors move with
+  them.** `architecture.md`'s `openapi` row sat in the feature-module table whose heading
+  promises every entry a `*.module.ts`; `apps/api/src/openapi` has no module file, so the row
+  moves to the cross-cutting table beside `common`, `prisma` and `storage`, which makes no such
+  promise. `development.md`'s "Database and cache credentials" undercounted the base64 collision
+  it warns about: `1 - (63/64)^43` excludes only `/`, giving 49.2 percent, when the alphabet has
+  two problem characters, `/` and `+`; the corrected figure, `1 - (62/64)^43`, is about 74
+  percent.
+
+- **#37's TypeScript half: `Activity`/`Notification` input types narrow from `string` to the
+  shared-types unions.** `RecordActivityInput.type` and `CreateNotificationInput.type` are now
+  `ActivityType`/`NotificationType`, so a typo in a new call site fails at compile time instead
+  of reaching the database; every existing call site already passed one of those constants, so
+  nothing needed an `as` cast. `ActivityDto.type`/`NotificationDto.type` stay `string` on
+  purpose: a row an older build wrote with a since-removed type must still decode. The
+  `Activity`/`Notification` columns stay `String`, not a Prisma enum, per the decision already
+  recorded beside each.
+
+- **The invitation `'pending'` literal is now one shared predicate instead of six copies.**
+  `InvitationStatus.pending` replaces the raw string at every application-code site, including
+  the one inside a raw `$executeRaw` template, which now interpolates the constant as a bound
+  parameter, still parameterised by Prisma, rather than concatenating it into the statement
+  text. `findPendingInvitations`, the pending invitations list and
+  `PlanLimitsService.seatsUsed` share one `pendingInvitationWhere(workspaceId, now)` helper in
+  place of three hand-copied predicates, so the settings screen and the seat count cannot drift
+  apart.
+
 ### Fixed
 
 - **The OpenAPI document advertised `0.1.0` from `v0.1.0` all the way through `v0.3.0`.**

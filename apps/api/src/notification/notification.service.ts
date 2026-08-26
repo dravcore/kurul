@@ -14,7 +14,12 @@ export type CreateNotificationInput = {
   userId: string;
   /** Acting user — never notify when equal to recipient */
   actorId: string;
-  type: string;
+  /**
+   * Narrowed to the shared-types union so a typo cannot reach the database from application
+   * code (#37's TypeScript half). `Notification.type` stays a `String` column, not a Prisma
+   * enum, for the same reason `Activity.type` does.
+   */
+  type: NotificationType;
   taskId?: string | null;
   activityId?: string | null;
   payload: Record<string, unknown>;
@@ -110,17 +115,11 @@ export class NotificationService {
     });
   }
 
-  async createAssignment(
-    db: NotificationDb,
-    input: Omit<CreateNotificationInput, 'type'> & { type?: string },
-  ) {
+  async createAssignment(db: NotificationDb, input: Omit<CreateNotificationInput, 'type'>) {
     return this.create(db, { ...input, type: NotificationType.Assignment });
   }
 
-  async createMention(
-    db: NotificationDb,
-    input: Omit<CreateNotificationInput, 'type'> & { type?: string },
-  ) {
+  async createMention(db: NotificationDb, input: Omit<CreateNotificationInput, 'type'>) {
     return this.create(db, { ...input, type: NotificationType.Mention });
   }
 
