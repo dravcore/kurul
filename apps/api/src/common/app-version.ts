@@ -18,9 +18,15 @@ const UNKNOWN_VERSION = 'unknown';
  * `CMD ["node", "dist/main.js"]` is not one — so it would be correct in development and silently
  * empty in exactly the deployments a version number is for.
  *
- * A missing or unreadable file returns {@link UNKNOWN_VERSION} rather than throwing. The only
- * caller is the opt-in telemetry ping, and a metrics nicety must never be able to stop a
- * process from booting.
+ * A missing or unreadable file returns {@link UNKNOWN_VERSION} rather than throwing, and the two
+ * callers want that for different reasons. The opt-in telemetry ping is a metrics nicety and must
+ * never be able to stop a process from booting. The OpenAPI document generator
+ * (`openapi/openapi.document.ts`) would instead advertise `info.version: "unknown"`, which is
+ * caught rather than shipped: `pnpm openapi:check` byte-compares the generated spec against the
+ * committed `apps/api/openapi.json`, so a build that cannot read the file turns the gate red
+ * instead of serving a wrong version from `/docs`. In practice neither caller meets the fallback:
+ * the generator runs inside the repository, and `pnpm deploy` puts `package.json` beside `dist/`
+ * in the runtime image.
  */
 export function readAppVersion(startDir: string = __dirname): string {
   let dir = startDir;

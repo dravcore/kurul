@@ -191,91 +191,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   visitor left behind. Setup is in
   [Self-hosting → Demo instance](docs/self-hosting.md#demo-instance).
 
-### Security
-
-- **The runtime images upgrade Alpine's own packages at build time.** The three stages that
-  become `kurul-api`, `kurul-migrate` and `kurul-web` now run `apk upgrade --no-cache` before
-  anything is copied in. Alpine publishes fixes for openssl, zlib and busybox days before the
-  Node project rebuilds `node:24-alpine` on top of them, and the `image-scan` gate fails on any
-  fixable HIGH or CRITICAL finding, so until now a new advisory in the base image turned every
-  build red with nothing in this repository to change. The first case was CVE-2026-14456 in
-  `libcrypto3` 3.5.7-r0 (fixed in 3.5.8-r0) on 2026-08-26. The upgrade adds one layer and
-  costs nothing at runtime; a pinned base digest still names the layer everything else is
-  built on.
-
-- **A demo instance no longer lets a visitor rotate the shared account's password.** The demo
-  is one published account (`demo@kurul.dev` with `DEMO_PASSWORD`), and Better Auth's
-  `POST /auth/change-password` asks only for the current password, which is public: one request
-  locked every other visitor out until the next reset wrote the password back, up to an hour.
-  `DemoRestrictedGuard` could not cover it because `/auth/*` is served by Express below the Nest
-  router, so the refusal lives at the Better Auth mount (`mount-better-auth.ts`), with the same
-  `403` envelope the guard produces for account and workspace deletion, and the guard's comment
-  now carries the full list: two Nest routes plus this auth path, with `/auth/change-email`
-  listed beside it so it is already refused the day `user.changeEmail` is enabled. Revoking
-  sessions and renaming the account stay open on purpose: both are a sign-in away from
-  recovered, and the list admits what the reset cannot recover, not what is annoying. An
-  ordinary install is untouched; the `DEMO_MODE` table in
-  [self-hosting.md](docs/self-hosting.md#what-demo_modetrue-changes) names the new row.
-- **Request bodies to `/auth/*` are bounded, at the proxy and at the API.** Better Auth reads
-  the raw request stream itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on
-  every other route, and the bundled `docker/Caddyfile` set `request_body max_size` only on
-  `/api/*`, so a `POST /auth/sign-in/email` could stream a body of any size into the API
-  container's heap (512 MB, `--max-old-space-size=384`) at the built-in attempt budget of 3 per
-  10 seconds per IP and path on sign-in, sign-up and change-password, and 100 per minute on the
-  other auth routes. `handle /auth/*` now carries `max_size 64KiB`, and the mount refuses a
-  declared `Content-Length` over the same `AUTH_BODY_MAX_BYTES` (`65536`, a constant in
-  `apps/api/src/auth/auth-body-limit.ts`) with the standard `413` envelope before a byte is
-  read; a chunked body, which has no length to check, is counted as it streams and the
-  connection is closed past the ceiling. The largest legitimate auth body is a few hundred bytes
-  of JSON. The nginx contract in `docs/self-hosting.md` gains `client_max_body_size 64k;` for
-  `location /auth/`, and `two-layer-limit.spec.ts` pins the Caddyfile figure, the nginx row and
-  the API constant to each other; unlike the upload pair, the two may be equal, since there is
-  no multipart envelope between them.
-- **The web app's `script-src` no longer allows `'unsafe-inline'`.** Inline script is admitted
-  by a per-request nonce instead: `apps/web/proxy.ts` — Next 16's replacement for the
-  `middleware.ts` convention, which is where the old file moved — draws 16 bytes from the
-  platform CSPRNG on every request and sets the resulting `Content-Security-Policy` on the
-  *forwarded request* as well as on the response. The request copy is the load-bearing half:
-  Next reads the nonce back out of that header and stamps it onto the scripts it emits itself
-  (the streamed RSC hydration payload, the framework and page bundles). The one inline script
-  Next does not own, `next-themes`'s pre-paint theme setter, is nonced by hand in
-  `app/layout.tsx`. Nothing had to become dynamic for this: every route already renders per
-  request, because `i18n/request.ts` reads `cookies()` and `headers()` on each one.
-
-  `Content-Security-Policy` is the only header that moved out of `next.config.ts`'s
-  `headers()`; the five constant ones stay there, where they also cover the `_next/static` and
-  `_next/image` routes the proxy's matcher skips. `'strict-dynamic'` was tried and dropped —
-  the whole suite passes with it, but `script-src` names no host for it to neutralise, and it
-  would turn a bundle tag Next forgot to nonce from "loads" into "blocked".
-
-  `style-src` keeps `'unsafe-inline'`, unchanged and out of scope: Radix and `@dnd-kit`
-  position elements through the inline `style` *attribute*, which a nonce cannot cover at all.
-
-  The browser suite now fails any scenario in which the browser refused content, collecting
-  both `securitypolicyviolation` events and Chromium's CSP console errors from every page in
-  every context (`e2e/support/fixtures.ts`). That check was verified against a build with the
-  nonce removed, where it failed on `script-src-elem blocked inline` rather than passing
-  quietly — which is how the old `'unsafe-inline'` would otherwise come back unnoticed.
-- **The release workflow no longer trusts a tag's name.** A new `guard` job in
-  `.github/workflows/release-images.yml` runs before any image is built, and every other job
-  waits for it. It checks the two things the release process asks a human to get right by
-  hand: a `vX.Y.Z` tag must point at the tip of `main` (the merge commit step 5 tags), while a
-  pre-release tag must be reachable from `main` or from an open `release/*` or `hotfix/*`
-  branch, the rehearsal path; and every workspace `package.json` must carry the tag's version,
-  with a stable tag also needing its `## [X.Y.Z] - ` heading in `CHANGELOG.md`. Until now a
-  tag typed on `develop`, or on a tree whose version bump was forgotten, would have been built,
-  signed and published, and a stable one would also have moved `latest` under every operator
-  who pulls without `TAG`. A failing guard names the offending file, or the refs it searched,
-  and nothing is pushed; `publish-sbom` waits on the guard explicitly, since its
-  `!cancelled()` condition would otherwise run past a rejected tag with `contents: write`.
-  Every job in the workflow also gained a `timeout-minutes`. The guard catches a slip inside
-  the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
-  repository admin is a repository ruleset, described in
-  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the operator checklist
-  in `ROADMAP.md`.
-
-### Added
-
 - **Board templates.** Creating a board now starts from one of four shapes instead of always
   the same three columns: **Kanban** (To Do / In Progress / Done), **Scrum Sprint** (a backlog
   feeding a sprint, with a review stage), **Bug Triage** (reported through fixing and
@@ -299,7 +214,52 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     Kanban template is the same column list, and a test asserts the two cannot drift, so every
     client that predates this release creates exactly the board it did before.
 
+- **`pnpm bootstrap --check`, a doctor mode for the dev loop.** Answers "did something go stale
+  since the last bootstrap" from the filesystem alone — no Docker, no database, no network — so
+  it stays well under 5 seconds and is safe to run after every `git pull`. It checks that
+  `packages/shared-types/dist` and `packages/auth-access/dist` are at least as new as their
+  `src`, that the generated Prisma client is at least as new as `schema.prisma`, and that `.env`
+  carries `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` with `DATABASE_URL`'s placeholder
+  replaced — the same three ways this repo's dev loop has gone stale silently before. Prints one
+  line per check with a concrete fix command on failure (`pnpm build`, `pnpm db:generate`, which
+  `.env` key to set) and exits non-zero if any check fails. Logic lives in
+  `scripts/lib/doctor.mjs`, tested in `scripts/lib/doctor.test.mjs`.
+
 ### Changed
+
+- **The canonical docs and the roadmap now describe the release that exists.** `ROADMAP.md`
+  still framed cutting `v0.3.0` as the active P0 three days after the tag, carried five
+  Hardening rows that had shipped on 2026-08-23 and two maintenance-sweep rows for the same
+  work, and scattered the announcement wave's dependencies over four places. It now names
+  `v0.3.0` as current and `v0.4.0` as next, marks each shipped row with its commit or ADR,
+  collects every launch dependency into one ordered Launch checklist that the demo row, the
+  wave row, `OPS-05` and the old operator checklist all link to instead of repeating, splits
+  the awesome-selfhosted submission out as trigger-based (that list requires a first release
+  over four months old, so 2026-12-12 here), and adds a Post-launch hardening table for the
+  audit items still open plus a proposed set of 1.0 criteria.
+
+  Alongside it: the README Status paragraph stops keeping a second, wrong copy of the Beyond MVP
+  list; `tech-stack.md` records two UI catalogs rather than one and eight compose services rather
+  than seven; `architecture.md` gains the `plan`, `token` and `openapi` modules, the
+  `PersonalAccessToken` and `UsagePing` models and ADRs through 0034; `development.md` closes its
+  env and pnpm-script tables against `.env.example` and `package.json`; `testing.md` names both
+  required branch-protection contexts; `SECURITY.md` no longer implies a
+  direct commit to `develop` or `main`; the secret-generation rule is stated once, in
+  `development.md`'s "Database and cache credentials", with `.env.example`, both READMEs and
+  `self-hosting.md` trimmed to the one-line generator and a link to it, so the arithmetic behind
+  `-hex` over `-base64` lives in one file instead of five; and `git-strategy.md` gains a release step for the
+  version-pinned prose that only a person keeps current, which is the root cause of most of the
+  above. Every `docs/` change moves with its `docs/tr/` mirror.
+
+  Not documentation, and in the same pass: `.github/dependabot.yml` now holds every bump it
+  proposes until the release is seven days old, fourteen for an npm major (`default-days` is all
+  the `github-actions`, `docker` and `docker-compose` ecosystems support, so their majors wait
+  the same seven).
+  That window is the supply-chain defence a lockfile cannot give and nothing more: a compromised
+  package is usually pulled within hours to a few days. **Security updates bypass it**, so an
+  advisory-driven bump still opens the day it lands, and a manual `pnpm add` is unaffected. It is
+  the zero-toolchain half of pnpm 10's `minimumReleaseAge`, which this repo cannot use while
+  `packageManager` is pnpm 9.
 
 - **API coverage: a fresh `develop` baseline, three new per-directory floors, and a cross-workspace
   case for the activity/notification feeds.** `apps/api/jest.config.cjs`'s dated baseline (last
@@ -437,7 +397,111 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and `docs/development.md`. The release process in `docs/git-strategy.md` gains the step that
   bumps the tag on the page. Turkish mirrors updated in step.
 
+- **`knip` wired up** (`pnpm knip`, `knip.jsonc`) and its unused-code findings cleared: 35
+  constants/functions/types that had no consumer outside their own file lost their unnecessary
+  `export`, one fully dead type alias (`AuthSession`) was deleted, and a redundant direct
+  `@prisma/client-runtime-utils` dependency was found to not actually be redundant (Prisma's
+  generated client bare-`require`s it from outside `@prisma/client`'s own module tree) and was
+  restored with a stated `knip.jsonc` ignore instead. `apps/web/components/ui/**`
+  (shadcn/ui's generated component library) is ignored wholesale for the same reason knip
+  flagged it: it intentionally exports a fuller API than any one call site currently uses.
+- **Coverage floors added for `components/auth/**`, `components/settings/**` and
+  `components/dashboard/**`** in `apps/web/vitest.config.ts`, the last three interactive
+  surfaces without one; all three were already well-tested, so this ratchets the existing
+  baseline rather than adding tests.
+- **`docs/tr/architecture.md` resynced with the English original**: a missing `Column.category`
+  field, two missing data-model rows (`Checklist`/`ChecklistItem`), and a stale description of
+  multi-tenant enforcement that predated the current `WorkspaceGuard`-plus-service-level-predicate
+  model. `docs/tr/tech-stack.md` was already accurate.
+
+- **`docs`:** [ADR 0030](docs/decisions/0030-typescript-7-hold.md) records why `typescript`
+  stays pinned `^5.8.2` across the workspace now that TypeScript 7.0 has shipped: both
+  `typescript-eslint` and `ts-jest` publish peer ranges that exclude it, and both maintainers
+  confirm the block is TypeScript 7.0 shipping without a stable compiler API. The
+  `dependabot.yml` ignore-rule comment now points at the ADR instead of restating the
+  rationale inline. No behaviour changes.
+- **The web app's client data layer is now written down, and the two widest files in it were
+  split along the seams that document names.**
+  [ADR 0029](docs/decisions/0029-client-data-layer.md) records what the layer is (a typed
+  `fetch` wrapper, one read primitive that models a single value arriving once, writes that
+  live beside the state they touch, and socket payloads that carry ids so a changed row is
+  refetched rather than merged out of the event), the five rules it runs by, and the one
+  measurement that would replace it with React Query: a third hand-written generation counter,
+  countable with `grep -rn "GenerationRef" apps/web`, which returns two today. Adopting a query
+  library now is rejected in writing, with the reasoning, so the question stops being reopened
+  per screen.
+
+  `use-board-data.ts` (381 lines) became four hooks behind one composer: `useBoardCaches` holds
+  the five lists and the refs that mirror them, `useBoardFetch` performs the reads,
+  `useBoardLoad` owns the skeleton, the error and the retry, and `useBoardPanelTask` covers the
+  deep-linked row the board itself never loaded. `task-panel.tsx` (409 lines) gave up its
+  hand-rolled dialog behaviour to `useTaskPanelFocus`, its title and description write to
+  `TaskPanelFields`, and its three no-task states to `TaskPanelStatus`. No behaviour changed and
+  no test was rewritten: the existing board and task suites pass unmodified, and the
+  `components/board` and `components/task` coverage floors hold at their current values.
+
+- **Both themes hold up over hours of reading instead of straining on close text or losing their
+  edges.** Dark mode gets a real surface ramp: canvas, column, card, popover and the hover
+  highlight are five distinguishable steps instead of two or three blurring together, and dark
+  text tokens are measured to the same 4.5:1 floor light already held. Every input, select and
+  textarea now draws a border a viewer can actually see (`--border-strong`, aliased as `--input`),
+  instead of a hairline that only separated a field from itself. Hovering a task card, a button or
+  a menu row moves to a real step (`--accent` in both themes, plus `--primary-hover` and
+  `--destructive-hover` on filled buttons), instead of an alpha thinning that could drop a white
+  label under AA partway through the hover. Opening a dialog dims the page behind it with a themed
+  scrim (`--overlay-scrim`) rather than a flat 50% black, and in dark mode dialogs, popovers and
+  the drag preview carry a 1px `--border-strong` ring inside their shadow, since a shadow alone
+  stops reading once the surface under it is this dark. `forced-colors: active` and
+  `prefers-contrast: more` now have their own fallbacks: a selected card, a drop target and a
+  highlighted menu row draw a system `Highlight` outline instead of leaning on a tint the mode
+  discards, and the hairline border thickens to `--border-strong` under high contrast instead of
+  opening a second palette. A new gate, `app/globals.contrast.test.ts`, measures every text token
+  against six real surfaces and every boundary token at 3:1 on every run, so a future token change
+  that quietly drops a pair under AA fails the build instead of shipping.
+- **Text now runs on one type scale, and a focused control draws exactly one indicator.** Every
+  button label, dialog title, form field and menu item used to draw from two competing sources:
+  shadcn's own default text sizes and weights sitting beside Kurul's own scale, so a button and the
+  card title next to it could land at different pixel sizes without either class saying so. The
+  Tailwind defaults are gone from `components/ui/` and the domain tree in favour of Kurul's own
+  steps, and `app/theme-classes.test.ts` fails the build on any class that resolves to nothing, so a
+  stray default cannot slip back in unnoticed. A dialog's title steps down from an unintended 18px
+  to the 16px `title` step the scale actually defines, since there never was an 18px step; a button
+  label and the card title beside it now agree on the same 13px. Fraunces also now loads its
+  optical-size axis (`axes: ['opsz']` in `app/layout.tsx`) so a 40px `.text-display` heading renders
+  with the carved 40pt cut instead of the low-optical-size cut `next/font/google` embeds by
+  default. Below 768px, every text field (`Input`, `Textarea`, `Select`) computes at 16px so iOS
+  Safari stops zooming the page on focus, matched by a new assertion in
+  `e2e/tests/mobile-navigation.spec.ts`, now that `cn()` dedupes the type scale so that 16px
+  override reliably beats any conflicting default reaching the DOM.
+
+  The same pass removed a duplicate focus mark: a focused control used to draw an outline and a
+  separate copper ring on top of it, from two different rules that had never been told about each
+  other. Only the outline is left, 2px `--ring` at 2px offset from a single rule in `@layer base`,
+  and a field that is both invalid and focused recolours that one outline to the destructive token
+  instead of growing a second mark beside its red border.
+- **The copper signature colour now has a written budget instead of an unenforced guideline.** Full
+  strength copper is limited to at most two uses per screen, the sancak rail plus, where a view has
+  one, its single primary action button. The focus ring and any data mark, a meter fill, a progress
+  fill, the dashboard's one copper emphasis series, do not count against that budget: the ring is
+  singular and momentary by construction, and a data mark is showing a value rather than describing
+  the screen around it. The signature tint is bound to exactly one role, active or selected, and
+  neither the tint nor the hover surface carries coloured copper text of its own: identity lives in
+  the sancak rail and the one button, in a dot beside a label, never in a coloured word sitting on
+  a tinted background.
+
 ### Fixed
+
+- **The OpenAPI document advertised `0.1.0` from `v0.1.0` all the way through `v0.3.0`.**
+  `openapi.document.ts` explained at length that the spec carries the monorepo version rather
+  than an independent one, because "a second version number here would be a second promise", and
+  then wrote that number as the literal `'0.1.0'` immediately below the paragraph. Nothing in the
+  release process compared the two, so every release since has served, and committed, a spec
+  stamped with the version of the first one. `OPENAPI_VERSION` is now `readAppVersion()`, the
+  helper the telemetry ping already uses: it resolves `apps/api/package.json` from `src/` under
+  Jest and from `dist/` under `pnpm openapi` and the runtime image, so the generator, the
+  committed snapshot and the document served at `/docs` cannot disagree. `apps/api/openapi.json`
+  is regenerated at `0.3.0`, and since `pnpm openapi:check` byte-compares that file in CI, a
+  version bump that forgets to regenerate now fails the gate instead of drifting quietly.
 
 - **A Trello import no longer skips the length checks every other write path enforces, and no
   longer has an unbounded row count.** `trello-import-planner.ts` wrote a card's name and
@@ -516,6 +580,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `apps/api/Dockerfile` and `apps/web/Dockerfile` drops from roughly 36.4 GB to 5.9 MB, and
   both images still build their `build` stage end to end. CI is unaffected: the runner already
   builds from a clean checkout with none of these directories present.
+
+- **`REDIS_URL` now honours a Redis 6+ ACL username and `rediss://` (TLS)
+  ([#204](https://github.com/dravcore/kurul/issues/204)).** `parseRedisUrl` read only host,
+  port, password and the database index; `url.username` and `url.protocol` were never
+  inspected, so a URL naming an ACL user (`redis://alice:s3cret@host`) silently authenticated
+  as `default` instead, and a `rediss://` URL connected in plaintext with no warning. The
+  parser now carries `username` through when the URL names one, sets `tls: {}` for `rediss:`,
+  and rejects any scheme other than `redis:`/`rediss:` with the same `Invalid REDIS_URL` error
+  an unparsable database index already uses. All six ioredis/BullMQ construction sites (auth
+  rate limiting, the upload byte budget, the readiness probe, the Socket.io adapter, and both
+  BullMQ workers) spread the parser's return value straight into their client, so the fix
+  reaches every one of them without a call site changing. The bundled Compose stack is
+  unaffected either way: it always builds a plain `redis://:password@redis:6379` for its own
+  `redis` container, so this only matters for a bring-your-own managed Redis.
 
 - **BullMQ's due-soon and cleanup workers, and the Socket.io Redis adapter, now report a Redis
   connection fault instead of losing it to `console.error`.** `queue`/`worker.on('error')` on
@@ -650,79 +728,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `workflow_dispatch` triggers are unchanged), and a new step prints the branch and commit
   that actually ran, since the run's own head branch still names the branch the schedule was
   read from. `main` keeps its coverage where it changes: the release and hotfix pull requests.
-- **`REDIS_URL` now honours a Redis 6+ ACL username and `rediss://` (TLS)
-  ([#204](https://github.com/dravcore/kurul/issues/204)).** `parseRedisUrl` read only host,
-  port, password and the database index; `url.username` and `url.protocol` were never
-  inspected, so a URL naming an ACL user (`redis://alice:s3cret@host`) silently authenticated
-  as `default` instead, and a `rediss://` URL connected in plaintext with no warning. The
-  parser now carries `username` through when the URL names one, sets `tls: {}` for `rediss:`,
-  and rejects any scheme other than `redis:`/`rediss:` with the same `Invalid REDIS_URL` error
-  an unparsable database index already uses. All six ioredis/BullMQ construction sites (auth
-  rate limiting, the upload byte budget, the readiness probe, the Socket.io adapter, and both
-  BullMQ workers) spread the parser's return value straight into their client, so the fix
-  reaches every one of them without a call site changing. The bundled Compose stack is
-  unaffected either way: it always builds a plain `redis://:password@redis:6379` for its own
-  `redis` container, so this only matters for a bring-your-own managed Redis.
-
-### Changed
-
-- **`knip` wired up** (`pnpm knip`, `knip.jsonc`) and its unused-code findings cleared: 35
-  constants/functions/types that had no consumer outside their own file lost their unnecessary
-  `export`, one fully dead type alias (`AuthSession`) was deleted, and a redundant direct
-  `@prisma/client-runtime-utils` dependency was found to not actually be redundant (Prisma's
-  generated client bare-`require`s it from outside `@prisma/client`'s own module tree) and was
-  restored with a stated `knip.jsonc` ignore instead. `apps/web/components/ui/**`
-  (shadcn/ui's generated component library) is ignored wholesale for the same reason knip
-  flagged it: it intentionally exports a fuller API than any one call site currently uses.
-- **Coverage floors added for `components/auth/**`, `components/settings/**` and
-  `components/dashboard/**`** in `apps/web/vitest.config.ts`, the last three interactive
-  surfaces without one; all three were already well-tested, so this ratchets the existing
-  baseline rather than adding tests.
-- **`docs/tr/architecture.md` resynced with the English original**: a missing `Column.category`
-  field, two missing data-model rows (`Checklist`/`ChecklistItem`), and a stale description of
-  multi-tenant enforcement that predated the current `WorkspaceGuard`-plus-service-level-predicate
-  model. `docs/tr/tech-stack.md` was already accurate.
-### Added
-
-- **`pnpm bootstrap --check`, a doctor mode for the dev loop.** Answers "did something go stale
-  since the last bootstrap" from the filesystem alone — no Docker, no database, no network — so
-  it stays well under 5 seconds and is safe to run after every `git pull`. It checks that
-  `packages/shared-types/dist` and `packages/auth-access/dist` are at least as new as their
-  `src`, that the generated Prisma client is at least as new as `schema.prisma`, and that `.env`
-  carries `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` with `DATABASE_URL`'s placeholder
-  replaced — the same three ways this repo's dev loop has gone stale silently before. Prints one
-  line per check with a concrete fix command on failure (`pnpm build`, `pnpm db:generate`, which
-  `.env` key to set) and exits non-zero if any check fails. Logic lives in
-  `scripts/lib/doctor.mjs`, tested in `scripts/lib/doctor.test.mjs`.
-### Changed
-
-- **`docs`:** [ADR 0030](docs/decisions/0030-typescript-7-hold.md) records why `typescript`
-  stays pinned `^5.8.2` across the workspace now that TypeScript 7.0 has shipped: both
-  `typescript-eslint` and `ts-jest` publish peer ranges that exclude it, and both maintainers
-  confirm the block is TypeScript 7.0 shipping without a stable compiler API. The
-  `dependabot.yml` ignore-rule comment now points at the ADR instead of restating the
-  rationale inline. No behaviour changes.
-- **The web app's client data layer is now written down, and the two widest files in it were
-  split along the seams that document names.**
-  [ADR 0029](docs/decisions/0029-client-data-layer.md) records what the layer is (a typed
-  `fetch` wrapper, one read primitive that models a single value arriving once, writes that
-  live beside the state they touch, and socket payloads that carry ids so a changed row is
-  refetched rather than merged out of the event), the five rules it runs by, and the one
-  measurement that would replace it with React Query: a third hand-written generation counter,
-  countable with `grep -rn "GenerationRef" apps/web`, which returns two today. Adopting a query
-  library now is rejected in writing, with the reasoning, so the question stops being reopened
-  per screen.
-
-  `use-board-data.ts` (381 lines) became four hooks behind one composer: `useBoardCaches` holds
-  the five lists and the refs that mirror them, `useBoardFetch` performs the reads,
-  `useBoardLoad` owns the skeleton, the error and the retry, and `useBoardPanelTask` covers the
-  deep-linked row the board itself never loaded. `task-panel.tsx` (409 lines) gave up its
-  hand-rolled dialog behaviour to `useTaskPanelFocus`, its title and description write to
-  `TaskPanelFields`, and its three no-task states to `TaskPanelStatus`. No behaviour changed and
-  no test was rewritten: the existing board and task suites pass unmodified, and the
-  `components/board` and `components/task` coverage floors hold at their current values.
-
-### Fixed
 
 - **The `kurul-web` image and the browser suite's standalone bundle could not boot on
   `next` 16.3.1.** `next` is now `16.3.2` (with `@next/eslint-plugin-next` moved in step).
@@ -740,8 +745,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `image-scan` job that already has the image in its daemon. Nothing in the pipeline started a
   built artifact before, which is why a build that compiled and scanned clean could still be
   dead on arrival; the check costs a few seconds and fails with the container's own log.
-
-### Fixed
 
 - **Border colours written in the markup were not the ones being drawn.** `app/globals.css`
   declared `* { border-color: var(--border) }` outside any cascade layer, and an unlayered
@@ -768,8 +771,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   declared in the stylesheet, `light` on `:root` and `dark` on `.dark`, rather than left to an
   inline style the theme provider writes, so the browser's own widgets follow the theme and keep
   doing so if that provider is reconfigured.
-
-### Fixed
 
 - **A dialog taller than the window had no way to reach its own buttons.** The page behind an
   open dialog is scroll-locked and the surface had no ceiling, so on a short viewport, or at the
@@ -807,59 +808,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the bell until the next load. Both now read one shell-level count, and marking everything read
   clears it in the same frame.
 
-### Changed
-
-- **Both themes hold up over hours of reading instead of straining on close text or losing their
-  edges.** Dark mode gets a real surface ramp: canvas, column, card, popover and the hover
-  highlight are five distinguishable steps instead of two or three blurring together, and dark
-  text tokens are measured to the same 4.5:1 floor light already held. Every input, select and
-  textarea now draws a border a viewer can actually see (`--border-strong`, aliased as `--input`),
-  instead of a hairline that only separated a field from itself. Hovering a task card, a button or
-  a menu row moves to a real step (`--accent` in both themes, plus `--primary-hover` and
-  `--destructive-hover` on filled buttons), instead of an alpha thinning that could drop a white
-  label under AA partway through the hover. Opening a dialog dims the page behind it with a themed
-  scrim (`--overlay-scrim`) rather than a flat 50% black, and in dark mode dialogs, popovers and
-  the drag preview carry a 1px `--border-strong` ring inside their shadow, since a shadow alone
-  stops reading once the surface under it is this dark. `forced-colors: active` and
-  `prefers-contrast: more` now have their own fallbacks: a selected card, a drop target and a
-  highlighted menu row draw a system `Highlight` outline instead of leaning on a tint the mode
-  discards, and the hairline border thickens to `--border-strong` under high contrast instead of
-  opening a second palette. A new gate, `app/globals.contrast.test.ts`, measures every text token
-  against six real surfaces and every boundary token at 3:1 on every run, so a future token change
-  that quietly drops a pair under AA fails the build instead of shipping.
-- **Text now runs on one type scale, and a focused control draws exactly one indicator.** Every
-  button label, dialog title, form field and menu item used to draw from two competing sources:
-  shadcn's own default text sizes and weights sitting beside Kurul's own scale, so a button and the
-  card title next to it could land at different pixel sizes without either class saying so. The
-  Tailwind defaults are gone from `components/ui/` and the domain tree in favour of Kurul's own
-  steps, and `app/theme-classes.test.ts` fails the build on any class that resolves to nothing, so a
-  stray default cannot slip back in unnoticed. A dialog's title steps down from an unintended 18px
-  to the 16px `title` step the scale actually defines, since there never was an 18px step; a button
-  label and the card title beside it now agree on the same 13px. Fraunces also now loads its
-  optical-size axis (`axes: ['opsz']` in `app/layout.tsx`) so a 40px `.text-display` heading renders
-  with the carved 40pt cut instead of the low-optical-size cut `next/font/google` embeds by
-  default. Below 768px, every text field (`Input`, `Textarea`, `Select`) computes at 16px so iOS
-  Safari stops zooming the page on focus, matched by a new assertion in
-  `e2e/tests/mobile-navigation.spec.ts`, now that `cn()` dedupes the type scale so that 16px
-  override reliably beats any conflicting default reaching the DOM.
-
-  The same pass removed a duplicate focus mark: a focused control used to draw an outline and a
-  separate copper ring on top of it, from two different rules that had never been told about each
-  other. Only the outline is left, 2px `--ring` at 2px offset from a single rule in `@layer base`,
-  and a field that is both invalid and focused recolours that one outline to the destructive token
-  instead of growing a second mark beside its red border.
-- **The copper signature colour now has a written budget instead of an unenforced guideline.** Full
-  strength copper is limited to at most two uses per screen, the sancak rail plus, where a view has
-  one, its single primary action button. The focus ring and any data mark, a meter fill, a progress
-  fill, the dashboard's one copper emphasis series, do not count against that budget: the ring is
-  singular and momentary by construction, and a data mark is showing a value rather than describing
-  the screen around it. The signature tint is bound to exactly one role, active or selected, and
-  neither the tint nor the hover surface carries coloured copper text of its own: identity lives in
-  the sancak rail and the one button, in a dot beside a label, never in a coloured word sitting on
-  a tinted background.
-
-### Fixed
-
 - **`dark:` utility classes followed the operating system's colour scheme instead of the theme
   chosen in the app.** Tailwind's `dark:` variant defaulted to `prefers-color-scheme: dark`, while
   every dark token lives on the `.dark` class the theme switcher sets, so anyone whose OS and
@@ -874,6 +822,89 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `:root`, and a custom property only resolves against the element that declares it, so every
   stack fell straight through to its fallback list. The three `.variable` classes now sit on
   `<html>` instead, next to the tokens that need them, so both faces load and draw as designed.
+
+### Security
+
+- **The runtime images upgrade Alpine's own packages at build time.** The three stages that
+  become `kurul-api`, `kurul-migrate` and `kurul-web` now run `apk upgrade --no-cache` before
+  anything is copied in. Alpine publishes fixes for openssl, zlib and busybox days before the
+  Node project rebuilds `node:24-alpine` on top of them, and the `image-scan` gate fails on any
+  fixable HIGH or CRITICAL finding, so until now a new advisory in the base image turned every
+  build red with nothing in this repository to change. The first case was CVE-2026-14456 in
+  `libcrypto3` 3.5.7-r0 (fixed in 3.5.8-r0) on 2026-08-26. The upgrade adds one layer and
+  costs nothing at runtime; a pinned base digest still names the layer everything else is
+  built on.
+
+- **A demo instance no longer lets a visitor rotate the shared account's password.** The demo
+  is one published account (`demo@kurul.dev` with `DEMO_PASSWORD`), and Better Auth's
+  `POST /auth/change-password` asks only for the current password, which is public: one request
+  locked every other visitor out until the next reset wrote the password back, up to an hour.
+  `DemoRestrictedGuard` could not cover it because `/auth/*` is served by Express below the Nest
+  router, so the refusal lives at the Better Auth mount (`mount-better-auth.ts`), with the same
+  `403` envelope the guard produces for account and workspace deletion, and the guard's comment
+  now carries the full list: two Nest routes plus this auth path, with `/auth/change-email`
+  listed beside it so it is already refused the day `user.changeEmail` is enabled. Revoking
+  sessions and renaming the account stay open on purpose: both are a sign-in away from
+  recovered, and the list admits what the reset cannot recover, not what is annoying. An
+  ordinary install is untouched; the `DEMO_MODE` table in
+  [self-hosting.md](docs/self-hosting.md#what-demo_modetrue-changes) names the new row.
+- **Request bodies to `/auth/*` are bounded, at the proxy and at the API.** Better Auth reads
+  the raw request stream itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on
+  every other route, and the bundled `docker/Caddyfile` set `request_body max_size` only on
+  `/api/*`, so a `POST /auth/sign-in/email` could stream a body of any size into the API
+  container's heap (512 MB, `--max-old-space-size=384`) at the built-in attempt budget of 3 per
+  10 seconds per IP and path on sign-in, sign-up and change-password, and 100 per minute on the
+  other auth routes. `handle /auth/*` now carries `max_size 64KiB`, and the mount refuses a
+  declared `Content-Length` over the same `AUTH_BODY_MAX_BYTES` (`65536`, a constant in
+  `apps/api/src/auth/auth-body-limit.ts`) with the standard `413` envelope before a byte is
+  read; a chunked body, which has no length to check, is counted as it streams and the
+  connection is closed past the ceiling. The largest legitimate auth body is a few hundred bytes
+  of JSON. The nginx contract in `docs/self-hosting.md` gains `client_max_body_size 64k;` for
+  `location /auth/`, and `two-layer-limit.spec.ts` pins the Caddyfile figure, the nginx row and
+  the API constant to each other; unlike the upload pair, the two may be equal, since there is
+  no multipart envelope between them.
+- **The web app's `script-src` no longer allows `'unsafe-inline'`.** Inline script is admitted
+  by a per-request nonce instead: `apps/web/proxy.ts` — Next 16's replacement for the
+  `middleware.ts` convention, which is where the old file moved — draws 16 bytes from the
+  platform CSPRNG on every request and sets the resulting `Content-Security-Policy` on the
+  *forwarded request* as well as on the response. The request copy is the load-bearing half:
+  Next reads the nonce back out of that header and stamps it onto the scripts it emits itself
+  (the streamed RSC hydration payload, the framework and page bundles). The one inline script
+  Next does not own, `next-themes`'s pre-paint theme setter, is nonced by hand in
+  `app/layout.tsx`. Nothing had to become dynamic for this: every route already renders per
+  request, because `i18n/request.ts` reads `cookies()` and `headers()` on each one.
+
+  `Content-Security-Policy` is the only header that moved out of `next.config.ts`'s
+  `headers()`; the five constant ones stay there, where they also cover the `_next/static` and
+  `_next/image` routes the proxy's matcher skips. `'strict-dynamic'` was tried and dropped —
+  the whole suite passes with it, but `script-src` names no host for it to neutralise, and it
+  would turn a bundle tag Next forgot to nonce from "loads" into "blocked".
+
+  `style-src` keeps `'unsafe-inline'`, unchanged and out of scope: Radix and `@dnd-kit`
+  position elements through the inline `style` *attribute*, which a nonce cannot cover at all.
+
+  The browser suite now fails any scenario in which the browser refused content, collecting
+  both `securitypolicyviolation` events and Chromium's CSP console errors from every page in
+  every context (`e2e/support/fixtures.ts`). That check was verified against a build with the
+  nonce removed, where it failed on `script-src-elem blocked inline` rather than passing
+  quietly — which is how the old `'unsafe-inline'` would otherwise come back unnoticed.
+- **The release workflow no longer trusts a tag's name.** A new `guard` job in
+  `.github/workflows/release-images.yml` runs before any image is built, and every other job
+  waits for it. It checks the two things the release process asks a human to get right by
+  hand: a `vX.Y.Z` tag must point at the tip of `main` (the merge commit step 5 tags), while a
+  pre-release tag must be reachable from `main` or from an open `release/*` or `hotfix/*`
+  branch, the rehearsal path; and every workspace `package.json` must carry the tag's version,
+  with a stable tag also needing its `## [X.Y.Z] - ` heading in `CHANGELOG.md`. Until now a
+  tag typed on `develop`, or on a tree whose version bump was forgotten, would have been built,
+  signed and published, and a stable one would also have moved `latest` under every operator
+  who pulls without `TAG`. A failing guard names the offending file, or the refs it searched,
+  and nothing is pushed; `publish-sbom` waits on the guard explicitly, since its
+  `!cancelled()` condition would otherwise run past a rejected tag with `contents: write`.
+  Every job in the workflow also gained a `timeout-minutes`. The guard catches a slip inside
+  the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
+  repository admin is a repository ruleset, described in
+  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the operator checklist
+  in `ROADMAP.md`.
 
 ## [0.3.0] - 2026-08-22
 

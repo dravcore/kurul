@@ -169,8 +169,13 @@ asla gerçek mail göndermemesi için lokal bir SMTP catch-all olarak
 `messages/<locale>.json` üzerinden geçer. Locale çözümü
 `User.locale → locale cookie → Accept-Language → 'en'`
 ([ADR 0018](decisions/0018-localization-strategy.md)); **Ayarlar → Dil** tercih veya
-“Tarayıcımı izle” seçebilir. Katalog hâlâ yalnızca İngilizce — ek UI dil paketleri
-[MVP ötesi](../../ROADMAP.md#beyond-mvp).
+“Tarayıcımı izle” seçebilir. İki katalog sevkediliyor, `en` ve `tr`; `messages/catalog.test.ts`,
+birinde olup diğerinde olmayan bir anahtarda build'i düşürüyor, yani eşitlik bir iddia değil bir
+kapı. Üçüncü bir dil yeni bir mekanizma istemiyor: bir katalog dosyası, artı iki
+`Record<Locale, …>` metin tablosunun her birine birer satır (`apps/api/src/mail/mail-templates.ts`
+içindeki `MAIL_COPY` ve `apps/api/src/common/board-templates.ts` içindeki board template
+kataloğu); ikisi de var olana kadar derleme hatası. Eksik olan yalnızca bir çevirmen, satırın
+[MVP ötesi](../../ROADMAP.md#beyond-mvp) altında kalma sebebi de bu.
 
 ### Dosya yükleme — `multer` + `file-type`
 
@@ -186,10 +191,11 @@ yoktur ve bilinçli olarak dar tutulmuş tek istisnadır; ayrıntısı
 
 ### Deployment — Docker Compose
 
-Yedi servis: ürünü taşıyan dördü — `api`, `web`, `postgres`, `redis` — artı `proxy` (Caddy;
-port yayınlayan tek servis, TLS'i sonlandırır ve tüm stack'i tek origin'den sunar), `migrate`
-(tek seferlik `prisma migrate deploy`) ve `backup` (`pg_dump` sidecar'ı; ek volume'ünü de
-arşivler). Bu, mevcut self-managed Linux sunucu kurulumuyla eşleşiyor. Ölçek gerektirdiğinde Kubernetes'e giden yol açık kalıyor (hem
+Her zaman yedi servis: ürünü taşıyan dördü (`api`, `web`, `postgres`, `redis`) artı `proxy`
+(Caddy; port yayınlayan tek servis, TLS'i sonlandırır ve tüm stack'i tek origin'den sunar),
+`migrate` (tek seferlik `prisma migrate deploy`) ve `backup` (`pg_dump` sidecar'ı; ek volume'ünü
+de arşivler). Sekizincisi, `demo-reset`, `demo` Compose profilinin arkasında duruyor ve yalnızca
+`--profile demo` ile başlıyor. Bu, mevcut self-managed Linux sunucu kurulumuyla eşleşiyor. Ölçek gerektirdiğinde Kubernetes'e giden yol açık kalıyor (hem
 ClickUp hem Linear sonunda oraya vardı), ama şimdilik tek bir host'ta Compose doğru
 büyüklük.
 
@@ -224,7 +230,7 @@ Mimari ve veri modelleme için incelemeye değer projeler:
 
 ## 5. Karar kayıtları
 
-Stack ve ürün ADR'leri [decisions/README.md](decisions/README.md) indeksinde (0001-0028).
-Tabloyu burada çoğaltmak yerine oradan başlayın.
+Stack ve ürün ADR'leri [decisions/README.md](decisions/README.md) indeksinde. Tabloyu burada
+çoğaltmak yerine oradan başlayın.
 
 İlgili: [architecture.md](architecture.md)

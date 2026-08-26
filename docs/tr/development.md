@@ -165,20 +165,29 @@ olduğu için `.env.example`'da yer almazlar. Bkz.
 [Gözlemlenebilirlik](#gözlemlenebilirlik).
 
 `.env.example` ayrıca `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `REDIS_PASSWORD`,
-`BACKUP_REMOTE` ve `TAG` taşır. Altısı da **yalnızca compose'a aittir**: `docker-compose.yml`
-bunları servis tanımlarına enterpolasyon eder (`TAG`, yayınlanan her imajın etiketini seçer) ve
-hiçbir uygulama kodu okumaz; bu yüzden yukarıdaki tabloda yer almazlar ve `apps/api` tarafında
-bağlanmaları gerekmez. İlk dördü için bkz.
+`REDIS_MAXMEMORY`, `BACKUP_REMOTE` ve `TAG` taşır. Yedisi de **yalnızca compose'a aittir**:
+`docker-compose.yml` bunları servis tanımlarına enterpolasyon eder (`TAG`, yayınlanan her imajın
+etiketini seçer; `REDIS_MAXMEMORY` bir `redis-server` argümanına dönüşür) ve hiçbir uygulama
+kodu okumaz; bu yüzden yukarıdaki tabloda yer almazlar ve `apps/api` tarafında bağlanmaları
+gerekmez. İlk dördü için bkz.
 [Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri), `BACKUP_REMOTE`
 için bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme). `BACKUP_INTERVAL` ve `BACKUP_KEEP`
 o listede değil: onları `backup` servisi okur ama `apps/api` içindeki cleanup worker da okur,
-tabloda olmalarının sebebi bu.
+tabloda olmalarının sebebi bu. `INTERNAL_API_URL` ise tersi yönde çalışır: uygulama kodu okur,
+o yüzden tabloda; ama `.env.example`'da yok, çünkü `docker-compose.yml` onu `.env`'den
+enterpolasyonla değil doğrudan ayarlar.
 
-Bir secret üretmek için:
+`BETTER_AUTH_SECRET`'i şununla üretin:
 
 ```bash
 openssl rand -base64 32
 ```
+
+Bu üretici yalnızca bu değişken için doğru; bir connection URL'in içine giren iki değişken için
+yanlış. Kural, önlediği hata ve olasılıklar tek bir yerde yazılı:
+[Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri). `.env.example`,
+[README.tr.md](../../README.tr.md) ve [self-hosting.md](self-hosting.md) kendi kopyalarını
+taşımak yerine oraya işaret eder.
 
 **Yeni bir ortam değişkeni eklemek dört adımlı bir değişikliktir** ve dördü de aynı PR'a girer:
 `apps/api/src/common/env.ts` yardımcıları üzerinden bağla (veya `process.env` okuyan çağrı
@@ -666,11 +675,12 @@ bakladığı) doğrudan sahipken hiçbir override gerekmiyor. `docker top`'un `r
 redis-server` yerine `999 ... redis-server` göstermesiyle, ve hem şifreli hem şifresiz
 durumda değerin sağlam kaldığı bir `SET` → restart döngüsüyle doğrulandı.
 
-Bu sertleştirme turunun kapsamı dışında: salt-okunur kök dosya sistemi (`read_only: true`)
-ve seccomp profilleri. İkisi de hangi yolların yazılabilir kalması gerektiğine dair
+Bu sertleştirme turunun kapsamı dışında: salt-okunur kök dosya sistemi (`read_only: true`),
+`pids_limit` ve seccomp profilleri. Üçü de hangi yolların yazılabilir kalması gerektiğine dair
 servis-bazlı bir denetim isteyen daha katı kısıtlar (geçici dizinler, node'un kendi `/tmp`
-kullanımı vb.); [ROADMAP.md](../../ROADMAP.md#hardening-track)'ın Hardening hattında takip
-işi olarak izleniyor, buraya dahil edilmedi.
+kullanımı vb.); o denetimi iki Dockerfile o zamandan beri yazdı.
+[ROADMAP.md](../../ROADMAP.md#hardening-track) içindeki "Container hardening pass 2" satırı
+olarak izleniyor, buraya dahil edilmedi.
 
 ## pnpm script'leri
 
@@ -692,6 +702,11 @@ Repository kökünden çalıştırın.
 | `db:seed`        | `pnpm db:seed`        | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır                                                                                                                                                                                                                                                                                                                                                              |
 | `db:studio`      | `pnpm db:studio`      | http://localhost:5555 adresinde Prisma Studio'yu açar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `db:drift`       | `pnpm db:drift`       | `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`'u çalıştırır: yapılandırılmış veritabanını `schema.prisma` ile karşılaştırır ve herhangi bir farkta sıfırdan farklı çıkışla sonlanır. CI'nin `db:migrate`'ten sonra çalıştırdığı komutla aynıdır — bkz. [Migration sapmasını kontrol etme](#migration-sapmasını-kontrol-etme)                                                                                                                                                                                                           |
+| `openapi`        | `pnpm openapi`        | `@kurul/api`'yi derler, sonra `apps/api/openapi.json`'ı derlenmiş uygulamadan yeniden üretir. Swagger CLI plugin'i yalnızca `nest build` sırasında çalışır, build'in burada opsiyonel olmamasının sebebi bu. Dokümanın `info.version`'ı `apps/api/package.json`'dan gelir, dolayısıyla bir sürüm yükseltmesi dosyayı da oynatır                                                                                                                                                                                                                                                              |
+| `openapi:check`  | `pnpm openapi:check`  | Dokümanı bellekte yeniden üretir ve commit'lenmiş `apps/api/openapi.json` ile byte byte karşılaştırır; ilk farklı satırda sıfırdan farklı çıkar. CI'ın `build` job'ının çalıştırdığı komutun aynısı; her controller, DTO veya rol kapısı değişikliğinden sonra çalıştırın                                                                                                                                                                                                                                                                                                                    |
+| `knip`           | `pnpm knip`           | `knip.jsonc` ile yapılandırılmış olarak workspace genelinde kullanılmayan dosya, export ve tipleri raporlar. Bugün bir CI kapısı değil: bilinçli olarak çalıştırılır ve işaretlediği bir export ya `export`'unu kaybeder, ya silinir, ya da gerekçesi yazılı bir ignore olur                                                                                                                                                                                                                                                                                                                 |
+| `test:browser`   | `pnpm test:browser`   | E2e stack'ini derler (`e2e/build-stack.mjs`) ve Playwright smoke paketini ona karşı çalıştırır. Docker ister. CI'da aynı paketi `e2e.yml` çalıştırır: `develop` üzerinde nightly ve `main`'e açılan `release/*` ile `hotfix/*` pull request'lerinde, hiçbir zaman `ci-ok` kapısında değil; o workflow stack'i kendi adımlarında kurar ve Playwright'ı bu script üzerinden değil doğrudan çağırır. Bkz. [testing.md](testing.md#browser-uçtan-uca)                                                                                                                                            |
+| `test:scripts`   | `pnpm test:scripts`   | `scripts/` altındaki bağımlılıksız `node:test` paketlerini çalıştırır; bootstrap doctor kontrolleri ve `api` servisinin iletmediği, dokümante edilmiş bir API-okur anahtarda düşen compose-env koruması dahil                                                                                                                                                                                                                                                                                                                                                                                |
 
 Tek bir workspace'i hedeflemek için pnpm'in filter flag'ini kullanın:
 
@@ -946,7 +961,7 @@ Açtığınızda, API süreci başlarken tam olarak bir `POST` yapılır; gövde
 ```json
 {
   "event": "instance_started",
-  "version": "0.1.0"
+  "version": "0.3.0"
 }
 ```
 
@@ -955,7 +970,7 @@ Alan alan, listenin tamamı budur:
 | Alan      | Değer                | Not                                             |
 | --------- | -------------------- | ----------------------------------------------- |
 | `event`   | `"instance_started"` | Her zaman bu düz metin. Tek bir olay vardır     |
-| `version` | örn. `"0.1.0"`       | Bu derlemenin geldiği `@kurul/api` paket sürümü |
+| `version` | örn. `"0.3.0"`       | Bu derlemenin geldiği `@kurul/api` paket sürümü |
 
 Gönderil**mey**en ve gönderilmesi için kod yolu bulunmayanlar: herhangi bir kurulum kimliği,
 hostname'iniz, IP adresiniz, URL'iniz, veritabanınız, kullanıcı/workspace/board/task sayıları,
@@ -965,7 +980,7 @@ yok, zamanlama yok. Yük gönderilmeden önce tamamen loglanır, böylece sunucu
 kendi API log'unuzda okuyabilirsiniz:
 
 ```text
-LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.1.0"} to https://…
+LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.3.0"} to https://…
 ```
 
 Reddedilen bağlantı, DNS hatası, toplayıcıdan gelen hata ya da zaman aşımı

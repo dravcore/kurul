@@ -12,6 +12,24 @@ updates:
     # Majors now arrive as one PR per package, so the cap has to leave room for a
     # week that lands several of them alongside the two grouped PRs.
     open-pull-requests-limit: 15
+    # Never take a release younger than a week. This is the supply-chain window and nothing
+    # else: a compromised package is typically pulled within hours to a few days, and holding
+    # every bump behind that window is the whole defence a lockfile cannot give. It is *not* a
+    # regression net, and pretending otherwise would be wrong here: the one dependency
+    # regression this repository has had (next 16.3.1 breaking the standalone bundle, fixed by
+    # hand in 390699f) came from a nine-day-old release, and a seven-day cooldown would have
+    # delayed its fix by a week instead of preventing anything.
+    #
+    # `cooldown` is the zero-toolchain half of pnpm 10's `minimumReleaseAge`, which this repo
+    # cannot use while `packageManager` is pnpm 9. Two differences worth knowing: it governs
+    # only what Dependabot proposes (a manual `pnpm add` is unaffected), and **security updates
+    # bypass it entirely**: an advisory-driven bump still opens the day it lands. A release
+    # blocked by an advisory is still bumped by hand, exactly as 390699f was.
+    cooldown:
+      default-days: 7
+      # Longer for majors: a major is reviewed and migrated on its own timeline anyway, so the
+      # extra week costs nothing and buys the ecosystem time to find the breakage first.
+      semver-major-days: 14
     ignore:
       # TypeScript 7 is held, not skipped — see ADR 0030
       # (docs/decisions/0030-typescript-7-hold.md) for the full picture, the maintainer
@@ -80,6 +98,11 @@ updates:
     # patch release of any of the fifteen actions in use is a diff. The grouping below keeps
     # the usual week to one PR, but a week where several actions cut majors needs the headroom.
     open-pull-requests-limit: 10
+    # Same window and the same reasoning as the npm block above. Only `default-days` is
+    # supported outside npm, so majors wait the same seven days as everything else here.
+    # Security updates bypass the cooldown.
+    cooldown:
+      default-days: 7
 
     groups:
       # Same reasoning as the npm groups above, and the same split: minor/patch batched into
@@ -113,6 +136,10 @@ updates:
       interval: weekly
     # Same reasoning as the other two blocks: `main` takes only release/* and hotfix/* merges.
     target-branch: develop
+    # Same window and the same reasoning as the npm block above; `default-days` only, and
+    # security updates bypass it.
+    cooldown:
+      default-days: 7
 
   # Bumps the base images pinned in the compose files: `postgres` and `redis` in both
   # `docker-compose.yml` and `docker-compose.dev.yml`, `caddy` in `docker-compose.yml`, and
@@ -132,3 +159,7 @@ updates:
       interval: weekly
     # Same reasoning as the other two blocks: `main` takes only release/* and hotfix/* merges.
     target-branch: develop
+    # Same window and the same reasoning as the npm block above; `default-days` only, and
+    # security updates bypass it.
+    cooldown:
+      default-days: 7

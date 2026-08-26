@@ -175,10 +175,10 @@ MAIL_FROM=Kurul <kurul@example.com>
 ```
 
 İki gizli değeri de `openssl rand -hex 32` ile üretin. `POSTGRES_PASSWORD` doğrudan bir bağlantı
-URL'inin içine giriyor; `-base64` çıktısındaki bir `/` orada URL'i keser — `-hex`'in alfabesinde
-(`0-9a-f`) böyle bir karakter yok. `BETTER_AUTH_SECRET` yalnızca byte byte karşılaştırılıyor,
-yani bu kısıtı taşımıyor, ama onu da `-hex` ile üretmek, değişken başına ayrı bir kural yerine
-tek bir üreticiyi akılda tutmak demek.
+URL'inin içine giriyor; `-base64`'ün onun için neden yanlış üretici olduğu tek bir yerde yazılı:
+[development.md](development.md#veritabanı-ve-cache-kimlik-bilgileri).
+`BETTER_AUTH_SECRET` yalnızca byte byte karşılaştırılıyor, yani bu kısıtı taşımıyor, ama onu da
+`-hex` ile üretmek, değişken başına ayrı bir kural yerine tek bir üreticiyi akılda tutmak demek.
 
 `SITE_URL` şemayı taşır, çünkü Caddy'nin düz HTTP mi sunacağına yoksa sertifika mı alacağına
 karar veren şey odur. `https://…` otomatik HTTPS'i açar. `http://localhost` (varsayılan) ise

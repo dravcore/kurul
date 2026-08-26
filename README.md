@@ -10,11 +10,12 @@ Open-source, Kanban-focused project management tool.
 
 ## Status
 
-Kurul’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards) — auth/workspaces, boards and
-tasks, filtering, dashboard, activity/notifications, and realtime board sync. See
-[ROADMAP.md](ROADMAP.md). A seven-scenario Playwright smoke pack covers the critical
-browser flows ([docs/testing.md](docs/testing.md#browser-end-to-end)). Beyond-MVP items (email
-notifications, presence, extra locales, …) remain listed under Beyond MVP.
+Kurul’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards): auth/workspaces, boards and
+tasks, filtering, dashboard, activity/notifications, and realtime board sync. A seven-scenario
+Playwright smoke pack covers the critical browser flows
+([docs/testing.md](docs/testing.md#browser-end-to-end)). What has shipped since, what is being
+worked on, and what is deliberately unscheduled all live in one place,
+[ROADMAP.md](ROADMAP.md), rather than being listed twice and going out of date here.
 
 ## What is Kurul?
 
@@ -54,10 +55,12 @@ Kurul's answer is deliberately narrow:
 - **Realtime and multi-tenancy in the core.** Socket.io board sync and workspace-scoped queries
   were designed in, not added on top.
 
-And what it is not, at `v0.3.0`: no subtasks, no time tracking, no public API tokens or
-webhooks. The UI speaks English and Turkish — every interface string, the columns a new board
-is seeded with, and the email we send you — and a third language is a catalog away. API tokens,
-webhooks and further language packs are listed under
+And what it is not, at `v0.3.0`: no subtasks, no time tracking, no public API tokens, no
+webhooks. Personal access tokens landed on `develop` after the tag and ship in the next
+release; webhooks have a design ([ADR 0033](docs/decisions/0033-webhook-delivery-and-failure-policy.md))
+and no implementation. The UI speaks English and Turkish (every interface string, the columns a
+new board is seeded with, and the email we send you) and a third language is a catalog away.
+Webhooks and further language packs are listed under
 [Beyond MVP](ROADMAP.md#beyond-mvp), each with the open question holding it up; subtasks
 and time tracking are not on that list at all. If you need them today, one of the more mature
 projects above is the better choice.
@@ -187,12 +190,9 @@ the client (`pnpm db:migrate:dev`, the command for your _own_ schema edits, does
 
 ### Both paths
 
-`POSTGRES_PASSWORD` has no default — compose refuses to start until it's set. Unlike
-`BETTER_AUTH_SECRET`, this value is embedded directly in a connection URL, so
-`openssl rand -base64 32` is the wrong generator here — its alphabet includes `/` and `+`,
-either of which breaks the URL if it lands in the password (`/` ends the authority section
-outright; roughly half of all base64-32 outputs contain at least one). Use
-`openssl rand -hex 32` instead, whose alphabet (`0-9a-f`) is always URL-safe; see
+`POSTGRES_PASSWORD` has no default: compose refuses to start until it's set. Generate it with
+`openssl rand -hex 32`, not `-base64`, because it is embedded directly in a connection URL. Why
+that matters is written down once, in
 [docs/development.md#database-and-cache-credentials](docs/development.md#database-and-cache-credentials).
 In the dev loop the password segment of `DATABASE_URL` a few lines above it in `.env.example`
 must match it by hand — that host-side string is what `pnpm dev` uses to reach `localhost:5432`,

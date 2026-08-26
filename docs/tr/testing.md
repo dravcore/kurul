@@ -290,7 +290,7 @@ pnpm test:browser                         # browser e2e (Mailpit de gerekir)
 
 Integration testler, test setup'ı tarafından oluşturulan ve migrate edilen **ayrı bir
 veritabanına** (`kurul_test`) karşı çalışır. Geliştirme veritabanına asla dokunmazlar.
-Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#izolasyon).
+Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#i̇zolasyon).
 
 Bu komutların hiçbiri `packages/*/dist` gerektirmez. İki Jest config'i ve Vitest config'leri
 `@kurul/shared-types` ile `@kurul/auth-access` paketlerini `src/index.ts` dosyalarına eşler;
@@ -471,20 +471,25 @@ en uzun job'ıdır ve
 [ROADMAP.md](../../ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit) içindeki
 OPS-10 satırına karşı izlenir.
 
-**Merge öncesi tüm adımlar geçmelidir.** Kapı job'ı (`ci-ok`) branch korumasında yapılandırılan
-tek zorunlu status kontrol — eğer herhangi bir upstream job başarısızsa, atlanırsa ya da iptal
-edilirse, kapı başarısız olur. Bu iki koruma sağlar:
+**Merge öncesi tüm adımlar geçmelidir.** `main` ve `develop` üzerindeki branch koruması iki
+zorunlu context tanıyor: `ci-ok` ve `CodeQL`. `ci-ok` bu workflow'un kapısıdır: herhangi bir
+upstream job başarısızsa, atlanırsa ya da iptal edilirse kapı başarısız olur. `CodeQL` ise
+kendi workflow'u ve kendi context'idir; SEC-06 turundan beri iki branch'ta da zorunlu, bir fork
+PR'ının bu tablodaki her şey yeşilken CodeQL beklemede durabilmesinin sebebi de bu. Kapı iki
+koruma sağlar:
 
 1. **Doğruluk**: hiç koşmamış bir job kapıyı geçemez. Dal koruması _atlanmış_ bir zorunlu
    kontrolü karşılanmış sayar; [#89](https://github.com/dravcore/kurul/pull/89) tam olarak
    böyle merge oldu (`test` kırmızı, `build` atlanmış). `ci-ok` `if: always()` ile koşar ve
    her `needs.*.result` değerinin tam olarak `success` olduğunu doğrular — `failure`, `skipped`
    ve `cancelled` üçü de kapıyı düşürür.
-2. **Dal korumasıyla sabit bir sözleşme**: koruma artık her job adını değil tek bir bağlamı
-   (`ci-ok`) tanıyor. Job eklemek, bölmek veya yeniden adlandırmak ayar değişikliği değil
-   `ci.yml` düzenlemesi; hata yapılırsa sonuç CI'ın içinde kalır — workflow tanımadığı bir
-   `needs` girdisiyle yüklenmeyi reddeder, hiçbir kontrol raporlanmaz ve PR kilitli kalır.
-   Eskiden aynı hata, korumayı artık var olmayan bir bağlamı beklerken bırakıyordu.
+2. **Dal korumasıyla sabit bir sözleşme**: koruma bu workflow için içindeki her job adını
+   değil tek bir bağlamı (`ci-ok`) tanıyor. Job eklemek, bölmek veya yeniden adlandırmak ayar
+   değişikliği değil `ci.yml` düzenlemesi; hata yapılırsa sonuç CI'ın içinde kalır — workflow
+   tanımadığı bir `needs` girdisiyle yüklenmeyi reddeder, hiçbir kontrol raporlanmaz ve PR
+   kilitli kalır. Eskiden aynı hata, korumayı artık var olmayan bir bağlamı beklerken
+   bırakıyordu. `CodeQL` bilinçli olarak istisna: kendi takvimi olan ayrı bir workflow,
+   dolayısıyla bu kapının altına toplamak onu gizlerdi.
 
 CI, `develop` ve `main`'e yapılan push'larda olduğu gibi herhangi bir branch'a yapılan pull
 request'lerde çalışır. Bkz.

@@ -109,7 +109,8 @@ export function scrubEvent(event: SentryEvent): SentryEvent {
  * treats a blank DSN as "initialize but drop everything", which still installs its global
  * error handlers and OpenTelemetry hooks. This product is self-hosted, and a self-hosted
  * install that quietly stands up a telemetry pipeline nobody asked for is the thing
- * `docs/roadmap.md` §9.1 rules out. Off means the package is never loaded at all.
+ * docs/decisions/0021-activation-funnel-and-opt-in-telemetry.md rules out. Off means the
+ * package is never loaded at all.
  */
 export function sentryOptionsFromEnv(
   env: NodeJS.ProcessEnv = process.env,
