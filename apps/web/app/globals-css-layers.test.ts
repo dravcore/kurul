@@ -13,6 +13,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // `new URL('./globals.css', import.meta.url)` is not usable here: Vite rewrites that exact
 // pattern into an asset reference, which resolves to a non-file URL under the test runner.
 const globalsPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'globals.css');
+const webRoot = path.dirname(path.dirname(globalsPath));
 const require = createRequire(import.meta.url);
 const tailwindDir = path.dirname(require.resolve('tailwindcss/package.json'));
 
@@ -235,6 +236,40 @@ function winningValue(sheet: Stylesheet, className: string, property: string): s
     ?.value;
 }
 
+/**
+ * The value that wins for `property` on an element carrying every class in `classNames` at once
+ * (e.g. `class="text-title font-strong"`), each contributed by its own single-class Tailwind
+ * utility rule. Every candidate here has specificity 1 (one class, no combinator), so a tie on
+ * layer falls to source order exactly as `winningValue` already resolves it: the later utility
+ * in Tailwind's compiled order wins outright, with no signal from either utility's use of a CSS
+ * custom-property default to fall back on.
+ */
+function winningValueAmong(
+  sheet: Stylesheet,
+  classNames: string[],
+  property: string,
+): string | undefined {
+  const applicable = sheet.rules
+    .filter((rule) => classNames.some((className) => rule.selector === `.${className}`))
+    .filter((rule) => rule.declarations.some((declaration) => declaration.property === property));
+
+  let winner: StyleRule | undefined;
+  for (const candidate of applicable) {
+    if (winner === undefined) {
+      winner = candidate;
+      continue;
+    }
+    const byLayer = layerRank(sheet, candidate.layer) - layerRank(sheet, winner.layer);
+    const byOrder = candidate.order - winner.order;
+    if (byLayer > 0 || (byLayer === 0 && byOrder > 0)) {
+      winner = candidate;
+    }
+  }
+
+  return winner?.declarations.filter((declaration) => declaration.property === property).at(-1)
+    ?.value;
+}
+
 function requireRule(
   sheet: Stylesheet,
   described: string,
@@ -245,12 +280,35 @@ function requireRule(
   return found;
 }
 
+/**
+ * Every element a keyboard can land on whose own class string could outrank the base outline:
+ * the four form primitives, which until Phase 4 each carried an `outline-none` next to a ring
+ * pair of their own, the dropdown rows, which carried `outline-hidden` while their `bg-accent`
+ * step was read as the indicator, the shell `main`, which is where the skip link lands, and the
+ * task panel's heading, which a keyboard user reaches by pressing Enter on a task card. The last
+ * two each carried a suppressor as a programmatic focus container until the phase keyboard tour
+ * measured both of them matching `:focus-visible` in Chromium and Firefox. Both utilities
+ * compile into `utilities`, which outranks `base`, so either one leaves the element focusing
+ * with nothing drawn at all: in Chromium a `:focus-visible` element under that suppressor
+ * computes `outline-style: none`. The scan reads the whole source rather than the class strings
+ * alone, so a comment in one of these files names the utility as `outline-*` instead of
+ * spelling it.
+ */
+const singleIndicatorTargets = [
+  'components/layout/app-shell.tsx',
+  'components/task/task-panel.tsx',
+  'components/ui/button.tsx',
+  'components/ui/dropdown-menu.tsx',
+  'components/ui/input.tsx',
+  'components/ui/select.tsx',
+  'components/ui/textarea.tsx',
+];
+
 const borderUtilities = {
   'border-border': 'var(--border)',
   'border-input': 'var(--input)',
   'border-signature': 'var(--signature)',
   'border-destructive': 'var(--destructive)',
-  'border-ring': 'var(--ring)',
   'border-border-strong': 'var(--border-strong)',
 } as const;
 
@@ -261,8 +319,6 @@ const borderUtilities = {
  * valid field the app marks `aria-invalid="false"`.
  */
 const stateVariants = {
-  'focus-visible:border-ring': { suffix: ':focus-visible', value: 'var(--ring)' },
-  'focus-within:border-ring': { suffix: ':focus-within', value: 'var(--ring)' },
   'focus-within:border-border-strong': { suffix: ':focus-within', value: 'var(--border-strong)' },
   'hover:border-border-strong': { suffix: ':hover', value: 'var(--border-strong)' },
   'aria-invalid:border-destructive': {
@@ -315,6 +371,11 @@ beforeAll(async () => {
     ...Object.keys(stateVariants),
     'divide-border',
     'dark:bg-accent',
+    'focus-visible:-outline-offset-2',
+    'text-title',
+    'text-title-lg',
+    'font-semibold',
+    'font-strong',
   ]);
   sheet = parseStylesheet(css);
 }, 30_000);
@@ -392,17 +453,100 @@ describe('globals.css cascade layers', () => {
     expect(layerRank(sheet, divide.layer)).toBeGreaterThan(layerRank(sheet, 'base'));
   });
 
-  // components/ui/button.tsx carries `outline-none` next to `focus-visible:border-ring` and
-  // `focus-visible:ring-[3px] ring-ring/50`, all @layer utilities rules. Layering this outline
-  // would leave a focused button with the 1px border and the half-opacity ring instead of the
-  // 2px --ring at 2px offset docs/design.md §5 requires, so it stays unlayered until Phase 4
-  // drops `outline-none` and settles the ring utilities together.
-  it('keeps the :focus-visible outline above every utility', () => {
+  // The keyboard baseline is one mark: 2px --ring at 2px offset (docs/design.md §5). It is an
+  // author rule in `base` like every other, which is only safe because no keyboard-reachable
+  // control carries a ring pair or an outline suppressor of its own any more. The utilities that
+  // still suppress it sit on containers that take focus by script rather than by Tab, an arrow
+  // key or a link; the `it.each` below is what keeps them off everything else.
+  it('layers the :focus-visible outline into base', () => {
     const focus = sheet.rules.filter((rule) => rule.selector === ':focus-visible');
     expect(focus).not.toHaveLength(0);
     for (const rule of focus) {
-      expect(layerRank(sheet, rule.layer)).toBeGreaterThan(layerRank(sheet, 'utilities'));
+      expect(rule.layer).toBe('base');
+      expect(rule.declarations).toContainEqual({
+        property: 'outline',
+        value: '2px solid var(--ring)',
+      });
     }
+  });
+
+  // An invalid field that is focused keeps one mark too, recoloured, rather than growing a
+  // second one beside it.
+  it('recolours that outline for a focused invalid field', () => {
+    const rule = requireRule(sheet, 'an aria-invalid focus outline colour', (candidate) => {
+      return candidate.selector.replaceAll(/['"]/g, '') === '[aria-invalid=true]:focus-visible';
+    });
+
+    expect(rule.layer).toBe('base');
+    expect(rule.declarations).toContainEqual({
+      property: 'outline-color',
+      value: 'var(--destructive)',
+    });
+  });
+
+  // The skip link's landing (components/layout/app-shell.tsx) is the one focus target that fills
+  // the shell, and the row it sits in is `overflow-hidden`, so an outline drawn 2px outside it is
+  // clipped away. The utility pulls the same single mark inside the region rather than
+  // suppressing it, which only works while it outranks the offset `base` declares.
+  it('pulls the shell main outline inside the region instead of suppressing it', () => {
+    const escaped = escapeClass('focus-visible:-outline-offset-2');
+    const inset = requireRule(sheet, `a rule for ${escaped}`, (rule) => {
+      return rule.selector.startsWith(escaped);
+    });
+
+    expect(inset.selector).toBe(`${escaped}:focus-visible`);
+    expect(inset.declarations.at(-1)).toEqual({
+      property: 'outline-offset',
+      value: 'calc(2px * -1)',
+    });
+    expect(layerRank(sheet, inset.layer)).toBeGreaterThan(layerRank(sheet, 'base'));
+  });
+
+  /**
+   * Why the invalid ring left the four primitives (ledger Ruling 11) instead of being kept as the
+   * task brief first wrote it. Both candidates are compiled here precisely because no source file
+   * carries them any more: a ring colour is only a custom property in this Tailwind, and the ring
+   * is painted by the width utility's `box-shadow`, so the class the primitives kept had nothing
+   * left to colour once the width went. This holds that reasoning to the compiler rather than to
+   * a report, and a Tailwind release that starts painting a bare ring colour fails here rather
+   * than by quietly putting a second mark on a focused invalid field.
+   */
+  it('paints nothing for a ring colour that has no ring width beside it', async () => {
+    const compiled = parseStylesheet(
+      await compileGlobals(['aria-invalid:ring-destructive/20', 'ring-[3px]']),
+    );
+    const rulesFor = (className: string): StyleRule[] =>
+      compiled.rules.filter((rule) => rule.selector.startsWith(escapeClass(className)));
+
+    const colourOnly = rulesFor('aria-invalid:ring-destructive/20');
+    expect(colourOnly).not.toHaveLength(0);
+    for (const rule of colourOnly) {
+      expect(rule.declarations.map((declaration) => declaration.property)).toEqual([
+        '--tw-ring-color',
+      ]);
+    }
+
+    const width = rulesFor('ring-[3px]').flatMap((rule) => {
+      return rule.declarations.map((declaration) => declaration.property);
+    });
+    expect(width).toContain('--tw-ring-shadow');
+    expect(width).toContain('box-shadow');
+  }, 30_000);
+
+  it.each(singleIndicatorTargets)('leaves no outline suppressor on %s', async (file) => {
+    expect(await readFile(path.join(webRoot, file), 'utf8')).not.toMatch(
+      /\boutline-(none|hidden)\b/,
+    );
+  });
+
+  // transition-all also animates the outline; the focus ring must draw instantly.
+  it('keeps components/ui/button.tsx off transition-all so its focus outline draws instantly', async () => {
+    const source = await readFile(path.join(webRoot, 'components/ui/button.tsx'), 'utf8');
+    expect(source).not.toMatch(/\btransition-all\b/);
+
+    const transitionList = source.match(/transition-\[([^\]]*)\]/);
+    expect(transitionList).not.toBeNull();
+    expect(transitionList![1]).not.toMatch(/\boutline\b/);
   });
 
   // jsdom never computes `color-scheme` (it lays out nothing), so the only thing a test in this
@@ -430,6 +574,102 @@ describe('globals.css cascade layers', () => {
   // (`dark:bg-destructive/60` under `text-white` lands at 3.02:1) or leave a dark-theme surface
   // with the light-theme rule (`bg-destructive` at 3.11:1). app/globals.contrast.test.ts measures
   // each theme as its own token set, which is only the truth while this variant follows the class.
+  // `.font-display` sets the family on every allowed context, including the 16px sidebar
+  // wordmark (docs/design.md §3), where the display cut's carved strokes would read as
+  // hairline. Only the 40/44 `display` step is meant to draw with that cut, so the axis lives
+  // on the size utility instead of the family one; a rule on `.font-display` would force the
+  // wordmark into the same 40pt cut it needs to stay clear of.
+  it('scopes the opsz axis to .text-display rather than .font-display', () => {
+    const textDisplay = requireRule(sheet, 'the .text-display opsz rule', (rule) => {
+      return rule.selector === '.text-display';
+    });
+    expect(textDisplay.layer).toBe('components');
+    expect(textDisplay.declarations).toContainEqual({
+      property: 'font-variation-settings',
+      value: "'opsz' 40",
+    });
+
+    const fontDisplay = requireRule(sheet, 'the .font-display font-family rule', (rule) => {
+      return rule.selector === '.font-display';
+    });
+    expect(
+      fontDisplay.declarations.some(
+        (declaration) => declaration.property === 'font-variation-settings',
+      ),
+    ).toBe(false);
+  });
+
+  // A theme font stack resolves on :root: `@theme inline` compiles `--font-sans` and its
+  // siblings onto `:root, :host` in `@layer theme`, and a custom property's `var()` reference
+  // only resolves against the element that defines it, so the next/font variable each stack
+  // names has to be defined on :root too, not on a descendant.
+  it('points every font-stack property at a next/font variable defined on html', async () => {
+    const nextFontVariables = ['--font-archivo', '--font-fraunces', '--font-jetbrains'];
+    const fontStackProperties = ['--font-sans', '--font-display', '--font-mono'];
+
+    const themeRule = requireRule(sheet, 'the compiled :root, :host theme block', (rule) => {
+      return (
+        rule.layer === 'theme' &&
+        fontStackProperties.every((property) => {
+          return rule.declarations.some((declaration) => declaration.property === property);
+        })
+      );
+    });
+
+    for (const property of fontStackProperties) {
+      const declaration = themeRule.declarations.find((entry) => entry.property === property);
+      expect(declaration).toBeDefined();
+      expect(
+        nextFontVariables.some((variable) => declaration!.value.startsWith(`var(${variable})`)),
+      ).toBe(true);
+    }
+
+    const layoutSource = await readFile(path.join(webRoot, 'app/layout.tsx'), 'utf8');
+    for (const variable of nextFontVariables) {
+      expect(layoutSource).toContain(`variable: '${variable}'`);
+    }
+
+    // `\s` right after `<html` (rather than `\b`) so this cannot match the literal `<html>` that
+    // appears earlier in the file's own prose comments.
+    const htmlTag = layoutSource.match(/<html\s[\s\S]*?>/)?.[0];
+    expect(htmlTag).toBeDefined();
+    expect(htmlTag).toContain('archivo.variable');
+    expect(htmlTag).toContain('fraunces.variable');
+    expect(htmlTag).toContain('jetbrainsMono.variable');
+  });
+
+  // `font-strong` writes a direct `font-weight: 550`, so pairing it with `text-title` or
+  // `text-title-lg` (whose 600 comes from the `--text-title--font-weight` custom property that
+  // `@theme inline` gives those size steps) does not blend the two: Tailwind's compiled order
+  // always places `.font-strong` after both title utilities in the same `utilities` layer, so at
+  // equal specificity `font-strong`'s direct value wins and silently drops the heading to 550 --
+  // `body-strong`'s weight, one step below what docs/design.md:160 specifies for a title. Page
+  // and panel headings must pair `text-title`/`text-title-lg` with `font-semibold` instead (or no
+  // weight utility at all) to keep the 600 the type-scale table calls for.
+  it('drops text-title(-lg) to 550 when paired with font-strong, and documents why', () => {
+    expect(winningValueAmong(sheet, ['text-title', 'font-strong'], 'font-weight')).toBe('550');
+    expect(winningValueAmong(sheet, ['text-title-lg', 'font-strong'], 'font-weight')).toBe('550');
+  });
+
+  it('keeps text-title(-lg) at 600 when paired with font-semibold, unlike font-strong', () => {
+    // .font-semibold wins the same source-order tie .font-strong does (it also compiles after
+    // the title utilities), but its declared value is `var(--font-weight-semibold)`, which
+    // globals.css defines as 600 -- the title utilities' own weight, not font-strong's 550.
+    expect(winningValueAmong(sheet, ['text-title', 'font-semibold'], 'font-weight')).toBe(
+      'var(--font-weight-semibold)',
+    );
+    expect(winningValueAmong(sheet, ['text-title-lg', 'font-semibold'], 'font-weight')).toBe(
+      'var(--font-weight-semibold)',
+    );
+    expect(
+      requireRule(sheet, 'the --font-weight-semibold custom property', (rule) => {
+        return rule.declarations.some(
+          (declaration) => declaration.property === '--font-weight-semibold',
+        );
+      }).declarations,
+    ).toContainEqual({ property: '--font-weight-semibold', value: '600' });
+  });
+
   it('binds the dark variant to the theme class rather than the OS preference', () => {
     const rule = requireRule(sheet, 'a compiled `dark:bg-accent` rule', (candidate) => {
       return candidate.selector.startsWith(escapeClass('dark:bg-accent'));
@@ -500,6 +740,7 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
       { property: 'forced-color-adjust', value: 'none' },
       { property: 'background', value: 'Highlight' },
       { property: 'color', value: 'HighlightText' },
+      { property: 'outline-color', value: 'CanvasText' },
     ]);
 
     // The icon declares its own `color` (`text-muted-foreground`), so the row's `HighlightText`
@@ -535,6 +776,10 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
       { property: 'forced-color-adjust', value: 'none' },
       { property: 'background', value: 'Highlight' },
       { property: 'color', value: 'HighlightText' },
+      // The opt-out freezes this row's `:focus-visible` outline at its author copper too. The
+      // outline sits at a positive offset, outside the Highlight ground and over the popover,
+      // so the system colour it names is the one that ground forces to.
+      { property: 'outline-color', value: 'CanvasText' },
     ]);
 
     // Separate from identifying which rule opts out: no other rule in the block does.

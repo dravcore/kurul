@@ -477,6 +477,16 @@ describe('Account deletion and anonymisation (e2e)', () => {
           expiresAt: new Date(Date.now() + 600_000),
         },
       });
+      // The reset-password shape is the one flow that really writes here today: the opaque
+      // token in the identifier, the user id in the value. A live one left behind would let
+      // whoever holds the link set a password on the anonymised row until it expired.
+      await prisma.verification.create({
+        data: {
+          identifier: 'reset-password:opaque-token-still-valid',
+          value: seed.departingId,
+          expiresAt: new Date(Date.now() + 3_600_000),
+        },
+      });
 
       const before = await Promise.all([
         prisma.session.count({ where: { userId: seed.departingId } }),
@@ -484,6 +494,7 @@ describe('Account deletion and anonymisation (e2e)', () => {
         prisma.taskAssignee.count({ where: { userId: seed.departingId } }),
         prisma.usagePing.count({ where: { userId: seed.departingId } }),
         prisma.verification.count({ where: { identifier: { contains: seed.departing.email } } }),
+        prisma.verification.count({ where: { value: seed.departingId } }),
       ]);
       // Every one of these has to be non-zero before the delete, or the assertions after it
       // prove nothing at all.
@@ -500,9 +511,10 @@ describe('Account deletion and anonymisation (e2e)', () => {
         prisma.taskAssignee.count({ where: { userId: seed.departingId } }),
         prisma.usagePing.count({ where: { userId: seed.departingId } }),
         prisma.verification.count({ where: { identifier: { contains: seed.departing.email } } }),
+        prisma.verification.count({ where: { value: seed.departingId } }),
         prisma.notification.count({ where: { userId: seed.departingId } }),
       ]);
-      expect(after).toEqual([0, 0, 0, 0, 0, 0]);
+      expect(after).toEqual([0, 0, 0, 0, 0, 0, 0]);
     });
 
     it('revokes the invitations the user had left pending, and keeps the accepted ones', async () => {

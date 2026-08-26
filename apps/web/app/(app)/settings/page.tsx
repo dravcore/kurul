@@ -28,7 +28,7 @@ function SettingsSection({
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h2 className="font-display text-title font-semibold tracking-tight">{title}</h2>
+        <h2 className="text-title font-semibold">{title}</h2>
         <p className="text-body text-muted-foreground">{description}</p>
       </div>
       {children}
