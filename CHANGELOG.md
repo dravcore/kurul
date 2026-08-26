@@ -409,6 +409,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A local `docker build` sent gigabytes of unrelated files into the build context, because
+  `.dockerignore`'s patterns were root-anchored.** Docker's ignore matcher treats a bare
+  pattern like `node_modules` as anchored to the context root, not as "match anywhere" the way
+  `.gitignore` does, so the old file's `node_modules`, `dist`, `.next` and `coverage` entries
+  only ever caught the repository's own top-level copies; every nested one under `apps/*`,
+  `packages/*` and any git worktree still went in through `COPY . .` in both Dockerfiles. On a
+  machine running several agent worktrees under the gitignored `.claude/` directory, that
+  directory alone measured 34 GB, none of it excluded, and a stale `dist` or `.next` from a
+  local build could get copied in ahead of the fresh one the image builds for itself.
+  `.dockerignore` is rewritten with `**/`-prefixed patterns for `node_modules`, `dist`,
+  `.next`, `coverage`, `.turbo`, `.cache` and `*.tsbuildinfo`, plus explicit entries for
+  `.claude`, `.superpowers`, `.nodeterm`, `.cursor`, `.vscode`, `docs`, `e2e`, `.github`,
+  `docker-compose.override.yml`, `rclone.env` and `rclone.conf`, none of which either
+  Dockerfile reads. Measured on this checkout, the context BuildKit reports for
+  `apps/api/Dockerfile` and `apps/web/Dockerfile` drops from roughly 36.4 GB to 5.9 MB, and
+  both images still build their `build` stage end to end. CI is unaffected: the runner already
+  builds from a clean checkout with none of these directories present.
+
 - **BullMQ's due-soon and cleanup workers, and the Socket.io Redis adapter, now report a Redis
   connection fault instead of losing it to `console.error`.** `queue`/`worker.on('error')` on
   both workers, and `pubClient`/`subClient.on('error')` on the gateway's adapter, had no
@@ -542,6 +560,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `workflow_dispatch` triggers are unchanged), and a new step prints the branch and commit
   that actually ran, since the run's own head branch still names the branch the schedule was
   read from. `main` keeps its coverage where it changes: the release and hotfix pull requests.
+- **`REDIS_URL` now honours a Redis 6+ ACL username and `rediss://` (TLS)
+  ([#204](https://github.com/dravcore/kurul/issues/204)).** `parseRedisUrl` read only host,
+  port, password and the database index; `url.username` and `url.protocol` were never
+  inspected, so a URL naming an ACL user (`redis://alice:s3cret@host`) silently authenticated
+  as `default` instead, and a `rediss://` URL connected in plaintext with no warning. The
+  parser now carries `username` through when the URL names one, sets `tls: {}` for `rediss:`,
+  and rejects any scheme other than `redis:`/`rediss:` with the same `Invalid REDIS_URL` error
+  an unparsable database index already uses. All six ioredis/BullMQ construction sites (auth
+  rate limiting, the upload byte budget, the readiness probe, the Socket.io adapter, and both
+  BullMQ workers) spread the parser's return value straight into their client, so the fix
+  reaches every one of them without a call site changing. The bundled Compose stack is
+  unaffected either way: it always builds a plain `redis://:password@redis:6379` for its own
+  `redis` container, so this only matters for a bring-your-own managed Redis.
 
 ### Changed
 
