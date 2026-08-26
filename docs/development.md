@@ -235,9 +235,10 @@ $ openssl rand -hex 32
 1b7c3785ecf7f7bd2ec4826214889d19ff17d518ce44126ab6f07393b39b98a   # 0-9a-f only, always URL-safe
 ```
 
-`-base64 32`'s alphabet includes `/` and `+`; with 43 base64 characters per password, the
-odds of at least one `/` or `+` landing in there are `1 - (63/64)^43 ≈ 51%` — roughly a coin
-flip on whether a freshly generated password silently breaks its own connection string.
+`-base64 32`'s alphabet includes both `/` and `+`, two problem characters out of 64; with 43
+base64 characters per password, the odds of at least one of them landing in there are
+`1 - (62/64)^43 ≈ 74%`, closer to three tries in four than to a coin flip on whether a freshly
+generated password silently breaks its own connection string.
 `openssl rand -hex 32` has no such character to avoid.
 
 | Variable            | Default           | Purpose                                                                                                                 |
