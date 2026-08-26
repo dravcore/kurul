@@ -128,8 +128,9 @@
   /* Dark depth is a lighter surface, not a shadow (docs/design.md §3), so the ramp is the
      hierarchy: canvas, column ground (--muted), card, popover, hover step (--accent), each one
      step above the last. --popover must not meet --accent at either end: a dropdown paints its
-     ground with bg-popover and the highlighted item with bg-accent, and the items carry
-     outline-hidden, so that step is the only thing saying which row is focused. */
+     ground with bg-popover and the highlighted item with bg-accent, so that step is what says
+     which row the pointer is on. The focus mark is the :focus-visible outline below, which the
+     rows no longer suppress: a 1.12:1 surface step cannot carry a focus mark on its own. */
   --background: #131715;
   --foreground: #e8ecea;
   --card: #212523;
@@ -285,16 +286,38 @@ body {
   font-family: var(--font-mono);
 }
 
-/* Unlayered on purpose, unlike the `*` rule above. components/ui/button.tsx carries
-   `outline-none` next to `focus-visible:border-ring` and `focus-visible:ring-[3px]
-   ring-ring/50`, both `@layer utilities` rules, so layering this outline would not leave a
-   focused button bare: it would leave it with a 1px copper border and a 50%-opacity ring,
-   and neither is the 2px `--ring` at 2px offset docs/design.md §5 sets as the keyboard
-   baseline. The rule moves into `base` in the same change that drops `outline-none` and
-   settles the ring utilities, Phase 4. */
-:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+@layer components {
+  /* Dialed to the carved 40pt cut only on the `display` step, not on `.font-display` itself:
+     the wordmark (sidebar-body.tsx) sets that family at 16px, and forcing this axis on the
+     family utility would draw it with the display step's strokes instead of the low-optical-size
+     cut it needs at that size (docs/design.md §3). */
+  .text-display {
+    font-variation-settings: 'opsz' 40;
+  }
+}
+
+/* The whole keyboard baseline, in one place: 2px `--ring` at 2px offset (docs/design.md §5).
+   Inside `base` like the `*` rule above, which is only correct because no keyboard-reachable
+   control carries a focus ring or an outline suppressor of its own any more. Every
+   `outline-none` / `outline-hidden` left in the tree is on a container that takes focus by
+   script rather than by Tab, an arrow key or a link (dialog and drawer content). The shell
+   `main` and the task panel heading are not among them: the skip link puts keyboard focus on
+   the first and Enter on a task card puts it on the second, so both keep this outline, and
+   `main` only pulls it inside its own edge, which is the one place the offset is not 2px.
+   Adding either utility to an element a keyboard can land on outranks this rule from
+   `utilities` and leaves it focusing with nothing drawn at all, which
+   app/globals-css-layers.test.ts holds every target it lists clear of. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* A field that is both invalid and focused keeps one mark, recoloured, rather than a copper
+     outline and a red border arguing over which state the reader is in. */
+  [aria-invalid='true']:focus-visible {
+    outline-color: var(--destructive);
+  }
 }
 
 /* Reduced motion drops movement but keeps state changes visible:
@@ -474,13 +497,17 @@ body {
      row that plate sits under the label and hides it, so `forced-color-adjust: none` is the only
      way to suppress it. The pair of system colours stays explicit so the row still follows the
      user's palette instead of an author colour. The opt-out inherits into every descendant,
-     which is why the `svg` rule below stays: without it the icon would keep its literal grey. */
+     which is why the `svg` rule below stays: without it the icon would keep its literal grey.
+     It reaches the focus outline as well, so that names a system colour here rather than
+     keeping author copper: the outline is drawn at a positive offset, outside the Highlight
+     ground and over the popover, and CanvasText is what that ground forces to. */
   [data-slot='dropdown-menu-item'][data-highlighted],
   [data-slot='dropdown-menu-checkbox-item'][data-highlighted],
   [data-slot='dropdown-menu-radio-item'][data-highlighted] {
     forced-color-adjust: none;
     background: Highlight;
     color: HighlightText;
+    outline-color: CanvasText;
   }
 
   /* The icon declares its own colour (`text-muted-foreground`), so the row's `HighlightText`

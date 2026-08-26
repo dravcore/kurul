@@ -229,15 +229,19 @@ components/
 ### Stil
 
 - Markup'ta Tailwind utility class'ları; CSS modülleri yok, styled-components yok.
-- Koşullu class'lar string concatenation değil, `cn()` helper'ından geçer.
+- Koşullu class'lar string concatenation değil, `cn()` helper'ından geçer. `cn()`
+  (`apps/web/lib/utils.ts`) `tailwind-merge`'ü Kurul'un tip ölçeği ve `font-strong` ağırlığıyla
+  genişletir; böylece bir tüketicinin `text-*`/`font-*` override'ı, primitifin kendi
+  varsayılanıyla tekilleşir, ikisi birden DOM'a ulaşmaz.
 - Design token'ları (renkler, spacing, radius) Tailwind theme'inden gelir — component'lerde
   keyfi hex değerleri yok.
 - `apps/web/app/globals.css` içindeki yazar CSS'i, kuralın yanına yazılmış bir gerekçe yoksa
   `@layer base` içine girer. Katmansız bir kural özgüllüğünden bağımsız olarak her cascade
   katmanını yener; bu yüzden katmansız bir `*` seçici, Tailwind'in `@layer utilities` içine
   ürettiği yardımcı sınıfları yeniden boyar ve markup'ta yazılan class söylediği şeyi ifade
-  etmeyi bırakır. Bugünkü tek istisna `:focus-visible` outline'ı ve gerekçesi kuralın yanında
-  duruyor. `apps/web/app/globals-css-layers.test.ts` bunu korur.
+  etmeyi bırakır. Böyle bir gerekçe taşıyan tek kural `:focus-visible` outline'ıydı; kontroller
+  kendi focus ring'lerini ve `outline-none`'larını bıraktığı anda `base` içine taşındı ve bugün
+  hiçbir kural böyle bir gerekçe taşımıyor. `apps/web/app/globals-css-layers.test.ts` bunu korur.
 - Her `text-*`, `bg-*`, `border-*`, `font-*` ve `shadow-*` class'ının `@theme inline` içinde ya da
   Tailwind'in yerleşik ölçeğinde bir karşılığı olmalı. Karşılığı olmayan class hiç CSS üretmez:
   hata da vermez, element yalnızca miras alır ve yanlışlık review'da görünmez.

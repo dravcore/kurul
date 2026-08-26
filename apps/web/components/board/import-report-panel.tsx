@@ -57,7 +57,7 @@ export function ImportReportPanel({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="font-display text-title font-semibold">
+          <h2 className="text-title font-semibold">
             {t('reportTitle', { name: report.boardName })}
           </h2>
           <p className="max-w-prose text-small text-muted-foreground">{t('notSaved')}</p>
@@ -68,7 +68,7 @@ export function ImportReportPanel({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <p className="text-small font-medium text-foreground">{t('importedTitle')}</p>
+        <p className="text-small font-strong text-foreground">{t('importedTitle')}</p>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-small text-muted-foreground">
           {IMPORTED_KEYS.map((key) => (
             <li key={key}>{t(`imported.${key}`, { count: report.imported[key] })}</li>
@@ -77,7 +77,7 @@ export function ImportReportPanel({
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-small font-medium text-foreground">{t('skippedTitle')}</p>
+        <p className="text-small font-strong text-foreground">{t('skippedTitle')}</p>
         {report.skipped.length === 0 ? (
           <p className="text-small text-muted-foreground">{t('nothingSkipped')}</p>
         ) : (
@@ -164,7 +164,7 @@ function ColumnSettingsLink({
   label: string;
 }): React.ReactElement {
   return (
-    <Link href={`/board/${boardId}`} className="text-small font-medium text-primary underline">
+    <Link href={`/board/${boardId}`} className="text-small font-strong text-primary underline">
       {label}
     </Link>
   );

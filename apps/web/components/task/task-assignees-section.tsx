@@ -21,7 +21,7 @@ export function TaskAssigneesSection({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-small font-medium text-foreground">{t('assignees')}</p>
+      <p className="text-small font-strong text-foreground">{t('assignees')}</p>
       <ul className="flex flex-col gap-1">
         {members.map((member) => {
           const assigned = assignedUserIds.has(member.userId);

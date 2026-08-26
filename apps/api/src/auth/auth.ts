@@ -5,14 +5,16 @@ import { uuidv7 } from 'uuidv7';
 import { PrismaClient } from '../generated/prisma';
 import { loadRootEnv, envString } from '../common/env';
 import { RESOLVED_CLIENT_IP_HEADER } from '../common/trust-proxy';
-import { buildVerificationEmail } from '../mail/mail-templates';
+import { DEMO_USER_EMAIL } from '../demo/demo-dataset';
+import { demoModeEnabled } from '../demo/demo-mode';
+import { buildPasswordResetEmail, buildVerificationEmail } from '../mail/mail-templates';
 import { acceptLanguageOf, resolveRecipientLocale } from '../mail/recipient-locale';
 import { sendMail } from '../mail/send-mail';
 import { readStoredLocale } from '../mail/stored-locale';
 import { createSharedPrismaAdapter, registerPoolConsumer } from '../prisma/database';
 import { authRateLimitOptions } from './auth-rate-limit';
 import { organizationOptions } from './organization-options';
-import { resolveVerificationUrl, webAppUrl } from './web-urls';
+import { resolvePasswordResetUrl, resolveVerificationUrl, webAppUrl } from './web-urls';
 
 loadRootEnv();
 
@@ -43,6 +45,14 @@ const webUrl = webAppUrl();
 // asked to tune it, and the trigger for adding one is a deployment where the per-minute read
 // itself measurably hurts, not a guess that one might exist.
 const SESSION_COOKIE_CACHE_MAX_AGE_SECONDS = 60;
+
+/**
+ * How long a password-reset link works. Better Auth's own default is the same hour; it is
+ * spelled out because the email says it in words (`buildPasswordResetEmail`) and the two must
+ * not drift, and because `account-deletion.service.ts` reasons about how long a token can
+ * outlive its account. Single-use regardless: the token row is consumed on the first reset.
+ */
+const RESET_PASSWORD_TOKEN_TTL_SECONDS = 60 * 60;
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -119,6 +129,39 @@ export const auth = betterAuth({
     // gates exactly one thing — accepting a workspace invitation, see `organization-options.ts`
     // — so existing accounts are never locked out by this feature landing.
     requireEmailVerification: false,
+    resetPasswordTokenExpiresIn: RESET_PASSWORD_TOKEN_TTL_SECONDS,
+    // A reset is how an account is taken back, from a forgotten password or from whoever
+    // learned the old one, so every session the account had ends with it. Each cookie is still
+    // trusted for up to `SESSION_COOKIE_CACHE_MAX_AGE_SECONDS`, like any other revocation.
+    revokeSessionsOnPasswordReset: true,
+    // `POST /auth/request-password-reset` answers the same `200` for an unknown address, and
+    // Better Auth's built-in limiter caps it at 3 per minute per IP (`auth-rate-limit.ts`).
+    // With this hook absent the route refuses outright (`RESET_PASSWORD_DISABLED`), which is
+    // what made "forgot my password" an instance-admin deletion until now.
+    async sendResetPassword({ user, url }, request) {
+      // The demo account's password is published, so a reset would only lock every visitor out
+      // until the next wipe. Demo mode already routes all mail to the log (`createMailSender`);
+      // this keeps the one token that matters out of even that.
+      if (demoModeEnabled() && user.email === DEMO_USER_EMAIL) {
+        return;
+      }
+
+      const locale = await resolveRecipientLocale(readStoredLocale, {
+        to: user.email,
+        acceptLanguage: acceptLanguageOf(request),
+      });
+
+      await sendMail(
+        buildPasswordResetEmail({
+          to: user.email,
+          name: user.name,
+          // Better Auth's link would redirect to the API origin after checking the token.
+          resetUrl: resolvePasswordResetUrl(url),
+          expiresInHours: RESET_PASSWORD_TOKEN_TTL_SECONDS / 3600,
+          locale,
+        }),
+      );
+    },
   },
   emailVerification: {
     // `sendOnSignUp` defaults to following `requireEmailVerification`, which is `false` above

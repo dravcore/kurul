@@ -446,6 +446,22 @@ kimse workspace'inize katılamaz. Üyeler ekranı bunu üründe de söyler. Bild
 (atama, mention, due-soon) aynı ayarları kullanır ve onlar olmadan yalnızca kapalı kalır; SMTP
 çalıştığında her kullanıcı bunları Ayarlar'dan kendisi için kapatabilir.
 
+**Parola sıfırlama da SMTP ister ve o olmadan sessizce başarısız olur.**
+`POST /auth/request-password-reset` her durumda `200` döner (hesabı olmayan bir adres için de
+aynısını döner, böylece kimse bu uçla hesap listesi çıkaramaz) ve `SMTP_HOST` boşken mesajın
+tamamı, sıfırlama bağlantısı dahil, kişiye değil API log'una gider:
+
+```
+Email not sent (no SMTP): from=Kurul <noreply@localhost> to=siz@example.com subject=Reset your Kurul password
+...
+http://localhost:4000/auth/reset-password/<token>?callbackURL=http%3A%2F%2Flocalhost%3A3000%2Freset-password
+```
+
+Tek kişilik bir kurulumda bu iş görür (bağlantıyı geçerli olduğu bir saat içinde
+`docker compose logs api` çıktısından kopyalarsınız), başkası için bir kurtarma yolu değildir:
+dışarıda kalmış bir kullanıcı sizin log'larınızı okuyamaz. `DEMO_MODE` açık bir kurulumda,
+parolası zaten yayımlanmış olan demo hesabı için sıfırlama postası log'a bile yazılmaz.
+
 Her SMTP sağlayıcısı çalışır. En sık iki şey ters gider:
 
 - **`SMTP_SECURE`.** `true`, yalnızca 465 portunda geçerli olan implicit TLS demektir. 587 ve
@@ -961,6 +977,16 @@ kural:
 | geri kalan her | web:3000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
 
 `/api/*` ayrıca WebSocket upgrade'lerini de geçirmelidir — realtime pano akışı odur.
+
+**Bir route sırrını yolunda taşır, onu proxy'nin access log'undan uzak tutun.**
+`GET /auth/reset-password/<token>`, gerçek bir tarayıcının izlediği bir URL'dir ve içindeki
+token, karşı taraftaki form gönderilene kadar canlıdır. API'nin kendi access log'u bu yolu
+`/auth/reset-password/:token` olarak yazar, token'ın kendisini asla
+(`apps/api/src/common/logging/access-log.middleware.ts`); ama öndeki proxy, kendisinden istenen
+URL'i olduğu gibi log'lar. Paketlenmiş `docker/Caddyfile` hiçbir `log` direktifi tanımlamaz, yani
+hiç access log yazmaz; nginx'in varsayılan `combined` formatı ise URL'in tamamı olan `$request`'i
+log'lar. Bu hostname'de access log tutuyorsanız `/auth/reset-password/*` yolunu filtreleyin ya da
+yeniden yazın; bunu yapana kadar o log'u canlı kimlik bilgisi tutan bir yer sayın.
 
 Yönlendirme sözleşmesinin dışında kalan ama yine de taklit etmeye değen bir şey var: pakete
 dahil Caddy, bir upstream yeniden başlarken isteği 502 ile yanıtlamak yerine 30s'ye kadar

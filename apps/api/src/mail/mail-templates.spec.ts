@@ -4,8 +4,62 @@ import {
   buildDueSoonEmail,
   buildInvitationEmail,
   buildMentionEmail,
+  buildPasswordResetEmail,
   buildVerificationEmail,
 } from './mail-templates';
+
+describe('buildPasswordResetEmail', () => {
+  const params = {
+    to: 'forgetful@example.test',
+    name: 'Ada Lovelace',
+    resetUrl:
+      'http://localhost:4000/auth/reset-password/opaque?callbackURL=http%3A%2F%2Flocalhost%3A3000%2Freset-password',
+    expiresInHours: 1,
+    locale: 'en' as Locale,
+  };
+
+  it('addresses the recipient and carries the reset link in both bodies', () => {
+    const message = buildPasswordResetEmail(params);
+
+    expect(message.to).toBe('forgetful@example.test');
+    expect(message.subject).toContain('Kurul');
+    expect(message.subject).toContain('password');
+    expect(message.text).toContain('Ada Lovelace');
+    expect(message.text).toContain(params.resetUrl);
+    expect(message.html).toContain(`href="${params.resetUrl}"`);
+  });
+
+  it('states the validity window it was built with, in words', () => {
+    expect(buildPasswordResetEmail(params).text).toContain('one hour');
+    expect(buildPasswordResetEmail({ ...params, expiresInHours: 2 }).text).toContain('2 hours');
+  });
+
+  it('tells someone who did not ask that nothing has changed', () => {
+    // The email reaches whoever owns the address, which is not always whoever typed it in.
+    expect(buildPasswordResetEmail(params).text).toContain('your password stays as it is');
+  });
+
+  it('greets a nameless account without a dangling blank', () => {
+    expect(buildPasswordResetEmail({ ...params, name: '   ' }).text.startsWith('Hi,')).toBe(true);
+  });
+
+  it('writes the whole email in Turkish for a Turkish recipient', () => {
+    const message = buildPasswordResetEmail({ ...params, locale: 'tr' });
+
+    expect(message.subject).toContain('parolanızı sıfırlayın');
+    expect(message.text.startsWith('Merhaba Ada Lovelace,')).toBe(true);
+    expect(message.text).toContain(params.resetUrl);
+    expect(message.text).toContain('bir saat');
+    expect(message.html).toContain('Yeni parola seç');
+    expect(message.text).not.toContain('Someone asked');
+  });
+
+  it('greets a nameless Turkish account without a dangling blank', () => {
+    const message = buildPasswordResetEmail({ ...params, name: '   ', locale: 'tr' });
+
+    expect(message.text.startsWith('Merhaba,')).toBe(true);
+  });
+});
 
 describe('buildVerificationEmail', () => {
   const params = {
