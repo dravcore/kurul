@@ -91,18 +91,42 @@ updates:
           - minor
           - patch
 
-  # `mailpit` in `docker-compose.dev.yml` is now pinned `tag@sha256:...` instead of `:latest`
-  # (roadmap Hardening: "mailpit pinned by digest"), which is what gives this ecosystem
-  # something to bump. `directory: /` also covers `docker-compose.yml` in the same directory:
-  # its `postgres`/`redis`/`caddy` tags may get bump PRs too, which is fine, and its
-  # `ghcr.io/dravcore/kurul-*` images resolve the `${TAG:-latest}` build arg through the
-  # release pipeline rather than a literal tag, so Dependabot has nothing to propose there.
+  # `node` in both Dockerfiles is pinned `tag@sha256:...` instead of a bare tag, which is what
+  # gives this ecosystem something to bump. Dependabot's `docker` updater only reads Dockerfiles
+  # (plus Helm charts and Kubernetes manifests) in the directory it is pointed at, and never a
+  # compose file, so `directories` lists the two Dockerfile locations, not the repo root: a
+  # `directory: /` entry here would match nothing in this repo and fail the job.
   #
-  # The e2e workflow's own `services: mailpit` image is a separate pin this ecosystem does not
-  # see at all — Dependabot's `docker` ecosystem only reads Dockerfiles and compose files, not
-  # a `uses:`-adjacent `services:` block in a workflow — so that one stays a manual bump; see
-  # the comment on it in `.github/workflows/e2e.yml`.
+  # The compose files are a separate Dependabot ecosystem, `docker-compose`, registered in the
+  # block right after this one. `mailpit` in `docker-compose.dev.yml` and every other base image
+  # (`postgres` and `redis` in both compose files, `caddy` in `docker-compose.yml`) are pinned
+  # the same way, and it is that block, not this one, that bumps them.
+  #
+  # The `ghcr.io/dravcore/kurul-*` images resolve the `${TAG:-latest}` build arg through the
+  # release pipeline rather than a literal tag, so neither ecosystem has anything to propose
+  # there.
   - package-ecosystem: docker
+    directories:
+      - /apps/api
+      - /apps/web
+    schedule:
+      interval: weekly
+    # Same reasoning as the other two blocks: `main` takes only release/* and hotfix/* merges.
+    target-branch: develop
+
+  # Bumps the base images pinned in the compose files: `postgres` and `redis` in both
+  # `docker-compose.yml` and `docker-compose.dev.yml`, `caddy` in `docker-compose.yml`, and
+  # `mailpit` in `docker-compose.dev.yml`. `docker-compose` is a distinct Dependabot ecosystem
+  # from `docker` above, not a directory of it: the `docker` updater never reads a compose
+  # file, so putting `/` in its `directories` list (as an earlier version of this file did)
+  # silently bumps nothing for these images and errors instead, since `/` then has no
+  # Dockerfile for `docker` to find either.
+  #
+  # The e2e workflow's own `services: mailpit` image is a separate pin that neither ecosystem
+  # sees, since Dependabot's docker ecosystems read Dockerfiles and compose files only, not a
+  # `uses:`-adjacent `services:` block in a workflow, so that one stays a manual bump; see the
+  # comment on it in `.github/workflows/e2e.yml`.
+  - package-ecosystem: docker-compose
     directory: /
     schedule:
       interval: weekly

@@ -1,14 +1,42 @@
-node_modules
-.next
-dist
+# A bare pattern here only matches at the context root: Docker's ignore matcher is not
+# git's, and "node_modules" alone never reaches apps/api/node_modules or a nested worktree's
+# copy. Every pattern that must match at any depth carries an explicit **/ prefix.
+
+# Version control and CI, never read by either Dockerfile
 .git
-coverage
+.github
+
+# Dependencies: root install plus every workspace package's own copy, and any git worktree's
+**/node_modules
+.pnpm-store
+
+# Build outputs and caches: both Dockerfiles rebuild these inside the image, so a stale local
+# copy must never be copied over the fresh one
+**/dist
+**/.next
+**/coverage
+**/.turbo
+**/.cache
+**/*.tsbuildinfo
+apps/api/src/generated
+
+# Agent worktrees and tool state: gitignored, multiple GB apiece with several checked out in
+# parallel, and no build ever reads them
+.claude
+.superpowers
+.nodeterm
+.cursor
+.vscode
+
+# Docs, the browser end-to-end suite and audit notes: not copied by either Dockerfile
+docs
+e2e
+audit/
 *.md
+
+# Environment and local Compose overrides
 .env
 .env.*
-apps/api/src/generated
-apps/web/.next
-**/*.tsbuildinfo
-audit/
-.pnpm-store
-e2e/test-results
+docker-compose.override.yml
+rclone.env
+rclone.conf
