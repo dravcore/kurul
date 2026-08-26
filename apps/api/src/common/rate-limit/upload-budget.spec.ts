@@ -268,7 +268,7 @@ describe('UploadBudgetService', () => {
       allowed: false,
       retryAfterSeconds: 9,
     });
-    await service.onModuleDestroy();
+    await service.onApplicationShutdown();
 
     expect(evalMock).toHaveBeenCalledTimes(1);
     expect(quitMock).toHaveBeenCalledTimes(1);

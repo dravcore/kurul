@@ -73,9 +73,9 @@ export function createSharedPrismaAdapter(): PrismaPg {
  * disconnect it before the pool goes away.
  *
  * This module is the single owner of the pool's lifecycle. Callers do not disconnect their
- * own client at shutdown — Nest gives no ordering guarantee between `onModuleDestroy` hooks,
- * and a client disconnecting after the pool has ended throws "Called end on pool more than
- * once" / "cannot use a pool after calling end".
+ * own client at shutdown: Nest gives no ordering guarantee between the shutdown hooks of two
+ * providers, and a client disconnecting after the pool has ended throws "Called end on pool
+ * more than once" / "cannot use a pool after calling end".
  */
 export function registerPoolConsumer(disconnect: PoolConsumer): void {
   consumers.add(disconnect);
@@ -86,7 +86,7 @@ export function registerPoolConsumer(disconnect: PoolConsumer): void {
  *
  * Idempotent and concurrency-safe: the first caller owns the shutdown and every later or
  * parallel caller awaits that same promise, so it does not matter whether `AuthModule` or
- * `PrismaService` gets its destroy hook first — both call this, the first one drains
+ * `PrismaService` gets its shutdown hook first. Both call this: the first one drains
  * everything and the second is a no-op.
  */
 export async function closeSharedDatabase(): Promise<void> {

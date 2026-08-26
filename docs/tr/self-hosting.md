@@ -769,6 +769,16 @@ değil.
    uygular ve `--wait`, uzun süreli her servis healthy raporladığında döner, biri raporlamazsa
    sıfırdan farklı kodla.
 
+   Yeniden oluşturma bir kesinti değil, bir duraklamadır. `api`, Docker onu öldürmeden önce
+   yaptığı işi bitirmek için 30s alır (`stop_grace_period`) ve pakete dahil Caddy, bir upstream
+   geri gelirken isteği 502 ile yanıtlamak yerine 30s'ye kadar tutar, her 500ms'de yeniden
+   dener. Tek replika hâlâ isteklerin başka yerde karşılanmak yerine beklemesi demektir ve
+   gövdesini göndermeye başlamış bir yükleme yeniden denenmez. Yerine konan bir reverse
+   proxy'nin aynı davranışı göstermesi için kendi karşılığına ihtiyacı vardır ve nginx open
+   source'ta birebir karşılığı yoktur: `proxy_next_upstream` isteği upstream grubundaki _bir
+   sonraki_ sunucuya devreder, dolayısıyla tek bir `api` girdisi olan grup hiç yeniden
+   denenmez.
+
 6. **Doğrulayın:**
 
    ```bash
@@ -884,6 +894,17 @@ bunu bırakmanızı sağlar: bu imajın bu deponun release workflow'undan çıkt
 **imza** ve içinde ne olduğunu söyleyen bir **SBOM**. İkisini de kullanmak isteğe bağlıdır ve
 aşağıdaki komutları hiç çalıştırmayan kimseyi korumazlar.
 
+Yığının altındaki temel imajlar da, `docker-compose.yml` içindeki `postgres`, `redis`, `caddy`
+ve api ile web Dockerfile'larındaki `node`, benzer bir nedenle salt tag yerine `tag@sha256:...`
+ile sabitlenir: aynı sürümün iki ayrı derlemesi böylece aynı byte'ları çözümler. Her digest'i
+güncel tutan iki ayrı Dependabot ekosistemi var: `docker-compose`, compose dosyalarındaki
+`postgres`, `redis` ve `caddy`'yi günceller; `docker` ise iki Dockerfile'daki `node`'u günceller.
+Her iki durumda da üst akıştaki bir düzeltme, bir şeyin yeniden derlenmesini bekleyip sessizce
+gelmek yerine, gözden geçirilebilir bir pull request olarak gelir. Bunun bir yan etkisi var: tek
+başına `docker compose pull`, artık iki Kurul sürümü arasında çıkan bir `postgres`/`redis`/`caddy`
+yama sürümünü almaz, çünkü çözümlediği tag artık bir digest'e sabitlenmiştir; o yama,
+Dependabot'un digest güncellemesini birleştiren bir sonraki Kurul sürümüyle gelir.
+
 ### İmzayı kontrol etmek
 
 [cosign](https://github.com/sigstore/cosign) **3.0 veya üstü** gerekir — imzalar cosign 3'ün
@@ -991,6 +1012,13 @@ URL'i olduğu gibi log'lar. Paketlenmiş `docker/Caddyfile` hiçbir `log` direkt
 hiç access log yazmaz; nginx'in varsayılan `combined` formatı ise URL'in tamamı olan `$request`'i
 log'lar. Bu hostname'de access log tutuyorsanız `/auth/reset-password/*` yolunu filtreleyin ya da
 yeniden yazın; bunu yapana kadar o log'u canlı kimlik bilgisi tutan bir yer sayın.
+
+Yönlendirme sözleşmesinin dışında kalan ama yine de taklit etmeye değen bir şey var: pakete
+dahil Caddy, bir upstream yeniden başlarken isteği 502 ile yanıtlamak yerine 30s'ye kadar
+tutuyor; bir upgrade'i hatalar yerine gecikmeye çeviren şey bu. Bunu yapmayan bir proxy yine de
+doğrudur, yalnızca her `docker compose up -d` sırasında daha gürültülüdür. Aynısını yapmanın
+neye mal olduğu ve nginx open source'ta neden birebir karşılığı olmadığı,
+[Upgrade](#upgrade) bölümünün 5. adımında.
 
 #### Proxy'nin sayısı neden 26 MiB, API'ninki neden 25
 

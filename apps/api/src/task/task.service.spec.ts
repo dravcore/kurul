@@ -136,7 +136,7 @@ describe('TaskService', () => {
       taskEvents,
       notificationMailer as unknown as NotificationMailer,
     );
-    const labels = new TaskLabelService(prismaService, taskRead, taskEvents);
+    const labels = new TaskLabelService(prismaService, activity, taskRead, taskEvents);
     return {
       service: new TaskService(prismaService, activity, realtime, assignees, labels, taskRead),
       prisma,
@@ -740,9 +740,51 @@ describe('TaskService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('records task.label_added inside the same transaction as the join-row write', async () => {
+    const { service, prisma, activityService } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1', boardId: BOARD_ID }));
+    prisma.label.findFirst.mockResolvedValue({
+      id: 'l1',
+      boardId: BOARD_ID,
+      name: 'Backend',
+      color: 'slot-1',
+    });
+    prisma.taskLabel.create.mockResolvedValue({ id: 'tl1', taskId: 't1', labelId: 'l1' });
+
+    await service.addLabel(WORKSPACE_ID, 't1', ACTOR_ID, { labelId: 'l1' });
+
+    expect(prisma.taskLabel.create).toHaveBeenCalledWith({
+      data: { taskId: 't1', labelId: 'l1' },
+    });
+    expect(activityService.record).toHaveBeenCalledWith(prisma, {
+      workspaceId: WORKSPACE_ID,
+      taskId: 't1',
+      userId: ACTOR_ID,
+      type: ActivityType.TaskLabelAdded,
+      payload: { labelId: 'l1', name: 'Backend', color: 'slot-1' },
+    });
+  });
+
+  it('returns 404 when removing a label that does not belong to this task board', async () => {
+    const { service, prisma } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.label.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.removeLabel(WORKSPACE_ID, 't1', USER_ID, '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.taskLabel.deleteMany).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when removing a label that is not attached to the task', async () => {
     const { service, prisma } = buildService();
     prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1' }));
+    prisma.label.findFirst.mockResolvedValue({
+      id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80',
+      boardId: BOARD_ID,
+      name: 'Backend',
+      color: 'slot-1',
+    });
     prisma.taskLabel.deleteMany.mockResolvedValue({ count: 0 });
 
     await expect(
@@ -754,6 +796,28 @@ describe('TaskService', () => {
         labelId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d80',
         task: { board: { workspaceId: WORKSPACE_ID } },
       },
+    });
+  });
+
+  it('records task.label_removed inside the same transaction as the join-row delete', async () => {
+    const { service, prisma, activityService } = buildService();
+    prisma.task.findFirst.mockResolvedValue(taskRow({ id: 't1', boardId: BOARD_ID }));
+    prisma.label.findFirst.mockResolvedValue({
+      id: 'l1',
+      boardId: BOARD_ID,
+      name: 'Backend',
+      color: 'slot-1',
+    });
+    prisma.taskLabel.deleteMany.mockResolvedValue({ count: 1 });
+
+    await service.removeLabel(WORKSPACE_ID, 't1', ACTOR_ID, 'l1');
+
+    expect(activityService.record).toHaveBeenCalledWith(prisma, {
+      workspaceId: WORKSPACE_ID,
+      taskId: 't1',
+      userId: ACTOR_ID,
+      type: ActivityType.TaskLabelRemoved,
+      payload: { labelId: 'l1', name: 'Backend', color: 'slot-1' },
     });
   });
 

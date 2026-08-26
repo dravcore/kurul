@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { Queue, Worker, type Job } from 'bullmq';
+import { WORKER_CLOSE_TIMEOUT_MS } from '../common/close-worker';
 import { initSentry, resetSentryForTesting } from '../common/observability/sentry';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -20,9 +21,15 @@ jest.mock('bullmq', () => ({
     add: jest.fn(),
     upsertJobScheduler: jest.fn().mockResolvedValue({ id: 'retention-cleanup' }),
     on: jest.fn(),
-    close: jest.fn(),
+    close: jest.fn().mockResolvedValue(undefined),
   })),
-  Worker: jest.fn().mockImplementation(() => ({ on: jest.fn(), close: jest.fn() })),
+  // `close` resolves rather than returning `undefined`: the shutdown hook races it against a
+  // timeout (`common/close-worker.ts`), so a stub that is not thenable is not a stand-in for
+  // the real worker at all.
+  Worker: jest.fn().mockImplementation(() => ({
+    on: jest.fn(),
+    close: jest.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 const RETENTION_ENV = [
@@ -380,7 +387,38 @@ describe('CleanupWorker', () => {
       await worker.onModuleInit();
 
       expect(Queue).not.toHaveBeenCalled();
-      await worker.onModuleDestroy();
+      await worker.onApplicationShutdown();
+    });
+  });
+
+  describe('shutdown', () => {
+    it('gives up on a sweep that will not stop instead of holding the shutdown open', async () => {
+      // The failure this guards: `worker.close()` waits for the running job and BullMQ puts no
+      // ceiling on that wait, so a first sweep on an instance with years of history used to hold
+      // the whole shutdown past the container's stop grace period and end in a SIGKILL, which
+      // skips every hook after this one (the pg pool, the Redis clients, the mail transport).
+      process.env.CLEANUP_ENABLED = 'true';
+      process.env.REDIS_URL = 'redis://localhost:6379';
+      const { worker } = buildWorker();
+      await worker.onModuleInit();
+
+      const bullWorker = (Worker as unknown as jest.Mock).mock.results[0]!.value as {
+        close: jest.Mock;
+      };
+      bullWorker.close.mockReturnValue(new Promise<void>(() => {}));
+
+      jest.useFakeTimers();
+      try {
+        const shutdown = worker.onApplicationShutdown();
+        await jest.advanceTimersByTimeAsync(WORKER_CLOSE_TIMEOUT_MS);
+
+        await expect(shutdown).resolves.toBeUndefined();
+      } finally {
+        jest.useRealTimers();
+      }
+
+      expect(bullWorker.close).toHaveBeenCalledTimes(2);
+      expect(bullWorker.close).toHaveBeenLastCalledWith(true);
     });
   });
 
@@ -673,7 +711,7 @@ describe('CleanupWorker', () => {
         },
       );
 
-      await worker.onModuleDestroy();
+      await worker.onApplicationShutdown();
     });
 
     it('starts nothing when REDIS_URL is unset', async () => {

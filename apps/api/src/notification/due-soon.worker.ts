@@ -1,6 +1,7 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { NotificationType } from '@kurul/shared-types';
 import { Queue, Worker, type Job } from 'bullmq';
+import { closeWorkerWithinTimeout } from '../common/close-worker';
 import { envString } from '../common/env';
 import { captureServerError } from '../common/observability/sentry';
 import { parseRedisUrl, type RedisConnectionOptions } from '../common/redis-url';
@@ -48,7 +49,7 @@ type ScanTaskRow = {
 };
 
 @Injectable()
-export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
+export class DueSoonWorker implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(DueSoonWorker.name);
   private queue: Queue | null = null;
   private worker: Worker | null = null;
@@ -135,8 +136,9 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`due-soon worker registered (every ${REPEAT_EVERY_MS / 60000}m)`);
   }
 
-  async onModuleDestroy(): Promise<void> {
-    await this.worker?.close();
+  /** Same phase and the same bounded close as the retention sweep - `common/close-worker.ts`. */
+  async onApplicationShutdown(): Promise<void> {
+    await closeWorkerWithinTimeout(this.worker, this.logger, 'due-soon worker');
     await this.queue?.close();
   }
 

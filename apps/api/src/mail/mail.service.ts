@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnApplicationShutdown } from '@nestjs/common';
 import type { MailDeliveryStatus } from '@kurul/shared-types';
 import type { MailMessage } from './mail-sender';
 import { closeMailSender, mailEnabled, sendMail } from './send-mail';
@@ -12,7 +12,7 @@ import { closeMailSender, mailEnabled, sendMail } from './send-mail';
  * has an owner that closes it when the application shuts down.
  */
 @Injectable()
-export class MailService implements OnModuleDestroy {
+export class MailService implements OnApplicationShutdown {
   /**
    * Whether this deployment can deliver email at all.
    *
@@ -34,7 +34,8 @@ export class MailService implements OnModuleDestroy {
     return sendMail(message);
   }
 
-  async onModuleDestroy(): Promise<void> {
+  /** Shutdown, not destroy: a request in flight can still be sending mail - see `main.ts`. */
+  async onApplicationShutdown(): Promise<void> {
     await closeMailSender();
   }
 }

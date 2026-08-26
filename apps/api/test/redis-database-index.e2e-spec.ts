@@ -175,7 +175,7 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
       expect(onThree).toContain('bull:due-soon:repeat:due-soon-scan');
       expect((await onDbZero.keys('bull:due-soon:*')).sort()).toEqual(zeroBefore);
     } finally {
-      await worker.onModuleDestroy();
+      await worker.onApplicationShutdown();
       const created = await onTestDb.keys('bull:due-soon:*');
       if (created.length > 0) await onTestDb.del(...created);
     }
@@ -197,7 +197,7 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
       expect(databases).not.toContain(0);
       expect(new Set(databases)).toEqual(new Set([TEST_DB]));
     } finally {
-      await probe.onModuleDestroy();
+      await probe.onApplicationShutdown();
     }
   }, 20_000);
 
@@ -241,7 +241,7 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
     } finally {
       if (savedWorkerId !== undefined) process.env.JEST_WORKER_ID = savedWorkerId;
       if (savedNodeEnv !== undefined) process.env.NODE_ENV = savedNodeEnv;
-      await gateway.onModuleDestroy();
+      await gateway.onApplicationShutdown();
     }
   }, 20_000);
 
@@ -267,6 +267,41 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
       await expect(delivered).resolves.toBe('crosses-databases');
     } finally {
       await Promise.all([subscriber.quit(), publisher.quit()]);
+    }
+  });
+
+  /**
+   * #204: `parseRedisUrl` used to drop `url.username`, so a URL naming a Redis 6+ ACL user
+   * authenticated as `default` instead. Proven by reverting the fix and running just this
+   * test: the connection does not fail (this server's `default` is `nopass`, the Compose
+   * default, so an unauthenticated session is already `default` with full permissions), it
+   * silently succeeds as the wrong user, `ACL WHOAMI` returns `"default"` where the assertion
+   * below expects the ACL username, and the test goes red on that mismatch, not on a thrown
+   * connection error.
+   */
+  it('authenticates as the ACL user REDIS_URL names, not default', async () => {
+    const username = `kurul-204-${Date.now()}`;
+    const password = 'acl-check-pw';
+    await onDbZero.acl('SETUSER', username, 'on', `>${password}`, '~*', '+@all');
+
+    try {
+      const url = new URL(urlWithDb(TEST_DB));
+      url.username = username;
+      url.password = password;
+      const client = new Redis({
+        ...parseRedisUrl(url.toString()),
+        lazyConnect: true,
+        maxRetriesPerRequest: 1,
+      });
+
+      try {
+        await client.connect();
+        await expect(client.acl('WHOAMI')).resolves.toBe(username);
+      } finally {
+        await client.quit();
+      }
+    } finally {
+      await onDbZero.acl('DELUSER', username);
     }
   });
 });
