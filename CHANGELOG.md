@@ -515,6 +515,35 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `PlanLimitsService.seatsUsed` share one `pendingInvitationWhere(workspaceId, now)` helper in
   place of three hand-copied predicates, so the settings screen and the seat count cannot drift
   apart.
+- **Dialogs and dropdown menus now open and close with visible motion instead of snapping.**
+  `animate-in`, `fade-in-0` and `zoom-in-95` on `DialogOverlay`, `DialogContent`,
+  `DropdownMenuContent` and `DropdownMenuSubContent` never produced any CSS, since this project
+  ships plain `tailwindcss` with no animation plugin, so every dialog and every menu cut open and
+  closed in a single frame. Real keyframes now bind through `data-slot` and `data-state`, the
+  pattern the off-canvas drawer already used: the dialog surface fades in and scales from 0.96 to
+  1 over 200ms (`--ease-out`), its scrim fades over the same 200ms, and the dropdown and submenu
+  fade and scale from their own Radix transform origin, 150ms open and 150ms close.
+  `--ease-in-out` (`cubic-bezier(0.77, 0, 0.175, 1)`), named in `docs/design.md`'s motion table
+  since it was written, is now a real custom property in `app/globals.css` and a Tailwind
+  `ease-in-out` utility, not only documentation. `prefers-reduced-motion: reduce` drops all of it
+  to an opacity-only fade: nothing moves, the state change stays visible.
+- **The board skeleton now breathes on its own schedule instead of Tailwind's default pulse.**
+  `animate-pulse` ran a 2s, 1.0-to-0.5 cycle, off the 1.6s, 1.0-to-0.6 cycle this document has
+  specified since it was written, and it was the one repeating animation in the tree with no
+  `prefers-reduced-motion` twin, felt directly since a loading board runs dozens of these at
+  once. It now runs its own `skeleton-pulse` keyframe at 1.6s, opacity 1.0 to 0.6 and back, and
+  holds flat at 0.75 opacity under reduced motion instead of pulsing at all.
+- **A loading button now shows a spinner instead of swapping its label, and the ad hoc
+  "sending" text is gone.** `Button` takes a `loading` prop: `aria-busy` and `disabled` apply
+  the instant loading starts, and a 14px spinner is drawn over the button's own content once a
+  400ms threshold passes, short enough to catch a slow request and long enough that a fast one
+  never flickers one in. The spinner sits outside the layout flow, so the control keeps its exact
+  box and its label never moves, and the label text is never swapped for a waiting string.
+  `FormDialog`, `ConfirmDialog`, `verification-resend`, `forgot-password-view`,
+  `reset-password-view` and `invite-accept-view` all move onto this one mechanism, replacing six
+  places that each disabled a button on its own and, on four of them, swapped its text to a
+  "Sending…" string of its own; the two `sending` keys and `auth.invite.submitPending` leave
+  `messages/en.json` and `messages/tr.json`.
 
 ### Fixed
 
@@ -849,6 +878,25 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `:root`, and a custom property only resolves against the element that declares it, so every
   stack fell straight through to its fallback list. The three `.variable` classes now sit on
   `<html>` instead, next to the tokens that need them, so both faces load and draw as designed.
+- **The off-canvas drawer kept its full slide under `prefers-reduced-motion: reduce`.** Its
+  reduced-motion rule existed but never won: the selector it had to override carried one more
+  attribute (`[data-side='left']`) than the reduced selector did, so the directional slide (28
+  distinct transform steps measured end to end) beat it on plain CSS specificity regardless of
+  the media query. A bare `[data-side]` presence check on the reduced selectors levels that and
+  lets the fade-only rule win, covering both docked sides with the same pair of rules.
+- **A keyboard focus outline faded in instead of appearing at once.** Tailwind v4 folds
+  `outline-color` into `transition-colors`, which v3 did not, so every element using that
+  shortcut animated its outline from `currentColor` to copper over 150ms while the outline's
+  width and offset appeared in the same frame: one indicator arriving in two beats. The six
+  sites that used the shortcut (`board-filter-chips.tsx`, `board-list.tsx`,
+  `board-template-picker.tsx`, `sidebar-body.tsx`, `notifications-list.tsx`, `task-card.tsx`)
+  now name their transitioned properties explicitly and never the outline, matching the shape
+  `components/ui/button.tsx` already carried.
+- **Dropping a card animated past the reduced-motion preference.** `@dnd-kit`'s drag overlay
+  plays its landing with the Web Animations API rather than CSS, so no media query had any say
+  over it: a real drop under `reduce` still ran a 250ms `translate3d` animation. A new
+  `useReducedMotion` hook now passes `dropAnimation={null}` when the preference is set, so the
+  overlay simply disappears instead of animating into place.
 
 ### Security
 

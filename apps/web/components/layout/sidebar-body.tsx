@@ -73,7 +73,7 @@ export function SidebarBody({
 
   const navLinkClass = (active: boolean): string =>
     cn(
-      'relative flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-2 text-body transition-colors',
+      'relative flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-2 text-body transition-[color,background-color,border-color]',
       touchTargets && 'min-h-11',
       active
         ? 'bg-signature-subtle font-strong text-foreground'

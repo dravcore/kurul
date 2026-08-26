@@ -327,7 +327,12 @@ focused recolors that one outline to `--destructive` (`[aria-invalid='true']:foc
 of growing a second mark beside the border; keeping a colored ring alongside the border was the
 earlier plan, dropped once Tailwind v4 turned out to paint nothing from a ring-color utility with no
 ring-width utility beside it. The offset turns inward only where the focused region fills the shell
-and an outside offset would be clipped away, which today is the skip link's `main`. Tab order
+and an outside offset would be clipped away, which today is the skip link's `main`. That mark is
+also never transitioned: Tailwind v4 folds `outline-color` into `transition-colors` (v3 did not),
+so a shortcut like `transition-colors` or `transition-all` fades the outline from `currentColor`
+to copper over the transition duration while its width and offset appear at once. Every
+transition in the tree therefore names its properties, and none of those lists names the
+outline. Tab order
 follows visual order; the board is a composite widget, so `Tab` reaches a column and arrows move
 within it. `Esc` closes the topmost layer only and returns focus to whatever opened it. Reserved
 now, mapped in Phase 4+: `⌘K` command palette, `C` create task, `/` filter, `?` help; nothing else
@@ -344,21 +349,31 @@ box scrolls away with the content and is clipped by it.
 **Motion.** Purposeful micro-interactions only, **at most one orchestrated moment per view** —
 on the board that is the first paint of the columns, and nothing else.
 
-| Case                                                | Duration             | Curve                                                     |
-| --------------------------------------------------- | -------------------- | --------------------------------------------------------- |
-| Press feedback (`scale(0.97)`) · sancak rail moving | 100–160ms            | `--ease-out`                                              |
-| Tooltip, small popover                              | 125–200ms            | `--ease-out`                                              |
-| Dropdown, select, menu                              | 150–250ms            | `--ease-out`, `transform-origin: var(--transform-origin)` |
-| Detail panel, sheet                                 | 220ms                | `--ease-drawer`                                           |
-| Dialog · toast (`translateY(100%)`)                 | 200ms                | `--ease-out`, dialog origin centered                      |
-| Card returning after a failed drop                  | 220ms                | `--ease-in-out`                                           |
-| Column stagger on first board paint                 | 40ms between columns | `--ease-out`                                              |
+| Case                                                | Duration                      | Curve                                                     |
+| --------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
+| Press feedback (`scale(0.97)`) · sancak rail moving | 100–160ms                     | `--ease-out`                                              |
+| Tooltip, small popover                              | 125–200ms                     | `--ease-out`                                              |
+| Dropdown, select, menu                              | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
+| Detail panel, sheet                                 | 220ms                         | `--ease-drawer`                                           |
+| Dialog · toast (`translateY(100%)`)                 | 200ms                         | `--ease-out`, dialog origin centered                      |
+| Dialog scrim                                        | 200ms                         | `--ease-out`                                              |
+| Card returning after a failed drop                  | 220ms                         | `--ease-in-out`                                           |
+| Column stagger on first board paint                 | 40ms between columns          | `--ease-out`                                              |
+| Skeleton pulse (loop, not a one-shot transition)    | 1.6s, opacity 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
 
 ```css
 --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* entering, exiting, default */
 --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* moving on screen */
 --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* panel and sheet */
 ```
+
+All three curves above are real custom properties in `app/globals.css`, also exposed as
+Tailwind `ease-out`, `ease-in-out` and `ease-drawer` utilities through `@theme inline`, not
+only this table's notation. The dialog surface and its scrim, the dropdown and submenu, and
+the off-canvas drawer all bind their keyframes through `data-slot`/`data-state` in
+`app/globals.css` rather than a Tailwind animation-plugin class, since this project ships
+plain `tailwindcss` with no such plugin: those classes would compile to nothing and every
+open would cut instead of transition.
 
 - **No animation on keyboard-initiated actions** — the command palette opens instantly; it runs
   a hundred times a day and motion makes it feel slow.
@@ -370,6 +385,16 @@ on the board that is the first paint of the columns, and nothing else.
 - Nothing over 300ms except the panel. Gate hover motion behind `@media (hover: hover) and
 (pointer: fine)`. Springs (`{ duration: 0.5, bounce: 0.2 }`) only where a gesture carries
   velocity — drag preview, swipe-to-dismiss.
+- **Loop indicators sit outside the "nothing over 300ms" rule**: a skeleton's pulse (1.6s,
+  opacity 1.0 to 0.6 and back) and a loading button's spinner (700ms per rotation, linear, shown
+  only after 400ms) run continuously while work is in progress instead of once on enter or exit.
+  Both hold still under `prefers-reduced-motion: reduce`, the skeleton at a flat 0.75 opacity and
+  the spinner not spinning at all.
+- **Waiting for a response draws from exactly one mechanism**: `Button`'s `loading` prop,
+  `aria-busy` and `disabled` immediately, spinner after the 400ms threshold, drawn over the
+  control's own content and out of its layout flow, so the button keeps its exact box and no
+  label moves (§6 has the full shape). No screen swaps a control's label to a "sending" string of
+  its own.
 - **`prefers-reduced-motion: reduce`** drops movement and keeps opacity and color: the panel
   cross-fades, the rail jumps, the highlight is unchanged. Fewer and gentler, not zero.
 
@@ -391,11 +416,11 @@ first row. Two identical primary buttons on a first run is a choice the reader d
 | Dashboard, no data    | Damga 64px | Nothing to chart yet         | Charts fill in as tasks are created and moved.                                                        | Open a board                     |
 | Notifications         | —          | You're caught up             | —                                                                                                     | —                                |
 
-**Loading** uses skeletons that match the final layout in `--muted`, with a 1.6s opacity pulse
+**Loading** uses skeletons that match the final layout in `--accent`, with a 1.6s opacity pulse
 (1.0 → 0.6) and no shimmer sweep: the board renders column skeletons at real width with three
 card skeletons at real card heights; the task panel opens immediately with the clicked card's
 title already in place, so it is never blank; inline actions are optimistic. Spinners exist in
-exactly one place — inside a pressed button, 14px, replacing the icon, after 400ms. List
+exactly one place: inside a pressed button, 14px, over its content, after 400ms. List
 content never gets one. Unknown-length work (import, export) gets a progress bar with a count.
 
 **Errors** derive from the problem-JSON shape in [api-conventions.md](api-conventions.md#errors).

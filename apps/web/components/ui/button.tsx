@@ -5,7 +5,7 @@ import { Slot } from 'radix-ui';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-body font-strong whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-body font-strong whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -52,26 +52,92 @@ const buttonVariants = cva(
   },
 );
 
+/** 14px, currentColor so every variant keeps its own contrast; rotation comes from the
+ * `[data-slot='button-spinner']` keyframe in app/globals.css, not from a class here, so the
+ * reduced-motion twin lives in exactly one place. */
+function ButtonSpinner(): React.ReactElement {
+  return (
+    <svg
+      data-slot="button-spinner"
+      className="size-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function Button({
   className,
   variant = 'default',
   size = 'default',
   asChild = false,
+  loading = false,
+  disabled,
+  children,
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    /**
+     * Marks the button `aria-busy` and `disabled` the moment it turns true, and after 400ms
+     * covers the button's own content with a centred 14px spinner. The spinner is taken out of
+     * flex flow (`absolute inset-0` against the base variant's `relative`) and the content keeps
+     * its box, so the control never changes width and the label never slides, whether or not the
+     * caller passed a leading icon. The label text itself is never swapped for a waiting string.
+     * `app/globals.css` carries the two rules that clear the content underneath.
+     *
+     * Ignored on `asChild`: the rendered element is the caller's own (typically a link), which
+     * has no button disabled/aria-busy story for this component to add to.
+     */
+    loading?: boolean;
   }) {
   const Comp = asChild ? Slot.Root : 'button';
+  const isLoading = loading && !asChild;
+  const [showSpinner, setShowSpinner] = React.useState(false);
+  const spinning = isLoading && showSpinner;
+
+  React.useEffect(() => {
+    if (!isLoading) return;
+    const timer = setTimeout(() => setShowSpinner(true), 400);
+    // Runs on unmount and on every `isLoading` flip (a fast response arriving before 400ms
+    // included), so the timer set above is always the one it clears.
+    return () => {
+      clearTimeout(timer);
+      setShowSpinner(false);
+    };
+  }, [isLoading]);
 
   return (
     <Comp
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      data-spinner={spinning ? '' : undefined}
+      aria-busy={isLoading ? true : undefined}
+      disabled={isLoading || disabled}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {isLoading ? (
+        <>
+          {children}
+          {spinning ? (
+            <span className="absolute inset-0 inline-flex items-center justify-center">
+              <ButtonSpinner />
+            </span>
+          ) : null}
+        </>
+      ) : (
+        // `asChild` hands `children` straight to `Slot.Root`, which requires exactly one
+        // element child (Radix's `React.Children.only`): the loading fragment above would
+        // break that even with an empty spinner slot, so this branch stays a bare pass-through.
+        children
+      )}
+    </Comp>
   );
 }
 

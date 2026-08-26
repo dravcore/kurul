@@ -338,7 +338,11 @@ outline'ı `--destructive`'e boyar (`[aria-invalid='true']:focus-visible`); bord
 bir ring'i de tutmak önceki plandı, Tailwind v4'ün bir ring-width class'ı yanında olmadan bir
 ring-color class'ından hiçbir şey boyamadığı ortaya çıkınca bu plandan vazgeçildi. Offset yalnızca
 focus alan bölge shell'i doldurduğunda ve dıştaki bir offset kırpılacağında içeri döner; bugün bu
-yalnızca skip link'in `main` hedefidir. Tab order visual order'ı takip eder; board bir composite
+yalnızca skip link'in `main` hedefidir. O işaret ayrıca hiçbir zaman transition edilmez: Tailwind
+v4, `outline-color`'ı `transition-colors`'ın içine koyar (v3 koymuyordu), yani `transition-colors`
+veya `transition-all` gibi bir kısayol, outline'ın genişliği ve offset'i tek karede belirirken
+rengini `currentColor`'dan bakıra transition süresi boyunca yavaşça geçirir. Bu yüzden ağaçtaki
+her transition kendi property'lerini tek tek yazar ve o listelerin hiçbirinde outline yoktur. Tab order visual order'ı takip eder; board bir composite
 widget'tır, bu yüzden `Tab` bir column'a ulaşır ve arrow'lar onun içinde hareket eder. `Esc`
 yalnızca en üstteki layer'ı kapatır ve focus'u onu açan şeye geri verir. Şimdiden reserve edilmiş,
 Faz 4+'ta map edilecek: `⌘K` command palette, `C` create task, `/` filter, `?` help; başka hiçbir
@@ -356,21 +360,31 @@ tarafından kırpılır.
 **Motion.** Yalnızca amaçlı micro-interaction'lar, **view başına en fazla bir orchestrated an** —
 board'da bu, column'ların ilk paint'idir, başka hiçbir şey değil.
 
-| Durum                                                      | Süre                  | Curve                                                     |
-| ---------------------------------------------------------- | --------------------- | --------------------------------------------------------- |
-| Press feedback (`scale(0.97)`) · sancak rail'inin hareketi | 100–160ms             | `--ease-out`                                              |
-| Tooltip, küçük popover                                     | 125–200ms             | `--ease-out`                                              |
-| Dropdown, select, menu                                     | 150–250ms             | `--ease-out`, `transform-origin: var(--transform-origin)` |
-| Detay paneli, sheet                                        | 220ms                 | `--ease-drawer`                                           |
-| Dialog · toast (`translateY(100%)`)                        | 200ms                 | `--ease-out`, dialog origin ortalanmış                    |
-| Başarısız bir drop'tan sonra kartın geri dönmesi           | 220ms                 | `--ease-in-out`                                           |
-| İlk board paint'inde column stagger'ı                      | column'lar arası 40ms | `--ease-out`                                              |
+| Durum                                                      | Süre                          | Curve                                                     |
+| ---------------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
+| Press feedback (`scale(0.97)`) · sancak rail'inin hareketi | 100–160ms                     | `--ease-out`                                              |
+| Tooltip, küçük popover                                     | 125–200ms                     | `--ease-out`                                              |
+| Dropdown, select, menu                                     | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
+| Detay paneli, sheet                                        | 220ms                         | `--ease-drawer`                                           |
+| Dialog · toast (`translateY(100%)`)                        | 200ms                         | `--ease-out`, dialog origin ortalanmış                    |
+| Dialog perdesi                                             | 200ms                         | `--ease-out`                                              |
+| Başarısız bir drop'tan sonra kartın geri dönmesi           | 220ms                         | `--ease-in-out`                                           |
+| İlk board paint'inde column stagger'ı                      | column'lar arası 40ms         | `--ease-out`                                              |
+| Skeleton pulse (loop, tek seferlik bir transition değil)   | 1.6s, opaklık 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
 
 ```css
 --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* entering, exiting, default */
 --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* moving on screen */
 --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* panel and sheet */
 ```
+
+Yukarıdaki üç curve artık `app/globals.css` içinde gerçek birer custom property, `@theme
+inline` üzerinden Tailwind `ease-out`, `ease-in-out` ve `ease-drawer` utility'leri olarak da
+erişilebilir, yalnızca bu tablonun notasyonu değil. Dialog yüzeyi ve perdesi, dropdown ve
+submenu, off-canvas drawer, keyframe'lerini bir Tailwind animation plugin class'ı yerine
+`app/globals.css` içinde `data-slot`/`data-state` üzerinden bağlar, çünkü bu proje düz
+`tailwindcss` kullanır, böyle bir plugin yok: o class'lar hiçbir CSS üretmezdi ve her açılış
+transition yerine kesme olurdu.
 
 - **Keyboard-initiated aksiyonlarda animasyon yok** — command palette anında açılır; günde yüz
   kere çalışır ve motion onu yavaş hissettirir.
@@ -383,6 +397,16 @@ board'da bu, column'ların ilk paint'idir, başka hiçbir şey değil.
 - Panel hariç 300ms'i geçen hiçbir şey yok. Hover motion'ı `@media (hover: hover) and
 (pointer: fine)`'ın arkasına gate'le. Spring'ler (`{ duration: 0.5, bounce: 0.2 }`) yalnızca
   bir gesture'ın velocity taşıdığı yerlerde — drag preview, swipe-to-dismiss.
+- **Loop indicator'lar "300ms'i geçen hiçbir şey yok" kuralının dışında**: bir skeleton'un
+  pulse'ı (1.6s, opaklık 1.0'dan 0.6'ya ve geri) ve loading bir button'ın spinner'ı (rotation
+  başına 700ms, linear, yalnızca 400ms sonra görünür), work devam ederken enter veya exit'te bir
+  kez değil sürekli çalışır. İkisi de `prefers-reduced-motion: reduce` altında hareketsiz kalır:
+  skeleton sabit 0.75 opaklıkta, spinner ise hiç dönmeden.
+- **Bir yanıt beklenirken tam olarak tek bir mekanizma çalışır**: `Button`'ın `loading` prop'u,
+  `aria-busy` ve `disabled` anında, spinner 400ms eşiğinden sonra, control'ün kendi içeriğinin
+  üzerine ve layout akışının dışına çizilerek, böylece button kutusunu birebir korur ve hiçbir
+  label kaymaz (tam şekli §6'da). Hiçbir screen bir control'ün label'ını kendi "sending"
+  ("gönderiliyor") string'ine boyamaz.
 - **`prefers-reduced-motion: reduce`** hareketi düşürür ve opacity ile rengi korur: panel
   cross-fade olur, rail zıplar, highlight değişmeden kalır. Daha az ve daha nazik, sıfır değil.
 
@@ -405,12 +429,12 @@ başlığındaki aynı aksiyonun kopyası ekran boşken gizlenir ve ilk satırla
 | Dashboard, veri yok               | Damga 64px | Nothing to chart yet (Henüz grafiklenecek bir şey yok)         | Charts fill in as tasks are created and moved. (Task'lar oluşturuldukça ve taşındıkça grafikler dolar.)                                                                                                                                                           | Open a board (Bir board aç)                                                    |
 | Bildirimler                       | —          | You're caught up (Her şeyi gördünüz)                           | —                                                                                                                                                                                                                                                                 | —                                                                              |
 
-**Loading**, `--muted` içinde final layout'a uyan skeleton'lar kullanır, 1.6s'lik bir opacity
+**Loading**, `--accent` içinde final layout'a uyan skeleton'lar kullanır, 1.6s'lik bir opacity
 pulse'ı ile (1.0 → 0.6) ve shimmer sweep olmadan: board, gerçek genişlikte column skeleton'ları
 render eder, gerçek kart yükseklikte üç kart skeleton'ıyla birlikte; task paneli, tıklanan kartın
 title'ı zaten yerindeyken anında açılır, böylece asla boş görünmez; inline aksiyonlar
-optimistic'tir. Spinner'lar tam olarak tek bir yerde var — basılı bir button'ın içinde, 14px,
-400ms sonra ikonun yerine geçerek. List içeriği asla bir tane almaz. Bilinmeyen uzunluktaki iş
+optimistic'tir. Spinner'lar tam olarak tek bir yerde var: basılı bir button'ın içinde, 14px,
+400ms sonra içeriğinin üzerine geçerek. List içeriği asla bir tane almaz. Bilinmeyen uzunluktaki iş
 (import, export) count'lu bir progress bar alır.
 
 **Error'lar**, [api-conventions.md](api-conventions.md#hatalar)'daki problem-JSON şeklinden

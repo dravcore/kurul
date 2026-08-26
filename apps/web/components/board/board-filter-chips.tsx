@@ -99,7 +99,7 @@ export function BoardFilterChips({
           key={chip.key}
           type="button"
           onClick={() => onChange(chip.next)}
-          className="inline-flex h-6 max-w-full items-center gap-1 rounded-sm bg-muted px-2 text-micro text-foreground transition-colors hover:bg-accent max-md:min-h-11 max-md:px-3"
+          className="inline-flex h-6 max-w-full items-center gap-1 rounded-sm bg-muted px-2 text-micro text-foreground transition-[color,background-color,border-color] hover:bg-accent max-md:min-h-11 max-md:px-3"
         >
           <span className="truncate">{chip.label}</span>
           <X className="size-3 shrink-0 opacity-70" aria-hidden />

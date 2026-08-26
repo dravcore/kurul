@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import messages from '@/messages/en.json';
 import { FormDialog, type FormDialogProps } from './form-dialog';
@@ -17,6 +17,7 @@ beforeAll(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 type Overrides = Partial<FormDialogProps>;
@@ -133,6 +134,36 @@ describe('FormDialog', () => {
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows the submit button’s spinner once a slow submission passes 400ms', async () => {
+    vi.useFakeTimers();
+    const onSubmit = vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, 600)));
+    renderDialog({ onSubmit });
+
+    fireEvent.click(submitButton());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    expect(submitButton().querySelector("[data-slot='button-spinner']")).not.toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+  });
+
+  it('never shows the submit button’s spinner for a fast submission', async () => {
+    vi.useFakeTimers();
+    const onSubmit = vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, 100)));
+    renderDialog({ onSubmit });
+
+    fireEvent.click(submitButton());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(submitButton().querySelector("[data-slot='button-spinner']")).toBeNull();
   });
 
   it('submits on Enter in a field, without reloading the page', async () => {

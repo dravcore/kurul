@@ -38,16 +38,15 @@ import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { Toaster } from '@/components/ui/sonner';
 import { EmailVerificationLink } from '@/components/auth/email-verification-link';
 import { ForgotPasswordView } from '@/components/auth/forgot-password-view';
-import { InviteAcceptView } from '@/components/auth/invite-accept-view';
 import { LoginView } from '@/components/auth/login-view';
-import { ResetPasswordView } from '@/components/auth/reset-password-view';
-import { VerificationResend } from '@/components/auth/verification-resend';
+import { RegisterView } from '@/components/auth/register-view';
 import { VerifyEmailView } from '@/components/auth/verify-email-view';
 import { BoardColumn } from '@/components/board/board-column';
 import { BoardList } from '@/components/board/board-list';
 import { BoardColumnsEmptyState } from '@/components/board/board-placeholders';
 import { ColumnSettingsDialog } from '@/components/board/column-settings-dialog';
 import { ImportReportPanel } from '@/components/board/import-report-panel';
+import { ImportTrelloDialog } from '@/components/board/import-trello-dialog';
 import { RenameBoardDialog } from '@/components/board/rename-board-dialog';
 import { AssigneeChart } from '@/components/dashboard/assignee-chart';
 import { ChartTableToggle } from '@/components/dashboard/chart-table-toggle';
@@ -58,6 +57,7 @@ import { NotificationUnreadProvider } from '@/components/notification/notificati
 import { NotificationsList } from '@/components/notification/notifications-list';
 import { CreateTokenDialog } from '@/components/settings/create-token-dialog';
 import { DeleteAccountDialog } from '@/components/settings/delete-account-dialog';
+import { InviteMemberDialog } from '@/components/settings/invite-member-dialog';
 import { MembersSettings } from '@/components/settings/members-settings';
 import { RemoveMemberDialog } from '@/components/settings/remove-member-dialog';
 import { RenameWorkspaceDialog } from '@/components/settings/rename-workspace-dialog';
@@ -451,6 +451,17 @@ const LONGEST_TURKISH: readonly LongString[] = [
     ratio: 1.56,
   },
   {
+    key: 'app.board.import.forbidden',
+    screen: 'components/board/import-trello-dialog.tsx',
+    ratio: 1.48,
+  },
+  {
+    key: 'app.settings.members.inviteErrorForbidden',
+    screen: 'components/settings/invite-member-dialog.tsx',
+    ratio: 1.47,
+  },
+  { key: 'auth.login.subtitle', screen: 'components/auth/login-view.tsx', ratio: 1.48 },
+  {
     key: 'app.board.import.setColumnCategories',
     screen: 'components/board/import-report-panel.tsx',
     ratio: 1.69,
@@ -618,27 +629,7 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/auth/verify-email-view.tsx',
     ratio: 1.5,
   },
-  {
-    key: 'auth.invite.submitPending',
-    screen: 'components/auth/invite-accept-view.tsx',
-    ratio: 1.5,
-  },
   { key: 'auth.login.registerLink', screen: 'components/auth/login-view.tsx', ratio: 1.5 },
-  {
-    key: 'auth.emailConfirmation.sending',
-    screen: 'components/auth/verification-resend.tsx',
-    ratio: 1.63,
-  },
-  {
-    key: 'auth.forgotPassword.sending',
-    screen: 'components/auth/forgot-password-view.tsx',
-    ratio: 1.63,
-  },
-  {
-    key: 'auth.resetPassword.submitting',
-    screen: 'components/auth/reset-password-view.tsx',
-    ratio: 1.86,
-  },
   {
     key: 'app.board.column.categoryOption.CANCELED',
     screen: 'components/board/column-settings-dialog.tsx',
@@ -649,6 +640,7 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/dashboard/completion-chart.tsx',
     ratio: 1.57,
   },
+  { key: 'auth.register.loginLink', screen: 'components/auth/register-view.tsx', ratio: 1.57 },
 ];
 
 /**
@@ -967,6 +959,33 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       expect(
         screen.getByRole('link', { name: messages.app.board.import.setColumnCategories }),
       ).toBeDefined();
+    },
+  },
+  {
+    screen: 'components/board/import-trello-dialog.tsx',
+    keys: ['app.board.import.forbidden'],
+    run: async () => {
+      apiPostForm.mockRejectedValue(
+        new ApiError({ statusCode: 403, error: 'Forbidden', message: 'forbidden' }),
+      );
+      render(
+        tr(
+          <ImportTrelloDialog
+            open
+            onOpenChange={vi.fn()}
+            workspaceId={WORKSPACE_ID}
+            onImported={vi.fn()}
+          />,
+        ),
+      );
+
+      const file = new File(['{}'], 'trello.json', { type: 'application/json' });
+      fireEvent.change(screen.getByLabelText(messages.app.board.import.file), {
+        target: { files: [file] },
+      });
+      fireEvent.click(screen.getByRole('button', { name: messages.app.board.import.submit }));
+
+      expect(await screen.findByText(messages.app.board.import.forbidden)).toBeDefined();
     },
   },
   {
@@ -1410,98 +1429,61 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
-    screen: 'components/auth/verification-resend.tsx',
-    keys: ['auth.emailConfirmation.sending'],
+    screen: 'components/settings/invite-member-dialog.tsx',
+    keys: ['app.settings.members.inviteErrorForbidden'],
     run: async () => {
-      auth.sendVerificationEmail.mockReturnValue(new Promise(() => {}));
-      render(tr(<VerificationResend email="ayla@example.com" callbackPath="/verify-email" />));
-
-      fireEvent.click(
-        screen.getByRole('button', { name: messages.auth.emailConfirmation.resendAction }),
+      apiPost.mockRejectedValue(forbidden());
+      render(
+        tr(
+          <InviteMemberDialog
+            open
+            onOpenChange={vi.fn()}
+            workspaceId={WORKSPACE_ID}
+            onInvited={vi.fn()}
+          />,
+        ),
       );
 
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: messages.auth.emailConfirmation.sending }),
-        ).toBeDefined();
+      fireEvent.change(screen.getByLabelText(messages.app.settings.members.inviteEmail), {
+        target: { value: 'bora@example.com' },
       });
-    },
-  },
-  {
-    screen: 'components/auth/invite-accept-view.tsx',
-    keys: ['auth.invite.submitPending'],
-    run: async () => {
-      auth.session = {
-        data: { user: { id: USER_ID, email: 'bora@example.com', emailVerified: true } },
-        isPending: false,
-      };
-      auth.getInvitation.mockResolvedValue({
-        data: { organizationId: WORKSPACE_ID, organizationName: 'Kurul' },
-        error: null,
-      });
-      apiPost.mockReturnValue(new Promise(() => {}));
+      fireEvent.click(
+        screen.getByRole('button', { name: messages.app.settings.members.inviteSubmit }),
+      );
 
-      render(tr(<InviteAcceptView invitationId={INVITATION.id} />));
-
-      const accept = await screen.findByRole('button', { name: messages.auth.invite.submit });
-      fireEvent.click(accept);
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: messages.auth.invite.submitPending }),
-        ).toBeDefined();
-      });
+      expect(
+        await screen.findByText(messages.app.settings.members.inviteErrorForbidden),
+      ).toBeDefined();
     },
   },
   {
     screen: 'components/auth/login-view.tsx',
-    keys: ['auth.login.registerLink'],
+    keys: ['auth.login.registerLink', 'auth.login.subtitle'],
     run: () => {
       render(tr(<LoginView />));
 
       expect(screen.getByRole('link', { name: messages.auth.login.registerLink })).toBeDefined();
+      expect(screen.getByText(messages.auth.login.subtitle)).toBeDefined();
+    },
+  },
+  {
+    screen: 'components/auth/register-view.tsx',
+    keys: ['auth.register.loginLink'],
+    run: () => {
+      render(tr(<RegisterView />));
+
+      expect(screen.getByRole('link', { name: messages.auth.register.loginLink })).toBeDefined();
     },
   },
   {
     screen: 'components/auth/forgot-password-view.tsx',
-    keys: ['auth.forgotPassword.submit', 'auth.forgotPassword.sending'],
-    run: async () => {
-      // The request never settles, so the button keeps the pending label for the assertion.
-      auth.requestPasswordReset.mockReturnValue(new Promise(() => {}));
+    keys: ['auth.forgotPassword.submit'],
+    run: () => {
       render(tr(<ForgotPasswordView />));
 
-      fireEvent.change(screen.getByLabelText(messages.auth.forgotPassword.email), {
-        target: { value: 'ayla@example.com' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: messages.auth.forgotPassword.submit }));
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: messages.auth.forgotPassword.sending }),
-        ).toBeDefined();
-      });
-    },
-  },
-  {
-    screen: 'components/auth/reset-password-view.tsx',
-    keys: ['auth.resetPassword.submitting'],
-    run: async () => {
-      // Without a `token` the view draws the dead-link state instead of the form.
-      nav.searchParams = new URLSearchParams({ token: 'opaque-token' });
-      auth.resetPassword.mockReturnValue(new Promise(() => {}));
-      render(tr(<ResetPasswordView />));
-
-      fireEvent.change(screen.getByLabelText(messages.auth.resetPassword.newPassword), {
-        // Long enough to clear the field's own `minLength`, which jsdom enforces on submit.
-        target: { value: 'dogru-at-pil-koprusu' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: messages.auth.resetPassword.submit }));
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: messages.auth.resetPassword.submitting }),
-        ).toBeDefined();
-      });
+      expect(
+        screen.getByRole('button', { name: messages.auth.forgotPassword.submit }),
+      ).toBeDefined();
     },
   },
   {

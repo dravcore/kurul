@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -362,6 +363,55 @@ function selectorParts(rule: StyleRule): string[] {
   return rule.selector.split(',').map((part) => part.trim());
 }
 
+/** The body of the sole `@keyframes name` block in the compiled sheet, braces excluded.
+ * `parseStylesheet` above deliberately skips over every `@keyframes` block (`blockEnd` on its
+ * prelude) rather than parsing its `from`/`to` steps as rules, so reading one back has to go
+ * around it and index into the raw compiled text directly, the same way `mediaBody` does for
+ * `@media`. */
+function keyframeBody(name: string): string {
+  const marker = `@keyframes ${name}`;
+  const start = css.indexOf(marker);
+  if (start === -1) throw new Error(`the compiled CSS has no @keyframes ${name}`);
+  const open = css.indexOf('{', start);
+  return css.slice(open + 1, blockEnd(css, open));
+}
+
+/** Every `@media (prefers-reduced-motion: reduce)` block's body, concatenated. Unlike `mediaBody`
+ * above, this does not demand exactly one: `app/globals.css` carries several, each scoped
+ * narrowly to the motion pattern beside it (the global transition-property drop, the column
+ * stagger's twin, the drawer's, and the dialog/menu ones this suite checks), so reading "the"
+ * reduced-motion block is reading all of them at once. */
+function reducedMotionBody(): string {
+  const query = '@media (prefers-reduced-motion: reduce)';
+  let body = '';
+  for (
+    let index = css.indexOf(query);
+    index !== -1;
+    index = css.indexOf(query, index + query.length)
+  ) {
+    const open = css.indexOf('{', index);
+    body += `${css.slice(open + 1, blockEnd(css, open))}\n`;
+  }
+  return body;
+}
+
+/** Every non-test `.ts`/`.tsx` under `dir`, recursively. A test file is prose as much as it is
+ * code (a title can name the very class the scan forbids), and Tailwind does not scan them
+ * either, so they are not part of what ships. */
+function sourceFiles(dir: string, acc: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === '.next') continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      sourceFiles(full, acc);
+      continue;
+    }
+    if (/\.test\.tsx?$/.test(entry.name)) continue;
+    if (/\.tsx?$/.test(entry.name)) acc.push(full);
+  }
+  return acc;
+}
+
 let sheet: Stylesheet;
 let css: string;
 
@@ -539,14 +589,51 @@ describe('globals.css cascade layers', () => {
     );
   });
 
-  // transition-all also animates the outline; the focus ring must draw instantly.
-  it('keeps components/ui/button.tsx off transition-all so its focus outline draws instantly', async () => {
-    const source = await readFile(path.join(webRoot, 'components/ui/button.tsx'), 'utf8');
-    expect(source).not.toMatch(/\btransition-all\b/);
+  /**
+   * docs/design.md §5 draws the focus indicator once and instantly, and calls a keyboard-
+   * initiated action the one case that gets no motion at all. Tailwind v4 puts `outline-color`
+   * inside `transition-colors` (v3 did not), so any element wearing that shortcut fades its
+   * outline from `currentColor` to copper over the transition duration while the width and
+   * offset appear at once: the browser pass traced eighteen intermediate colours over 150ms on a
+   * sidebar nav link in dark. `transition-all` has the same effect for the same reason, which is
+   * what this test used to check on `components/ui/button.tsx` alone.
+   *
+   * The property list is compiled rather than quoted so this stays true against whatever
+   * Tailwind is installed: a release that drops `outline-color` from the shortcut again turns
+   * the scan below from a rule into dead weight, and this is where that shows up.
+   */
+  it('still compiles outline-color into transition-colors and transition-all', async () => {
+    const compiled = parseStylesheet(await compileGlobals(['transition-colors', 'transition-all']));
+    const shortcut = requireRule(compiled, 'a rule for transition-colors', (rule) => {
+      return rule.selector === '.transition-colors';
+    });
+    expect(
+      shortcut.declarations.find((entry) => entry.property === 'transition-property')?.value,
+    ).toContain('outline-color');
 
-    const transitionList = source.match(/transition-\[([^\]]*)\]/);
-    expect(transitionList).not.toBeNull();
-    expect(transitionList![1]).not.toMatch(/\boutline\b/);
+    const all = requireRule(compiled, 'a rule for transition-all', (rule) => {
+      return rule.selector === '.transition-all';
+    });
+    expect(all.declarations.find((entry) => entry.property === 'transition-property')?.value).toBe(
+      'all',
+    );
+  }, 30_000);
+
+  it('names every transitioned property explicitly, and never the outline', () => {
+    const offenders: string[] = [];
+    for (const directory of ['app', 'components', 'lib']) {
+      for (const file of sourceFiles(path.join(webRoot, directory))) {
+        const source = readFileSync(file, 'utf8');
+        const relative = path.relative(webRoot, file);
+        for (const match of source.matchAll(/\btransition-(all|colors|\[([^\]]*)\])/g)) {
+          const line = source.slice(0, match.index).split('\n').length;
+          if (match[1] === 'all' || match[1] === 'colors' || /\boutline/.test(match[2] ?? '')) {
+            offenders.push(`${relative}:${line}  ${match[0]}`);
+          }
+        }
+      }
+    }
+    expect(offenders.sort()).toEqual([]);
   });
 
   // jsdom never computes `color-scheme` (it lays out nothing), so the only thing a test in this
@@ -833,4 +920,407 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
     });
     expect(raised.order).toBeGreaterThan(darkTokens.order);
   });
+});
+
+/**
+ * P5 Task 1: the dialog and dropdown open/close, written as real keyframes bound through
+ * `data-slot`/`data-state` because this project imports plain `tailwindcss` with no animation
+ * plugin (`animate-in`, `fade-in-0`, `zoom-in-95` and their siblings compile to nothing at all).
+ * jsdom never evaluates a `@media` query and never plays a keyframe, so the compiled sheet is
+ * the only place either fact is checkable: that each of the four layered surfaces below carries
+ * a real `animation-name`, and that `prefers-reduced-motion: reduce` retargets every one of them
+ * to a keyframe whose body holds no `transform`, `scale` or `translate` declaration.
+ */
+describe('globals.css dialog and dropdown motion', () => {
+  let reduced: Stylesheet;
+
+  beforeAll(() => {
+    reduced = parseStylesheet(reducedMotionBody());
+  });
+
+  const layeredSelectors = [
+    "[data-slot='dialog-overlay']",
+    "[data-slot='dialog-content']",
+    "[data-slot='dropdown-menu-content']",
+    "[data-slot='dropdown-menu-sub-content']",
+  ];
+
+  it.each(layeredSelectors)('gives %s an animation-name in both data-state', (selector) => {
+    for (const state of ['open', 'closed']) {
+      const target = `${selector}[data-state='${state}']`;
+      const rule = requireRule(sheet, target, (candidate) => {
+        return selectorParts(candidate).includes(target);
+      });
+      const name = rule.declarations.find(
+        (declaration) => declaration.property === 'animation-name',
+      );
+      expect(name?.value).toBeTruthy();
+    }
+  });
+
+  it.each(layeredSelectors)(
+    'switches %s to a fade-only keyframe under prefers-reduced-motion: reduce',
+    (selector) => {
+      for (const state of ['open', 'closed']) {
+        const target = `${selector}[data-state='${state}']`;
+        const rule = requireRule(
+          reduced,
+          `${target} inside prefers-reduced-motion: reduce`,
+          (candidate) => {
+            return selectorParts(candidate).includes(target);
+          },
+        );
+        const name = rule.declarations.find(
+          (declaration) => declaration.property === 'animation-name',
+        );
+        expect(name?.value).toBeTruthy();
+
+        // The fade-only twin never re-declares movement: the reduced keyframe it points at has
+        // no transform, scale or translate step of its own to drop.
+        const body = keyframeBody(name!.value);
+        expect(body).not.toMatch(/\b(transform|scale|translate)\s*:/);
+      }
+    },
+  );
+});
+
+/**
+ * P5 Task 2: the loading skeleton's own pulse (components/ui/skeleton.tsx), replacing Tailwind's
+ * `animate-pulse` (2s, 1.0-0.5, no reduced-motion twin) with docs/design.md §6's 1.6s, 1.0-0.6
+ * loop. A board renders dozens of these at once, so `prefers-reduced-motion: reduce` does not
+ * retarget the loop to a fade like the dialog and menu above, it removes the animation outright
+ * and holds the midpoint opacity instead: nothing left running on a machine that asked for none
+ * of it, across however many skeletons are on screen at once.
+ */
+describe('globals.css skeleton motion', () => {
+  const target = "[data-slot='skeleton']";
+
+  it('completes a full 1.6s loop between full and 0.6 opacity', () => {
+    const rule = requireRule(sheet, target, (candidate) =>
+      selectorParts(candidate).includes(target),
+    );
+    const name = rule.declarations.find((declaration) => declaration.property === 'animation-name');
+    const duration = rule.declarations.find(
+      (declaration) => declaration.property === 'animation-duration',
+    );
+    const direction = rule.declarations.find(
+      (declaration) => declaration.property === 'animation-direction',
+    );
+    expect(name?.value).toBeTruthy();
+    expect(duration?.value).toBe('1.6s');
+    // `animation-duration` must name the full round-trip period, matching Tailwind's own
+    // `pulse` convention (a single mid-loop dip, no alternate). A from/to keyframe combined with
+    // `animation-direction: alternate` would instead spend the whole duration on each one-way
+    // leg, silently doubling the period to 3.2s while this assertion alone still passed.
+    expect(direction?.value ?? 'normal').not.toBe('alternate');
+
+    const body = keyframeBody(name!.value);
+    // The dip must sit at the midpoint (50%) of a single normal-direction loop, not at a `to`
+    // endpoint that only reaches 0.6 by riding an alternated second leg.
+    expect(body).toMatch(/(^|[,\s])0%[,\s].*100%\s*{[^}]*opacity\s*:\s*1\b/s);
+    expect(body).toMatch(/50%\s*{[^}]*opacity\s*:\s*0\.6\b/s);
+  });
+
+  it('stops moving and holds 0.75 opacity under prefers-reduced-motion: reduce', () => {
+    const reduced = parseStylesheet(reducedMotionBody());
+    const rule = requireRule(
+      reduced,
+      `${target} inside prefers-reduced-motion: reduce`,
+      (candidate) => selectorParts(candidate).includes(target),
+    );
+
+    const animation = rule.declarations.find((declaration) => declaration.property === 'animation');
+    const opacity = rule.declarations.find((declaration) => declaration.property === 'opacity');
+    expect(animation?.value).toBe('none');
+    expect(opacity?.value).toBe('0.75');
+  });
+});
+
+/**
+ * P5 Task 4: the submit spinner covers the button's content instead of joining it.
+ *
+ * The spinner is positioned out of flex flow (components/ui/button.tsx), and these two rules
+ * clear what sits under it. Both halves matter to the geometry: a button with no leading icon
+ * would otherwise widen by the spinner's own box plus the flex gap the moment `loading` turns
+ * true, sliding its centred label by half that and sliding it back when the response lands, and
+ * an icon dropped with `display: none` would leave the flow and shrink the button by the same
+ * amount. jsdom computes no Tailwind output, so this is the only place the pair is checkable.
+ */
+describe('globals.css button spinner cover', () => {
+  const target = "[data-slot='button'][data-spinner]";
+
+  /** Selector match, whitespace around a combinator normalised away. */
+  function matches(rule: StyleRule, selector: string): boolean {
+    const tight = (part: string): string => part.replace(/\s+/g, '');
+    return selectorParts(rule).some((part) => tight(part) === tight(selector));
+  }
+
+  it('clears the label through text-fill, leaving `color` for the spinner stroke', () => {
+    const rule = requireRule(sheet, target, (candidate) => matches(candidate, target));
+
+    const fill = rule.declarations.find(
+      (declaration) => declaration.property === '-webkit-text-fill-color',
+    );
+    expect(fill?.value).toBe('transparent');
+    // `color` itself has to stay put: the spinner draws its stroke in `currentColor`, so a
+    // `color: transparent` here would hide the spinner along with the label it replaces.
+    expect(rule.declarations.some((declaration) => declaration.property === 'color')).toBe(false);
+  });
+
+  it('hides a leading icon without taking it out of the flow', () => {
+    const icon = `${target} > svg`;
+    const rule = requireRule(sheet, icon, (candidate) => matches(candidate, icon));
+
+    const opacity = rule.declarations.find((declaration) => declaration.property === 'opacity');
+    expect(opacity?.value).toBe('0');
+    expect(rule.declarations.some((declaration) => declaration.property === 'display')).toBe(false);
+  });
+});
+
+/**
+ * P5 Task 5: the adversarial pass over every animated surface under
+ * `prefers-reduced-motion: reduce`.
+ *
+ * The suites above check that a reduced-motion rule *exists* for a surface. Existing is not
+ * winning: a reduced twin written with fewer attribute selectors than the movement rule it is
+ * meant to replace loses the cascade outright, and no `@media` query changes that. The drawer
+ * shipped that way, two attribute selectors
+ * (`[data-slot='dialog-drawer-content'][data-state='open']`) against the side-qualified slide
+ * rule's three, so a reader who asked for less motion still got the full 320px slide.
+ *
+ * So this suite resolves the cascade for real instead: for a synthetic element carrying a given
+ * set of attributes or classes, it finds the `animation`/`animation-name` declaration that
+ * actually wins, once with only the unconditional rules in play and once with the
+ * reduced-motion blocks added, exactly as a browser would order them.
+ */
+describe('globals.css reduced-motion cascade', () => {
+  const REDUCED = '@media (prefers-reduced-motion: reduce)';
+
+  type Target = { attrs?: Record<string, string>; classes?: string[] };
+
+  /** One animated surface, the keyframe it plays when nothing is asked for, and whether its
+   * reduced twin still has to leave something on screen when it finishes. */
+  type Surface = { label: string; target: Target; moving: string; visible: boolean };
+
+  /**
+   * The specificity `selector` contributes for `target`, or `null` when it does not match or is
+   * not a plain chain of attribute and class parts. Everything this suite targets is written as
+   * one such chain, and anything else (a type selector, a pseudo-class, a combinator) is a rule
+   * that cannot apply to a bare synthetic element anyway.
+   */
+  function matchSpecificity(selector: string, target: Target): number | null {
+    const parts = selector.match(/\[[^\]]+\]|\.[\w-]+/g);
+    if (parts === null) return null;
+    if (parts.join('') !== selector.trim()) return null;
+
+    const attrs = target.attrs ?? {};
+    const classes = target.classes ?? [];
+    for (const part of parts) {
+      if (part.startsWith('.')) {
+        if (!classes.includes(part.slice(1))) return null;
+        continue;
+      }
+      const inner = part.slice(1, -1);
+      const eq = inner.indexOf('=');
+      if (eq === -1) {
+        if (!(inner in attrs)) return null;
+        continue;
+      }
+      const name = inner.slice(0, eq);
+      const value = inner.slice(eq + 1).replaceAll(/^['"]|['"]$/g, '');
+      if (attrs[name] !== value) return null;
+    }
+    // Every part is a class or an attribute selector, each worth one unit of the `b` column.
+    return parts.length;
+  }
+
+  const ANIMATION_PROPERTIES = ['animation', 'animation-name'];
+
+  /**
+   * The `animation`/`animation-name` declaration that wins for `target`, following layer, then
+   * specificity, then source order. `reduced` decides whether the reduced-motion blocks are in
+   * play; every other at-rule (`hover`, `forced-colors`, `prefers-contrast`) is left out either
+   * way, since none of them is the condition under test.
+   */
+  function winningAnimation(target: Target, { reduced }: { reduced: boolean }): Declaration {
+    let winner: { rule: StyleRule; specificity: number; declaration: Declaration } | undefined;
+
+    for (const rule of sheet.rules) {
+      const conditions = rule.atRules.map((at) => at.replaceAll(/\s+/g, ' '));
+      if (!conditions.every((at) => at === REDUCED)) continue;
+      if (!reduced && conditions.length > 0) continue;
+
+      const declaration = rule.declarations
+        .filter((entry) => ANIMATION_PROPERTIES.includes(entry.property))
+        .at(-1);
+      if (declaration === undefined) continue;
+
+      for (const part of selectorParts(rule)) {
+        const specificity = matchSpecificity(part, target);
+        if (specificity === null) continue;
+        if (winner === undefined) {
+          winner = { rule, specificity, declaration };
+          continue;
+        }
+        const byLayer = layerRank(sheet, rule.layer) - layerRank(sheet, winner.rule.layer);
+        const bySpecificity = specificity - winner.specificity;
+        const byOrder = rule.order - winner.rule.order;
+        if (
+          byLayer > 0 ||
+          (byLayer === 0 && (bySpecificity > 0 || (bySpecificity === 0 && byOrder > 0)))
+        ) {
+          winner = { rule, specificity, declaration };
+        }
+      }
+    }
+
+    if (winner === undefined) {
+      throw new Error(`nothing in the compiled CSS animates ${JSON.stringify(target)}`);
+    }
+    return winner.declaration;
+  }
+
+  /** The keyframe name a winning `animation` shorthand or `animation-name` resolves to. */
+  function keyframeNameOf(declaration: Declaration): string {
+    if (declaration.property === 'animation-name') return declaration.value.trim();
+    const named = declaration.value
+      .split(/\s+/)
+      .find((token) => css.includes(`@keyframes ${token}`));
+    return named ?? 'none';
+  }
+
+  /**
+   * Every animated surface in the tree, with the keyframe that must play when nothing is asked
+   * for. `visible` marks the layers whose reduced twin still has to *arrive*: an open dialog
+   * that ends at anything but full opacity is a state change nobody can see, which is the other
+   * half of what reduced motion must not break.
+   */
+  const surfaces: Surface[] = [
+    {
+      label: 'drawer, docked left, opening',
+      target: {
+        attrs: { 'data-slot': 'dialog-drawer-content', 'data-side': 'left', 'data-state': 'open' },
+      },
+      moving: 'drawer-in-left',
+      visible: true,
+    },
+    {
+      label: 'drawer, docked left, closing',
+      target: {
+        attrs: {
+          'data-slot': 'dialog-drawer-content',
+          'data-side': 'left',
+          'data-state': 'closed',
+        },
+      },
+      moving: 'drawer-out-left',
+      visible: false,
+    },
+    {
+      label: 'drawer, docked right, opening',
+      target: {
+        attrs: { 'data-slot': 'dialog-drawer-content', 'data-side': 'right', 'data-state': 'open' },
+      },
+      moving: 'drawer-in-right',
+      visible: true,
+    },
+    {
+      label: 'drawer, docked right, closing',
+      target: {
+        attrs: {
+          'data-slot': 'dialog-drawer-content',
+          'data-side': 'right',
+          'data-state': 'closed',
+        },
+      },
+      moving: 'drawer-out-right',
+      visible: false,
+    },
+    {
+      label: 'dialog surface, opening',
+      target: { attrs: { 'data-slot': 'dialog-content', 'data-state': 'open' } },
+      moving: 'dialog-content-in',
+      visible: true,
+    },
+    {
+      label: 'dialog surface, closing',
+      target: { attrs: { 'data-slot': 'dialog-content', 'data-state': 'closed' } },
+      moving: 'dialog-content-out',
+      visible: false,
+    },
+    {
+      label: 'dialog scrim, opening',
+      target: { attrs: { 'data-slot': 'dialog-overlay', 'data-state': 'open' } },
+      moving: 'layer-fade-in',
+      visible: true,
+    },
+    {
+      label: 'dialog scrim, closing',
+      target: { attrs: { 'data-slot': 'dialog-overlay', 'data-state': 'closed' } },
+      moving: 'layer-fade-out',
+      visible: false,
+    },
+    {
+      label: 'menu, opening',
+      target: { attrs: { 'data-slot': 'dropdown-menu-content', 'data-state': 'open' } },
+      moving: 'menu-content-in',
+      visible: true,
+    },
+    {
+      label: 'menu, closing',
+      target: { attrs: { 'data-slot': 'dropdown-menu-content', 'data-state': 'closed' } },
+      moving: 'menu-content-out',
+      visible: false,
+    },
+    {
+      label: 'submenu, opening',
+      target: { attrs: { 'data-slot': 'dropdown-menu-sub-content', 'data-state': 'open' } },
+      moving: 'menu-content-in',
+      visible: true,
+    },
+    {
+      label: 'submenu, closing',
+      target: { attrs: { 'data-slot': 'dropdown-menu-sub-content', 'data-state': 'closed' } },
+      moving: 'menu-content-out',
+      visible: false,
+    },
+    {
+      label: 'loading skeleton',
+      target: { attrs: { 'data-slot': 'skeleton' } },
+      moving: 'skeleton-pulse',
+      visible: false,
+    },
+    {
+      label: 'submit spinner',
+      target: { attrs: { 'data-slot': 'button-spinner' } },
+      moving: 'spinner',
+      visible: false,
+    },
+    {
+      label: 'board column entrance',
+      target: { classes: ['board-column-enter'] },
+      moving: 'board-column-enter',
+      visible: true,
+    },
+  ];
+
+  it.each(surfaces)('plays $moving on $label when nothing is asked for', ({ target, moving }) => {
+    expect(keyframeNameOf(winningAnimation(target, { reduced: false }))).toBe(moving);
+  });
+
+  it.each(surfaces)('leaves $label with no movement under reduce', ({ target }) => {
+    const name = keyframeNameOf(winningAnimation(target, { reduced: true }));
+    if (name === 'none') return;
+    expect(keyframeBody(name)).not.toMatch(/\b(transform|scale|translate|rotate)\s*:/);
+  });
+
+  it.each(surfaces.filter((surface) => surface.visible))(
+    'still lets $label finish fully opaque under reduce',
+    ({ target }) => {
+      const name = keyframeNameOf(winningAnimation(target, { reduced: true }));
+      expect(name).not.toBe('none');
+      const body = keyframeBody(name);
+      expect(body.slice(body.lastIndexOf('to'))).toMatch(/opacity\s*:\s*1\b/);
+    },
+  );
 });

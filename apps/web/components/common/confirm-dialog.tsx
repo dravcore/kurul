@@ -103,7 +103,8 @@ function ConfirmDialogBody({
         <Button
           type="button"
           variant={destructive ? 'destructive' : 'default'}
-          disabled={pending || confirmDisabled}
+          loading={pending}
+          disabled={confirmDisabled}
           onClick={() => void confirm()}
         >
           {confirmLabel}

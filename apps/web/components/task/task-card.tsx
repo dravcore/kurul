@@ -58,7 +58,7 @@ export function TaskCard({
         // reasoning behind its `containIntrinsicSize`. Closing that gap changes desktop
         // density and invalidates a performance measurement; it is a real discrepancy and it
         // is not this change's to settle.
-        'block rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 text-left transition-colors max-md:min-h-11',
+        'block rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 text-left transition-[color,background-color,border-color] max-md:min-h-11',
         // Both are single-class utilities, so whichever is emitted later in the compiled sheet
         // wins regardless of source order here. Applying the hover pair only while the card is
         // not selected keeps a hovered selected card on its tint and rail instead of losing them

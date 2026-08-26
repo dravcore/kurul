@@ -31,10 +31,7 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
-      className={cn(
-        'fixed inset-0 z-50 bg-overlay-scrim data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
-        className,
-      )}
+      className={cn('fixed inset-0 z-50 bg-overlay-scrim', className)}
       {...props}
     />
   );
@@ -96,7 +93,7 @@ function DialogContent({
           opener.focus();
         }}
         className={cn(
-          'fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-4rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-lg border bg-popover p-6 shadow-overlay duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+          'fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-4rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-lg border bg-popover p-6 shadow-overlay outline-none sm:max-w-lg',
           className,
         )}
         {...props}
@@ -142,9 +139,9 @@ function DialogContent({
  * The slide is written as real keyframes in `globals.css`, keyed off the `data-slot` and
  * `data-state` attributes below, and not with `animate-in` / `slide-in-from-*` utility
  * classes: this project imports plain `tailwindcss` with no animation plugin, so those class
- * names generate nothing. (The ones already on `DialogContent` and `DialogOverlay` are
- * inert for the same reason — pre-existing, and not this component's to fix.) Writing the
- * keyframes out is also what lets `prefers-reduced-motion` drop the movement and keep the
+ * names generate nothing. `DialogContent` and `DialogOverlay` bind their own keyframes the
+ * same way. Writing the keyframes out is also what lets `prefers-reduced-motion` drop the
+ * movement and keep the
  * fade, which §5 asks for and a utility class could not express.
  *
  * No close button of its own: the drawer's close control is a real, labelled `DialogClose`
