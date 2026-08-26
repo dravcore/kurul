@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Added
 
 - **Password reset by email: a forgotten password is now recovered by the person who forgot it.**
@@ -214,6 +215,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `scripts/lib/doctor.mjs`, tested in `scripts/lib/doctor.test.mjs`.
 
 ### Changed
+
 - **The canonical docs and the roadmap now describe the release that exists.** `ROADMAP.md`
   still framed cutting `v0.3.0` as the active P0 three days after the tag, carried five
   Hardening rows that had shipped on 2026-08-23 and two maintenance-sweep rows for the same
