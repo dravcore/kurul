@@ -739,6 +739,14 @@ değil.
    uygular ve `--wait`, uzun süreli her servis healthy raporladığında döner, biri raporlamazsa
    sıfırdan farklı kodla.
 
+   Yeniden oluşturma bir kesinti değil, bir duraklamadır. `api`, Docker onu öldürmeden önce
+   yaptığı işi bitirmek için 30s alır (`stop_grace_period`) ve pakete dahil Caddy, bir upstream
+   geri gelirken isteği 502 ile yanıtlamak yerine 30s'ye kadar tutar, her 500ms'de yeniden
+   dener. Tek replika hâlâ isteklerin başka yerde karşılanmak yerine beklemesi demektir ve
+   gövdesini göndermeye başlamış bir yükleme yeniden denenmez. Yerine konan bir reverse
+   proxy'nin aynı davranışı göstermesi için kendi karşılığına ihtiyacı vardır (nginx:
+   `proxy_next_upstream`).
+
 6. **Doğrulayın:**
 
    ```bash

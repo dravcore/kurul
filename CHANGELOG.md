@@ -156,6 +156,29 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   visitor left behind. Setup is in
   [Self-hosting → Demo instance](docs/self-hosting.md#demo-instance).
 
+### Fixed
+
+- **A restart no longer drops the requests that were in flight.** Every connection the API owns
+  (the shared Postgres pool, the Redis clients behind the realtime fan-out, the readiness probe
+  and the upload budget, the mail transport, the storage backend and the two BullMQ workers)
+  used to be released from `onModuleDestroy`, which Nest runs _before_ it closes the HTTP
+  listener and the Socket.io server. On `docker compose up -d` that ended the pool under
+  whatever was mid-request, so an ordinary upgrade reported a handful of 500s to Sentry with
+  nothing actually wrong behind them. They all close in `onApplicationShutdown` now, the phase
+  that runs after the listener is shut, and an integration test asserts those two events in
+  that order rather than trusting the hook name.
+
+  The retention sweep also stopped being able to hold the whole shutdown open. `worker.close()`
+  waits for the job that is running and BullMQ puts no ceiling on that wait, so a first sweep on
+  an instance with years of history ran past Docker's 10s grace and ended in a SIGKILL that
+  skipped every hook after it. The wait is bounded now (five seconds, logged when it fires) and
+  the abandoned attempt is re-delivered by BullMQ, which is safe because both scheduled jobs are
+  idempotent by construction. `api` gained `stop_grace_period: 30s` so the rest of the shutdown
+  fits comfortably inside it, and the bundled Caddy holds a request for up to 30s while an
+  upstream is coming back (`lb_try_duration`) instead of answering 502, which turns a recreate
+  into latency rather than errors. Related to #160: this is the cheap half of zero-downtime
+  deploys, not the item itself.
+
 ### Security
 
 - **A demo instance no longer lets a visitor rotate the shared account's password.** The demo
