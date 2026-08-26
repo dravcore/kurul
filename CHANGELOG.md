@@ -256,6 +256,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **API coverage: a fresh `develop` baseline, three new per-directory floors, and a cross-workspace
+  case for the activity/notification feeds.** `apps/api/jest.config.cjs`'s dated baseline (last
+  recorded 2026-08-22, on the feature branch before merge rather than on `develop` after it) is
+  replaced with a `develop`-after-merge measurement: 77.06 / 69.96 / 78.95 / 77.91
+  (stmts/branch/funcs/lines), a margin of 2.06 / 3.96 / 1.95 / 1.91 over the unchanged
+  75 / 66 / 77 / 76 global floor. `src/common/guards/`, `src/common/rate-limit/` and
+  `src/account/` each gain their own floor at their measured value (100 / 93.75 / 100 / 100,
+  98.33 / 94.87 / 91.3 / 99.09, and 0 / 0 / 0 / 0), the same directory-scoped pattern
+  `apps/web/vitest.config.ts` already uses; `src/account/`'s floor is 0 across the board because
+  its GDPR-erasure service is deliberately unit-untested and covered end to end instead. The two
+  rules every floor answers to (raise it when the baseline rises; record a drop here rather than
+  lowering the floor to erase it) and the no-exclusions-from-the-denominator rule move out of the
+  config file's comment history into `docs/testing.md`'s Coverage section, which now states the
+  API's real margin and points at the CI `api-coverage` artifact as the source of truth in place
+  of the stale "a few points under" claim. `activity-notifications.e2e-spec.ts` gains a
+  cross-workspace case: a member of one workspace requesting another's task activities,
+  notification list, unread count or mark-read all get `404`, the same convention
+  `comment.e2e-spec.ts` and `trello-import.e2e-spec.ts` already use for cross-tenant access.
 - **CI now parses the compose files and the Caddyfile on every pull request.** A new
   `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
   `docker compose config -q`, without a profile and with `--profile demo`, renders
