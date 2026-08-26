@@ -58,10 +58,9 @@ password lock-out, password reset by email, the Redis error listeners, the `REDI
 username and `rediss://` forms, the `.dockerignore` rewrite, the Alpine package upgrade in the
 runtime stages, the shutdown ordering, the digest-pinned base images, the re-measured coverage
 baseline, the label activity rows and the Trello importer clamps are all on `develop` and go out
-as `v0.4.0`. What is left of it is below. A row
-that shipped after this table was written keeps its line, marked with its date and pull request,
-until `v0.4.0` is cut; otherwise the table empties rather than grows, and a row leaves it by
-shipping, not by being re-deferred.
+as `v0.4.0`. What is left of it is below. A row that shipped after this table was written keeps
+its line, marked with its date and pull request, until `v0.4.0` is cut; otherwise the table
+empties rather than grows, and a row leaves it by shipping, not by being re-deferred.
 
 | Item                                                                                           | Prio | Effort | Acceptance criterion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | ---------------------------------------------------------------------------------------------- | ---- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
