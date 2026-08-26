@@ -480,6 +480,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `workflow_dispatch` triggers are unchanged), and a new step prints the branch and commit
   that actually ran, since the run's own head branch still names the branch the schedule was
   read from. `main` keeps its coverage where it changes: the release and hotfix pull requests.
+- **`REDIS_URL` now honours a Redis 6+ ACL username and `rediss://` (TLS)
+  ([#204](https://github.com/dravcore/kurul/issues/204)).** `parseRedisUrl` read only host,
+  port, password and the database index; `url.username` and `url.protocol` were never
+  inspected, so a URL naming an ACL user (`redis://alice:s3cret@host`) silently authenticated
+  as `default` instead, and a `rediss://` URL connected in plaintext with no warning. The
+  parser now carries `username` through when the URL names one, sets `tls: {}` for `rediss:`,
+  and rejects any scheme other than `redis:`/`rediss:` with the same `Invalid REDIS_URL` error
+  an unparsable database index already uses. All six ioredis/BullMQ construction sites (auth
+  rate limiting, the upload byte budget, the readiness probe, the Socket.io adapter, and both
+  BullMQ workers) spread the parser's return value straight into their client, so the fix
+  reaches every one of them without a call site changing. The bundled Compose stack is
+  unaffected either way: it always builds a plain `redis://:password@redis:6379` for its own
+  `redis` container, so this only matters for a bring-your-own managed Redis.
 
 ### Changed
 
