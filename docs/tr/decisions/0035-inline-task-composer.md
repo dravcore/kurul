@@ -68,7 +68,8 @@ dışına asla taşımaz.
 ### 3. Tek bir ek kontrol, `Open details`, ve panel'i açar
 
 Composer, alanın yanında tam olarak tek bir kontrol taşır: `Open details`. Yazılmış olandan
-task'ı oluşturur ve yeni kartın task panel'ini açar. Bir dialog açmaz ve ikinci bir form değildir.
+task'ı oluşturur ve yeni kartın task panel'ini açar. Alan boşken devre dışıdır, çünkü açılacak bir
+kart henüz yoktur. Bir dialog açmaz ve ikinci bir form değildir.
 
 "Peki diğer alanlar ne olacak" sorusunun tüm cevabı budur: zaten yaşadıkları yerde doldurulurlar.
 Composer bir başlık toplar, çünkü bir kartın var olmak için ihtiyaç duyduğu tek şey bir başlıktır.
@@ -81,21 +82,23 @@ hiçbir yüzey task oluşturmaz. Kararın bağlayıcı yarısı budur: "board co
 değil, "composer tek yoldur"; böylece doğru yapılacak tek bir davranış kümesi, bir hatanın
 düzeltileceği tek bir yer ve aynı alanı toplayan iki form arasında sürüklenme ihtimali olmaz.
 
-### 5. `n` ilk column'un composer'ını açar ve odaklar
+### 5. `c` ilk column'un composer'ını açar ve odaklar
 
-Modifier'sız çıplak bir `n`, board'un ilk column'undaki composer'ı açar ve imleci içine koyar.
+Modifier'sız çıplak bir `c`, board'un ilk column'undaki composer'ı açar ve imleci içine koyar.
 Guard, `/` kısayolunun zaten kullandığı guard'dır: handler, `metaKey`, `ctrlKey` veya `altKey`
 basılıysa döner ve event target'ı bir `INPUT`, bir `TEXTAREA` ya da `contentEditable` bir eleman
-ise döner, böylece bir alana yazılan `n` bir harftir, kısayol değil. Ancak bundan sonra
+ise döner, böylece bir alana yazılan `c` bir harftir, kısayol değil. Ancak bundan sonra
 `preventDefault` çağırır ve focus'u taşır.
 
-Bu, design.md §5'te reserve edilen harfi `C`'den `n`'e değiştirir; burada karara bağlanır ve aynı
-fazın ilerleyen bir görevinde design.md'ye yazılır. Reserve listesinin kalanına dokunulmaz ve
-başka hiçbir şey çıplak bir harf tuşu talep etmez.
+Bu, design.md §5'in create task için zaten reserve ettiği harftir. ADR yeni bir tuş talep etmez;
+reserve edilmiş olanı map eder ve karara bağladığı şey o tuşun ne yaptığıdır: bir şey açmak değil,
+composer'ı odaklamak. design.md reserve listesinde harfi `C` olarak yazar; handler'ın eşleştirdiği
+tuş, Shift'siz `c`'dir, çünkü Shift onu modifier'lı bir tuş yapardı. Reserve listesinin kalanına
+dokunulmaz.
 
 ### 6. Gelecekteki command palette kendine ait bir create-task dialog'u almaz
 
-`⌘K` geldiğinde, onun task oluşturma aksiyonu tıpkı `n` gibi composer'ı odaklar. Palette, tek
+`⌘K` geldiğinde, onun task oluşturma aksiyonu tıpkı `c` gibi composer'ı odaklar. Palette, tek
 oluşturma yoluna ulaşmanın bir yoludur, asla ikinci bir yol değildir. Bu, palette daha ortada
 yokken şimdi söyleniyor, çünkü ikinci yolun geri gelmesinin en bariz biçimi "palette'in kendi
 hızlı ekleme dialog'una ihtiyacı var" cümlesidir.
@@ -126,16 +129,17 @@ hızlı ekleme dialog'una ihtiyacı var" cümlesidir.
   ikinci bir form, bu işi daha az yerin olduğu ve büyümeye yerin olmadığı bir noktada
   çoğaltırdı.
 
-- **Harf, odakladığı şeyle birlikte karara bağlanır.** Açacak bir şeyi olmayan bir reserve
-  kısayol bir nottur; onu gerçek kılan şey composer'dır, dolayısıyla composer'ı yaratan ADR,
-  harfin geçicilikten çıktığı yerdir.
+- **Reserve bir harf, ancak ona cevap veren bir şey olduğunda gerçek olur.** design.md §5,
+  `C`'yi create task için, ona açacak bir şey daha ortada yokken reserve etti. Onun açtığı şey
+  composer'dır, dolayısıyla composer'ı yaratan ADR, o reservasyonun not olmaktan çıkıp bağlayıcı
+  hale geldiği yerdir.
 
 ## Sonuçlar
 
 - **Composer'daki bir regresyon task oluşturmayı imkânsız kılar.** Geri düşülecek bir dialog
   kalmadı ve hata kısmi değil tam bir hatadır. Bu yüzden iki yol da `e2e/tests/` altındaki
   tarayıcı e2e'siyle kapsanır (`pnpm test:browser`): imleç yolu (`Add task`'a tıkla, yaz,
-  `Enter`, kart belirir) ve klavye yolu (`n`, yaz, `Enter`, focus hâlâ boşalmış alandadır).
+  `Enter`, kart belirir) ve klavye yolu (`c`, yaz, `Enter`, focus hâlâ boşalmış alandadır).
   Bileşen testleri bunun yerine geçemez, çünkü bozulan şey gerçek bir tarayıcıdaki focus ve tuş
   işleyişidir.
 

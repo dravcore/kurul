@@ -66,8 +66,8 @@ out of the field.
 ### 3. One extra control, `Open details`, and it opens the panel
 
 Beside the field the composer carries exactly one control: `Open details`. It creates the task
-from what is typed and opens the new card's task panel. It does not open a dialog, and it is not a
-second form.
+from what is typed and opens the new card's task panel. It is disabled while the field is empty,
+because there is no card to open yet. It does not open a dialog, and it is not a second form.
 
 That is the whole answer to "what about the other fields": they are filled where they already live.
 The composer collects a title because a title is the only thing a card needs to exist.
@@ -80,21 +80,23 @@ the product creates a task. This is the binding half of the decision: not "the b
 composer" but "the composer is the only way", so that there is one set of behaviours to get right,
 one place to fix a bug, and no drift between two forms that collect the same field.
 
-### 5. `n` opens and focuses the first column's composer
+### 5. `c` opens and focuses the first column's composer
 
-A bare `n`, with no modifier, opens the composer of the board's first column and puts the caret in
+A bare `c`, with no modifier, opens the composer of the board's first column and puts the caret in
 it. The guard is the one the `/` shortcut already uses: the handler returns when `metaKey`,
 `ctrlKey` or `altKey` is held, and returns when the event target is an `INPUT`, a `TEXTAREA` or a
-`contentEditable` element, so an `n` typed into a field is a letter and not a shortcut. Only then
+`contentEditable` element, so a `c` typed into a field is a letter and not a shortcut. Only then
 does it call `preventDefault` and move focus.
 
-This changes the letter reserved in design.md §5 from `C` to `n`, which is decided here and
-written into design.md later in the same phase. The rest of the reserved list is untouched, and
-nothing else claims a bare letter key.
+This is the letter design.md §5 already reserves for create task. The ADR does not claim a new
+key; it maps the reserved one, and what it decides is what that key does, which is to focus the
+composer rather than to open anything. design.md writes the letter as `C` in its reserved list;
+the key the handler matches is the unshifted `c`, since Shift would make it a modified key. The
+rest of the reserved list is untouched.
 
 ### 6. A future command palette gets no create-task dialog
 
-When `⌘K` lands, its create-task action focuses the composer, exactly as `n` does. The palette is
+When `⌘K` lands, its create-task action focuses the composer, exactly as `c` does. The palette is
 a way to reach the one creation path, never a second one. This is stated now, before the palette
 exists, because "the palette needs its own quick-add dialog" is the obvious way for the second
 path to come back.
@@ -123,16 +125,17 @@ path to come back.
   laid out and permission-checked in the task panel. A second form that collects a subset of them
   would duplicate that work in a place with less room and no room to grow.
 
-- **The letter is decided with the thing it focuses.** A reserved shortcut with nothing to open is
-  a note; the composer is what makes it real, so the ADR that creates the composer is where the
-  letter stops being provisional.
+- **A reserved letter is only real once something answers it.** design.md §5 has reserved `C` for
+  create task since before there was anything for it to open. The composer is what it opens, so
+  the ADR that creates the composer is where that reservation stops being a note and starts
+  binding.
 
 ## Consequences
 
 - **A regression in the composer makes task creation impossible.** There is no dialog left to fall
   back to, and the failure is total rather than degraded. Both paths are therefore covered by
   browser e2e under `e2e/tests/` (`pnpm test:browser`): the pointer path (click `Add task`, type,
-  `Enter`, the card appears) and the keyboard path (`n`, type, `Enter`, focus is still in the
+  `Enter`, the card appears) and the keyboard path (`c`, type, `Enter`, focus is still in the
   emptied field). Component tests cannot stand in for this, because what breaks is focus and key
   handling in a real browser.
 
