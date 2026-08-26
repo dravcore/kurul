@@ -1091,6 +1091,48 @@ describe('globals.css button spinner cover', () => {
 });
 
 /**
+ * P6 Task 6: the two marks a card wears when the board answers back, and the JS timers that
+ * decide how long each one's `data-state` stays on the element.
+ *
+ * The keyframe's duration and the timer's are one figure written twice. Dropped early, the card
+ * jumps out of a play that had not finished; dropped late, the element carries a state nothing
+ * draws. Neither module exports its constant, since nothing else has a use for it, so the pairing
+ * is read out of the source the same way the rest of this file reads the tree.
+ */
+describe('globals.css task card feedback', () => {
+  function timerMs(file: string, name: string): number {
+    const source = readFileSync(path.join(webRoot, file), 'utf8');
+    const match = new RegExp(`${name} = ([\\d_]+)`).exec(source);
+    if (match === null) throw new Error(`${file} no longer declares ${name}`);
+    return Number(match[1]!.replaceAll('_', ''));
+  }
+
+  function animationOf(target: string): string {
+    const rule = requireRule(sheet, target, (candidate) =>
+      selectorParts(candidate).includes(target),
+    );
+    const animation = rule.declarations.find((declaration) => declaration.property === 'animation');
+    if (animation === undefined) throw new Error(`${target} declares no animation shorthand`);
+    return animation.value;
+  }
+
+  it('lands a refused move over the 220ms --ease-in-out docs/design.md §5 gives it', () => {
+    const animation = animationOf("[data-slot='task-card'][data-state='returning']");
+
+    expect(animation).toContain('220ms');
+    expect(animation).toContain('var(--ease-in-out)');
+    expect(timerMs('components/board/use-board-mutations.ts', 'RETURN_ANIMATION_MS')).toBe(220);
+  });
+
+  it('fades a remote change over the 1200ms the same section gives it', () => {
+    const animation = animationOf("[data-slot='task-card'][data-state='remote-changed']");
+
+    expect(animation).toContain('1200ms');
+    expect(timerMs('components/board/use-board-realtime.ts', 'REMOTE_CHANGE_MS')).toBe(1_200);
+  });
+});
+
+/**
  * P5 Task 5: the adversarial pass over every animated surface under
  * `prefers-reduced-motion: reduce`.
  *
