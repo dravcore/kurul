@@ -137,11 +137,13 @@ hızlı ekleme dialog'una ihtiyacı var" cümlesidir.
 ## Sonuçlar
 
 - **Composer'daki bir regresyon task oluşturmayı imkânsız kılar.** Geri düşülecek bir dialog
-  kalmadı ve hata kısmi değil tam bir hatadır. Bu yüzden iki yol da `e2e/tests/` altındaki
-  tarayıcı e2e'siyle kapsanır (`pnpm test:browser`): imleç yolu (`Add task`'a tıkla, yaz,
-  `Enter`, kart belirir) ve klavye yolu (`c`, yaz, `Enter`, focus hâlâ boşalmış alandadır).
-  Bileşen testleri bunun yerine geçemez, çünkü bozulan şey gerçek bir tarayıcıdaki focus ve tuş
-  işleyişidir.
+  kalmadı ve hata kısmi değil tam bir hatadır. Bu yüzden iki yol da
+  `e2e/tests/board-composer.spec.ts` ile kapsanır (`pnpm test:browser`): klavye yolu (`Add
+task`'a ulaş, `Enter`, yaz, `Enter`, iki kez üst üste; focus hâlâ boşalmış alandadır ve
+  `Escape` onu butona geri verir) ve imleç yolu (`Add task`'a tıkla, yaz, `Open details`, panel
+  yeni task üzerinde açılır). İkisi de bir reload ile biter, yani doğrulanan şey sunucunun
+  sakladığıdır. Bileşen testleri bunun yerine geçemez, çünkü bozulan şey gerçek bir tarayıcıdaki
+  focus ve tuş işleyişidir.
 
 - **Dokunma ve küçük ekranlar kararın sonrasında değil içindedir.** Alan 768px altında 16px'tir
   (bunu 360px e2e taraması zorlar ve iOS'un focus'ta board'u zoomlamasını durduran şey budur) ve

@@ -134,10 +134,12 @@ path to come back.
 
 - **A regression in the composer makes task creation impossible.** There is no dialog left to fall
   back to, and the failure is total rather than degraded. Both paths are therefore covered by
-  browser e2e under `e2e/tests/` (`pnpm test:browser`): the pointer path (click `Add task`, type,
-  `Enter`, the card appears) and the keyboard path (`c`, type, `Enter`, focus is still in the
-  emptied field). Component tests cannot stand in for this, because what breaks is focus and key
-  handling in a real browser.
+  `e2e/tests/board-composer.spec.ts` (`pnpm test:browser`): the keyboard path (reach `Add task`,
+  `Enter`, type, `Enter`, twice over, with focus still in the emptied field and `Escape` handing
+  it back to the button) and the pointer path (click `Add task`, type, `Open details`, the panel
+  opens on the new task). Both end on a reload, so what is asserted is what the server stored.
+  Component tests cannot stand in for this, because what breaks is focus and key handling in a
+  real browser.
 
 - **Touch and small screens are inside the decision, not after it.** The field is 16px below 768px
   (which the 360px e2e sweep enforces, and which is what stops iOS from zooming the board on
