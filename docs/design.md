@@ -188,12 +188,13 @@ falls straight through to the fallback fonts.
 | Body / UI | **Archivo** (variable, OFL)                                | Everything in the product                                                 | A signage grotesque: tall x-height, economical widths, legible at 12–13px. A board is hundreds of short strings in narrow columns — a signage problem. Chosen over Inter and Geist, which are correct but read as the framework default. |
 | Mono      | **JetBrains Mono** (OFL), `0.92em`                         | Ids, shortcuts, code                                                      | Unambiguous `0/O` and `1/l/I` — a UUIDv7 legibility tool, not a style choice                                                                                                                                                             |
 
-| Step                   | Size / line       | Weight    | Use                                                         |
-| ---------------------- | ----------------- | --------- | ----------------------------------------------------------- |
-| `display`              | 40 / 44           | 600       | One per auth or marketing screen                            |
-| `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Page and panel titles · section and dialog titles           |
-| `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — fields and rows · card titles, active nav |
-| `small` · `micro`      | 12 / 16 · 11 / 14 | 400 · 500 | Metadata, timestamps · chips, counts, axis ticks            |
+| Step                   | Size / line       | Weight    | Use                                                                      |
+| ---------------------- | ----------------- | --------- | ------------------------------------------------------------------------ |
+| `display`              | 40 / 44           | 600       | One per auth or marketing screen                                         |
+| `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Page and panel titles · section and dialog titles                        |
+| `read`                 | 14 / 21           | 400       | Long-form prose: task description, comment body, import report sentences |
+| `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — fields and rows · card titles, active nav              |
+| `small` · `micro`      | 12 / 16 · 11 / 14 | 400 · 500 | Metadata, timestamps · chips, counts, axis ticks                         |
 
 This is the whole scale, with no gap left for a Tailwind default to fill unnoticed: `text-sm`,
 `text-lg`, `text-xs` and `font-medium` are gone from the component tree, and
@@ -208,6 +209,13 @@ title both carry their own step's line-height now, 18px and 24px, with no `leadi
 on top: that was a shadcn default riding along uninvited, not a choice this scale ever asked for.
 (Tailwind's own `text-base`, 16px, stays as a deliberate exception on three form fields below
 768px, §4, not a gap in this scale.)
+
+`read` (14/21, weight 400) is a closed list on purpose, not a general prose size: task
+description, comment body, and import report sentences carry it, nowhere else. Board cards stay
+`body` (13/18) even where they show a description snippet. `text-read-utilities.test.ts` scans
+`app/`, `components/` and `lib/` for the literal utility class and fails the build the moment a
+fourth call site adds itself, the same technique `border-utilities.test.ts` already uses for its
+own closed lists.
 
 `tabular-nums` on columns of numbers, axis ticks, and table cells — never on a hero figure or
 a stat-tile value.
@@ -300,6 +308,48 @@ creation, and destructive actions stay **dialogs**; those genuinely need to bloc
 | Flow        | Triage is open → edit → next. A panel keeps the next card one click away instead of a dismiss plus a click.                                                                |
 | Realtime    | A card moving under a modal is invisible; behind a panel it is visible                                                                                                     |
 | Routing     | Deep-linkable at `board/[boardId]/task/[taskId]` — both soft navigation and a hard load render `BoardView` with the task selected (no Next.js intercepting/`@modal` route) |
+
+**Which surface a situation gets.** Every layer in the app answers to one of these:
+
+| Situation                                                                                                                                              | Surface                                   | Rule                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One or two fields that save where they are, opened from the exact spot they describe                                                                   | Inline composer / inline edit             | No layer, no focus trap; `Enter` saves, `Escape` cancels and restores the old value (`components/common/inline-rename.tsx`, `components/board/task-composer.tsx`, [ADR 0035](decisions/0035-inline-task-composer.md)) |
+| A focused multi-field form, or a destructive or hard-to-reverse confirmation that genuinely has to block the screen behind it                          | Dialog                                    | Traps focus, closes on `Esc`, restores focus on close (§5, §9 Focus management); board and column creation, invites, an owner role change, every delete                                                               |
+| One entity's full detail, read or edited alongside the list it came from                                                                               | Panel                                     | Non-modal, ~480px, a fullscreen sheet below `md` ("Task detail" above)                                                                                                                                                |
+| Several independent settings-style sections on one screen, 2 to 7 of them                                                                              | One page, one `SettingsSection` per topic | `/settings` holds six today: members, language, notifications, tokens, workspace, account                                                                                                                             |
+| One of those sections reaches its own data-table scale (a roster with a control per row), or a confirmation flow too tall for a paragraph and a button | Sub-route                                 | `/settings/members`, `/settings/account/delete` (Settings IA below)                                                                                                                                                   |
+| A distinct top-level destination                                                                                                                       | Full page                                 | Owns its own `flex-1 overflow-y-auto` ("The shell is exactly one viewport tall" above)                                                                                                                                |
+| A list of options that outgrows a flat scan                                                                                                            | Progressive disclosure                    | 7 or fewer renders flat; 8 or more folds behind a searchable popover (below)                                                                                                                                          |
+| The result of an action the screen cannot already show for itself                                                                                      | Toast                                     | Per §7's third-beat rule: the effect is off-screen, has no on-screen representation, or reaches further than the view admits                                                                                          |
+| A field-level `400` or `422` failure                                                                                                                   | Inline error                              | Under the field, focus moves to the first (§6 Errors)                                                                                                                                                                 |
+
+**Panel order.** `TaskPanel` composes, top to bottom: `TaskPanelFields` (title at `title-lg`,
+borderless at rest and bordered only on focus via `border-transparent focus:border-input`,
+description at `read`), `TaskPropertiesPanel` (priority, due date, estimate, assignees, labels),
+`TaskChecklists`, `TaskAttachments`, `TaskDiscussionPanel` (comments, activity), then, for
+whoever can mutate, a delete footer. It is the same order the card itself reads in: what the
+task is, then what is in it, then what was said about it. The footer is `mt-auto` and only
+reaches the bottom of the panel while it is the last child of that flex column
+(`components/task/task-panel.tsx`, pinned by `task-panel.test.tsx`), so nothing may be appended
+after it.
+
+The assignee and label pickers fold at the same number the panel itself scans without searching:
+`INLINE_PICKER_MAX = 7` (`components/task/searchable-picker.tsx`) renders 7 or fewer options as
+a flat checkbox list and folds 8 or more behind a searchable, non-portalled popover
+(`components/ui/popover.tsx`) instead of letting the list outgrow the panel's own width.
+`Escape` closes only that popover, not the panel behind it (`ESCAPE_LAYER_SELECTOR` in
+`use-task-panel-focus.ts`).
+
+**Settings IA: further down, harder to undo.** `/settings`'s sections read top to bottom on that
+rule. Members first, since it is the only section about other people and what a new workspace
+owner opens this screen to find. Language and notifications next, both about the person rather
+than the workspace. Tokens before workspace, since revoking one undoes itself the moment it is
+minted again, unlike anything below it. Workspace before account, since deleting a workspace
+stays inside it while deleting the account reaches past this workspace into every workspace the
+person is in on this instance ([ADR 0026](decisions/0026-account-deletion-anonymisation.md));
+nothing on the page is further down than that. `/settings/members` and
+`/settings/account/delete` are the two sections the sub-route rule above promotes off this page;
+every other section stays inline as a `SettingsSection` (`components/settings/settings-section.tsx`).
 
 ## 5. Interaction patterns
 

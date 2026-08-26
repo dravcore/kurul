@@ -266,7 +266,46 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `.env` key to set) and exits non-zero if any check fails. Logic lives in
   `scripts/lib/doctor.mjs`, tested in `scripts/lib/doctor.test.mjs`.
 
+- **Member management and account deletion move off the settings list onto their own routes.**
+  `/settings/members` (`app/(app)/settings/members/page.tsx`) holds the roster: an inline native
+  `<select>` sets a member's role directly on their row, with the role's hint printed underneath
+  it, and choosing `OWNER` opens a `ConfirmDialog` instead of applying on select the way every
+  other role does. `/settings/account/delete` (`app/(app)/settings/account/delete/page.tsx`) is
+  one 720px route covering the account holding zero, one or many owned workspaces, gated the
+  same way the old dialog was: typing the account's own email address. `/settings` keeps a link
+  out to each, and `SettingsSection` moves to `components/settings/settings-section.tsx` so both
+  routes can use it too.
+
+- **A `read` type step for the panel's long-form text.** `--text-read` (`app/globals.css`) sets
+  14px/21px at weight 400, a size between `title` and `body` for prose meant to be read rather
+  than scanned. It is a closed list on purpose: the task description field, the comment body and
+  import report sentences carry it, and `text-read-utilities.test.ts` fails the build the moment
+  a fourth call site adds itself.
+
+- **The assignee and label pickers stay a flat list until they cannot.**
+  `components/task/searchable-picker.tsx` renders 7 or fewer options as the plain checkbox list
+  the panel always showed (`INLINE_PICKER_MAX = 7`) and folds 8 or more behind a searchable
+  popover instead, so a board with a large member roster or label set no longer turns the task
+  panel into a scroll of checkboxes. The popover is non-portalled and lives inside the panel
+  (a new `components/ui/popover.tsx` primitive), and `Escape` closes only it, never the panel
+  underneath (`use-task-panel-focus.ts`); the filter folds with the reader's locale.
+
+- **Renaming a board or a workspace happens where the name already sits, not in a dialog.**
+  `components/common/inline-rename.tsx` opens the name, and for a board the description too, as
+  editable fields in place, reached from the board card menu's `Rename` item or the workspace
+  settings row's `Rename` button: `Enter` saves, `Escape` cancels, and an empty name restores the
+  old one rather than saving a blank.
+
 ### Changed
+
+- **The task panel splits its metadata and its conversation into their own sections, in the
+  order the card itself reads.** `task-metadata-panel.tsx` becomes two components:
+  `components/task/task-properties-panel.tsx` (priority, due date, estimate, assignees, labels)
+  and `components/task/task-discussion-panel.tsx` (comments, activity). `TaskPanel` composes
+  them, top to bottom, as fields, properties, checklists, attachments, discussion, then a delete
+  footer for whoever can mutate; the footer is `mt-auto` and only reaches the bottom of the panel
+  while it stays the last child, pinned by a test in `task-panel.test.tsx`. The title field in
+  `TaskPanelFields` is now borderless at rest and bordered only on focus.
 
 - **A card says its due date and its estimate on one line, and never grows a second.** The meta
   row (`components/task/task-card.tsx`) is one flex row that carries the label dots, the due
@@ -611,6 +650,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `messages/en.json` and `messages/tr.json`.
 
 ### Removed
+
+- **Three dialog kinds close in favour of the surface above them.**
+  `components/settings/change-member-role-dialog.tsx` (role changes are now the inline `<select>`
+  on `/settings/members`, `OWNER` still confirmed through `ConfirmDialog`),
+  `components/settings/delete-account-dialog.tsx` (replaced by the `/settings/account/delete`
+  route), and `components/board/rename-board-dialog.tsx` plus
+  `components/settings/rename-workspace-dialog.tsx` (both replaced by
+  `components/common/inline-rename.tsx`) are all gone.
 
 - **`CreateTaskDialog` is gone.** Adding a task from a dialog cost a layer, a focus trap and a
   round trip through the middle of the screen for one field; the inline composer replaces it
