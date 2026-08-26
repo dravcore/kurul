@@ -304,7 +304,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # OPS-02 (audit/findings/devops.md, 2026-08-18 audit): backup.sh's main loop runs
+    # OPS-02 (2026-08-18 devops audit; that dashboard was a local working note and is not in
+    # the repo, so this comment carries the reasoning): backup.sh's main loop runs
     # `take_dump || true` / `take_files || true` (see there) so ONE failing cycle only logs
     # and keeps sleeping — the process itself never exits non-zero, and without this block
     # nothing about the container's state changed either. A dump could stop being produced
@@ -425,7 +426,8 @@ services:
         condition: service_healthy
 
   api:
-    # OPS-04 (audit/findings/devops.md): `image:` alongside `build:` is not an either/or —
+    # OPS-04 (2026-08-18 devops audit, dashboard not in the repo): `image:` alongside `build:`
+    # is not an either/or —
     # Compose's default pull_policy (`missing`) means `docker compose up -d` only builds when
     # the tag below isn't already resolvable, so `docker compose pull && docker compose up -d`
     # (docs/development.md#full-stack-in-docker) now installs and upgrades from a published
