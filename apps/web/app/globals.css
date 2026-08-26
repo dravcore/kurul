@@ -710,8 +710,10 @@ body {
    `task-card-remote-change` keeps the same animation under `reduce`: it declares background
    colour and nothing else, which is what reduced motion preserves rather than removes, and it is
    the only mark that says a row changed under the reader's hands. It ends on the card's own
-   ground rather than on `transparent`, which would let the column show through it, and that
-   ground is a variable because the selected card's ground is the tint itself. */
+   ground rather than on `transparent`, which would let the column show through it, and both ends
+   are variables because the selected card already sits on the tint this mark fades from: one
+   keyframe serves both cards, and the selected one runs it between the hover step and the tint so
+   the fade is visible there too. */
 @keyframes task-card-return {
   from {
     opacity: 0.5;
@@ -725,7 +727,7 @@ body {
 
 @keyframes task-card-remote-change {
   from {
-    background-color: var(--signature-subtle);
+    background-color: var(--task-card-remote-from);
   }
   to {
     background-color: var(--task-card-ground);
@@ -734,10 +736,12 @@ body {
 
 [data-slot='task-card'] {
   --task-card-ground: var(--card);
+  --task-card-remote-from: var(--signature-subtle);
 }
 
 [data-slot='task-card'][data-selected] {
   --task-card-ground: var(--signature-subtle);
+  --task-card-remote-from: var(--accent);
 }
 
 [data-slot='task-card'][data-state='returning'] {
@@ -768,6 +772,17 @@ body {
 
   a[data-selected] {
     border-color: Highlight;
+  }
+
+  /* The tint a card takes when someone else changed it is a background colour and nothing
+     else, so the mode paints it the same Canvas as every resting card and the mark is gone.
+     A dotted Highlight border is the twin: the same system colour selection uses, in the one
+     channel selection does not, so the two states stay tellable apart on a card wearing both
+     (selection keeps a solid border and its outline). The animation still runs, and the border
+     carries the state for as long as the card holds it. */
+  a[data-state='remote-changed'] {
+    border-color: Highlight;
+    border-style: dotted;
   }
 
   /* components/board/board-column.tsx marks the column dnd-kit reports as `isOver`. The column

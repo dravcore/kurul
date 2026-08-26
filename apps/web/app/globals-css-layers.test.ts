@@ -804,6 +804,29 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
     expect(border.declarations).toEqual([{ property: 'border-color', value: 'Highlight' }]);
   });
 
+  /**
+   * The remote-change tint is a background colour and nothing else, so the mode leaves the card
+   * indistinguishable from a resting one. The twin is a border, and it is dotted rather than
+   * solid so a card that is both selected and remotely changed still wears two readable marks.
+   */
+  it('marks a remotely changed card with a dotted Highlight border', () => {
+    const remote = requireRule(forced, 'the remote-change border twin', (rule) => {
+      return rule.selector === "a[data-state='remote-changed']";
+    });
+    expect(remote.declarations).toEqual([
+      { property: 'border-color', value: 'Highlight' },
+      { property: 'border-style', value: 'dotted' },
+    ]);
+
+    // Selection is the state this one has to stay distinct from, and it is solid.
+    const selection = requireRule(forced, "the selected card's border", (rule) => {
+      return rule.selector === 'a[data-selected]';
+    });
+    expect(
+      selection.declarations.some((declaration) => declaration.property === 'border-style'),
+    ).toBe(false);
+  });
+
   it('gives the drop target a Highlight outline in place of its tint, without reflowing it', () => {
     const drop = requireRule(forced, 'the drop target outline', (rule) => {
       return rule.selector === 'section[data-drop-target]';
@@ -898,6 +921,7 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
   it.each([
     'a[data-selected]',
     'a[data-selected]:not(:focus-visible)',
+    "a[data-state='remote-changed']",
     'section[data-drop-target]',
     "[data-slot='drop-indicator']",
   ])('keeps %s above every utility', (selector) => {
@@ -1129,6 +1153,36 @@ describe('globals.css task card feedback', () => {
 
     expect(animation).toContain('1200ms');
     expect(timerMs('components/board/use-board-realtime.ts', 'REMOTE_CHANGE_MS')).toBe(1_200);
+  });
+
+  /**
+   * One keyframe, two grounds. The selected card already sits on `--signature-subtle`, so a fade
+   * written from that colour to the card's own ground is a fade from a colour to itself there:
+   * the mark exists in the stylesheet and is invisible on exactly the card the reader is looking
+   * at. Both ends of the keyframe are therefore variables, and the selected card overrides both.
+   */
+  it('gives the selected card its own ends for the remote-change fade', () => {
+    const resting = requireRule(sheet, 'the task card ground', (rule) => {
+      return rule.selector === "[data-slot='task-card']";
+    });
+    expect(resting.declarations).toEqual([
+      { property: '--task-card-ground', value: 'var(--card)' },
+      { property: '--task-card-remote-from', value: 'var(--signature-subtle)' },
+    ]);
+
+    const selected = requireRule(sheet, "the selected card's grounds", (rule) => {
+      return rule.selector === "[data-slot='task-card'][data-selected]";
+    });
+    expect(selected.declarations).toEqual([
+      { property: '--task-card-ground', value: 'var(--signature-subtle)' },
+      { property: '--task-card-remote-from', value: 'var(--accent)' },
+    ]);
+
+    // The keyframe reads both, which is what makes the pair above a fade rather than two
+    // unrelated declarations.
+    const frames = keyframeBody('task-card-remote-change');
+    expect(frames).toContain('var(--task-card-remote-from)');
+    expect(frames).toContain('var(--task-card-ground)');
   });
 });
 
