@@ -74,7 +74,6 @@
       "title": "Daveti kabul et",
       "subtitle": "{workspace} workspace'ine davet edildiniz.",
       "submit": "Daveti kabul et",
-      "submitPending": "Kabul ediliyor…",
       "accepted": "Davet kabul edildi",
       "signInFirst": "Kabul etmek için davet edilen e-posta adresiyle giriş yapın.",
       "signInCta": "Giriş yap",

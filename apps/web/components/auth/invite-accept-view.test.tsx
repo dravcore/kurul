@@ -139,6 +139,30 @@ describe('InviteAcceptView', () => {
     expect(mocks.setActive).toHaveBeenCalledWith({ organizationId: WORKSPACE_ID });
   });
 
+  it('marks the accept button busy while the request is out, keeping its label', async () => {
+    signedIn(true);
+    invitationLoads();
+    let settle = (): void => {};
+    mocks.post.mockReturnValue(
+      new Promise((resolve) => {
+        settle = () => resolve({});
+      }),
+    );
+    renderView();
+
+    const accept = await screen.findByRole('button', { name: ACCEPT_LABEL });
+    fireEvent.click(accept);
+
+    // The waiting state is `Button`'s one mechanism (docs/design.md §5): busy and disabled, and
+    // the label still reads the same, rather than a second string of this screen's own.
+    await waitFor(() => expect(accept.getAttribute('aria-busy')).toBe('true'));
+    expect((accept as HTMLButtonElement).disabled).toBe(true);
+    expect(accept.textContent).toBe(ACCEPT_LABEL);
+
+    settle();
+    await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith('/dashboard'));
+  });
+
   it('explains the block instead of hiding it when the invitation cannot even be read', async () => {
     // The regression this screen was rebuilt for: an unconfirmed invitee used to be refused by
     // `get-invitation` and never reached the accept button at all.

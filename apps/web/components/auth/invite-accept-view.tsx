@@ -209,10 +209,10 @@ export function InviteAcceptView({
       </p>
       <Button
         type="button"
-        disabled={accepting}
+        loading={accepting}
         onClick={() => void onAccept(invitation.workspaceId)}
       >
-        {accepting ? t('submitPending') : t('submit')}
+        {t('submit')}
       </Button>
     </>
   );

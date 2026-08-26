@@ -742,10 +742,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   400ms threshold passes, short enough to catch a slow request and long enough that a fast one
   never flickers one in. The spinner sits outside the layout flow, so the control keeps its exact
   box and its label never moves, and the label text is never swapped for a waiting string.
-  `FormDialog`, `ConfirmDialog`, `verification-resend`, `forgot-password-view` and
-  `reset-password-view` all move onto this one mechanism, replacing five places that each
-  disabled a button on its own and, on three of them, swapped its text to a "Sending…" string of
-  its own; both `sending` keys leave `messages/en.json` and `messages/tr.json`.
+  `FormDialog`, `ConfirmDialog`, `verification-resend`, `forgot-password-view`,
+  `reset-password-view` and `invite-accept-view` all move onto this one mechanism, replacing six
+  places that each disabled a button on its own and, on four of them, swapped its text to a
+  "Sending…" string of its own; the two `sending` keys and `auth.invite.submitPending` leave
+  `messages/en.json` and `messages/tr.json`.
 
 ### Fixed
 

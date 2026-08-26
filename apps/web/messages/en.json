@@ -74,7 +74,6 @@
       "title": "Accept invitation",
       "subtitle": "You've been invited to join {workspace}.",
       "submit": "Accept invitation",
-      "submitPending": "Accepting…",
       "accepted": "Invitation accepted",
       "signInFirst": "Sign in with the invited email to accept.",
       "signInCta": "Sign in",

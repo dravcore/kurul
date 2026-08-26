@@ -38,7 +38,6 @@ import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { Toaster } from '@/components/ui/sonner';
 import { EmailVerificationLink } from '@/components/auth/email-verification-link';
 import { ForgotPasswordView } from '@/components/auth/forgot-password-view';
-import { InviteAcceptView } from '@/components/auth/invite-accept-view';
 import { LoginView } from '@/components/auth/login-view';
 import { RegisterView } from '@/components/auth/register-view';
 import { VerifyEmailView } from '@/components/auth/verify-email-view';
@@ -58,6 +57,7 @@ import { NotificationUnreadProvider } from '@/components/notification/notificati
 import { NotificationsList } from '@/components/notification/notifications-list';
 import { CreateTokenDialog } from '@/components/settings/create-token-dialog';
 import { DeleteAccountDialog } from '@/components/settings/delete-account-dialog';
+import { InviteMemberDialog } from '@/components/settings/invite-member-dialog';
 import { MembersSettings } from '@/components/settings/members-settings';
 import { RemoveMemberDialog } from '@/components/settings/remove-member-dialog';
 import { RenameWorkspaceDialog } from '@/components/settings/rename-workspace-dialog';
@@ -455,6 +455,11 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/board/import-trello-dialog.tsx',
     ratio: 1.48,
   },
+  {
+    key: 'app.settings.members.inviteErrorForbidden',
+    screen: 'components/settings/invite-member-dialog.tsx',
+    ratio: 1.47,
+  },
   { key: 'auth.login.subtitle', screen: 'components/auth/login-view.tsx', ratio: 1.48 },
   {
     key: 'app.board.import.setColumnCategories',
@@ -622,11 +627,6 @@ const LONGEST_TURKISH: readonly LongString[] = [
   {
     key: 'auth.confirmEmail.registerLink',
     screen: 'components/auth/verify-email-view.tsx',
-    ratio: 1.5,
-  },
-  {
-    key: 'auth.invite.submitPending',
-    screen: 'components/auth/invite-accept-view.tsx',
     ratio: 1.5,
   },
   { key: 'auth.login.registerLink', screen: 'components/auth/login-view.tsx', ratio: 1.5 },
@@ -1429,29 +1429,31 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
-    screen: 'components/auth/invite-accept-view.tsx',
-    keys: ['auth.invite.submitPending'],
+    screen: 'components/settings/invite-member-dialog.tsx',
+    keys: ['app.settings.members.inviteErrorForbidden'],
     run: async () => {
-      auth.session = {
-        data: { user: { id: USER_ID, email: 'bora@example.com', emailVerified: true } },
-        isPending: false,
-      };
-      auth.getInvitation.mockResolvedValue({
-        data: { organizationId: WORKSPACE_ID, organizationName: 'Kurul' },
-        error: null,
+      apiPost.mockRejectedValue(forbidden());
+      render(
+        tr(
+          <InviteMemberDialog
+            open
+            onOpenChange={vi.fn()}
+            workspaceId={WORKSPACE_ID}
+            onInvited={vi.fn()}
+          />,
+        ),
+      );
+
+      fireEvent.change(screen.getByLabelText(messages.app.settings.members.inviteEmail), {
+        target: { value: 'bora@example.com' },
       });
-      apiPost.mockReturnValue(new Promise(() => {}));
+      fireEvent.click(
+        screen.getByRole('button', { name: messages.app.settings.members.inviteSubmit }),
+      );
 
-      render(tr(<InviteAcceptView invitationId={INVITATION.id} />));
-
-      const accept = await screen.findByRole('button', { name: messages.auth.invite.submit });
-      fireEvent.click(accept);
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: messages.auth.invite.submitPending }),
-        ).toBeDefined();
-      });
+      expect(
+        await screen.findByText(messages.app.settings.members.inviteErrorForbidden),
+      ).toBeDefined();
     },
   },
   {
