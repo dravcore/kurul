@@ -128,7 +128,12 @@ export function TaskPanelFields({
         <Input
           id={titleId}
           value={title}
-          disabled={!canMutate || pending}
+          disabled={!canMutate}
+          // `readOnly`, not folded into `disabled`: a disabled field drops focus, and the two
+          // fields share one `pending` flag, so a save started from one would otherwise pull
+          // focus out from under a reader still typing in the other (P6 deferred finding).
+          readOnly={pending}
+          className="border-transparent md:text-title-lg focus:border-input"
           onChange={(event) => setTitle(event.target.value)}
           onBlur={() => void save()}
         />
@@ -138,11 +143,12 @@ export function TaskPanelFields({
         <Textarea
           id={descriptionId}
           value={description}
-          disabled={!canMutate || pending}
+          disabled={!canMutate}
+          readOnly={pending}
           onChange={(event) => setDescription(event.target.value)}
           onBlur={() => void save()}
           rows={8}
-          className="min-h-32"
+          className="min-h-32 md:text-read"
         />
       </div>
     </>

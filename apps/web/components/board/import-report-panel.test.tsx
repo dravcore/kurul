@@ -69,9 +69,13 @@ describe('ImportReportPanel', () => {
     );
 
     const region = panel();
-    expect(within(region).getByText(/31 comments were not imported/i)).toBeDefined();
+    const sentence = within(region).getByText(/31 comments were not imported/i);
+    expect(sentence).toBeDefined();
     expect(within(region).getByText(/2,000 cards were not imported/i)).toBeDefined();
     expect(within(region).getByText(/8 columns came across changed/i)).toBeDefined();
+    // The report's own sentences read at the `read` step (14/21), not the surrounding `small`
+    // metadata (12/16): docs/design.md §3's closed list for it.
+    expect(sentence.className).toContain('text-read');
   });
 
   /**

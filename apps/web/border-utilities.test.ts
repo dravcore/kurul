@@ -70,6 +70,7 @@ const reviewedUtilities = [
   'border-signature',
   'border-l-signature',
   'border-destructive',
+  'border-transparent',
   'divide-border',
 ];
 
@@ -104,11 +105,14 @@ const stateTokenCallSites: Record<string, string[]> = {
   'border-input': [
     'components/notification/notifications-list.tsx',
     'components/settings/notification-settings.tsx',
+    'components/task/task-panel-fields.tsx',
     'components/ui/button.tsx',
     'components/ui/input.tsx',
     'components/ui/select.tsx',
     'components/ui/textarea.tsx',
   ],
+  // The task panel title only: borderless at rest, `--input` back on focus (Phase 7 Task 2).
+  'border-transparent': ['components/task/task-panel-fields.tsx'],
 };
 
 /**
