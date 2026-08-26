@@ -21,7 +21,6 @@
       "subtitle": "Hesabınızın e-posta adresini girin. Bu adrese ait bir hesap varsa yeni parola seçmeniz için bir bağlantı göndeririz.",
       "email": "E-posta",
       "submit": "Sıfırlama bağlantısı gönder",
-      "sending": "Gönderiliyor…",
       "sent": "Bu adrese ait bir hesap varsa sıfırlama bağlantısı yolda. Bağlantı bir saat geçerli.",
       "sendError": "Bağlantı gönderilemedi. Birazdan tekrar deneyin.",
       "rateLimited": "Çok fazla istek. Birkaç saniye içinde tekrar deneyin.",
@@ -104,7 +103,6 @@
     "emailConfirmation": {
       "emailLabel": "E-posta",
       "resendAction": "Yeni bağlantı gönder",
-      "sending": "Gönderiliyor…",
       "sentTo": "{email} adresine yeni bir bağlantı yolda. Kısa bir süre geçerli.",
       "sentIfRegistered": "O adrese ait doğrulanmamış bir hesap varsa yeni bir bağlantı yolda.",
       "alreadyConfirmed": "Bu adres zaten doğrulanmış.",

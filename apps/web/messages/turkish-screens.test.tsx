@@ -40,14 +40,15 @@ import { EmailVerificationLink } from '@/components/auth/email-verification-link
 import { ForgotPasswordView } from '@/components/auth/forgot-password-view';
 import { InviteAcceptView } from '@/components/auth/invite-accept-view';
 import { LoginView } from '@/components/auth/login-view';
+import { RegisterView } from '@/components/auth/register-view';
 import { ResetPasswordView } from '@/components/auth/reset-password-view';
-import { VerificationResend } from '@/components/auth/verification-resend';
 import { VerifyEmailView } from '@/components/auth/verify-email-view';
 import { BoardColumn } from '@/components/board/board-column';
 import { BoardList } from '@/components/board/board-list';
 import { BoardColumnsEmptyState } from '@/components/board/board-placeholders';
 import { ColumnSettingsDialog } from '@/components/board/column-settings-dialog';
 import { ImportReportPanel } from '@/components/board/import-report-panel';
+import { ImportTrelloDialog } from '@/components/board/import-trello-dialog';
 import { RenameBoardDialog } from '@/components/board/rename-board-dialog';
 import { AssigneeChart } from '@/components/dashboard/assignee-chart';
 import { ChartTableToggle } from '@/components/dashboard/chart-table-toggle';
@@ -451,6 +452,11 @@ const LONGEST_TURKISH: readonly LongString[] = [
     ratio: 1.56,
   },
   {
+    key: 'app.board.import.forbidden',
+    screen: 'components/board/import-trello-dialog.tsx',
+    ratio: 1.48,
+  },
+  {
     key: 'app.board.import.setColumnCategories',
     screen: 'components/board/import-report-panel.tsx',
     ratio: 1.69,
@@ -625,16 +631,6 @@ const LONGEST_TURKISH: readonly LongString[] = [
   },
   { key: 'auth.login.registerLink', screen: 'components/auth/login-view.tsx', ratio: 1.5 },
   {
-    key: 'auth.emailConfirmation.sending',
-    screen: 'components/auth/verification-resend.tsx',
-    ratio: 1.63,
-  },
-  {
-    key: 'auth.forgotPassword.sending',
-    screen: 'components/auth/forgot-password-view.tsx',
-    ratio: 1.63,
-  },
-  {
     key: 'auth.resetPassword.submitting',
     screen: 'components/auth/reset-password-view.tsx',
     ratio: 1.86,
@@ -649,6 +645,7 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/dashboard/completion-chart.tsx',
     ratio: 1.57,
   },
+  { key: 'auth.register.loginLink', screen: 'components/auth/register-view.tsx', ratio: 1.57 },
 ];
 
 /**
@@ -967,6 +964,33 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       expect(
         screen.getByRole('link', { name: messages.app.board.import.setColumnCategories }),
       ).toBeDefined();
+    },
+  },
+  {
+    screen: 'components/board/import-trello-dialog.tsx',
+    keys: ['app.board.import.forbidden'],
+    run: async () => {
+      apiPostForm.mockRejectedValue(
+        new ApiError({ statusCode: 403, error: 'Forbidden', message: 'forbidden' }),
+      );
+      render(
+        tr(
+          <ImportTrelloDialog
+            open
+            onOpenChange={vi.fn()}
+            workspaceId={WORKSPACE_ID}
+            onImported={vi.fn()}
+          />,
+        ),
+      );
+
+      const file = new File(['{}'], 'trello.json', { type: 'application/json' });
+      fireEvent.change(screen.getByLabelText(messages.app.board.import.file), {
+        target: { files: [file] },
+      });
+      fireEvent.click(screen.getByRole('button', { name: messages.app.board.import.submit }));
+
+      expect(await screen.findByText(messages.app.board.import.forbidden)).toBeDefined();
     },
   },
   {
@@ -1410,24 +1434,6 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
-    screen: 'components/auth/verification-resend.tsx',
-    keys: ['auth.emailConfirmation.sending'],
-    run: async () => {
-      auth.sendVerificationEmail.mockReturnValue(new Promise(() => {}));
-      render(tr(<VerificationResend email="ayla@example.com" callbackPath="/verify-email" />));
-
-      fireEvent.click(
-        screen.getByRole('button', { name: messages.auth.emailConfirmation.resendAction }),
-      );
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: messages.auth.emailConfirmation.sending }),
-        ).toBeDefined();
-      });
-    },
-  },
-  {
     screen: 'components/auth/invite-accept-view.tsx',
     keys: ['auth.invite.submitPending'],
     run: async () => {
@@ -1463,23 +1469,23 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
+    screen: 'components/auth/register-view.tsx',
+    keys: ['auth.register.loginLink'],
+    run: () => {
+      render(tr(<RegisterView />));
+
+      expect(screen.getByRole('link', { name: messages.auth.register.loginLink })).toBeDefined();
+    },
+  },
+  {
     screen: 'components/auth/forgot-password-view.tsx',
-    keys: ['auth.forgotPassword.submit', 'auth.forgotPassword.sending'],
-    run: async () => {
-      // The request never settles, so the button keeps the pending label for the assertion.
-      auth.requestPasswordReset.mockReturnValue(new Promise(() => {}));
+    keys: ['auth.forgotPassword.submit'],
+    run: () => {
       render(tr(<ForgotPasswordView />));
 
-      fireEvent.change(screen.getByLabelText(messages.auth.forgotPassword.email), {
-        target: { value: 'ayla@example.com' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: messages.auth.forgotPassword.submit }));
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: messages.auth.forgotPassword.sending }),
-        ).toBeDefined();
-      });
+      expect(
+        screen.getByRole('button', { name: messages.auth.forgotPassword.submit }),
+      ).toBeDefined();
     },
   },
   {

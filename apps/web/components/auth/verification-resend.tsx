@@ -80,13 +80,13 @@ export function VerificationResend({
             value={typedEmail}
             onChange={(event) => setTypedEmail(event.target.value)}
           />
-          <Button type="submit" disabled={pending}>
-            {pending ? t('sending') : t('resendAction')}
+          <Button type="submit" loading={pending}>
+            {t('resendAction')}
           </Button>
         </form>
       ) : (
-        <Button type="button" disabled={pending} onClick={() => void send(email)}>
-          {pending ? t('sending') : t('resendAction')}
+        <Button type="button" loading={pending} onClick={() => void send(email)}>
+          {t('resendAction')}
         </Button>
       )}
       {/* Kept mounted rather than conditionally rendered: a live region a screen reader has

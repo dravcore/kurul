@@ -5,7 +5,7 @@ import { Slot } from 'radix-ui';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-body font-strong whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-body font-strong whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&[data-loading]>svg]:hidden",
   {
     variants: {
       variant: {
@@ -52,26 +52,93 @@ const buttonVariants = cva(
   },
 );
 
+/** 14px, currentColor so every variant keeps its own contrast; rotation comes from the
+ * `[data-slot='button-spinner']` keyframe in app/globals.css, not from a class here, so the
+ * reduced-motion twin lives in exactly one place. */
+function ButtonSpinner(): React.ReactElement {
+  return (
+    <svg
+      data-slot="button-spinner"
+      className="size-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function Button({
   className,
   variant = 'default',
   size = 'default',
   asChild = false,
+  loading = false,
+  disabled,
+  children,
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    /**
+     * After 400ms, replaces the leading icon (or, on an icon-less button, an always-present
+     * reserved slot) with a 14px spinner, and marks the button `aria-busy` and `disabled`
+     * meanwhile. The label text never changes and the icon slot is reserved from the moment
+     * `loading` turns true, so the 400ms delay against flicker on a fast response does not
+     * also cost a layout shift on a slow one.
+     *
+     * Ignored on `asChild`: the rendered element is the caller's own (typically a link), which
+     * has no button disabled/aria-busy story for this component to add to.
+     */
+    loading?: boolean;
   }) {
   const Comp = asChild ? Slot.Root : 'button';
+  const isLoading = loading && !asChild;
+  const [showSpinner, setShowSpinner] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isLoading) return;
+    const timer = setTimeout(() => setShowSpinner(true), 400);
+    // Runs on unmount and on every `isLoading` flip (a fast response arriving before 400ms
+    // included), so the timer set above is always the one it clears.
+    return () => {
+      clearTimeout(timer);
+      setShowSpinner(false);
+    };
+  }, [isLoading]);
 
   return (
     <Comp
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      data-loading={isLoading ? '' : undefined}
+      aria-busy={isLoading ? true : undefined}
+      disabled={isLoading || disabled}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {isLoading ? (
+        <>
+          <span
+            className={cn(
+              'inline-flex size-4 shrink-0 items-center justify-center',
+              !showSpinner && 'invisible',
+            )}
+          >
+            {showSpinner ? <ButtonSpinner /> : null}
+          </span>
+          {children}
+        </>
+      ) : (
+        // `asChild` hands `children` straight to `Slot.Root`, which requires exactly one
+        // element child (Radix's `React.Children.only`): the loading fragment above would
+        // break that even with an empty spinner slot, so this branch stays a bare pass-through.
+        children
+      )}
+    </Comp>
   );
 }
 

@@ -653,6 +653,28 @@ body {
   }
 }
 
+/* The submit spinner (components/ui/button.tsx) is the one place docs/design.md §6 puts a
+   spinner: 14px, inside a pressed button, replacing the icon, after 400ms. A custom
+   keyframe rather than Tailwind's built-in `animate-spin` so the reduced-motion twin sits right
+   beside it instead of depending on a second rule finding this one. Reduced motion holds the
+   spinner still rather than swapping in an opacity pulse: `aria-busy` and `disabled` already
+   carry the state, so a fixed glyph is enough, matching the skeleton's own reduced twin above. */
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+[data-slot='button-spinner'] {
+  animation: spinner 700ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='button-spinner'] {
+    animation: none;
+  }
+}
+
 /* Forced colours replace every author colour with the user's palette, which erases exactly the
    channel this phase's feedback leans on: a surface step and a tint. Every state built on one
    carries a border-based twin here, per docs/design.md §9. */

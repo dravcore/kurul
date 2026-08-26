@@ -77,8 +77,8 @@ export function ForgotPasswordView(): React.ReactElement {
           onChange={(e) => setEmail(e.target.value)}
         />
         {error ? <SubmitError message={error} /> : null}
-        <Button type="submit" disabled={pending}>
-          {pending ? t('sending') : t('submit')}
+        <Button type="submit" loading={pending}>
+          {t('submit')}
         </Button>
         {/* Kept mounted rather than conditionally rendered: a live region a screen reader has
             not observed before the text arrives is not announced. */}

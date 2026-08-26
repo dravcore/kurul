@@ -21,7 +21,6 @@
       "subtitle": "Enter the email address of your account. If it has one, we'll send a link for choosing a new password.",
       "email": "Email",
       "submit": "Send reset link",
-      "sending": "Sending…",
       "sent": "If that address has an account, a reset link is on its way. It works for one hour.",
       "sendError": "Could not send the link. Try again in a moment.",
       "rateLimited": "Too many requests. Try again in a few seconds.",
@@ -104,7 +103,6 @@
     "emailConfirmation": {
       "emailLabel": "Email",
       "resendAction": "Send a new link",
-      "sending": "Sending…",
       "sentTo": "A new link is on its way to {email}. It's good for a short while.",
       "sentIfRegistered": "If that address has an unconfirmed account, a new link is on its way.",
       "alreadyConfirmed": "This address is already confirmed.",
