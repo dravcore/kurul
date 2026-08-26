@@ -54,7 +54,9 @@ edge'i, bir drag sırasındaki insertion point). App chrome'da signature rengin 
 göründüğü tek yerdir ve _hareket eder_ — yanıp sönmek yerine pozisyonlar arasında kayarak geçer.
 Renkli bir header veya tonlanmış bir background yerine bu seçildi çünkü layout'a hiçbir maliyeti
 yok, 36px satır yüksekliğinde hayatta kalıyor, yoğun bir column'da anında okunuyor — ve kelimenin
-tam anlamıyla meclisin toplandığı yere dikilen sancaktır.
+tam anlamıyla meclisin toplandığı yere dikilen sancaktır. Board'da seçili task kart bir istisna:
+rail'i kartlar arasında kayan değil, kartın kendi sol edge'ine sabit; sidebar'daki hareketli rail
+değişmedi.
 
 Bakır iki güç seviyesinde çalışır ve bu fazın bulup düzelttiği kusur tam olarak bu ikisinin
 birbirine karışmasıydı.

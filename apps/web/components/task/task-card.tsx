@@ -58,13 +58,18 @@ export function TaskCard({
         // reasoning behind its `containIntrinsicSize`. Closing that gap changes desktop
         // density and invalidates a performance measurement; it is a real discrepancy and it
         // is not this change's to settle.
-        'block rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 text-left transition-[color,background-color,border-color] max-md:min-h-11',
-        // Both are single-class utilities, so whichever is emitted later in the compiled sheet
-        // wins regardless of source order here. Applying the hover pair only while the card is
-        // not selected keeps a hovered selected card on its tint and rail instead of losing them
-        // to the later hover declaration.
+        // `border-l-2` is unconditional so the selected and unselected box are the same size:
+        // a rail that only thickens on selection would shift the title text by a pixel the
+        // moment a card is opened.
+        'block rounded-[var(--radius-md)] border border-border border-l-2 bg-card px-3 py-2 text-left transition-[color,background-color,border-color] max-md:min-h-11',
+        // `border-l-signature` is a longhand (`border-left-color`) and `border-border` /
+        // `hover:border-border-strong` are the shorthand (`border-color`); Tailwind emits every
+        // side-specific longhand after the shorthands that touch the same property, so the left
+        // edge keeps the signature colour no matter which order these classes are written here.
+        // That is what keeps the rail to the selected card's own left edge while its other three
+        // edges, and every edge of an unselected card, stay on the plain hairline.
         selected
-          ? 'border-signature bg-signature-subtle'
+          ? 'border-l-signature bg-signature-subtle'
           : 'hover:border-border-strong hover:bg-accent',
         className,
       )}

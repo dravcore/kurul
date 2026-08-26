@@ -91,11 +91,16 @@ describe('TaskCard selection', () => {
    * `*` border rule moved into `@layer base` it was repainted the hairline grey, so the card
    * that carried it looked like every other one, and nothing in the suite would have noticed.
    */
-  it('wears the signature border only while it is the selected card', () => {
+  it('wears the signature rail on its left edge only while it is the selected card', () => {
     renderCard({}, true);
     const selected = screen.getByRole('link');
+    const classes = classesOf(selected);
 
-    expect(classesOf(selected).has('border-signature')).toBe(true);
+    expect(classes.has('border-l-signature')).toBe(true);
+    // The other three edges stay on the plain hairline: `border-signature` would paint all
+    // four, which is the whole-card copper edge this rail replaces.
+    expect(classes.has('border-signature')).toBe(false);
+    expect(classes.has('border-border')).toBe(true);
     expect(selected.getAttribute('data-selected')).toBe('true');
     expect(selected.getAttribute('aria-current')).toBe('true');
   });
@@ -104,10 +109,27 @@ describe('TaskCard selection', () => {
     renderCard();
     const unselected = screen.getByRole('link');
 
+    expect(classesOf(unselected).has('border-l-signature')).toBe(false);
     expect(classesOf(unselected).has('border-signature')).toBe(false);
     expect(classesOf(unselected).has('border-border')).toBe(true);
     expect(unselected.hasAttribute('data-selected')).toBe(false);
     expect(unselected.hasAttribute('aria-current')).toBe(false);
+  });
+
+  /**
+   * `border-l-2` has to be unconditional. If only the selected card carried it, opening a task
+   * would grow its box by a pixel and shift the title text, since a 1px and a 2px left border
+   * measure differently even in the same colour.
+   */
+  it('keeps the same left border width selected or not, so opening a card does not shift it', () => {
+    renderCard({}, true);
+    const selectedClasses = classesOf(screen.getByRole('link'));
+    cleanup();
+    renderCard({}, false);
+    const unselectedClasses = classesOf(screen.getByRole('link'));
+
+    expect(selectedClasses.has('border-l-2')).toBe(true);
+    expect(unselectedClasses.has('border-l-2')).toBe(true);
   });
 
   /** Focus is the single `:focus-visible` outline `app/globals.css` draws. A focus utility here
@@ -129,7 +151,7 @@ describe('TaskCard selection', () => {
 
     expect(classes.has('hover:border-border-strong')).toBe(false);
     expect(classes.has('hover:bg-accent')).toBe(false);
-    expect(classes.has('border-signature')).toBe(true);
+    expect(classes.has('border-l-signature')).toBe(true);
     expect(classes.has('bg-signature-subtle')).toBe(true);
   });
 

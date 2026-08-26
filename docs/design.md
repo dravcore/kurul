@@ -52,7 +52,9 @@ leading edge, the insertion point during a drag). It is the only place the signa
 appears at full strength in the app chrome, and it _moves_, sliding between positions rather
 than blinking. Chosen over a colored header or tinted background because it costs no layout,
 survives at 36px row height, reads instantly in a dense column — and is literally the banner
-planted where the assembly is meeting.
+planted where the assembly is meeting. On the board, the selected task card is an exception: its
+rail is fixed to the card's own left edge instead of sliding between cards, and the sidebar's
+moving rail is unchanged.
 
 Copper works at two power levels, and mixing them up is the defect this phase found and fixed.
 

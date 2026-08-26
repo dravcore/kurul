@@ -68,6 +68,7 @@ const reviewedUtilities = [
   'border-border-strong',
   'border-input',
   'border-signature',
+  'border-l-signature',
   'border-destructive',
   'divide-border',
 ];
@@ -87,10 +88,9 @@ const stateTokenCallSites: Record<string, string[]> = {
     'components/task/task-card.tsx',
   ],
   // Selection only.
-  'border-signature': [
-    'components/board/board-template-picker.tsx',
-    'components/task/task-card.tsx',
-  ],
+  'border-signature': ['components/board/board-template-picker.tsx'],
+  // The selected task card's own left-edge rail; the other three edges stay `border-border`.
+  'border-l-signature': ['components/task/task-card.tsx'],
   // `aria-invalid="true"` only, and only on the four form primitives.
   'border-destructive': [
     'components/ui/button.tsx',
