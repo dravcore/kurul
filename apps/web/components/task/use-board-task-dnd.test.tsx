@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
+import {
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
 import { Priority, type TaskDto } from '@kurul/shared-types';
 import { columnDroppableId } from '@/components/board/board-column';
 import { useBoardTaskDnd, type TaskMovePayload } from './use-board-task-dnd';
@@ -324,5 +331,44 @@ describe('useBoardTaskDnd', () => {
       beforeTaskId: 'b',
       afterTaskId: null,
     });
+  });
+});
+
+/**
+ * A touch also raises pointer events, so one `PointerSensor` cannot hold both a distance for the
+ * mouse and a delay for the finger: whichever constraint is on it decides for both devices. The
+ * board splits them, which is what lets the card body keep scrolling under a thumb while the
+ * grip still lifts a card after a long press.
+ */
+describe('useBoardTaskDnd sensors', () => {
+  function sensors() {
+    const { rendered } = setup([task('a', COLUMN_A, 1000)]);
+    return rendered.result.current.sensors;
+  }
+
+  /** @dnd-kit types the descriptor's options as the base `SensorOptions`, which declares none. */
+  function constraintOf(index: number): unknown {
+    const options = sensors()[index]!.options as { activationConstraint?: unknown };
+    return options.activationConstraint;
+  }
+
+  it('drives the mouse, the finger and the keyboard from three separate sensors', () => {
+    expect(sensors().map((descriptor) => descriptor.sensor)).toEqual([
+      MouseSensor,
+      TouchSensor,
+      KeyboardSensor,
+    ]);
+  });
+
+  it('starts a mouse drag after 6px and with no timer of any kind', () => {
+    expect(constraintOf(0)).toEqual({ distance: 6 });
+  });
+
+  it('starts a touch drag on a 250ms press held inside 5px', () => {
+    expect(constraintOf(1)).toEqual({ delay: 250, tolerance: 5 });
+  });
+
+  it('leaves the keyboard sensor unconstrained', () => {
+    expect(constraintOf(2)).toBeUndefined();
   });
 });

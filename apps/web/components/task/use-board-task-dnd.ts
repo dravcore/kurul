@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import {
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCorners,
   useSensor,
   useSensors,
@@ -124,8 +125,17 @@ export function useBoardTaskDnd(
   const [activeTask, setActiveTask] = useState<TaskDto | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
 
+  /**
+   * Three sensors rather than one `PointerSensor`, because a touch raises pointer events too:
+   * a single sensor's activation constraint decides for both devices, so a 250ms delay on it
+   * would also make every mouse drag wait, and the 6px distance it replaces would let the first
+   * pixel of a thumb scroll lift a card. Split, each device gets the constraint it needs: the
+   * mouse starts on distance alone with no timer, and a finger has to hold the grip still for
+   * the delay before anything moves, which is what leaves a plain swipe to the scroller.
+   */
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 

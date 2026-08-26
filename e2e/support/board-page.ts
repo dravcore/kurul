@@ -232,7 +232,11 @@ export async function touchDragCardOnto(
   };
 
   await touch('touchStart', from);
-  // Past the 6px activation distance first, in small steps, exactly as the mouse helper does.
+  // The long press. The touch sensor activates on a 250ms hold rather than on distance, and
+  // cancels if the finger travels more than 5px before that timer fires, so the finger stays
+  // exactly where it landed until the delay has passed and only then does the drag begin. A move
+  // sent any earlier is a scroll gesture, which is the whole point of the delay.
+  await page.waitForTimeout(300);
   await touch('touchMove', { x: from.x, y: from.y + 12 });
   const steps = 16;
   for (let step = 1; step <= steps; step += 1) {
