@@ -58,6 +58,21 @@ describe('AppShell', () => {
     expect(main.textContent).toBe('Route content');
   });
 
+  /**
+   * The skip link is a keyboard action, so its landing has to be visible: `app/globals.css`
+   * draws the one focus mark in `@layer base`, and a utility on this element is the only thing
+   * that can outrank it. The offset is pulled inside because the region fills the shell and the
+   * row around it is `overflow-hidden`, which clips an outline drawn outside the region;
+   * app/globals-css-layers.test.ts checks that utility against the compiled cascade.
+   */
+  it('leaves the skip-link landing a visible focus mark, pulled inside the region', () => {
+    renderShell();
+
+    const main = screen.getByRole('main');
+    expect(main.className).not.toMatch(/\boutline-(none|hidden)\b/);
+    expect(main.className.split(/\s+/)).toContain('focus-visible:-outline-offset-2');
+  });
+
   it('shows the sidebar once there is a workspace to navigate', () => {
     renderShell();
 

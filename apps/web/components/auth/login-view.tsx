@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, type FormEvent } from 'react';
 import { AuthFormField } from '@/components/auth/auth-form-field';
+import { FORGOT_PASSWORD_PATH } from '@/components/auth/password-reset-paths';
 import { SubmitError } from '@/components/common/submit-error';
 import { Button } from '@/components/ui/button';
 import { AFTER_LOGIN_PATH, NEXT_PARAM, safeNextPath, withNextParam } from '@/lib/auth-redirect';
@@ -81,6 +82,12 @@ export function LoginView(): React.ReactElement {
           {t('submit')}
         </Button>
       </form>
+
+      <p className="text-body text-muted-foreground">
+        <Link href={FORGOT_PASSWORD_PATH} className="text-signature underline underline-offset-4">
+          {t('forgotPasswordLink')}
+        </Link>
+      </p>
 
       <p className="text-body text-muted-foreground">
         {t('noAccount')}{' '}
