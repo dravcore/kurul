@@ -1,4 +1,4 @@
-import { Logger, type OnModuleDestroy } from '@nestjs/common';
+import { Logger, type OnApplicationShutdown } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -45,7 +45,7 @@ const REDIS_ERROR_REPORT_DAMPEN_MS = 60 * 1000;
     credentials: true,
   },
 })
-export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnModuleDestroy {
+export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnApplicationShutdown {
   private readonly logger = new Logger(RealtimeGateway.name);
   private redisClients: Redis[] = [];
   private lastRedisErrorReportedAt = 0;
@@ -255,6 +255,17 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnMo
   }
 
   /**
+   * Shutdown, not destroy: Nest closes the Socket.io server in the same step that closes the
+   * HTTP listener, and that step runs *after* every destroy hook (`main.ts`). Quitting the
+   * adapter's Redis pair from a destroy hook would therefore cut the fan-out under sockets
+   * that are still connected and still being served.
+   */
+  async onApplicationShutdown(): Promise<void> {
+    await Promise.all(this.redisClients.map((client) => client.quit().catch(() => undefined)));
+    this.redisClients = [];
+  }
+
+  /**
    * Registers the `error` listener a `pubClient`/`subClient` needs so a reconnect failure is
    * reported instead of becoming an unhandled `error` event on the underlying `EventEmitter`
    * (ioredis's own fallback is `console.error`, invisible to the JSON log format and to
@@ -278,10 +289,5 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnMo
     }
     this.lastRedisErrorReportedAt = now;
     return true;
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    await Promise.all(this.redisClients.map((client) => client.quit().catch(() => undefined)));
-    this.redisClients = [];
   }
 }

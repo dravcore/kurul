@@ -29,7 +29,7 @@ describe('Notification email (e2e)', () => {
         outbox.push(message);
         return Promise.resolve(MailDeliveryStatus.SENT);
       },
-      onModuleDestroy: () => Promise.resolve(),
+      onApplicationShutdown: () => Promise.resolve(),
     };
     app = await createTestApp({
       configure: (builder) => builder.overrideProvider(MailService).useValue(capturingMail),

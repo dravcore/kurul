@@ -26,9 +26,15 @@ jest.mock('bullmq', () => ({
     add: jest.fn(),
     upsertJobScheduler: jest.fn().mockResolvedValue({ id: 'due-soon-scan' }),
     on: jest.fn(),
-    close: jest.fn(),
+    close: jest.fn().mockResolvedValue(undefined),
   })),
-  Worker: jest.fn().mockImplementation(() => ({ on: jest.fn(), close: jest.fn() })),
+  // `close` resolves rather than returning `undefined`: the shutdown hook races it against a
+  // timeout (`common/close-worker.ts`), so a stub that is not thenable is not a stand-in for
+  // the real worker at all.
+  Worker: jest.fn().mockImplementation(() => ({
+    on: jest.fn(),
+    close: jest.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 /** Every migration's SQL, whitespace-normalised so statements can be matched as one line. */
@@ -389,7 +395,7 @@ describe('DueSoonWorker', () => {
         },
       );
 
-      await worker.onModuleDestroy();
+      await worker.onApplicationShutdown();
     });
 
     it('starts nothing when REDIS_URL is unset', async () => {

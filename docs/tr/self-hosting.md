@@ -755,6 +755,16 @@ değil.
    uygular ve `--wait`, uzun süreli her servis healthy raporladığında döner, biri raporlamazsa
    sıfırdan farklı kodla.
 
+   Yeniden oluşturma bir kesinti değil, bir duraklamadır. `api`, Docker onu öldürmeden önce
+   yaptığı işi bitirmek için 30s alır (`stop_grace_period`) ve pakete dahil Caddy, bir upstream
+   geri gelirken isteği 502 ile yanıtlamak yerine 30s'ye kadar tutar, her 500ms'de yeniden
+   dener. Tek replika hâlâ isteklerin başka yerde karşılanmak yerine beklemesi demektir ve
+   gövdesini göndermeye başlamış bir yükleme yeniden denenmez. Yerine konan bir reverse
+   proxy'nin aynı davranışı göstermesi için kendi karşılığına ihtiyacı vardır ve nginx open
+   source'ta birebir karşılığı yoktur: `proxy_next_upstream` isteği upstream grubundaki _bir
+   sonraki_ sunucuya devreder, dolayısıyla tek bir `api` girdisi olan grup hiç yeniden
+   denenmez.
+
 6. **Doğrulayın:**
 
    ```bash
@@ -988,6 +998,13 @@ URL'i olduğu gibi log'lar. Paketlenmiş `docker/Caddyfile` hiçbir `log` direkt
 hiç access log yazmaz; nginx'in varsayılan `combined` formatı ise URL'in tamamı olan `$request`'i
 log'lar. Bu hostname'de access log tutuyorsanız `/auth/reset-password/*` yolunu filtreleyin ya da
 yeniden yazın; bunu yapana kadar o log'u canlı kimlik bilgisi tutan bir yer sayın.
+
+Yönlendirme sözleşmesinin dışında kalan ama yine de taklit etmeye değen bir şey var: pakete
+dahil Caddy, bir upstream yeniden başlarken isteği 502 ile yanıtlamak yerine 30s'ye kadar
+tutuyor; bir upgrade'i hatalar yerine gecikmeye çeviren şey bu. Bunu yapmayan bir proxy yine de
+doğrudur, yalnızca her `docker compose up -d` sırasında daha gürültülüdür. Aynısını yapmanın
+neye mal olduğu ve nginx open source'ta neden birebir karşılığı olmadığı,
+[Upgrade](#upgrade) bölümünün 5. adımında.
 
 #### Proxy'nin sayısı neden 26 MiB, API'ninki neden 25
 

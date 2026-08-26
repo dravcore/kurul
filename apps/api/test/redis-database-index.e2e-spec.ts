@@ -175,7 +175,7 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
       expect(onThree).toContain('bull:due-soon:repeat:due-soon-scan');
       expect((await onDbZero.keys('bull:due-soon:*')).sort()).toEqual(zeroBefore);
     } finally {
-      await worker.onModuleDestroy();
+      await worker.onApplicationShutdown();
       const created = await onTestDb.keys('bull:due-soon:*');
       if (created.length > 0) await onTestDb.del(...created);
     }
@@ -197,7 +197,7 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
       expect(databases).not.toContain(0);
       expect(new Set(databases)).toEqual(new Set([TEST_DB]));
     } finally {
-      await probe.onModuleDestroy();
+      await probe.onApplicationShutdown();
     }
   }, 20_000);
 
@@ -241,7 +241,7 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
     } finally {
       if (savedWorkerId !== undefined) process.env.JEST_WORKER_ID = savedWorkerId;
       if (savedNodeEnv !== undefined) process.env.NODE_ENV = savedNodeEnv;
-      await gateway.onModuleDestroy();
+      await gateway.onApplicationShutdown();
     }
   }, 20_000);
 

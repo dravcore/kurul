@@ -124,9 +124,11 @@ Cross-cutting infrastructure:
 Dependency direction: feature modules depend on `common` and `prisma`, never the reverse. `realtime` is a consumer of domain events, not a place where domain logic lives — so it can be lifted into its own process role without dragging business rules with it.
 
 **Scheduled jobs.** Two, both BullMQ job schedulers on `REDIS_URL`, both registered from the
-module that owns them and closed on `onModuleDestroy`. `notification/due-soon.worker.ts`
-scans for approaching due dates every 15 minutes and only ever inserts.
-`retention/cleanup.worker.ts` deletes rows past their retention window once a day
+module that owns them and closed from `onApplicationShutdown` with a bounded wait
+(`api/src/common/close-worker.ts`), so a run still in flight cannot hold the container open past
+its stop grace period ([§9.1](#91-shutdown-order-nest-picks-the-phase-one-module-owns-the-pool)).
+`notification/due-soon.worker.ts` scans for approaching due dates every 15 minutes and only
+ever inserts. `retention/cleanup.worker.ts` deletes rows past their retention window once a day
 ([ADR 0020](decisions/0020-data-retention.md)). With `REDIS_URL` unset neither starts, which
 is a supported single-instance configuration for the first and a disabled retention policy
 for the second. Both are the `worker` role that stage 2 of [§8](#8-runtime-evolution) splits
@@ -397,14 +399,31 @@ about them was to already be reading the file. They are small enough not to warr
 each, and consequential enough that an operator debugging a shutdown or a stale session
 should not have to rediscover them from source.
 
-### 9.1 Shutdown ordering is owned by one module, not by Nest
+### 9.1 Shutdown order: Nest picks the phase, one module owns the pool
 
-`PrismaService` and Better Auth's own `PrismaClient` both borrow from a single process-wide
-`pg` pool (`api/src/prisma/database.ts`). Two clients, one pool, and **Nest gives no ordering
-guarantee between `onModuleDestroy` hooks** — so whichever module happens to be torn down
-first would end the pool out from under the other, and the survivor's `$disconnect()` would
-throw `Called end on pool more than once` / `cannot use a pool after calling end` on every
-SIGTERM.
+**Which phase a resource is released in is Nest's rule, and the boundary that matters sits in
+the middle of it.** `NestApplicationContext.close` (read from @nestjs/core 11.2.1) runs
+`onModuleDestroy`, then `beforeApplicationShutdown`, then `NestApplication.dispose()`, which
+closes the Socket.io server and the HTTP listener, and only then `onApplicationShutdown`. A
+destroy hook therefore runs while the listener is still accepting and serving requests. So the
+rule here is that anything a live request or an open socket still needs (the shared `pg` pool,
+the Redis clients, the mail transport, the storage backend, the two BullMQ workers) is released
+in `onApplicationShutdown`. The classes that do it are not listed in prose that would go stale:
+`grep -rn onApplicationShutdown apps/api/src` is the current list.
+
+Within one phase Nest walks modules by their distance from the root and hands every global
+module `Number.MAX_VALUE` for that distance (`injector/container.js`), with the shutdown phases
+walking that list reversed, so a global module is torn down last. That is what lets
+`common/close-worker.ts` abandon a retention sweep it could not stop in time: the shared pool
+lives in a global module, so it is ended after the (non-global) retention module has returned,
+and the abandoned run's next query rejects instead of running against a half-torn-down app.
+
+**Between two providers Nest still gives no ordering guarantee**, neither between two globals
+nor between two providers of the same module. `PrismaService` and Better Auth's own
+`PrismaClient` both borrow from a single process-wide `pg` pool (`api/src/prisma/database.ts`),
+and both live in global modules. Two clients, one pool: whichever is torn down first would end
+the pool out from under the other, and the survivor's `$disconnect()` would throw `Called end on
+pool more than once` / `cannot use a pool after calling end` on every SIGTERM.
 
 The resolution is that no module disconnects its own client. `database.ts` is the sole owner
 of the pool's lifecycle: clients register a disconnect callback via `registerPoolConsumer`,
