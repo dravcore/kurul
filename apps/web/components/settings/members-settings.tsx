@@ -374,6 +374,10 @@ function MemberRow({
   }
 
   function onSelectChange(event: React.ChangeEvent<HTMLSelectElement>): void {
+    // The refusal lives here rather than in a `disabled` attribute: a native `<select>` has no
+    // `readOnly`, and disabling the control the reader just used blurs them onto `<body>` for
+    // the length of the request (docs/design.md §6). React puts the shown value back.
+    if (pending) return;
     const next = event.target.value as MemberRole;
     if (next === role) return;
     if (next === MemberRole.OWNER) {
@@ -430,8 +434,7 @@ function MemberRow({
             aria-label={t('memberRole', { name: member.name })}
             aria-describedby={roleHintId}
             value={shownRole}
-            disabled={pending}
-            aria-busy={pending}
+            aria-disabled={pending || undefined}
             onChange={onSelectChange}
           >
             {assignableRoles(actorRole).map((option) => (
@@ -462,6 +465,12 @@ function MemberRow({
       <div className="flex flex-col gap-1">
         <p id={roleHintId} className="text-small text-muted-foreground">
           {t(`roleHints.${shownRole}`)}
+        </p>
+        {/* The busy mark sits here rather than on the `<select>`: the control has to stay the
+            plain, focusable thing the reader is standing on, and this is what says the write
+            is out. Mounted while idle too, so the insertion is what announces. */}
+        <p role="status" aria-busy={pending || undefined} className="sr-only">
+          {pending ? t('savingRole') : ''}
         </p>
         {/* Focus stays on the row's own control rather than jumping here: the reader just
             chose a value on this exact `<select>`, unlike a dialog submit their focus was
