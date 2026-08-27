@@ -33,7 +33,7 @@ export interface TaskAttachmentsProps {
 /**
  * The task panel's attachment surface.
  *
- * Its own component rather than another section inside `task-metadata-panel.tsx`, which is
+ * Its own component rather than another section inside `task-properties-panel.tsx`, which is
  * already the widest file in this folder and is the subject of issue #41 — the same reasoning
  * `task-checklists.tsx` was split out under.
  *

@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 
-/** The sentinel for "no decision yet" — never sent to the API. */
+/** The sentinel for "no decision yet" (never sent to the API). */
 const UNDECIDED = '';
 /** The option value that means "delete this workspace with everything in it". */
 const DELETE_WORKSPACE = 'delete';
@@ -33,7 +33,7 @@ const EMPTY_PREVIEW: AccountDeletionPreviewDto = {
 };
 
 /**
- * Deleting the account — the one control in this product that nothing can undo, including a
+ * Deleting the account: the one control in this product that nothing can undo, including a
  * restore the person themselves can ask for. `/settings/account/delete` rather than a dialog:
  * a sole-owned workspace needs one `<select>` of its own (transfer or destroy), and a caller
  * who owns several no longer fits a 512px surface at all (Phase 7 Task 5).
@@ -117,14 +117,17 @@ export function DeleteAccountSettings(): React.ReactElement {
       });
 
       // The API cleared the session cookies on the way out, so there is nothing to sign out
-      // of — but the socket is still connected and still authenticated as a session the server
-      // has torn down, exactly as after leaving a workspace.
+      // of (but the socket is still connected and still authenticated as a session the server
+      // has torn down, exactly as after leaving a workspace).
       disconnectSocket();
 
       // No toast. Every other destructive action lands the user somewhere that does not explain
       // itself; this one lands them on the sign-in page having just been told, at length, what
       // was about to happen. A success message on top of that reads as a system notice about
       // somebody else.
+      //
+      // `pending` is deliberately not reset here: the page is about to be replaced by the
+      // redirect, and the button must not flash back to its idle state before that happens.
       router.replace('/login');
       router.refresh();
     } catch (caught) {

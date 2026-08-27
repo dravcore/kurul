@@ -261,8 +261,8 @@ describe('the Turkish interface', () => {
 
   /**
    * The account-deletion route's settings surface, and it is here rather than only in its own
-   * spec because both of its sentences are ICU plurals over a count — `retained` and
-   * `ownedWorkspace` — which is exactly the shape `catalog.test.ts` can prove complete and
+   * spec because both of its sentences are ICU plurals over a count (`retained` and
+   * `ownedWorkspace`), which is exactly the shape `catalog.test.ts` can prove complete and
    * cannot prove renders.
    */
   it('renders the account-deletion settings in Turkish, with Turkish plural forms', async () => {
@@ -1041,9 +1041,12 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       // happy-path assertions above never exercise.
       const row = screen.getByText('Bora').closest('li');
       if (!row) throw new Error('no row for Bora');
-      fireEvent.change(within(row).getByLabelText(messages.app.settings.members.inviteRole), {
-        target: { value: MemberRole.ADMIN },
-      });
+      fireEvent.change(
+        within(row).getByLabelText(
+          fill(messages.app.settings.members.memberRole, { name: 'Bora' }),
+        ),
+        { target: { value: MemberRole.ADMIN } },
+      );
 
       expect(
         await screen.findByText(messages.app.settings.members.changeRoleErrorForbidden),

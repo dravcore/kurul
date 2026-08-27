@@ -31,7 +31,7 @@ interface TaskChecklistsProps {
 /**
  * The task panel's checklist surface.
  *
- * Its own component rather than another section inside `task-metadata-panel.tsx`, which is
+ * Its own component rather than another section inside `task-properties-panel.tsx`, which is
  * already the widest file in this folder and is the subject of issue #41 — adding a fifth
  * surface to it makes that split more expensive, not less.
  */

@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({ post: vi.fn(), delete: vi.fn() }));
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-// Only the transport is faked — `resolveApiMessage` stays real, so these tests exercise the
+// Only the transport is faked (`resolveApiMessage` stays real), so these tests exercise the
 // same status-to-copy mapping the app runs.
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>();

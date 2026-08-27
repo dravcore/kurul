@@ -169,7 +169,7 @@ export function TaskPropertiesPanel({
       });
       // What the screen shows is one palette row and this task's chip going away. What actually
       // happened is that the label left every task on the board, so the confirmation has to say
-      // so — the visible change under-reports the blast radius.
+      // so: the visible change under-reports the blast radius.
       toast.success(t('labelDeleted'));
     } catch (caught) {
       toast.error(

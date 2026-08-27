@@ -24,10 +24,11 @@ interface WorkspaceContextValue {
   /**
    * Folds a `PATCH /workspaces/:workspaceId` response back into `workspaces` by id.
    *
-   * `RenameWorkspaceDialog` already has the updated `WorkspaceDto` in hand — the response body
-   * of the call it just made — so this never re-fetches. It exists at all because the name
-   * shown in `WorkspaceSwitcher` and the one shown in Settings both read the same `workspaces`
-   * array; without this, a rename would be visible on the settings row (which could hold its
+   * The inline editor in `workspace-settings.tsx` already has the updated `WorkspaceDto` in
+   * hand (the response body of the call it just made), so this never re-fetches. It exists
+   * at all because the name shown in `WorkspaceSwitcher` and the one shown in Settings both
+   * read the same `workspaces` array; without this, a rename would be visible on the settings
+   * row (which could hold its
    * own local state) but stale in the switcher until the next full bootstrap.
    */
   renameActiveWorkspace: (workspace: WorkspaceDto) => void;

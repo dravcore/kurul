@@ -52,7 +52,7 @@ answer over it, restore the snapshot on failure). **Three:**
 | `use-task-checklists.ts` `toggleItem`                                  | One checklist tick, plus the recounted `checklistSummary` badge |
 
 Two near-misses sit next to them and are worth naming so nobody counts them by accident:
-`task-metadata-panel.tsx` `patchTask` restores a snapshot but never pre-writes, and
+`task-properties-panel.tsx` `patchTask` restores a snapshot but never pre-writes, and
 `workspace-provider.tsx` `onSwitch` pre-writes `activeId` but has no snapshot to go back to.
 
 **Merge-a-server-row-into-a-local-list-by-id**, with no local prediction at all. **Twelve:**

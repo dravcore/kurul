@@ -49,7 +49,7 @@ export function TaskDiscussionPanel({
   /**
    * Names the object the caller actually touched, rather than the task it hangs off.
    *
-   * Comment writes used to fall through to `saveError` — "Could not save this task." — which
+   * Comment writes used to fall through to `saveError` ("Could not save this task."), which
    * describes a write the user did not make and leaves the comment they did make unexplained.
    */
   function toastObjectError(caught: unknown, fallback: string): void {

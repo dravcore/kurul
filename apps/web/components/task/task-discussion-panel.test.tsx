@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({ post: vi.fn(), delete: vi.fn() }));
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-// Only the transport is faked — `resolveApiMessage` stays real, so these tests exercise the
+// Only the transport is faked (`resolveApiMessage` stays real), so these tests exercise the
 // same status-to-copy mapping the app runs.
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>();
@@ -163,7 +163,7 @@ describe('TaskDiscussionPanel', () => {
   });
 
   it('names the comment, not the task, when posting a comment fails', async () => {
-    // These used to fall through to `saveError` — "Could not save this task." — which reports
+    // These used to fall through to `saveError` ("Could not save this task."), which reports
     // a write the user never made and leaves the one they did make unexplained.
     mocks.post.mockRejectedValue(new Error('network'));
     renderPanel();

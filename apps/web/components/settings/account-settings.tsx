@@ -48,7 +48,7 @@ export function AccountSettings(): React.ReactElement {
   }
 
   // No user means the one read this section needs failed. The delete button is not drawn at
-  // all in that state: it would open a dialog that cannot confirm anything, because the
+  // all in that state: it would link to a route that cannot confirm anything, because the
   // address it compares against is exactly what did not load.
   if (!user) {
     return <p className="text-body text-destructive">{error ?? t('loadError')}</p>;
