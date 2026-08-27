@@ -98,7 +98,7 @@ describe('AppShell', () => {
 
 /**
  * Before any bootstrap has ever finished, `workspaces` is the same empty array a confirmed-
- * zero account would have — the two can't be told apart by the array alone. The shape has to
+ * zero account would have, and the two can't be told apart by the array alone. The shape has to
  * default to painting in that case: hiding it here is what used to make a returning reader's
  * plain reload skip the sidebar shape and then pop one in once the roster resolved.
  */
@@ -126,7 +126,7 @@ describe('AppShell loading skeleton', () => {
    * bootstrap has already resolved the roster empty, and a second load (a manual retry) is now
    * in flight. `useApiResource` leaves the resolved value standing while a fresh load runs, so
    * this is the scenario that lets the shell tell "not yet known" apart from "confirmed empty"
-   * at all — it has to have seen `bootstrapped` true at least once first.
+   * at all: it has to have seen `bootstrapped` true at least once first.
    */
   it('skips the sidebar shape once a completed bootstrap has confirmed the roster is empty', () => {
     context.value.bootstrapped = true;

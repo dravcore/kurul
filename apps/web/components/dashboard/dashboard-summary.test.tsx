@@ -109,7 +109,7 @@ describe('DashboardSummary with no boards at all', () => {
 /**
  * The dashboard summary and the board roster are two independent requests (`lib/api.ts` and
  * `lib/workspace-boards.ts`), unsynchronized with each other. `useApiResource` starts `boards`
- * at `[]` and, on a failed load, resets it back to `[]` too — the same shape a workspace with
+ * at `[]` and, on a failed load, resets it back to `[]` too, the same shape a workspace with
  * genuinely zero boards has. Rendering nothing on that guess, before boards has an answer of
  * its own, would hide this section's empty state for a workspace that does have boards.
  */

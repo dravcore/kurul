@@ -19,14 +19,14 @@ function AppShellFrame({
     useWorkspaceContext();
 
   // `workspaces` is `[]` both on the very first render (before any bootstrap has ever
-  // finished) and once a bootstrap has actually confirmed the account has none — the two are
+  // finished) and once a bootstrap has actually confirmed the account has none. The two are
   // not the same thing, but read alone the array can't tell them apart. This latches true the
   // first time `bootstrapped` is seen true (on mount or on a later render, whichever comes
   // first) and stays latched, so a later re-entry into the loading branch below (a manual
   // retry, a session revalidation) can trust the roster already on hand instead of the
-  // pre-bootstrap default. Set during render, not an effect — mirroring
-  // `use-api-resource.ts`'s `syncedRequest` — since the latch is monotonic there is nothing
-  // for an effect to add.
+  // pre-bootstrap default. Set during render, not an effect (mirroring
+  // `use-api-resource.ts`'s `syncedRequest`), since the latch is monotonic and there is
+  // nothing for an effect to add.
   const [hasResolvedOnce, setHasResolvedOnce] = useState(bootstrapped);
   if (bootstrapped && !hasResolvedOnce) {
     setHasResolvedOnce(true);
@@ -42,8 +42,8 @@ function AppShellFrame({
 
             The shape is the conservative default: it paints unless `rosterConfirmedEmpty` says
             a completed bootstrap has actually seen zero workspaces. Gating on `workspaces.length`
-            alone (dropped here) could not tell "not yet known" apart from "confirmed empty" —
-            both are `[]` — so it hid the shape for every returning reader's reload, not only for
+            alone (dropped here) could not tell "not yet known" apart from "confirmed empty"
+            (both are `[]`), so it hid the shape for every returning reader's reload, not only for
             the first-time signup this was meant for; that one case still sees it once before the
             redirect to `/workspaces/new`, whose own layout carries no sidebar at all. */}
         {rosterConfirmedEmpty ? null : (
