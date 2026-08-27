@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AppSidebar } from './app-sidebar';
 import { DemoBanner } from './demo-banner';
@@ -17,6 +18,21 @@ function AppShellFrame({
   const { workspaces, sessionPending, hasSession, bootstrapped, loadError, retryBootstrap } =
     useWorkspaceContext();
 
+  // `workspaces` is `[]` both on the very first render (before any bootstrap has ever
+  // finished) and once a bootstrap has actually confirmed the account has none — the two are
+  // not the same thing, but read alone the array can't tell them apart. This latches true the
+  // first time `bootstrapped` is seen true (on mount or on a later render, whichever comes
+  // first) and stays latched, so a later re-entry into the loading branch below (a manual
+  // retry, a session revalidation) can trust the roster already on hand instead of the
+  // pre-bootstrap default. Set during render, not an effect — mirroring
+  // `use-api-resource.ts`'s `syncedRequest` — since the latch is monotonic there is nothing
+  // for an effect to add.
+  const [hasResolvedOnce, setHasResolvedOnce] = useState(bootstrapped);
+  if (bootstrapped && !hasResolvedOnce) {
+    setHasResolvedOnce(true);
+  }
+  const rosterConfirmedEmpty = hasResolvedOnce && workspaces.length === 0;
+
   if (sessionPending || !hasSession || !bootstrapped) {
     return (
       <div className="flex h-dvh overflow-hidden bg-background" aria-busy>
@@ -24,19 +40,19 @@ function AppShellFrame({
         {/* `md:flex`, matching `AppSidebar`: the skeleton used to appear only from `lg` up, so
             between 768px and 1024px the shell painted with no sidebar and then grew one.
 
-            `workspaces` is the last bootstrap's roster, which a plain reload keeps standing
-            while a fresh one is in flight (`useApiResource` only clears it on failure), so on
-            the very first load it is the same empty array as an account with no workspaces.
-            Painting this block on that guess is what a first-time signup used to watch flash
-            and disappear on its way to `/workspaces/new`, whose own layout carries no sidebar
-            at all: skip the shape until a roster is actually known to be there. */}
-        {workspaces.length > 0 ? (
+            The shape is the conservative default: it paints unless `rosterConfirmedEmpty` says
+            a completed bootstrap has actually seen zero workspaces. Gating on `workspaces.length`
+            alone (dropped here) could not tell "not yet known" apart from "confirmed empty" —
+            both are `[]` — so it hid the shape for every returning reader's reload, not only for
+            the first-time signup this was meant for; that one case still sees it once before the
+            redirect to `/workspaces/new`, whose own layout carries no sidebar at all. */}
+        {rosterConfirmedEmpty ? null : (
           <div className="hidden w-[var(--sidebar-width)] shrink-0 flex-col gap-2 border-r border-border bg-card p-3 md:flex">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="mt-4 h-9 w-full" />
             <Skeleton className="h-9 w-2/3" />
           </div>
-        ) : null}
+        )}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-[var(--topbar-height)] items-center border-b border-border px-3">
             <Skeleton className="h-5 w-40" />

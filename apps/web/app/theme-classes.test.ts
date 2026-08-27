@@ -344,7 +344,7 @@ const SIZE_WEIGHT_EXCEPTIONS: SizeWeightException[] = [
   },
   {
     file: 'components/dashboard/dashboard-summary.tsx',
-    line: 115,
+    line: 126,
     bareClass: 'font-semibold',
     reason: "redundant with text-title-lg's own 600; outside Task 5's file list",
   },

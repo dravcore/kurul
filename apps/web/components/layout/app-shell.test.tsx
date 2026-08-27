@@ -97,20 +97,19 @@ describe('AppShell', () => {
 });
 
 /**
- * Before `bootstrapped` is true, `useApiResource` still hands back whatever the last load
- * resolved to: the empty roster this provider defaults to before the very first one ever
- * finishes. A returning reader whose account does have workspaces overwrites that default the
- * moment their own bootstrap lands, so by the time a *second* load starts (a manual retry) the
- * roster already on hand is the real signal to paint from.
+ * Before any bootstrap has ever finished, `workspaces` is the same empty array a confirmed-
+ * zero account would have — the two can't be told apart by the array alone. The shape has to
+ * default to painting in that case: hiding it here is what used to make a returning reader's
+ * plain reload skip the sidebar shape and then pop one in once the roster resolved.
  */
 describe('AppShell loading skeleton', () => {
-  it('does not paint a sidebar shape before any roster is known', () => {
+  it('paints the sidebar shape on a fresh mount, before any roster is known', () => {
     context.value.bootstrapped = false;
     context.value.workspaces = [];
 
     const { container } = renderShell();
 
-    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(4);
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(7);
   });
 
   it('keeps the sidebar shape once a roster is already on hand', () => {
@@ -120,5 +119,30 @@ describe('AppShell loading skeleton', () => {
     const { container } = renderShell();
 
     expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(7);
+  });
+
+  /**
+   * The one case where an empty `workspaces` really does mean "confirmed none": a completed
+   * bootstrap has already resolved the roster empty, and a second load (a manual retry) is now
+   * in flight. `useApiResource` leaves the resolved value standing while a fresh load runs, so
+   * this is the scenario that lets the shell tell "not yet known" apart from "confirmed empty"
+   * at all — it has to have seen `bootstrapped` true at least once first.
+   */
+  it('skips the sidebar shape once a completed bootstrap has confirmed the roster is empty', () => {
+    context.value.bootstrapped = true;
+    context.value.workspaces = [];
+
+    const { container, rerender } = renderShell();
+
+    context.value.bootstrapped = false;
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AppShell>
+          <p>Route content</p>
+        </AppShell>
+      </NextIntlClientProvider>,
+    );
+
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(4);
   });
 });
