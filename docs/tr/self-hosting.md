@@ -803,7 +803,7 @@ adımdaki yedek elinizdeyken bilinçli attığınız bir adım olmalı, bir sonr
 Bir release'in bu sayfanın indirttiği dosyalarda neyi değiştirdiği ya da `pull`'dan önce
 sizden ne beklediği. Girdilerin tamamı `CHANGELOG.md`'de; bu liste yalnızca onları gösterir.
 
-- **Sonraki release ([Unreleased](../../CHANGELOG.md#unreleased)):** Better Auth 1.7.1,
+- **0.4.0 ([CHANGELOG](../../CHANGELOG.md#040---2026-08-27)):** Better Auth 1.7.1,
   `migrate` servisinin ilk `up`'ta uyguladığı bir migration getiriyor; çalıştırılacak bir şey
   yok, ama onu karşılayan 2. adımdaki yedek. `BACKUP_REMOTE` ve host dışı kopya, 3. adımdaki
   `scripts/backup.sh` ve `docker-compose.yml`'i gerektirir (v0.3.0'ın script'i değişkeni hata

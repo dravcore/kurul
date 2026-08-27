@@ -783,7 +783,7 @@ a step you take deliberately, with the backup from step 2 in hand, not something
 What a release changes in the files this page has you fetch, or expects of you before `pull`.
 The full entries live in `CHANGELOG.md`; this list only points at them.
 
-- **Next release ([Unreleased](../CHANGELOG.md#unreleased)):** Better Auth 1.7.1 ships a
+- **0.4.0 ([CHANGELOG](../CHANGELOG.md#040---2026-08-27)):** Better Auth 1.7.1 ships a
   migration the `migrate` service applies on the first `up`; nothing to run, but the backup in
   step 2 is what covers it. `BACKUP_REMOTE` and the off-host copy need the `scripts/backup.sh`
   and `docker-compose.yml` from step 3 (v0.3.0's script ignores the variable without an

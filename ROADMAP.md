@@ -2,13 +2,12 @@
 
 Kurul is an open-source, self-hosted, Kanban-focused project management tool. The MVP is
 complete: Phases 0-9 and the hardening pass that followed shipped as
-[`v0.1.0`](CHANGELOG.md#010---2026-08-12), and [`v0.3.0`](CHANGELOG.md#030---2026-08-22) is the
-current release, tagged `b580448` on 2026-08-22. The next release is `v0.4.0`. The work ahead is
+[`v0.1.0`](CHANGELOG.md#010---2026-08-12), and [`v0.4.0`](CHANGELOG.md#040---2026-08-27) is the
+current release, cut on 2026-08-27. The next release is `v0.5.0`. The work ahead is
 turning a finished MVP into a launched, trusted product: standing up the demo host the
-announcement wave is gated on, closing the audit items that landed on `develop` after the tag,
-and growing the API surface toward a 1.0 compatibility promise. Work runs on **two parallel
-tracks**, Hardening and New Features, so stability debt and user value never queue behind each
-other.
+announcement wave is gated on, and growing the API surface toward a 1.0 compatibility promise.
+Work runs on **two parallel tracks**, Hardening and New Features, so stability debt and user
+value never queue behind each other.
 
 **Last updated:** 2026-08-27. This file supersedes `docs/roadmap.md` and absorbs the open
 items of the 2026-08-13 local audit dashboard (now deleted). Task-level work lives in
@@ -17,21 +16,20 @@ items of the 2026-08-13 local audit dashboard (now deleted). Task-level work liv
 
 ## Next 2 weeks
 
-`v0.3.0` is out. Everything the tag was gated on shipped with it, so the announcement wave is
-the only P0 left and it waits on one thing, a deployed demo host. Every dependency it has is
-enumerated once, in the [Launch checklist](#launch-checklist), and the rows that used to carry a
-quarter of that list each now link there. What has landed on `develop` since the tag is two
-bodies of work: the post-`v0.3.0` audit fix set, tracked in
+`v0.4.0` is cut. It carries the two bodies of work that landed on `develop` after the previous
+tag: the post-`v0.3.0` audit fix set, tracked in
 [Post-launch hardening](#post-launch-hardening), and the eight-phase UI/UX comfort series
 ([#311](https://github.com/dravcore/kurul/pull/311) through
 [#343](https://github.com/dravcore/kurul/pull/343), merged 2026-08-25 to 2026-08-27), tracked in
-the [Hardening track](#hardening-track). Both go out as `v0.4.0`.
+the [Hardening track](#hardening-track). That leaves the announcement wave as the only P0, and
+it waits on one thing, a deployed demo host. Every dependency it has is enumerated once, in the
+[Launch checklist](#launch-checklist), and the rows that used to carry a quarter of that list
+each now link there.
 
 | #   | Item                                                                    | Blocked on            |
 | --- | ----------------------------------------------------------------------- | --------------------- |
 | 1   | Work the [Launch checklist](#launch-checklist) down to a live demo host | operator time, a host |
 | 2   | Publish the launch-window wave (r/selfhosted, HN, Show and Tell)        | item 1                |
-| 3   | Cut `v0.4.0`: its last P1 row shipped 2026-08-26, so the gate is clear  | nothing, ready to cut |
 
 **Policy, from 2026-08-21:** external contributions are accepted again under plain AGPL-3.0
 with nothing to sign, and revenue comes from an optional hosted service rather than a
@@ -103,7 +101,7 @@ empties rather than grows, and a row leaves it by shipping, not by being re-defe
 | Live demo instance                                                                | P1   | M           | Redis password; uptime monitor (OPS-05)                                                                               | **Code shipped 2026-08-22; the host is not deployed.** `DEMO_MODE=true` gives the banner, log-only mail, `403` on account deletion, workspace deletion and a password change on the shared account, and `demo: { enabled, resetIntervalMinutes, nextResetAt }` on `GET /config`. `docker compose --profile demo up -d` adds `demo-reset`, which runs `node dist/demo/reset.js` from the API image on the interval and goes unhealthy after two missed cycles; the reset refuses unless `DEMO_MODE` is true **and** the database is named like a demo. Setup: [self-hosting.md#demo-instance](docs/self-hosting.md#demo-instance). **Remaining is operator work and lives in one place, the [Launch checklist](#launch-checklist)**, which the host, the pinned `TAG`, the `.env`, the `API_DOCS_ENABLED` decision, the uptime monitor (OPS-05), the load-test criterion and the README link all belong to                 |
 | Plan-limit layer: seat, board and storage ceilings per workspace and per instance | P1   | M           | attachment quota defaults (shipped 2026-08-21)                                                                        | **Shipped 2026-08-23.** `PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`, `PLAN_MAX_WORKSPACES` and `PLAN_MAX_USERS` cap quantities the way ADR 0027 caps bytes, and one resolver answers every ceiling question, the byte quotas included. Unset is unlimited and issues no counting query; a seat is a member or a pending invitation; an over-limit write is a `403` carrying `error: "Plan Limit Exceeded"` and a `planLimit` object with the code, the limit and the current count. `Workspace.planLimits` (JSON) overrides the instance key by key, which is where billing writes a plan ([ADR 0032](docs/decisions/0032-plan-limits.md)). All four keys reach the `api` container: compose forwarding shipped in [#316](https://github.com/dravcore/kurul/pull/316) together with the `scripts/lib/compose-env.test.mjs` guard that fails on a documented API-read key the service does not forward |
 | Hosted service billing and plan assignment (ADR 0028)                             | P1   | L           | plan-limit layer (shipped 2026-08-23); [ADR 0034](docs/decisions/0034-hosted-billing-and-plan-assignment.md) accepted | **Design proposed 2026-08-26.** [ADR 0034](docs/decisions/0034-hosted-billing-and-plan-assignment.md) (Proposed) picks a merchant of record, one subscription row per workspace, and nothing at all when unconfigured. Sequencing from here: accept 0033 and 0034, then this billing slice (L), then `/v1` at 1.0 (M), then webhooks (M or L). Provider integration sits behind configuration and is off by default: a self-hoster runs the same code with billing inert, a hosted workspace gets a plan                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `v0.3.0` launch-window wave: r/selfhosted, HN, Show and Tell (P3-13)              | P0   | S           | the [Launch checklist](#launch-checklist) worked down to a live demo host                                             | Posts published with a working demo link; first-30-day adoption signals start being measurable. The awesome-selfhosted submission is deliberately **not** in this wave: that list requires a first release over four months old, which is 2026-12-12 here, so it is trigger-based in [Deferred](#deferred-with-triggers-from-the-2026-08-13-audit) as `LIST-01`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `v0.4.0` launch-window wave: r/selfhosted, HN, Show and Tell (P3-13)              | P0   | S           | the [Launch checklist](#launch-checklist) worked down to a live demo host                                             | Posts published with a working demo link; first-30-day adoption signals start being measurable. The awesome-selfhosted submission is deliberately **not** in this wave: that list requires a first release over four months old, which is 2026-12-12 here, so it is trigger-based in [Deferred](#deferred-with-triggers-from-the-2026-08-13-audit) as `LIST-01`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `/v1` versioning ADR + declared sequencing PAT → `/v1` → webhooks                 | P2   | S           | —                                                                                                                     | **Shipped 2026-08-23.** [ADR 0031](docs/decisions/0031-api-versioning.md) decides the `/v1` URI prefix at 1.0 and not before, rejects header negotiation and no-versioning in writing, and records the sequencing PAT, then `/v1`, then webhooks; [API 1.0](#api-10) links it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Personal access tokens — first slice of API 1.0                                   | P2   | L (slice 1) | `/v1` ADR                                                                                                             | **Shipped 2026-08-23.** Workspace-scoped, hashed-at-rest, owner-listable and revocable tokens (`POST/GET/DELETE /workspaces/:id/tokens`, `Authorization: Bearer kurul_pat_...`) call the OpenAPI-documented workspace endpoints without a cookie, with the owner's live role; [api-conventions.md](docs/api-conventions.md#authentication) names the boundary: no scopes, no OAuth, and the writes Better Auth performs on a session (invitations, membership, rename/delete) stay session-only until `/v1`                                                                                                                                                                                                                                                                                                                                                                                                               |
 | API 1.0 remainder: `/v1` surface + minimal webhooks                               | P2   | L           | PAT slice; [ADR 0033](docs/decisions/0033-webhook-delivery-and-failure-policy.md) accepted                            | The three-event webhook scope from [API 1.0](#api-10) ships with at-least-once signed delivery. The failure-policy ADR is written: [ADR 0033](docs/decisions/0033-webhook-delivery-and-failure-policy.md), **Proposed**, and the question it turns on is endpoint ownership, since the only statement this repository ever carried (an operator-configured URL) arrived as prose and the ADR proposes a workspace-owned endpoint instead                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -120,7 +118,7 @@ empties rather than grows, and a row leaves it by shipping, not by being re-defe
 - **Phase 2, closed 2026-08-23:** off-host backups, the client data layer ADR and the
   panel/hook split, the TS 7 hold ADR, `bootstrap --check`, the `/v1` ADR and the PAT slice,
   the plan-limit layer, the maintenance sweep. What landed after it is the post-`v0.3.0` audit
-  fix set in [Post-launch hardening](#post-launch-hardening), which `v0.4.0` releases.
+  fix set in [Post-launch hardening](#post-launch-hardening), which `v0.4.0` released.
 - **Phase 3, trigger-based:** hosted service billing and the hosted launch
   ([ADR 0034](docs/decisions/0034-hosted-billing-and-plan-assignment.md), Proposed) and the
   API 1.0 remainder ([ADR 0033](docs/decisions/0033-webhook-delivery-and-failure-policy.md),
@@ -136,7 +134,7 @@ used to sit under the deferred table each carried a quarter of it, and now link 
 1. **Provision the host and DNS, and name an owner.** One small VPS with `kurul.dev` pointed at
    it. The owner is whoever answers when the demo stops answering; the step is not done until
    that is a name rather than "us".
-2. **Pin `TAG=v0.3.0` in the host's `.env`.** `.env.example` leaves `TAG` empty, which resolves
+2. **Pin `TAG=v0.4.0` in the host's `.env`.** `.env.example` leaves `TAG` empty, which resolves
    to `latest`, and a demo the announcement points at has to be the build the announcement
    names. See [self-hosting.md](docs/self-hosting.md#upgrading).
 3. **Write the rest of the demo `.env`** exactly as

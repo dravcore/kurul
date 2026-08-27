@@ -57,9 +57,12 @@ Kurul'un cevabı bilinçli olarak dar:
 - **Realtime ve çok-kiracılılık çekirdekte.** Socket.io board senkronu ve workspace'e
   scope'lanmış sorgular sonradan eklenmedi, baştan tasarlandı.
 
-Ve `v0.3.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, public API token'ı yok,
-webhook yok. Personal access token'lar etiketten sonra `develop`'a indi ve bir sonraki sürümle
-çıkıyor; webhook'ların ise tasarımı var ([ADR 0033](docs/tr/decisions/0033-webhook-delivery-and-failure-policy.md)),
+Ve `v0.4.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, webhook yok. Personal access
+token'lar bu sürümle çıkıyor: workspace'e scope'lanıyor ve `Authorization: Bearer` ile
+gönderiliyor, yani bir script ya da bir CI job'ı bir board'u sürebiliyor; bunu stabil bir API'ye
+çeviren `/v1` öneki ise 1.0'da geliyor, öncesinde değil
+([ADR 0031](docs/tr/decisions/0031-api-versioning.md)). Webhook'ların ise tasarımı var
+([ADR 0033](docs/tr/decisions/0033-webhook-delivery-and-failure-policy.md)),
 uygulaması yok. UI hem İngilizce hem Türkçe konuşuyor (her arayüz metni, yeni bir board'un
 başladığı column adları ve size gönderdiğimiz e-posta dahil) ve üçüncü bir dil bir katalog
 uzakta. Webhook'lar ve ek dil paketleri

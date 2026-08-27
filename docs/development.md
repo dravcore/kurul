@@ -944,7 +944,7 @@ body and **nothing else**:
 ```json
 {
   "event": "instance_started",
-  "version": "0.3.0"
+  "version": "0.4.0"
 }
 ```
 
@@ -953,7 +953,7 @@ Field by field, that is the whole list:
 | Field     | Value                | Notes                                                 |
 | --------- | -------------------- | ----------------------------------------------------- |
 | `event`   | `"instance_started"` | Always this literal string. There is only one event   |
-| `version` | e.g. `"0.3.0"`       | The `@kurul/api` package version this build came from |
+| `version` | e.g. `"0.4.0"`       | The `@kurul/api` package version this build came from |
 
 What is **not** sent, and has no code path to be sent: any instance or installation identifier,
 your hostname, your IP address, your URL, your database, any count of users, workspaces, boards
@@ -963,7 +963,7 @@ schedule. The payload is logged in full before it is sent, so you can read what 
 in your own API log:
 
 ```text
-LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.3.0"} to https://…
+LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.4.0"} to https://…
 ```
 
 A refused connection, a DNS failure, an error from the collector or a timeout

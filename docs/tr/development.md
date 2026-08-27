@@ -962,7 +962,7 @@ Açtığınızda, API süreci başlarken tam olarak bir `POST` yapılır; gövde
 ```json
 {
   "event": "instance_started",
-  "version": "0.3.0"
+  "version": "0.4.0"
 }
 ```
 
@@ -971,7 +971,7 @@ Alan alan, listenin tamamı budur:
 | Alan      | Değer                | Not                                             |
 | --------- | -------------------- | ----------------------------------------------- |
 | `event`   | `"instance_started"` | Her zaman bu düz metin. Tek bir olay vardır     |
-| `version` | örn. `"0.3.0"`       | Bu derlemenin geldiği `@kurul/api` paket sürümü |
+| `version` | örn. `"0.4.0"`       | Bu derlemenin geldiği `@kurul/api` paket sürümü |
 
 Gönderil**mey**en ve gönderilmesi için kod yolu bulunmayanlar: herhangi bir kurulum kimliği,
 hostname'iniz, IP adresiniz, URL'iniz, veritabanınız, kullanıcı/workspace/board/task sayıları,
@@ -981,7 +981,7 @@ yok, zamanlama yok. Yük gönderilmeden önce tamamen loglanır, böylece sunucu
 kendi API log'unuzda okuyabilirsiniz:
 
 ```text
-LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.3.0"} to https://…
+LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.4.0"} to https://…
 ```
 
 Reddedilen bağlantı, DNS hatası, toplayıcıdan gelen hata ya da zaman aşımı
