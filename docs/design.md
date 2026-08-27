@@ -192,13 +192,14 @@ falls straight through to the fallback fonts.
 | Body / UI | **Archivo** (variable, OFL)                                | Everything in the product                                                                                                                                                                                                                    | A signage grotesque: tall x-height, economical widths, legible at 12–13px. A board is hundreds of short strings in narrow columns — a signage problem. Chosen over Inter and Geist, which are correct but read as the framework default. |
 | Mono      | **JetBrains Mono** (OFL), `0.92em`                         | Ids, shortcuts, code                                                                                                                                                                                                                         | Unambiguous `0/O` and `1/l/I` — a UUIDv7 legibility tool, not a style choice                                                                                                                                                             |
 
-| Step                   | Size / line       | Weight    | Use                                                                      |
-| ---------------------- | ----------------- | --------- | ------------------------------------------------------------------------ |
-| `display`              | 40 / 44           | 600       | One per auth or marketing screen                                         |
-| `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Page and panel titles · section and dialog titles                        |
-| `read`                 | 14 / 21           | 400       | Long-form prose: task description, comment body, import report sentences |
-| `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — fields and rows · card titles, active nav              |
-| `small` · `micro`      | 12 / 16 · 11 / 14 | 400       | Metadata, timestamps · chips, counts, axis ticks                         |
+| Step                   | Size / line       | Weight    | Use                                                                                |
+| ---------------------- | ----------------- | --------- | ---------------------------------------------------------------------------------- |
+| `display`              | 40 / 44           | 600       | One per auth or marketing screen                                                   |
+| `stat`                 | 28 / 32           | 600       | The stat tile's value, and nothing else (§8); proportional figures, never Fraunces |
+| `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Page and panel titles · section and dialog titles                                  |
+| `read`                 | 14 / 21           | 400       | Long-form prose: task description, comment body, import report sentences           |
+| `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline**: fields and rows · card titles, active nav                         |
+| `small` · `micro`      | 12 / 16 · 11 / 14 | 400       | Metadata, timestamps · chips, counts, axis ticks                                   |
 
 This is the whole scale, with no gap left for a Tailwind default to fill unnoticed: `text-sm`,
 `text-lg`, `text-xs` and `font-medium` are gone from the component tree, and

@@ -1071,6 +1071,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   retry control, the way the members roster already did, instead of leaving the route on a dead
   error line.
 
+- **Four small follow-ups from the outside review of the UI series.** The dialog's corner close
+  button rested at `opacity-70`, and that is a group opacity: it faded the base-layer focus outline
+  with the icon, so the ring measured 2.91:1 on the light popover, under the 3:1 floor
+  `docs/design.md` §9 sets for a focus indicator, even though `--ring` on `--popover` is 5.05:1 at
+  full strength. It now carries `focus-visible:opacity-100`, so the whole button is opaque exactly
+  while the ring shows. The task panel's activity refresh and the comment thread's "Load more" each
+  reported a failure as a bare toast; both now carry the catalogue's **Try again** action, which
+  re-runs the same request, and since the panel is not remounted per task and a toast outlives a
+  card switch, a retry that fires after the reader has moved to another task is dropped rather
+  than written into the new task's lists. The comment box no longer claims `role="combobox"`: ARIA
+  in HTML gives a `<textarea>` no role at all (axe `aria-allowed-role`), and a plain textbox does
+  not take `aria-expanded` either (that would be `aria-allowed-attr`, a critical finding), so the
+  field stays a textbox and the mention picker hangs off `aria-controls`, `aria-haspopup`,
+  `aria-autocomplete` and `aria-activedescendant`, which the textbox role does support. The keyboard
+  behaviour of the picker is unchanged. `docs/design.md` §3 lists the `stat` step (28/32, weight
+  600) in the type-scale table, which named it in prose but had no row for it.
+
 ### Security
 
 - **The runtime images upgrade Alpine's own packages at build time.** The three stages that

@@ -35,12 +35,17 @@ describe('Textarea', () => {
     expect(element.className).toContain('disabled:opacity-50');
   });
 
-  /** The comment box turns itself into a combobox for the mention picker. */
+  /** The comment box wires the mention picker through ARIA attributes on the field itself. */
   it('passes ARIA attributes through untouched', () => {
-    const element = renderTextarea({ role: 'combobox', 'aria-expanded': true });
+    const element = renderTextarea({
+      'aria-haspopup': 'listbox',
+      'aria-controls': 'mention-list',
+      'aria-autocomplete': 'list',
+    });
 
-    expect(element.getAttribute('role')).toBe('combobox');
-    expect(element.getAttribute('aria-expanded')).toBe('true');
+    expect(element.getAttribute('aria-haspopup')).toBe('listbox');
+    expect(element.getAttribute('aria-controls')).toBe('mention-list');
+    expect(element.getAttribute('aria-autocomplete')).toBe('list');
     expect(element.getAttribute('data-slot')).toBe('textarea');
   });
 });
