@@ -506,6 +506,17 @@ title already in place, so it is never blank; inline actions are optimistic. Spi
 exactly one place: inside a pressed button, 14px, over its content, after 400ms. List
 content never gets one. Unknown-length work (import, export) gets a progress bar with a count.
 
+**A control the reader can be focused on is never `disabled` mid-request.** The browser blurs a
+disabled element, which drops a keyboard user onto `<body>` in the middle of their own edit.
+While a write is out: a text field goes `readOnly`; a native `<select>` and a checkbox, neither
+of which has a `readOnly`, stay enabled, carry `aria-disabled` and let their change handler
+refuse the change, which React puts back so a refused choice is never left on screen as a saved
+one; and the busy state is announced by a sibling live region (`role="status"` with `aria-busy`,
+mounted while idle too) rather than by the control itself. Pending state is scoped to the one
+control in flight, never shared across a section: a save on one field may not lock the field
+beside it. `Button`'s `loading` is the single exception, and only because it disables the
+control the press already came from.
+
 **Errors** derive from the problem-JSON shape in [api-conventions.md](api-conventions.md#errors).
 Per that contract the UI **branches on `statusCode` and `error`, never on `message` text** — so
 user-facing strings come from the i18n catalog and the API `message` is logged, not shown. Only

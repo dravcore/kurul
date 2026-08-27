@@ -525,6 +525,17 @@ optimistic'tir. Spinner'lar tam olarak tek bir yerde var: basılı bir button'ı
 400ms sonra içeriğinin üzerine geçerek. List içeriği asla bir tane almaz. Bilinmeyen uzunluktaki iş
 (import, export) count'lu bir progress bar alır.
 
+**Okuyucunun üzerinde durabileceği bir control, istek sürerken asla `disabled` olmaz.** Tarayıcı
+disabled olan elemanı blur eder ve klavye kullanıcısı, kendi düzenlemesinin ortasında `<body>`
+üzerine düşer. Bir yazma sürerken: metin field'ı `readOnly` olur; `readOnly`'si olmayan native bir
+`<select>` ve bir checkbox enabled kalır, `aria-disabled` taşır ve değişikliği kendi change
+handler'ı reddeder (React gösterilen değeri geri koyar, böylece reddedilen bir seçim ekranda
+kaydedilmiş gibi durmaz); busy durumu ise control'ün kendisi yerine yanındaki bir live region
+(`role="status"` artı `aria-busy`, boştayken de mount edilmiş halde) tarafından duyurulur. Pending
+durumu, uçuştaki tek control'e daraltılır, bir bölümün tamamına yayılmaz: bir field'daki kayıt,
+yanındaki field'ı kilitleyemez. Tek istisna `Button`'ın `loading`'i, o da yalnızca basışın zaten
+geldiği control'ü disabled ettiği için.
+
 **Error'lar**, [api-conventions.md](api-conventions.md#hatalar)'daki problem-JSON şeklinden
 türer. O contract'a göre UI **`statusCode` ve `error` üzerinden branch'lenir, asla `message`
 metni üzerinden değil** — bu yüzden kullanıcıya görünen string'ler i18n katalogundan gelir ve API
