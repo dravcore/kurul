@@ -38,7 +38,7 @@ interface BoardCardProps {
 /**
  * One board tile: the link to the board, and (behind its menu) rename and delete.
  *
- * Rename used to be a dialog (`RenameBoardDialog`); P7 task 6 folds it into this card instead,
+ * Rename used to be a dialog (`RenameBoardDialog`); it is folded into this card instead,
  * because the menu item was the only real affordance a dialog gave it. The menu item survives
  * unchanged; what it opens is now an `InlineRename` in place of the name and description, not a
  * modal. Its own component (rather than inline in `BoardList`'s `.map`) because the editing

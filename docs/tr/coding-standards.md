@@ -235,6 +235,12 @@ components/
   varsayılanıyla tekilleşir, ikisi birden DOM'a ulaşmaz.
 - Design token'ları (renkler, spacing, radius) Tailwind theme'inden gelir — component'lerde
   keyfi hex değerleri yok.
+- İki çağrı noktası bilerek ham renk taşır: components/ui/button.tsx'in destructive
+  `text-white`'ı ve components/ui/select.tsx'in chevron `stroke="%23888"`'i; ikisi de
+  `RAW_COLOUR_CALL_SITES` (`apps/web/app/globals.contrast.test.ts`) içinde sabitlenmiş ve
+  ölçülmüş durumda. Chevron bir token'ı hiç okuyamaz: kontrolün kendi background'una bir
+  `data:` URI olarak çizilir ve orada `var()` çözülmez. Bu ikisinin dışındaki her şey bir
+  defect'tir.
 - `apps/web/app/globals.css` içindeki yazar CSS'i, kuralın yanına yazılmış bir gerekçe yoksa
   `@layer base` içine girer. Katmansız bir kural özgüllüğünden bağımsız olarak her cascade
   katmanını yener; bu yüzden katmansız bir `*` seçici, Tailwind'in `@layer utilities` içine
@@ -242,7 +248,8 @@ components/
   etmeyi bırakır. Böyle bir gerekçe taşıyan tek kural `:focus-visible` outline'ıydı; kontroller
   kendi focus ring'lerini ve `outline-none`'larını bıraktığı anda `base` içine taşındı ve bugün
   hiçbir kural böyle bir gerekçe taşımıyor. `apps/web/app/globals-css-layers.test.ts` bunu korur.
-- Her `text-*`, `bg-*`, `border-*`, `font-*` ve `shadow-*` class'ının `@theme inline` içinde ya da
+- Her `text-*`, `bg-*`, `border-*`, `font-*`, `shadow-*` ve `rounded-*` class'ının
+  `@theme inline` içinde ya da
   Tailwind'in yerleşik ölçeğinde bir karşılığı olmalı. Karşılığı olmayan class hiç CSS üretmez:
   hata da vermez, element yalnızca miras alır ve yanlışlık review'da görünmez.
   `apps/web/app/theme-classes.test.ts` ağacı Tailwind üzerinden derler ve hiçbir şey üretmeyen her

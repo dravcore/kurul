@@ -61,7 +61,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
         // height once it has been rendered, so the column's scroll height settles instead of
         // drifting as cards with more metadata turn out taller than the guess.
         // 56px is the measured median card height on the seeded board (min 36 for a bare
-        // title). As of P6 task 5, label dots moved into the same `flex-nowrap` meta row as the
+        // title). Label dots moved into the same `flex-nowrap` meta row as the
         // due date, estimate and assignees, so a card carrying all of them still measures 56 on
         // one line, not the ~76 a label row of its own used to add as a second row before that
         // change. A placeholder that is too tall is not free: at that old 76px, the seeded

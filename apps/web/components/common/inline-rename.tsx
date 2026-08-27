@@ -40,7 +40,7 @@ export interface InlineRenameProps {
 }
 
 /**
- * The board-card and workspace-settings rename editors (P7 task 6): a named affordance still
+ * The board-card and workspace-settings rename editors: a named affordance still
  * opens it, but the editing itself happens in place instead of inside a dialog.
  *
  * Enter (from any field) and the visible Save button share this component's one submit path;

@@ -397,14 +397,14 @@ Zaten kapsanmış kodun geri kaymasını mandallar engeller. Hepsi CI'ı kırar.
 | `apps/api` `src/common/guards/`         | statements 100 / branches 93.75 / functions 100 / lines 100      | `apps/api/jest.config.cjs`  |
 | `apps/api` `src/common/rate-limit/`     | statements 98.33 / branches 94.87 / functions 91.3 / lines 99.09 | `apps/api/jest.config.cjs`  |
 | `apps/api` `src/account/`               | statements 0 / branches 0 / functions 0 / lines 0                | `apps/api/jest.config.cjs`  |
-| `apps/web` `app/**`                     | statements 85 / branches 90 / functions 85 / lines 85            | `apps/web/vitest.config.ts` |
+| `apps/web` `app/**`                     | statements 97 / branches 97 / functions 97 / lines 97            | `apps/web/vitest.config.ts` |
 | `apps/web` `components/board/**`        | statements 65 / branches 54 / functions 54 / lines 70            | `apps/web/vitest.config.ts` |
 | `apps/web` `components/task/**`         | statements 60 / branches 60 / functions 58 / lines 62            | `apps/web/vitest.config.ts` |
 | `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78            | `apps/web/vitest.config.ts` |
 | `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93            | `apps/web/vitest.config.ts` |
 | `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92            | `apps/web/vitest.config.ts` |
 | `apps/web` `components/auth/**`         | statements 94 / branches 91 / functions 95 / lines 94            | `apps/web/vitest.config.ts` |
-| `apps/web` `components/settings/**`     | statements 85 / branches 86 / functions 80 / lines 86            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/settings/**`     | statements 90 / branches 86 / functions 89 / lines 92            | `apps/web/vitest.config.ts` |
 | `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88            | `apps/web/vitest.config.ts` |
 
 `apps/api`'nin global taban değeri `develop`'da merge sonrası ölçülür, hiçbir zaman bir feature

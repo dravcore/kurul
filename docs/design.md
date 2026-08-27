@@ -127,7 +127,6 @@ white, so elevation reads without shadows.
 | Text, primary                                                        | `--foreground`                  | `#191C1B`              | `#E8ECEA`             |
 | Text, secondary                                                      | `--foreground-secondary`        | `#545A57`              | `#BCC3BF`             |
 | Text, muted                                                          | `--muted-foreground`            | `#626965`              | `#98A09C`             |
-| Text, disabled / placeholder                                         | `--foreground-disabled`         | `#7F8683`              | `#7B837F`             |
 | Primary action surface · hover                                       | `--primary` · `--primary-hover` | `#A85A28` · `#964F23`  | `#D98A4E` · `#E0955B` |
 | Text on primary                                                      | `--primary-foreground`          | `#FFFFFF`              | `#131715`             |
 | Rail, focus ring, link                                               | `--signature`, `--ring`         | `#A85A28`              | `#D98A4E`             |
@@ -634,7 +633,7 @@ legend plus direct labels or the table view in a chart.
 | Slot assignment        | Fixed order, assigned in sequence, **never cycled**. Color follows the entity, not its rank — filtering out a series must not repaint the survivors.                                                                                                                                 |
 | Series cap             | 6 soft / 8 hard for bars, lines, stacks; **3** for scatter, bubble, and small multiples (the all-pairs gate)                                                                                                                                                                         |
 | Sequential · diverging | One hue, blue, light→dark for magnitude · blue ↔ red with a **neutral gray** midpoint (`#F0EFEC` / `#383835`), only for "vs target" views                                                                                                                                            |
-| Emphasis               | One series in `--signature` copper, the rest in `--foreground-disabled`. The only copper in a chart, and the right answer whenever the story is "this one".                                                                                                                          |
+| Emphasis               | One series in `--signature` copper, the rest in `--label-slot-1`. The only copper in a chart, and the right answer whenever the story is "this one".                                                                                                                                 |
 | Status and priority    | Reserved — never reused as "series 4"                                                                                                                                                                                                                                                |
 | Marks                  | Bars ≤ 24px thick, 4px rounded data-end, square at the baseline, 2px surface-colored gap between adjacent bars and stacked segments; lines 2px round cap/join; markers ≥ 8px with a 2px surface ring                                                                                 |
 | Grid and axes          | Horizontal gridlines only, 1px solid `--border`, never dashed. No chart border, no background fill. Ticks rounded to clean numbers, thousands-separated, `tabular-nums`, in `--muted-foreground`.                                                                                    |
@@ -646,7 +645,7 @@ legend plus direct labels or the table view in a chart.
 in Archivo 600 at 28px with **proportional** figures, auto-compacted (`1,284` / `12.9K`) · delta
 signed against a named period, colored by _direction × whether up is good_ (more overdue tasks
 is not good news) and paired with an arrow · optional 12-point sparkline in
-`--foreground-disabled` with the current period in copper. **At most one hero figure per view**,
+`--muted-foreground` with the current period in copper. **At most one hero figure per view**,
 ≥48px, in Archivo — never Fraunces; a display face on a number reads as decoration.
 
 ## 9. Accessibility
@@ -677,11 +676,11 @@ Target **WCAG 2.1 AA** in both themes, verified per token pair rather than per s
 
 ## 10. Cross-references
 
-| Document                                                               | What it binds here                                                                                                                                                |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [coding-standards.md](coding-standards.md#nextjs-appsweb)              | `components/ui/` is shadcn output only — tokens are edited in the theme, never in a primitive; no arbitrary hex in components; conditional classes through `cn()` |
-| [architecture.md](architecture.md#4-appsweb--structure)                | The `(auth)` / `(app)` route groups and the `board/`, `task/`, `dashboard/`, `layout/` component domains this document lays out                                   |
-| [api-conventions.md](api-conventions.md#errors)                        | The problem-JSON shape error copy derives from, and the rule to branch on `statusCode`                                                                            |
-| [Shipped MVP summary](../ROADMAP.md#shipped-mvp-summary)               | Phase 3 lands tokens, shell, and board chrome; Phase 4 the drag interaction and detail panel; Phase 5 priority and label rendering; Phase 7 the charts            |
-| [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts — the toolkit every rule above is written against                                                         |
-| [tech-stack.md](tech-stack.md)                                         | Why that toolkit                                                                                                                                                  |
+| Document                                                               | What it binds here                                                                                                                                                                                 |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [coding-standards.md](coding-standards.md#nextjs-appsweb)              | `components/ui/` is shadcn output only — tokens are edited in the theme, never in a primitive; no arbitrary hex in components beyond the two pinned exceptions; conditional classes through `cn()` |
+| [architecture.md](architecture.md#4-appsweb--structure)                | The `(auth)` / `(app)` route groups and the `board/`, `task/`, `dashboard/`, `layout/` component domains this document lays out                                                                    |
+| [api-conventions.md](api-conventions.md#errors)                        | The problem-JSON shape error copy derives from, and the rule to branch on `statusCode`                                                                                                             |
+| [Shipped MVP summary](../ROADMAP.md#shipped-mvp-summary)               | Phase 3 lands tokens, shell, and board chrome; Phase 4 the drag interaction and detail panel; Phase 5 priority and label rendering; Phase 7 the charts                                             |
+| [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts — the toolkit every rule above is written against                                                                                          |
+| [tech-stack.md](tech-stack.md)                                         | Why that toolkit                                                                                                                                                                                   |

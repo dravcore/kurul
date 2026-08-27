@@ -232,6 +232,11 @@ components/
   primitive's own default instead of both classes reaching the DOM.
 - Design tokens (colors, spacing, radius) come from the Tailwind theme — no arbitrary hex
   values in components.
+- Two call sites keep a raw colour on purpose: components/ui/button.tsx's destructive
+  `text-white` and components/ui/select.tsx's chevron `stroke="%23888"`, both pinned and
+  measured in `RAW_COLOUR_CALL_SITES` (`apps/web/app/globals.contrast.test.ts`). The chevron
+  cannot read a token at all: it is drawn into the control's own background as a `data:` URI,
+  where `var()` is not resolved. Anything outside those two is a defect.
 - Author CSS in `apps/web/app/globals.css` goes inside `@layer base` unless there is a written
   reason not to, stated next to the rule. An unlayered rule outranks every cascade layer whatever
   its specificity, so an unlayered `*` selector repaints the utilities Tailwind emits into
@@ -239,9 +244,9 @@ components/
   `:focus-visible` outline was the one rule that carried such a reason; it moved into `base` once
   the controls stopped carrying focus rings and `outline-none` of their own, and no rule carries
   one now. Guarded by `apps/web/app/globals-css-layers.test.ts`.
-- Every `text-*`, `bg-*`, `border-*`, `font-*` and `shadow-*` class must resolve against
-  `@theme inline` or Tailwind's built-in scale. A class with no counterpart compiles to no CSS at
-  all: nothing errors, the element just inherits and the mistake is invisible in review.
+- Every `text-*`, `bg-*`, `border-*`, `font-*`, `shadow-*` and `rounded-*` class must resolve
+  against `@theme inline` or Tailwind's built-in scale. A class with no counterpart compiles to
+  no CSS at all: nothing errors, the element just inherits and the mistake is invisible in review.
   `apps/web/app/theme-classes.test.ts` compiles the tree through Tailwind and fails on any class
   that emits nothing.
 

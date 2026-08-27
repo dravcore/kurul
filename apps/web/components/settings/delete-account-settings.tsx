@@ -36,7 +36,7 @@ const EMPTY_PREVIEW: AccountDeletionPreviewDto = {
  * Deleting the account: the one control in this product that nothing can undo, including a
  * restore the person themselves can ask for. `/settings/account/delete` rather than a dialog:
  * a sole-owned workspace needs one `<select>` of its own (transfer or destroy), and a caller
- * who owns several no longer fits a 512px surface at all (Phase 7 Task 5).
+ * who owns several no longer fits a 512px surface at all.
  *
  * The API refuses the deletion until every workspace the caller is the only OWNER of has an
  * explicit disposition (`docs/decisions/0026-account-deletion-anonymisation.md`), and the only

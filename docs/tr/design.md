@@ -133,7 +133,6 @@ beyazdır, bu yüzden elevation shadow olmadan okunur.
 | Metin, primary                                                         | `--foreground`                  | `#191C1B`              | `#E8ECEA`             |
 | Metin, secondary                                                       | `--foreground-secondary`        | `#545A57`              | `#BCC3BF`             |
 | Metin, muted                                                           | `--muted-foreground`            | `#626965`              | `#98A09C`             |
-| Metin, disabled / placeholder                                          | `--foreground-disabled`         | `#7F8683`              | `#7B837F`             |
 | Primary action surface'i · hover                                       | `--primary` · `--primary-hover` | `#A85A28` · `#964F23`  | `#D98A4E` · `#E0955B` |
 | Primary üzerinde metin                                                 | `--primary-foreground`          | `#FFFFFF`              | `#131715`             |
 | Rail, focus ring, link                                                 | `--signature`, `--ring`         | `#A85A28`              | `#D98A4E`             |
@@ -308,17 +307,19 @@ Dokunmatik drag ayrıca grip üzerinde **250ms'lik bir basışla** başlar (5px'
 eder), böylece grip'ten başlayan bir kaydırma yine scroll eder; mouse drag'i ise gecikmesiz,
 **6px'lik hareketle** başlar, çünkü mouse'un vazgeçecek bir hareketi yoktur.
 
-**Task detayı: bir modal değil, sağ tarafta bir panel.** Varsayılan 480px, drag-resizable
-420–640px, **non-modal** — board arkasında görünür ve tıklanabilir kalır. 1024px altında
-full-screen bir sheet'e dönüşür. Confirmation'lar, board oluşturma ve destructive aksiyonlar
-**dialog** olarak kalır; onların gerçekten block etmesi gerekir.
+**Task detayı: bir modal değil, sağ tarafta bir panel.** ~480px genişlik (CSS ile `min` 420px /
+`max` 640px), **non-modal**: masaüstünde board arkasında görünür ve tıklanabilir kalır. Tailwind
+`md` breakpoint'inin (768px) altında full-screen bir sheet'e dönüşür (`fixed inset-0`). Panel
+genişliğinin drag ile yeniden boyutlandırılması uygulanmadı; CSS sınırları sabittir.
+Confirmation'lar, board oluşturma ve destructive aksiyonlar **dialog** olarak kalır; onların
+gerçekten block etmesi gerekir.
 
-| Neden bir panel |                                                                                                                                                          |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Context         | Bir board'un amacı çevresindeki kartlardır; bir modal onları siler                                                                                       |
-| Flow            | Triage open → edit → next'tir. Bir panel, bir dismiss artı bir click yerine, bir sonraki kartı tek bir click uzakta tutar.                               |
-| Realtime        | Bir modal'ın altında hareket eden bir kart görünmezdir; bir panelin arkasında görünürdür                                                                 |
-| Routing         | Bir intercepting route üzerinden `board/[boardId]/task/[taskId]`'te deep-linkable — paylaşılan bir URL full page'i açar, board içi bir click paneli açar |
+| Neden bir panel |                                                                                                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Context         | Bir board'un amacı çevresindeki kartlardır; bir modal onları siler                                                                                                            |
+| Flow            | Triage open → edit → next'tir. Bir panel, bir dismiss artı bir click yerine, bir sonraki kartı tek bir click uzakta tutar.                                                    |
+| Realtime        | Bir modal'ın altında hareket eden bir kart görünmezdir; bir panelin arkasında görünürdür                                                                                      |
+| Routing         | `board/[boardId]/task/[taskId]`'te deep-linkable: hem soft navigation hem de hard load, task seçili halde `BoardView`'i render eder (Next.js intercepting/`@modal` route yok) |
 
 **Bir durumun hangi surface'i aldığı.** Uygulamadaki her katman bunlardan birine cevap verir:
 
@@ -657,7 +658,7 @@ kendi ismi, chart'ta legend artı direct label'lar ya da table view.
 | Slot ataması             | Fixed order, sırayla assign edilir, **asla cycle'lanmaz**. Renk, rank'ini değil entity'yi takip eder — bir series'i filtrelemek, kalanları repaint etmemeli.                                                                                                                                     |
 | Series cap'i             | Bar'lar, line'lar, stack'ler için 6 soft / 8 hard; scatter, bubble ve small multiple'lar için **3** (all-pairs gate)                                                                                                                                                                             |
 | Sequential · diverging   | Magnitude için tek bir ton, mavi, açık→koyu · **neutral gray** (`#F0EFEC` / `#383835`) midpoint'li mavi ↔ kırmızı, yalnızca "vs target" view'ları için                                                                                                                                           |
-| Emphasis                 | `--signature` bakırında tek bir series, kalanı `--foreground-disabled`'da. Bir chart'taki tek bakır, ve story "this one" ("bu") olduğunda doğru cevap.                                                                                                                                           |
+| Emphasis                 | `--signature` bakırında tek bir series, kalanı `--label-slot-1`'da. Bir chart'taki tek bakır, ve story "this one" ("bu") olduğunda doğru cevap.                                                                                                                                                  |
 | status ve priority       | Reserved — asla "series 4" olarak reuse edilmez                                                                                                                                                                                                                                                  |
 | Mark'lar                 | Bar'lar ≤ 24px kalınlığında, 4px rounded data-end, baseline'da square, adjacent bar'lar ve stacked segment'ler arasında 2px surface-colored gap; line'lar 2px round cap/join; marker'lar ≥ 8px, 2px'lik bir surface ring'iyle                                                                    |
 | Grid ve axis'ler         | Yalnızca horizontal gridline, 1px solid `--border`, asla dashed değil. Chart border yok, background fill yok. Tick'ler temiz sayılara rounded, thousands-separated, `tabular-nums`, `--muted-foreground`'da.                                                                                     |
@@ -668,7 +669,7 @@ kendi ismi, chart'ta legend artı direct label'lar ya da table view.
 **Stat tile'lar.** `small` `--muted-foreground`'da label, sentence case, sondan colon yok ·
 **proportional** figure'larla, auto-compacted (`1,284` / `12.9K`) 28px'te Archivo 600'de value ·
 adlandırılmış bir periyoda karşı signed delta, _direction × whether up is good_'a göre renklenir
-(daha fazla overdue task iyi haber değildir) ve bir arrow'la eşleşir · `--foreground-disabled`'da
+(daha fazla overdue task iyi haber değildir) ve bir arrow'la eşleşir · `--muted-foreground`'da
 opsiyonel 12-point sparkline, current period bakırda. **View başına en fazla bir hero figure**,
 ≥48px, Archivo'da — asla Fraunces'te; bir sayının üzerindeki bir display face, dekorasyon gibi
 okunur.
@@ -702,11 +703,11 @@ verify edilmiş olarak.
 
 ## 10. Çapraz referanslar
 
-| Doküman                                                                | Burada neyi bağlıyor                                                                                                                                                                  |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [coding-standards.md](coding-standards.md#nextjs-appsweb)              | `components/ui/` yalnızca shadcn output'udur — token'lar theme'de edit edilir, asla bir primitive'de değil; component'lerde arbitrary hex yok; conditional class'lar `cn()` üzerinden |
-| [architecture.md](architecture.md#4-appsweb--yapı)                     | Bu dokümanın ortaya koyduğu `(auth)` / `(app)` route group'ları ve `board/`, `task/`, `dashboard/`, `layout/` component domain'leri                                                   |
-| [api-conventions.md](api-conventions.md#hatalar)                       | Error metninin türediği problem-JSON şekli, ve `statusCode` üzerinden branch'leme kuralı                                                                                              |
-| [Sevkedilen MVP özeti](../../ROADMAP.md#shipped-mvp-summary)           | Faz 3 token'ları, shell'i ve board chrome'unu getirir; Faz 4 drag etkileşimini ve detay panelini; Faz 5 priority ve label render'ını; Faz 7 grafikleri                                |
-| [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts — yukarıdaki her kuralın karşısında yazıldığı toolkit                                                                         |
-| [tech-stack.md](tech-stack.md)                                         | Neden o toolkit                                                                                                                                                                       |
+| Doküman                                                                | Burada neyi bağlıyor                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [coding-standards.md](coding-standards.md#nextjs-appsweb)              | `components/ui/` yalnızca shadcn output'udur — token'lar theme'de edit edilir, asla bir primitive'de değil; component'lerde, sabitlenmiş iki istisna dışında, arbitrary hex yok; conditional class'lar `cn()` üzerinden |
+| [architecture.md](architecture.md#4-appsweb--yapı)                     | Bu dokümanın ortaya koyduğu `(auth)` / `(app)` route group'ları ve `board/`, `task/`, `dashboard/`, `layout/` component domain'leri                                                                                     |
+| [api-conventions.md](api-conventions.md#hatalar)                       | Error metninin türediği problem-JSON şekli, ve `statusCode` üzerinden branch'leme kuralı                                                                                                                                |
+| [Sevkedilen MVP özeti](../../ROADMAP.md#shipped-mvp-summary)           | Faz 3 token'ları, shell'i ve board chrome'unu getirir; Faz 4 drag etkileşimini ve detay panelini; Faz 5 priority ve label render'ını; Faz 7 grafikleri                                                                  |
+| [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts — yukarıdaki her kuralın karşısında yazıldığı toolkit                                                                                                           |
+| [tech-stack.md](tech-stack.md)                                         | Neden o toolkit                                                                                                                                                                                                         |
