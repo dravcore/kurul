@@ -95,6 +95,22 @@ describe('TaskAssigneesSection over the threshold', () => {
     expect(screen.getByText('Member 2')).toBeDefined();
   });
 
+  it('draws each assigned name as its own chip, not as a run of words', () => {
+    // Two names side by side in a wrapping list read as one string once either of them has a
+    // space in it ("Ada Lovelace Alan Turing"), which is what the summary was before: the
+    // popover took the checkbox list away and left the names with no boundary of their own.
+    // The chip is the same shell the labels beside it wear (`LabelChip`), minus the dot.
+    renderSection(INLINE_PICKER_MAX + 1, ['u2', 'u3']);
+
+    const chips = [screen.getByText('Member 2'), screen.getByText('Member 3')];
+
+    for (const chip of chips) {
+      expect(chip.className).toContain('border');
+      expect(chip.className).toContain('bg-muted');
+      expect(chip.className).toContain('rounded-[var(--radius-sm)]');
+    }
+  });
+
   it('filters the rows as the reader types', () => {
     renderSection(INLINE_PICKER_MAX + 1);
     openPicker();

@@ -32,9 +32,17 @@ export function TaskAssigneesSection({
           {assigned.length === 0 ? (
             <span className="text-small text-muted-foreground">{t('noAssignees')}</span>
           ) : (
-            <ul className="flex flex-wrap gap-x-2 gap-y-1 text-body">
+            /* Each name in the same chip the labels beside it wear, minus the colour dot: two
+               bare names in a row read as one string the moment either of them has a space in
+               it, and every name does. */
+            <ul className="flex flex-wrap gap-1.5">
               {assigned.map((member) => (
-                <li key={member.id}>{member.name}</li>
+                <li
+                  key={member.id}
+                  className="inline-flex items-center rounded-[var(--radius-sm)] border border-border bg-muted px-1.5 py-0.5 text-small text-foreground"
+                >
+                  {member.name}
+                </li>
               ))}
             </ul>
           )}
