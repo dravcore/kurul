@@ -112,11 +112,17 @@ const deleteButton = (): HTMLButtonElement =>
   screen.getByRole('button', { name: copy.deleteAction }) as HTMLButtonElement;
 
 describe('DeleteAccountSettings', () => {
-  it('renders the heading and lead as page content, not dialog chrome', async () => {
+  /**
+   * `Topbar` (app/(app)/settings/account/delete/page.tsx) already carries the route's one
+   * heading, `deletePageTitle`. This surface used to repeat it as its own `<h2>`, a second
+   * heading naming the same thing on one screen, which is what this component's own test suite
+   * has to stay clear of even though the route's `<h1>` is out of its render tree.
+   */
+  it('renders the lead as page content, not dialog chrome, and carries no heading of its own', async () => {
     renderSettings();
 
-    expect(await screen.findByRole('heading', { name: copy.deleteTitle })).toBeTruthy();
-    expect(screen.getByText(copy.deleteBody)).toBeTruthy();
+    await screen.findByText(copy.deleteBody);
+    expect(screen.queryByRole('heading')).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 

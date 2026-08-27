@@ -158,10 +158,10 @@ export function DeleteAccountSettings(): React.ReactElement {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-title font-semibold">{t('deleteTitle')}</h2>
-        <p className="text-body text-muted-foreground">{t('deleteBody')}</p>
-      </div>
+      {/* No `<h2>` here: `Topbar` already carries `deletePageTitle` as the route's one heading
+          (app/(app)/settings/account/delete/page.tsx), and a second one repeating the same
+          "delete your account" claim would be a duplicate landmark, not a subsection. */}
+      <p className="text-body text-muted-foreground">{t('deleteBody')}</p>
 
       {loading ? (
         <div className="flex flex-col gap-2" role="status" aria-busy>

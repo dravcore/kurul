@@ -320,7 +320,6 @@
         "deleteSectionBody": "Sizi bu sunucudaki her workspace'ten çıkarır ve yazdığınız her şeyden adınızı kaldırır. Bu geri alınamaz.",
         "deletePageTitle": "Hesabınızı silin",
         "deleteAction": "Hesabı sil",
-        "deleteTitle": "Hesabınızı sil?",
         "deleteBody": "Oturumunuz kapatılacak ve buradaki her workspace'ten çıkarılacaksınız. Adınız ve e-posta adresiniz silinir. Bu geri alınamaz.",
         "retained": "Yazdığınız {comments, plural, =0 {yorum yok} other {# yorum}} ve {tasks, plural, =0 {task yok} other {# task}} olduğu yerde kalır; “Deleted user” adına yazılır.",
         "ownedTitle": "Bunların tek sahibi sizsiniz. Her biri için ne olacağına karar verin.",

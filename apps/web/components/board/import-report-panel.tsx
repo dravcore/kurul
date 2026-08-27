@@ -57,9 +57,7 @@ export function ImportReportPanel({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="text-title font-semibold">
-            {t('reportTitle', { name: report.boardName })}
-          </h2>
+          <h2 className="text-title">{t('reportTitle', { name: report.boardName })}</h2>
           <p className="max-w-prose text-small text-muted-foreground">{t('notSaved')}</p>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>

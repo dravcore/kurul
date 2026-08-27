@@ -54,7 +54,7 @@ export function ActivationFunnel(): React.ReactElement | null {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-title font-semibold">{t('title')}</h2>
+        <h2 className="text-title">{t('title')}</h2>
         <p className="text-body text-muted-foreground">{t('description')}</p>
       </div>
 
