@@ -11,7 +11,7 @@ Open-source, Kanban-focused project management tool.
 ## Status
 
 Kurul’s **MVP feature set (Phases 1–9) is complete** (Phase 0 was docs/standards): auth/workspaces, boards and
-tasks, filtering, dashboard, activity/notifications, and realtime board sync. A seven-scenario
+tasks, filtering, dashboard, activity/notifications, and realtime board sync. An eight-scenario
 Playwright smoke pack covers the critical browser flows
 ([docs/testing.md](docs/testing.md#browser-end-to-end)). What has shipped since, what is being
 worked on, and what is deliberately unscheduled all live in one place,

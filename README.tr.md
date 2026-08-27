@@ -12,7 +12,7 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı): auth/workspace’ler, board ve
 task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Kritik tarayıcı
-akışlarını yedi senaryoluk bir Playwright smoke paketi kapsıyor
+akışlarını sekiz senaryoluk bir Playwright smoke paketi kapsıyor
 ([docs/tr/testing.md](docs/tr/testing.md#browser-uçtan-uca)). O günden bu yana ne sevkedildiği,
 neyin üzerinde çalışıldığı ve neyin bilinçli olarak programa alınmadığı tek bir yerde,
 [ROADMAP.md](ROADMAP.md) içinde; burada ikinci kez listelenip eskimesin diye.
