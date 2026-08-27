@@ -77,6 +77,11 @@ export default defineConfig({
       // funcs/lines). Dashboard's branch figure is the outlier, but it still sits well above
       // `components/board/**`'s 54 branch floor, the lowest in this file, so it gets the same
       // few-points-under margin as the rest rather than a round of new tests.
+      //
+      // `components/settings/**` (2026-08-27, P7 fix wave): re-measured at 92.75/88.27/91.67/
+      // 94.40 after the panel and settings IA changes, well past the figures above, so the
+      // floor moves up with it (branch stays at 86, a few points under the measured 88.27,
+      // for the same margin the rest of this file keeps).
       thresholds: {
         'app/**': {
           statements: 85,
@@ -121,10 +126,10 @@ export default defineConfig({
           lines: 94,
         },
         'components/settings/**': {
-          statements: 85,
+          statements: 90,
           branches: 86,
-          functions: 80,
-          lines: 86,
+          functions: 89,
+          lines: 92,
         },
         'components/dashboard/**': {
           statements: 89,
