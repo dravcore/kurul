@@ -92,7 +92,7 @@ services:
       # boot, connecting to) a database with a well-known password shared by every Kurul
       # install. This only bites on the *first* boot of an empty postgres_data volume — initdb
       # bakes the password into the role once, so changing this value later does not rotate an
-      # already-initialized database's password. See the [Unreleased] entry in CHANGELOG.md for
+      # already-initialized database's password. See the [0.2.0] entry in CHANGELOG.md for
       # how to roll an existing volume onto a new password with `ALTER USER`.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
       POSTGRES_DB: ${POSTGRES_DB:-kurul}

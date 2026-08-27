@@ -63,7 +63,7 @@ commercial license ([ADR 0028](docs/decisions/0028-open-contributions-hosted-ser
 
 ## Post-launch hardening
 
-The audit that followed `v0.3.0` is mostly merged: the compose interpolation and forwarding
+The audit that followed `v0.3.0` is largely done: the compose interpolation and forwarding
 fixes, the nightly suite moving to `develop`, the release guard, the upgrade runbook, the import
 ceiling, the auth body limit, the compose tuning, the CI split, `SIGNUP_ENABLED`, the demo
 password lock-out, password reset by email, the Redis error listeners, the `REDIS_URL` ACL
