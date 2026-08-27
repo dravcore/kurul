@@ -168,10 +168,11 @@ const AA_NON_TEXT = 3;
 const SURFACE_STEP = 1.05;
 
 /**
- * Every surface a colour can land on. `--secondary` is absent: the Button `secondary` variant
- * used to paint it as a ground, but that variant carried no call site and no visible hover step,
- * and is gone, so nothing paints `--secondary` at all today. `--primary` / `--destructive` are
- * covered as fills by their own `-foreground` pair.
+ * Every surface a colour can land on. `--secondary` is absent because the token is: the Button
+ * `secondary` variant that used to paint it carried no call site and no visible hover step, so
+ * it went, and the two now-dead tokens went with it rather than sitting in `globals.css` with
+ * nothing painting them and nothing measuring them. `--primary` / `--destructive` are covered
+ * as fills by their own `-foreground` pair.
  */
 const SURFACES = [
   '--background',
@@ -189,14 +190,13 @@ const TEXT_TOKENS = [
   '--foreground',
   '--foreground-secondary',
   '--muted-foreground',
-  // Aliases that shadcn primitives read by name. `--popover-foreground` and `--accent-foreground`
-  // each keep a call site in `components/ui/`; `--secondary-foreground` lost its own when the
-  // Button `secondary` variant it painted was deleted (`hover:bg-secondary/80` measured under
-  // 1.05:1 against its own resting fill on every surface, and nothing called the variant to
-  // begin with). It stays in this list anyway: all three equal `--foreground` today, and
-  // dropping the one with no current reader is exactly how a future one would go unmeasured.
+  // Aliases that shadcn primitives read by name, each with a call site in `components/ui/`.
+  // They equal `--foreground` today; measured separately so a future split cannot slip past
+  // this gate. `--secondary-foreground` was the third of them until the Button `secondary`
+  // variant it painted was deleted (`hover:bg-secondary/80` measured under 1.05:1 against its
+  // own resting fill on every surface, and nothing called the variant to begin with); it is
+  // absent here because the token itself is gone from `globals.css`.
   '--popover-foreground',
-  '--secondary-foreground',
   '--accent-foreground',
 ];
 

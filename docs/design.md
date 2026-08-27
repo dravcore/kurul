@@ -127,7 +127,7 @@ white, so elevation reads without shadows.
 | Column ground                                                        | `--muted`                       | `#F1F3F1`              | `#1A1E1C`             |
 | Card surface                                                         | `--card`                        | `#FFFFFF`              | `#212523`             |
 | Popover surface                                                      | `--popover`                     | `#FFFFFF`              | `#272B29`             |
-| Hover step (drag preview stays the card surface, `--elevation-drag`) | `--accent`, `--secondary`       | `#EAEDEA`              | `#2F3331`             |
+| Hover step (drag preview stays the card surface, `--elevation-drag`) | `--accent`                      | `#EAEDEA`              | `#2F3331`             |
 | Border · border-strong (`--input` reads `--border-strong`)           | `--border` · `--border-strong`  | `#D6DAD8` · `#7D8481`  | `#3A403D` · `#767D7A` |
 | Text, primary                                                        | `--foreground`                  | `#212523`              | `#E8ECEA`             |
 | Text, secondary                                                      | `--foreground-secondary`        | `#545A57`              | `#BCC3BF`             |
@@ -198,7 +198,7 @@ falls straight through to the fallback fonts.
 | `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Page and panel titles · section and dialog titles                        |
 | `read`                 | 14 / 21           | 400       | Long-form prose: task description, comment body, import report sentences |
 | `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — fields and rows · card titles, active nav              |
-| `small` · `micro`      | 12 / 16 · 11 / 14 | 400 · 550 | Metadata, timestamps · chips, counts, axis ticks                         |
+| `small` · `micro`      | 12 / 16 · 11 / 14 | 400       | Metadata, timestamps · chips, counts, axis ticks                         |
 
 This is the whole scale, with no gap left for a Tailwind default to fill unnoticed: `text-sm`,
 `text-lg`, `text-xs` and `font-medium` are gone from the component tree, and
@@ -215,7 +215,13 @@ exception at all. `text-lg` becomes `title` (16/24) at every call site, `DialogT
 included: a dialog's title is a section title, not a size of its own, and there is no `18px`
 step for it to have kept. `text-xs` becomes `small` (12/16), never `micro` (11/14): its two call
 sites were a button label and a keyboard-shortcut hint, neither one metadata small enough for the
-smallest step. `font-medium` becomes `font-strong` (550) throughout. The label and the dialog
+smallest step. `font-medium` becomes `font-strong` (550) throughout. Only the four heading steps
+(`display`, `stat`, `title-lg`, `title`) declare a `--text-*--font-weight`; `read`, `body`,
+`small` and `micro` declare a size and a line box and nothing else, so they render at the
+inherited 400. That is what `body-strong` names: `text-body` paired with `font-strong` at the
+call site, not a step of its own. `micro` is paired the same way in the two places it needs to
+be heavier, the board's filter count and the notification bell, and left alone in the eleven
+where it is metadata. The label and the dialog
 title both carry their own step's line-height now, 18px and 24px, with no `leading-none` layered
 on top: that was a shadcn default riding along uninvited, not a choice this scale ever asked for.
 (Tailwind's own `text-base`, 16px, stays as a deliberate exception on three form fields below

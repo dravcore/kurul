@@ -42,11 +42,9 @@
      moves. --destructive-hover below follows the same reasoning. */
   --primary-hover: #964f23;
 
-  /* --secondary and --accent share one value and --muted holds a different one. --accent is
-     the hover step, so it has to stay a visible step away from both grounds it is painted
-     over (the white card and the column), and --muted is the column ground itself. */
-  --secondary: #eaedea;
-  --secondary-foreground: #212523;
+  /* --accent is the hover step, so it has to stay a visible step away from both grounds it is
+     painted over (the white card and the column), and --muted, which holds a different value,
+     is the column ground itself. */
   --muted: #f1f3f1;
   --muted-foreground: #626965;
   --accent: #eaedea;
@@ -155,8 +153,6 @@
   --primary: #d98a4e;
   --primary-foreground: #131715;
   --primary-hover: #e0955b;
-  --secondary: #2f3331;
-  --secondary-foreground: #e8ecea;
   --muted: #1a1e1c;
   /* This token is what the 11px and 12px meta rows are painted in (text-micro and text-small on a
      card, a column header, a menu row), so the type it has to survive is the smallest the app
@@ -219,8 +215,6 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);

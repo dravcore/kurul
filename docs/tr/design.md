@@ -134,7 +134,7 @@ beyazdır, bu yüzden elevation shadow olmadan okunur.
 | Column ground'u                                                        | `--muted`                       | `#F1F3F1`              | `#1A1E1C`             |
 | Kart surface'i                                                         | `--card`                        | `#FFFFFF`              | `#212523`             |
 | Popover surface'i                                                      | `--popover`                     | `#FFFFFF`              | `#272B29`             |
-| Hover adımı (drag preview kart surface'inde kalır, `--elevation-drag`) | `--accent`, `--secondary`       | `#EAEDEA`              | `#2F3331`             |
+| Hover adımı (drag preview kart surface'inde kalır, `--elevation-drag`) | `--accent`                      | `#EAEDEA`              | `#2F3331`             |
 | Border · border-strong (`--input`, `--border-strong`'u okur)           | `--border` · `--border-strong`  | `#D6DAD8` · `#7D8481`  | `#3A403D` · `#767D7A` |
 | Metin, primary                                                         | `--foreground`                  | `#212523`              | `#E8ECEA`             |
 | Metin, secondary                                                       | `--foreground-secondary`        | `#545A57`              | `#BCC3BF`             |
@@ -207,7 +207,7 @@ doğrudan fallback fontlara düşer.
 | `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Sayfa ve panel başlıkları · section ve dialog başlıkları             |
 | `read`                 | 14 / 21           | 400       | Uzun prose: task description, comment body, import report cümleleri  |
 | `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — field'lar ve satırlar · kart başlıkları, aktif nav |
-| `small` · `micro`      | 12 / 16 · 11 / 14 | 400 · 550 | Metadata, timestamp'ler · chip'ler, count'lar, axis tick'leri        |
+| `small` · `micro`      | 12 / 16 · 11 / 14 | 400       | Metadata, timestamp'ler · chip'ler, count'lar, axis tick'leri        |
 
 Bu ölçeğin tamamı budur, bir Tailwind varsayılanının fark edilmeden dolduracağı bir boşluk
 bırakmaz: `text-sm`, `text-lg`, `text-xs` ve `font-medium` component ağacından tamamen kalktı, ve
@@ -225,7 +225,13 @@ yerinde `title` (16/24) oluyor, `DialogTitle` dahil: bir dialog'un başlığı b
 başlığıdır, kendine ait bir boyut değil, ve zaten `18px`'lik bir adım hiç olmadı. `text-xs`,
 `small` (12/16) oluyor, asla `micro` (11/14) değil: iki çağrı yeri de bir button label'ı ve bir
 keyboard-shortcut ipucuydu, ikisi de en küçük adıma sığacak kadar metadata değil. `font-medium`
-her yerde `font-strong` (550) oluyor. Label ve dialog başlığı artık kendi adımlarının
+her yerde `font-strong` (550) oluyor. Yalnızca dört heading adımı (`display`, `stat`,
+`title-lg`, `title`) kendi `--text-*--font-weight`'ini bildiriyor; `read`, `body`, `small` ve
+`micro` bir boyut ve bir satır kutusu bildiriyor, başka bir şey değil, dolayısıyla miras alınan
+400'de render ediliyorlar. `body-strong`'un adlandırdığı şey de bu: kendine ait bir adım değil,
+çağrı yerinde `font-strong` ile eşlenmiş `text-body`. `micro` da daha kalın olması gereken iki
+yerde, board'un filter count'unda ve notification bell'inde aynı şekilde eşleniyor, metadata
+olduğu on bir yerde ise kendi haline bırakılıyor. Label ve dialog başlığı artık kendi adımlarının
 line-height'ını taşıyor, 18px ve 24px, üstüne binmiş bir `leading-none` olmadan: o, davetsiz
 misafir bir shadcn varsayılanıydı, bu ölçeğin hiç istediği bir seçim değildi. (Tailwind'in kendi
 `text-base`'i, 16px, 768px altındaki üç form field'inde bilinçli bir istisna olarak kalıyor,
