@@ -1461,8 +1461,7 @@ describe('globals.css reduced-motion cascade', () => {
     ({ target }) => {
       const name = keyframeNameOf(winningAnimation(target, { reduced: true }));
       expect(name).not.toBe('none');
-      const body = keyframeBody(name);
-      expect(body.slice(body.lastIndexOf('to'))).toMatch(/opacity\s*:\s*1\b/);
+      expect(keyframeBody(name)).toMatch(/\bto\s*\{[^}]*opacity\s*:\s*1\b/);
     },
   );
 });

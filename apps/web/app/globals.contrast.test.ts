@@ -1119,7 +1119,7 @@ const RAW_COLOUR_CALL_SITES: {
  * utilities, and a hex inside an arbitrary value in either spelling a class string can carry.
  */
 const RAW_COLOUR = [
-  /(?<![a-z0-9])(?:text|bg|border|ring|fill|stroke|outline|divide|shadow|from|via|to)-(?:white|black)(?![-\w])/,
+  /(?<![a-z0-9])(?:text|bg|border|ring|fill|stroke|outline|divide|shadow|from|via|to|caret|accent|decoration|placeholder)-(?:white|black)(?![-\w])/,
   /\[[^\]]*(?:#|%23)[0-9a-fA-F]{3,8}/,
 ];
 
