@@ -329,7 +329,7 @@ describe('BoardList - the board ceiling (ADR 0032)', () => {
   });
 });
 
-describe('BoardList - inline rename (P7 task 6)', () => {
+describe('BoardList - inline rename', () => {
   function boardWithDescription(): BoardDto {
     return {
       id: 'b1',

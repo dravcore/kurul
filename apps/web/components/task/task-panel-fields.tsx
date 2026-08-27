@@ -131,7 +131,7 @@ export function TaskPanelFields({
           disabled={!canMutate}
           // `readOnly`, not folded into `disabled`: a disabled field drops focus, and the two
           // fields share one `pending` flag, so a save started from one would otherwise pull
-          // focus out from under a reader still typing in the other (P6 deferred finding).
+          // focus out from under a reader still typing in the other.
           readOnly={pending}
           aria-busy={pending || undefined}
           className="border-transparent md:text-title-lg focus:border-input"

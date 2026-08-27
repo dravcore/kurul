@@ -111,7 +111,7 @@ const stateTokenCallSites: Record<string, string[]> = {
     'components/ui/select.tsx',
     'components/ui/textarea.tsx',
   ],
-  // The task panel title only: borderless at rest, `--input` back on focus (Phase 7 Task 2).
+  // The task panel title only: borderless at rest, `--input` back on focus.
   'border-transparent': ['components/task/task-panel-fields.tsx'],
 };
 

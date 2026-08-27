@@ -80,10 +80,10 @@ export default defineConfig({
       // `components/board/**`'s 54 branch floor, the lowest in this file, so it gets the same
       // few-points-under margin as the rest rather than a round of new tests.
       //
-      // `components/settings/**` (2026-08-27, P7 fix wave): re-measured at 92.75/88.27/91.67/
-      // 94.40 after the panel and settings IA changes, well past the figures above, so the
-      // floor moves up with it (branch stays at 86, a few points under the measured 88.27,
-      // for the same margin the rest of this file keeps).
+      // `components/settings/**` (2026-08-27): re-measured at 92.75/88.27/91.67/94.40 after the
+      // panel and settings IA changes, well past the figures above, so the floor moves up with
+      // it (branch stays at 86, a few points under the measured 88.27, for the same margin the
+      // rest of this file keeps).
       thresholds: {
         'app/**': {
           statements: 97,

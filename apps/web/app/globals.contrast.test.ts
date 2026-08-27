@@ -1091,8 +1091,8 @@ const RAW_COLOUR_CALL_SITES: {
     note:
       'the dark 2.67 is the base rule, which `dark:bg-destructive/60` replaces in dark and ' +
       'ALPHA_DERIVATIVES measures at 5.08 there; the hover is --destructive-hover, a solid ' +
-      'token gated on its own floor above, not an alpha of this fill. P4 owns ' +
-      'components/ui/button.tsx',
+      'token gated on its own floor above, not an alpha of this fill, and ' +
+      'components/ui/button.tsx is covered there rather than here',
   },
   {
     file: 'components/ui/select.tsx',
@@ -1295,7 +1295,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     worst: { light: 3.21, dark: 4.21 },
     reason:
       'WCAG 1.4.3 exempts text in an inactive control, and docs/design.md §9 holds disabled ' +
-      'text to 3:1 anyway, which this clears. Settled in Phase 4 and not open: the alpha stays ' +
+      'text to 3:1 anyway, which this clears. Not open for revisit: the alpha stays ' +
       'the disabled treatment on controls, because it thins whatever the control already paints ' +
       '(a filled button and a bare field do not share a resting colour) and a single drawn ' +
       'token cannot. The surfaces with no such colour to thin, chart marks and placeholders, ' +
@@ -1398,7 +1398,8 @@ function worstComposite(theme: Theme, row: AlphaRow): { surface: string; measure
  *
  * Read out of the painted class strings rather than the raw file, for the reason
  * `classNameValues` exists: a utility named in a doc comment is prose, and the comment above
- * `DropdownMenuItem` names the one this phase deleted. `opacity-100` is skipped because
+ * `DropdownMenuItem` names the outline suppressor dropped from that row, not a class still
+ * painted anywhere. `opacity-100` is skipped because
  * restoring full opacity cannot thin anything.
  */
 const ALPHA_UTILITY =
@@ -1674,9 +1675,9 @@ describe('APCA on the dark theme', () => {
 
   // Only `--foreground` is gated. WCAG 2.x AA is this project's binding standard and the three
   // secondary tokens below clear it on every surface; APCA scores them lower because it models
-  // light-on-dark polarity, and the values that would satisfy both are outside the ramp this
-  // phase settled on. They are reported rather than asserted, and named in the phase report as
-  // the APCA / WCAG divergence pairs.
+  // light-on-dark polarity, and the values that would satisfy both are outside the current
+  // ramp. They are reported rather than asserted, and logged below as the APCA / WCAG
+  // divergence pairs.
   it('holds --foreground at Lc 75 on every dark surface', () => {
     const foreground = hexOf('dark', '--foreground');
     const failures = SURFACES.flatMap((surface) => {
@@ -1714,8 +1715,8 @@ describe('APCA on the dark theme', () => {
       );
       return `${token} ${text}: ${cells.join(', ')}`;
     });
-    // Printed as well as asserted, and visible with `vitest --reporter=verbose`: the phase report
-    // quotes this table as the APCA / WCAG divergence list.
+    // Printed as well as asserted, and visible with `vitest --reporter=verbose`: this table is
+    // the APCA / WCAG divergence list.
     console.log(['APCA Lc, dark theme (divergence from WCAG AA):', ...rows].join('\n  '));
 
     const broken = reported.flatMap(({ token, floor }) =>

@@ -283,14 +283,14 @@ function requireRule(
 
 /**
  * Every element a keyboard can land on whose own class string could outrank the base outline:
- * the four form primitives, which until Phase 4 each carried an `outline-none` next to a ring
+ * the four form primitives, each of which used to carry an `outline-none` next to a ring
  * pair of their own, the dropdown rows, which carried `outline-hidden` while their `bg-accent`
  * step was read as the indicator, the shell `main`, which is where the skip link lands, and the
  * task panel's heading, which a keyboard user reaches by pressing Enter on a task card, and the
  * popover surface and the picker rows inside it, which a large workspace's assignee and label
  * lists moved behind. The panel heading and the shell `main` each carried a suppressor as a
- * programmatic focus container until the phase keyboard tour measured both of them matching
- * `:focus-visible` in Chromium and Firefox. Both utilities
+ * programmatic focus container until a keyboard accessibility pass measured both of them
+ * matching `:focus-visible` in Chromium and Firefox. Both utilities
  * compile into `utilities`, which outranks `base`, so either one leaves the element focusing
  * with nothing drawn at all: in Chromium a `:focus-visible` element under that suppressor
  * computes `outline-style: none`. The scan reads the whole source rather than the class strings
@@ -791,13 +791,13 @@ describe('globals.css cascade layers', () => {
 });
 
 /**
- * The border-based twins of the states this phase built out of a surface step or a tint.
+ * The border-based twins of the states built out of a surface step or a tint.
  * `forced-colors: active` replaces every author colour with the user's palette, so a hover step,
  * a selection tint and a drop tint all collapse onto the same ground: without these rules the
  * three states below are indistinguishable from a resting card, column or menu row, which is
  * what docs/design.md §9 forbids. jsdom evaluates no media queries, so the compiled stylesheet
  * is where the fallbacks can be checked at all; a real Chromium under forced-colors and
- * prefers-contrast emulation is the phase-level check on top of this one.
+ * prefers-contrast emulation is the manual check on top of this one.
  */
 describe('globals.css forced-colours and contrast fallbacks', () => {
   let forced: Stylesheet;
@@ -979,7 +979,7 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
 });
 
 /**
- * P5 Task 1: the dialog and dropdown open/close, written as real keyframes bound through
+ * The dialog and dropdown open/close, written as real keyframes bound through
  * `data-slot`/`data-state` because this project imports plain `tailwindcss` with no animation
  * plugin (`animate-in`, `fade-in-0`, `zoom-in-95` and their siblings compile to nothing at all).
  * jsdom never evaluates a `@media` query and never plays a keyframe, so the compiled sheet is
@@ -1042,7 +1042,7 @@ describe('globals.css dialog and dropdown motion', () => {
 });
 
 /**
- * P5 Task 2: the loading skeleton's own pulse (components/ui/skeleton.tsx), replacing Tailwind's
+ * The loading skeleton's own pulse (components/ui/skeleton.tsx), replacing Tailwind's
  * `animate-pulse` (2s, 1.0-0.5, no reduced-motion twin) with docs/design.md §6's 1.6s, 1.0-0.6
  * loop. A board renders dozens of these at once, so `prefers-reduced-motion: reduce` does not
  * retarget the loop to a fade like the dialog and menu above, it removes the animation outright
@@ -1094,7 +1094,7 @@ describe('globals.css skeleton motion', () => {
 });
 
 /**
- * P5 Task 4: the submit spinner covers the button's content instead of joining it.
+ * The submit spinner covers the button's content instead of joining it.
  *
  * The spinner is positioned out of flex flow (components/ui/button.tsx), and these two rules
  * clear what sits under it. Both halves matter to the geometry: a button with no leading icon
@@ -1135,7 +1135,7 @@ describe('globals.css button spinner cover', () => {
 });
 
 /**
- * P6 Task 6: the two marks a card wears when the board answers back, and the JS timers that
+ * The two marks a card wears when the board answers back, and the JS timers that
  * decide how long each one's `data-state` stays on the element.
  *
  * The keyframe's duration and the timer's are one figure written twice. Dropped early, the card
@@ -1207,7 +1207,7 @@ describe('globals.css task card feedback', () => {
 });
 
 /**
- * P5 Task 5: the adversarial pass over every animated surface under
+ * The adversarial pass over every animated surface under
  * `prefers-reduced-motion: reduce`.
  *
  * The suites above check that a reduced-motion rule *exists* for a surface. Existing is not

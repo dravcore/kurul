@@ -9,7 +9,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * Catches the failure mode that let `text-caption` sit in eleven call sites producing no CSS at
- * all (Task 3 of this phase): Tailwind drops an unrecognised utility candidate silently, so a
+ * all: Tailwind drops an unrecognised utility candidate silently, so a
  * typo'd or never-defined class compiles clean, renders wrong, and fails no type check.
  *
  * The scan walks every `.tsx` under `app/` and `components/`, collects each `text-*`, `bg-*`,
@@ -189,11 +189,11 @@ describe('theme-covered utility classes', () => {
  * candidate the scan above would catch (those still ask Tailwind to compile the bare prefix,
  * and `fade`/`zoom`/`slide` are not among `text-`/`bg-`/`border-`/`font-`/`shadow-`), just a
  * class string sitting on an element with no rule anywhere in the compiled sheet backing it.
- * P5 Task 1 replaced every real call site with keyframes bound through `data-slot`/`data-state`
+ * Every real call site was replaced with keyframes bound through `data-slot`/`data-state`
  * (see `app/globals.css`); this scan is what stops the dead classes from coming back silently.
  *
- * `animate-pulse` is a real Tailwind utility (it does compile) but is banned here anyway: P5
- * Task 2 moved the skeleton pulse to its own `skeleton-pulse` keyframe, bound through
+ * `animate-pulse` is a real Tailwind utility (it does compile) but is banned here anyway: the
+ * skeleton pulse moved to its own `skeleton-pulse` keyframe, bound through
  * `[data-slot='skeleton']`, because `animate-pulse` runs 2s / 1.0-0.5 against docs/design.md
  * §6's 1.6s / 1.0-0.6 and carries no `prefers-reduced-motion` twin of its own. `animate-spin`
  * stays out of this list on purpose: it is a later task's own choice of spinner keyframe, not

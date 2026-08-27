@@ -17,7 +17,7 @@ describe('Select', () => {
   /**
    * The reason this component exists: the same control was hand-styled in three places and
    * one of them had lost its focus ring entirely. Keyboard visibility is not a per-call-site
-   * decision, and since Phase 4 the way to honour it is to add nothing: the one mark is the
+   * decision, and the way to honour it is to add nothing: the one mark is the
    * `:focus-visible` outline in `app/globals.css`, which any `focus-visible:` ring or
    * `outline-none` here would either double or erase.
    */
