@@ -343,10 +343,11 @@ kalıyor; bu faz başlarken 19'du: bir board'u ve bir workspace'i yeniden adland
 düzenlemeye, rol değiştirmek ile hesap silmek de yukarıdaki iki alt rotaya taşındı. Her düşüş bir
 yüzeyin rubrikte aşağı inmesiydi, sayı için silinen bir dialog değil.
 
-**Panel sırası.** `TaskPanel`, yukarıdan aşağı şunları compose eder: `TaskPanelFields` (title,
-`title-lg`'de, durağanken borderless ve yalnızca focus'ta border'lı, `border-transparent
-focus:border-input` üzerinden; description ise `read`'de), `TaskPropertiesPanel` (priority, due
-date, estimate, assignee'ler, label'lar), `TaskChecklists`, `TaskAttachments`,
+**Panel sırası.** `TaskPanel`, yukarıdan aşağı şunları compose eder: `TaskPanelFields` (title
+`md` ve üzerinde `title-lg`'de, description ise `read`'de, `md` altında ikisi de 16px; title
+durağanken borderless ve yalnızca focus'ta border'lı, `border-transparent focus:border-input`
+üzerinden), `TaskPropertiesPanel` (priority, due date, estimate, assignee'ler, label'lar),
+`TaskChecklists`, `TaskAttachments`,
 `TaskDiscussionPanel` (comment'ler, activity), ardından, mutate edebilen herkes için, bir delete
 footer'ı. Bu, kartın kendisinin okuduğu aynı sıra: önce task'ın ne olduğu, sonra içinde ne
 olduğu, sonra hakkında ne söylendiği. Footer `mt-auto`'dur ve yalnızca o flex column'un son

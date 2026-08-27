@@ -332,11 +332,12 @@ down from 19 when this phase started: renaming a board and renaming a workspace 
 edits, and changing a role and deleting an account became the two sub-routes above. Every removal
 was a surface moving down the rubric, never a dialog deleted for the count's sake.
 
-**Panel order.** `TaskPanel` composes, top to bottom: `TaskPanelFields` (title at `title-lg`,
-borderless at rest and bordered only on focus via `border-transparent focus:border-input`,
-description at `read`), `TaskPropertiesPanel` (priority, due date, estimate, assignees, labels),
-`TaskChecklists`, `TaskAttachments`, `TaskDiscussionPanel` (comments, activity), then, for
-whoever can mutate, a delete footer. It is the same order the card itself reads in: what the
+**Panel order.** `TaskPanel` composes, top to bottom: `TaskPanelFields` (title at `title-lg` and
+description at `read` from `md` up, both 16px below it; the title is borderless at rest and
+bordered only on focus via `border-transparent focus:border-input`), `TaskPropertiesPanel`
+(priority, due date, estimate, assignees, labels), `TaskChecklists`, `TaskAttachments`,
+`TaskDiscussionPanel` (comments, activity), then, for whoever can mutate, a delete footer. It is
+the same order the card itself reads in: what the
 task is, then what is in it, then what was said about it. The footer is `mt-auto` and only
 reaches the bottom of the panel while it is the last child of that flex column
 (`components/task/task-panel.tsx`, pinned by `task-panel.test.tsx`), so nothing may be appended
