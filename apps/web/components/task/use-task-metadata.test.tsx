@@ -11,6 +11,7 @@ import { useTaskMetadata } from './use-task-metadata';
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00';
 const BOARD_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d01';
 const TASK_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d02';
+const OTHER_TASK_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d03';
 
 vi.mock('@/lib/api', () => ({ api: { get: vi.fn() } }));
 vi.mock('@/lib/member-query', () => ({ fetchAllWorkspaceMembers: vi.fn() }));
@@ -320,5 +321,41 @@ describe('useTaskMetadata', () => {
     );
 
     expect(toastError).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * TaskPanel does not remount per task, so this hook instance is still alive after the reader
+   * moves to another card, and a retry closure from the old task is still sitting in a toast.
+   * Firing it must not write the old task's page into the new task's list.
+   */
+  it('drops a retry that fires after the panel moved to another task', async () => {
+    stubMeta();
+    const { result, rerender } = renderMeta();
+    await waitFor(() => expect(result.current.loadingMeta).toBe(false));
+
+    apiGet.mockImplementationOnce(() => Promise.reject(new Error('network')));
+    await act(() => result.current.refreshActivities());
+    const action = retryAction(toastError.mock.calls[0] as unknown[]);
+
+    rerender({ taskId: OTHER_TASK_ID });
+    await waitFor(() => expect(result.current.loadingMeta).toBe(false));
+    expect(result.current.activities.map((entry) => entry.id)).toEqual(['a1']);
+
+    apiGet.mockImplementation(
+      () =>
+        Promise.resolve({
+          items: [{ id: 'stale-a' }, { id: 'stale-b' }],
+          nextCursor: null,
+          hasMore: false,
+        }) as never,
+    );
+    const callsBeforeRetry = apiGet.mock.calls.length;
+    await act(async () => {
+      action.onClick();
+    });
+
+    expect(apiGet).toHaveBeenCalledTimes(callsBeforeRetry);
+    expect(result.current.activities).toHaveLength(1);
+    expect(result.current.activities.map((entry) => entry.id)).not.toContain('stale-a');
   });
 });
