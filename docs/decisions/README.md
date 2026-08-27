@@ -61,7 +61,7 @@ replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).
 
 1. Copy the template below into a new file: `docs/decisions/NNNN-kebab-title.md`,
    where `NNNN` is the next zero-padded four-digit number in sequence.
-2. Fill in every section — leave nothing as a placeholder.
+2. Fill in every section, leaving nothing as a placeholder.
 3. Add a row to the index table above.
 4. Open a PR. Discussion happens on the PR; once merged, the ADR's status is
    `Accepted` and the record is treated as historical (edit later decisions by
@@ -91,8 +91,8 @@ Why this option, over the others, given the context above.
 
 ## Consequences
 
-What this makes easier, what it makes harder, and any negative trade-offs —
-stated honestly, not just the upside.
+What this makes easier, what it makes harder, and any negative trade-offs,
+stated honestly rather than only the upside.
 
 ## Alternatives considered
 

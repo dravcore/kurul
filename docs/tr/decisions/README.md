@@ -2,7 +2,7 @@
 
 Kurul'un ardındaki önemli kararların hafif, MADR tarzı kayıtları.
 
-> 🌐 [English (canonical)](../../decisions/README.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/README.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Neden ADR
 
@@ -53,7 +53,7 @@ Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Supersede
 ## Yeni bir ADR eklemek
 
 1. Aşağıdaki şablonu yeni bir dosyaya kopyala: `docs/decisions/NNNN-kebab-title.md`, burada `NNNN` sıradaki bir sonraki sıfırla-doldurulmuş dört haneli sayı.
-2. Her bölümü doldur — hiçbir yeri placeholder olarak bırakma.
+2. Her bölümü doldur, hiçbir yeri placeholder olarak bırakma.
 3. Yukarıdaki dizin tablosuna bir satır ekle.
 4. Bir PR aç. Tartışma PR üzerinde gerçekleşir; merge edildikten sonra ADR'in durumu `Accepted` olur ve kayıt tarihsel olarak ele alınır (sonraki kararları yerini alma yoluyla düzenle, geçmişi yeniden yazarak değil).
 
@@ -65,7 +65,7 @@ Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Supersede
 **Durum:** Önerildi | Kabul edildi | [NNNN](NNNN-file.md) tarafından yerini aldı
 **Tarih:** YYYY-AA-GG
 
-> 🌐 [English (canonical)](../../decisions/NNNN-kebab-title.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/NNNN-kebab-title.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 
@@ -81,7 +81,7 @@ Bu seçenek neden diğerlerine tercih edildi, yukarıdaki bağlam göz önüne a
 
 ## Sonuçlar
 
-Bunun neyi kolaylaştırdığı, neyi zorlaştırdığı ve olumsuz trade-off'lar — sadece artıları değil, dürüstçe belirtilmiş.
+Bunun neyi kolaylaştırdığı, neyi zorlaştırdığı ve olumsuz trade-off'lar; sadece artıları değil, dürüstçe belirtilmiş.
 
 ## Değerlendirilen Alternatifler
 
