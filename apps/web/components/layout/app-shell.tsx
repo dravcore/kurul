@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AppSidebar } from './app-sidebar';
+import { DemoBanner } from './demo-banner';
 import { useWorkspaceContext, WorkspaceProvider } from './workspace-provider';
+import { NotificationUnreadProvider } from '@/components/notification/notification-unread-provider';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -12,20 +15,44 @@ function AppShellFrame({
   children: React.ReactNode;
 }>): React.ReactElement {
   const t = useTranslations('app');
-  const { sessionPending, hasSession, bootstrapped, loadError, retryBootstrap } =
+  const { workspaces, sessionPending, hasSession, bootstrapped, loadError, retryBootstrap } =
     useWorkspaceContext();
+
+  // `workspaces` is `[]` both on the very first render (before any bootstrap has ever
+  // finished) and once a bootstrap has actually confirmed the account has none. The two are
+  // not the same thing, but read alone the array can't tell them apart. This latches true the
+  // first time `bootstrapped` is seen true (on mount or on a later render, whichever comes
+  // first) and stays latched, so a later re-entry into the loading branch below (a manual
+  // retry, a session revalidation) can trust the roster already on hand instead of the
+  // pre-bootstrap default. Set during render, not an effect (mirroring
+  // `use-api-resource.ts`'s `syncedRequest`), since the latch is monotonic and there is
+  // nothing for an effect to add.
+  const [hasResolvedOnce, setHasResolvedOnce] = useState(bootstrapped);
+  if (bootstrapped && !hasResolvedOnce) {
+    setHasResolvedOnce(true);
+  }
+  const rosterConfirmedEmpty = hasResolvedOnce && workspaces.length === 0;
 
   if (sessionPending || !hasSession || !bootstrapped) {
     return (
       <div className="flex h-dvh overflow-hidden bg-background" aria-busy>
         <p className="sr-only">{t('shell.loading')}</p>
         {/* `md:flex`, matching `AppSidebar`: the skeleton used to appear only from `lg` up, so
-            between 768px and 1024px the shell painted with no sidebar and then grew one. */}
-        <div className="hidden w-[var(--sidebar-width)] shrink-0 flex-col gap-2 border-r border-border bg-card p-3 md:flex">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="mt-4 h-9 w-full" />
-          <Skeleton className="h-9 w-2/3" />
-        </div>
+            between 768px and 1024px the shell painted with no sidebar and then grew one.
+
+            The shape is the conservative default: it paints unless `rosterConfirmedEmpty` says
+            a completed bootstrap has actually seen zero workspaces. Gating on `workspaces.length`
+            alone (dropped here) could not tell "not yet known" apart from "confirmed empty"
+            (both are `[]`), so it hid the shape for every returning reader's reload, not only for
+            the first-time signup this was meant for; that one case still sees it once before the
+            redirect to `/workspaces/new`, whose own layout carries no sidebar at all. */}
+        {rosterConfirmedEmpty ? null : (
+          <div className="hidden w-[var(--sidebar-width)] shrink-0 flex-col gap-2 border-r border-border bg-card p-3 md:flex">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="mt-4 h-9 w-full" />
+            <Skeleton className="h-9 w-2/3" />
+          </div>
+        )}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-[var(--topbar-height)] items-center border-b border-border px-3">
             <Skeleton className="h-5 w-40" />
@@ -76,22 +103,44 @@ function AppShellFrame({
      * so every page owns its own scroll container. The three non-board pages already did
      * (`flex-1 overflow-y-auto` on dashboard, settings and notifications) — they were written
      * for a bounded shell that had not been built yet.
+     *
+     * `DemoBanner` is the one thing allowed above the sidebar, and it is why this is now a
+     * column: the strip takes its natural height (`shrink-0`, and it renders `null` on every
+     * instance that is not a demo, which is all of them by default), and the row below it is
+     * `min-h-0 flex-1`, which hands the bounded-height chain described above straight through
+     * unchanged. Nesting it inside `main` instead would have put it below the sidebar and
+     * scrolled it away with the page, which is not what a standing notice is.
      */
-    <div className="flex h-dvh overflow-hidden bg-background">
-      <AppSidebar />
-      {/* Skip-link target (see app/(app)/layout.tsx): tabIndex={-1} lets the fragment
-          navigation move keyboard focus here without adding a tab stop.
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
+      <DemoBanner />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* No workspace, no sidebar. Every link in `SidebarBody` needs one, and
+            `workspace-provider.tsx`'s bootstrap effect sends a reader with none straight back to
+            `/workspaces/new`, so the whole navigation would be a loop; that route carries its
+            own header instead, and this is what keeps it the only chrome on screen rather than
+            a second wordmark and a second sign-out beside the sidebar's. */}
+        {workspaces.length > 0 ? <AppSidebar /> : null}
+        {/* Skip-link target (see app/(app)/layout.tsx): tabIndex={-1} lets the fragment
+            navigation move keyboard focus here without adding a tab stop.
 
-          `min-h-0` is what passes the bound on: a flex child's default `min-height: auto`
-          refuses to shrink below its content, which would have let the board push `main`
-          taller than the shell and re-opened the chain one level down. */}
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className="flex min-h-0 min-w-0 flex-1 flex-col outline-none"
-      >
-        {children}
-      </main>
+            Taking that link is a keyboard action and this element does match `:focus-visible`
+            after it, so the landing has to show the one focus mark app/globals.css draws in
+            `@layer base`; an `outline-*` suppressor here is the only thing that can erase it.
+            The offset is pulled inside instead of left at 2px because this region fills the
+            shell and the row above is `overflow-hidden`, which clips an outline drawn outside
+            the region away entirely.
+
+            `min-h-0` is what passes the bound on: a flex child's default `min-height: auto`
+            refuses to shrink below its content, which would have let the board push `main`
+            taller than the shell and re-opened the chain one level down. */}
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex min-h-0 min-w-0 flex-1 flex-col focus-visible:-outline-offset-2"
+        >
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
@@ -102,8 +151,14 @@ export function AppShell({
   children: React.ReactNode;
 }>): React.ReactElement {
   return (
+    /* The unread count is mounted here, above both surfaces that read it: the bell renders
+       inside `AppSidebar` and the notifications page inside `main`, so this is the lowest node
+       that contains both. It sits under `WorkspaceProvider` because the count is scoped to the
+       active workspace, which is what that provider resolves. */
     <WorkspaceProvider>
-      <AppShellFrame>{children}</AppShellFrame>
+      <NotificationUnreadProvider>
+        <AppShellFrame>{children}</AppShellFrame>
+      </NotificationUnreadProvider>
     </WorkspaceProvider>
   );
 }

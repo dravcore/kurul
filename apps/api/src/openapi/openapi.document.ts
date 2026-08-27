@@ -10,6 +10,7 @@ import {
   RATE_LIMIT_WINDOW_SECONDS,
   TASK_SEARCH_RATE_LIMIT,
 } from '../common/rate-limit/rate-limit';
+import { readAppVersion } from '../common/app-version';
 import { ErrorEnvelopeSchema } from './schemas/error.schema';
 
 /**
@@ -33,11 +34,59 @@ type ResponseHeaders = NonNullable<Extract<ResponseOrRef, { description: string 
  * there is no `/v1` prefix before 1.0 and that `@kurul/shared-types` is versioned with the
  * monorepo, so a client that pins the package pins the contract. A second version number here
  * would be a second promise, and the two would disagree the first time one of them moved.
+ *
+ * Read from `apps/api/package.json` rather than written down, because a literal is exactly the
+ * second promise the paragraph above refuses: it said "the monorepo version" while advertising
+ * `0.1.0` from `v0.1.0` all the way through `v0.3.0`, and no step of the release process would
+ * have caught it. `readAppVersion()` resolves the same file the telemetry ping reads, from
+ * `src/` under Jest and from `dist/` under `pnpm openapi` and the runtime image, so the
+ * generator, the snapshot spec and the served document cannot disagree. The committed
+ * `apps/api/openapi.json` is byte-compared by `pnpm openapi:check` in CI, so a version bump
+ * that forgets to regenerate now fails the gate instead of drifting quietly.
  */
-export const OPENAPI_VERSION = '0.1.0';
+const OPENAPI_VERSION = readAppVersion();
 
 /** Name of the cookie security scheme every guarded operation references. */
 export const SESSION_SECURITY_SCHEME = 'session';
+
+/**
+ * Name of the Bearer scheme for personal access tokens.
+ *
+ * Referenced by every workspace-addressed operation except the three that manage tokens; an
+ * operation with no `{workspaceId}` in its path is session-only, because a token is bound to
+ * one workspace and `SessionAuthGuard` refuses it wherever there is no workspace to compare.
+ */
+export const TOKEN_SECURITY_SCHEME = 'personalAccessToken';
+
+/**
+ * Workspace-addressed operations a personal access token can never call, as `METHOD path`.
+ *
+ * Two families. Token management, because a credential must not mint or enumerate
+ * credentials (`SessionOnlyGuard` on `TokenController`). And the writes Better Auth's
+ * organization plugin performs on the request's own session, which a token does not carry
+ * (`SessionOnly()` in `WorkspaceController`). Listed rather than discovered for the same
+ * reason as `PUBLIC_PATHS`, and checked by `assertOperationsExist` for the same reason.
+ */
+const SESSION_ONLY_OPERATIONS: readonly string[] = [
+  'POST /workspaces/{workspaceId}/tokens',
+  'GET /workspaces/{workspaceId}/tokens',
+  'DELETE /workspaces/{workspaceId}/tokens/{tokenId}',
+  'PATCH /workspaces/{workspaceId}',
+  'DELETE /workspaces/{workspaceId}',
+  'POST /workspaces/{workspaceId}/members/me/leave',
+  'DELETE /workspaces/{workspaceId}/members/{userId}',
+  'PATCH /workspaces/{workspaceId}/members/{userId}/role',
+  'POST /workspaces/{workspaceId}/invitations',
+  'DELETE /workspaces/{workspaceId}/invitations/{invitationId}',
+  'POST /workspaces/{workspaceId}/invitations/{invitationId}/accept',
+];
+
+function acceptsToken(method: string, path: string): boolean {
+  return (
+    path.startsWith('/workspaces/{workspaceId}') &&
+    !SESSION_ONLY_OPERATIONS.includes(`${method.toUpperCase()} ${path}`)
+  );
+}
 
 /**
  * The complete set of operations that need **no** session.
@@ -80,6 +129,7 @@ const UUID_PATH_PARAMS: ReadonlySet<string> = new Set([
   'invitationId',
   'notificationId',
   'userId',
+  'tokenId',
 ]);
 
 const DESCRIPTION = `
@@ -100,9 +150,29 @@ not HTTP, and it is defined in \`@kurul/shared-types\`.
 
 ### Authentication
 
-A **session cookie**, issued by \`POST /auth/sign-in/email\`. Every operation requires it except
-the two health probes. A browser on the allowed origin sends it automatically; any other client
-must store and replay it.
+Two credentials, and every operation except the two health probes requires one of them.
+
+A **session cookie**, issued by \`POST /auth/sign-in/email\`. A browser on the allowed origin
+sends it automatically; any other client must store and replay it.
+
+A **personal access token**, sent as \`Authorization: Bearer kurul_pat_...\`, minted by
+\`POST /workspaces/{workspaceId}/tokens\` and shown once. A token acts as its owner in the one
+workspace it was created in, with whatever role the owner holds at the time of each request;
+there are no scopes beyond that. It is accepted on every operation whose path carries that
+\`{workspaceId}\` and refused everywhere else: another workspace is \`404\`, exactly as for a
+non-member; an operation with no workspace in its path (\`/me\`, \`GET /workspaces\`,
+\`/instance/*\`) is \`403\`. A request that carries a Bearer header is decided by that header
+alone and never falls back to a cookie. Revocation is immediate, expiry is checked on every
+request, and the server stores only a SHA-256 of the secret.
+
+An operation whose \`security\` lists only the \`session\` scheme is **session-only** and
+answers \`403\` to a token: the three token-management operations, because a credential must
+not mint or enumerate credentials, and the workspace-administration writes that Better Auth's
+organization plugin performs on the caller's own session (rename and delete the workspace,
+invite, revoke and accept invitations, remove a member, change a role, leave). Boards, columns,
+tasks, labels, comments, checklists, attachments, imports, activity, notifications, the
+dashboard and every read under the workspace accept either credential. See
+[\`docs/api-conventions.md\`](https://github.com/dravcore/kurul/blob/develop/docs/api-conventions.md#authentication).
 
 Writes (\`POST\`/\`PUT\`/\`PATCH\`/\`DELETE\`) are additionally checked server-side against an
 origin allowlist. A request that announces an \`Origin\` other than \`WEB_URL\` is refused with
@@ -185,6 +255,12 @@ const TAGS: ReadonlyArray<{ name: string; description: string }> = [
   { name: 'Activity', description: 'Workspace and task activity feeds.' },
   { name: 'Notifications', description: 'In-app notifications.' },
   { name: 'Dashboard', description: 'Read-only aggregations over a workspace.' },
+  {
+    name: 'Tokens',
+    description:
+      "A member's own personal access tokens for one workspace: minted once, listed by " +
+      'prefix, revoked immediately. Session-only routes.',
+  },
 ];
 
 const RATE_LIMIT_HEADERS: ResponseHeaders = {
@@ -224,16 +300,42 @@ function isReference(value: object): boolean {
   return '$ref' in value;
 }
 
-/** Every `(path, operation)` pair in the document. */
-function* operations(document: OpenAPIObject): Generator<{ path: string; operation: Operation }> {
+/** Every `(method, path, operation)` triple in the document. */
+function* operations(
+  document: OpenAPIObject,
+): Generator<{ method: string; path: string; operation: Operation }> {
   for (const [path, item] of Object.entries(document.paths)) {
-    for (const candidate of Object.values(item)) {
+    for (const [method, candidate] of Object.entries(item)) {
       // A path item also carries `parameters`, `$ref`, `summary`, `description` and `servers`,
       // none of which are operations. Only the verbs have `responses`.
       if (typeof candidate === 'object' && candidate !== null && 'responses' in candidate) {
-        yield { path, operation: candidate as Operation };
+        yield { method, path, operation: candidate as Operation };
       }
     }
+  }
+}
+
+/**
+ * The `assertPathsExist` of `SESSION_ONLY_OPERATIONS`: an entry naming an operation the
+ * document does not contain would be a token exemption that exempts nothing, and an operation
+ * quietly documented as accepting a credential it refuses.
+ */
+function assertOperationsExist(document: OpenAPIObject, entries: readonly string[]): void {
+  const present = new Set<string>();
+  for (const { method, path } of operations(document)) {
+    present.add(`${method.toUpperCase()} ${path}`);
+  }
+  // A document with no workspace-addressed operation at all (the probe-only app the serving
+  // spec builds) has nothing a token could be exempted from, so there is nothing to check.
+  if (![...present].some((entry) => entry.includes(' /workspaces/{workspaceId}'))) {
+    return;
+  }
+  const missing = entries.filter((entry) => !present.has(entry));
+  if (missing.length > 0) {
+    throw new Error(
+      `openapi: SESSION_ONLY_OPERATIONS names ${missing.length} operation(s) the document ` +
+        `does not contain: ${missing.join(', ')}. Update the list in openapi.document.ts.`,
+    );
   }
 }
 
@@ -265,14 +367,20 @@ function assertPathsExist(document: OpenAPIObject, paths: readonly string[], lab
 function applyGlobalContract(document: OpenAPIObject): void {
   assertPathsExist(document, PUBLIC_PATHS, 'PUBLIC_PATHS');
   assertPathsExist(document, RATE_LIMIT_EXEMPT_PATHS, 'RATE_LIMIT_EXEMPT_PATHS');
+  assertOperationsExist(document, SESSION_ONLY_OPERATIONS);
 
-  for (const { path, operation } of operations(document)) {
+  for (const { method, path, operation } of operations(document)) {
     const isPublic = PUBLIC_PATHS.includes(path);
     const isThrottled = !RATE_LIMIT_EXEMPT_PATHS.includes(path);
 
     // `security: []` is how OpenAPI spells "this one overrides the document-level requirement",
-    // and an empty array is meaningfully different from an absent key.
-    operation.security = isPublic ? [] : [{ [SESSION_SECURITY_SCHEME]: [] }];
+    // and an empty array is meaningfully different from an absent key. Two entries in the
+    // array mean "either one": a workspace-addressed operation takes a session or a token.
+    operation.security = isPublic
+      ? []
+      : acceptsToken(method, path)
+        ? [{ [SESSION_SECURITY_SCHEME]: [] }, { [TOKEN_SECURITY_SCHEME]: [] }]
+        : [{ [SESSION_SECURITY_SCHEME]: [] }];
 
     for (const parameter of operation.parameters ?? []) {
       if (isReference(parameter)) {
@@ -311,7 +419,10 @@ function applyGlobalContract(document: OpenAPIObject): void {
 
     if (!isPublic) {
       operation.responses['401'] ??= {
-        description: 'No session cookie, or one the server no longer recognises.',
+        description: acceptsToken(method, path)
+          ? 'No session cookie and no Bearer token, or a credential the server no longer ' +
+            'recognises: a revoked or expired token reads the same as one that never existed.'
+          : 'No session cookie, or one the server no longer recognises.',
         content: errorContent(),
       };
     }
@@ -365,6 +476,17 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
           'Nest router and is therefore not described in this document.',
       },
       SESSION_SECURITY_SCHEME,
+    )
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'kurul_pat_...',
+        description:
+          'Personal access token from `POST /workspaces/{workspaceId}/tokens`. Bound to that ' +
+          'workspace; acts as its owner with the role the owner holds at request time.',
+      },
+      TOKEN_SECURITY_SCHEME,
     )
     // A **relative** server URL. An absolute one would bake one deployment's hostname into a
     // document that ships in the repository and is served by every self-hosted instance under

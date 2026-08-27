@@ -1,39 +1,83 @@
 @import 'tailwindcss';
 
-/* Kurul design tokens — values from docs/design.md §3 (Phase 3 validated). */
+/* Test files are never rendered, so a class-like string inside one (a code example in a comment,
+   a test title quoting a class name) must never reach the compiled stylesheet: Tailwind's scanner
+   is language-agnostic and would otherwise treat prose like `bg-[url(...)]` as a real candidate. */
+@source not "../**/*.test.{ts,tsx}";
+
+/* next-themes writes the theme onto the document as a class (components/layout/theme-provider.tsx
+   passes `attribute="class"`) and every token below is declared on `.dark`. Tailwind's own `dark:`
+   variant defaults to `@media (prefers-color-scheme: dark)`, which reports the operating system's
+   preference and not this app's theme, so without this line a `dark:` utility and the `.dark`
+   tokens it was written against disagree for anyone whose chosen theme differs from their OS:
+   `dark:bg-destructive/60` thins a light-theme button to 3.02:1 under its white label, and a
+   dark-theme one keeps the full fill at 3.11:1. app/globals-css-layers.test.ts compiles the sheet
+   and checks which selector the variant actually emits. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Kurul design tokens (values from docs/design.md §3). */
 
 :root {
+  /* Native controls and scrollbars (select, date/number inputs, the OS scrollbar chrome) key
+     off this property, not off next-themes' `class` attribute, so it cannot be left to that
+     provider's `enableColorScheme` default. */
+  color-scheme: light;
+
   --background: #f7f8f7;
-  --foreground: #191c1b;
+  /* One step off near-black on purpose. #191c1b measured 17.17:1 on the white card (APCA Lc
+     104.1), far past the 4.5:1 floor and into the band where a full-strength ink on a full-white
+     card haloes on long reading. This holds 15.51:1 (Lc 102.5) on the card and 12.64:1 on the
+     signature tint, its worst of the six surfaces. The three aliases below carry the same value
+     because shadcn primitives read them by name; a split between them and this token would be a
+     design decision, not a typo. */
+  --foreground: #212523;
   --card: #ffffff;
-  --card-foreground: #191c1b;
   --popover: #ffffff;
-  --popover-foreground: #191c1b;
+  --popover-foreground: #212523;
   --primary: #a85a28;
   --primary-foreground: #ffffff;
-  --secondary: #f1f3f1;
-  --secondary-foreground: #191c1b;
+  /* A hover cannot be an alpha of --primary: thinning the fill toward the page (shadcn's
+     default hover) drops --primary-foreground under 4.5:1 in light (4.17 on a card). This is a
+     solid step instead, moved toward the theme's floor, the same direction the surface ramp
+     moves. --destructive-hover below follows the same reasoning. */
+  --primary-hover: #964f23;
+
+  /* --accent is the hover step, so it has to stay a visible step away from both grounds it is
+     painted over (the white card and the column), and --muted, which holds a different value,
+     is the column ground itself. */
   --muted: #f1f3f1;
-  --muted-foreground: #6b726e;
-  --accent: #f1f3f1;
-  --accent-foreground: #191c1b;
+  --muted-foreground: #626965;
+  --accent: #eaedea;
+  --accent-foreground: #212523;
   --destructive: #c0281f;
-  --destructive-foreground: #ffffff;
+  /* Same reason as --primary-hover above: a thinned --destructive mixes toward the page and
+     takes white under 4.5:1 before the hover finishes fading in. */
+  --destructive-hover: #b0241c;
+
+  /* The one colour token allowed under 3:1: it separates two areas of a single surface and
+     never carries state on its own. Every edge that means something interactive or selected
+     wears --border-strong, --input, --ring or --signature. */
   --border: #d6dad8;
-  --border-strong: #b9bfbc;
-  --input: #d6dad8;
+  --border-strong: #7d8481;
+  /* One value under two names. --input stays only because shadcn primitives read
+     `border-input`; there is no second job for it to do. */
+  --input: var(--border-strong);
   --ring: #a85a28;
   --signature: #a85a28;
-  --signature-subtle: #f6ede5;
+
+  /* Never copper (--signature) text on this tint: it measures 4.11:1 in light, under the 4.5
+     floor. Neutral --foreground text is allowed (12.64:1) and is measured against it like any
+     other surface. No call site breaks the rule today: app/globals.contrast.test.ts rescans the
+     tree on every run, so one cannot arrive unnoticed. */
+  --signature-subtle: #f2e6da;
   --foreground-secondary: #545a57;
-  --foreground-disabled: #8a918d;
 
   --priority-low: #6b726e;
   --priority-medium: #3f6b99;
   --priority-high: #8a5a00;
   --priority-urgent: #c0281f;
   --status-info: #3f6b99;
-  --status-good: #1f7a4d;
+  --status-good: #1d7349;
   --status-warning: #8a5a00;
   --status-danger: #c0281f;
 
@@ -47,12 +91,18 @@
   --label-slot-8: #e34948;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  /* docs/design.md §5 — the panel-and-sheet curve. The off-canvas drawer is the first thing
-     in the app to need it, which is why it was only a line in the spec until now. */
+  /* docs/design.md §5: the panel-and-sheet curve. The off-canvas drawer is the only surface
+     that reads it today, and it is declared as a token rather than folded into that drawer's
+     own styles so the next sheet cannot quietly pick a different curve. */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
   --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
   --elevation-drag: 0 12px 32px rgb(0 0 0 / 0.18), 0 4px 8px rgb(0 0 0 / 0.1);
+
+  /* Pure black is outside the felt family and darkens the whole screen 45 L* points behind a
+     dialog; this tint holds the same family and drops it 30. */
+  --overlay-scrim: rgb(25 28 27 / 0.38);
 
   --sidebar-width: 240px;
   --sidebar-rail-width: 56px;
@@ -66,85 +116,119 @@
    one number the bar is built from moves with them.
 
    A token override rather than `max-md:h-14` at each call site because four separate surfaces
-   read `var(--topbar-height)` — the shell skeleton, the board's Suspense fallback, `Topbar`
-   itself and the board page's own header — and a breakpoint only three of them knew about is
-   exactly the kind of split this variable exists to prevent. */
-@media (max-width: 767px) {
+   read `var(--topbar-height)` (the shell skeleton, the board's Suspense fallback, `Topbar`
+   itself, and the board page's own header), and a breakpoint only three of them knew about is
+   exactly the kind of split this variable exists to prevent.
+
+   `width < 48rem` and not `max-width: 767px`: `max-md:` compiles to the former, and the two
+   disagree for anyone whose root font size is not 16px, which would put a token override and
+   the utilities written against it on different sides of the same breakpoint. */
+@media (width < 48rem) {
   :root {
     --topbar-height: 56px;
+
+    /* A column takes 85% of the screen below `md`, so the next one is always visible at the
+       edge and the strip reads as a strip rather than as a page. The strip snaps to column
+       starts at this width (components/board/board-canvas.tsx), which is why the desktop
+       280-320px clamp comes off the column there: a clamped column would leave the snap
+       stopping short of the viewport it is meant to fill. */
+    --column-width: 85vw;
   }
 }
 
 .dark {
-  --background: #0e100f;
+  color-scheme: dark;
+
+  /* Dark depth is a lighter surface, not a shadow (docs/design.md §3), so the ramp is the
+     hierarchy: canvas, column ground (--muted), card, popover, hover step (--accent), each one
+     step above the last. --popover must not meet --accent at either end: a dropdown paints its
+     ground with bg-popover and the highlighted item with bg-accent, so that step is what says
+     which row the pointer is on. The focus mark is the :focus-visible outline below, which the
+     rows no longer suppress: a 1.12:1 surface step cannot carry a focus mark on its own. */
+  --background: #131715;
   --foreground: #e8ecea;
-  --card: #161918;
-  --card-foreground: #e8ecea;
-  --popover: #161918;
+  --card: #212523;
+  --popover: #272b29;
   --popover-foreground: #e8ecea;
   --primary: #d98a4e;
-  --primary-foreground: #0e100f;
-  --secondary: #1d2120;
-  --secondary-foreground: #e8ecea;
-  --muted: #1d2120;
-  --muted-foreground: #8a928e;
-  --accent: #1d2120;
+  --primary-foreground: #131715;
+  --primary-hover: #e0955b;
+  --muted: #1a1e1c;
+  /* This token is what the 11px and 12px meta rows are painted in (text-micro and text-small on a
+     card, a column header, a menu row), so the type it has to survive is the smallest the app
+     draws. #98a09c cleared WCAG AA on all six dark surfaces (4.79:1 at worst, on --accent) and
+     still scored APCA Lc 44.2 there, under the Lc 48 that size needs, because light-on-dark is
+     the polarity WCAG's formula models least well. This is the smallest step that clears Lc 48 on
+     all six (48.5 on --accent) without closing on --foreground-secondary, which stays a rank
+     above it at Lc 63.7. */
+  --muted-foreground: #a0a8a4;
+  --accent: #2f3331;
   --accent-foreground: #e8ecea;
-  --destructive: #f0665c;
-  --destructive-foreground: #0e100f;
-  --border: #2a2f2d;
-  --border-strong: #383e3b;
-  --input: #2a2f2d;
+  /* #f47a73 is the lowest value that clears 4.5:1 against --accent (4.81), the tightest step
+     this colour sits on as running text: the overdue date on a hovered card
+     (components/task/task-card.tsx) and the dropdown's destructive row. --status-danger and
+     --priority-urgent below share it, being the same severity by another name. */
+  --destructive: #f47a73;
+  --destructive-hover: #b8524a;
+  --border: #3a403d;
+  --border-strong: #767d7a;
+  --input: var(--border-strong);
   --ring: #d98a4e;
   --signature: #d98a4e;
-  --signature-subtle: #241a12;
-  --foreground-secondary: #b3bab6;
-  --foreground-disabled: #6e7773;
+  --signature-subtle: #37291d;
+  --foreground-secondary: #bcc3bf;
 
   --priority-low: #8a928e;
   --priority-medium: #6ba3e8;
   --priority-high: #d9a227;
-  --priority-urgent: #f0665c;
+  --priority-urgent: #f47a73;
   --status-info: #6ba3e8;
   --status-good: #3fbf85;
   --status-warning: #d9a227;
-  --status-danger: #f0665c;
+  --status-danger: #f47a73;
 
   --label-slot-1: #3987e5;
   --label-slot-2: #d95926;
   --label-slot-3: #199e70;
   --label-slot-4: #c98500;
   --label-slot-5: #d55181;
-  --label-slot-6: #008300;
+  --label-slot-6: #2a9d3c;
   --label-slot-7: #9085e9;
   --label-slot-8: #e66767;
+
+  /* No alpha of black separates a dialog from a canvas already this dark by shade alone; the
+     dialog's own surface step and its --border-strong ring below carry that job instead. */
+  --overlay-scrim: rgb(5 7 6 / 0.7);
+
+  /* A 12% black shadow reads as nothing once it lands on a surface this dark (it drops to L*
+     7.3), so the separation moves from the shadow's blur to a 1px --border-strong ring. */
+  --elevation-overlay: 0 8px 24px rgb(0 0 0 / 0.5), 0 0 0 1px var(--border-strong);
+  --elevation-drag: 0 8px 24px rgb(0 0 0 / 0.5), 0 0 0 1px var(--border-strong);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-hover: var(--destructive-hover);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-signature: var(--signature);
   --color-signature-subtle: var(--signature-subtle);
+  --color-overlay-scrim: var(--overlay-scrim);
   --color-foreground-secondary: var(--foreground-secondary);
-  --color-foreground-disabled: var(--foreground-disabled);
   --color-priority-low: var(--priority-low);
   --color-priority-medium: var(--priority-medium);
   --color-priority-high: var(--priority-high);
@@ -168,12 +252,20 @@
   --text-display: 40px;
   --text-display--line-height: 44px;
   --text-display--font-weight: 600;
+  /* The dashboard's one hero figure (docs/design.md §8, `stat-tile.tsx`): a size with no
+     sibling in the reading scale above, so it gets its own step rather than an arbitrary
+     `text-[28px]` with no declared line box at all. */
+  --text-stat: 28px;
+  --text-stat--line-height: 32px;
+  --text-stat--font-weight: 600;
   --text-title-lg: 20px;
   --text-title-lg--line-height: 28px;
   --text-title-lg--font-weight: 600;
   --text-title: 16px;
   --text-title--line-height: 24px;
   --text-title--font-weight: 600;
+  --text-read: 14px;
+  --text-read--line-height: 21px;
   --text-body: 13px;
   --text-body--line-height: 18px;
   --text-small: 12px;
@@ -186,10 +278,18 @@
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
   --shadow-overlay: var(--elevation-overlay);
   --shadow-drag: var(--elevation-drag);
+  --ease-out: var(--ease-out);
+  --ease-drawer: var(--ease-drawer);
+  --ease-in-out: var(--ease-in-out);
 }
 
-* {
-  border-color: var(--border);
+/* Inside `base` because an unlayered rule outranks every cascade layer regardless of
+   specificity, so an unlayered `*` here silently repaints every `border-*` utility Tailwind
+   emits into `@layer utilities`. */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 body {
@@ -200,17 +300,38 @@ body {
   line-height: 18px;
 }
 
-.font-display {
-  font-family: var(--font-display);
+@layer components {
+  /* Dialed to the carved 40pt cut only on the `display` step, not on `.font-display` itself:
+     the wordmark (sidebar-body.tsx) sets that family at 16px, and forcing this axis on the
+     family utility would draw it with the display step's strokes instead of the low-optical-size
+     cut it needs at that size (docs/design.md §3). */
+  .text-display {
+    font-variation-settings: 'opsz' 40;
+  }
 }
 
-.font-mono {
-  font-family: var(--font-mono);
-}
+/* The whole keyboard baseline, in one place: 2px `--ring` at 2px offset (docs/design.md §5).
+   Inside `base` like the `*` rule above, which is only correct because no keyboard-reachable
+   control carries a focus ring or an outline suppressor of its own any more. Every
+   `outline-none` / `outline-hidden` left in the tree is on a container that takes focus by
+   script rather than by Tab, an arrow key or a link (dialog and drawer content). The shell
+   `main` and the task panel heading are not among them: the skip link puts keyboard focus on
+   the first and Enter on a task card puts it on the second, so both keep this outline, and
+   `main` only pulls it inside its own edge, which is the one place the offset is not 2px.
+   Adding either utility to an element a keyboard can land on outranks this rule from
+   `utilities` and leaves it focusing with nothing drawn at all, which
+   app/globals-css-layers.test.ts holds every target it lists clear of. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 
-:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+  /* A field that is both invalid and focused keeps one mark, recoloured, rather than a copper
+     outline and a red border arguing over which state the reader is in. */
+  [aria-invalid='true']:focus-visible {
+    outline-color: var(--destructive);
+  }
 }
 
 /* Reduced motion drops movement but keeps state changes visible:
@@ -235,15 +356,6 @@ body {
   }
 }
 
-@keyframes board-column-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 .board-column-enter {
   animation: board-column-enter 200ms var(--ease-out) both;
   animation-delay: calc(var(--stagger-index) * 40ms);
@@ -251,7 +363,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .board-column-enter {
-    animation-name: board-column-fade;
+    animation-name: layer-fade-in;
     animation-delay: 0ms;
   }
 }
@@ -308,7 +420,10 @@ body {
   }
 }
 
-@keyframes drawer-fade-in {
+/* The opacity-only twin every layer's reduced-motion variant switches to: a dialog, a drawer
+   and a menu all cross-fade the same way once movement drops, so one pair of keyframes serves
+   all of them instead of a duplicate per component. */
+@keyframes layer-fade-in {
   from {
     opacity: 0;
   }
@@ -317,7 +432,7 @@ body {
   }
 }
 
-@keyframes drawer-fade-out {
+@keyframes layer-fade-out {
   from {
     opacity: 1;
   }
@@ -348,15 +463,436 @@ body {
   animation-name: drawer-out-right;
 }
 
-/* Reduced motion keeps the layer's arrival and departure legible — it cross-fades instead of
-   sliding — rather than removing the animation, which would also remove Radix's cue to wait
-   before unmounting and make the drawer disappear a frame early. */
+/* Reduced motion keeps the layer's arrival and departure legible: it cross-fades instead of
+   sliding, rather than removing the animation, which would also remove Radix's cue to wait
+   before unmounting and make the drawer disappear a frame early.
+
+   `[data-side]` is here to be counted, not to select: without it these two selectors carry two
+   attribute selectors against the side-qualified slide rules' three above, and a rule inside a
+   media query is still just a rule: it loses that specificity contest outright and the drawer
+   keeps its full slide for a reader who asked for none of it. Written as a bare presence check
+   so one pair of rules still covers both docked sides. */
 @media (prefers-reduced-motion: reduce) {
-  [data-slot='dialog-drawer-content'][data-state='open'] {
-    animation-name: drawer-fade-in;
+  [data-slot='dialog-drawer-content'][data-side][data-state='open'] {
+    animation-name: layer-fade-in;
   }
 
-  [data-slot='dialog-drawer-content'][data-state='closed'] {
-    animation-name: drawer-fade-out;
+  [data-slot='dialog-drawer-content'][data-side][data-state='closed'] {
+    animation-name: layer-fade-out;
+  }
+}
+
+/* The one pair of keyframes every scaling surface reads: the centred dialog
+   (components/ui/dialog.tsx `DialogContent`), the dropdown menu and its submenus
+   (components/ui/dropdown-menu.tsx) and the popover (components/ui/popover.tsx).
+
+   Written here for the same reason the drawer above is: this project imports plain `tailwindcss`
+   with no animation plugin, so `animate-in`/`fade-in-0`/`zoom-in-95` and their `data-[state=]`
+   siblings generate no CSS and every one of those surfaces cut instead of animating.
+
+   One pair rather than one per surface because there is nothing for a second pair to differ on:
+   what makes a menu grow out of its trigger while the dialog grows from its own centre is the
+   `origin-(--radix-*-content-transform-origin)` utility on the content element, not the
+   keyframe. A second copy would only be a second thing to keep in step.
+
+   Tailwind v4 compiles `translate-x-*`/`translate-y-*` onto the standalone CSS `translate`
+   property rather than composing them into `transform` (its upgrade from v3's behaviour), so the
+   `translate-x-[-50%] translate-y-[-50%]` utilities that centre the dialog keep doing that
+   undisturbed while this keyframe animates the equally standalone `scale` property instead of
+   `transform`, per docs/design.md §5's "enter from `scale(0.96)` + `opacity: 0`", without ever
+   touching, or needing to redeclare, the centring translate. */
+@keyframes surface-scale-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes surface-scale-out {
+  from {
+    opacity: 1;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+[data-slot='dialog-overlay'] {
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease-out);
+  animation-fill-mode: both;
+}
+
+[data-slot='dialog-overlay'][data-state='open'] {
+  animation-name: layer-fade-in;
+}
+
+[data-slot='dialog-overlay'][data-state='closed'] {
+  animation-name: layer-fade-out;
+}
+
+[data-slot='dialog-content'] {
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease-out);
+  animation-fill-mode: both;
+}
+
+[data-slot='dialog-content'][data-state='open'] {
+  animation-name: surface-scale-in;
+}
+
+[data-slot='dialog-content'][data-state='closed'] {
+  animation-name: surface-scale-out;
+}
+
+/* The overlay is already opacity-only, so reduced motion changes nothing about how it moves;
+   it is still restated here so every animated layer names its reduced-motion twin explicitly
+   rather than leaving a reader to work out that one of them is opacity-only and needs none.
+   The content loses its scale and keeps the fade. */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='dialog-overlay'][data-state='open'] {
+    animation-name: layer-fade-in;
+  }
+
+  [data-slot='dialog-overlay'][data-state='closed'] {
+    animation-name: layer-fade-out;
+  }
+
+  [data-slot='dialog-content'][data-state='open'] {
+    animation-name: layer-fade-in;
+  }
+
+  [data-slot='dialog-content'][data-state='closed'] {
+    animation-name: layer-fade-out;
+  }
+}
+
+/* The dropdown menu's open and close (components/ui/dropdown-menu.tsx `DropdownMenuContent` and
+   `DropdownMenuSubContent`), and the popover's (components/ui/popover.tsx `PopoverContent`), on
+   the shared keyframes declared above.
+
+   Radix writes `--radix-dropdown-menu-content-transform-origin` from whichever side the menu
+   actually opened on, and both components already carry the Tailwind utility that reads it
+   (`origin-(--radix-dropdown-menu-content-transform-origin)`), so scaling from `scale` grows the
+   menu out of the corner nearest its trigger instead of its own centre, docs/design.md §5's
+   `transform-origin: var(--transform-origin)` for this row of the table. The popover reads its
+   own `--radix-popover-content-transform-origin` and is the same gesture, a surface growing out
+   of the control that opened it, so it joins the same rule. */
+[data-slot='dropdown-menu-content'],
+[data-slot='dropdown-menu-sub-content'],
+[data-slot='popover-content'] {
+  animation-timing-function: var(--ease-out);
+  animation-fill-mode: both;
+}
+
+[data-slot='dropdown-menu-content'][data-state='open'],
+[data-slot='dropdown-menu-sub-content'][data-state='open'],
+[data-slot='popover-content'][data-state='open'] {
+  animation-name: surface-scale-in;
+  animation-duration: 150ms;
+}
+
+[data-slot='dropdown-menu-content'][data-state='closed'],
+[data-slot='dropdown-menu-sub-content'][data-state='closed'],
+[data-slot='popover-content'][data-state='closed'] {
+  animation-name: surface-scale-out;
+  animation-duration: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='dropdown-menu-content'][data-state='open'],
+  [data-slot='dropdown-menu-sub-content'][data-state='open'],
+  [data-slot='popover-content'][data-state='open'] {
+    animation-name: layer-fade-in;
+  }
+
+  [data-slot='dropdown-menu-content'][data-state='closed'],
+  [data-slot='dropdown-menu-sub-content'][data-state='closed'],
+  [data-slot='popover-content'][data-state='closed'] {
+    animation-name: layer-fade-out;
+  }
+}
+
+/* The loading placeholder (components/ui/skeleton.tsx). docs/design.md §6 asks for a 1.6s
+   opacity pulse from 1.0 to 0.6, its own keyframe rather than Tailwind's built-in `animate-pulse`
+   (2s, 1.0-0.5, and the only animation in the tree whose default already satisfies
+   `prefers-reduced-motion` on its own, since it neither moves nor scales).
+   `animation-duration` names the FULL loop period, the same convention
+   Tailwind's own `pulse` keyframe uses (0%/100% implicit at opacity 1, a single 50% stop at the
+   dim value, run once through with no `alternate`): a from/to pair plus `alternate` would instead
+   spend the full duration on each one-way leg, doubling the period to 3.2s. A board loads dozens
+   of these at once, so the reduced variant does not just slow the loop down, it removes it: a
+   still 0.75 midpoint reads as "loading" without asking dozens of elements to keep animating on a
+   machine that asked for none of them to. */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+[data-slot='skeleton'] {
+  animation-name: skeleton-pulse;
+  animation-duration: 1.6s;
+  animation-timing-function: var(--ease-in-out);
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='skeleton'] {
+    animation: none;
+    opacity: 0.75;
+  }
+}
+
+/* The submit spinner (components/ui/button.tsx) is the one place docs/design.md §6 puts a
+   spinner: 14px, inside a pressed button, over the label, after 400ms. A custom
+   keyframe rather than Tailwind's built-in `animate-spin` so the reduced-motion twin sits right
+   beside it instead of depending on a second rule finding this one. Reduced motion holds the
+   spinner still rather than swapping in an opacity pulse: `aria-busy` and `disabled` already
+   carry the state, so a fixed glyph is enough, matching the skeleton's own reduced twin above. */
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+[data-slot='button-spinner'] {
+  animation: spinner 700ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='button-spinner'] {
+    animation: none;
+  }
+}
+
+/* The spinner sits over the button's content instead of beside it, so a button keeps its exact
+   box while it waits: nothing enters the flex flow, no control widens and no centred label
+   slides. These two rules clear what is underneath it. The label goes out through
+   `-webkit-text-fill-color` rather than `color` because the spinner's own stroke reads
+   `currentColor` and has to keep the variant's colour; the leading icon goes to `opacity: 0`
+   rather than `display: none` because leaving the flow is exactly the shift being avoided. */
+[data-slot='button'][data-spinner] {
+  -webkit-text-fill-color: transparent;
+}
+
+[data-slot='button'][data-spinner] > svg {
+  opacity: 0;
+}
+
+/* The two marks a card wears when the board answers back (docs/design.md §5): the return after a
+   move the server refused, and the tint a card takes when someone else changed it. Keyframes on
+   the card's own `data-state`, not transitions: both the rollback and a socket update re-render
+   the list in a single commit, so there is no intermediate value for a transition to run between.
+
+   `task-card-return` lands the card instead of retracing the drag. The optimistic order is gone
+   by the time it plays and nothing in the DOM still knows where the card was picked up from, so
+   the honest thing to draw is the arrival: 220ms on `--ease-in-out`, the figure docs/design.md §5
+   gives this exact case. Its reduced twin is the shared fade.
+
+   `task-card-remote-change` keeps the same animation under `reduce`: it declares background
+   colour and nothing else, which is what reduced motion preserves rather than removes, and it is
+   the only mark that says a row changed under the reader's hands. It ends on the card's own
+   ground rather than on `transparent`, which would let the column show through it, and both ends
+   are variables because the selected card already sits on the tint this mark fades from: one
+   keyframe serves both cards, and the selected one runs it between the hover step and the tint so
+   the fade is visible there too. */
+@keyframes task-card-return {
+  from {
+    opacity: 0.5;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes task-card-remote-change {
+  from {
+    background-color: var(--task-card-remote-from);
+  }
+  to {
+    background-color: var(--task-card-ground);
+  }
+}
+
+[data-slot='task-card'] {
+  --task-card-ground: var(--card);
+  --task-card-remote-from: var(--signature-subtle);
+}
+
+[data-slot='task-card'][data-selected] {
+  --task-card-ground: var(--signature-subtle);
+  --task-card-remote-from: var(--accent);
+}
+
+[data-slot='task-card'][data-state='returning'] {
+  animation: task-card-return 220ms var(--ease-in-out) both;
+}
+
+[data-slot='task-card'][data-state='remote-changed'] {
+  animation: task-card-remote-change 1200ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='task-card'][data-state='returning'] {
+    animation-name: layer-fade-in;
+  }
+}
+
+/* Forced colours replace every author colour with the user's palette, which erases exactly the
+   channel most interactive-state feedback here relies on: a surface step and a tint. Every
+   state built on one carries a border-based twin here, per docs/design.md §9. */
+@media (forced-colors: active) {
+  /* Selection and focus stay two marks. The outline is selection while the card is not focused;
+     the moment it is, `:focus-visible` takes the outline back and this border is what still
+     says the card is the open one. */
+  a[data-selected]:not(:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  a[data-selected] {
+    border-color: Highlight;
+  }
+
+  /* The tint a card takes when someone else changed it is a background colour and nothing
+     else, so the mode paints it the same Canvas as every resting card and the mark is gone.
+     A dotted Highlight border is the twin: the same system colour selection uses, in the one
+     channel selection does not, so the two states stay tellable apart on a card wearing both
+     (selection keeps a solid border and its outline). The animation still runs, and the border
+     carries the state for as long as the card holds it. */
+  a[data-state='remote-changed'] {
+    border-color: Highlight;
+    border-style: dotted;
+  }
+
+  /* components/board/board-column.tsx marks the column dnd-kit reports as `isOver`. The column
+     has no resting border, so this is the edge, not a thickening of one. Scoped to the `section`
+     it renders and drawn as an outline so the 2px mark does not add to the box and reflow the
+     column's content by 4px each time `isOver` flips. */
+  section[data-drop-target] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  /* The insertion rail components/board/board-column.tsx draws between two cards. It is a
+     `--signature` ground and nothing else, so the mode would give it the same colour it gives
+     the cards around it; it is also the only mark a keyboard drag has, the wash being a second
+     touch rather than the signal. */
+  [data-slot='drop-indicator'] {
+    background: Highlight;
+  }
+
+  /* Chromium paints a Canvas-coloured backplate behind text runs in forced-colours mode; on this
+     row that plate sits under the label and hides it, so `forced-color-adjust: none` is the only
+     way to suppress it. The pair of system colours stays explicit so the row still follows the
+     user's palette instead of an author colour. The opt-out inherits into every descendant,
+     which is why the `svg` rule below stays: without it the icon would keep its literal grey.
+     It reaches the focus outline as well, so that names a system colour here rather than
+     keeping author copper: the outline is drawn at a positive offset, outside the Highlight
+     ground and over the popover, and CanvasText is what that ground forces to. */
+  [data-slot='dropdown-menu-item'][data-highlighted],
+  [data-slot='dropdown-menu-checkbox-item'][data-highlighted],
+  [data-slot='dropdown-menu-radio-item'][data-highlighted] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+    outline-color: CanvasText;
+  }
+
+  /* The icon declares its own colour (`text-muted-foreground`), so the row's `HighlightText`
+     never reaches it and the mode forces that grey to CanvasText, unreadable on Highlight. */
+  [data-slot='dropdown-menu-item'][data-highlighted] svg,
+  [data-slot='dropdown-menu-checkbox-item'][data-highlighted] svg,
+  [data-slot='dropdown-menu-radio-item'][data-highlighted] svg {
+    color: HighlightText;
+  }
+}
+
+/* The hairline darkens to a value the ramp already holds instead of thickening or opening a
+   second palette. After `.dark` because both selectors weigh the same and only source order
+   decides which `--border` a dark document ends up with. */
+@media (prefers-contrast: more) {
+  :root,
+  .dark {
+    --border: var(--border-strong);
+  }
+}
+
+/* The board strip's edge masks (components/board/board-canvas.tsx). Eight columns in, the only
+   thing saying the board continues past the screen is a scrollbar, which a trackpad hides
+   entirely; these are 24px of the page fading back over each edge that still has a column
+   behind it, which is a signal at column scale rather than a new control. Each is drawn only while
+   there is a column in that direction: `data-overflow` is written from the strip's own
+   scrollLeft, scrollWidth and clientWidth, so a board whose columns fit wears no mask at all.
+
+   Pseudo-elements on the wrapper rather than on the scroller, because the scroller's own
+   `::before` would be a flex item inside it and would scroll away with the columns.
+
+   `isolation` keeps the z-index below local to the board: the mask has to sit over the columns'
+   own sticky headers (z-10 in components/board/board-column.tsx), and without a stacking context
+   of its own that number would also be competing with the topbar and the task panel.
+
+   Opacity is the only thing that moves, which is what reduced motion keeps rather than removes
+   (the block above narrows every transition to colour and opacity), so this needs no twin. */
+[data-slot='board-canvas'] {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-slot='board-canvas']::before,
+[data-slot='board-canvas']::after {
+  content: '';
+  position: absolute;
+  z-index: 11;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms var(--ease-out);
+}
+
+[data-slot='board-canvas']::before {
+  left: 0;
+  background: linear-gradient(to right, var(--background), transparent);
+}
+
+[data-slot='board-canvas']::after {
+  right: 0;
+  background: linear-gradient(to left, var(--background), transparent);
+}
+
+[data-slot='board-canvas'][data-overflow='left']::before,
+[data-slot='board-canvas'][data-overflow='both']::before {
+  opacity: 1;
+}
+
+[data-slot='board-canvas'][data-overflow='right']::after,
+[data-slot='board-canvas'][data-overflow='both']::after {
+  opacity: 1;
+}
+
+/* The strip snaps to column starts below `md` (components/board/board-canvas.tsx), and lets go
+   of the snap while a card is being carried: @dnd-kit crosses columns by scrolling this element
+   itself, and a mandatory snap would pull each of those steps back to the column the card left.
+
+   Here rather than as a `snap-none` utility on the element: Tailwind emits `snap-none` ahead of
+   `snap-x`, so the two on one element would leave the snap on. An unlayered rule outranks both. */
+@media (width < 48rem) {
+  [data-slot='board-scroller'][data-dragging] {
+    scroll-snap-type: none;
   }
 }

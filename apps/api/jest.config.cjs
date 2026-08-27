@@ -109,116 +109,29 @@ module.exports = {
   coveragePathIgnorePatterns: ['/generated/'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
-  // Floor set a few points below the measured baseline, so CI fails on real regressions without
-  // being so tight that routine refactors trip it.
+  // Coverage floor. The two lasting rules (raise it when the baseline rises; record a drop
+  // here instead of lowering the floor to erase it; never exclude a file from the
+  // denominator) live in docs/testing.md's Coverage section, not here, per the repo's own
+  // working-notes policy. Full measurement history is in git log for this file.
   //
-  // Baseline history, all `pnpm --filter @kurul/api test:cov`, stmts/branch/funcs/lines:
+  // Baselines are measured on `develop` after merge (`pnpm --filter @kurul/api test:cov`) or
+  // read from CI's `api-coverage` artifact for that run, never on a feature branch.
   //
-  //   2026-08-09  57.19 / 48.29 / 59.68 / 58.12
-  //   2026-08-14  77.86 / 69.31 / 79.64 / 79.24  after closing the workspace/activity/label/
-  //                                              common-pipes-and-decorators cold zones tracked
-  //                                              as audit finding QA-03
-  //   2026-08-15  76.51 / 66.64 / 78.82 / 77.76  on `develop` — measured twice, independently,
-  //                                              agreeing to four digits
+  //   2026-08-22  75.94 / 68.79 / 77.69 / 76.81  measured on the feat/demo-mode branch, not
+  //                                              develop. The develop-after-merge figure for
+  //                                              that PR (#299, 75120af) was
+  //                                              75.82 / 68.70 / 77.80 / 76.70.
+  //   2026-08-26  77.06 / 69.96 / 78.95 / 77.91  develop at 017838a. Margins 2.06 / 3.96 /
+  //                                              1.95 / 1.91 over the floor below.
   //
-  // **The 2026-08-15 baseline is lower than the one before it, and the floor did not move.**
-  // P3-2 (#206, #207) added checklist code, `collectCoverageFrom: ['**/*.(t|j)s']` counted it
-  // automatically, and nobody re-measured — so the recorded baseline claimed roughly 3 points of
-  // headroom over the branch floor while the real figure was **0.64**. That is worth stating
-  // plainly, because the instruction below reads as symmetric and is not:
+  // Files over ~50 statements at 0% unit coverage, each an all-or-nothing operation covered
+  // end to end instead:
+  //   account-deletion.service.ts (133 stmts)  test/account-deletion.e2e-spec.ts
+  //   demo/reset.ts (97 stmts)                 test/demo-reset.e2e-spec.ts
+  //   task/task.controller.ts (64 stmts)       test/task.e2e-spec.ts
   //
-  //   - Baseline moves **up**: re-measure, then raise the floor to a few points under the *new*
-  //     number rather than under the old one.
-  //   - Baseline moves **down**: re-measure and **record it here**. Do not lower the floor to
-  //     restore the margin. The margin shrinking is the signal; lowering the floor deletes the
-  //     signal and keeps the cause. A floor is only lowered on a deliberate, argued decision,
-  //     never as bookkeeping after a drop.
-  //
-  // For reference, the attachment work (P3-1 tasks 1-4) measured 77.08 / 67.33 / 79.66 / 78.39,
-  // i.e. it pulled the baseline back up rather than down. That is the expected shape for a new
-  // module and not a reason to re-cut the floor either.
-  //
-  //   2026-08-15  77.56 / 67.96 / 79.61 / 78.85  after P3-1 tasks 5-8 (attachment service,
-  //                                              controller, download path) — measured on three
-  //                                              consecutive runs, identical to four digits
-  //
-  // The branch margin over the floor is back to 1.96 points from the 0.64 recorded above. The
-  // floor is left where it is, for the same reason tasks 1-4 left it: a new module arriving with
-  // its own tests raises the average without saying anything about the zones the floor watches.
-  //
-  //   2026-08-15  78.03 / 68.46 / 80.00 / 79.29  `develop` at b13fbf5, i.e. after #221 landed.
-  //                                              Measured on this branch with `src/import`
-  //                                              temporarily moved aside, which reproduces
-  //                                              `develop` exactly: the importer is this
-  //                                              branch's only addition under `src`.
-  //   2026-08-15  78.65 / 69.54 / 80.66 / 79.99  after P3-3 tasks 1/3/4/5/6 (the Trello export
-  //                                              reader and the label-colour mapping) — three
-  //                                              consecutive runs, identical to four digits
-  //
-  // Up again, and the floor is left alone again, for the third time and for the same reason: the
-  // two files this added are pure functions with 100% function coverage, so the average moved
-  // without a single one of the cold zones the floor watches getting warmer. Branch margin is now
-  // 3.54 points. If a later item wants to raise the floor, the number to raise it against is a
-  // measurement taken *after* the cold zones are covered, not this one.
-  //
-  //   2026-08-15  78.06 / 69.15 / 79.57 / 79.09  after P3-11 (OpenAPI specification and `/docs`)
-  //                                              — three consecutive runs, identical to four
-  //                                              digits
-  //
-  // **Down, and recorded rather than accommodated**, per the asymmetry above. The cause is
-  // `src/openapi/`: 35 response-schema classes with no runtime behaviour to exercise, plus
-  // `openapi.document.ts` and `generate-openapi.ts`, which run under `nest build` and the CI
-  // drift gate rather than under Jest. Only `serve-openapi.ts`'s exposure decision is unit
-  // tested, because it is the only part of the directory where being wrong changes what a
-  // deployment publishes. The floor does not move: 0.59 points of the P3-3 margin are gone and
-  // that is the signal, not something to erase — but nothing the floor watches got colder, and
-  // the branch margin is still 3.15 points.
-  //
-  //   2026-08-16  74.70 / 66.44 / 76.54 / 75.66  P3-11 rebased onto a `develop` carrying P3-4
-  //                                              through P3-9. **Below the floor on three of
-  //                                              four.** Measured in CI, reproduced locally.
-  //
-  // The entry above said the margin shrinking was the signal. This is what the signal was for.
-  // Nothing about `src/openapi/` changed; the denominator did, when six other items landed and
-  // the 3.15-point cushion that was absorbing an untested module stopped existing. A drop that
-  // only shows up when someone else's work lands is still this module's drop.
-  //
-  //   2026-08-16  76.11 / 67.89 / 78.11 / 77.13  after testing `src/openapi/` — three
-  //                                              consecutive runs, identical to four digits
-  //
-  // **Recovered by covering the cause, and no file is excluded from the denominator.** Three
-  // options were measured rather than argued:
-  //
-  //   - excluding `generate-openapi.ts` alone        75.46 / 66.87 / 77.25 / 76.46
-  //   - excluding it and `openapi.document.ts`       76.40 / 67.97 / 78.32 / 77.45
-  //   - testing the module, excluding nothing        76.11 / 67.89 / 78.11 / 77.13
-  //
-  // The last one is within a rounding error of the second and beats the first outright, so the
-  // exclusion buys about three tenths of a point. That is not worth what it costs:
-  // `apps/web/vitest.config.ts` already states the rule in this repository's own words — *an
-  // excluded file is an invisible one* — and excluding a file to restore a margin is the same
-  // move as lowering the floor with one indirection in front of it.
-  //
-  // The tempting argument for exclusion was that `pnpm openapi:check` regenerates the whole
-  // document on every CI build and byte-compares it, which is a stronger instrument than a unit
-  // test. It is — for the paths a *green* run walks. It is blind exactly where the risk is:
-  // `openapi.document.ts`'s two guards (`assertPathsExist`, the `UUID_PATH_PARAMS` membership
-  // test) throw, so a passing gate never executes them, and they are the code that makes it safe
-  // to restate a routing fact as a hard-coded list. The gate proves the lists are right today;
-  // only a test proves the thing that is supposed to notice when they stop being right does.
-  // `openapi.document.ts` is now 96.49% statements / 82.35% branches / 100% functions, and
-  // `serve-openapi.ts` — the file that decides whether an unauthenticated console is published
-  // in production — is 100% across the board, mount and all.
-  //
-  // `generate-openapi.ts` stays counted at 0% and stays in. It is the one file with a real
-  // exclusion argument (argv, two `fs` calls, and a container boot, all of which `openapi:check`
-  // runs on every build), and the floor clears with a 1.11-point margin without making it. An
-  // argument you do not need to make is one you should not make. Its only untested logic — the
-  // sentence printed when the gate fires, which a green run can never reach — was moved to
-  // `openapi/snapshot.ts` and tested there.
-  //
-  // The floor still does not move. Margins are 1.11 / 1.89 / 1.11 / 1.13, and they are now
-  // margins over a measurement that includes every file, which is the only kind worth having.
+  // `./src/account/` floors at 0 across every metric: account-deletion.service.ts above is
+  // the whole reason, and its unit coverage is deliberately 0, not a regression.
   coverageThreshold: {
     global: {
       statements: 75,
@@ -226,5 +139,13 @@ module.exports = {
       functions: 77,
       lines: 76,
     },
+    './src/common/guards/': { statements: 100, branches: 93.75, functions: 100, lines: 100 },
+    './src/common/rate-limit/': {
+      statements: 98.33,
+      branches: 94.87,
+      functions: 91.3,
+      lines: 99.09,
+    },
+    './src/account/': { statements: 0, branches: 0, functions: 0, lines: 0 },
   },
 };

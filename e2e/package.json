@@ -1,6 +1,6 @@
 {
   "name": "@kurul/e2e",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -14,6 +14,7 @@
     "@kurul/shared-types": "workspace:*"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.2.0",
     "dotenv": "^17.4.2",

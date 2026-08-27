@@ -125,7 +125,7 @@ describe('StorageService', () => {
     const service = await enable();
     expect(service.persistsFiles).toBe(true);
 
-    await service.onModuleDestroy();
+    await service.onApplicationShutdown();
 
     // The singleton was dropped, so the next read builds a fresh one from the environment.
     expect(service.persistsFiles).toBe(true);

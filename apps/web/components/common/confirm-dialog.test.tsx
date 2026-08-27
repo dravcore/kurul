@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import messages from '@/messages/en.json';
 import { ConfirmDialog, type ConfirmDialogProps } from './confirm-dialog';
@@ -17,6 +17,7 @@ beforeAll(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 type Overrides = Partial<ConfirmDialogProps>;
@@ -118,6 +119,36 @@ describe('ConfirmDialog', () => {
     rerender({ open: true });
 
     await waitFor(() => expect(screen.queryByText(/failed:/)).toBeNull());
+  });
+
+  it('shows the confirm button’s spinner once a slow action passes 400ms', async () => {
+    vi.useFakeTimers();
+    const onConfirm = vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, 600)));
+    renderDialog({ onConfirm });
+
+    fireEvent.click(confirmButton());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    expect(confirmButton().querySelector("[data-slot='button-spinner']")).not.toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+  });
+
+  it('never shows the confirm button’s spinner for a fast action', async () => {
+    vi.useFakeTimers();
+    const onConfirm = vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, 100)));
+    renderDialog({ onConfirm });
+
+    fireEvent.click(confirmButton());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(confirmButton().querySelector("[data-slot='button-spinner']")).toBeNull();
   });
 
   it('blocks the action while the caller says it is not allowed', () => {

@@ -3,7 +3,7 @@
 **Durum:** [0028](0028-open-contributions-hosted-service.md) tarafından yerini aldı
 **Tarih:** 2026-08-12
 
-> 🌐 [English (canonical)](../../decisions/0015-no-external-contributions.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0015-no-external-contributions.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 > **Yerini aldı:** katkılar 2026-08-21'de [0028](0028-open-contributions-hosted-service.md) ile yeniden açıldı. Kod, doküman ve çeviri pull request'leri, CLA olmadan ve imzalanacak hiçbir şey olmadan, düz AGPL-3.0 altında yeniden kabul ediliyor. Aşağıdaki FSEK sorusunun artık cevaplanması gerekmiyor, çünkü hiçbir şey yeniden lisanslanmıyor. Bu kayıt tarihsel olarak duruyor; içindeki hiçbir şey yürürlükte değil.
 

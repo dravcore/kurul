@@ -4,8 +4,9 @@
 **Tarih:** 2026-08-15
 **Güncellendi:** 2026-08-18 — silme akışı artık ayrılan kullanıcıya gönderilmiş her `WorkspaceInvitation` satırını da — hangi durumda olursa olsun — kaldırıyor: `email` düz bir sütun ve `User` satırını anonimleştirmek ona hiç dokunmuyordu, yani gerçek adres silme talebinden sağ çıkıyordu (denetim bulgusu DB-01).
 **Güncellendi:** 2026-08-18 — `session.cookieCache.maxAge` (`api/src/auth/auth.ts`) 5 dakikadan 60 saniyeye indi; aşağıda silinen hesabın çerez penceresini anlatan "beş dakika" rakamları artık tarihsel: bu ADR'ın kabul ettiği gerçek pencere şu an 60 saniyeye kadar (denetim bulgusu SEC-01).
+**Güncellendi:** 2026-08-26: parola sıfırlama artık yapılandırıldı (`emailAndPassword.sendResetPassword`), yani `reset-password:<token>` gerçekten yazılan bir `Verification` satırı. Silme işlemindeki `Verification` silmesi, adres koşulunun yanına bir kullanıcı id'si koşulu kazandı; aşağıdaki sonuç maddesi de buna göre yeniden yazıldı (denetim bulgusu SEC-01, özellik boşluğu).
 
-> 🌐 [English (kanonik)](../../decisions/0026-account-deletion-anonymisation.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0026-account-deletion-anonymisation.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 
@@ -299,14 +300,17 @@ gereken iki şey var:
 - **Bir hesabı silmek, başkalarının workspace'lerine yazmaktır.** Üyeler roster'ın küçüldüğünü ve
   feed'lerinde bir `account.deleted` kaydını görür. Bu kasıtlı — alternatifi, kimseye atanmamış
   bir kart ve artık hiçbir yerde görünmeyen bir addan gelen bir yorum.
-- **`Verification` adrese göre süpürülüyor ve bu, kulağa geldiğinden daha azına ulaşıyor.**
-  Varsayılmadı, ölçüldü: bu kurulumda Better Auth 1.6 `Verification.identifier`'a **hiçbir**
-  akışta adres yazmıyor. E-posta doğrulaması secret ile imzalanmış bir JWT ve bu tabloya hiç
-  satır yazmıyor; parola sıfırlama `reset-password:<opak token>` saklıyor. Adres bu kolona
-  yalnızca OTP ve magic-link plugin'leri üzerinden düşüyor ve onlar etkin değil. Yani silme,
-  kişiyi adıyla anan her doğrulama satırını kaldırıyor — bugün sıfır tane — ve token biçimli
-  satırlar kendi sürelerine bırakılıyor; onu da ADR 0020'nin gecelik süpürmesi zaten uyguluyor
-  ve bu arada ortada açığa çıkacak bir adres yok.
+- **`Verification` hem kullanıcı id'sine hem adrese göre süpürülüyor ve adres tarafı, kulağa
+  geldiğinden daha azına ulaşıyor.** Varsayılmadı, ölçüldü: bu kurulumda Better Auth
+  `Verification.identifier`'a **hiçbir** akışta adres yazmıyor. E-posta doğrulaması secret ile
+  imzalanmış bir JWT ve bu tabloya hiç satır yazmıyor; parola sıfırlama identifier olarak
+  `reset-password:<opak token>`, value olarak da _kullanıcı id'sini_ saklıyor. Adres bu kolona
+  yalnızca OTP ve magic-link plugin'leri üzerinden düşüyor ve onlar etkin değil. Yani adres
+  koşulu, kişiyi adıyla anan her doğrulama satırını kaldırıyor (bugün sıfır tane); canlı bir
+  sıfırlama token'ını kaldıran ise kullanıcı id'si koşulu: geride bırakılsa, o bağlantıyı elinde
+  tutan kişi token'ın süresi dolana kadar anonimleştirilmiş satıra parola koyabilirdi. Token
+  biçimli başka ne varsa kendi süresine bırakılıyor; onu da ADR 0020'nin gecelik süpürmesi zaten
+  uyguluyor ve bu arada ortada açığa çıkacak bir adres yok.
 - **Veri taşınabilirliği (md. 20) açıkça kapsam dışı**, faz planının söylediği gibi. Bu kalem
   silme kalemi. Export ayrı bir iş ve burada aksini varsaymak ikisinin de daha kötü bir sürümünü
   üretirdi.

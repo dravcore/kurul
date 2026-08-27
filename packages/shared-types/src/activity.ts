@@ -26,11 +26,21 @@ export const ActivityType = {
   TaskDeleted: 'task.deleted',
   TaskAssigned: 'task.assigned',
   TaskUnassigned: 'task.unassigned',
+  // `added`/`removed` rather than `attached`/`detached`: the join row itself is created and
+  // deleted, and every other pair on a task's own join tables (`task.assigned`/`unassigned`)
+  // already names the join, not the click. The payload is a snapshot (`labelId`, `name`,
+  // `color`) rather than only an id, because a label can be renamed or recolored after the row
+  // is written and the sentence should describe what happened at the time, not what the label
+  // looks like now.
+  TaskLabelAdded: 'task.label_added',
+  TaskLabelRemoved: 'task.label_removed',
   CommentCreated: 'comment.created',
-  // `created`/`deleted` rather than `added`/`removed`: no name in this object uses `added`, and
-  // `comment.created` / `task.deleted` are the direct precedents. The names are unrenameable
-  // once a row carries one, so matching the existing vocabulary was a one-time free choice
-  // (ADR 0024). Only the second of the two joins the audit subset — see the rule below.
+  // `created`/`deleted` rather than `added`/`removed`: at the time this pair was named, no name
+  // in this object used `added`, and `comment.created` / `task.deleted` were the direct
+  // precedents. (`task.label_added`/`removed` above came later, naming a join row rather than an
+  // upload, and does not reopen this choice.) The names are unrenameable once a row carries one,
+  // so matching the existing vocabulary was a one-time free choice (ADR 0024). Only the second of
+  // the two joins the audit subset (see the rule below).
   AttachmentCreated: 'attachment.created',
   AttachmentDeleted: 'attachment.deleted',
 
@@ -76,6 +86,12 @@ export const ActivityType = {
   // so that row would be removed by the statement it describes — the same reason there is no
   // `workspace.deleted` type.
   AccountDeleted: 'account.deleted',
+  // Personal access tokens (docs/api-conventions.md, "Authentication"). A token is a standing
+  // credential for this workspace, so minting and revoking one are access-changing events in
+  // the same sense as an invitation. The payload carries the token's id, name and display
+  // prefix and never the secret, which the server does not hold after creation anyway.
+  TokenCreated: 'token.created',
+  TokenRevoked: 'token.revoked',
 } as const;
 
 export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
@@ -101,7 +117,7 @@ export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
  *    `label.deleted`, `attachment.deleted`.
  * 2. **Access-changing** — it changes who can reach this workspace. `member.removed`,
  *    `member.left`, `member.role_changed`, `invitation.created`, `invitation.revoked`,
- *    `invitation.accepted`.
+ *    `invitation.accepted`, `token.created`, `token.revoked`.
  * 3. **Structural administration** — it changes the workspace's own shape and vocabulary
  *    rather than the work inside it, and those rows outlive the objects they describe (an
  *    `Activity` row is scoped to the workspace, not to the board, so a `board.created` row is
@@ -175,6 +191,11 @@ export const AUDIT_ACTIVITY_TYPES = [
   // unlike `member.left` it is permanent — the account behind it can never come back. Volume is
   // one row per workspace per deleted account, which is the lowest of anything in this list.
   ActivityType.AccountDeleted,
+  // Kind 2, access-changing: a token is a credential that keeps working after the browser
+  // session that minted it is gone, so "who created a token here, and who revoked one" is the
+  // first question after a leaked secret. Volume is a handful of rows per member, ever.
+  ActivityType.TokenCreated,
+  ActivityType.TokenRevoked,
 ] as const;
 
 export type AuditActivityType = (typeof AUDIT_ACTIVITY_TYPES)[number];

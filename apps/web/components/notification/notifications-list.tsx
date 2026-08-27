@@ -14,6 +14,7 @@ import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useNotificationUnreadContext } from './notification-unread-provider';
 import { useNotificationSocket } from './use-notification-socket';
 import { toast } from 'sonner';
 
@@ -29,6 +30,7 @@ export function NotificationsList(): React.ReactElement {
   const locale = useLocale();
   const router = useRouter();
   const { activeId: workspaceId } = useWorkspaceContext();
+  const { count: unreadCount, setCount: setUnreadCount } = useNotificationUnreadContext();
 
   const [loadingMore, setLoadingMore] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -123,6 +125,9 @@ export function NotificationsList(): React.ReactElement {
       setItems((current) =>
         current.map((item) => (item.readAt ? item : { ...item, readAt: new Date().toISOString() })),
       );
+      // Zero, not "minus the rows on screen": the server marked every notification in this
+      // workspace, including the pages this screen never loaded.
+      setUnreadCount(0);
     } catch {
       toast.error(t('markReadError'));
     }
@@ -138,6 +143,7 @@ export function NotificationsList(): React.ReactElement {
       );
       if (updated) {
         setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+        setUnreadCount((current) => Math.max(0, current - 1));
       }
       if (notification.taskId && !navigated) {
         toast.error(t('openTaskError'));
@@ -146,8 +152,6 @@ export function NotificationsList(): React.ReactElement {
       toast.error(t('markReadError'));
     }
   }
-
-  const hasUnread = items.some((item) => !item.readAt);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
@@ -181,7 +185,7 @@ export function NotificationsList(): React.ReactElement {
           type="button"
           variant="outline"
           size="sm"
-          disabled={!hasUnread}
+          disabled={unreadCount === 0}
           onClick={() => void markAllRead()}
         >
           {t('markAllRead')}
@@ -190,9 +194,9 @@ export function NotificationsList(): React.ReactElement {
 
       {loading ? (
         <div className="flex flex-col gap-2">
-          <Skeleton className="h-16 w-full rounded-[var(--radius-md)]" />
-          <Skeleton className="h-16 w-full rounded-[var(--radius-md)]" />
-          <Skeleton className="h-16 w-full rounded-[var(--radius-md)]" />
+          <Skeleton className="h-16 w-full rounded-md" />
+          <Skeleton className="h-16 w-full rounded-md" />
+          <Skeleton className="h-16 w-full rounded-md" />
         </div>
       ) : error ? (
         // Same rule the bell's dropdown follows: a failed load clears the rows, so the empty
@@ -215,8 +219,8 @@ export function NotificationsList(): React.ReactElement {
               <button
                 type="button"
                 className={cn(
-                  'flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors hover:bg-muted/40',
-                  !item.readAt && 'bg-signature-subtle/40',
+                  'flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-[color,background-color,border-color] hover:bg-accent',
+                  !item.readAt && 'bg-signature-subtle',
                 )}
                 onClick={() => void openNotification(item)}
               >

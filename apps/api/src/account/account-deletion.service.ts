@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, MemberRole } from '@kurul/shared-types';
+import { ActivityType, InvitationStatus, MemberRole } from '@kurul/shared-types';
 import type {
   AccountDeletionPreviewDto,
   DepartingMembershipDto,
@@ -57,6 +57,12 @@ export interface AccountDeletionCounts {
   commentsRedacted: number;
   activitiesRedacted: number;
   sessionsDeleted: number;
+  /**
+   * Personal access tokens, every workspace. Deleted rather than revoked: a revoked row is
+   * kept as evidence beside a `token.revoked` activity entry, and an erasure request is the
+   * one case where keeping a row that names the account is the wrong outcome.
+   */
+  accessTokensDeleted: number;
   accountsDeleted: number;
   verificationsDeleted: number;
   notificationsDeleted: number;
@@ -73,7 +79,7 @@ export interface AccountDeletionCounts {
  * copying them into a log aggregator on the way out would move the problem rather than solve
  * it — the rule ADR 0020's retention sweep already follows.
  */
-export interface AccountDeletedLogLine extends AccountDeletionCounts {
+interface AccountDeletedLogLine extends AccountDeletionCounts {
   ts: string;
   level: 'warn';
   event: 'account.deleted';
@@ -351,6 +357,7 @@ export class AccountDeletionService {
           commentsRedacted: 0,
           activitiesRedacted: 0,
           sessionsDeleted: 0,
+          accessTokensDeleted: 0,
           accountsDeleted: 0,
           verificationsDeleted: 0,
           notificationsDeleted: 0,
@@ -427,7 +434,7 @@ export class AccountDeletionService {
         // that a deleted account would still be vouching for.
         result.invitationsRevoked = (
           await tx.workspaceInvitation.deleteMany({
-            where: { inviterId: userId, status: 'pending' },
+            where: { inviterId: userId, status: InvitationStatus.pending },
           })
         ).count;
 
@@ -475,19 +482,27 @@ export class AccountDeletionService {
         ).count;
         result.usagePingsDeleted = (await tx.usagePing.deleteMany({ where: { userId } })).count;
         result.sessionsDeleted = (await tx.session.deleteMany({ where: { userId } })).count;
+        result.accessTokensDeleted = (
+          await tx.personalAccessToken.deleteMany({ where: { userId } })
+        ).count;
         result.accountsDeleted = (await tx.account.deleteMany({ where: { userId } })).count;
-        // `Verification` has no `userId`, so `identifier` is its only link to a person — and
-        // what that column holds depends on the flow. Better Auth 1.6 writes an *opaque* token
-        // for the two flows this deployment can reach (`reset-password:<token>`,
-        // `delete-account-<token>`), and e-mail verification does not touch this table at all:
-        // its link is a JWT signed with the secret. The address only lands here through the
-        // OTP/magic-link plugins, which are not enabled today.
+        // `Verification` has no `userId`, so a row is linked to a person by whatever Better
+        // Auth 1.7 put in `identifier` and `value`, and that depends on the flow. Of the flows
+        // that write here, exactly one is reachable on this deployment (`auth.ts`,
+        // `emailAndPassword`): password reset stores `reset-password:<opaque token>` as the
+        // identifier and the *user id* as the value, so the row never names the address.
+        // `user.deleteUser` (`delete-account-<token>`) is not enabled, this service is the
+        // deletion path instead, and e-mail verification does not touch this table at all: its
+        // link is a JWT signed with the secret. The address only lands in `identifier` through
+        // the OTP/magic-link plugins, which are not enabled today. Enabling any of those is the
+        // trigger to revisit this delete.
         //
-        // So this is a `contains` on the address rather than an equality, and it is honest
-        // about its reach: it removes every row that *names* the person, and it cannot remove a
-        // row that does not. Those are covered by their own expiry, which ADR 0020's nightly
-        // sweep already enforces — a `reset-password` token outlives its user by at most an
-        // hour and carries no address to disclose in the meantime.
+        // Two conditions, then: an equality on the user id, which is what removes a live reset
+        // token (left behind, it would let whoever holds the link set a password on the
+        // anonymised row until it expired), and a `contains` on the address rather than an
+        // equality for the plugin-shaped rows. Both are honest about their reach: they remove
+        // every row that *names* the person, and cannot remove a row that does not. Those are
+        // covered by their own expiry, which ADR 0020's nightly sweep already enforces.
         //
         // `escapeLikePattern` for the same reason the comment two blocks up rules out
         // `mode: 'insensitive'` on the invitation delete: plain `contains` compiles to the same
@@ -498,7 +513,9 @@ export class AccountDeletionService {
         // never supposed to be a pattern.
         result.verificationsDeleted = (
           await tx.verification.deleteMany({
-            where: { identifier: { contains: escapeLikePattern(user.email) } },
+            where: {
+              OR: [{ value: userId }, { identifier: { contains: escapeLikePattern(user.email) } }],
+            },
           })
         ).count;
 

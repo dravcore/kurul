@@ -140,7 +140,10 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
     const key = `${AUTH_RATE_LIMIT_KEY_PREFIX}${probe}`;
     const storage = createRedisRateLimitStorage(urlWithDb(TEST_DB));
 
-    await storage.set(probe, { key: probe, count: 1, lastRequest: Date.now() });
+    // `consume` is the storage's only operation as of better-auth 1.7, and the counter it
+    // increments is the same key the removed `set` used to write, so this still exercises the
+    // shortest path from `REDIS_URL` to a key. One consume of a fresh key leaves it at 1.
+    await storage.consume(probe, { window: 60, max: 10 });
 
     expect(await onTestDb.get(key)).toBe('1');
     expect(await onDbZero.get(key)).toBeNull();
@@ -172,7 +175,7 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
       expect(onThree).toContain('bull:due-soon:repeat:due-soon-scan');
       expect((await onDbZero.keys('bull:due-soon:*')).sort()).toEqual(zeroBefore);
     } finally {
-      await worker.onModuleDestroy();
+      await worker.onApplicationShutdown();
       const created = await onTestDb.keys('bull:due-soon:*');
       if (created.length > 0) await onTestDb.del(...created);
     }
@@ -194,13 +197,18 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
       expect(databases).not.toContain(0);
       expect(new Set(databases)).toEqual(new Set([TEST_DB]));
     } finally {
-      await probe.onModuleDestroy();
+      await probe.onApplicationShutdown();
     }
   }, 20_000);
 
   it('opens both Socket.io adapter connections on the database the URL names', async () => {
     const adapters: unknown[] = [];
-    const server = { adapter: (factory: unknown) => adapters.push(factory) } as unknown as Server;
+    // `use` as well as `adapter`: `afterInit` registers the handshake-auth middleware on the
+    // server before it attaches the adapter, and this fake stands in for a real one.
+    const server = {
+      adapter: (factory: unknown) => adapters.push(factory),
+      use: () => {},
+    } as unknown as Server;
     const gateway = new RealtimeGateway(
       {} as unknown as PrismaService,
       { attachServer: () => {} } as unknown as RealtimeService,
@@ -233,7 +241,7 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
     } finally {
       if (savedWorkerId !== undefined) process.env.JEST_WORKER_ID = savedWorkerId;
       if (savedNodeEnv !== undefined) process.env.NODE_ENV = savedNodeEnv;
-      await gateway.onModuleDestroy();
+      await gateway.onApplicationShutdown();
     }
   }, 20_000);
 
@@ -259,6 +267,41 @@ describeWithRedis('REDIS_URL database index (e2e)', () => {
       await expect(delivered).resolves.toBe('crosses-databases');
     } finally {
       await Promise.all([subscriber.quit(), publisher.quit()]);
+    }
+  });
+
+  /**
+   * #204: `parseRedisUrl` used to drop `url.username`, so a URL naming a Redis 6+ ACL user
+   * authenticated as `default` instead. Proven by reverting the fix and running just this
+   * test: the connection does not fail (this server's `default` is `nopass`, the Compose
+   * default, so an unauthenticated session is already `default` with full permissions), it
+   * silently succeeds as the wrong user, `ACL WHOAMI` returns `"default"` where the assertion
+   * below expects the ACL username, and the test goes red on that mismatch, not on a thrown
+   * connection error.
+   */
+  it('authenticates as the ACL user REDIS_URL names, not default', async () => {
+    const username = `kurul-204-${Date.now()}`;
+    const password = 'acl-check-pw';
+    await onDbZero.acl('SETUSER', username, 'on', `>${password}`, '~*', '+@all');
+
+    try {
+      const url = new URL(urlWithDb(TEST_DB));
+      url.username = username;
+      url.password = password;
+      const client = new Redis({
+        ...parseRedisUrl(url.toString()),
+        lazyConnect: true,
+        maxRetriesPerRequest: 1,
+      });
+
+      try {
+        await client.connect();
+        await expect(client.acl('WHOAMI')).resolves.toBe(username);
+      } finally {
+        await client.quit();
+      }
+    } finally {
+      await onDbZero.acl('DELUSER', username);
     }
   });
 });

@@ -2,7 +2,7 @@
 
 Kurul geliştirme ortamının nasıl kurulacağı ve günden güne nasıl çalışılacağı.
 
-> 🌐 [English (canonical)](../development.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../development.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 
@@ -88,7 +88,7 @@ job'ından önce açıkça build eder, çünkü `pnpm typecheck` orada koşar.
 Test suite'leri bunun istisnasıdır. Jest (`apps/api`, unit ve integration) ve Vitest
 (`apps/web`, `packages/auth-access`) iki paketi de `src/index.ts` dosyalarına eşler; bu yüzden
 `pnpm test` hiç `dist` olmayan bir checkout'ta geçer ve asla bayat bir build'e karşı koşmaz.
-CI'daki test job'ı da bu sebeple build adımını bilerek atlar. Bayat build iki arızanın kötü
+CI'daki test job'ları da bu sebeple build adımını bilerek atlar. Bayat build iki arızanın kötü
 olanıdır, çünkü çözümlenir: son build'den sonra eklenen bir enum her tüketicide `undefined`
 olarak okunur. `pnpm dev` ve `pnpm db:seed` hâlâ `dist` üzerinden gider; bu yüzden iki
 paketten birine gelen bir değişikliği çektikten sonra yeniden build edin.
@@ -122,6 +122,13 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `ATTACHMENT_INSTANCE_QUOTA_BYTES`     | `21474836480`                                                     | Aynı tavan, instance'taki **bütün** workspace'ler üzerinden toplanmış hali; ayarlanmamış = 20 GiB, `0` = sınırsız. Volume'ün gerçek boş alanının altına ayarlayın: dağıtılan Compose yığınındaki `STORAGE_PATH`, dosya sistemini Postgres'le paylaşır. API iki kotanın da geçerli değerini açılışta, hangisinin ortamdan geldiğini belirterek loglar ve bu değer workspace kotasının altına ayarlanmışsa uyarır ([ADR 0027](decisions/0027-attachment-quotas.md))                                                                                                                                 |
 | `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`  | `268435456`                                                       | Bir istemci IP'sinin sabit bir dakikada yükleme rotasına gönderebileceği byte (256 MiB, yaklaşık on tam boy yükleme); her isteğin `Content-Length`'i multer gövdeyi okumadan önce düşülür, `Content-Length` taşımayan multipart istek `ATTACHMENT_MAX_BYTES` kadar düşülür. `0` kapatır; negatif değer açılışı reddeder. `RATE_LIMIT_ENABLED` ve `TRUST_PROXY`'ye uyar; sayaçlar `REDIS_URL` ayarlıyken Redis'te yaşar, Redis hatasında süreç belleğine düşer. Ret, `error: "Upload Budget Exceeded"` ve `Retry-After` taşıyan `429`'dur ([api-conventions.md](api-conventions.md#rate-limiting)) |
 | `TRELLO_IMPORT_MAX_BYTES`             | `20971520`                                                        | Importer'ın kabul ettiği en büyük Trello export'u, byte cinsinden (20 MiB). Disk değil **heap** tavanı — parse edilmiş grafik, onu üreten byte'ların birkaç katıdır. Yukarıdaki iki limitten de ayrı, ve import `STORAGE_PATH` istemez ([ADR 0025](decisions/0025-trello-import-mapping.md))                                                                                                                                                                                                                                                                                                      |
+| `TRELLO_IMPORT_MAX_CARDS`             | `50000`                                                           | Bir Trello import'unun planlayacağı en fazla kart sayısı, arşivlenmiş ya da bozuk olanlar elenmeden önce sayılır. Aşılırsa cevap `400`'dür ve hiçbir şey yazılmaz ([ADR 0025'in değişikliği](decisions/0025-trello-import-mapping.md#değişiklik-2026-08-26-alan-uzunluğu-tavanları-ve-satır-sayısı-tavanı-sec-04))                                                                                                                                                                                                                                                                                |
+| `TRELLO_IMPORT_MAX_LISTS`             | `5000`                                                            | Aynı tavan, listeler (`Column` satırları) için ([ADR 0025'in değişikliği](decisions/0025-trello-import-mapping.md#değişiklik-2026-08-26-alan-uzunluğu-tavanları-ve-satır-sayısı-tavanı-sec-04))                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `PLAN_MAX_SEATS_PER_WORKSPACE`        | _(boş)_                                                           | Bir workspace'teki üye artı bekleyen davet sayısına tavan ([ADR 0032](decisions/0032-plan-limits.md)). **Ayarsız ya da `0` = sınırsız**; negatif ya da tam sayı olmayan bir değer açılışı reddeder. Paketlenmiş `docker-compose.yml` dört `PLAN_MAX_*` anahtarını da `api`'ye iletir                                                                                                                                                                                                                                                                                                              |
+| `PLAN_MAX_BOARDS_PER_WORKSPACE`       | _(boş)_                                                           | Bir workspace'teki board sayısına tavan. Aynı ayarsız/`0` kuralı                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `PLAN_MAX_WORKSPACES`                 | _(boş)_                                                           | Instance'taki workspace sayısına tavan. Aynı kural                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `PLAN_MAX_USERS`                      | _(boş)_                                                           | Instance'taki hesap sayısına tavan; yalnızca sign-up'ı reddeder, sign-in'i asla. Aynı kural                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `SIGNUP_ENABLED`                      | _(boş)_ / `false`                                                 | Kayıt anahtarı. Boş ya da `true`, `POST /auth/sign-up/email`'i açık tutar; `false` onu `403` `error: "Sign-up Disabled"` ile reddeder, sign-in ve diğer her `/auth` rotasını açık bırakır. `GET /config`'de `signUpEnabled` olarak yayınlanır; `DEMO_MODE`'dan bağımsızdır. Bkz. [self-hosting](self-hosting.md#2-compose-dosyasını-indirin-ve-yapılandırın)                                                                                                                                                                                                                                      |
 | `SMTP_HOST`                           | `localhost` (geliştirme, Mailpit üzerinden)                       | SMTP sunucu host'u. Tamamen boş bırakılırsa mail modülü göndermek yerine loglar — bkz. [SMTP ve Mailpit](#smtp-ve-mailpit)                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `SMTP_PORT`                           | `1025` (geliştirme, Mailpit üzerinden) / `587` (tipik production) | SMTP sunucu portu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `SMTP_USER`                           | _(Mailpit için boş)_                                              | SMTP auth kullanıcı adı, sunucunuz gerektiriyorsa                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -132,13 +139,15 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `NOTIFICATION_RETENTION_DAYS`         | `90`                                                              | Bir bildirimin **okunduktan sonra** saklandığı gün sayısı. Okunmamış bildirimler hangi yaşta olursa olsun silinmez. `0` = sonsuza dek                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `ACTIVITY_RETENTION_DAYS`             | `365`                                                             | Bir aktivite satırının yazıldıktan sonra saklandığı gün sayısı. `0` = sonsuza dek — yasal denetim izi yükümlülüğünüz varsa bunu kullanın                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `INVITATION_RETENTION_DAYS`           | `90`                                                              | **Sonuçlanmış** bir davetin, oluşturulduğu andan itibaren saklandığı gün sayısı. Sonuçlanmış = yanıtlanmış (accepted/rejected/canceled) ya da süresi dolmuş; süresi dolmamış `pending` bir davet hangi yaşta olursa olsun silinmez. `0` = sonsuza dek                                                                                                                                                                                                                                                                                                                                             |
+| `BACKUP_INTERVAL`                     | `86400`                                                           | Yedekleme döngüleri arası saniye. `backup` servisi **ve** cleanup worker okur: worker bunu `BACKUP_KEEP` ile çarparak (24 saat taban) sahipsiz kalmış bir ek dosyasının silinmesinden önceki bekleme süresini hesaplar, böylece saklanan en eski dump'tan yapılan bir geri yükleme süpürmenin sildiği bir dosyayı asla işaret etmez. Bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme)                                                                                                                                                                                                       |
+| `BACKUP_KEEP`                         | `7`                                                               | `backup` servisinin her seriden sakladığı arşiv sayısı; cleanup worker'ın sahipsiz dosya bekleme süresinin diğer çarpanı                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `DATABASE_POOL_MAX`                   | `20`                                                              | Paylaşılan `pg` havuzunun Postgres'e açtığı azami eşzamanlı bağlantı sayısı — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                           | Tüm `DATABASE_POOL_MAX` bağlantılar meşgulken bir isteğin havuzdan bağlantı için ne kadar bekleyeceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                           | Postgres'in tek bir SQL ifadesini öldürmeden önce ne kadar çalışmasına izin vereceği — bkz. [Veritabanı bağlantı havuzu](#veritabanı-bağlantı-havuzu)                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `SENTRY_DSN`                          | _(boş)_                                                           | API hata takibi. **Boş = kapalı, ve kapalı SDK'nın hiç yüklenmemesi demektir** — bkz. [Gözlemlenebilirlik](#gözlemlenebilirlik)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `SENTRY_ENVIRONMENT`                  | _(boş)_ / `production`                                            | API event'lerindeki ortam etiketi; boşsa `NODE_ENV`'e düşer. Staging ve production aynı imajı çalıştırıyorsa açıkça ayarlayın                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `SENTRY_RELEASE`                      | _(boş)_ / `v0.2.0`                                                | API event'lerindeki sürüm etiketi; en iyisi dağıtılan tag. Boşsa hiç gönderilmez                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `NEXT_PUBLIC_SENTRY_DSN`              | _(boş)_                                                           | Web hata takibi, aynı opt-in kuralı — **build sırasında gömülür**, değiştirdikten sonra web imajını yeniden build edin                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `NEXT_PUBLIC_SENTRY_DSN`              | _(boş)_                                                           | Web hata takibi, aynı opt-in kuralı: **build sırasında gömülür**, değiştirdikten sonra web imajını yeniden build edin. Yayınlanan GHCR imajı yerinde yeniden build edilemez, bkz. [Tarayıcı hata takibi](self-hosting.md#tarayıcı-hata-takibi)                                                                                                                                                                                                                                                                                                                                                    |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(boş)_ / `production`                                            | `SENTRY_ENVIRONMENT`'ın web karşılığı, o da build zamanlı                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `NEXT_PUBLIC_SENTRY_RELEASE`          | _(boş)_ / `v0.2.0`                                                | `SENTRY_RELEASE`'in web karşılığı, o da build zamanlı                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `SEED_LARGE_BOARD_TASKS`              | _(boş)_ / `1000`                                                  | Yalnızca `pnpm db:seed` okur. Demo board'un yanına bu kadar task taşıyan sentetik bir board ekler. Boş ya da `0` atlar — bkz. [Büyük board seed'lemek](#büyük-board-seedlemek)                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -146,6 +155,9 @@ Sonra boşlukları doldurun. `.env` git tarafından ignore edilir ve asla commit
 | `TELEMETRY_ENABLED`                   | `false`                                                           | Dışa telemetri. **Varsayılan kapalı; bu `false` iken hiçbir şey gönderilmez** — bkz. [Aktivasyon hunisi ve telemetri](#aktivasyon-hunisi-ve-telemetri)                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `TELEMETRY_ENDPOINT`                  | _(boş)_                                                           | Opt-in ping'in POST edileceği adres. **Varsayılanı yok**; `TELEMETRY_ENABLED=true` iken bu boşsa hata loglanır ve hiçbir şey gönderilmez                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `TELEMETRY_TIMEOUT_MS`                | `5000`                                                            | Açılıştaki tek ping'in terk edilmeden önce sürebileceği süre. Başarısızlık tek bir uyarı satırıdır, başka hiçbir şey değil                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `DEMO_MODE`                           | `false`                                                           | Instance'ı herkese açık bir demo olarak çalıştırır: bir banner, SMTP ne derse desin tüm giden mail loga, hesap ve workspace silme reddedilir, sıfırlama takvimi `GET /config`'de yayınlanır. Bkz. [self-hosting.md](self-hosting.md#demo-instance)                                                                                                                                                                                                                                                                                                                                                |
+| `DEMO_PASSWORD`                       | _(boş)_                                                           | `demo-reset` servisinin her sıfırlamada demo hesabına verdiği parola (en az 8 karakter). Yalnızca `apps/api/src/demo/reset.ts` okur; bu yüzden `docker-compose.yml` onu `api`'ye değil `demo-reset`'e iletir                                                                                                                                                                                                                                                                                                                                                                                      |
+| `DEMO_RESET_INTERVAL_MINUTES`         | `60`                                                              | Demo sıfırlamaları arası dakika. Hem `api` (banner'daki geri sayım) hem `demo-reset` (uyku süresi) okur; compose aynı değeri ikisine de bu yüzden geçer                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` ve `SENTRY_PROJECT` yalnızca `next build` tarafından, source
 map yüklenirken ve yalnızca ayarlanmışlarsa okunur; bunlar olmadan build sessizce başarılı
@@ -153,23 +165,42 @@ olduğu için `.env.example`'da yer almazlar. Bkz.
 [Gözlemlenebilirlik](#gözlemlenebilirlik).
 
 `.env.example` ayrıca `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `REDIS_PASSWORD`,
-`BACKUP_INTERVAL` ve `BACKUP_KEEP` taşır. Altısı da **yalnızca compose'a aittir** —
-`docker-compose.yml` bunları `postgres`/`redis`/`migrate`/`api`/`backup` servislerine
-enterpolasyon eder ve hiçbir uygulama kodu doğrudan okumaz; bu yüzden yukarıdaki tabloda yer
-almazlar ve `apps/api` tarafında bağlanmaları gerekmez. İlk dördü için bkz.
-[Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri), yedekleme
-çifti için bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme).
+`REDIS_MAXMEMORY`, `BACKUP_REMOTE` ve `TAG` taşır. Yedisi de **yalnızca compose'a aittir**:
+`docker-compose.yml` bunları servis tanımlarına enterpolasyon eder (`TAG`, yayınlanan her imajın
+etiketini seçer; `REDIS_MAXMEMORY` bir `redis-server` argümanına dönüşür) ve hiçbir uygulama
+kodu okumaz; bu yüzden yukarıdaki tabloda yer almazlar ve `apps/api` tarafında bağlanmaları
+gerekmez. İlk dördü için bkz.
+[Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri), `BACKUP_REMOTE`
+için bkz. [Yükseltme ve yedekleme](#yükseltme-ve-yedekleme). `BACKUP_INTERVAL` ve `BACKUP_KEEP`
+o listede değil: onları `backup` servisi okur ama `apps/api` içindeki cleanup worker da okur,
+tabloda olmalarının sebebi bu. `INTERNAL_API_URL` ise tersi yönde çalışır: uygulama kodu okur,
+o yüzden tabloda; ama `.env.example`'da yok, çünkü `docker-compose.yml` onu `.env`'den
+enterpolasyonla değil doğrudan ayarlar.
 
-Bir secret üretmek için:
+`BETTER_AUTH_SECRET`'i şununla üretin:
 
 ```bash
 openssl rand -base64 32
 ```
 
-**Yeni bir ortam değişkeni eklemek üç adımlı bir değişikliktir** ve üçü de aynı PR'a girer:
+Bu üretici yalnızca bu değişken için doğru; bir connection URL'in içine giren iki değişken için
+yanlış. Kural, önlediği hata ve olasılıklar tek bir yerde yazılı:
+[Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri). `.env.example`,
+[README.tr.md](../../README.tr.md) ve [self-hosting.md](self-hosting.md) kendi kopyalarını
+taşımak yerine oraya işaret eder.
+
+**Yeni bir ortam değişkeni eklemek dört adımlı bir değişikliktir** ve dördü de aynı PR'a girer:
 `apps/api/src/common/env.ts` yardımcıları üzerinden bağla (veya `process.env` okuyan çağrı
-noktası — bugün ayrı bir Zod/tipli env şeması yok), güvenli bir placeholder ile
-`.env.example`'a ekle ve yukarıdaki tabloda belgele.
+noktası; bugün ayrı bir Zod/tipli env şeması yok), güvenli bir placeholder ile `.env.example`'a
+ekle, yukarıdaki tabloda belgele ve `docker-compose.yml` içinde onu okuyan servisin (`api`, `web`,
+`demo-reset` ya da `migrate`) altına `KEY: ${KEY:-}` olarak ilet, ya da tabloda yalnızca
+geliştirme döngüsüne ait olduğunu belirt. Son adım unutması kolay, fark etmesi imkânsız olan:
+Compose `.env`'i yalnızca `${VAR}` enterpolasyonu için okur ve dosyayı hiçbir container'a
+vermez, api imajı da kendi `.env`'i olmadan gelir; dolayısıyla `environment:` bloğunda olmayan
+bir anahtar her Compose kurulumunda sessizce varsayılanında kalır.
+`scripts/lib/compose-env.test.mjs` (`pnpm test:scripts`), `api` servisinin iletmediği belgelenmiş
+ve API'nin okuduğu bir anahtarda başarısız olur; bilinçli bir istisna, gerekçesiyle birlikte
+oradaki istisna listesine girer.
 
 ## Veritabanı ve cache kimlik bilgileri
 
@@ -204,10 +235,11 @@ $ openssl rand -hex 32
 1b7c3785ecf7f7bd2ec4826214889d19ff17d518ce44126ab6f07393b39b98a   # yalnızca 0-9a-f, her zaman URL-güvenli
 ```
 
-`-base64 32`'nin alfabesi `/` ve `+` içerir; parola başına 43 base64 karakteriyle, en az bir
-`/` veya `+`'nin düşme olasılığı `1 - (63/64)^43 ≈ %51` — yeni üretilen bir parolanın kendi
-bağlantı string'ini sessizce bozup bozmayacağı kabaca yazı tura. `openssl rand -hex 32`'de
-kaçınılması gereken böyle bir karakter yok.
+`-base64 32`'nin alfabesi hem `/` hem `+` içerir, 64 karakter içinde iki sorunlu karakter;
+parola başına 43 base64 karakteriyle, ikisinden en az birinin düşme olasılığı
+`1 - (62/64)^43 ≈ %74` - yeni üretilen bir parolanın kendi bağlantı string'ini sessizce bozup
+bozmayacağı, yazı turadan çok, dörtte üçe yakın bir ihtimal. `openssl rand -hex 32`'de kaçınılması
+gereken böyle bir karakter yok.
 
 | Değişken            | Varsayılan      | Amaç                                                                                                                   |
 | ------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -249,12 +281,26 @@ kanalları değil. Bir de: indeks negatif olmayan düz bir tam sayı değilse
 ayarın tüm amacı iki uygulamayı ayrı tutmak olduğuna göre, içindeki bir yazım hatası onları bir
 araya getirmemelidir.
 
+**Bir Redis 6+ ACL kullanıcısı ve `rediss://` (TLS) da dikkate alınır.**
+`redis://alice:s3cret@host:6379`, `default` yerine `alice` olarak `s3cret` şifresiyle kimlik
+doğrular; `rediss://host:6379` ise düz metin yerine TLS bağlantısı açar. Bunlardan biri, ACL
+kullanıcısı veya TLS isteyen yönetilen bir Redis (Upstash, ElastiCache aktarımda şifreleme,
+Redis Cloud) için gereklidir.
+[#204](https://github.com/dravcore/kurul/issues/204) öncesinde ikisi de sessizce
+düşürülüyordu: ACL kullanıcı adı ioredis'e hiç ulaşmıyordu, dolayısıyla instance verilen
+şifreyle `default` olarak kimlik doğruluyordu (bu, `default`'un eşleşecek kendi şifresi
+olmadığında tamamen başarısız olur, aksi halde yanlış kullanıcının izinleriyle çalışır) ve
+`rediss://` hiçbir uyarı vermeden düz metin bağlanıyordu. `redis:` veya `rediss:` dışındaki bir
+şema, ayrıştırılamayan bir veritabanı indeksiyle aynı şekilde bağlantı anında reddedilir.
+Bundle edilmiş Compose stack'i her iki durumda da etkilenmez: kendi `redis` konteyneri için
+her zaman düz bir `redis://:password@redis:6379` oluşturur.
+
 **`POSTGRES_PASSWORD`'ü mevcut bir `postgres_data` volume'unda değiştirmek, çalışan
 veritabanının şifresini döndürmez.** Resmi Postgres image'ı `POSTGRES_PASSWORD`'ü yalnızca
 `initdb` sırasında, yani bir volume ilk oluşturulduğunda uygular — `.env`'i düzenleyip zaten
 initialize edilmiş bir stack'i yeniden başlatmak, rolün şifresini tam olarak eskisi gibi
 bırakır. Çalışan bir instance'ta şifreyi döndüren `ALTER USER ... PASSWORD` komutu için
-`CHANGELOG.md`'deki `[Unreleased]` girdisine bakın.
+`CHANGELOG.md`'deki `[0.2.0]` girdisine bakın.
 
 ### Checkout'unuz yeniden adlandırmadan eskiyse
 
@@ -408,6 +454,41 @@ yalnız veritabanında hiç `Workspace` satırı yokken çalışır. `--seed` yi
 atlar. Betik o tabloyu herhangi bir sebeple okuyamazsa da atlar — yıkıcı dal asla tahmine
 dayanarak seçilmez.
 
+**`pnpm bootstrap --check`**, aynı betik için bir doctor mode'dur: Docker'a, veritabanına ya da
+ağa hiç dokunmadan "son bootstrap'tan bu yana bir şey bayatladı mı" sorusunu yanıtlar, bu yüzden
+5 saniyenin oldukça altında kalır ve her `git pull` sonrası, tam bir `pnpm bootstrap`'e değip
+değmediğine karar vermeden önce koşturmak için güvenlidir. Tam olarak üç şeyi kontrol eder ve
+başarısızlıkta bir düzeltme komutuyla, kontrol başına bir satır yazdırır:
+
+```
+✓ @kurul/shared-types dist: up to date
+✓ @kurul/auth-access dist: up to date
+✗ Prisma client: stale — schema.prisma is newer than the generated client
+  fix: pnpm db:generate
+✗ required env keys: POSTGRES_PASSWORD empty or missing in .env
+  fix: set POSTGRES_PASSWORD in .env — see docs/development.md#environment-variables
+```
+
+1. `packages/shared-types/dist` ve `packages/auth-access/dist`, kendi `src`'lerinden en az o
+   kadar yeni — `pnpm dev` ve `pnpm db:seed`'in gerçekte tükettiği iki build çıktısı (bunun
+   yerini aldığı hata modu için `[0.4.0]` CHANGELOG girdisine bakın: bayat bir `dist`
+   yüksek sesli başarısız olmak yerine çözümlenir ve her tüketicide `undefined` olarak geri
+   okunur).
+2. Üretilmiş Prisma client'ı (`apps/api/src/generated/prisma`), `schema.prisma`'dan en az o
+   kadar yeni.
+3. `.env`, boş olmayan `POSTGRES_PASSWORD` ve `BETTER_AUTH_SECRET` taşıyor — `pnpm bootstrap`'in
+   kendi ön kontrolünün zaten olmadan boot etmeyi reddettiği aynı iki anahtar — ve
+   `DATABASE_URL` artık `.env.example`'ın gönderdiği `<POSTGRES_PASSWORD>` yer tutucusunu
+   taşımıyor.
+
+Kasıtlı olarak `apps/api/dist` ya da `apps/web/.next`'i kontrol **etmez**: ne `pnpm bootstrap` ne
+de `pnpm dev` bunları build eder (bunlar `pnpm typecheck` ve bir production build için gereken
+`nest build` / `next build` çıktıları, dev loop'un değil), yani burada onları kontrol etmek sağlıklı
+bir dev checkout'u bozuk olarak raporlardı. Her kontrol geçtiğinde çıkış kodu `0`, aksi halde
+`1` — mantık [`scripts/lib/doctor.mjs`](../../scripts/lib/doctor.mjs)'de yaşıyor,
+[`scripts/lib/doctor.test.mjs`](../../scripts/lib/doctor.test.mjs)'de test ediliyor
+(`pnpm test:scripts`).
+
 `schema.prisma`'nın ve commit edilmiş migration'ların hâlâ uyuştuğunu doğrulamak için, en son
 migration'a alınmış bir veritabanına karşı `pnpm db:drift` çalıştırın — aşağıdaki [Migration
 sapmasını kontrol etme](#migration-sapmasını-kontrol-etme) bölümüne bakın.
@@ -520,7 +601,10 @@ edilmeden çalışır**. Gerekçenin tamamı:
 
 Sentry DSN'leri hâlâ gerçekten build zamanlıdır: tarayıcı hata takibini açıp kapatmak `web`'i
 yeniden build etmeyi gerektirir (`docker compose build web`, `NEXT_PUBLIC_SENTRY_*`'i
-`.env`'den okur), yalnızca yeniden başlatmayı değil. `NEXT_PUBLIC_API_URL` bilinçli olarak o
+`.env`'den okur), yalnızca yeniden başlatmayı değil; bunun için de bir kaynak ağacı gerekir,
+çünkü yayınlanan GHCR imajı DSN boşken build edilmiştir ve yerinde yeniden build edilemez, bkz.
+[Tarayıcı hata takibi](self-hosting.md#tarayıcı-hata-takibi). `NEXT_PUBLIC_API_URL` bilinçli
+olarak o
 `args:` bloğunda **değildir**; böylece lokal bir build, geliştirme döngüsünün `.env`'de
 bıraktığını sessizce gömmek yerine release imajıyla aynı bundle'ı üretir. API'yi gerçekten kendi
 hostname'inde isteyen bir dağıtım build arg'ını doğrudan geçer ve domain'e özgü bir imajı kabul
@@ -592,32 +676,38 @@ bakladığı) doğrudan sahipken hiçbir override gerekmiyor. `docker top`'un `r
 redis-server` yerine `999 ... redis-server` göstermesiyle, ve hem şifreli hem şifresiz
 durumda değerin sağlam kaldığı bir `SET` → restart döngüsüyle doğrulandı.
 
-Bu sertleştirme turunun kapsamı dışında: salt-okunur kök dosya sistemi (`read_only: true`)
-ve seccomp profilleri. İkisi de hangi yolların yazılabilir kalması gerektiğine dair
+Bu sertleştirme turunun kapsamı dışında: salt-okunur kök dosya sistemi (`read_only: true`),
+`pids_limit` ve seccomp profilleri. Üçü de hangi yolların yazılabilir kalması gerektiğine dair
 servis-bazlı bir denetim isteyen daha katı kısıtlar (geçici dizinler, node'un kendi `/tmp`
-kullanımı vb.); [ROADMAP.md](../../ROADMAP.md#hardening-track)'ın Hardening hattında takip
-işi olarak izleniyor, buraya dahil edilmedi.
+kullanımı vb.); o denetimi iki Dockerfile o zamandan beri yazdı.
+[ROADMAP.md](../../ROADMAP.md#hardening-track) içindeki "Container hardening pass 2" satırı
+olarak izleniyor, buraya dahil edilmedi.
 
 ## pnpm script'leri
 
 Repository kökünden çalıştırın.
 
-| Script           | Komut                 | Ne yapar                                                                                                                                                                                                                                                                                                                                                                           |
-| ---------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bootstrap`      | `pnpm bootstrap`      | Taze clone (veya taze pull) → çalışan dev loop: paylaşılan paketler, Prisma client, container'lar, migration'lar, demo veri. Idempotent; halihazırda workspace tutan bir veritabanını yeniden seed'lemez. `--seed` / `--no-seed` bunu geçersiz kılar. `pnpm setup` **değil** — o, shell profilinize yazan yerleşik bir pnpm komutudur                                              |
-| `dev`            | `pnpm dev`            | `apps/api` ve `apps/web`'i hot reload ile paralel çalıştırır                                                                                                                                                                                                                                                                                                                       |
-| `build`          | `pnpm build`          | Her workspace paketini build eder                                                                                                                                                                                                                                                                                                                                                  |
-| `lint`           | `pnpm lint`           | Tüm paketlerde ESLint                                                                                                                                                                                                                                                                                                                                                              |
-| `format`         | `pnpm format`         | Repo genelinde Prettier write                                                                                                                                                                                                                                                                                                                                                      |
-| `format:check`   | `pnpm format:check`   | Prettier check (CI kapısı)                                                                                                                                                                                                                                                                                                                                                         |
-| `typecheck`      | `pnpm typecheck`      | `@kurul/shared-types` + `@kurul/auth-access` build, ardından her workspace'te `tsc --noEmit`                                                                                                                                                                                                                                                                                       |
-| `test`           | `pnpm test`           | Tüm workspace paketlerinin test suite'lerini çalıştırır                                                                                                                                                                                                                                                                                                                            |
-| `db:generate`    | `pnpm db:generate`    | `prisma generate`'i çalıştırır: Prisma client'ı şemadan (yeniden) üretir. Migration'lara veya veritabanına dokunmaz. Klonlama sonrasında ve başkasının yaptığı şema/migration değişikliklerini pull'ladıktan sonra gereklidir                                                                                                                                                      |
-| `db:migrate`     | `pnpm db:migrate`     | `prisma migrate deploy`'u çalıştırır: var olan, zaten commit edilmiş migration'ları uygular. Asla migration oluşturmaz ve client'ı asla yeniden üretmez — CI/production için güvenlidir. Bunu yalnızca yeni migration'ları pull'ladıktan sonra çalıştırdıysanız, ardından `pnpm db:generate` çalıştırın                                                                            |
-| `db:migrate:dev` | `pnpm db:migrate:dev` | `prisma migrate dev`'i çalıştırır: yerel şemanızı diff'ler, **yeni bir migration dosyası oluşturur**, uygular ve client'ı yeniden üretir. `schema.prisma`'yı düzenledikten sonra yerelde çalıştırmanız gereken komut budur — `db:migrate` tek başına onu oluşturmaz                                                                                                                |
-| `db:seed`        | `pnpm db:seed`        | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır                                                                                                                                                    |
-| `db:studio`      | `pnpm db:studio`      | http://localhost:5555 adresinde Prisma Studio'yu açar                                                                                                                                                                                                                                                                                                                              |
-| `db:drift`       | `pnpm db:drift`       | `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`'u çalıştırır: yapılandırılmış veritabanını `schema.prisma` ile karşılaştırır ve herhangi bir farkta sıfırdan farklı çıkışla sonlanır. CI'nin `db:migrate`'ten sonra çalıştırdığı komutla aynıdır — bkz. [Migration sapmasını kontrol etme](#migration-sapmasını-kontrol-etme) |
+| Script           | Komut                 | Ne yapar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bootstrap`      | `pnpm bootstrap`      | Taze clone (veya taze pull) → çalışan dev loop: paylaşılan paketler, Prisma client, container'lar, migration'lar, demo veri. Idempotent; halihazırda workspace tutan bir veritabanını yeniden seed'lemez. `--seed` / `--no-seed` bunu geçersiz kılar. `--check`, onun yerine doctor mode'u koşturur — Docker yok, ağ yok, bayat/eksik dist, Prisma client ya da `.env` anahtarlarında sıfırdan farklı çıkış kodu döner, bkz. [yukarısı](#önerilen-geliştirme-döngüsü-servisler-dockerda-uygulamalar-hostta). `pnpm setup` **değil** — o, shell profilinize yazan yerleşik bir pnpm komutudur |
+| `dev`            | `pnpm dev`            | `apps/api` ve `apps/web`'i hot reload ile paralel çalıştırır                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `build`          | `pnpm build`          | Her workspace paketini build eder                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `lint`           | `pnpm lint`           | Tüm paketlerde ESLint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `format`         | `pnpm format`         | Repo genelinde Prettier write                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `format:check`   | `pnpm format:check`   | Prettier check (CI kapısı)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `typecheck`      | `pnpm typecheck`      | `@kurul/shared-types` + `@kurul/auth-access` build, ardından her workspace'te `tsc --noEmit`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `test`           | `pnpm test`           | Tüm workspace paketlerinin test suite'lerini çalıştırır                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `db:generate`    | `pnpm db:generate`    | `prisma generate`'i çalıştırır: Prisma client'ı şemadan (yeniden) üretir. Migration'lara veya veritabanına dokunmaz. Klonlama sonrasında ve başkasının yaptığı şema/migration değişikliklerini pull'ladıktan sonra gereklidir                                                                                                                                                                                                                                                                                                                                                                |
+| `db:migrate`     | `pnpm db:migrate`     | `prisma migrate deploy`'u çalıştırır: var olan, zaten commit edilmiş migration'ları uygular. Asla migration oluşturmaz ve client'ı asla yeniden üretmez — CI/production için güvenlidir. Bunu yalnızca yeni migration'ları pull'ladıktan sonra çalıştırdıysanız, ardından `pnpm db:generate` çalıştırın                                                                                                                                                                                                                                                                                      |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | `prisma migrate dev`'i çalıştırır: yerel şemanızı diff'ler, **yeni bir migration dosyası oluşturur**, uygular ve client'ı yeniden üretir. `schema.prisma`'yı düzenledikten sonra yerelde çalıştırmanız gereken komut budur — `db:migrate` tek başına onu oluşturmaz                                                                                                                                                                                                                                                                                                                          |
+| `db:seed`        | `pnpm db:seed`        | Demo veriyi yükler: bir workspace, bir board, varsayılan column'lar, birkaç task. Prisma 7 altında seed giriş noktası `prisma.config.ts` içinde deklare edilir — seeding hiçbir zaman otomatik değildir ve açıkça çağrılmalıdır                                                                                                                                                                                                                                                                                                                                                              |
+| `db:studio`      | `pnpm db:studio`      | http://localhost:5555 adresinde Prisma Studio'yu açar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `db:drift`       | `pnpm db:drift`       | `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`'u çalıştırır: yapılandırılmış veritabanını `schema.prisma` ile karşılaştırır ve herhangi bir farkta sıfırdan farklı çıkışla sonlanır. CI'nin `db:migrate`'ten sonra çalıştırdığı komutla aynıdır — bkz. [Migration sapmasını kontrol etme](#migration-sapmasını-kontrol-etme)                                                                                                                                                                                                           |
+| `openapi`        | `pnpm openapi`        | `@kurul/api`'yi derler, sonra `apps/api/openapi.json`'ı derlenmiş uygulamadan yeniden üretir. Swagger CLI plugin'i yalnızca `nest build` sırasında çalışır, build'in burada opsiyonel olmamasının sebebi bu. Dokümanın `info.version`'ı `apps/api/package.json`'dan gelir, dolayısıyla bir sürüm yükseltmesi dosyayı da oynatır                                                                                                                                                                                                                                                              |
+| `openapi:check`  | `pnpm openapi:check`  | Dokümanı bellekte yeniden üretir ve commit'lenmiş `apps/api/openapi.json` ile byte byte karşılaştırır; ilk farklı satırda sıfırdan farklı çıkar. CI'ın `build` job'ının çalıştırdığı komutun aynısı; her controller, DTO veya rol kapısı değişikliğinden sonra çalıştırın                                                                                                                                                                                                                                                                                                                    |
+| `knip`           | `pnpm knip`           | `knip.jsonc` ile yapılandırılmış olarak workspace genelinde kullanılmayan dosya, export ve tipleri raporlar. Bugün bir CI kapısı değil: bilinçli olarak çalıştırılır ve işaretlediği bir export ya `export`'unu kaybeder, ya silinir, ya da gerekçesi yazılı bir ignore olur                                                                                                                                                                                                                                                                                                                 |
+| `test:browser`   | `pnpm test:browser`   | E2e stack'ini derler (`e2e/build-stack.mjs`) ve Playwright smoke paketini ona karşı çalıştırır. Docker ister. CI'da aynı paketi `e2e.yml` çalıştırır: `develop` üzerinde nightly ve `main`'e açılan `release/*` ile `hotfix/*` pull request'lerinde, hiçbir zaman `ci-ok` kapısında değil; o workflow stack'i kendi adımlarında kurar ve Playwright'ı bu script üzerinden değil doğrudan çağırır. Bkz. [testing.md](testing.md#browser-uçtan-uca)                                                                                                                                            |
+| `test:scripts`   | `pnpm test:scripts`   | `scripts/` altındaki bağımlılıksız `node:test` paketlerini çalıştırır; bootstrap doctor kontrolleri ve `api` servisinin iletmediği, dokümante edilmiş bir API-okur anahtarda düşen compose-env koruması dahil                                                                                                                                                                                                                                                                                                                                                                                |
 
 Tek bir workspace'i hedeflemek için pnpm'in filter flag'ini kullanın:
 
@@ -872,7 +962,7 @@ Açtığınızda, API süreci başlarken tam olarak bir `POST` yapılır; gövde
 ```json
 {
   "event": "instance_started",
-  "version": "0.1.0"
+  "version": "0.4.0"
 }
 ```
 
@@ -881,7 +971,7 @@ Alan alan, listenin tamamı budur:
 | Alan      | Değer                | Not                                             |
 | --------- | -------------------- | ----------------------------------------------- |
 | `event`   | `"instance_started"` | Her zaman bu düz metin. Tek bir olay vardır     |
-| `version` | örn. `"0.1.0"`       | Bu derlemenin geldiği `@kurul/api` paket sürümü |
+| `version` | örn. `"0.4.0"`       | Bu derlemenin geldiği `@kurul/api` paket sürümü |
 
 Gönderil**mey**en ve gönderilmesi için kod yolu bulunmayanlar: herhangi bir kurulum kimliği,
 hostname'iniz, IP adresiniz, URL'iniz, veritabanınız, kullanıcı/workspace/board/task sayıları,
@@ -891,7 +981,7 @@ yok, zamanlama yok. Yük gönderilmeden önce tamamen loglanır, böylece sunucu
 kendi API log'unuzda okuyabilirsiniz:
 
 ```text
-LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.1.0"} to https://…
+LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.4.0"} to https://…
 ```
 
 Reddedilen bağlantı, DNS hatası, toplayıcıdan gelen hata ya da zaman aşımı
@@ -943,14 +1033,24 @@ yedekleme sidecar'ı sessizce kurtarma noktası üretmeyi bırakır ki bu bölü
 tam olarak bu hatadır. `docker-compose.dev.yml`'de bilinçli olarak **yok** — `pnpm db:seed`'in
 istendiğinde sildiği yerel bir veritabanında saklanmaya değer bir şey yoktur.
 
-İki ayar, ikisi de compose tarafından `.env`'den okunur:
+O hafta bir arşiv sayısıdır, yaş değil, ve container'ı yeniden başlatmak bundan harcamaz. Döngü
+eskiden her başladığında girişte bir çift alırdı ve her host reboot'u, `.env` düzenlemesinden
+sonraki her `docker compose up` ve her image pull onu başlatır; yani bir günlük yeniden
+başlatmalar bir haftalık geçmişi yedi slotun dışına itebilirdi. Artık `BACKUP_INTERVAL`'ın
+yarısından genç bir dump zaten varken o ilk döngüyü atlar, atladığını loglar ve yalnızca
+aralığın kalanı kadar uyur; böylece hem kadans hem de geçmiş yeniden başlatmadan önceki gibi
+kalır. Aşağıdaki elle çalıştırılan `backup.sh once` hiçbir zaman atlanmaz: dump isteyen
+operatör dump alır.
+
+Üç ayar, üçü de compose tarafından `.env`'den okunur:
 
 | Değişken          | Varsayılan | Amaç                                                                       |
 | ----------------- | ---------- | -------------------------------------------------------------------------- |
 | `BACKUP_INTERVAL` | `86400`    | Döngüler arası saniye. `86400` = günlük; bu **doğrudan** sizin RPO'nuzdur  |
 | `BACKUP_KEEP`     | `7`        | Her seride saklanan arşiv sayısı; her döngüden sonra daha eskileri silinir |
+| `BACKUP_REMOTE`   | boş        | Host dışı kopya için rclone remote yolu; boş = yalnızca yerel arşivler     |
 
-Compose bu ikisini `api` servisine de geçirir — yedekleme ayarı gibi okunduğu için gözden
+Compose ilk ikisini `api` servisine de geçirir — yedekleme ayarı gibi okunduğu için gözden
 kaçması kolaydır: gece koşan yetim dosya süpürmesi, bir dosyayı sahiplenmeyi bırakacak kadar
 eski bir dump hâlâ restore edilebilirken o dosyayı silmeyi reddeder ve bu grace period tam
 olarak `BACKUP_KEEP × BACKUP_INTERVAL`'dır. "Diskte var, veritabanında yok" ancak veritabanı
@@ -970,13 +1070,19 @@ docker compose exec backup ls -lh /backups   # en yeni çift ve kaç tanesi sakl
 
 Döngü başına bir değil iki satır: yalnızca dump'ı loglayan bir döngü, dosya arşivinin
 başarısız olduğu (ya da `ATTACHMENT_DIR`'in boş olduğu) anlamına gelir; üstündeki `ERROR`
-satırı hangisi olduğunu söyler.
+satırı hangisi olduğunu söyler. `BACKUP_REMOTE` ayarlıysa arşiv başına bir tane olmak üzere iki
+satır daha (`off-host: pushed …`) gelir ve aynı kural onlar için de geçerlidir.
 
 **Arşivleri host dışına kopyalayın.** `backup_data`, `postgres_data` ile aynı diskte durur;
-yani "yanlış tabloyu düşürdüm"ü kapsar, ölen bir diski veya kaybolan bir sunucuyu hiç
-kapsamaz — volume'ü düzenli olarak başka bir yere aynalayın
-(`docker compose exec -T backup cat /backups/<arşiv>` üzerinden ya da doğrudan volume'ün host
-yolundan `rsync`/`rclone`), yoksa felaket senaryosu yine her şeyi kaybettirir.
+yani yukarıdaki her şey "yanlış tabloyu düşürdüm"ü kapsar, ölen bir diski veya kaybolan bir
+sunucuyu hiç kapsamaz. `BACKUP_REMOTE`'a bir rclone remote yolu verin (`s3:bucket/prefix`,
+`b2:bucket`, `sftp:…`); aynı sidecar her döngüden sonra iki arşivi de oraya iter, remote'u aynı
+`BACKUP_KEEP` sayısına budar ve, asıl mesele budur, en yeni host dışı kopya
+`2 × BACKUP_INTERVAL`'ı geçtiğinde container'ı **unhealthy** raporlar; yani bozulan bir yükleme
+restore gününde değil bozulduğu gün fark edilir. Başarısız bir yükleme hiçbir zaman yerel bir
+arşive mal olmaz. Varsayılan olan boş değer bu bölümü tam olarak bu seçenek yokken olduğu gibi
+bırakır. Kurulum, kimlik bilgileri ve remote'tan restore:
+[Host dışı kopyalar](self-hosting.md#host-dışı-kopyalar).
 
 ### Elle dump almak
 
@@ -1424,8 +1530,10 @@ SENTRY_RELEASE=v0.2.0                    # opsiyonel; dağıttığınız tag'i v
 
 ardından `docker compose up -d --build web && docker compose up -d api`. API DSN'ini
 konteyner başlarken okur, bu yüzden restart yeterlidir. Web DSN'i bir `NEXT_PUBLIC_*`
-değeridir ve Next.js bunu **build** sırasında gömer — değişikliğin etkili olması için web
-imajının yeniden build edilmesi gerekir. (Bu, eskiden `NEXT_PUBLIC_API_URL` için de yeniden
+değeridir ve Next.js bunu **build** sırasında gömer; değişikliğin etkili olması için web
+imajının yeniden build edilmesi gerekir. Pull ile kurulmuş bir instance'da bu bir clone
+demektir, çünkü yayınlanan imaj DSN boşken build edilmiştir:
+[Tarayıcı hata takibi](self-hosting.md#tarayıcı-hata-takibi). (Bu, eskiden `NEXT_PUBLIC_API_URL` için de yeniden
 build'i zorunlu kılan aynı mekanizmadır; o artık zorunlu kılmıyor, çünkü gömülen değer bir
 dağıtımın hostname'i değil aynı origin'deki bir yol —
 bkz. [Docker'da tam stack](#dockerda-tam-stack).)

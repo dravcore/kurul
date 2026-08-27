@@ -1,7 +1,7 @@
 import type { Priority } from '@kurul/shared-types';
 import type { Prisma } from '../generated/prisma';
 
-export const taskInclude = {
+const taskInclude = {
   assignees: {
     include: { user: { select: { id: true, name: true, avatarUrl: true } } },
     orderBy: { id: 'asc' },

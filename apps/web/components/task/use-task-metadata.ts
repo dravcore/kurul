@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type {
@@ -17,7 +17,8 @@ import { useApiResource, useResourceField } from '@/lib/use-api-resource';
 export type UseTaskMetadataOptions = {
   workspaceId: string;
   boardId: string;
-  taskId: string;
+  /** `null` while the panel has no task yet: nothing is read until one arrives. */
+  taskId: string | null;
   /** Board-scoped caches from BoardView — skip the members/labels refetch when provided. */
   members?: WorkspaceMemberDto[];
   labels?: LabelDto[];
@@ -83,6 +84,13 @@ export function useTaskMetadata({
 
   const [loadingMoreComments, setLoadingMoreComments] = useState(false);
 
+  // TaskPanel does not remount per task (task-panel.tsx), so this hook instance survives a
+  // switch to another card, and the retry toast from a failed load outlives it too. Assigned
+  // during render, not from an effect, so a `run` closure that bails on it sees the current
+  // task the moment it checks, not one commit behind.
+  const taskIdRef = useRef(taskId);
+  taskIdRef.current = taskId;
+
   const loadMeta = useCallback(
     async (signal: AbortSignal): Promise<TaskMeta> => {
       const sharedReady = membersProp !== undefined && labelsProp !== undefined;
@@ -122,11 +130,13 @@ export function useTaskMetadata({
     failed: metaFailed,
     setData: setMeta,
   } = useApiResource<TaskMeta>(
-    loadMeta,
-    // The board's caches are the floor a failure falls back to, not an empty roster: the
-    // assignee picker still has real people in it when the comment thread is the thing that
-    // did not load. Only the first render's value is kept, which is the one BoardView mounts
-    // the panel with.
+    // `null` holds the read off entirely, which is the state a deep-linked panel is in before
+    // the board has fetched the task. `loadMeta` therefore only ever runs with a real id.
+    taskId === null ? null : loadMeta,
+    // On a deep link the panel mounts before the board resolves, so `membersProp` and
+    // `labelsProp` can still be empty here. Because this is only read on the first render,
+    // that empty snapshot is what the assignee picker and label list are stuck with for the
+    // rest of this resource's life, even after the board's own fetch fills them in.
     {
       members: membersProp ?? [],
       boardLabels: labelsProp ?? [],
@@ -145,41 +155,63 @@ export function useTaskMetadata({
   const setComments = useResourceField(setMeta, 'comments');
 
   /** Comments come back oldest first, so the next page appends to the end of the thread. */
-  const loadMoreComments = useCallback(async (): Promise<void> => {
-    const cursor = meta.commentsCursor;
-    if (!cursor || loadingMoreComments) return;
-    setLoadingMoreComments(true);
-    try {
-      const page = await api.get<CursorPage<CommentDto>>(
-        `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=${COMMENTS_PAGE_LIMIT}&cursor=${encodeURIComponent(cursor)}`,
-      );
-      setMeta((current) => {
-        // A comment posted from this panel also sits past the cursor, so the next page can
-        // repeat what is already on screen — the id is what decides, not the server slice.
-        const seen = new Set(current.comments.map((comment) => comment.id));
-        return {
-          ...current,
-          comments: [...current.comments, ...page.items.filter((item) => !seen.has(item.id))],
-          commentsCursor: page.nextCursor,
-        };
-      });
-    } catch {
-      toast.error(t('commentsLoadMoreError'));
-    } finally {
-      setLoadingMoreComments(false);
-    }
-  }, [workspaceId, taskId, meta.commentsCursor, loadingMoreComments, setMeta, t]);
+  const loadMoreComments = useCallback(
+    async function run(): Promise<void> {
+      // The retry action below can still fire after the panel has moved to another task; a
+      // stale page landing here would appear to belong to the thread now on screen.
+      const forTask = taskId;
+      if (taskIdRef.current !== forTask) return;
+      const cursor = meta.commentsCursor;
+      if (!cursor || loadingMoreComments) return;
+      setLoadingMoreComments(true);
+      try {
+        const page = await api.get<CursorPage<CommentDto>>(
+          `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=${COMMENTS_PAGE_LIMIT}&cursor=${encodeURIComponent(cursor)}`,
+        );
+        if (taskIdRef.current !== forTask) return;
+        setMeta((current) => {
+          // A comment posted from this panel also sits past the cursor, so the next page can
+          // repeat what is already on screen: the id is what decides, not the server slice.
+          const seen = new Set(current.comments.map((comment) => comment.id));
+          return {
+            ...current,
+            comments: [...current.comments, ...page.items.filter((item) => !seen.has(item.id))],
+            commentsCursor: page.nextCursor,
+          };
+        });
+      } catch {
+        if (taskIdRef.current !== forTask) return;
+        toast.error(t('commentsLoadMoreError'), {
+          action: { label: t('retryAction'), onClick: () => void run() },
+        });
+      } finally {
+        setLoadingMoreComments(false);
+      }
+    },
+    [workspaceId, taskId, meta.commentsCursor, loadingMoreComments, setMeta, t],
+  );
 
-  const refreshActivities = useCallback(async (): Promise<void> => {
-    try {
-      const page = await api.get<CursorPage<ActivityDto>>(
-        `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=${ACTIVITIES_PAGE_LIMIT}`,
-      );
-      setMeta((current) => ({ ...current, activities: page.items }));
-    } catch {
-      toast.error(tActivity('loadError'));
-    }
-  }, [workspaceId, taskId, setMeta, tActivity]);
+  const refreshActivities = useCallback(
+    async function run(): Promise<void> {
+      // Same guard as `loadMoreComments`: the panel is not remounted per task, so a retry
+      // closure from a task the reader has since left must not write into the new one.
+      const forTask = taskId;
+      if (taskIdRef.current !== forTask) return;
+      try {
+        const page = await api.get<CursorPage<ActivityDto>>(
+          `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=${ACTIVITIES_PAGE_LIMIT}`,
+        );
+        if (taskIdRef.current !== forTask) return;
+        setMeta((current) => ({ ...current, activities: page.items }));
+      } catch {
+        if (taskIdRef.current !== forTask) return;
+        toast.error(tActivity('loadError'), {
+          action: { label: t('retryAction'), onClick: () => void run() },
+        });
+      }
+    },
+    [workspaceId, taskId, setMeta, tActivity, t],
+  );
 
   return {
     members: meta.members,

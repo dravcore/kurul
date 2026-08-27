@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { TaskDto } from '@kurul/shared-types';
+import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 import { authClient } from '@/lib/auth';
 import { canMutateColumns, canMutateLabels, canMutateTasks } from '@/lib/board-permissions';
 import {
@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Topbar } from '@/components/layout/topbar';
 import { TaskPanel } from '@/components/task/task-panel';
+import type { TaskCardSignal } from '@/components/task/task-card';
 import { buildTaskDndAnnouncements } from '@/components/task/task-dnd-announcements';
 import { useBoardTaskDnd } from '@/components/task/use-board-task-dnd';
 import { BoardCanvas } from './board-canvas';
@@ -154,6 +155,13 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     [pathname, router, searchParams],
   );
 
+  const appendTask = useCallback(
+    (task: TaskDto): void => {
+      setTasks((current) => [...current, task]);
+    },
+    [setTasks],
+  );
+
   const applyTaskPatch = useCallback(
     (patch: TaskPatch): void => {
       if (!tasksRef.current.some((task) => task.id === patch.id)) {
@@ -179,14 +187,28 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     [reload, setTasks, tasksRef],
   );
 
-  const { commitTaskMove, moveColumn, seedDefaults, defaultsPending } = useBoardMutations({
-    boardId,
-    columnsRef,
-    tasksRef,
-    setColumns,
-    setTasks,
-    reload,
-  });
+  const { commitTaskMove, returningTaskIds, moveColumn, seedDefaults, defaultsPending } =
+    useBoardMutations({
+      boardId,
+      columnsRef,
+      tasksRef,
+      setColumns,
+      setTasks,
+      reload,
+    });
+
+  /**
+   * Swallows the promise `moveColumn` answers with, which nothing here awaits. Memoised because
+   * `BoardCanvas` hands this straight to every `BoardColumn`, and those are `memo`-wrapped: an
+   * inline wrapper would be a new identity on every render of this view and would re-render the
+   * whole strip.
+   */
+  const handleMoveColumn = useCallback(
+    (column: ColumnDto, direction: -1 | 1) => {
+      void moveColumn(column, direction);
+    },
+    [moveColumn],
+  );
 
   const dnd = useBoardTaskDnd(tasks, canMutateTasksFlag, commitTaskMove);
   const dndAccessibility = useMemo(
@@ -200,7 +222,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     dndRef.current = { cancelDrag: dnd.cancelDrag, isDragging: dnd.isDragging };
   }, [dnd.cancelDrag, dnd.isDragging]);
 
-  const { connected: socketConnected } = useBoardRealtime({
+  const { connected: socketConnected, remoteChangedTaskIds } = useBoardRealtime({
     boardId,
     loading,
     currentUserId,
@@ -212,6 +234,18 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
     setMetaRefreshKey,
     reload,
   });
+
+  /**
+   * One mark per card, so a column can read a scalar per task instead of two sets. A card that
+   * just came back from a refused move keeps that mark: the reader's own move failing outranks
+   * telling them someone else touched the same card.
+   */
+  const taskSignals = useMemo(() => {
+    const signals = new Map<string, TaskCardSignal>();
+    for (const taskId of remoteChangedTaskIds) signals.set(taskId, 'remote-changed');
+    for (const taskId of returningTaskIds) signals.set(taskId, 'returning');
+    return signals;
+  }, [remoteChangedTaskIds, returningTaskIds]);
 
   if (loading) {
     return <BoardLoadingState />;
@@ -261,20 +295,26 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
       {/*
         The filter bar, and with it the board's two status lines.
 
-        `Reconnecting…` and `Loading the rest of the tasks…` used to sit in the topbar's action
-        slot. At 360px that bar is a hamburger, a back arrow, a title and an overflow menu —
-        three 44px targets and whatever is left — and a sentence dropped in beside them either
+        The connection line and `Loading the rest of the tasks…` used to sit in the topbar's
+        action slot. At 360px that bar is a hamburger, a back arrow, a title and an overflow menu
+        (three 44px targets and whatever is left), and a sentence dropped in beside them either
         wrapped inside a fixed-height bar or squeezed the board's name to nothing. Here they
         wrap onto their own line when the row runs out of width and cost the title nothing.
 
-        It is also where `docs/design.md` §5 says they belong: "a quiet inline 'Reconnecting…'
-        bar, never a blocking overlay". Same live regions, same wording, one row lower.
+        It is also where `docs/design.md` §5 says they belong: a quiet inline bar, never a
+        blocking overlay. Same live regions, one row lower.
       */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-3 py-2">
         <BoardFilters filters={filters} members={members} labels={labels} onChange={applyFilters} />
+        {/*
+          It says the connection is lost rather than that the app is reconnecting, and it carries
+          no dismiss control: the retry is automatic and invisible, so the only thing worth
+          telling the reader is that what they are looking at may already be out of date. It
+          leaves when the socket is back, which is the only thing that makes it untrue.
+        */}
         {!socketConnected ? (
-          <span className="text-micro text-muted-foreground max-md:w-full" aria-live="polite">
-            {t('realtime.reconnecting')}
+          <span role="status" className="text-micro text-muted-foreground max-md:w-full">
+            {t('connectionLost')}
           </span>
         ) : null}
         {/* The board paints on the first page; later pages stream in behind it. */}
@@ -302,9 +342,11 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
           ) : (
             <BoardCanvas
               boardId={boardId}
+              workspaceId={activeId}
               columns={columns}
               tasksByColumn={tasksByColumn}
               selectedTaskId={selectedTaskId}
+              taskSignals={taskSignals}
               canMutateColumns={canMutateColumnsFlag}
               canMutateTasks={canMutateTasksFlag}
               entranceDone={entranceDone}
@@ -313,8 +355,8 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
               onCreateColumn={dialogs.openCreateColumn}
               onOpenColumnSettings={dialogs.openColumnSettings}
               onDeleteColumn={dialogs.openDeleteColumn}
-              onMoveColumn={(column, direction) => void moveColumn(column, direction)}
-              onAddTask={dialogs.openCreateTask}
+              onMoveColumn={handleMoveColumn}
+              onTaskCreated={appendTask}
             />
           )}
         </div>
@@ -354,7 +396,6 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
             setColumns((current) => current.filter((item) => item.id !== columnId));
             setTasks((current) => current.filter((task) => task.columnId !== columnId));
           }}
-          onTaskCreated={(task) => setTasks((current) => [...current, task])}
           onTaskDeleted={(taskId) => {
             setTasks((current) => current.filter((task) => task.id !== taskId));
             if (selectedTaskId === taskId) {

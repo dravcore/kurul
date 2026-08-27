@@ -110,7 +110,7 @@ export function LanguageSettings(): React.ReactElement {
           </option>
         ))}
       </Select>
-      <p className="text-caption text-muted-foreground">{t('help')}</p>
+      <p className="text-small text-muted-foreground">{t('help')}</p>
     </div>
   );
 }

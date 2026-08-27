@@ -1,7 +1,7 @@
 import { envBool, envPort, envString } from '../common/env';
 
 /** Credentials are omitted entirely for anonymous relays (a dev Mailpit, an internal MTA). */
-export interface SmtpAuth {
+interface SmtpAuth {
   user: string;
   password: string;
 }

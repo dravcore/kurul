@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BadRequestException } from '@nestjs/common';
-import { ActivityType } from '@kurul/shared-types';
+import { ActivityType, PlanLimitCode } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
+import { planLimitRefusal } from '../plan/plan-limit.exception';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   IMPORT_CHUNK_SIZE,
@@ -52,6 +54,32 @@ function largeExportBytes(cardCount: number): Buffer {
   );
 }
 
+/**
+ * A synthetic export with `listCount` empty lists and no cards.
+ *
+ * Built here rather than committed as a fixture, for the same reason `largeExportBytes` is: it
+ * measures the row cap (SEC-04), not Trello's schema.
+ */
+function manyListsExportBytes(listCount: number): Buffer {
+  return Buffer.from(
+    JSON.stringify({
+      name: 'A wide board',
+      desc: null,
+      lists: Array.from({ length: listCount }, (_unused, index) => ({
+        id: `6512d000000000000000${(index + 4096).toString(16).padStart(4, '0')}`,
+        name: `List ${index}`,
+        closed: false,
+        pos: (index + 1) * 1024,
+      })),
+      cards: [],
+      labels: [],
+      checklists: [],
+      members: [],
+      actions: [],
+    }),
+  );
+}
+
 type CreateManyMock = { createMany: jest.Mock };
 
 function buildService() {
@@ -78,6 +106,13 @@ function buildService() {
     calls.push('board');
     return Promise.resolve({});
   });
+  /** The ceiling check joins the same list: its place in the order is the claim under test. */
+  const planLimits = {
+    assertBoardAvailable: jest.fn().mockImplementation(() => {
+      calls.push('planLimit');
+      return Promise.resolve();
+    }),
+  };
 
   const prisma = {
     $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) =>
@@ -90,9 +125,11 @@ function buildService() {
     service: new TrelloImportService(
       prisma as unknown as PrismaService,
       activity as unknown as ActivityService,
+      planLimits as unknown as PlanLimitsService,
     ),
     prisma,
     activity,
+    planLimits,
     tx,
     calls,
   };
@@ -144,8 +181,10 @@ describe('TrelloImportService', () => {
 
     // `Task.column` is a composite foreign key on `(boardId, columnId)`, so this order is a
     // constraint rather than a style. `taskLabel` after `task` and `label` for the same reason,
-    // and `checklistItem` after `checklist`.
+    // and `checklistItem` after `checklist`. The ceiling check is first because a refusal must
+    // find nothing to roll back (ADR 0032).
     expect(calls).toEqual([
+      'planLimit',
       'board',
       'column',
       'label',
@@ -206,6 +245,40 @@ describe('TrelloImportService', () => {
       report.skipped.reduce((total, group) => total + group.count, 0),
     );
     expect(payload.payload.skippedTotal).toBeGreaterThan(0);
+  });
+
+  it('asks the plan layer for room with the transaction client, before the board row', async () => {
+    const { service, planLimits, tx } = buildService();
+
+    await service.importBoard(WORKSPACE_ID, ACTOR_ID, fixtureBytes('synthetic-full-board'));
+
+    // The same client as the insert, so the count and the write read one snapshot; the base
+    // client would count outside the transaction and make the check a separate statement.
+    expect(planLimits.assertBoardAvailable).toHaveBeenCalledTimes(1);
+    expect(planLimits.assertBoardAvailable).toHaveBeenCalledWith(WORKSPACE_ID, tx);
+  });
+
+  it('writes nothing when the workspace is at its board ceiling', async () => {
+    const { service, planLimits, tx, activity } = buildService();
+    planLimits.assertBoardAvailable.mockRejectedValueOnce(
+      planLimitRefusal(PlanLimitCode.Boards, 1, 1, 'This workspace has reached its boards'),
+    );
+
+    await expect(
+      service.importBoard(WORKSPACE_ID, ACTOR_ID, fixtureBytes('synthetic-full-board')),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: expect.objectContaining({
+        planLimit: expect.objectContaining({ code: PlanLimitCode.Boards }),
+      }),
+    });
+
+    // Not "rolled back" but never issued: the refusal is the first statement, so a board that
+    // was refused costs the transaction nothing but the count.
+    expect(tx.board.create).not.toHaveBeenCalled();
+    expect(tx.column.createMany).not.toHaveBeenCalled();
+    expect(tx.attachment.createMany).not.toHaveBeenCalled();
+    expect(activity.record).not.toHaveBeenCalled();
   });
 
   it('never broadcasts: the board it creates has no room to broadcast into', () => {
@@ -288,5 +361,77 @@ describe('TrelloImportService', () => {
     // drift into an accident.
     expect(first.boardId).not.toBe(second.boardId);
     expect(second.imported).toEqual(first.imported);
+  });
+
+  describe('the row cap (SEC-04)', () => {
+    const originalMaxCards = process.env.TRELLO_IMPORT_MAX_CARDS;
+    const originalMaxLists = process.env.TRELLO_IMPORT_MAX_LISTS;
+
+    afterEach(() => {
+      if (originalMaxCards === undefined) delete process.env.TRELLO_IMPORT_MAX_CARDS;
+      else process.env.TRELLO_IMPORT_MAX_CARDS = originalMaxCards;
+      if (originalMaxLists === undefined) delete process.env.TRELLO_IMPORT_MAX_LISTS;
+      else process.env.TRELLO_IMPORT_MAX_LISTS = originalMaxLists;
+    });
+
+    it('refuses an export over the card cap before opening a transaction, and writes nothing', async () => {
+      process.env.TRELLO_IMPORT_MAX_CARDS = '5';
+      const { service, prisma } = buildService();
+
+      await expect(
+        service.importBoard(WORKSPACE_ID, ACTOR_ID, largeExportBytes(6)),
+      ).rejects.toThrow(BadRequestException);
+
+      // Refused before a single statement, not rolled back after one: the cost of an oversized
+      // export is the parse, not a connection.
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('accepts an export exactly at the card cap', async () => {
+      process.env.TRELLO_IMPORT_MAX_CARDS = '5';
+      const { service } = buildService();
+
+      const report = await service.importBoard(WORKSPACE_ID, ACTOR_ID, largeExportBytes(5));
+
+      expect(report.imported.tasks).toBe(5);
+    });
+
+    it('refuses an export over the list cap before opening a transaction, and writes nothing', async () => {
+      process.env.TRELLO_IMPORT_MAX_LISTS = '2';
+      const { service, prisma } = buildService();
+
+      await expect(
+        service.importBoard(WORKSPACE_ID, ACTOR_ID, manyListsExportBytes(3)),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('accepts an export exactly at the list cap', async () => {
+      process.env.TRELLO_IMPORT_MAX_LISTS = '2';
+      const { service } = buildService();
+
+      const report = await service.importBoard(WORKSPACE_ID, ACTOR_ID, manyListsExportBytes(2));
+
+      expect(report.imported.columns).toBe(2);
+    });
+
+    it("counts the export's raw lists and cards, not the plan's filtered ones", async () => {
+      // A board of six archived cards writes zero tasks, but it is still six rows this API had
+      // to hold in memory and would have carried into the planner had the cap not stopped it
+      // first: the ceiling is on what Trello sent, not on what survives filtering.
+      process.env.TRELLO_IMPORT_MAX_CARDS = '5';
+      const { service, prisma } = buildService();
+      const raw = JSON.parse(largeExportBytes(6).toString('utf8')) as {
+        cards: Array<Record<string, unknown>>;
+      };
+      for (const card of raw.cards) card.closed = true;
+
+      await expect(
+        service.importBoard(WORKSPACE_ID, ACTOR_ID, Buffer.from(JSON.stringify(raw))),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
   });
 });

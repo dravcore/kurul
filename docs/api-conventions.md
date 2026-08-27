@@ -11,6 +11,7 @@ REST conventions for the Kurul API: URLs, verbs, payloads, errors, pagination, a
 - [HTTP verbs and status codes](#http-verbs-and-status-codes)
 - [Request and response bodies](#request-and-response-bodies)
 - [Errors](#errors)
+- [Authentication](#authentication)
 - [Cross-origin requests](#cross-origin-requests)
 - [Rate limiting](#rate-limiting)
 - [Pagination](#pagination)
@@ -63,8 +64,9 @@ GET    /workspaces/:workspaceId/invitations     # cursor page of pending invitat
 POST   /workspaces/:workspaceId/invitations
 DELETE /workspaces/:workspaceId/invitations/:invitationId
 
+GET    /workspaces/:workspaceId/board-templates  # the starting shapes a create can name
 GET    /workspaces/:workspaceId/boards
-POST   /workspaces/:workspaceId/boards
+POST   /workspaces/:workspaceId/boards            # `template` seeds its columns and labels
 GET    /workspaces/:workspaceId/boards/:boardId
 PATCH  /workspaces/:workspaceId/boards/:boardId
 DELETE /workspaces/:workspaceId/boards/:boardId
@@ -288,25 +290,69 @@ Action segments are the exception and each one needs a reason. Do not invent
 genuinely the operation (reordering an entire column, for example). A `PATCH` that omits a
 field leaves it untouched; sending `null` explicitly clears a nullable field.
 
-| Status                       | When                                                                                                                                                                                                                                                                 |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `200 OK`                     | Successful read, update, or action                                                                                                                                                                                                                                   |
-| `201 Created`                | Resource created; body is the created resource                                                                                                                                                                                                                       |
-| `204 No Content`             | Successful delete; empty body                                                                                                                                                                                                                                        |
-| `400 Bad Request`            | Malformed request or validation failure                                                                                                                                                                                                                              |
-| `401 Unauthorized`           | Missing or invalid session                                                                                                                                                                                                                                           |
-| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient                                                                                                                                                                                                            |
-| `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                                                                                                                                                          |
-| `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                                                                                                                                            |
-| `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, an upload is over `ATTACHMENT_MAX_BYTES` or would exceed a storage quota (its `error` says which — see [File uploads and downloads](#file-uploads-and-downloads)), or an import is over `TRELLO_IMPORT_MAX_BYTES` |
-| `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted                                                                                                                            |
-| `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                                                                                                                                            |
-| `429 Too Many Requests`      | Rate limited: over a route's request budget, or over the upload route's per-IP byte budget (its `error` says which, see [Rate limiting](#rate-limiting))                                                                                                             |
-| `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                                                                                                                                                        |
+| Status                       | When                                                                                                                                                                                                                                                                               |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200 OK`                     | Successful read, update, or action                                                                                                                                                                                                                                                 |
+| `201 Created`                | Resource created; body is the created resource                                                                                                                                                                                                                                     |
+| `204 No Content`             | Successful delete; empty body                                                                                                                                                                                                                                                      |
+| `400 Bad Request`            | Malformed request or validation failure                                                                                                                                                                                                                                            |
+| `401 Unauthorized`           | Missing or invalid session                                                                                                                                                                                                                                                         |
+| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient, **or** a plan ceiling would be exceeded (its `error` says which, see [Plan limits](#plan-limits)), **or** registration is closed (`SIGNUP_ENABLED=false`: `POST /auth/sign-up/email` only, `error: "Sign-up Disabled"`) |
+| `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                                                                                                                                                                        |
+| `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                                                                                                                                                          |
+| `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, an upload is over `ATTACHMENT_MAX_BYTES` or would exceed a storage quota (its `error` says which — see [File uploads and downloads](#file-uploads-and-downloads)), or an import is over `TRELLO_IMPORT_MAX_BYTES`               |
+| `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted                                                                                                                                          |
+| `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                                                                                                                                                          |
+| `429 Too Many Requests`      | Rate limited: over a route's request budget, or over the upload route's per-IP byte budget (its `error` says which, see [Rate limiting](#rate-limiting))                                                                                                                           |
+| `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                                                                                                                                                                      |
 
 **Cross-workspace access returns `404`, not `403`.** A `403` would confirm that the resource
 exists, which leaks information across the tenant boundary. `403` is reserved for a
-legitimate member whose role is too low.
+legitimate member whose role is too low, for the plan ceilings below, for a closed registration
+(`SIGNUP_ENABLED=false`) and for the actions a demo instance refuses (`DEMO_MODE=true`), which
+the envelope's `error` field tells apart.
+
+### Plan limits
+
+Seats, boards, workspaces and accounts have configurable ceilings
+([ADR 0032](decisions/0032-plan-limits.md)). Every ceiling is **unlimited unless the instance
+sets it**, so an unconfigured deployment never produces any of these responses.
+
+A write that would cross a ceiling is refused with `403` and an `error` of its own, because the
+status alone cannot say which fix to suggest: a role change never helps here, someone has to
+free a seat or raise a number.
+
+```jsonc
+{
+  "statusCode": 403,
+  "error": "Plan Limit Exceeded",
+  "message": "This workspace has no seats left on its plan",
+  "planLimit": { "code": "PLAN_LIMIT_SEATS", "limit": 10, "current": 10 },
+  "path": "/workspaces/w_1/invitations",
+  "timestamp": "2026-08-23T09:12:31.114Z",
+  "requestId": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
+}
+```
+
+`planLimit` is the only optional envelope member besides `details`. `current` is what was
+counted at the moment of the refusal, so it can equal or exceed `limit`.
+
+| `planLimit.code`        | Refuses                                      | Counts                                             |
+| ----------------------- | -------------------------------------------- | -------------------------------------------------- |
+| `PLAN_LIMIT_SEATS`      | `POST .../invitations`, and accepting one    | Members plus invitations still pending             |
+| `PLAN_LIMIT_BOARDS`     | `POST .../boards`, `POST .../imports/trello` | Boards in the workspace                            |
+| `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                           | Workspaces on the instance                         |
+| `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                   | Accounts on the instance, anonymised ones excluded |
+
+Accepting an invitation counts members only, since the invitation being accepted is already
+holding its seat. Attachment bytes are a plan ceiling too, but they keep the `413` and the
+`error: "Attachment Quota Exceeded"` that [ADR 0027](decisions/0027-attachment-quotas.md) gave
+them; what the plan layer adds is that a workspace can carry its own byte ceiling.
+
+Two reads publish the numbers so a client can show them before it is refused: `GET /config`
+carries the instance ceilings (capability, identical for every caller), and
+`GET /workspaces/{workspaceId}/plan` carries one workspace's resolved ceilings and current
+usage, readable by any member. `null` in either document means unlimited.
 
 ## Request and response bodies
 
@@ -447,13 +493,14 @@ globally) and `Cache-Control: private, max-age=0, must-revalidate`. Asking for t
 `POST /workspaces/:workspaceId/imports/trello` takes a Trello board's JSON export and creates a
 **new board** from it. It is the API's only bulk-write endpoint.
 
-| Property     | Value                                                                           |
-| ------------ | ------------------------------------------------------------------------------- |
-| Body         | `multipart/form-data`, one part named **`file`** — no other part, no JSON shape |
-| Role         | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                            |
-| Size ceiling | `TRELLO_IMPORT_MAX_BYTES` (default `20971520` — 20 MiB)                         |
-| Rate limit   | **3 / min** per client IP                                                       |
-| Success      | `201` with a `TrelloImportReportDto`                                            |
+| Property     | Value                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------- |
+| Body         | `multipart/form-data`, one part named **`file`** — no other part, no JSON shape         |
+| Role         | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                                    |
+| Size ceiling | `TRELLO_IMPORT_MAX_BYTES` (default `20971520` — 20 MiB)                                 |
+| Row ceiling  | `TRELLO_IMPORT_MAX_CARDS` (default `50000`), `TRELLO_IMPORT_MAX_LISTS` (default `5000`) |
+| Rate limit   | **3 / min** per client IP                                                               |
+| Success      | `201` with a `TrelloImportReportDto`                                                    |
 
 **Multipart rather than JSON, and that is a decision rather than a convenience.** A board export
 is several megabytes and `REQUEST_BODY_MAX_BYTES` is 1 MiB; raising that to fit this one endpoint
@@ -472,17 +519,22 @@ its caller could not do in several.
 
 **Errors:**
 
-| Status | When                                                                                                 |
-| ------ | ---------------------------------------------------------------------------------------------------- |
-| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export              |
-| `403`  | Workspace member whose role is below `ADMIN`                                                         |
-| `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it |
-| `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                      |
-| `429`  | More than three imports in a rolling minute                                                          |
+| Status | When                                                                                                                                                                                                |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export; the export has more cards than `TRELLO_IMPORT_MAX_CARDS` or more lists than `TRELLO_IMPORT_MAX_LISTS`      |
+| `403`  | Workspace member whose role is below `ADMIN`, **or** the workspace is at its board ceiling (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, see [Plan limits](#plan-limits)) |
+| `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it                                                                                                |
+| `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                                                                                                                     |
+| `429`  | More than three imports in a rolling minute                                                                                                                                                         |
 
 A `400` is the only failure that reaches the parser, and **nothing is written when it does**: the
 export is read and mapped entirely before the transaction opens, so a rejected import leaves the
-workspace byte-for-byte as it was.
+workspace byte-for-byte as it was. The row-cap refusal is part of that same `400`: once the export
+is read, its list and card counts are checked against `TRELLO_IMPORT_MAX_LISTS` and
+`TRELLO_IMPORT_MAX_CARDS` before the planner maps a single row, so an oversized export is refused
+after reading and before mapping, with nothing written either way. The board-ceiling `403` writes
+nothing either: the check is the first statement inside the transaction, before the board row, so
+the refusal rolls back an empty transaction.
 
 **The response body is the whole report, and it is not stored anywhere.**
 
@@ -616,9 +668,102 @@ session cookies and invitation tokens. `ip` is Express's own `req.ip`, not a raw
 unconfigured, this is always the TCP peer, so behind an unconfigured reverse proxy it is the
 proxy's address for every request. See `TRUST_PROXY` below.
 
+## Authentication
+
+Two credentials. Every route except the two health probes requires one of them, and the
+OpenAPI document says which on every operation (`security`).
+
+**A session cookie**, issued by Better Auth at `POST /auth/sign-in/email`. The browser path,
+and what the web app uses. A non-browser client can store and replay it, but that is not what
+cookies are for, which is why the second credential exists.
+
+**A personal access token**, sent as `Authorization: Bearer kurul_pat_...`. Minted by a member
+at `POST /workspaces/:workspaceId/tokens`, shown in that one response and never again; the
+server stores a SHA-256 of it and cannot show it back. Listed (`GET .../tokens`, own tokens
+only, by display prefix) and revoked (`DELETE .../tokens/:tokenId`, immediate) by the person
+who minted it. A token may carry an expiry; an expired one reads exactly like a revoked one,
+which reads exactly like one that never existed: `401` for all three, so a stolen secret learns
+nothing about its own history.
+
+**A forgotten password is recovered, not reissued by an admin.**
+`POST /auth/request-password-reset` mails a single-use link that is good for one hour, and
+`POST /auth/reset-password` spends it. Both are Better Auth's, and the request endpoint answers
+the same `200` and the same body for an address with no account as for one with an account, so
+it cannot be used to find out who has one. Spending the link revokes every session the account
+held (`revokeSessionsOnPasswordReset`), which is what makes a reset a way to take an account
+back rather than only a way to remember it. Delivery is a hard requirement: see
+[self-hosting](self-hosting.md#email-smtp) for what an instance without SMTP does instead.
+
+```
+POST   /workspaces/:workspaceId/tokens            # mint; the only response carrying the plaintext
+GET    /workspaces/:workspaceId/tokens            # the caller's live tokens, newest first
+DELETE /workspaces/:workspaceId/tokens/:tokenId   # revoke; another member's token is 404
+```
+
+### What a token is, and is not
+
+A token **acts as its owner, in one workspace, with the role the owner holds at the time of
+each request.** There are no scopes: the workspace is the scope, and the role is read live
+from the membership, so demoting or removing the owner changes what every one of their tokens
+can do on the next request (removal and leaving also revoke them outright, so a member re-added
+later does not find old credentials working). A GUEST's token can do what a GUEST can, and
+nothing a token does is unavailable to its owner through the web app. `ROADMAP.md`'s "API 1.0"
+section is explicit that this is **not OAuth** and that per-token scopes are not promised.
+
+Where a token is accepted follows from that scope:
+
+| Route                                                                                                                                         | With a token                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Anything under the token's own `/workspaces/:workspaceId/...`                                                                                 | As the owner, with the owner's current role                                                                                                      |
+| Any other `/workspaces/:workspaceId/...`                                                                                                      | `404`, exactly as for a non-member; whether the owner belongs to that workspace too makes no difference                                          |
+| A route with no workspace in its path: `/me`, `GET /workspaces`, `POST /workspaces`, `/config`, `/instance/*`                                 | `403`; a workspace-bound credential has no scope to compare there                                                                                |
+| The three token routes above                                                                                                                  | `403`; a credential must not mint, list or revoke credentials                                                                                    |
+| The workspace-administration writes Better Auth performs: rename and delete, invite, revoke and accept, remove a member, change a role, leave | `403`; these run on the caller's own Better Auth session, which a token does not carry. The reads beside them (roster, pending invitations) work |
+
+The last row is the slice boundary, named rather than hidden: lifting it means moving those
+writes out from under the organization plugin, and that is a `/v1` decision
+([ADR 0031](decisions/0031-api-versioning.md)), not a token one.
+
+**A request that carries a Bearer header is decided by that header alone.** It never falls
+back to a cookie the request also happens to send, and a Bearer credential that is not a
+`kurul_pat_` token is `401` rather than ignored: a client that sends a token expects to be the
+identity that token names.
+
+### Properties every token has
+
+- **Hashed at rest.** The row holds `sha256(plaintext)` and a display `prefix` (`kurul_pat_`
+  plus eight characters). A database dump yields no usable credential. SHA-256 rather than a
+  slow password hash because the secret is 256 random bits: there is nothing to guess, and a
+  slow hash would only tax every request.
+- **Workspace-bound at the guard.** `SessionAuthGuard` resolves the token to a user and a
+  workspace, and `WorkspaceGuard` refuses any other `:workspaceId` before the membership lookup
+  runs. The tenant isolation rule in [architecture.md](architecture.md) holds for tokens by the
+  same code path that holds it for cookies.
+- **Revocation is immediate** and is a timestamp, not a delete: the row stays as evidence
+  beside the `token.revoked` activity entry. Minting writes `token.created`. Both are in the
+  audit subset (`AUDIT_ACTIVITY_TYPES`) and neither payload carries the secret.
+- **Rate limited like everything else.** The throttler runs ahead of authentication and keys on
+  client IP and route, so a script replaying a token spends the same budget a browser session
+  does ([Rate limiting](#rate-limiting)).
+- **`lastUsedAt`** is stamped on first use and then at most once a minute, so a polling script
+  does not turn every read into a write.
+- **Account deletion deletes the tokens**, every workspace, inside the same transaction that
+  anonymises the account ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)).
+
+### Why a first-party model rather than Better Auth's API-key plugin
+
+Better Auth 1.7 ships its API-key plugin as a separate package that is not in this tree, and
+its key is bound to a user with free-form `metadata`, not to an organization: workspace scoping
+would have been a JSON field the guards parse rather than a foreign key the database enforces,
+and verification goes through `getSession`, which would hand `WorkspaceGuard` a session with no
+workspace on it. The plugin also brings its own per-key rate limiter and permission model, both
+of which this slice deliberately does not want. A 40-line Prisma model, one service and one
+branch in the existing guard express the scope exactly, keep revocation and listing under
+Kurul's own activity log, and leave the existing controllers untouched.
+
 ## Cross-origin requests
 
-Authentication is a **cookie**, so every request a browser makes to this API carries the
+Authentication is a **cookie** for the web app, so every request a browser makes to this API carries the
 caller's session automatically — including one initiated by a page the caller did not intend
 to act on. Three rules decide what the API does about that.
 
@@ -639,7 +784,7 @@ an oversight: browsers are required to send `Origin` on every request whose meth
 `GET`/`HEAD`, `fetch`, XHR and form submissions alike, so there is no cross-site request
 shape that carries a victim's cookie _and_ omits the header. Everything left in the
 header-less case — `curl`, a CI script, a native client, the web app's own server-side
-session lookup in `apps/web/middleware.ts` — cannot be induced by a hostile page to replay
+session lookup in `apps/web/proxy.ts` — cannot be induced by a hostile page to replay
 someone else's ambient credentials, which is the entire mechanism the rule defends against.
 Rejecting it would break every non-browser caller and close nothing.
 
@@ -678,6 +823,7 @@ running hot never spends another endpoint's allowance.
 | `POST /workspaces/:workspaceId/imports/trello` | 3 / min       | A 20 MiB body parsed into heap, then thousands of rows in one transaction              |
 | `GET .../attachments/:attachmentId/content`    | 300 / min     | _Above_ the default: a panel with ten image attachments issues ten requests on open    |
 | `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10s       | Better Auth's built-in rule for credential endpoints                                   |
+| `/auth/request-password-reset`                 | 3 / 60s       | Built-in too: each call mails a link to an address the caller did not prove they own   |
 | `/auth/*` otherwise                            | 100 / min     | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004)              |
 | `GET /health`, `GET /health/ready`             | exempt        | A throttled probe would report a healthy API as down                                   |
 
@@ -939,9 +1085,11 @@ Until 1.0:
 - `@kurul/shared-types` is versioned with the monorepo, so a client that pins the package
   version pins the contract.
 
-At 1.0, the API is frozen behind SemVer. If a versioning scheme is needed after that, it will
-be introduced by ADR — URI prefix (`/v1`) is the likely choice, decided when it is actually
-needed rather than pre-emptively.
+At 1.0, the API is frozen behind SemVer and every route gains a `/v1` URI prefix, with
+`/auth/*` and the two health probes outside it. The scheme, the rejection of header negotiation
+and of no-versioning, and the order the 1.0 surface ships in (personal access tokens, then
+`/v1`, then webhooks) are decided in [ADR 0031](decisions/0031-api-versioning.md); this section
+is the pre-1.0 rule set that record keeps in force until the prefix lands.
 
 ## See also
 

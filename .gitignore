@@ -6,6 +6,10 @@ node_modules/
 .env
 .env.local
 .env.*.local
+# Object-storage credentials for the backup sidecar's off-host copy, read by the `backup`
+# service only (docs/self-hosting.md#off-host-copies). Same reason as .env: it holds secrets.
+rclone.env
+rclone.conf
 
 # Build outputs
 dist/
@@ -45,9 +49,18 @@ Thumbs.db
 .claude/
 .cursor/
 .cursorrules
+# Written, and re-added, by every `next dev` run
+# (node_modules/next/dist/server/lib/generate-agent-files.js). They describe the installed Next
+# version, not this repo, so they are a dev-server artifact rather than a committed rule file;
+# the repo's own agent rules live in the tracked root CLAUDE.md. Listed by full path so that
+# root CLAUDE.md is not caught with them.
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
 
 # Docker volumes / local overrides
 docker-compose.override.yml
 
 # Audit artifacts (local only — reports, findings, roadmap data)
-audit/
+# Anchored to the repo root: unanchored it matched a directory named `audit` at any depth,
+# which silently swallowed e2e/audit/, the checked-in accessibility rig.
+/audit/

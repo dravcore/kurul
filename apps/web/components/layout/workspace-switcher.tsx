@@ -30,15 +30,32 @@ export function WorkspaceSwitcher({
         <Button
           type="button"
           variant="ghost"
-          aria-label={collapsed ? t('switchWorkspace') : undefined}
+          // Collapsed to the 24px initial chip, this trigger is the only place the active
+          // workspace's name still appears: `title` names it for a pointer, and the
+          // accessible name folds it into the action for AT, matching how a screen reader
+          // would otherwise announce nothing more specific than "Switch workspace" on every
+          // workspace at once.
+          title={collapsed ? active?.name : undefined}
+          aria-label={
+            collapsed
+              ? active
+                ? t('switchWorkspaceNamed', { name: active.name })
+                : t('switchWorkspace')
+              : undefined
+          }
           className={cn(
             'h-10 justify-start gap-2 px-2',
             collapsed ? 'w-10 justify-center px-0' : 'w-full',
           )}
         >
+          {/* `bg-muted text-foreground-secondary`, not the signature tint: this initial names
+              which workspace is open, it does not mean "active" the way the sancak rail does
+              (docs/design.md §2), so it wears a neutral. `--muted` rather than `--accent`
+              because the enclosing ghost Button paints `hover:bg-accent`, which would dissolve
+              the chip's square into the button for as long as the pointer rests on it. */}
           <span
             aria-hidden
-            className="flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-signature-subtle text-small font-medium text-signature"
+            className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-muted text-small font-strong text-foreground-secondary"
           >
             {initial}
           </span>

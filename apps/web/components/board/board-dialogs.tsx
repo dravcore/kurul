@@ -1,7 +1,6 @@
 'use client';
 
-import type { ColumnDto, TaskDto } from '@kurul/shared-types';
-import { CreateTaskDialog } from '@/components/task/create-task-dialog';
+import type { ColumnDto } from '@kurul/shared-types';
 import { DeleteTaskDialog } from '@/components/task/delete-task-dialog';
 import { CreateColumnDialog } from './create-column-dialog';
 import { DeleteColumnDialog } from './delete-column-dialog';
@@ -17,7 +16,6 @@ interface BoardDialogsProps {
   onColumnCreated: (column: ColumnDto) => void;
   onColumnSaved: (column: ColumnDto) => void;
   onColumnDeleted: (columnId: string) => void;
-  onTaskCreated: (task: TaskDto) => void;
   onTaskDeleted: (taskId: string) => void;
 }
 
@@ -30,7 +28,6 @@ export function BoardDialogs({
   onColumnCreated,
   onColumnSaved,
   onColumnDeleted,
-  onTaskCreated,
   onTaskDeleted,
 }: BoardDialogsProps): React.ReactElement {
   return (
@@ -60,16 +57,6 @@ export function BoardDialogs({
         workspaceId={workspaceId}
         column={dialogs.deleteColumn}
         onDeleted={onColumnDeleted}
-      />
-      <CreateTaskDialog
-        open={dialogs.createTaskColumnId !== null}
-        onOpenChange={(open) => {
-          if (!open) dialogs.closeCreateTask();
-        }}
-        workspaceId={workspaceId}
-        boardId={boardId}
-        columnId={dialogs.createTaskColumnId ?? ''}
-        onCreated={onTaskCreated}
       />
       <DeleteTaskDialog
         open={dialogs.deleteTask !== null}

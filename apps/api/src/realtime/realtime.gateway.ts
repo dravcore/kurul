@@ -1,8 +1,7 @@
-import { Logger, type OnModuleDestroy } from '@nestjs/common';
+import { Logger, type OnApplicationShutdown } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
-  OnGatewayConnection,
   OnGatewayDisconnect,
   OnGatewayInit,
   SubscribeMessage,
@@ -14,6 +13,7 @@ import { fromNodeHeaders } from 'better-auth/node';
 import { Redis } from 'ioredis';
 import {
   SocketClientEvents,
+  SOCKET_UNAUTHORIZED,
   type BoardJoinPayload,
   type BoardLeavePayload,
   type NotificationsJoinPayload,
@@ -22,6 +22,7 @@ import {
 import type { Server, Socket } from 'socket.io';
 import { auth } from '../auth/auth';
 import { envString, isTestEnv } from '../common/env';
+import { captureServerError } from '../common/observability/sentry';
 import { parseRedisUrl } from '../common/redis-url';
 import { PrismaService } from '../prisma/prisma.service';
 import { boardRoom, RealtimeService, userRoom, type SocketRoomState } from './realtime.service';
@@ -30,17 +31,24 @@ type AuthedSocket = Socket & {
   data: SocketRoomState;
 };
 
+/**
+ * Minimum time between reports (WARN log + Sentry capture) for a `pubClient`/`subClient`
+ * connection error. ioredis retries a broken connection on its own and re-emits `error` on
+ * every failed attempt, so without this a single outage would report once per retry instead
+ * of once for the outage: same shape as `AUTH_RATE_LIMIT_REPORT_DAMPEN_MS`.
+ */
+const REDIS_ERROR_REPORT_DAMPEN_MS = 60 * 1000;
+
 @WebSocketGateway({
   cors: {
     origin: envString('WEB_URL', 'http://localhost:3000'),
     credentials: true,
   },
 })
-export class RealtimeGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
-{
+export class RealtimeGateway implements OnGatewayInit, OnGatewayDisconnect, OnApplicationShutdown {
   private readonly logger = new Logger(RealtimeGateway.name);
   private redisClients: Redis[] = [];
+  private lastRedisErrorReportedAt = 0;
 
   @WebSocketServer()
   server!: Server;
@@ -51,25 +59,54 @@ export class RealtimeGateway
   ) {}
 
   afterInit(server: Server): void {
+    server.use((socket, next) => {
+      void this.authenticate(socket as AuthedSocket, next);
+    });
     this.realtime.attachServer(server);
     void this.attachRedisAdapter(server);
   }
 
-  async handleConnection(client: AuthedSocket): Promise<void> {
+  /**
+   * Resolves the handshake's session and stamps it on `socket.data`, as Socket.io
+   * *middleware* rather than in an `OnGatewayConnection` hook.
+   *
+   * That distinction is the whole point, and it is a correctness one, not a style one.
+   * Socket.io does not hold a connection's inbound packets while a `connection` listener is
+   * running: `Namespace._doConnect` acks the CONNECT packet and *then* emits `connection`, so
+   * an `async handleConnection` that awaits a session read hands the client a live socket
+   * while `socket.data.userId` is still undefined. The client emits `board:join` on its
+   * `connect` event — one round trip — and every room handler below reads `client.data.userId`
+   * and answers `unauthenticated` if the read has not landed yet. The board then shows
+   * "Reconnecting…" for the life of that socket, because a join is emitted once per connection
+   * and a denied one is never retried. It is a pure race: it loses only when the session read
+   * is slower than the client's round trip, which is why it never reproduced on a developer's
+   * machine and flipped a fixed commit's nightly browser suite green and red for a week.
+   *
+   * Middleware runs *before* the CONNECT ack, and Socket.io queues nothing behind it, so by
+   * the time any handler can be reached the id is either present or the connection was
+   * refused. The race cannot be lost because the window no longer exists.
+   *
+   * A refusal is `next(Error)` rather than `socket.disconnect(true)` for the same reason it is
+   * middleware: the client is told *why* before it is dropped, as a `connect_error` it can act
+   * on (`apps/web/lib/socket.ts` schedules its own retry, because Socket.io's reconnection
+   * gives up on both a server-side disconnect and a handshake error).
+   */
+  private async authenticate(client: AuthedSocket, next: (error?: Error) => void): Promise<void> {
     try {
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(client.handshake.headers),
       });
       if (!session?.user?.id) {
-        client.disconnect(true);
+        next(new Error(SOCKET_UNAUTHORIZED));
         return;
       }
       client.data.userId = session.user.id;
+      next();
     } catch (error) {
       this.logger.warn(
         `Socket auth failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      client.disconnect(true);
+      next(new Error(SOCKET_UNAUTHORIZED));
     }
   }
 
@@ -205,6 +242,8 @@ export class RealtimeGateway
       const connection = parseRedisUrl(redisUrl);
       const pubClient = new Redis(connection);
       const subClient = pubClient.duplicate();
+      this.attachRedisErrorListener(pubClient, 'pubClient');
+      this.attachRedisErrorListener(subClient, 'subClient');
       this.redisClients = [pubClient, subClient];
       server.adapter(createAdapter(pubClient, subClient));
       this.logger.log('Socket.io Redis adapter attached');
@@ -215,8 +254,40 @@ export class RealtimeGateway
     }
   }
 
-  async onModuleDestroy(): Promise<void> {
+  /**
+   * Shutdown, not destroy: Nest closes the Socket.io server in the same step that closes the
+   * HTTP listener, and that step runs *after* every destroy hook (`main.ts`). Quitting the
+   * adapter's Redis pair from a destroy hook would therefore cut the fan-out under sockets
+   * that are still connected and still being served.
+   */
+  async onApplicationShutdown(): Promise<void> {
     await Promise.all(this.redisClients.map((client) => client.quit().catch(() => undefined)));
     this.redisClients = [];
+  }
+
+  /**
+   * Registers the `error` listener a `pubClient`/`subClient` needs so a reconnect failure is
+   * reported instead of becoming an unhandled `error` event on the underlying `EventEmitter`
+   * (ioredis's own fallback is `console.error`, invisible to the JSON log format and to
+   * Sentry: audit BE-11). Kept as its own method, separate from `attachRedisAdapter`, so a
+   * unit test can drive it directly without opening a real socket `isTestEnv()` would refuse.
+   */
+  private attachRedisErrorListener(client: Redis, label: 'pubClient' | 'subClient'): void {
+    client.on('error', (error: Error) => {
+      this.logger.warn(`Socket.io Redis adapter ${label} error: ${error.message}`);
+      if (this.shouldReportRedisError()) {
+        captureServerError(error, { path: `realtime-gateway-${label}` });
+      }
+    });
+  }
+
+  /** Claims the report slot for a Redis connection error, or says one was claimed too recently. */
+  private shouldReportRedisError(): boolean {
+    const now = Date.now();
+    if (now - this.lastRedisErrorReportedAt < REDIS_ERROR_REPORT_DAMPEN_MS) {
+      return false;
+    }
+    this.lastRedisErrorReportedAt = now;
+    return true;
   }
 }

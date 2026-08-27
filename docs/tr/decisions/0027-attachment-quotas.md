@@ -3,7 +3,7 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-18
 
-> 🌐 [English (kanonik)](../../decisions/0027-attachment-quotas.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0027-attachment-quotas.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 > **Güncellendi (2026-08-21):** aşağıdaki kararın "ayarlanmamış = sınırsız" yarısı tersine
 > çevrildi. Ayarlanmamış `ATTACHMENT_WORKSPACE_QUOTA_BYTES` artık 2 GiB, ayarlanmamış

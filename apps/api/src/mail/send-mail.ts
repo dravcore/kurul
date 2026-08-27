@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { MailDeliveryStatus } from '@kurul/shared-types';
-import { LogMailSender } from './log-mail-sender';
+import { demoModeEnabled } from '../demo/demo-mode';
+import { DEMO_MODE_REASON, LogMailSender } from './log-mail-sender';
 import { recordMailDelivery } from './mail-delivery-scope';
 import { readMailConfig, type MailConfig } from './mail-config';
 import type { MailMessage, MailSender } from './mail-sender';
@@ -8,8 +9,28 @@ import { SmtpMailSender } from './smtp-mail-sender';
 
 const logger = new Logger('Mail');
 
-/** Picks the transport for a configuration: SMTP when there is a host, the log otherwise. */
+/**
+ * Picks the transport for a configuration: SMTP when there is a host, the log otherwise.
+ *
+ * `DEMO_MODE` overrides the host, and this is the only place that has to know it. Silencing
+ * mail on a demo instance is one line here instead of a check inside every sender: every
+ * outbound message in the API already goes through one transport chosen once per process
+ * (see `getMailSender` below), so switching the transport switches *all* of it: verification,
+ * invitations and notification email alike, including the paths Better Auth calls directly
+ * with no injection point of their own.
+ *
+ * `mailEnabled()` then reports `false`, which is the truth and a state every consumer already
+ * renders: the members screen explains that invitations must be delivered by hand, and
+ * `POST /workspaces/:id/invitations` answers `emailDelivery: NOT_CONFIGURED`. A demo where
+ * anyone can make the server send mail to any address a stranger typed in is a demo of an
+ * open relay, so the reason a demo instance sends nothing is worth the small imprecision in
+ * the words "not set up".
+ */
 export function createMailSender(config: MailConfig): MailSender {
+  if (demoModeEnabled()) {
+    return new LogMailSender(config.from, DEMO_MODE_REASON);
+  }
+
   return config.smtp === undefined
     ? new LogMailSender(config.from)
     : new SmtpMailSender(config.from, config.smtp);

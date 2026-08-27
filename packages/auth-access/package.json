@@ -1,6 +1,6 @@
 {
   "name": "@kurul/auth-access",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -21,12 +21,12 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "better-auth": "1.6.27"
+    "better-auth": "1.7.1"
   },
   "devDependencies": {
     "@kurul/shared-types": "workspace:*",
-    "better-auth": "1.6.27",
+    "better-auth": "1.7.1",
     "typescript": "^5.8.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

@@ -44,7 +44,7 @@ x-hardened: &hardened
 
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     restart: unless-stopped
     logging: *logging
     <<: *hardened
@@ -81,26 +81,40 @@ services:
     # with it. See docs/self-hosting.md#server-sizing for how this and the other ceilings below
     # add up against that budget.
     mem_limit: 512m
+    # Docker's /dev/shm is 64 MB by default and Postgres puts dynamic shared memory (parallel
+    # workers, hash joins) there; 256m keeps a heavy dashboard query from failing with "could not
+    # resize shared memory segment". Charged to this container's cgroup, so it is inside the
+    # 512m above, not on top of it.
+    shm_size: 256m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kurul}
       # No baked-in default: compose fails loudly instead of initializing (or, on every later
       # boot, connecting to) a database with a well-known password shared by every Kurul
       # install. This only bites on the *first* boot of an empty postgres_data volume — initdb
       # bakes the password into the role once, so changing this value later does not rotate an
-      # already-initialized database's password. See the [Unreleased] entry in CHANGELOG.md for
+      # already-initialized database's password. See the [0.2.0] entry in CHANGELOG.md for
       # how to roll an existing volume onto a new password with `ALTER USER`.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
       POSTGRES_DB: ${POSTGRES_DB:-kurul}
     volumes:
       - postgres_data:/var/lib/postgresql
+    # `-h 127.0.0.1`, so the probe goes over TCP. Without a host, pg_isready asks the Unix socket,
+    # and on the very first boot of an empty postgres_data volume the official entrypoint runs
+    # initdb behind a temporary, socket-only server (`listen_addresses=''`) that answers that
+    # probe as readily as the real one: the check turned healthy, `migrate` below started, and
+    # its one `prisma migrate deploy` failed with a connection refused because nothing was
+    # listening on 5432 yet, which reads to a newcomer as a broken install. Probing the TCP
+    # listener means healthy is not reported until the server the other containers will actually
+    # talk to is up. scripts/bootstrap.mjs names the same race for the dev stack.
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-kurul} -d ${POSTGRES_DB:-kurul}']
+      test:
+        ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-kurul} -d ${POSTGRES_DB:-kurul}']
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
-    image: redis:8-alpine
+    image: redis:8-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
     restart: unless-stopped
     logging: *logging
     <<: *hardened
@@ -157,7 +171,33 @@ services:
     # stay array form: a single command *string* here would go through `sh -c` again (the
     # same trap this replaces) and a string with a trailing blank argument silently loses
     # it, whereas the array passes an explicit empty element through to `redis-server`.
-    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-}']
+    #
+    # `--maxmemory ${REDIS_MAXMEMORY:-100mb}` under the 128m `mem_limit` above, for the reason
+    # api's NODE_OPTIONS pins V8's heap under its own ceiling: a limit Redis knows about ends in
+    # a logged `OOM command not allowed when used memory > 'maxmemory'` that the API already
+    # survives (its rate limiters fall back to process memory while Redis is erroring, and a
+    # cache miss is a cache miss), where the cgroup's ends in a bare exit 137 that `restart:
+    # unless-stopped` turns into a loop. `noeviction` rather than an LRU policy because BullMQ's
+    # queues (the notification and retention workers in apps/api) live here, BullMQ requires it,
+    # and an evicted job is a job that silently never runs: a full Redis must refuse writes, not
+    # drop keys. The 28m between the two, at the default, is for what maxmemory does not count,
+    # mostly the RDB save fork's copy-on-write pages and client buffers.
+    #
+    # `REDIS_MAXMEMORY` in `.env` raises the ceiling without editing this file; raise `mem_limit`
+    # above alongside it. Check `used_memory_human` first on an instance that is already running
+    # (docs/self-hosting.md#server-sizing): with `noeviction`, a dataset already over the ceiling
+    # does not shrink itself back under it, it refuses every write until keys expire, so the
+    # check comes before the number, not after.
+    command:
+      [
+        'redis-server',
+        '--requirepass',
+        '${REDIS_PASSWORD:-}',
+        '--maxmemory',
+        '${REDIS_MAXMEMORY:-100mb}',
+        '--maxmemory-policy',
+        'noeviction',
+      ]
     volumes:
       - redis_data:/data
     # Still branches on REDIS_PASSWORD, even though `redis-cli -a "" ping` was confirmed to
@@ -184,9 +224,12 @@ services:
   # match the server major. Restore procedure: docs/development.md#upgrading-and-backups.
   #
   # backup_data lives on the same host as postgres_data — that covers "I dropped the wrong
-  # table", not "the disk died". Copy the volume off-host as well; see the same section.
+  # table", not "the disk died". Set BACKUP_REMOTE to an rclone remote path and the same sidecar
+  # also pushes both archives off-host every cycle, prunes the remote to the same BACKUP_KEEP,
+  # and reports unhealthy when the newest off-host copy goes stale
+  # (docs/self-hosting.md#off-host-copies). Left blank, nothing about this service changes.
   backup:
-    image: postgres:18-alpine
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     logging: *logging
     <<: *hardened
     # Unlike postgres above, `entrypoint:` here replaces docker-entrypoint.sh outright —
@@ -201,7 +244,9 @@ services:
     # OPS-05 (2026-08-18 audit) — see postgres's mem_limit above for why a ceiling exists at all.
     # 256m: `pg_dump -Fc` streams its output rather than buffering the whole archive in memory
     # (see backup.sh), so this covers process overhead plus headroom for the `tar` this container
-    # also runs over attachment_data — not the size of either archive on disk.
+    # also runs over attachment_data — not the size of either archive on disk. The off-host push
+    # fits the same way: rclone streams each archive and its upload buffers are a handful of
+    # chunks, not the file, and it runs after both archives are closed rather than beside them.
     mem_limit: 256m
     environment:
       # postgres:5432 is the in-network address, same as the api/migrate services above —
@@ -211,6 +256,13 @@ services:
       PGUSER: ${POSTGRES_USER:-kurul}
       PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
       PGDATABASE: ${POSTGRES_DB:-kurul}
+      # Retention is a COUNT: backup.sh keeps the newest BACKUP_KEEP archives of each series and
+      # never looks at their age. A container start used to spend one of those slots (the loop
+      # dumped on entry, every reboot, `up` and image pull included), so a day of restarts could
+      # push a week of history out; backup.sh now skips its boot-time cycle while a dump younger
+      # than BACKUP_INTERVAL/2 exists, and restarts no longer consume retention. The two values
+      # are also handed to `api` above, whose orphan-file sweep waits BACKUP_KEEP × BACKUP_INTERVAL
+      # on the assumption of one pair per interval, which that skip is what keeps true.
       BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
       # Where the read-only attachments mount lands. Blank would skip the file archive
@@ -220,6 +272,22 @@ services:
       # restores" — the answer here is not that the files are visible to users, but that this
       # copy is read and restored on the same rehearsed schedule as the dump beside it.
       ATTACHMENT_DIR: /attachments
+      # The off-host target, blank by default: an rclone remote path such as
+      # `s3:my-bucket/kurul` or `b2:my-bucket`. Blank means backup.sh skips its whole off-host
+      # half and this service behaves exactly as it did before that half existed, including the
+      # healthcheck below. See docs/self-hosting.md#off-host-copies.
+      BACKUP_REMOTE: ${BACKUP_REMOTE:-}
+    # Where the remote's CREDENTIALS come from, and the reason they are not in `.env`: rclone
+    # names its env-only config `RCLONE_CONFIG_<REMOTE>_<KEY>`, where `<REMOTE>` is chosen by the
+    # operator, so no fixed list of keys can be enumerated in `environment:` above the way every
+    # other secret in this file is. An optional second env file is the one mechanism that passes
+    # unknown key names through, and it also keeps object-storage keys out of the file the api
+    # and web containers read. `required: false` means an install with no off-host target (and
+    # one supplying credentials through a mounted rclone.conf instead) starts with no such file
+    # present.
+    env_file:
+      - path: ./rclone.env
+        required: false
     volumes:
       - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
       - backup_data:/backups
@@ -236,7 +304,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # OPS-02 (audit/findings/devops.md, 2026-08-18 audit): backup.sh's main loop runs
+    # OPS-02 (2026-08-18 devops audit; that dashboard was a local working note and is not in
+    # the repo, so this comment carries the reasoning): backup.sh's main loop runs
     # `take_dump || true` / `take_files || true` (see there) so ONE failing cycle only logs
     # and keeps sleeping — the process itself never exits non-zero, and without this block
     # nothing about the container's state changed either. A dump could stop being produced
@@ -246,7 +315,15 @@ services:
     # apps/api/src/retention/cleanup.worker.ts) quietly assumes never happens.
     #
     # "Healthy" = a `kurul-*.dump` in /backups modified within the last 2×BACKUP_INTERVAL
-    # seconds. 2×, not 1×, so one slow or skipped cycle (a big `pg_dump`, or postgres
+    # seconds, or, once BACKUP_REMOTE is set, the `.offhost-stamp` file backup.sh touches only
+    # after a cycle's BOTH archives have landed on the remote and it has been pruned. The
+    # off-host check subsumes the local one rather than adding to it: that stamp cannot be newer
+    # than the archives it just uploaded, so a fresh stamp proves a fresh local pair as well,
+    # while the reverse is exactly the failure this exists to catch (dumps still being written
+    # here, nothing leaving the host). An operator who has declared a remote is told about a
+    # broken upload, not reassured by the copy that dies with the disk.
+    #
+    # 2×, not 1×, so one slow or skipped cycle (a big `pg_dump`, or postgres
     # restarting underneath it — both already survived by the `|| true` above) doesn't flap
     # this healthy → unhealthy → healthy every single interval; it takes a SECOND missed
     # cycle in a row to actually mean something is stuck.
@@ -277,16 +354,26 @@ services:
     # starts immediately at container boot (see backup.sh's main loop below `mkdir -p
     # "$BACKUP_DIR"`), not after one BACKUP_INTERVAL has elapsed, so how long it takes is a
     # function of database size, not of the configured cadence — sizing it off a 24h default
-    # would hide a genuinely broken first cycle for most of a day. 10 minutes is generous for
+    # would hide a genuinely broken first cycle for most of a day. A RESTART is the other case:
+    # backup.sh skips that boot-time cycle when a dump younger than BACKUP_INTERVAL/2 already
+    # exists (so restarts stop eating count-based retention, see BACKUP_KEEP above), and the
+    # dump it leaves in place is exactly what the `find -mmin` below reads, so the check is
+    # healthy from the first probe. 10 minutes is generous for
     # the databases a single-host Compose install runs (this file's whole premise, and
     # self-hosting.md's); an instance with an unusually large first dump that still needs
     # longer can raise `start_period` with a compose override file, same as any other
     # deployment-specific tuning in this project, rather than a knob added here pre-emptively.
+    # That reasoning covers the off-host branch too: the first push follows the first dump,
+    # so what it waits on is still database size plus one upload of it.
+    #
+    # $BACKUP_REMOTE is baked in the same way as $BACKUP_INTERVAL, from `${BACKUP_REMOTE:-}`
+    # above, so the empty case is a genuinely empty variable and the `find` that runs is
+    # character for character the one that ran before this branch existed.
     healthcheck:
       test:
         [
           'CMD-SHELL',
-          'mmin=$$(( ($$BACKUP_INTERVAL * 2 + 59) / 60 )); [ "$$mmin" -lt 1 ] && mmin=1; find /backups -maxdepth 1 -name "kurul-*.dump" -mmin "-$$mmin" 2>/dev/null | grep -q .',
+          'mmin=$$(( ($$BACKUP_INTERVAL * 2 + 59) / 60 )); [ "$$mmin" -lt 1 ] && mmin=1; if [ -n "$$BACKUP_REMOTE" ]; then find /backups/.offhost-stamp -mmin "-$$mmin" 2>/dev/null | grep -q .; else find /backups -maxdepth 1 -name "kurul-*.dump" -mmin "-$$mmin" 2>/dev/null | grep -q .; fi',
         ]
       interval: 5m
       timeout: 10s
@@ -339,7 +426,7 @@ services:
         condition: service_healthy
 
   api:
-    # OPS-04 (audit/findings/devops.md): `image:` alongside `build:` is not an either/or —
+    # OPS-04 (2026-08-18 devops audit): `image:` alongside `build:` is not an either/or —
     # Compose's default pull_policy (`missing`) means `docker compose up -d` only builds when
     # the tag below isn't already resolvable, so `docker compose pull && docker compose up -d`
     # (docs/development.md#full-stack-in-docker) now installs and upgrades from a published
@@ -359,6 +446,16 @@ services:
     # reboot or daemon restart, not only after an in-container crash. `migrate` is the
     # deliberate exception: it is a one-shot job that must stay exited.
     restart: unless-stopped
+    # How long Docker waits between SIGTERM and SIGKILL. The default is 10s, and this API's
+    # shutdown does real work inside that window: `enableShutdownHooks` (apps/api/src/main.ts)
+    # closes the HTTP listener, then releases the pg pool, the Redis clients, the mail
+    # transport and the two BullMQ workers, and the worker close alone is allowed
+    # WORKER_CLOSE_TIMEOUT_MS (apps/api/src/common/close-worker.ts) before a running job is
+    # abandoned. A SIGKILL part-way through skips every hook that had not run yet, which is
+    # how an ordinary `docker compose up -d` ended up dropping in-flight requests and leaving
+    # a half-closed pool behind. 30s is comfortably above that budget and is still short
+    # enough that a stuck container does not stall an upgrade.
+    stop_grace_period: 30s
     logging: *logging
     <<: *hardened
     # `runner` (apps/api/Dockerfile) already runs as `USER node` (PR #109, SEC-02's other
@@ -387,6 +484,13 @@ services:
       # is set and to nothing when it isn't, so this URL matches whichever branch the redis
       # service's own entrypoint took above without a second flag to keep in sync.
       REDIS_URL: redis://${REDIS_PASSWORD:+:${REDIS_PASSWORD}@}redis:6379
+      # The three knobs on the `pg` pool `apps/api/src/prisma/database.ts` opens against the
+      # URL above. Blank = the API's own defaults (20 connections, 10s connection wait, 30s
+      # statement timeout). Not on `migrate`: Prisma's engine reads DATABASE_URL directly and
+      # never goes through this pool.
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-}
+      DATABASE_POOL_CONNECTION_TIMEOUT_MS: ${DATABASE_POOL_CONNECTION_TIMEOUT_MS:-}
+      DATABASE_STATEMENT_TIMEOUT_MS: ${DATABASE_STATEMENT_TIMEOUT_MS:-}
       API_PORT: 4000
       # Both derive from SITE_URL — the one public origin the `proxy` service answers on —
       # because that is now the only address a browser ever uses for either app (see
@@ -407,14 +511,24 @@ services:
       BETTER_AUTH_URL: ${SITE_URL:-http://localhost}
       # Exactly one proxy hop stands in front of this service, and there is no route around it:
       # the port below is not published, so nothing outside the compose network can reach the
-      # API directly to forge an X-Forwarded-For. That is what makes a fixed `1` correct here
+      # API directly to forge an X-Forwarded-For. That is what makes a default of `1` correct here
       # and what makes it safe — the warning in `.env.example` is about `true` (trust the whole
       # chain) on a *directly exposed* instance, which this no longer is. Without it every
       # rate-limit bucket and every access-log `ip` would collapse onto the proxy's container
       # address, i.e. one bucket for the entire internet. Add a hop for each additional proxy
-      # you put in front (a CDN in front of `proxy` makes this `2`) — see
-      # docs/self-hosting.md.
-      TRUST_PROXY: 1
+      # you put in front by setting TRUST_PROXY in .env (a CDN in front of `proxy` makes it
+      # `2`); the default applies when the line is blank or absent, so a re-fetched compose
+      # file never loses the value. `false` in .env is forwarded as-is and switches the hop
+      # off, which is the one value not to write there. See
+      # docs/self-hosting.md#bringing-your-own-reverse-proxy.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      # The interactive console at /docs and the document at /openapi.json. Blank follows
+      # NODE_ENV, which the image bakes to `production`, so this stack ships with them off
+      # until an operator writes `true` (see .env.example for why that default is the decision).
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-}
+      # Master switch for the request throttles, the API's only brute-force ceiling. Passed
+      # through so that turning it off is a deliberate `false` in .env rather than impossible.
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       # Largest JSON/form-encoded body the API reads (issue #214). Passed through rather than
       # left to the default so an operator who sets it in .env actually gets it — a limit that
       # silently ignores its own variable is the same class of defect as the unconfigured
@@ -469,6 +583,29 @@ services:
       # ATTACHMENT_MAX_BYTES, which is why it is a separate number rather than a derived one, and
       # it needs no STORAGE_PATH — an import writes link rows and stores no bytes.
       TRELLO_IMPORT_MAX_BYTES: ${TRELLO_IMPORT_MAX_BYTES:-20971520}
+      # Row caps for the same import (SEC-04): the largest number of cards and lists it will
+      # plan, checked before a row is planned or a transaction is opened. TRELLO_IMPORT_MAX_BYTES
+      # bounds the parsed export's size, not how many rows it asks this API to write, so these
+      # are the ceiling on that separately.
+      TRELLO_IMPORT_MAX_CARDS: ${TRELLO_IMPORT_MAX_CARDS:-50000}
+      TRELLO_IMPORT_MAX_LISTS: ${TRELLO_IMPORT_MAX_LISTS:-5000}
+      # Plan ceilings (docs/decisions/0032-plan-limits.md): quantities rather than bytes. Blank
+      # and `0` both mean unlimited, which is what every install runs until an operator writes a
+      # number; a negative or non-integer value refuses to boot. Passed through for the same
+      # reason as every other limit in this block: before they were, PLAN_MAX_USERS=1 in .env
+      # produced an instance that logged `Plan ceilings: unlimited` and capped nothing. Not on
+      # `demo-reset`: the reset creates the demo account through Better Auth directly, below the
+      # route where the sign-up ceiling is enforced, and it empties the database first anyway.
+      PLAN_MAX_SEATS_PER_WORKSPACE: ${PLAN_MAX_SEATS_PER_WORKSPACE:-}
+      PLAN_MAX_BOARDS_PER_WORKSPACE: ${PLAN_MAX_BOARDS_PER_WORKSPACE:-}
+      PLAN_MAX_WORKSPACES: ${PLAN_MAX_WORKSPACES:-}
+      PLAN_MAX_USERS: ${PLAN_MAX_USERS:-}
+      # Registration switch, a policy rather than a ceiling and so not one of the four above:
+      # blank or `true` keeps POST /auth/sign-up/email open, `false` refuses it with a 403
+      # whatever the account count is and leaves sign-in and the rest of /auth alone. Passed
+      # through for the same reason the ceilings are. Independent of DEMO_MODE, which keeps
+      # registration open; see docs/self-hosting.md.
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-}
       # Read by the orphan sweep, which refuses to delete a file while a dump old enough to
       # disown it is still restorable — its grace period is BACKUP_KEEP × BACKUP_INTERVAL, with
       # a 24h floor the API applies whatever these say (the window also covers an upload whose
@@ -477,6 +614,34 @@ services:
       # are passed here rather than defaulted in code.
       BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
+      # The nightly retention sweep (docs/development.md#data-retention), same worker as the
+      # orphan sweep above. Blank windows = the API's defaults (90 / 365 / 90 days); `0` on a
+      # window keeps those rows forever; a negative value refuses the run. `false` on the switch
+      # stops the whole sweep, so the instance keeps everything it ever wrote.
+      CLEANUP_ENABLED: ${CLEANUP_ENABLED:-true}
+      NOTIFICATION_RETENTION_DAYS: ${NOTIFICATION_RETENTION_DAYS:-}
+      ACTIVITY_RETENTION_DAYS: ${ACTIVITY_RETENTION_DAYS:-}
+      INVITATION_RETENTION_DAYS: ${INVITATION_RETENTION_DAYS:-}
+      # Comma-separated addresses allowed on the instance-wide routes (the activation funnel
+      # and the GDPR erasure endpoint, docs/api-conventions.md). Blank = nobody, and without
+      # this line nobody was the only possible answer on a Compose install.
+      INSTANCE_ADMIN_EMAILS: ${INSTANCE_ADMIN_EMAILS:-}
+      # Outbound telemetry, off unless an operator opts in; see
+      # docs/development.md#activation-funnel-and-telemetry. Blank = off and no endpoint, so
+      # an install that never touches these sends nothing, exactly as before they were passed.
+      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-}
+      TELEMETRY_ENDPOINT: ${TELEMETRY_ENDPOINT:-}
+      TELEMETRY_TIMEOUT_MS: ${TELEMETRY_TIMEOUT_MS:-}
+      # The demo instance. Off everywhere by default, and one variable rather than a set of
+      # them so an operator cannot get half of it: `true` shows the "this data disappears"
+      # banner, routes all outbound mail to the log whatever SMTP says, refuses account and
+      # workspace deletion with 403, and publishes the reset schedule on `GET /config`.
+      # The interval is passed here too, because the banner has to name the same cadence the
+      # `demo-reset` service below sleeps for. Both sides derive the next reset from the same
+      # epoch-anchored grid, so they agree without sharing any state; two different numbers
+      # would make the countdown a lie. See docs/self-hosting.md#demo-instance.
+      DEMO_MODE: ${DEMO_MODE:-false}
+      DEMO_RESET_INTERVAL_MINUTES: ${DEMO_RESET_INTERVAL_MINUTES:-60}
     # The first `volumes:` this service has ever had, and with it the first deployment
     # constraint naming which host a replica may run on (ADR 0022). The directory is created in
     # the image already owned by `node` (apps/api/Dockerfile), so nothing chowns at runtime and
@@ -485,7 +650,7 @@ services:
       - attachment_data:/data/attachments
     # No `ports:` — the API is reached only through `proxy` below, at ${SITE_URL}/api. This is
     # not merely tidiness: an API also published on a host port would be a second, unproxied
-    # way in, which would invalidate the `TRUST_PROXY: 1` above (anyone could connect straight
+    # way in, which would invalidate the `TRUST_PROXY` default above (anyone could connect straight
     # to :4000 and hand themselves a fabricated client IP) and would put a second origin —
     # http://localhost:4000 — in play for cookies that are now scoped to the proxy's. Reach it
     # for debugging with `docker compose exec api wget -qO- http://127.0.0.1:4000/health/ready`
@@ -504,6 +669,130 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # The public demo's reset loop. The first service in this file behind a profile, so it starts
+  # only for `docker compose --profile demo up -d` and every ordinary self-hosted install is
+  # unaffected by its existence.
+  #
+  # Same image as `api` above, deliberately: the reset is compiled into `dist` with the rest of
+  # the API (`apps/api/src/demo/reset.ts`), so this adds a container and not a second artefact
+  # to build, publish, scan and keep in step with the schema. It is *not* `pnpm db:seed` on a
+  # timer: the runner image has no pnpm workspace and no tsx for `prisma.config.ts` to invoke,
+  # and `assertSeedAllowed` refuses under the `NODE_ENV=production` the image bakes in. The
+  # replacement for that refusal is in `reset-guard.ts`: this script runs only when DEMO_MODE is
+  # true *and* the database is named like a demo, so pointing it at a real deployment by
+  # copy-pasting this block takes two independent mistakes rather than one.
+  demo-reset:
+    profiles: ['demo']
+    image: ghcr.io/dravcore/kurul-api:${TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    # `unless-stopped` for the same reason `backup` has it: a reset sidecar that stays down
+    # after a host reboot leaves a public demo full of whatever the last visitor typed.
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardened
+    # 256m: this process writes a few hundred rows and holds none of them, so the ceiling is
+    # process overhead plus the Prisma client. Same reasoning as `backup` above, and the same
+    # explicit V8 heap so a runaway hits a catchable JS error rather than a bare SIGKILL.
+    mem_limit: 256m
+    environment:
+      NODE_OPTIONS: --max-old-space-size=192
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kurul}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}@postgres:5432/${POSTGRES_DB:-kurul}
+      # Better Auth is constructed at module load and refuses to build without it: the reset
+      # creates the demo account through `signUpEmail` rather than writing a password hash by
+      # hand, so the same secret the API signs sessions with has to be here too.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env — see docs/development.md#environment-variables}
+      BETTER_AUTH_URL: ${SITE_URL:-http://localhost}
+      WEB_URL: ${SITE_URL:-http://localhost}
+      # Both checks the reset makes before deleting anything. Blank defaults (`:-`), not the
+      # required form (`:?`), and the difference is not cosmetic: Compose interpolates the whole
+      # file before it filters services by profile, so a `:?` on these two lines aborted every
+      # plain `docker compose pull`/`up -d`/`config` with the shipped `.env.example` (both keys
+      # blank), on an install that never asked for a demo, with a message telling that operator
+      # to set DEMO_MODE=true. To run the demo profile, set DEMO_MODE=true and DEMO_PASSWORD in
+      # .env (docs/self-hosting.md#demo-instance). Leaving either blank is refused at runtime,
+      # where it can be logged, rather than at parse time: `reset-guard.ts`
+      # (`assertDemoResetAllowed`) exits on any DEMO_MODE other than true, and `reset.ts` exits
+      # on a blank DEMO_PASSWORD or one shorter than 8 characters, so
+      # `docker compose --profile demo logs demo-reset` shows "Refusing to reset" instead of
+      # Compose refusing the file.
+      # Still no `false` here, unlike `api` above: an empty value is refused exactly as `false`
+      # is, and a container whose whole job is to empty a database should not carry a default
+      # either way.
+      DEMO_MODE: ${DEMO_MODE:-}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      DEMO_RESET_INTERVAL_MINUTES: ${DEMO_RESET_INTERVAL_MINUTES:-60}
+      # No REDIS_URL, and that is the decision rather than an omission: nothing this script does
+      # touches Redis, and Better Auth would build a rate-limit client at module load for a
+      # process that never serves a request.
+    # `sh -c` with the loop inline rather than a mounted script: `scripts/backup.sh` is mounted
+    # into a stock `postgres:18-alpine`, which carries none of this project's code, whereas this
+    # image already carries all of it. A file bind-mounted from the host would also mean an
+    # operator running `docker compose pull` gets a new image and their old loop.
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        set -eu
+        STAMP=/tmp/kurul-demo-reset.stamp
+        INTERVAL=$$(( $$DEMO_RESET_INTERVAL_MINUTES * 60 ))
+        trap 'echo "demo-reset: stopping"; exit 0' INT TERM
+        # `if`, not a bare call: `set -e` would take the container down on the first failed
+        # cycle, and a demo that stops resetting because Postgres was restarting once is worse
+        # than one that logs it and tries again. The stamp is touched only on success, which is
+        # what the healthcheck below reads, the same shape as `backup`'s newest-dump mtime check.
+        run() {
+          if node dist/demo/reset.js; then
+            touch "$$STAMP"
+          else
+            echo "demo-reset: ERROR reset failed, retrying at the next interval"
+          fi
+        }
+        # Once at boot, so a freshly started stack has data before the first boundary.
+        run
+        while true; do
+          NOW=$$(date +%s)
+          # Sleep to the next boundary of the interval grid rather than a flat INTERVAL, so the
+          # instant matches what `GET /config` publishes as `demo.nextResetAt` (see
+          # apps/api/src/demo/demo-mode.ts) and so restarting this container does not shift the
+          # schedule the banner is promising. Backgrounded + `wait`, like backup.sh, so the
+          # trap above can interrupt it.
+          sleep $$(( INTERVAL - NOW % INTERVAL )) &
+          wait $$!
+          run
+        done
+    # "Healthy" = a successful reset within the last 2 × the interval. 2×, not 1×, for the
+    # reason `backup`'s check states: one slow or skipped cycle must not flap this
+    # healthy → unhealthy → healthy every interval; it takes a second missed cycle in a row to
+    # mean something is stuck. Without it, a reset loop that had stopped producing resets would
+    # report as simply "Up", and on a public demo the failure that matters is exactly the
+    # silent one, where a launch-day link keeps serving whatever a stranger left behind.
+    #
+    # `-mmin` takes whole minutes and the interval is already in minutes, so no rounding is
+    # needed; the `-lt 1` floor is there so an operator experimenting with a sub-minute cadence
+    # cannot produce `-mmin -0`, which BusyBox reads as "modified in the last zero minutes" and
+    # never matches. Every `$` is doubled because the container's shell interprets this, not
+    # Compose's interpolation of this file.
+    #
+    # `start_period` covers the boot reset (a wipe and a few hundred inserts, seconds) plus the
+    # `depends_on` wait, not a whole interval: the first run starts immediately, so sizing this
+    # off the cadence would hide a genuinely broken first cycle for an hour.
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mmin=$$(( $$DEMO_RESET_INTERVAL_MINUTES * 2 )); [ "$$mmin" -lt 1 ] && mmin=1; find /tmp -maxdepth 1 -name kurul-demo-reset.stamp -mmin "-$$mmin" 2>/dev/null | grep -q .',
+        ]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 3m
+    depends_on:
+      postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -588,7 +877,7 @@ services:
   # reusable across deployments (audit finding PM-02); docs/self-hosting.md is the operator
   # walkthrough.
   proxy:
-    image: caddy:2-alpine
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     restart: unless-stopped
     logging: *logging
     <<: *hardened

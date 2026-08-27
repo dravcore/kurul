@@ -151,7 +151,7 @@ export function AttachmentRow({
           <img
             src={previewUrl}
             alt={attachment.filename}
-            className="max-h-40 w-fit max-w-full rounded-[var(--radius-md)] border border-border object-contain"
+            className="max-h-40 w-fit max-w-full rounded-md border border-border object-contain"
           />
         ) : null}
       </div>

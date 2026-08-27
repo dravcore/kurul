@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { Queue, Worker, type Job } from 'bullmq';
+import { WORKER_CLOSE_TIMEOUT_MS } from '../common/close-worker';
 import { initSentry, resetSentryForTesting } from '../common/observability/sentry';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -19,9 +20,16 @@ jest.mock('bullmq', () => ({
   Queue: jest.fn().mockImplementation(() => ({
     add: jest.fn(),
     upsertJobScheduler: jest.fn().mockResolvedValue({ id: 'retention-cleanup' }),
-    close: jest.fn(),
+    on: jest.fn(),
+    close: jest.fn().mockResolvedValue(undefined),
   })),
-  Worker: jest.fn().mockImplementation(() => ({ on: jest.fn(), close: jest.fn() })),
+  // `close` resolves rather than returning `undefined`: the shutdown hook races it against a
+  // timeout (`common/close-worker.ts`), so a stub that is not thenable is not a stand-in for
+  // the real worker at all.
+  Worker: jest.fn().mockImplementation(() => ({
+    on: jest.fn(),
+    close: jest.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 const RETENTION_ENV = [
@@ -266,14 +274,17 @@ describe('CleanupWorker', () => {
       const [call] = callsFor(executeRaw, 'WorkspaceInvitation');
       const statement = statementOf(call!);
       expect(statement).toContain('WHERE "createdAt" < ?');
-      // Finished either because somebody decided, or because the clock did.
-      expect(statement).toContain('AND ("status" <> \'pending\' OR "expiresAt" < ?)');
+      // Finished either because somebody decided, or because the clock did. `status` is
+      // parameterised, not concatenated, so it is a placeholder in the statement text and a
+      // separate bound value below.
+      expect(statement).toContain('AND ("status" <> ? OR "expiresAt" < ?)');
       // Default window: 90 days, not the activity year.
       expect(call![1]).toEqual(new Date(NOW.getTime() - 90 * DAY_MS));
+      expect(call![2]).toEqual('pending');
       // The expiry half compares against the sweep instant itself, not against the cutoff — an
       // invitation that expired yesterday is finished today, and the window is what then
       // decides how long the finished record is kept.
-      expect(call![2]).toEqual(NOW);
+      expect(call![3]).toEqual(NOW);
     });
 
     it('honours INVITATION_RETENTION_DAYS independently of the notification window', async () => {
@@ -379,7 +390,38 @@ describe('CleanupWorker', () => {
       await worker.onModuleInit();
 
       expect(Queue).not.toHaveBeenCalled();
-      await worker.onModuleDestroy();
+      await worker.onApplicationShutdown();
+    });
+  });
+
+  describe('shutdown', () => {
+    it('gives up on a sweep that will not stop instead of holding the shutdown open', async () => {
+      // The failure this guards: `worker.close()` waits for the running job and BullMQ puts no
+      // ceiling on that wait, so a first sweep on an instance with years of history used to hold
+      // the whole shutdown past the container's stop grace period and end in a SIGKILL, which
+      // skips every hook after this one (the pg pool, the Redis clients, the mail transport).
+      process.env.CLEANUP_ENABLED = 'true';
+      process.env.REDIS_URL = 'redis://localhost:6379';
+      const { worker } = buildWorker();
+      await worker.onModuleInit();
+
+      const bullWorker = (Worker as unknown as jest.Mock).mock.results[0]!.value as {
+        close: jest.Mock;
+      };
+      bullWorker.close.mockReturnValue(new Promise<void>(() => {}));
+
+      jest.useFakeTimers();
+      try {
+        const shutdown = worker.onApplicationShutdown();
+        await jest.advanceTimersByTimeAsync(WORKER_CLOSE_TIMEOUT_MS);
+
+        await expect(shutdown).resolves.toBeUndefined();
+      } finally {
+        jest.useRealTimers();
+      }
+
+      expect(bullWorker.close).toHaveBeenCalledTimes(2);
+      expect(bullWorker.close).toHaveBeenLastCalledWith(true);
     });
   });
 
@@ -672,7 +714,7 @@ describe('CleanupWorker', () => {
         },
       );
 
-      await worker.onModuleDestroy();
+      await worker.onApplicationShutdown();
     });
 
     it('starts nothing when REDIS_URL is unset', async () => {
@@ -794,6 +836,114 @@ describe('CleanupWorker', () => {
       // Must not throw even though nothing is listening on the Sentry side.
       expect(() => handler(job, new Error('boom'))).not.toThrow();
       expect(logError).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * BE-11: mirrors the due-soon worker's own error-handling tests. A Redis connection fault
+   * on either the queue or the worker connection used to have no listener at all: ioredis's
+   * own fallback for an unlistened `error` event is `console.error`, invisible to the JSON log
+   * format and to Sentry.
+   */
+  describe('redis connection error handling', () => {
+    beforeEach(() => {
+      process.env.CLEANUP_ENABLED = 'true';
+      resetSentryForTesting();
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.clearAllMocks();
+      jest.useRealTimers();
+      resetSentryForTesting();
+    });
+
+    /** Installs a fake Sentry SDK through the loader seam, same pattern as the failed-handler tests. */
+    async function enableFakeSentry(): Promise<{ captureException: jest.Mock }> {
+      const captureException = jest.fn();
+      const api = {
+        init: jest.fn(),
+        captureException,
+        close: jest.fn(() => Promise.resolve(true)),
+        withScope: (callback: (scope: { setTag: jest.Mock; setContext: jest.Mock }) => void) => {
+          callback({ setTag: jest.fn(), setContext: jest.fn() });
+        },
+      } as unknown as typeof import('@sentry/node');
+
+      process.env.SENTRY_DSN = 'https://k@o.ingest.sentry.io/1';
+      try {
+        await initSentry(() => Promise.resolve(api));
+      } finally {
+        delete process.env.SENTRY_DSN;
+      }
+
+      return { captureException };
+    }
+
+    /**
+     * Starts a worker and hands back the `on('error', ...)` callback registered on the given
+     * mocked BullMQ object, read off its own `.on` calls, not a copy the test wrote itself.
+     */
+    async function registerAndGetErrorHandler(
+      of: 'queue' | 'worker',
+    ): Promise<(error: Error) => void> {
+      process.env.REDIS_URL = 'redis://localhost:6379';
+      const prisma = { $executeRaw: jest.fn() } as unknown as PrismaService;
+      const worker = new CleanupWorker(prisma, {
+        persistsFiles: false,
+      } as unknown as StorageService);
+
+      await worker.onModuleInit();
+
+      const mock = of === 'queue' ? Queue : Worker;
+      const instance = (mock as unknown as jest.Mock).mock.results[0]!.value as { on: jest.Mock };
+      const [, handler] = instance.on.mock.calls.find(([event]) => event === 'error') as [
+        string,
+        (error: Error) => void,
+      ];
+      return handler;
+    }
+
+    it('registers an error listener on both the queue and the worker connection', async () => {
+      const queueHandler = await registerAndGetErrorHandler('queue');
+      const workerHandler = await registerAndGetErrorHandler('worker');
+
+      expect(queueHandler).toBeInstanceOf(Function);
+      expect(workerHandler).toBeInstanceOf(Function);
+    });
+
+    it('logs at warn, naming the connection, and reports to Sentry', async () => {
+      const { captureException } = await enableFakeSentry();
+      const logWarn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const handler = await registerAndGetErrorHandler('worker');
+
+      const error = new Error('ECONNREFUSED');
+      handler(error);
+
+      expect(logWarn).toHaveBeenCalledWith(expect.stringContaining('cleanup worker Redis error'));
+      expect(captureException).toHaveBeenCalledWith(error);
+    });
+
+    it('reports the first error immediately, then throttles further reports for a minute', async () => {
+      const { captureException } = await enableFakeSentry();
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const handler = await registerAndGetErrorHandler('queue');
+
+      handler(new Error('ECONNRESET'));
+      handler(new Error('ECONNRESET'));
+      handler(new Error('ECONNRESET'));
+      expect(captureException).toHaveBeenCalledTimes(1);
+
+      jest.advanceTimersByTime(60_000);
+      handler(new Error('ECONNRESET'));
+      expect(captureException).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not throw when Sentry is off (no SENTRY_DSN)', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const handler = await registerAndGetErrorHandler('worker');
+
+      expect(() => handler(new Error('boom'))).not.toThrow();
     });
   });
 

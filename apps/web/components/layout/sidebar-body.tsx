@@ -73,7 +73,7 @@ export function SidebarBody({
 
   const navLinkClass = (active: boolean): string =>
     cn(
-      'relative flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-2 text-body transition-colors',
+      'relative flex items-center gap-2 rounded-md px-2 py-2 text-body transition-[color,background-color,border-color]',
       touchTargets && 'min-h-11',
       active
         ? 'bg-signature-subtle font-strong text-foreground'
@@ -90,7 +90,7 @@ export function SidebarBody({
         )}
       >
         {!collapsed ? (
-          <p className="font-display text-title font-semibold tracking-tight text-foreground">
+          <p className="font-display text-title tracking-tight text-foreground">
             {t('shell.title')}
           </p>
         ) : null}
@@ -147,7 +147,7 @@ export function SidebarBody({
           )}
           onClick={() => void onSignOut()}
         >
-          <LogOut className="size-4" />
+          <LogOut className="size-5" />
           {!collapsed ? t('shell.signOut') : null}
         </Button>
       </div>

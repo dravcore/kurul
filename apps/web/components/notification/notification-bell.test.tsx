@@ -10,6 +10,7 @@ import {
 import { toast } from 'sonner';
 import messages from '@/messages/en.json';
 import { NotificationBell } from './notification-bell';
+import { NotificationUnreadProvider } from './notification-unread-provider';
 
 type Ack = (response: { ok: boolean }) => void;
 type Listener = (...args: unknown[]) => void;
@@ -123,10 +124,18 @@ function notification(id: string, overrides: Partial<NotificationDto> = {}): Not
   };
 }
 
+/**
+ * The bell as the shell mounts it: inside the provider that owns the count and the room.
+ * Rendered for real rather than stubbed, because everything this suite asserts about the badge
+ * (the join, the push, the re-join refresh, the fallback poll) is that provider's behaviour
+ * reaching the bell.
+ */
 function renderBell() {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <NotificationBell />
+      <NotificationUnreadProvider>
+        <NotificationBell />
+      </NotificationUnreadProvider>
     </NextIntlClientProvider>,
   );
 }

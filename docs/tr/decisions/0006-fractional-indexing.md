@@ -4,7 +4,7 @@
 **Tarih:** 2026-08-08
 **Güncellendi:** 2026-08-08 — rebalancing periyodik bir job değil, talep üzerine yapılıyor; testing.md ve roadmap.md ile eşleşecek şekilde.
 
-> 🌐 [English (canonical)](../../decisions/0006-fractional-indexing.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0006-fractional-indexing.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

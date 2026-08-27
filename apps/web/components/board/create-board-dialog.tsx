@@ -3,7 +3,9 @@
 import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { BoardDto, CreateBoardRequest } from '@kurul/shared-types';
+import { PLAN_LIMIT_ERROR } from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
+import { BoardTemplatePicker } from '@/components/board/board-template-picker';
 import { FormDialog } from '@/components/common/form-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,11 +27,16 @@ export function CreateBoardDialog({
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  // No slug is spelled out here: the picker learns the catalog from the API and reports back
+  // whichever it settled on. `null` means it has not answered yet, or could not — and an
+  // omitted `template` is the pre-templates behaviour, so the board still comes out usable.
+  const [template, setTemplate] = useState<string | null>(null);
 
   async function onSubmit(): Promise<void> {
     const body: CreateBoardRequest = {
       name: name.trim(),
       description: description.trim() || null,
+      ...(template === null ? {} : { template }),
     };
     const board = await api.post<BoardDto, CreateBoardRequest>(
       `/workspaces/${workspaceId}/boards`,
@@ -38,6 +45,9 @@ export function CreateBoardDialog({
     onCreated(board);
     setName('');
     setDescription('');
+    // Back to "the picker decides" rather than to the last choice: the next board is a new
+    // decision, and the dialog reopens on the catalog's default the way it did the first time.
+    setTemplate(null);
   }
 
   return (
@@ -50,7 +60,14 @@ export function CreateBoardDialog({
       submitDisabled={name.trim().length === 0}
       initialFocusRef={nameInputRef}
       onSubmit={onSubmit}
-      resolveError={(caught) => resolveApiMessage(caught, t, { fallback: 'createError' })}
+      resolveError={(caught) =>
+        resolveApiMessage(caught, t, {
+          fallback: 'createError',
+          // The list screen already disables the control at the ceiling; this is the answer
+          // when the ceiling was reached between that read and this submit (ADR 0032).
+          byError: { [PLAN_LIMIT_ERROR]: 'planLimitReached' },
+        })
+      }
     >
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="board-name">{t('name')}</Label>
@@ -70,6 +87,7 @@ export function CreateBoardDialog({
           onChange={(event) => setDescription(event.target.value)}
         />
       </div>
+      <BoardTemplatePicker workspaceId={workspaceId} value={template} onChange={setTemplate} />
     </FormDialog>
   );
 }

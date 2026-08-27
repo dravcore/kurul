@@ -9,6 +9,7 @@ import { APIError } from 'better-auth/api';
 import type { Request } from 'express';
 import { ActivityService } from '../activity/activity.service';
 import { auth } from '../auth/auth';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceService, type WorkspaceDeletedLogLine } from './workspace.service';
 
@@ -64,11 +65,19 @@ function buildService(): {
   const activityService: ActivityStub = {
     record: jest.fn().mockResolvedValue({ id: 'activity' }),
   };
+  // The instance workspace ceiling never refuses in this suite; `assertWorkspaceAvailable`
+  // itself is exercised in plan-limits.spec.ts.
+  const planLimits = {
+    assertBoardAvailable: jest.fn().mockResolvedValue(undefined),
+    assertWorkspaceAvailable: jest.fn().mockResolvedValue(undefined),
+    assertSeatAvailable: jest.fn().mockResolvedValue(undefined),
+  } as unknown as PlanLimitsService;
 
   return {
     service: new WorkspaceService(
       prisma as unknown as PrismaService,
       activityService as unknown as ActivityService,
+      planLimits,
     ),
     prisma,
     activityService,

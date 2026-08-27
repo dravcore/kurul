@@ -73,6 +73,55 @@ describe('mail transport selection', () => {
     expect(smtp.deliversMail).toBe(true);
   });
 
+  /**
+   * `DEMO_MODE` is the whole switch: a public demo must not be able to send mail to an address
+   * a stranger typed into it, whatever SMTP the operator configured for their own use. The
+   * transport is the single place this is enforced, so every path (verification, invitations,
+   * notification email, including the ones Better Auth calls directly) is covered by it.
+   */
+  describe('under DEMO_MODE', () => {
+    const original = { ...process.env };
+
+    afterEach(() => {
+      process.env = { ...original };
+    });
+
+    it('uses the log transport even with SMTP configured', () => {
+      process.env.DEMO_MODE = 'true';
+
+      const sender = createMailSender({
+        from: 'Kurul <noreply@example.test>',
+        smtp: { host: 'smtp.example.test', port: 587, secure: false },
+      });
+
+      expect(sender.transport).toBe('log');
+      expect(sender.deliversMail).toBe(false);
+    });
+
+    /** The reason has to name DEMO_MODE: "SMTP_HOST is unset" would send an operator hunting. */
+    it('says why, rather than blaming an SMTP_HOST that is set', () => {
+      process.env.DEMO_MODE = 'true';
+
+      createMailSender({
+        from: 'Kurul <noreply@example.test>',
+        smtp: { host: 'smtp.example.test', port: 587, secure: false },
+      });
+
+      expect(Logger.prototype.warn).toHaveBeenCalledWith(expect.stringContaining('DEMO_MODE'));
+    });
+
+    it('leaves SMTP alone when demo mode is off', () => {
+      process.env.DEMO_MODE = 'false';
+
+      const sender = createMailSender({
+        from: 'Kurul <noreply@example.test>',
+        smtp: { host: 'smtp.example.test', port: 587, secure: false },
+      });
+
+      expect(sender.transport).toBe('smtp');
+    });
+  });
+
   it('builds the process-wide sender once', () => {
     expect(getMailSender()).toBe(getMailSender());
   });

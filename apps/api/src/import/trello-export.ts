@@ -12,7 +12,7 @@ import { TrelloImportScope, TrelloImportSkipReason } from '@kurul/shared-types';
  * field below. That is one date and two boards, not a guarantee about Trello's schema going
  * forward, which is why this file still reports rather than throws — see `parseTrelloExport`.
  */
-export interface TrelloExport {
+interface TrelloExport {
   name: string;
   desc: string | null;
   lists: TrelloList[];
@@ -49,7 +49,7 @@ export interface TrelloCard {
   attachments: TrelloAttachment[];
 }
 
-export interface TrelloLabel {
+interface TrelloLabel {
   id: string;
   /** Often `''` in a real board — Trello lets a label be a colour with no name. */
   name: string;
@@ -66,7 +66,7 @@ export interface TrelloChecklist {
   checkItems: TrelloCheckItem[];
 }
 
-export interface TrelloCheckItem {
+interface TrelloCheckItem {
   id: string;
   name: string;
   /** `'complete'` / `'incomplete'` in every export seen so far; kept open as a string. */
@@ -74,7 +74,7 @@ export interface TrelloCheckItem {
   pos: number | null;
 }
 
-export interface TrelloAttachment {
+interface TrelloAttachment {
   id: string;
   name: string;
   url: string;

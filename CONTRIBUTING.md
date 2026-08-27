@@ -89,14 +89,18 @@ Test expectations: [docs/testing.md](docs/testing.md).
   lint/typecheck/tests — CI must be green).
 - CI on a pull request from a fork runs without repository secrets, so a job that needs one
   runs after merge instead. If a check is skipped on your PR, that is why.
-- Expect **one approving review** before merge. Prefer a merge commit into `develop`
-  (`--no-ff`) so multi-commit history stays readable; squash into `develop` is allowed for
-  Dependabot / single-commit noise. Squash into `main` is never allowed — see
+- Expect **one approving review** before merge. This is a norm, not a setting: branch
+  protection on `develop` and `main` requires zero approvals today, precisely because Kurul
+  has a single maintainer and there would be nobody to review _their_ pull requests. What
+  protection does enforce on both branches, for everyone including the maintainer, is a pull
+  request, a branch up to date with its base, no force push, no deletion, and two green
+  contexts: `ci-ok` and `CodeQL`. So
+  maintainer-authored PRs are self-reviewed and self-merged once CI is green; your PRs are
+  reviewed as normal; and the approval count goes back up the moment a second maintainer
+  exists. Prefer a merge commit into `develop` (`--no-ff`) so multi-commit history stays
+  readable; squash into `develop` is allowed for Dependabot / single-commit noise. Squash
+  into `main` is never allowed — see
   [docs/git-strategy.md](docs/git-strategy.md#merge-strategy).
-  While Kurul has a single maintainer there is nobody to review _their_ PRs, so
-  maintainer-authored PRs are self-reviewed and self-merged once CI is green. Your PRs are
-  reviewed as normal, and the review requirement applies to everyone again as soon as a
-  second maintainer exists.
 - Clean up noisy fixup commits (interactive rebase or amend) before requesting review — they
   land in `develop` as-is.
 

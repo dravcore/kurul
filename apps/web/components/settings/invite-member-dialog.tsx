@@ -9,6 +9,7 @@ import {
   type CreateInvitationRequest,
   type InvitationDto,
 } from '@kurul/shared-types';
+import { PLAN_LIMIT_ERROR } from '@kurul/shared-types';
 import { api, resolveApiMessage } from '@/lib/api';
 import { INVITABLE_ROLES } from '@/lib/member-permissions';
 import { FormDialog } from '@/components/common/form-dialog';
@@ -93,6 +94,9 @@ export function InviteMemberDialog({
       resolveError={(caught) =>
         resolveApiMessage(caught, t, {
           fallback: 'inviteError',
+          // Checked before `byStatus`: a seat ceiling and an insufficient role are both 403s
+          // and want opposite advice, which is why the envelope carries `error` (ADR 0032).
+          byError: { [PLAN_LIMIT_ERROR]: 'seatLimitReached' },
           byStatus: {
             // 400 covers both a malformed address and Better Auth's deliberately generic
             // "cannot invite this address" — the server refuses to say which, so that the
@@ -129,7 +133,7 @@ export function InviteMemberDialog({
             </option>
           ))}
         </Select>
-        <p className="text-caption text-muted-foreground">{t(`roleHints.${role}`)}</p>
+        <p className="text-small text-muted-foreground">{t(`roleHints.${role}`)}</p>
       </div>
     </FormDialog>
   );

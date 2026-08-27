@@ -47,7 +47,9 @@ export default defineConfig({
       // Floors sit a few points under the measured baseline, the same margin
       // `apps/api/jest.config.cjs` uses, so routine refactors do not trip them.
       //
-      // `app/**` (2026-08-12): stmts 90.93 / branch 100 / funcs 90 / lines 90.93.
+      // `app/**` (2026-08-27, re-measured): stmts 100 / branch 100 / funcs 100 / lines 100
+      // (79/79, 6/6, 34/34, 79/79). The route tests this series added left the folder fully
+      // covered, so the floor moves up with it rather than staying 15 points behind.
       // `app/layout.tsx` counts here too: `next/font/google` is stubbed in its test rather
       // than the file being excluded, because an excluded file is an invisible one.
       //
@@ -68,24 +70,44 @@ export default defineConfig({
       // there is a ratchet on code that is genuinely tested, which is the only kind this file
       // sets. It also means a new helper landing in `lib/` with no test at all is visible,
       // which is the regression the notification helpers themselves were.
+      //
+      // `components/auth/**`, `components/settings/**` and `components/dashboard/**`
+      // (2026-08-23, maintenance sweep): the three interactive surfaces still missing a floor.
+      // All three already carry real coverage, so this is a ratchet, not a target to grow into:
+      // measured with `pnpm --filter @kurul/web test:cov`, auth 99.31/96.04/100.00/99.31,
+      // settings 89.85/90.91/85.23/90.76, dashboard 94.12/68.42/95.24/93.33 (stmts/branch/
+      // funcs/lines). Dashboard's branch figure is the outlier, but it still sits well above
+      // `components/board/**`'s 54 branch floor, the lowest in this file, so it gets the same
+      // few-points-under margin as the rest rather than a round of new tests.
+      //
+      // `components/settings/**` (2026-08-27): re-measured at 92.75/88.27/91.67/94.40 after the
+      // panel and settings IA changes, well past the figures above, so the floor moves up with
+      // it (branch stays at 86, a few points under the measured 88.27, for the same margin the
+      // rest of this file keeps).
+      //
+      // `components/board/**` and `components/task/**` (2026-08-27, P8 gate-and-evidence sweep,
+      // re-measured): board 87.06/80.16/81.67/91.15, task 85.62/82.44/84.94/89.51 (stmts/branch/
+      // funcs/lines), both well past the 2026-08-12 figures the old floors were set from. Moved
+      // up with them, a few points under each measured number, the same margin the rest of this
+      // file keeps.
       thresholds: {
         'app/**': {
-          statements: 85,
-          branches: 90,
-          functions: 85,
-          lines: 85,
+          statements: 97,
+          branches: 97,
+          functions: 97,
+          lines: 97,
         },
         'components/board/**': {
-          statements: 65,
-          branches: 54,
-          functions: 54,
-          lines: 70,
+          statements: 84,
+          branches: 77,
+          functions: 78,
+          lines: 88,
         },
         'components/task/**': {
-          statements: 60,
-          branches: 60,
-          functions: 58,
-          lines: 62,
+          statements: 82,
+          branches: 79,
+          functions: 81,
+          lines: 86,
         },
         'components/layout/**': {
           statements: 75,
@@ -104,6 +126,24 @@ export default defineConfig({
           branches: 83,
           functions: 93,
           lines: 92,
+        },
+        'components/auth/**': {
+          statements: 94,
+          branches: 91,
+          functions: 95,
+          lines: 94,
+        },
+        'components/settings/**': {
+          statements: 90,
+          branches: 86,
+          functions: 89,
+          lines: 92,
+        },
+        'components/dashboard/**': {
+          statements: 89,
+          branches: 63,
+          functions: 90,
+          lines: 88,
         },
       },
     },

@@ -365,7 +365,7 @@ export function pseudonymUrl(original, seed) {
   return `${protocol}${hash}`;
 }
 
-export function pseudonymEmail(original, seed) {
+function pseudonymEmail(original, seed) {
   return `${digestHex(seed, 'email', original, 12)}@example.invalid`;
 }
 

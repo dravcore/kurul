@@ -2,7 +2,7 @@
 
 Kurul için branch modeli, commit convention'ı, PR süreci ve release prosedürü.
 
-> 🌐 [English (canonical)](../git-strategy.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../git-strategy.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 
@@ -32,11 +32,11 @@ merge sonrası silinir.
 | `hotfix/*`  | kısa ömürlü | `main`           | `main` + `develop` | Acil production fix'i                                                       |
 
 ```
-main     ──●───────────────────────●──────────────●──  tags: v0.1.0, v0.1.1, v0.2.0
-            \                     /              /
-release      \              ●────●              /      release/0.2.0
-              \            /                   /
-develop  ──────●──●──●────●───────●──●──●─────●─────
+main     ──●───────────────────────●──────────────●─────●──  tags: v0.1.0, v0.2.0, v0.3.0, v0.4.0
+            \                     /              /     /
+release      \              ●────●              /     /      release/0.2.0
+              \            /                   /     /
+develop  ──────●──●──●────●───────●──●──●─────●─────●─────
                   /        \         /  /
 feature          ●          └─ geri-merge
 
@@ -231,10 +231,36 @@ Release'ler `develop`'tan bir `release/*` branch'i üzerinden kesilir. Versiyonl
 git switch develop && git pull
 git switch -c release/0.2.0
 
-# 2. Her package.json'da versiyonu bump'la (kök, apps/*, packages/*)
+# 2. Her package.json'da versiyonu bump'la (kök, apps/*, packages/*, e2e)
 #    ve CHANGELOG.md'yi finalize et: [Unreleased]'i [0.2.0] - YYYY-MM-DD olarak yeniden adlandır,
 #    en üste yeni bir boş [Unreleased] bölümü ekle.
+#    docs/self-hosting.md'deki release tag'ini de yükselt (kurulum URL'leri, TAG ve
+#    cosign örnekleri) ve docs/tr aynasını da: operatör sayfası dosyalarını tag'den
+#    indirir, bu yüzden sayfa ile release birlikte ilerler.
 git commit -am "chore(release): 0.2.0"
+
+# 2b. Sürüme sabitlenmiş düzyazıyı tazele. Aşağıdakilerin hepsi, yalnızca bir insanın
+#     güncel tuttuğu bir sürüm numarası taşır ve v0.3.0 kesimi bunlardan tam olarak
+#     birine ulaştı. Hafızaya güvenmek yerine listeyi yürü:
+#     - README.md ve README.tr.md, "vX.Y.Z itibarıyla olmayanlar" paragrafı: hem
+#       sürüm hem iddialar, çünkü o günden beri bir özellik inmiş olabilir.
+#     - ROADMAP.md: giriş (hangi sürüm güncel, hangisi sıradaki), Next 2 weeks
+#       tablosu ve Phases listesi.
+#     - .env.example ve docs/tr/development.md#aktivasyon-hunisi-ve-telemetri:
+#       telemetri örneği paket sürümünü basar, dolayısıyla "version" alanı da
+#       diğerleri gibi sürüme sabitlenmiş düzyazıdır.
+#     - docs/self-hosting.md ve docs/tr aynası: yukarıdaki 2. adım kapsıyor, ama
+#       varsaymak yerine doğrula; kurulum URL'leri dosyaları tag'den indiriyor.
+#     - Bu dosyanın başındaki tag diyagramı: var olan tag'leri listeler.
+#     - CHANGELOG.md: az önce yeniden adlandırdığın bölümde, merge edilen PR başına
+#       birer tane olmak üzere iki Added ya da iki Fixed başlığı olabilir. Bölüm
+#       release notu olarak yayımlanmadan önce, her kaydı ve sırasını koruyarak
+#       her türden tek başlığa indir.
+#     - apps/api/openapi.json: `pnpm openapi` yeniden üretir ve info.version
+#       apps/api/package.json'ı izler. `pnpm openapi:check`, yeniden üretilene
+#       kadar build job'ını düşürür, yani bu madde kendini zorunlu kılar; yine de
+#       burada çalıştır ki düzeltme takip PR'ında değil release commit'inde olsun.
+git commit -am "docs(release): refresh release-pinned prose for 0.2.0"
 
 # 3. Bu branch'e yalnızca release'i engelleyen fix'ler girebilir.
 #    Geri kalan her şey her zamanki gibi develop'a gitmeye devam eder.
@@ -267,6 +293,23 @@ docker compose down -v                     # -v: sonraki koşuya volume bırakma
 #    bunu v0.2.0'dan sonraki ilk release'de gerektirir — bu workflow'un onu
 #    ilk yayınladığı release — ve sonradan eklenen her yeni imaj adı da aynı
 #    şekilde, bir kez, buna ihtiyaç duyar.
+#
+#    Workflow, herhangi bir imaj build edilmeden önce `guard` job'ında iki şeyi
+#    denetler; böylece buradaki bir hata yayınlanmak yerine bir dakika içinde
+#    kırılır:
+#    - tag'in nereyi gösterdiği: bir vX.Y.Z tag'i main'in ucu (bu merge
+#      commit'i) olmak zorundadır; bir ön-sürüm tag'i (vX.Y.Z-rc.N) main'de
+#      ya da bir release/* veya hotfix/* branch'inde durmalıdır;
+#    - ağacın ne söylediği: her package.json versiyonu X.Y.Z'ye eşit olmalı
+#      ve bir vX.Y.Z tag'i için CHANGELOG.md bir `## [X.Y.Z] - ` başlığı
+#      taşımalıdır.
+#    v* tag'leri ayrıca bir repository ruleset ile korunmalıdır (hedef: tag,
+#    refs/tags/v*; create, update, delete ve non-fast-forward engellenir;
+#    bypass: yalnızca repository admin'i); böylece contents:write yetkili bir
+#    token tek başına bir release tag'ini push edemez, taşıyamaz ve silemez.
+#    Ruleset kod değil bir repository ayarıdır: oluşturulması ROADMAP.md'deki
+#    operatör kontrol listesindedir ve yerine oturduğunda bir v* tag'ini
+#    yalnızca admin push edebilir, taşıyabilir ve silebilir.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
@@ -332,13 +375,20 @@ gelirse) tetiklenir ve bunun tek bir sebebi vardır: workflow imaj yayınlar, co
 ve SBOM ekler — bunların **hiçbiri CI'da koşmaz**. Hiç çalışmamış bir workflow'un ilk koşusunu
 gerçek bir sürüm yapmak, sürümün kendisini teste dönüştürür.
 
-Dolayısıyla yayın yolu değiştiyse — yeni bir action major'ı, imzalama veya SBOM adımlarında bir
-değişiklik, yeni bir registry — 5. adımdan önce prova edin:
+Dolayısıyla yayın yolu değiştiyse (yeni bir action major'ı, imzalama veya SBOM adımlarında bir
+değişiklik, yeni bir registry), `release/*` branch'inde, 2. adımdan sonra ve 5. adımdan önce
+prova edin:
 
 ```bash
 git tag -a v0.2.0-rc.1 -m "v0.2.0-rc.1"
 git push origin v0.2.0-rc.1
 ```
+
+Sıra önemlidir: `guard` job'ı package.json denetimini ön-sürüm tag'lerine de uygular (yalnız
+CHANGELOG başlığı kararlı tag'e özeldir); dolayısıyla prova tag'inin altındaki ağaç çoktan
+`X.Y.Z` demelidir. 2. adımdaki bump'tan önce kesilen bir tag guard'da kırılır ve guard eski
+versiyonda kalan dosyaları adıyla söyler. Soy denetimi `main`, `release/*` veya `hotfix/*`
+üzerindeki bir ön-sürüm tag'ini kabul eder; release branch'i bunun için doğal yerdir.
 
 Prova gerçek bir yayındır: gerçek imajlar, gerçek imza, gerçek SBOM asset'leri, ve
 [self-hosting.md](self-hosting.md#çektiğiniz-imajı-doğrulamak)'daki `cosign verify` komutu
@@ -354,7 +404,9 @@ o biçimin üretildiğini doğruluyor; yani bir gerileme, 404 veren belgelenmiş
 yerine sürümü kırar. Ama bu doğrulama da ilk kez sürümü kestiğinizde koşar.
 
 Prova tag'i tek kullanımlıktır. Gerçek sürüm çıkınca tag'i ve release'ini silin; imajlar kendi
-`-rc` tag'leriyle registry'de kalır ve paket listesinde bir satırdan başka maliyeti olmaz.
+`-rc` tag'leriyle registry'de kalır ve paket listesinde bir satırdan başka maliyeti olmaz. Tag'i
+silmek admin'in adımıdır: 5. adımdaki `v*` ruleset'i yerine oturduğunda tag silmeyi herkes için
+engeller, admin'in bypass'ı ise silmeyi geçiren şeydir.
 
 ## Hotfix süreci
 

@@ -7,58 +7,36 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
 import { NotificationMenuContent } from './notification-menu-content';
+import { useNotificationUnreadContext } from './notification-unread-provider';
 import { useNotificationMenu } from './use-notification-menu';
-import { useNotificationSocket } from './use-notification-socket';
-import { useNotificationUnread } from './use-notification-unread';
 
 /**
  * The bell in the app shell.
  *
- * Composition only: the badge's count lives in `useNotificationUnread`, the dropdown's rows
- * and actions in `useNotificationMenu`, the markup in `NotificationMenuContent`. What is left
- * here is the one thing none of them can own — the single socket subscription, which both the
- * badge and the rows react to and which must not be opened twice for the same room.
+ * Composition only: the badge's count and the socket behind it live in
+ * `NotificationUnreadProvider`, the dropdown's rows and actions in `useNotificationMenu`, the
+ * markup in `NotificationMenuContent`. The count is read from the shell rather than owned here
+ * because the notifications page moves the same number and is not in this subtree.
  */
 export function NotificationBell(): React.ReactElement {
   const t = useTranslations('app.notifications');
-  const { activeId: workspaceId, bootstrapped } = useWorkspaceContext();
+  const { activeId: workspaceId } = useWorkspaceContext();
   const [open, setOpen] = useState(false);
 
-  /**
-   * One signal, two readers. The badge acts on every bump; the rows only re-read while the
-   * dropdown is on screen. A key rather than two callbacks because the unread hook needs
-   * `connected` from the socket that would have to be handed those callbacks — passing the
-   * signal down instead of the reloader up is what breaks that cycle.
-   */
-  const [refreshKey, setRefreshKey] = useState(0);
-  const refreshOpenViews = useCallback((): void => {
-    setRefreshKey((key) => key + 1);
-  }, []);
+  // `setCount` is the badge's own setter: a row read in the dropdown moves the shared count
+  // without asking the server for a number it already knows.
+  const { count, setCount, refreshKey } = useNotificationUnreadContext();
 
-  const { connected } = useNotificationSocket(workspaceId, bootstrapped, {
-    onUnreadChanged: refreshOpenViews,
-    // A (re)join replays nothing, so the first thing after it is a full refresh — that is what
-    // closes the gap a disconnection opened.
-    onResync: refreshOpenViews,
-  });
-
-  const unread = useNotificationUnread({
-    workspaceId,
-    enabled: bootstrapped,
-    connected,
-    refreshKey,
-  });
   const close = useCallback(() => setOpen(false), []);
   const menu = useNotificationMenu({
     workspaceId,
     open,
     refreshKey,
-    setUnreadCount: unread.setCount,
+    setUnreadCount: setCount,
     onClose: close,
   });
 
-  const badgeLabel =
-    unread.count > 99 ? t('badgeOverflow') : unread.count > 0 ? String(unread.count) : null;
+  const badgeLabel = count > 99 ? t('badgeOverflow') : count > 0 ? String(count) : null;
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -71,8 +49,14 @@ export function NotificationBell(): React.ReactElement {
           className="relative"
         >
           <Bell className="size-4" />
+          {/* `bg-foreground text-background`, not the signature: docs/design.md §2 puts badges
+              in the column copper must not touch, and an unread count is not an error either, so
+              `--destructive` is not the answer (that family stays reserved for status and
+              priority, docs/design.md §3). The ink/canvas pair already flips with the theme and
+              holds 14.57:1 light, 15.17:1 dark, against the signature fill's 2.73:1 dark AA
+              fail. */}
           {badgeLabel ? (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-sm)] bg-signature px-0.5 text-[10px] font-medium text-white">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-sm bg-foreground px-0.5 text-micro font-strong text-background">
               {badgeLabel}
             </span>
           ) : null}
@@ -82,7 +66,7 @@ export function NotificationBell(): React.ReactElement {
         items={menu.items}
         loading={menu.loading}
         error={menu.error}
-        unreadCount={unread.count}
+        unreadCount={count}
         onMarkAllRead={() => void menu.markAllRead()}
         onOpenNotification={(notification) => void menu.openNotification(notification)}
         onClose={close}

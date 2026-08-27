@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { ActivityDto, CursorPage } from '@kurul/shared-types';
+import type { ActivityDto, ActivityType, CursorPage } from '@kurul/shared-types';
 import type { Prisma } from '../generated/prisma';
 import { AUTHOR_SELECT, toAuthorDto, type AuthorRow } from '../common/author';
 import { toCursorPage } from '../common/pagination/cursor-page';
@@ -11,7 +11,13 @@ export type RecordActivityInput = {
   workspaceId: string;
   taskId?: string | null;
   userId: string;
-  type: string;
+  /**
+   * Narrowed to the shared-types union so a typo cannot reach the database from application
+   * code (#37's TypeScript half). The `Activity.type` column stays `String`, not a Prisma
+   * enum: adding the next kind must be an insert, not a migration that locks the table (see
+   * the comment beside `ActivityType` in `packages/shared-types/src/activity.ts`).
+   */
+  type: ActivityType;
   payload: Record<string, unknown>;
 };
 

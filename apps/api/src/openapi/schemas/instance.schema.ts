@@ -5,9 +5,69 @@ import type {
   ActivationStepDto,
   ActivationUnit,
   ActivationWindow,
+  DemoConfigDto,
   InstanceConfigDto,
+  InstancePlanLimitsDto,
 } from '@kurul/shared-types';
 import type { DependencyStatus, ReadinessReport } from '../../health/health.service';
+
+/**
+ * Whether this deployment is a public demo, and when its data next disappears.
+ *
+ * `resetIntervalMinutes` and `nextResetAt` are `null` on every instance that is not a demo:
+ * there is no schedule to describe, and a number there would be a value a client could render.
+ */
+export class DemoConfigSchema implements DemoConfigDto {
+  /** `true` only under `DEMO_MODE=true`. */
+  enabled!: boolean;
+
+  /**
+   * How often the demo data is wiped and re-seeded, in minutes. `null` when `enabled` is false.
+   * @example 60
+   */
+  resetIntervalMinutes!: number | null;
+
+  /**
+   * ISO 8601 UTC instant of the next wipe. `null` when `enabled` is false.
+   * @example 2026-08-22T15:00:00.000Z
+   */
+  nextResetAt!: string | null;
+}
+
+/**
+ * The instance-wide ceilings, `null` for each one nobody configured (ADR 0032).
+ *
+ * The two byte fields are the ADR 0027 attachment quotas, which have non-null defaults and so
+ * are the only two an unconfigured instance publishes as numbers.
+ */
+export class InstancePlanLimitsSchema implements InstancePlanLimitsDto {
+  /**
+   * Members plus pending invitations one workspace may hold (`PLAN_MAX_SEATS_PER_WORKSPACE`).
+   * @example 10
+   */
+  seatsPerWorkspace!: number | null;
+
+  /** Boards one workspace may hold (`PLAN_MAX_BOARDS_PER_WORKSPACE`). */
+  boardsPerWorkspace!: number | null;
+
+  /** Workspaces this instance may hold (`PLAN_MAX_WORKSPACES`). */
+  workspaces!: number | null;
+
+  /** Accounts this instance may hold (`PLAN_MAX_USERS`). Refuses sign-up, never sign-in. */
+  users!: number | null;
+
+  /**
+   * `ATTACHMENT_WORKSPACE_QUOTA_BYTES`, in bytes. Defaults to 2 GiB.
+   * @example 2147483648
+   */
+  storageBytesPerWorkspace!: number | null;
+
+  /**
+   * `ATTACHMENT_INSTANCE_QUOTA_BYTES`, in bytes. Defaults to 20 GiB.
+   * @example 21474836480
+   */
+  storageBytesPerInstance!: number | null;
+}
 
 /** What this deployment is configured to do. Capability, never tenant state. */
 export class InstanceConfigSchema implements InstanceConfigDto {
@@ -20,6 +80,27 @@ export class InstanceConfigSchema implements InstanceConfigDto {
    * Link attachments do not depend on it — a `LINK` needs no storage at all.
    */
   attachmentsEnabled!: boolean;
+
+  /**
+   * `false` when the operator has closed registration with `SIGNUP_ENABLED=false`.
+   *
+   * A policy switch beside the `planLimits.users` head count: `POST /auth/sign-up/email` then
+   * answers `403` with `error: "Sign-up Disabled"` whatever the count is, and signing in stays
+   * open. Independent of `demo.enabled`.
+   */
+  signUpEnabled!: boolean;
+
+  /**
+   * The demo-instance section. `enabled` is `false` on every ordinary self-hosted install, and
+   * the web renders a standing "data resets every hour" banner from it when it is not.
+   */
+  demo!: DemoConfigSchema;
+
+  /**
+   * The ceilings this instance's configuration puts on quantities. A workspace can carry lower
+   * ones of its own; those resolved numbers come from `GET /workspaces/{workspaceId}/plan`.
+   */
+  planLimits!: InstancePlanLimitsSchema;
 }
 
 /** Liveness — the process is up. Touches no dependency. */

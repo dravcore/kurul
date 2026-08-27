@@ -1,4 +1,8 @@
-FROM node:24-alpine AS base
+# Pinned by digest so a build resolves the same base across time and machines; Dependabot
+# bumps this line (see .github/dependabot.yml, directories /apps/web). Dependabot's docker
+# updater only parses a literal `FROM image:tag` + digest line, not an ARG-substituted one,
+# so the digest is repeated on every FROM below rather than factored into a shared ARG.
+FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS base
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 
@@ -45,7 +49,7 @@ RUN pnpm --filter @kurul/shared-types build \
   && pnpm --filter @kurul/auth-access build \
   && pnpm --filter @kurul/web build
 
-FROM node:24-alpine AS runner
+FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -57,6 +61,13 @@ ENV HOSTNAME=0.0.0.0
 # the `runner` stage of apps/api/Dockerfile: nothing in this image runs either (the CMD is `node
 # apps/web/server.js` over a Next.js standalone bundle), and npm's bundled dependencies are where
 # every fixable HIGH/CRITICAL finding of the `image-scan` job came from.
+# Alpine ships security fixes for its own packages (openssl, zlib, busybox) days before the Node
+# project rebuilds `node:24-alpine` on top of them, and the `image-scan` job in
+# .github/workflows/ci.yml fails on any fixable HIGH/CRITICAL finding. Upgrading the base
+# packages at build time closes that window here rather than waiting on the upstream tag:
+# the first case was CVE-2026-14456 in libcrypto3 3.5.7-r0 (fixed in 3.5.8-r0) on
+# 2026-08-26, which turned every image build red with no change in this repository.
+RUN apk upgrade --no-cache
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
   /opt/yarn-v* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./

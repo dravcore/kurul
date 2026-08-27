@@ -35,6 +35,14 @@ export function LabelDots({ labels, className }: LabelDotsProps): React.ReactEle
   );
 }
 
+/**
+ * The chip shell every named thing in the panel wears: a label here, an assigned member in
+ * `task-assignees-section.tsx`. One string, so the two cannot drift into two shapes for the same
+ * job; the dot is the label's own addition on top of it.
+ */
+export const chipShell =
+  'inline-flex items-center gap-1.5 rounded-sm border border-border bg-muted px-1.5 py-0.5 text-small text-foreground';
+
 type LabelChipProps = {
   label: LabelDto;
 } & (
@@ -43,7 +51,7 @@ type LabelChipProps = {
 
 export function LabelChip({ label, onRemove, removeLabel }: LabelChipProps): React.ReactElement {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-muted/40 px-1.5 py-0.5 text-small text-foreground">
+    <span className={chipShell}>
       <span className={cn('size-1.5 rounded-full', SLOT_CLASS[label.color])} aria-hidden />
       <span>{label.name}</span>
       {onRemove ? (

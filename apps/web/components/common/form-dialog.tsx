@@ -116,7 +116,7 @@ function FormDialogBody({
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             {cancelLabel}
           </Button>
-          <Button type="submit" disabled={pending || submitDisabled}>
+          <Button type="submit" loading={pending} disabled={submitDisabled}>
             {submitLabel}
           </Button>
         </DialogFooter>

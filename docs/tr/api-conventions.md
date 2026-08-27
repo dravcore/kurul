@@ -3,7 +3,7 @@
 Kurul API'si için REST konvansiyonları: URL'ler, verb'ler, payload'lar, hatalar,
 pagination ve DTO'lar.
 
-> 🌐 [English (canonical)](../api-conventions.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../api-conventions.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 
@@ -12,6 +12,7 @@ pagination ve DTO'lar.
 - [HTTP verb'leri ve status kodları](#http-verbleri-ve-status-kodları)
 - [Request ve response body'leri](#request-ve-response-bodyleri)
 - [Hatalar](#hatalar)
+- [Kimlik doğrulama](#kimlik-doğrulama)
 - [Cross-origin istekler](#cross-origin-istekler)
 - [Rate limiting](#rate-limiting)
 - [Pagination](#pagination)
@@ -65,8 +66,9 @@ GET    /workspaces/:workspaceId/invitations     # bekleyen davetlerin cursor say
 POST   /workspaces/:workspaceId/invitations
 DELETE /workspaces/:workspaceId/invitations/:invitationId
 
+GET    /workspaces/:workspaceId/board-templates  # bir create'in adlandırabileceği başlangıç şekilleri
 GET    /workspaces/:workspaceId/boards
-POST   /workspaces/:workspaceId/boards
+POST   /workspaces/:workspaceId/boards            # `template` onun kolonlarını ve etiketlerini tohumlar
 GET    /workspaces/:workspaceId/boards/:boardId
 PATCH  /workspaces/:workspaceId/boards/:boardId
 DELETE /workspaces/:workspaceId/boards/:boardId
@@ -301,7 +303,7 @@ nullable bir alanı temizler.
 | `204 No Content`             | Başarılı silme; boş body                                                                                                                                                                                                                                                      |
 | `400 Bad Request`            | Bozuk request veya validation hatası                                                                                                                                                                                                                                          |
 | `401 Unauthorized`           | Eksik veya geçersiz session                                                                                                                                                                                                                                                   |
-| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz                                                                                                                                                                                                                                   |
+| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz, **ya da** bir plan tavanı aşılacak (hangisi olduğunu `error` söyler, bkz. [Plan limitleri](#plan-limitleri)), **ya da** kayıt kapalı (`SIGNUP_ENABLED=false`: yalnızca `POST /auth/sign-up/email`, `error: "Sign-up Disabled"`)  |
 | `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                                                                                                                                                                                 |
 | `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                                                                                                                                                                                   |
 | `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, bir yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor ya da bir depolama kotasını aşacak (hangisi olduğunu `error` söyler — bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)), ya da bir import `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor |
@@ -312,7 +314,52 @@ nullable bir alanı temizler.
 
 **Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
 doğrulardı, ki bu tenant sınırının ötesine bilgi sızdırır. `403`, rolü çok düşük meşru bir
-üye için ayrılmıştır.
+üye için, aşağıdaki plan tavanları için, kapalı kayıt (`SIGNUP_ENABLED=false`) için ve bir demo
+instance'ın reddettiği eylemler (`DEMO_MODE=true`) için ayrılmıştır; zarfın `error` alanı
+bunları birbirinden ayırır.
+
+### Plan limitleri
+
+Seat'lerin, board'ların, workspace'lerin ve hesapların yapılandırılabilir tavanları var
+([ADR 0032](decisions/0032-plan-limits.md)). Her tavan, **instance onu ayarlamadıkça
+sınırsızdır**, dolayısıyla yapılandırılmamış bir deployment bu yanıtlardan hiçbirini üretmez.
+
+Bir tavanı aşacak bir yazma, kendine ait bir `error` ile `403` olarak reddedilir, çünkü status
+tek başına hangi düzeltmenin önerileceğini söyleyemez: burada bir rol değişikliği asla yardımcı
+olmaz, birinin bir seat boşaltması ya da bir sayıyı yükseltmesi gerekir.
+
+```jsonc
+{
+  "statusCode": 403,
+  "error": "Plan Limit Exceeded",
+  "message": "This workspace has no seats left on its plan",
+  "planLimit": { "code": "PLAN_LIMIT_SEATS", "limit": 10, "current": 10 },
+  "path": "/workspaces/w_1/invitations",
+  "timestamp": "2026-08-23T09:12:31.114Z",
+  "requestId": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
+}
+```
+
+`planLimit`, `details` dışındaki tek opsiyonel zarf üyesidir. `current`, reddin olduğu anda
+sayılan şeydir, dolayısıyla `limit`'e eşit ya da onu aşabilir.
+
+| `planLimit.code`        | Reddeder                                     | Sayar                                                   |
+| ----------------------- | -------------------------------------------- | ------------------------------------------------------- |
+| `PLAN_LIMIT_SEATS`      | `POST .../invitations`, ve birini kabul etme | Üyeler artı hâlâ bekleyen davetler                      |
+| `PLAN_LIMIT_BOARDS`     | `POST .../boards`, `POST .../imports/trello` | Workspace'teki board'lar                                |
+| `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                           | Instance'taki workspace'ler                             |
+| `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                   | Instance'taki hesaplar, anonimleştirilmiş olanlar hariç |
+
+Bir daveti kabul etmek yalnızca üyeleri sayar, çünkü kabul edilen davet zaten kendi seat'ini
+tutuyordur. Attachment baytları da bir plan tavanıdır, ama onlar [ADR 0027](decisions/0027-attachment-quotas.md)'nin
+kendilerine verdiği `413`'ü ve `error: "Attachment Quota Exceeded"`'ı korur; plan katmanının
+eklediği şey, bir workspace'in kendine ait bir bayt tavanı taşıyabilmesidir.
+
+Bir istemcinin reddedilmeden önce sayıları gösterebilmesi için iki okuma bunları yayınlar:
+`GET /config` instance tavanlarını taşır (her çağıran için aynı kapasite), ve
+`GET /workspaces/{workspaceId}/plan` bir workspace'in çözümlenmiş tavanlarını ve güncel
+kullanımını taşır, herhangi bir üye tarafından okunabilir. Her ikisinde de `null`, sınırsız
+demektir.
 
 ## Request ve response body'leri
 
@@ -456,13 +503,14 @@ olarak verdiği `cross-origin` politikasını override eder) ve
 `POST /workspaces/:workspaceId/imports/trello`, bir Trello board'unun JSON export'unu alır ve
 ondan **yeni bir board** yaratır. API'nin toplu yazma yapan tek ucudur.
 
-| Özellik      | Değer                                                                              |
-| ------------ | ---------------------------------------------------------------------------------- |
-| Gövde        | `multipart/form-data`, **`file`** adında tek bir parça — başka parça yok, JSON yok |
-| Rol          | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                               |
-| Boyut tavanı | `TRELLO_IMPORT_MAX_BYTES` (varsayılan `20971520` — 20 MiB)                         |
-| Rate limit   | **3 / dk**, client IP başına                                                       |
-| Başarı       | `201` ve gövdede bir `TrelloImportReportDto`                                       |
+| Özellik      | Değer                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| Gövde        | `multipart/form-data`, **`file`** adında tek bir parça — başka parça yok, JSON yok            |
+| Rol          | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                                          |
+| Boyut tavanı | `TRELLO_IMPORT_MAX_BYTES` (varsayılan `20971520` — 20 MiB)                                    |
+| Satır tavanı | `TRELLO_IMPORT_MAX_CARDS` (varsayılan `50000`), `TRELLO_IMPORT_MAX_LISTS` (varsayılan `5000`) |
+| Rate limit   | **3 / dk**, client IP başına                                                                  |
+| Başarı       | `201` ve gövdede bir `TrelloImportReportDto`                                                  |
 
 **JSON değil multipart, ve bu bir kolaylık değil bir karar.** Bir board export'u birkaç
 megabayttır, `REQUEST_BODY_MAX_BYTES` ise 1 MiB'dır; onu tek bir uç için yükseltmek aynı maliyeti
@@ -481,17 +529,22 @@ yapamayacağı şeyi tek istekte yapmamalı.
 
 **Hatalar:**
 
-| Durum | Ne zaman                                                                                |
-| ----- | --------------------------------------------------------------------------------------- |
-| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil |
-| `403` | Workspace üyesi, ama rolü `ADMIN`'in altında                                            |
-| `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı     |
-| `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                        |
-| `429` | Bir dakikalık pencerede üçten fazla import                                              |
+| Durum | Ne zaman                                                                                                                                                                                         |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil; export'un kart sayısı `TRELLO_IMPORT_MAX_CARDS`'ı ya da liste sayısı `TRELLO_IMPORT_MAX_LISTS`'i aşıyor |
+| `403` | Workspace üyesi, ama rolü `ADMIN`'in altında **ya da** workspace board tavanında (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, bkz. [Plan limitleri](#plan-limitleri)) |
+| `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı                                                                                                              |
+| `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                                                                                                                                 |
+| `429` | Bir dakikalık pencerede üçten fazla import                                                                                                                                                       |
 
 Ayrıştırıcıya ulaşan tek hata `400`'dür ve **ulaştığında hiçbir şey yazılmaz**: export, transaction
 açılmadan önce baştan sona okunup eşlenir, yani reddedilen bir import workspace'i baytı baytına
-olduğu gibi bırakır.
+olduğu gibi bırakır. Satır tavanı reddi de aynı `400`'ün bir parçasıdır: export okunduktan sonra,
+planlayıcı tek bir satırı eşlemeden önce liste ve kart sayıları `TRELLO_IMPORT_MAX_LISTS` ve
+`TRELLO_IMPORT_MAX_CARDS`'a karşı kontrol edilir, yani aşırı büyük bir export okunduktan sonra ve
+eşlemeden önce reddedilir, her iki durumda da hiçbir şey yazılmadan. Board tavanı `403`'ü de
+hiçbir şey yazmaz: kontrol, board satırından önce, transaction'ın ilk ifadesidir, dolayısıyla ret
+boş bir transaction'ı geri alır.
 
 **Cevabın gövdesi raporun kendisidir ve hiçbir yerde saklanmaz.**
 
@@ -626,11 +679,107 @@ session cookie'lerini ve davet token'larını taşır. `ip`, ham bir header değ
 `req.ip`'sidir — yapılandırılmamışsa bu her zaman TCP peer'ıdır, yani yapılandırılmamış bir
 reverse proxy arkasında her istek için proxy'nin adresidir. Aşağıda `TRUST_PROXY`'ye bakın.
 
+## Kimlik doğrulama
+
+İki kimlik bilgisi var. İki health probe'u dışındaki her route bunlardan birini ister, ve
+OpenAPI belgesi her operasyonda hangisinin gerektiğini söyler (`security`).
+
+**Bir session cookie'si**, Better Auth tarafından `POST /auth/sign-in/email`'de verilir. Tarayıcı
+yolu budur, ve web uygulamasının kullandığı da budur. Tarayıcı olmayan bir client onu saklayıp
+tekrar oynatabilir, ama cookie'ler bunun için değildir; ikinci kimlik bilgisinin var olma sebebi
+de budur.
+
+**Bir kişisel erişim token'ı**, `Authorization: Bearer kurul_pat_...` olarak gönderilir.
+`POST /workspaces/:workspaceId/tokens`'ta bir üye tarafından basılır, yalnızca o tek yanıtta
+gösterilir ve bir daha asla; sunucu onun SHA-256'sını saklar ve geri gösteremez. Basan kişi
+tarafından listelenir (`GET .../tokens`, yalnızca kendi token'ları, görüntü öneki üzerinden) ve
+iptal edilir (`DELETE .../tokens/:tokenId`, anında). Bir token bir son kullanma tarihi
+taşıyabilir; süresi dolmuş biri tıpkı iptal edilmiş biri gibi okunur, o da hiç var olmamış biri
+gibi okunur: üçü için de `401`, böylece çalınmış bir sır kendi geçmişi hakkında hiçbir şey
+öğrenmez.
+
+**Unutulmuş bir parola kurtarılır, bir admin tarafından yeniden verilmez.**
+`POST /auth/request-password-reset`, bir saat geçerli ve tek kullanımlık bir bağlantı postalar;
+`POST /auth/reset-password` onu harcar. İkisi de Better Auth'undur ve istek ucu, hesabı olmayan
+bir adres için de hesabı olan bir adres için de aynı `200`'ü ve aynı gövdeyi döner; yani kimin
+hesabı olduğunu öğrenmek için kullanılamaz. Bağlantının harcanması, hesabın sahip olduğu bütün
+oturumları iptal eder (`revokeSessionsOnPasswordReset`); sıfırlamayı yalnızca hatırlamanın değil,
+hesabı geri almanın da yolu yapan budur. İletim zorunludur: SMTP'si olmayan bir kurulumun bunun
+yerine ne yaptığı için [kendi sunucunda barındırma](self-hosting.md#e-posta-smtp).
+
+```
+POST   /workspaces/:workspaceId/tokens            # bas; plaintext'i taşıyan tek yanıt
+GET    /workspaces/:workspaceId/tokens            # çağıranın canlı token'ları, en yeniden eskiye
+DELETE /workspaces/:workspaceId/tokens/:tokenId   # iptal et; başka bir üyenin token'ı 404'tür
+```
+
+### Bir token nedir, ve ne değildir
+
+Bir token, **her isteğin anında sahibinin tuttuğu rolle, tek bir workspace'te sahibi olarak
+davranır.** Scope yoktur: workspace scope'tur, ve rol üyelikten canlı okunur; dolayısıyla sahibi
+düşürmek veya çıkarmak, sonraki istekte o kişinin bütün token'larının yapabileceğini değiştirir
+(çıkarma ve ayrılma da token'ları doğrudan iptal eder, böylece sonradan yeniden eklenen bir üye
+eski kimlik bilgilerini çalışır bulmaz). Bir GUEST'in token'ı GUEST'in yapabileceğini yapabilir,
+ve bir token'ın yaptığı hiçbir şey sahibi için web uygulaması üzerinden erişilemez değildir.
+`ROADMAP.md`'nin "API 1.0" bölümü, bunun **OAuth olmadığını** ve token başına scope'ların vaat
+edilmediğini açıkça söyler.
+
+Bir token'ın nerede kabul edildiği o scope'tan çıkar:
+
+| Route                                                                                                                                                                   | Token ile                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Token'ın kendi `/workspaces/:workspaceId/...`'ının altındaki her şey                                                                                                    | Sahibi olarak, sahibinin güncel rolüyle                                                                                                             |
+| Başka herhangi bir `/workspaces/:workspaceId/...`                                                                                                                       | `404`, tam olarak üye olmayan biri için olduğu gibi; sahibin o workspace'e de üye olup olmaması hiçbir fark yaratmaz                                |
+| Path'inde workspace olmayan bir route: `/me`, `GET /workspaces`, `POST /workspaces`, `/config`, `/instance/*`                                                           | `403`; workspace'e bağlı bir kimlik bilgisinin orada karşılaştıracağı bir scope yoktur                                                              |
+| Yukarıdaki üç token route'u                                                                                                                                             | `403`; bir kimlik bilgisi kimlik bilgisi basamaz, listeleyemez veya iptal edemez                                                                    |
+| Better Auth'un yaptığı workspace-yönetimi yazmaları: yeniden adlandırma ve silme, davet etme, iptal etme ve kabul etme, bir üyeyi çıkarma, bir rolü değiştirme, ayrılma | `403`; bunlar çağıranın kendi Better Auth session'ında çalışır, ve bir token onu taşımaz. Yanlarındaki okumalar (roster, bekleyen davetler) çalışır |
+
+Son satır dilim sınırıdır, gizlenmek yerine adlandırılmıştır: onu kaldırmak, o yazmaları
+organization plugin'inin altından çıkarmak demektir, ve bu bir `/v1` kararıdır
+([ADR 0031](decisions/0031-api-versioning.md)), bir token kararı değil.
+
+**Bir Bearer header'ı taşıyan istek, yalnızca o header'a göre karar verilir.** İsteğin taşıdığı
+bir cookie'ye asla geri düşmez, ve `kurul_pat_` bir token olmayan bir Bearer kimlik bilgisi, yok
+sayılmak yerine `401`'dir: bir token gönderen bir client, o token'ın adlandırdığı kimlik olmayı
+bekler.
+
+### Her token'ın taşıdığı özellikler
+
+- **Yerinde hashlenir.** Satır `sha256(plaintext)`'i ve bir görüntü `prefix`'i (`kurul_pat_` artı
+  sekiz karakter) tutar. Bir veritabanı dump'ı kullanılabilir bir kimlik bilgisi vermez. SHA-256,
+  yavaş bir parola hash'i yerine, çünkü sır 256 rastgele bittir: tahmin edilecek bir şey yoktur,
+  ve yavaş bir hash yalnızca her isteğe vergi koyardı.
+- **Guard'da workspace'e bağlıdır.** `SessionAuthGuard`, token'ı bir kullanıcıya ve bir
+  workspace'e çözer, ve `WorkspaceGuard`, üyelik sorgusu çalışmadan önce başka herhangi bir
+  `:workspaceId`'yi reddeder. [architecture.md](architecture.md)'deki tenant izolasyon kuralı,
+  token'lar için de cookie'ler için tuttuğu aynı kod yoluyla tutar.
+- **İptal anındadır** ve bir silme değil bir zaman damgasıdır: satır, `token.revoked` activity
+  girdisinin yanında kanıt olarak kalır. Basmak `token.created` yazar. İkisi de audit alt
+  kümesindedir (`AUDIT_ACTIVITY_TYPES`) ve hiçbir payload sırrı taşımaz.
+- **Her şey gibi rate limitlidir.** Throttler kimlik doğrulamadan önce çalışır ve client IP'sine
+  ve route'a göre anahtarlanır, böylece bir token'ı tekrar oynatan bir script, bir tarayıcı
+  session'ının harcadığı aynı bütçeyi harcar ([Rate limiting](#rate-limiting)).
+- **`lastUsedAt`**, ilk kullanımda ve sonrasında en fazla dakikada bir damgalanır, böylece
+  polling yapan bir script her okumayı bir yazmaya çevirmez.
+- **Hesap silme token'ları siler**, her workspace'te, hesabı anonimleştiren aynı transaction
+  içinde ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)).
+
+### Neden Better Auth'un API-key eklentisi yerine ilk taraf bir model
+
+Better Auth 1.7, API-key eklentisini bu ağaçta olmayan ayrı bir paket olarak sunar, ve anahtarı
+bir organization'a değil, serbest biçimli `metadata`'sı olan bir kullanıcıya bağlar: workspace
+scoping, veritabanının zorladığı bir foreign key yerine guard'ların ayrıştırdığı bir JSON alanı
+olurdu, ve doğrulama `getSession`'dan geçer, ki bu da `WorkspaceGuard`'a üzerinde workspace
+olmayan bir session verirdi. Eklenti ayrıca kendi başına, bu dilimin bilinçli olarak istemediği
+bir rate limiter ve izin modeli getirir. 40 satırlık bir Prisma modeli, bir servis ve mevcut
+guard'da bir dal, scope'u tam olarak ifade eder, iptali ve listelemeyi Kurul'un kendi activity
+log'unun altında tutar ve mevcut controller'ları dokunulmamış bırakır.
+
 ## Cross-origin istekler
 
-Kimlik doğrulama bir **cookie**'dir, dolayısıyla tarayıcının bu API'ye yaptığı her istek
-çağıranın session'ını otomatik olarak taşır — çağıranın üzerinde işlem yapmayı hiç
-istemediği bir sayfanın başlattığı istek dahil. Bu konuda API'nin ne yaptığına üç kural
+Kimlik doğrulama, web uygulaması için bir **cookie**'dir, dolayısıyla tarayıcının bu API'ye
+yaptığı her istek çağıranın session'ını otomatik olarak taşır, çağıranın üzerinde işlem yapmayı
+hiç istemediği bir sayfanın başlattığı istek dahil. Bu konuda API'nin ne yaptığına üç kural
 karar verir.
 
 **Okumaları CORS yönetir.** `WEB_URL` tek izinli origin'dir ve `credentials: true` ile
@@ -651,7 +800,7 @@ sınırdır: tarayıcılar metodu `GET`/`HEAD` olmayan her istekte `Origin` gön
 zorundadır — `fetch`, XHR ve form gönderimleri dahil — yani kurbanın cookie'sini taşıyıp
 _aynı zamanda_ header'ı atlayan bir cross-site istek şekli yoktur. Header'sız durumda geriye
 kalan her şey — `curl`, bir CI script'i, native bir istemci, web uygulamasının
-`apps/web/middleware.ts` içindeki kendi sunucu tarafı session sorgusu — düşmanca bir sayfa
+`apps/web/proxy.ts` içindeki kendi sunucu tarafı session sorgusu — düşmanca bir sayfa
 tarafından başkasının ambient kimlik bilgilerini tekrar oynatmaya ikna edilemez; kuralın
 savunduğu mekanizma tam olarak budur. Bu durumu reddetmek her tarayıcı-dışı çağıranı kırar
 ve hiçbir şeyi kapatmaz.
@@ -691,6 +840,7 @@ Bütçeler **client IP'si ve route başına**, kayan bir dakikalık pencerede sa
 | `POST /workspaces/:workspaceId/imports/trello` | 3 / dk       | Heap'e ayrıştırılan 20 MiB'lık gövde, ardından tek transaction'da binlerce satır     |
 | `GET .../attachments/:attachmentId/content`    | 300 / dk     | Varsayılanın _üstünde_: on görsel ekli bir panel açılışta on istek üretir            |
 | `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10sn     | Better Auth'un kimlik endpoint'leri için yerleşik kuralı                             |
+| `/auth/request-password-reset`                 | 3 / 60sn     | O da yerleşik: her çağrı, çağıranın sahipliğini kanıtlamadığı adrese bağlantı yollar |
 | Diğer `/auth/*`                                | 100 / dk     | Better Auth'un kendi limiter'ı — `/auth/*` Nest router'ını atlar (ADR 0004)          |
 | `GET /health`, `GET /health/ready`             | muaf         | Throttle edilen bir probe, sağlıklı bir API'yi çökmüş gösterir                       |
 
@@ -962,9 +1112,11 @@ bump edilmesi gerekirdi. Bkz.
 - `@kurul/shared-types` monorepo ile birlikte versiyonlanır, dolayısıyla paket
   versiyonunu pinleyen bir client kontratı da pinler.
 
-1.0'da API SemVer'ın arkasında dondurulur. Bundan sonra bir versiyonlama şeması gerekirse,
-bir ADR ile getirilecektir — URI öneki (`/v1`) muhtemel seçimdir, önden değil gerçekten
-ihtiyaç duyulduğunda karar verilecektir.
+1.0'da API SemVer'ın arkasında dondurulur ve her route, `/auth/*` ile iki health probe'u dışında
+kalacak şekilde bir `/v1` URI önekini kazanır. Şema, header negotiation'ın ve versiyonsuzluğun
+reddi, ve 1.0 yüzeyinin gönderilme sırası (önce kişisel erişim token'ları, sonra `/v1`, sonra
+webhook'lar) [ADR 0031](decisions/0031-api-versioning.md)'de karara bağlanır; bu bölüm, o kaydın
+önek gelene kadar yürürlükte tuttuğu 1.0-öncesi kural kümesidir.
 
 ## Ayrıca bakınız
 

@@ -21,12 +21,15 @@
 #   2. `/api/*`   → the API, `/api` prefix REMOVED (nginx: `proxy_pass http://api:4000/;`)
 #   3. everything else → the web app
 #
-# plus WebSocket upgrades passed through on rule 2, and a request body limit on rule 2 that
-# matches the API's ATTACHMENT_MAX_BYTES (nginx: `client_max_body_size 25m;`). The body limit
-# is part of the contract, not a tuning knob: Caddy imposes none by default and nginx defaults
-# to 1 MB, so a replacement proxy that omits it fails every upload over a megabyte with a 413
-# that appears in no documentation. Rules 1 and 2 differ on purpose; the comments on each below
-# say why.
+# plus WebSocket upgrades passed through on rule 2, and a request body limit on both API rules:
+# 64 KiB on rule 1, the API's AUTH_BODY_MAX_BYTES (nginx: `client_max_body_size 64k;`), and
+# 26 MiB on rule 2, one mebibyte above the API's ATTACHMENT_MAX_BYTES, not equal to it (nginx:
+# `client_max_body_size 26m;`; the `request_body` block below says why an equal limit rejects a
+# file of exactly the published size). The body limits are part of the contract, not tuning
+# knobs: Caddy imposes none by default and nginx defaults to 1 MB, so a replacement proxy that
+# omits the second fails every upload over a megabyte with a 413 that appears in no
+# documentation, and one that omits the first leaves the auth routes reading bodies of any size
+# into the API's heap. Rules 1 and 2 differ on purpose; the comments on each below say why.
 {
 	# Nothing here is administered over Caddy's HTTP admin API — the config is this file, and a
 	# change is a container restart. Leaving the endpoint listening (localhost:2019 inside the
@@ -63,7 +66,40 @@
 	# The cost is that `/auth/*` is reserved on this origin: the web app must never own a route
 	# there. It does not (its sign-in pages are `/login`, `/register`, `/verify-email`).
 	handle /auth/* {
-		reverse_proxy api:4000
+		# The proxy half of the auth body ceiling, and the SAME number as the API's
+		# AUTH_BODY_MAX_BYTES (apps/api/src/auth/auth-body-limit.ts). Equal on purpose, unlike the
+		# /api/* pair below: an auth body is a JSON object of a few hundred bytes with no multipart
+		# envelope, so both layers count the same bytes and the ordering rule ("the proxy must
+		# never reject something the API would accept") holds at equality.
+		#
+		# It has to exist because Better Auth reads the raw request stream itself, below the
+		# parsers that enforce REQUEST_BODY_MAX_BYTES on every other route (configure-app.ts), and
+		# Caddy sets no limit of its own; until this block a sign-in body of any size streamed into
+		# the API container's heap. The API refuses a declared Content-Length over the ceiling with
+		# its own 413 envelope and cuts a chunked body at the same count by closing the connection;
+		# this line is what keeps either from reaching the API at all. `two-layer-limit.spec.ts`
+		# fails the build if it drops below the API constant or drifts from the nginx row in
+		# docs/self-hosting.md.
+		request_body {
+			max_size 64KiB
+		}
+		reverse_proxy api:4000 {
+			# Hold a request while the upstream is restarting instead of answering 502. `api` is
+			# recreated on every `docker compose up -d`, and its healthcheck alone gives it a 15s
+			# start period (docker-compose.yml), so without this an upgrade is a stretch of errors
+			# for anyone mid-session rather than a stretch of latency. Caddy retries a request when
+			# it cannot reach the upstream, for up to this long, at this interval; a request whose
+			# body has already begun streaming is not retried, which is why an upload can still fail
+			# across a restart. 30s is `stop_grace_period` on the API container, which covers a
+			# typical shutdown and most of the restart behind it; a request that arrives at the very
+			# start of a shutdown that then uses its whole grace can still run the window out.
+			#
+			# This is the cheap half of zero-downtime deploys (#160/OPS-11), not the item itself:
+			# there is still one replica, so a request that arrives while nothing is listening waits
+			# rather than being served by a second instance.
+			lb_try_duration 30s
+			lb_try_interval 500ms
+		}
 	}
 
 	# The rest of the API — `/boards`, `/workspaces/*`, `/me`, `/health/*`, `/socket.io/*`.
@@ -108,13 +144,22 @@
 		request_body {
 			max_size 26MiB
 		}
-		reverse_proxy api:4000
+		# Same restart-retry window as the `/auth/*` handle above, which carries the reasoning.
+		reverse_proxy api:4000 {
+			lb_try_duration 30s
+			lb_try_interval 500ms
+		}
 	}
 
-	# Everything else is the Next.js app, including its `_next/*` assets and the auth
-	# middleware. Last, and unconditional, so a path that matched neither rule above can never
+	# Everything else is the Next.js app, including its `_next/*` assets and the auth proxy
+	# (`apps/web/proxy.ts`). Last, and unconditional, so a path that matched neither rule can never
 	# 404 here.
 	handle {
-		reverse_proxy web:3000
+		# Same restart-retry window, for the same reason: `web` is recreated by the same
+		# `docker compose up -d`.
+		reverse_proxy web:3000 {
+			lb_try_duration 30s
+			lb_try_interval 500ms
+		}
 	}
 }

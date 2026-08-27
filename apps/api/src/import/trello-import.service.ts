@@ -1,13 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ActivityType } from '@kurul/shared-types';
 import type { TrelloImportReportDto } from '@kurul/shared-types';
 import { ActivityService } from '../activity/activity.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   IMPORT_CHUNK_SIZE,
   TRELLO_IMPORT_TRANSACTION_MAX_WAIT_MS,
   TRELLO_IMPORT_TRANSACTION_TIMEOUT_MS,
   chunked,
+  readTrelloImportMaxCards,
+  readTrelloImportMaxLists,
 } from './import-config';
 import { parseTrelloExport } from './trello-export';
 import { importedCounts, planTrelloImport } from './trello-import-planner';
@@ -19,7 +22,9 @@ import { importedCounts, planTrelloImport } from './trello-import-planner';
  * decision-making happens *before* the transaction opens, in `parseTrelloExport` and
  * `planTrelloImport`, neither of which touches a database. Inside the transaction there are no
  * branches, no lookups and no "skip this one and carry on" — every row that reaches it is already
- * known to be writable (ADR 0025).
+ * known to be writable (ADR 0025). The one read inside it is the board ceiling (ADR 0032), and it
+ * is there for the same reason `BoardService.create` keeps it there: the count and the insert
+ * share a snapshot, and a refusal rolls back a transaction that has written nothing yet.
  *
  * That is what makes the board atomic while the *coverage* is partial: a failure rolls back a
  * whole board rather than leaving a half-imported one, and the report describes what was never
@@ -36,6 +41,7 @@ export class TrelloImportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activity: ActivityService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   /**
@@ -54,11 +60,39 @@ export class TrelloImportService {
     // Throws only for the two "this is not the file you think it is" cases; everything else the
     // reader could not understand arrives as issues the planner folds into the report.
     const read = parseTrelloExport(bytes);
+
+    // SEC-04: a row cap, checked on the export's own counts before a single row is planned or a
+    // transaction is opened. `TRELLO_IMPORT_MAX_BYTES` bounds the parsed object graph's size, not
+    // how many rows it asks this API to write, and a small card can be a few dozen bytes: an
+    // export well under the byte ceiling can still carry far more lists or cards than any board
+    // this import could produce is meant to hold. `read.source.lists` and `read.source.cards`
+    // are the reader's own counts, so an archived list or card is still in them (the planner is
+    // what drops those, not the reader); an entry the reader could not parse into a row at all
+    // (no id, or a field of the wrong type) is already gone by this point, since that is what
+    // makes it a reader issue rather than a row. Checking the reader's counts rather than the
+    // plan's is still the point: the cost this ceiling exists for (heap held by the parsed
+    // graph, and the length of the `createMany` sequence a valid subset of it would produce) is
+    // paid for every row the reader kept, whether or not the planner goes on to write it.
+    const maxLists = readTrelloImportMaxLists();
+    const maxCards = readTrelloImportMaxCards();
+    if (read.source.lists.length > maxLists || read.source.cards.length > maxCards) {
+      throw new BadRequestException(
+        `This export has more lists or cards than this instance accepts ` +
+          `(limit ${maxLists} lists, ${maxCards} cards)`,
+      );
+    }
+
     const plan = planTrelloImport(read, { actorId });
     const imported = importedCounts(plan);
 
     await this.prisma.$transaction(
       async (tx) => {
+        // First, before a single row: an import is a board create by another route, and a
+        // workspace at its board ceiling (ADR 0032) does not get one more by posting an export
+        // instead of a name. Same call, same transaction client and same 403 as
+        // `BoardService.create`, so the ceiling is one rule rather than one per endpoint.
+        await this.planLimits.assertBoardAvailable(workspaceId, tx);
+
         await tx.board.create({
           data: {
             id: plan.board.id,

@@ -7,6 +7,7 @@ import {
   type NotificationUnreadChangedPayload,
 } from '@kurul/shared-types';
 import { connectSocket, getSocket } from '@/lib/socket';
+import { createRoomJoin } from '@/lib/socket-room';
 
 export type NotificationSocketHandlers = {
   /** The recipient's unread count changed — a notification arrived, or one was read. */
@@ -21,9 +22,10 @@ export type NotificationSocketHandlers = {
 /**
  * How many mounted hooks hold each workspace's notification room.
  *
- * The bell lives in the app shell and the notifications page mounts inside it, so both
- * subscribe to the same room. Without a count, navigating away from the page would emit a
- * leave that also unsubscribes the bell — which would then sit there, silent, looking correct.
+ * The shell's unread provider (which feeds the bell) and the notifications page that mounts
+ * inside it both subscribe to the same room. Without a count, navigating away from the page
+ * would emit a leave that also unsubscribes the badge, which would then sit there, silent,
+ * looking correct.
  * Module scope is the right scope: `lib/socket.ts` hands out one socket per tab, and rooms are
  * a property of that socket, not of a component.
  */
@@ -72,23 +74,26 @@ export function useNotificationSocket(
     const socket = getSocket();
     retainRoom(workspaceId);
 
+    // `connected` flips only once the room is actually joined: a socket that connected but was
+    // denied the room delivers nothing, and the caller has to keep its fallback refresh running
+    // rather than trust a live-looking flag. A denial is retried with backoff
+    // (`lib/socket-room.ts`) rather than left to stand for the life of the socket.
+    const join = createRoomJoin(
+      socket,
+      SocketClientEvents.NOTIFICATIONS_JOIN,
+      { workspaceId },
+      () => {
+        setConnected(true);
+        handlersRef.current.onResync();
+      },
+    );
+
     function onConnect(): void {
-      socket.emit(
-        SocketClientEvents.NOTIFICATIONS_JOIN,
-        { workspaceId },
-        (ack: { ok?: boolean } | undefined) => {
-          // `connected` flips only once the room is actually joined: a socket that connected
-          // but was denied the room delivers nothing, and the caller has to keep its fallback
-          // refresh running rather than trust a live-looking flag.
-          if (ack?.ok) {
-            setConnected(true);
-            handlersRef.current.onResync();
-          }
-        },
-      );
+      join.start();
     }
 
     function onDisconnect(): void {
+      join.cancel();
       setConnected(false);
     }
 
@@ -113,6 +118,7 @@ export function useNotificationSocket(
     }
 
     return () => {
+      join.cancel();
       if (releaseRoom(workspaceId)) {
         socket.emit(SocketClientEvents.NOTIFICATIONS_LEAVE, { workspaceId });
       }

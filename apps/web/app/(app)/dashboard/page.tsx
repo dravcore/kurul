@@ -9,10 +9,10 @@ function SummaryFallback(): React.ReactElement {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Skeleton className="h-24 w-full rounded-[var(--radius-lg)]" />
-        <Skeleton className="h-24 w-full rounded-[var(--radius-lg)]" />
+        <Skeleton className="h-24 w-full rounded-lg" />
+        <Skeleton className="h-24 w-full rounded-lg" />
       </div>
-      <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" />
+      <Skeleton className="h-56 w-full rounded-lg" />
     </div>
   );
 }

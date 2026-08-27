@@ -36,8 +36,9 @@ interface TaskCommentsSectionProps {
 /**
  * The comment thread and its composer, including the `@mention` picker.
  *
- * The picker is an editable combobox: DOM focus never leaves the textarea, so the caret
- * stays where the author is typing and `aria-activedescendant` is what moves instead.
+ * The picker behaves like a combobox's list, but the field itself is a textbox: a textarea
+ * takes no ARIA role. DOM focus never leaves the textarea, so the caret stays where the
+ * author is typing and `aria-activedescendant` is what moves instead.
  */
 export function TaskCommentsSection({
   comments,
@@ -122,9 +123,9 @@ export function TaskCommentsSection({
     if (!mentionPickerOpen) return;
 
     if (event.key === 'Escape') {
+      // The panel's own Escape handler (use-task-panel-focus.ts) reads this: a key already
+      // dealt with by the layer above it is not the panel's to close on.
       event.preventDefault();
-      // Stop here: the panel's own Escape handler would otherwise close the whole task.
-      event.stopPropagation();
       closeMentionPicker();
       return;
     }
@@ -152,13 +153,13 @@ export function TaskCommentsSection({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-small font-medium text-foreground">{t('comments')}</p>
+      <p className="text-small font-strong text-foreground">{t('comments')}</p>
       <ul className="flex flex-col gap-3">
         {comments.map((comment) => (
           <li key={comment.id} className="rounded-md border border-border px-3 py-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-small font-medium text-foreground">
+                <p className="text-small font-strong text-foreground">
                   {authorLabel(comment.author, tCommon('deletedUser'))}
                 </p>
                 <p className="text-micro text-muted-foreground">
@@ -205,17 +206,15 @@ export function TaskCommentsSection({
           <Textarea
             ref={commentRef}
             id={commentId}
-            // The implicit `textbox` role does not support `aria-expanded`; the mention
-            // picker turns this field into an editable combobox while it is open, so it
-            // needs the role that actually owns that state.
-            role="combobox"
+            // A textarea takes no ARIA role, so the field stays a plain textbox. Its open
+            // state is carried by aria-controls naming the listbox instead of aria-expanded,
+            // and the active option travels through aria-activedescendant.
             aria-haspopup="listbox"
             value={commentBody}
             disabled={pending}
             rows={3}
             aria-describedby={`${commentId}-hint`}
             aria-autocomplete="list"
-            aria-expanded={mentionPickerOpen}
             aria-controls={mentionPickerOpen ? mentionListId : undefined}
             aria-activedescendant={
               mentionPickerOpen && mentionCandidates.length > 0
@@ -286,7 +285,15 @@ export function TaskCommentsSection({
             {mentionPickerOpen && mentionCandidates.length === 0 ? t('mentions.empty') : ''}
           </span>
           <div className="flex justify-end">
-            <Button type="button" size="sm" disabled={pending} onClick={() => void submit()}>
+            {/* Outline, not the default fill: docs/design.md §2 allows one full-strength copper
+                action per view beside the rail, and this one is not the panel's. */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() => void submit()}
+            >
               {t('postComment')}
             </Button>
           </div>

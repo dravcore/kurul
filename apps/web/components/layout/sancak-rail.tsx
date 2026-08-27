@@ -43,7 +43,7 @@ export function SancakRail({
   return (
     <span
       aria-hidden
-      className="absolute left-0 z-10 w-0.5 rounded-full bg-signature transition-[transform,height] duration-150 ease-[var(--ease-out)]"
+      className="absolute left-0 z-10 w-0.5 rounded-full bg-signature transition-[transform,height] duration-150 ease-out"
       style={{ height: box.height, transform: `translateY(${box.top}px)` }}
     />
   );

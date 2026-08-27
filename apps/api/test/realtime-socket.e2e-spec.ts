@@ -7,6 +7,7 @@ import {
   MemberRole,
   SocketClientEvents,
   SocketEvents,
+  SOCKET_UNAUTHORIZED,
   type TaskCreatedPayload,
 } from '@kurul/shared-types';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -107,6 +108,8 @@ interface TestSocket {
   connected: Promise<void>;
   /** Resolves with the disconnect reason reported by the client. */
   disconnected: Promise<string>;
+  /** Resolves with the `connect_error` message when the handshake is refused. */
+  refused: Promise<string>;
 }
 
 function withDeadline<T>(promise: Promise<T>, label: string, timeoutMs: number): Promise<T> {
@@ -212,7 +215,11 @@ describe('Realtime socket handshake and eviction (e2e)', () => {
       socket.once('disconnect', (reason: string) => resolve(reason));
     });
 
-    return { socket, connected, disconnected };
+    const refused = new Promise<string>((resolve) => {
+      socket.once('connect_error', (error: Error) => resolve(error.message));
+    });
+
+    return { socket, connected, disconnected, refused };
   }
 
   /**
@@ -287,20 +294,18 @@ describe('Realtime socket handshake and eviction (e2e)', () => {
     return task.body.id as string;
   }
 
-  it('disconnects a handshake that carries no session cookie', async () => {
+  it('refuses a handshake that carries no session cookie, before it is ever connected', async () => {
     const anonymous = openSocket();
 
-    const reason = await withDeadline(
-      anonymous.disconnected,
-      'server disconnect',
-      EVENT_TIMEOUT_MS,
-    );
+    const message = await withDeadline(anonymous.refused, 'handshake refusal', EVENT_TIMEOUT_MS);
 
-    // `client.disconnect(true)` in `handleConnection` is what the client reports back as
-    // 'io server disconnect' — a transport-level drop (network blip, client-initiated close)
-    // would report a different reason, so pinning this value proves the *server* evicted the
-    // handshake rather than merely that some disconnect, of any origin, took place.
-    expect(reason).toBe('io server disconnect');
+    // The refusal comes from Socket.io *middleware*, which runs before the CONNECT packet is
+    // acked — so the client is told why and never reaches a connected state at all. It used to
+    // be `client.disconnect(true)` from an async `handleConnection`, which meant the socket was
+    // briefly live and reachable: room handlers could be, and on a loaded CI runner were,
+    // dispatched against a socket whose session had not been resolved. Asserting on
+    // `connect_error` rather than on a disconnect reason is what pins that ordering.
+    expect(message).toBe(SOCKET_UNAUTHORIZED);
     expect(anonymous.socket.connected).toBe(false);
   });
 

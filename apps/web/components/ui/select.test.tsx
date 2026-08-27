@@ -17,23 +17,24 @@ describe('Select', () => {
   /**
    * The reason this component exists: the same control was hand-styled in three places and
    * one of them had lost its focus ring entirely. Keyboard visibility is not a per-call-site
-   * decision.
+   * decision, and the way to honour it is to add nothing: the one mark is the
+   * `:focus-visible` outline in `app/globals.css`, which any `focus-visible:` ring or
+   * `outline-none` here would either double or erase.
    */
-  it('keeps a visible focus ring at every size', () => {
+  it('draws no focus mark of its own at either size', () => {
     for (const size of ['default', 'sm'] as const) {
       cleanup();
       const element = renderSelect({ size });
-      expect(element.className).toContain('focus-visible:ring-[3px]');
-      expect(element.className).toContain('focus-visible:ring-ring/50');
-      expect(element.className).toContain('focus-visible:border-ring');
+      expect(element.className).not.toMatch(/\bfocus-visible:/);
+      expect(element.className).not.toMatch(/\boutline-(none|hidden)\b/);
     }
   });
 
-  it('keeps the focus ring when the caller adds layout classes', () => {
+  it('keeps the shared base when the caller adds layout classes', () => {
     const element = renderSelect({ className: 'min-w-[10rem]' });
 
     expect(element.className).toContain('min-w-[10rem]');
-    expect(element.className).toContain('focus-visible:ring-[3px]');
+    expect(element.className).toContain('aria-invalid:border-destructive');
   });
 
   it('styles the disabled state rather than leaving it to each call site', () => {

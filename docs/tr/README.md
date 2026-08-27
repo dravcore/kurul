@@ -3,7 +3,7 @@
 Kurul dokümanlarının beş dakikalık haritası. İngilizce kanoniktir; Türkçe kopyalar
 [`tr/`](.) altında yaşar.
 
-> 🌐 [English (canonical)](../README.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../README.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Buradan başlayın
 

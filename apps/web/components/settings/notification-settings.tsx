@@ -81,7 +81,7 @@ export function NotificationSettings(): React.ReactElement {
         />
         <span>{t('emailLabel')}</span>
       </label>
-      <p className="text-caption text-muted-foreground">{t('help')}</p>
+      <p className="text-small text-muted-foreground">{t('help')}</p>
     </div>
   );
 }

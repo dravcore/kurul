@@ -231,9 +231,10 @@ describe('WorkspaceProvider bootstrap', () => {
   });
 
   /**
-   * `RenameWorkspaceDialog` hands the `PATCH` response straight to this — no second fetch — so
-   * `WorkspaceSwitcher` (which reads the same `workspaces` array) shows the new name without a
-   * full bootstrap. The other workspace stays untouched, matched by id rather than position.
+   * The inline editor in `workspace-settings.tsx` hands the `PATCH` response straight to this
+   * (no second fetch), so `WorkspaceSwitcher` (which reads the same `workspaces` array) shows
+   * the new name without a full bootstrap. The other workspace stays untouched, matched by id
+   * rather than position.
    */
   it('folds a rename into the matching workspace by id, and only that one', async () => {
     const other: WorkspaceDto = { ...workspace, id: 'other-workspace', name: 'Bugs' };

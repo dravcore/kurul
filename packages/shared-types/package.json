@@ -1,6 +1,6 @@
 {
   "name": "@kurul/shared-types",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -22,6 +22,6 @@
   },
   "devDependencies": {
     "typescript": "^5.8.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

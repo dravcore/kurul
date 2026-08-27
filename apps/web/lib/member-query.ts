@@ -13,7 +13,7 @@ export const WORKSPACE_MEMBER_PAGE_LIMIT = 100;
  * roster's constant rather than shared: they are two endpoints that happen to agree today, and
  * a future ceiling change on one of them should not silently retune the other.
  */
-export const WORKSPACE_INVITATION_PAGE_LIMIT = 100;
+const WORKSPACE_INVITATION_PAGE_LIMIT = 100;
 
 /**
  * Walks a cursor-paged collection to its end and returns every row.

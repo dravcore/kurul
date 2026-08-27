@@ -27,7 +27,7 @@ Kurul’s MVP feature set is complete; the testing strategy stays deliberately
   catching at this stage live in the query, not in the TypeScript.
 - Do **not** chase a coverage number. Do not write tests that only restate the
   implementation.
-- Browser e2e covers **seven flows, and deliberately no more** — the ones where the stack
+- Browser e2e covers **eight flows, and deliberately no more**: the ones where the stack
   either holds together or does not. See [Browser end-to-end](#browser-end-to-end).
 
 The cost of a test is not writing it — it is maintaining it through every refactor. Tests
@@ -35,14 +35,14 @@ are written where that cost buys real confidence.
 
 ## The pyramid
 
-| Layer           | Tool                                   | Scope                                                                                     | Status                                                      |
-| --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Services, guards, pure functions, board/permission logic, DnD hooks. Dependencies mocked. | Required from day one                                       |
-| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`)    | Required for every endpoint                                 |
-| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | Seven scenarios (`e2e/`) — nightly and before every release |
+| Layer           | Tool                                   | Scope                                                                                     | Status                                                                  |
+| --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Services, guards, pure functions, board/permission logic, DnD hooks. Dependencies mocked. | Required from day one                                                   |
+| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`)    | Required for every endpoint                                             |
+| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | Eight scenarios (`e2e/`): nightly on `develop` and before every release |
 
 ```
-        /\        e2e — seven critical flows (Playwright, real Chromium)
+        /\        e2e: eight critical flows (Playwright, real Chromium)
        /  \
       /────\      integration — every endpoint (Supertest + real Postgres)
      /      \
@@ -53,7 +53,7 @@ Full component-tree rendering tests are not part of the MVP. Web unit tests cove
 (`lib/*.test.ts` — permissions, position math, mentions, query params) and the board
 drag-and-drop hook in isolation; type safety plus integration coverage of the API is the
 trade-off for everything else, and the board's own behaviour is covered end to end by the
-seven browser scenarios below rather than by component tests covering it in pieces.
+eight browser scenarios below rather than by component tests covering it in pieces.
 
 ## What must be tested
 
@@ -112,36 +112,38 @@ endpoint, and **not once in a real browser**. Both of those suites pass against 
 never renders.
 
 The suite lives in [`e2e/`](../e2e), runs a real Chromium against a compiled API and a
-production web build, and is exactly seven scenarios. It started at four and has grown only
-with features whose stack-level wiring nothing else could reach — a real multipart upload from a
-real browser, a real file picker feeding the importer, and a viewport, a touchscreen and a
-laid-out document, none of which exist in jsdom.
+production web build, and is exactly eight scenarios. It started at four and has grown only
+with features whose stack-level wiring nothing else could reach: a real multipart upload from a
+real browser, a real file picker feeding the importer, a viewport, a touchscreen and a
+laid-out document none of which exist in jsdom, and an implicit form submission, which jsdom
+does not perform.
 
-### The seven scenarios
+### The eight scenarios
 
-| Scenario                                                                                    | File                                   | What it is the only coverage of                                                                                                                                                                                                 |
-| ------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sign in → open a board → drag a card → **reload and find it still moved**                   | `tests/board-drag-persistence.spec.ts` | That a pointer gesture in a browser produces the move request at all, and that the board reads back what it wrote                                                                                                               |
-| A move in one browser appears **in a second browser**, with no reload                       | `tests/board-realtime.spec.ts`         | Socket.io handshake auth, board-room membership, and the client applying an id-only payload                                                                                                                                     |
-| Invite from settings → **read the mail in Mailpit** → accept from the link                  | `tests/invitation.spec.ts`             | That the invitation mail is sent and carries a link that works — `acceptUrl` is built from `WEB_URL`, and the API's own tests assert on the DTO, not the message                                                                |
-| Click a notification → **the right task opens**                                             | `tests/notification.spec.ts`           | A notification carries `taskId` but no `boardId`; the web resolves the board with a second request, in the browser, with the recipient's session                                                                                |
-| Upload a file to a card → **download it back and compare the bytes**                        | `tests/task-attachment.spec.ts`        | A multipart body Chromium wrote rather than the API suite; a non-ASCII filename surviving both the upload encoding and `Content-Disposition`; the board card's count badge, which comes from a different query than the panel's |
-| Import a Trello export from a file picker → **read the report on screen**                   | `tests/board-import.spec.ts`           | A real `<input type="file">` producing the boundary the API never composes itself, and the import report reaching the screen — it exists only in the body of the `201`, so a panel that drops it drops the only copy            |
-| The board at **360px with a touchscreen** — drawer, 44px targets, column scroll, touch drag | `tests/mobile-navigation.spec.ts`      | Layout at a width, and input from a finger. jsdom lays nothing out, so every box measurement in a Vitest test is zeros; `hasTouch` / `isMobile` are context options a unit test has no equivalent of                            |
+| Scenario                                                                                                                                                                   | File                                   | What it is the only coverage of                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign in → open a board → drag a card → **reload and find it still moved**                                                                                                  | `tests/board-drag-persistence.spec.ts` | That a pointer gesture in a browser produces the move request at all, and that the board reads back what it wrote                                                                                                                                                |
+| A move in one browser appears **in a second browser**, with no reload                                                                                                      | `tests/board-realtime.spec.ts`         | Socket.io handshake auth, board-room membership, and the client applying an id-only payload — plus the handshake read off the wire (one namespace CONNECT per connection, no denied room join), which is where two silent defects hid behind a passing indicator |
+| Invite from settings → **read the mail in Mailpit** → accept from the link                                                                                                 | `tests/invitation.spec.ts`             | That the invitation mail is sent and carries a link that works — `acceptUrl` is built from `WEB_URL`, and the API's own tests assert on the DTO, not the message                                                                                                 |
+| Click a notification → **the right task opens**                                                                                                                            | `tests/notification.spec.ts`           | A notification carries `taskId` but no `boardId`; the web resolves the board with a second request, in the browser, with the recipient's session                                                                                                                 |
+| Upload a file to a card → **download it back and compare the bytes**                                                                                                       | `tests/task-attachment.spec.ts`        | A multipart body Chromium wrote rather than the API suite; a non-ASCII filename surviving both the upload encoding and `Content-Disposition`; the board card's count badge, which comes from a different query than the panel's                                  |
+| Import a Trello export from a file picker → **read the report on screen**                                                                                                  | `tests/board-import.spec.ts`           | A real `<input type="file">` producing the boundary the API never composes itself, and the import report reaching the screen — it exists only in the body of the `201`, so a panel that drops it drops the only copy                                             |
+| The board at **360px with a touchscreen** — drawer, 44px targets, column scroll, touch drag                                                                                | `tests/mobile-navigation.spec.ts`      | Layout at a width, and input from a finger. jsdom lays nothing out, so every box measurement in a Vitest test is zeros; `hasTouch` / `isMobile` are context options a unit test has no equivalent of                                                             |
+| Create a task from the keyboard, both ways: **Enter creates and keeps the caret in the field**, Escape closes and returns focus, "Open details" opens the new task's panel | `tests/board-composer.spec.ts`         | The Enter/Escape focus-move contract the inline composer depends on since ADR 0035 removed the create dialog, and that "Open details" opens a real route rather than a rendered branch, none of it reachable from jsdom                                          |
 
-Anything outside those seven belongs in a unit or integration test. Every test added here is
+Anything outside those eight belongs in a unit or integration test. Every test added here is
 one more thing to keep green through a UI refactor, and this suite exists to notice when the
 **stack** comes apart — not to re-check what the layers below already cover.
 
 ### Running it
 
 Postgres **and Mailpit** must be up (`docker compose -f docker-compose.dev.yml up -d`);
-without Mailpit three of the seven scenarios cannot confirm an address or read an invitation.
+without Mailpit three of the eight scenarios cannot confirm an address or read an invitation.
 Redis is not needed — see [Isolation](#isolation) for why the suite runs without it.
 
 ```bash
 pnpm --filter @kurul/e2e browsers   # once: downloads Chromium
-pnpm test:browser                      # builds the stack, then runs all seven
+pnpm test:browser                      # builds the stack, then runs all eight
 ```
 
 `pnpm test:browser` runs `e2e/build-stack.mjs` first — it builds `shared-types`,
@@ -154,6 +156,34 @@ already listening.
 at build time, so the suite's build hard-codes port 4110 into the client bundle and overwrites
 `apps/web/.next`. After running the suite locally, rebuild before using
 `pnpm --filter @kurul/web start`.
+
+### Two more rigs, run by hand
+
+Two Playwright configs sit beside `e2e/playwright.config.ts` and are deliberately outside the
+eight-scenario smoke suite and outside CI. Both spread `playwright.config.ts`, so they drive the
+same built artifacts, the same database and the same ports; both run at `workers: 1`, because
+every number either of them produces is a duration and two of them measured at once are two
+measurements of a contended machine.
+
+```bash
+pnpm --filter @kurul/e2e exec playwright test -c audit.config.ts     # axe accessibility sweep
+pnpm --filter @kurul/e2e exec playwright test -c measure.config.ts   # performance numbers
+```
+
+**`audit.config.ts`** (`e2e/audit/accessibility.audit.ts`) runs an axe-core sweep over the routes
+a UI phase touched, six routes in both themes. Serious and critical violations fail the run;
+moderate and minor ones are recorded and read rather than gated, since an axe rule that fails the
+build gets suppressed instead of fixed. It is not in `tests/` because it is evidence produced on
+demand at the end of a UI phase rather than a way the stack comes apart, and twelve page loads on
+every nightly would cost every run for a result nobody reads until a phase closes. Its output is
+a working note, so it stays out of the repo like every other one; what lasts goes into
+[ROADMAP.md](../ROADMAP.md) or an ADR.
+
+**`measure.config.ts`** (`e2e/measure/`) produces the performance numbers this repository has
+promised: a 10 MB upload, a 500-card Trello import, and the board's badge cost. Each file asserts
+only that the operation succeeded and prints its timing. Nothing here fails on a number, on
+purpose: a threshold that fails the build gets raised until it stops failing, and then it measures
+nothing.
 
 ### Isolation
 
@@ -210,6 +240,13 @@ where it belongs, against a live server, in `apps/api/test/redis-database-index.
 - **A drop assertion before a reload proves nothing.** The board applies moves optimistically,
   so the order changes on screen whether or not anything was persisted. The reload is the
   test.
+- **A Content-Security-Policy violation fails the scenario that saw it.** An `auto` fixture in
+  `e2e/support/fixtures.ts` puts a collector on every context — the built-in `page` one and
+  every context `openAs` creates — reading both `securitypolicyviolation` events and Chromium's
+  CSP console errors, and asserts the list is empty at teardown. This is not a scenario of its
+  own because a CSP failure is not one: the policy blocks a script, the page still renders, the
+  click still lands, and no assertion any scenario makes can see it. The check is what keeps
+  `'unsafe-inline'` from coming back into `script-src` unnoticed (`apps/web/proxy.ts`).
 
 ### Prove the test can fail
 
@@ -288,6 +325,39 @@ compile the same source `pnpm typecheck` reads and cannot pass against a stale b
 required for `pnpm typecheck`, `nest build`, `next build` and `pnpm dev`, see
 [development.md](development.md#clone-and-install).
 
+`apps/web/workspace-packages.test.ts` is one of five **structural guards** that sit at the root of
+`apps/web` (or beside `globals.css`) instead of next to a component, because their subject is the
+app as a whole. Two came with the cascade-layer repair: `apps/web/app/globals-css-layers.test.ts`
+compiles `app/globals.css` through the installed Tailwind and resolves the cascade the way a
+browser would, so the wildcard `border-color` rule cannot leave `@layer base` unnoticed; the token
+ramp widened it to also compile the `dark:` variant's own selector, so a `dark:` utility resolving
+against `prefers-color-scheme` instead of the `.dark` class fails here, and to compile the
+`forced-colors: active` and `prefers-contrast: more` blocks, so a Highlight fallback or the
+high-contrast border swap that only exists on paper fails here instead of in a screenshot.
+`apps/web/border-utilities.test.ts` scans the tree and fails on any border class drawn from
+outside the reviewed token set; `apps/web/app/theme-classes.test.ts` asks Tailwind whether every
+`text-`, `bg-`, `border-`, `font-`, `shadow-` and `rounded-` class in the tree resolves to CSS at
+all. Those same two files also enforce three closed lists added in the P8 UI-comfort phase:
+`globals-css-layers.test.ts` scans the whole tree for `outline-none` / `outline-hidden` and fails
+unless the result is exactly one named exception (`components/ui/dialog.tsx`'s Radix content
+wrappers, which take focus by script when they open rather than by Tab, an arrow key or a link),
+and `theme-classes.test.ts` denies Tailwind's own text-size and font-weight scale
+(`text-xs` through `text-9xl`, `font-thin` through `font-black`) outside three pinned `text-base`
+iOS-zoom exceptions on the form primitives, and confines `font-display` to a closed allowlist of
+reviewed call sites. A denied class compiles clean, so the resolve gate above would never catch
+it; these lists are what makes a re-introduced default fail the build rather than the next audit.
+The fifth, `apps/web/app/globals.contrast.test.ts`, is the contrast gate: it reads every color token
+out of the compiled `:root` and `.dark` blocks and measures every text token against six real
+surfaces at 4.5:1 and every boundary and state token at the same six at 3:1, plus three scanners
+that rescan the rendered tree on each run rather than trust a token name (every alpha derivative
+composited over its real ground, every call site pairing a risky text colour with a risky ground,
+every untokenised colour). It fails on a pair under its floor, an alpha composite that has drifted
+off its recorded number, or a call site its pinned list does not already name. Exemptions live in
+the file itself as named lists carrying their measured number and their reason, never a lowered
+threshold, and each one is re-measured every run and fails if it drifts off its number or rises
+past the floor it was excused from. The rules they enforce are written down in
+[coding-standards.md](coding-standards.md#styling).
+
 ## Writing tests
 
 - **Arrange–Act–Assert**, with blank lines between the three parts.
@@ -328,29 +398,65 @@ number for its own sake.
   why floors are scoped to code that is already meaningfully tested, never applied globally
   to pull an average up.
 
+### Floor policy
+
+Two rules govern every floor in this repo, `apps/api` and `apps/web` alike:
+
+- **The baseline moves up, the floor follows.** Re-measure, then raise the floor to reflect
+  the new number rather than leaving the old one in place. A new module landing with its own
+  tests is not itself a reason to raise a floor it does not touch; raise a zone's floor when
+  that zone gets warmer, not because something unrelated pulled the average up.
+- **The baseline moves down, the drop is recorded, never hidden.** Re-measure and write the
+  number down (in `apps/api/jest.config.cjs`'s dated history, or here for `apps/web`). Do not
+  lower the floor to restore the old margin: the margin shrinking is the signal, and lowering
+  the floor deletes the signal while leaving the cause in place. A floor is only ever lowered
+  on a deliberate, argued decision, never as bookkeeping after a drop.
+
+Both rules assume the denominator is honest: **no file is ever excluded from coverage to
+raise a percentage.** An excluded file is an invisible one, and excluding it to restore a
+margin is the same move as lowering the floor with one indirection in front of it.
+`collectCoverageFrom` (`apps/api`) and `coverage.exclude` (`apps/web`) only ever drop
+generated code and test files themselves.
+
 ### Where floors do exist
 
 These floors keep already-covered code from sliding back. Each fails CI.
 
-| Scope                                   | Floor                                                 | Set in                      |
-| --------------------------------------- | ----------------------------------------------------- | --------------------------- |
-| `apps/api` global                       | statements 75 / branches 66 / functions 77 / lines 76 | `apps/api/jest.config.cjs`  |
-| `apps/web` `app/**`                     | statements 85 / branches 90 / functions 85 / lines 85 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/board/**`        | statements 65 / branches 54 / functions 54 / lines 70 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/task/**`         | statements 60 / branches 60 / functions 58 / lines 62 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78 | `apps/web/vitest.config.ts` |
-| `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93 | `apps/web/vitest.config.ts` |
-| `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92 | `apps/web/vitest.config.ts` |
+| Scope                                   | Floor                                                            | Set in                      |
+| --------------------------------------- | ---------------------------------------------------------------- | --------------------------- |
+| `apps/api` global                       | statements 75 / branches 66 / functions 77 / lines 76            | `apps/api/jest.config.cjs`  |
+| `apps/api` `src/common/guards/`         | statements 100 / branches 93.75 / functions 100 / lines 100      | `apps/api/jest.config.cjs`  |
+| `apps/api` `src/common/rate-limit/`     | statements 98.33 / branches 94.87 / functions 91.3 / lines 99.09 | `apps/api/jest.config.cjs`  |
+| `apps/api` `src/account/`               | statements 0 / branches 0 / functions 0 / lines 0                | `apps/api/jest.config.cjs`  |
+| `apps/web` `app/**`                     | statements 97 / branches 97 / functions 97 / lines 97            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/board/**`        | statements 84 / branches 77 / functions 78 / lines 88            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/task/**`         | statements 82 / branches 79 / functions 81 / lines 86            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93            | `apps/web/vitest.config.ts` |
+| `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/auth/**`         | statements 94 / branches 91 / functions 95 / lines 94            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/settings/**`     | statements 90 / branches 86 / functions 89 / lines 92            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/dashboard/**`    | statements 89 / branches 63 / functions 90 / lines 88            | `apps/web/vitest.config.ts` |
 
-All sit a few points under the measurement taken when they were introduced — enough margin
-that a routine refactor does not trip them, tight enough that deleting a test does.
+`apps/api`'s global floor is measured against `develop` after merge, never a feature branch;
+the CI `api-coverage` artifact for the latest `develop` run is the source of truth. As of
+2026-08-26 (`develop` at `017838a`), the measurement is 77.06 / 69.96 / 78.95 / 77.91 against
+the 75 / 66 / 77 / 76 floor, a margin of 2.06 / 3.96 / 1.95 / 1.91. The three `apps/api`
+directory floors above are set at, not under, that same measurement: `src/common/guards/` and
+`src/common/rate-limit/` ratchet zones that already carry real unit tests, and `src/account/`
+records, rather than hides, that its GDPR-erasure flow is deliberately unit-untested and
+covered end to end instead (`apps/api/jest.config.cjs` names the file and its e2e spec). The
+`apps/web` folder floors sit a few points under the measurement taken when they were
+introduced, enough margin that a routine refactor does not trip them, tight enough that
+deleting a test does.
 
-`apps/web` has **no global floor**, deliberately. Overall web coverage is around 83% of
-instrumented statements in recent runs, but that average still mixes heavily-tested hooks with
+`apps/web` has **no global floor**, deliberately. Overall web coverage is around 90% of
+instrumented statements in recent runs (2026-08-27: 90.25 / 84.51 / 89.33 / 93.07
+stmts/branch/funcs/lines over 138 files, 1407 tests), but that average still mixes heavily-tested hooks with
 thin page shells; a global floor at the average would catch little. Folder floors cover the
 surfaces that already have meaningful unit tests: route entrypoints (`app/**`), the
-interactive board / task / layout / notification components, and the `lib/**` helpers behind
-them. `apps/web/vitest.config.ts` carries the full reasoning inline.
+interactive board / task / layout / notification / auth / settings / dashboard components, and
+the `lib/**` helpers behind them. `apps/web/vitest.config.ts` carries the full reasoning inline.
 
 **What a folder floor does not catch.** Coverage is reported for files a test _imports_, not
 for every file on disk. Deleting the last test that imports a module therefore takes the
@@ -371,37 +477,50 @@ on every run, passing or failing.
 
 Every pull request runs, on `develop` and `main` as well:
 
-| Step                 | Command                                                                                                  |
-| -------------------- | -------------------------------------------------------------------------------------------------------- |
-| Build shared pkgs    | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                      |
-| Lint                 | `pnpm lint`                                                                                              |
-| Format check         | `pnpm format:check`                                                                                      |
-| Typecheck            | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                                      |
-| Audit                | `pnpm audit --audit-level high`                                                                          |
-| Unit tests (api)     | `pnpm --filter @kurul/api test:cov`                                                                      |
-| Unit tests (web)     | `pnpm --filter @kurul/web exec vitest run --coverage`                                                    |
-| Unit tests (pkgs)    | `pnpm --filter "./packages/*" test`                                                                      |
-| Unit tests (scripts) | `pnpm test:scripts`                                                                                      |
-| Integration tests    | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers                        |
-| Build                | `pnpm build`                                                                                             |
-| Image build + scan   | The three shipped images, then Trivy over each (see below)                                               |
-| **Gate** (required)  | `ci-ok` — passes only if `lint`, `test`, `build` and `image-scan` all succeed (not skipped or cancelled) |
+| Step                  | Job                | Command                                                                                                                                           |
+| --------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build shared pkgs     | `lint`             | `pnpm --filter @kurul/shared-types build && pnpm --filter @kurul/auth-access build`                                                               |
+| Lint                  | `lint`             | `pnpm lint`                                                                                                                                       |
+| Format check          | `lint`             | `pnpm format:check`                                                                                                                               |
+| Typecheck             | `lint`             | `pnpm typecheck` (`tsc --noEmit` across workspaces)                                                                                               |
+| Audit                 | `lint`             | `pnpm audit --audit-level high`                                                                                                                   |
+| Unit tests (api)      | `test-unit`        | `pnpm --filter @kurul/api test:cov`                                                                                                               |
+| Unit tests (web)      | `test-unit`        | `pnpm --filter @kurul/web exec vitest run --coverage`                                                                                             |
+| Unit tests (pkgs)     | `test-unit`        | `pnpm --filter "./packages/*" test`                                                                                                               |
+| Unit tests (scripts)  | `test-unit`        | `pnpm test:scripts`                                                                                                                               |
+| Migration drift       | `test-integration` | `pnpm db:migrate`, then `pnpm db:drift` against the Postgres service container                                                                    |
+| Integration tests     | `test-integration` | `pnpm --filter @kurul/api test:e2e` against Postgres and Redis service containers                                                                 |
+| Build                 | `build`            | `pnpm build`                                                                                                                                      |
+| Image build + scan    | `image-scan`       | The three shipped images, then Trivy over each (see below)                                                                                        |
+| Compose + Caddy parse | `compose-config`   | `docker compose config -q` over both compose files, with and without the `demo` profile, and `caddy validate` over `docker/Caddyfile` (see below) |
+| **Gate** (required)   | `ci-ok`            | Passes only if `lint`, `test-unit`, `test-integration`, `build`, `image-scan` and `compose-config` all succeed (not skipped or cancelled)         |
 
-**All steps must pass before merge.** The gate job (`ci-ok`) is the single required status check
-configured in branch protection — if any upstream job fails, is skipped, or is cancelled, the
-gate fails. This provides two protections:
+The six jobs above the gate run in parallel and none of them `needs` another: `build` installs
+and generates the Prisma client on its own, and `test-integration` is the only job with Postgres
+and Redis service containers, so the unit suites in `test-unit` start without a container pull.
+The pipeline's wall time is therefore its longest job rather than the sum of them, and it is
+tracked against the OPS-10 row in
+[ROADMAP.md](../ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit).
+
+**All steps must pass before merge.** Branch protection on `main` and `develop` names two
+required contexts, `ci-ok` and `CodeQL`. `ci-ok` is the gate over this workflow: if any upstream
+job fails, is skipped, or is cancelled, the gate fails. `CodeQL` is its own workflow and its own
+context, required on both branches since the SEC-06 pass, which is why a fork PR can sit with
+CodeQL pending while everything in this table is already green. The gate provides two
+protections:
 
 1. **Correctness**: a job that never ran cannot pass the gate. Branch protection treats a
    _skipped_ required check as satisfied, which is how [#89](https://github.com/dravcore/kurul/pull/89)
    merged with `test` red and `build` skipped. `ci-ok` runs under `if: always()` and asserts
    every `needs.*.result` is exactly `success`, so `failure`, `skipped` and `cancelled` all
    fail the gate.
-2. **A stable contract with branch protection**: protection now names one context, `ci-ok`,
-   instead of tracking every job name. Adding, splitting or renaming a job is a `ci.yml` edit
-   with no settings change, and the failure mode of getting it wrong stays inside CI — the
-   workflow refuses to load an unknown `needs` entry, so nothing reports and the PR stays
-   blocked. Previously the same mistake left protection waiting on a context that no longer
-   existed.
+2. **A stable contract with branch protection**: protection names one context for this
+   workflow, `ci-ok`, instead of tracking every job name in it. Adding, splitting or renaming a
+   job is a `ci.yml` edit with no settings change, and the failure mode of getting it wrong
+   stays inside CI — the workflow refuses to load an unknown `needs` entry, so nothing reports
+   and the PR stays blocked. Previously the same mistake left protection waiting on a context
+   that no longer existed. `CodeQL` is deliberately the exception: it is a separate workflow
+   with its own schedule, so collapsing it under this gate would hide it.
 
 CI runs on pull requests to any branch (`pull_request.branches: ['**']`) and on pushes to
 `develop` and `main`. See [git-strategy.md](git-strategy.md#pull-request-process).
@@ -423,12 +542,28 @@ Two choices are worth knowing about:
   version anywhere would fail every pull request for something no pull request can do, and a
   check that is always red is a check nobody reads. What is left is the actionable set: a base
   image bump or a dependency bump.
-- **It runs beside `lint` and `test`, not after `build`.** The job is off the critical path on
-  purpose, so it costs runner minutes rather than pipeline wall time, and it reads a buildx
-  layer cache (`type=gha`) that the `develop` runs of this same workflow write.
+- **It runs beside `lint`, `test-unit`, `test-integration` and `build`, not after them.** The
+  job is off the critical path on purpose, so it costs runner minutes rather than pipeline wall
+  time, and it reads a buildx layer cache (`type=gha`) that only the `develop` and `main` runs
+  of this same workflow write. Pull request runs read that cache and write nothing, so their
+  own caches cannot crowd `develop`'s out of the repository's 10 GB cache allowance.
 
 Nothing is pushed: `push: false` with `load: true` keeps each image inside its own runner.
 Publishing stays in `release-images.yml`, behind a tag.
+
+### Compose and Caddyfile parse
+
+`compose-config` renders `docker-compose.yml` with `docker compose config -q`, once without a
+profile and once with `--profile demo`, then `docker-compose.dev.yml`, and runs `caddy validate`
+over `docker/Caddyfile` in the same `caddy:2-alpine` image the stack ships. The env file is
+`.env.example` plus the two keys that have no default (`POSTGRES_PASSWORD`,
+`BETTER_AUTH_SECRET`), which is the install [self-hosting.md](self-hosting.md) describes, so
+the job fails on what an operator would hit: a broken YAML anchor, a renamed Caddy directive,
+or a required-variable interpolation (`${VAR:?}`) that a plain `docker compose up -d` cannot
+satisfy. Compose interpolates the whole file before it filters services by profile, so that
+last one bites even inside a profiled service, which is how the `demo-reset` sidecar once broke
+every ordinary install on `develop`. The compose legs talk to no daemon, the whole job takes
+seconds, and it runs beside `lint` and the test jobs with no `needs:`.
 
 ### Browser e2e in CI
 
@@ -436,11 +571,16 @@ The browser suite runs in its own workflow,
 [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml), on a different schedule and
 **outside the `ci-ok` gate**:
 
-| Trigger                   | Why                                                                                                  |
-| ------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Nightly, 03:00 UTC        | Late enough to include the day's merges, early enough that a red run is waiting in the morning       |
-| Pull requests into `main` | Only `release/*` and `hotfix/*` open those, so this is exactly once per release candidate and hotfix |
-| `workflow_dispatch`       | On demand                                                                                            |
+| Trigger                          | Why                                                                                                             |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Nightly, 03:00 UTC, on `develop` | Where the day's merges land: late enough to include them, early enough that a red run is waiting in the morning |
+| Pull requests into `main`        | Only `release/*` and `hotfix/*` open those, so this is exactly once per release candidate and hotfix            |
+| `workflow_dispatch`              | On demand                                                                                                       |
+
+GitHub runs a scheduled workflow on the default branch, so the schedule is declared on `main`'s
+copy of the workflow and its checkout step points at `develop`; the run log prints the branch
+and commit that actually ran. `main` is not tested nightly on purpose: between releases it does
+not change, and the pull requests that change it already run the suite.
 
 It is not a required check on purpose. This suite starts Postgres, Redis, Mailpit, a compiled
 API and a production web build, then drives Chromium through all of it — the project's most

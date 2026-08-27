@@ -43,7 +43,7 @@ export function MailDisabledNotice(): React.ReactElement {
   const t = useTranslations('app.settings.members');
 
   return (
-    <div className="flex gap-2.5 rounded-[var(--radius-md)] border border-border bg-muted px-3 py-2.5">
+    <div className="flex gap-2.5 rounded-md border border-border bg-muted px-3 py-2.5">
       <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-warning" aria-hidden />
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-body font-strong text-foreground">{t('mailDisabledTitle')}</p>

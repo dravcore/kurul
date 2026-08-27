@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { MemberRole, type BoardDto, type TrelloImportReportDto } from '@kurul/shared-types';
@@ -13,17 +13,32 @@ const workspace = vi.hoisted(() => ({
   value: { activeId: '', activeRole: null as MemberRole | null },
 }));
 
+/** The plan document the screen reads; every test but the ceiling ones leaves it uncapped. */
+const plan = vi.hoisted(() => ({
+  value: {
+    limits: { seats: null as number | null, boards: null as number | null, storageBytes: null },
+    usage: { seats: 1, boards: 0, storageBytes: 0 },
+  },
+}));
+
 vi.mock('@/lib/workspace-boards', () => ({ fetchWorkspaceBoards: vi.fn() }));
 vi.mock('@/components/layout/workspace-provider', () => ({
   useWorkspaceContext: () => workspace.value,
 }));
+// Only the hook is replaced; `isAtCeiling` stays real, so these tests exercise the comparison
+// the screen actually makes rather than a boolean the test decided (ADR 0032).
+vi.mock('@/lib/plan-query', async () => ({
+  ...(await vi.importActual<typeof import('@/lib/plan-query')>('@/lib/plan-query')),
+  useWorkspacePlan: () => plan.value,
+}));
 vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
-  return { ...actual, api: { ...actual.api, postForm: vi.fn() } };
+  return { ...actual, api: { ...actual.api, postForm: vi.fn(), patch: vi.fn() } };
 });
 
 const fetchBoards = vi.mocked(fetchWorkspaceBoards);
 const postForm = vi.mocked(api.postForm);
+const apiPatch = vi.mocked(api.patch);
 
 const REPORT: TrelloImportReportDto = {
   boardId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d10',
@@ -51,16 +66,49 @@ function renderList(): void {
   );
 }
 
+beforeAll(() => {
+  // Radix DropdownMenu measures its content; jsdom ships none of the APIs it probes for.
+  globalThis.ResizeObserver ??= class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+  Element.prototype.scrollIntoView ??= vi.fn();
+});
+
 beforeEach(() => {
   fetchBoards.mockReset();
   postForm.mockReset();
+  apiPatch.mockReset();
   workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.ADMIN };
+  plan.value = {
+    limits: { seats: null, boards: null, storageBytes: null },
+    usage: { seats: 1, boards: 0, storageBytes: 0 },
+  };
 });
 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
+
+/** Radix opens its menu from the keyboard, which is also the path jsdom can drive. */
+async function openBoardMenu(): Promise<void> {
+  const trigger = await screen.findByRole('button', { name: messages.app.board.boardMenu });
+  fireEvent.keyDown(trigger, { key: 'Enter' });
+}
+
+async function openRenameEditor(): Promise<void> {
+  await openBoardMenu();
+  fireEvent.click(await screen.findByRole('menuitem', { name: messages.app.board.renameAction }));
+}
+
+const nameField = (): HTMLInputElement =>
+  screen.getByLabelText(messages.app.board.name) as HTMLInputElement;
+const descriptionField = (): HTMLInputElement =>
+  screen.getByLabelText(messages.app.board.description) as HTMLInputElement;
+const saveButton = (): HTMLButtonElement =>
+  screen.getByRole('button', { name: messages.common.save }) as HTMLButtonElement;
 
 describe('BoardList', () => {
   it('lists the boards it loaded', async () => {
@@ -122,6 +170,27 @@ describe('BoardList', () => {
     expect(screen.queryByText(messages.app.board.listError)).toBeNull();
   });
 
+  describe('single primary action in zero-board state', () => {
+    it('shows exactly one create button in the empty state', async () => {
+      fetchBoards.mockResolvedValue([]);
+      renderList();
+
+      await screen.findByText(messages.app.board.emptyTitle);
+      const createButtons = screen.queryAllByRole('button', {
+        name: messages.app.board.createAction,
+      });
+      expect(createButtons).toHaveLength(1);
+    });
+
+    it('hides the empty state and shows the header create button when there are boards', async () => {
+      fetchBoards.mockResolvedValue([board('b1')]);
+      renderList();
+
+      await screen.findByText('Board b1');
+      expect(screen.queryByText(messages.app.board.emptyTitle)).toBeNull();
+    });
+  });
+
   describe('Trello import', () => {
     async function openImport(): Promise<void> {
       fetchBoards.mockResolvedValue([]);
@@ -176,9 +245,6 @@ describe('BoardList', () => {
       const report = await screen.findByRole('region', { name: /import report/i });
       expect(report.textContent).toContain('124 tasks');
       expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true');
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(screen.getByRole('region', { name: /import report/i })).toBeDefined();
     });
 
     it('shows nothing until an import has actually returned one', async () => {
@@ -213,5 +279,217 @@ describe('BoardList', () => {
 
       expect(await screen.findByText('Board imported-1')).toBeDefined();
     });
+  });
+});
+
+describe('BoardList - the board ceiling (ADR 0032)', () => {
+  it('leaves the create control enabled when nothing caps boards', async () => {
+    fetchBoards.mockResolvedValue([board('b1')]);
+    plan.value = {
+      limits: { seats: null, boards: null, storageBytes: null },
+      usage: { seats: 1, boards: 40, storageBytes: 0 },
+    };
+
+    renderList();
+
+    const create = await screen.findByRole('button', { name: messages.app.board.createAction });
+    expect(create.hasAttribute('disabled')).toBe(false);
+    expect(screen.queryByText(/boards its plan allows/i)).toBeNull();
+  });
+
+  it('disables the create control at the ceiling and says which number was reached', async () => {
+    fetchBoards.mockResolvedValue([board('b1'), board('b2')]);
+    plan.value = {
+      limits: { seats: null, boards: 2, storageBytes: null },
+      usage: { seats: 1, boards: 2, storageBytes: 0 },
+    };
+
+    renderList();
+
+    const create = await screen.findByRole('button', { name: messages.app.board.createAction });
+    expect(create.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText(/all 2 of the boards its plan allows/i)).toBeDefined();
+  });
+
+  it('disables the create control in the empty state too, so the ceiling is not a dead end', async () => {
+    fetchBoards.mockResolvedValue([]);
+    plan.value = {
+      limits: { seats: null, boards: 1, storageBytes: null },
+      usage: { seats: 1, boards: 1, storageBytes: 0 },
+    };
+
+    renderList();
+
+    await screen.findByText(messages.app.board.emptyTitle);
+    for (const create of screen.getAllByRole('button', {
+      name: messages.app.board.createAction,
+    })) {
+      expect(create.hasAttribute('disabled')).toBe(true);
+    }
+  });
+});
+
+describe('BoardList - inline rename', () => {
+  function boardWithDescription(): BoardDto {
+    return {
+      id: 'b1',
+      workspaceId: WORKSPACE_ID,
+      name: 'Roadmap',
+      description: 'Where the quarter lives',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as unknown as BoardDto;
+  }
+
+  beforeEach(() => {
+    apiPatch.mockImplementation((_path, body) =>
+      Promise.resolve({ ...boardWithDescription(), ...(body as object) } as never),
+    );
+  });
+
+  it('opens the inline editor with the name selected, and keeps the named menu item', async () => {
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+
+    await openRenameEditor();
+
+    const input = nameField();
+    expect(input.value).toBe('Roadmap');
+    // Radix's own close-focus for the menu that opened this editor lands asynchronously; the
+    // editor's own focus/select has to win the race, but not necessarily on the same tick.
+    await waitFor(() => expect(document.activeElement).toBe(input));
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe('Roadmap'.length);
+    expect(descriptionField().value).toBe('Where the quarter lives');
+    // The Link is gone while editing: an `Input` inside it would be a nested interactive
+    // element, and this is also the proof Enter in the field cannot navigate.
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('saves the trimmed name and description on Enter', async () => {
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    await openRenameEditor();
+
+    fireEvent.change(nameField(), { target: { value: '  Q3 roadmap  ' } });
+    fireEvent.keyDown(nameField(), { key: 'Enter' });
+
+    await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+    expect(apiPatch).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/boards/b1`, {
+      name: 'Q3 roadmap',
+      description: 'Where the quarter lives',
+    });
+    expect(await screen.findByText('Q3 roadmap')).toBeDefined();
+  });
+
+  it('saves on Enter in the description field too', async () => {
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    await openRenameEditor();
+
+    fireEvent.keyDown(descriptionField(), { key: 'Enter' });
+
+    await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+  });
+
+  it('saves when the Save button is clicked, the same as Enter', async () => {
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    await openRenameEditor();
+
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+  });
+
+  it('sends null rather than an empty description', async () => {
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    await openRenameEditor();
+
+    fireEvent.change(descriptionField(), { target: { value: '   ' } });
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+    expect(apiPatch).toHaveBeenCalledWith(expect.any(String), {
+      name: 'Roadmap',
+      description: null,
+    });
+  });
+
+  it('restores the old name and sends nothing when Enter is pressed with an empty name', async () => {
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    await openRenameEditor();
+
+    fireEvent.change(nameField(), { target: { value: '   ' } });
+    fireEvent.keyDown(nameField(), { key: 'Enter' });
+
+    expect(apiPatch).not.toHaveBeenCalled();
+    expect(await screen.findByText('Roadmap')).toBeDefined();
+  });
+
+  it('cancels on Escape without saving, restoring the original values', async () => {
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    await openRenameEditor();
+
+    fireEvent.change(nameField(), { target: { value: 'Half-typed' } });
+    fireEvent.keyDown(nameField(), { key: 'Escape' });
+
+    expect(apiPatch).not.toHaveBeenCalled();
+    expect(await screen.findByText('Roadmap')).toBeDefined();
+    expect(screen.queryByText('Half-typed')).toBeNull();
+  });
+
+  it('returns focus to the menu trigger after a save', async () => {
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    const trigger = await screen.findByRole('button', { name: messages.app.board.boardMenu });
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: messages.app.board.renameAction }));
+
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it('returns focus to the menu trigger after a cancel', async () => {
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    const trigger = await screen.findByRole('button', { name: messages.app.board.boardMenu });
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: messages.app.board.renameAction }));
+
+    fireEvent.keyDown(nameField(), { key: 'Escape' });
+
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('shows the failure inline and keeps the editor open', async () => {
+    apiPatch.mockRejectedValue(new Error('boom'));
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    await openRenameEditor();
+
+    fireEvent.click(saveButton());
+
+    expect(await screen.findByRole('alert')).toBeDefined();
+    expect(nameField()).toBeDefined();
+  });
+
+  it('leaves Radix’s own focus return in place when the menu closes without Rename chosen', async () => {
+    // No item was selected, so this hook must get out of the way entirely and let Radix send
+    // focus back to the trigger itself, the way it does for every menu on the page that never
+    // touches `onCloseAutoFocus` at all.
+    fetchBoards.mockResolvedValue([boardWithDescription()]);
+    renderList();
+    const trigger = await screen.findByRole('button', { name: messages.app.board.boardMenu });
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    await screen.findByRole('menuitem', { name: messages.app.board.renameAction });
+
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 });

@@ -1,7 +1,7 @@
 {
   "name": "kurul",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Open-source Kanban-focused project management",
   "license": "AGPL-3.0-only",
   "packageManager": "pnpm@9.15.9",
@@ -27,6 +27,7 @@
     "openapi:check": "pnpm --filter @kurul/api openapi:check",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "knip": "knip",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -40,14 +41,15 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@next/eslint-plugin-next": "^16.0.0",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@next/eslint-plugin-next": "^16.3.2",
+    "@vitest/coverage-v8": "^4.1.11",
     "dotenv": "^17.4.2",
     "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
+    "knip": "6.32.2",
     "lint-staged": "^17.3.0",
     "prettier": "^3.5.3",
     "prisma": "^7.0.0",

@@ -263,3 +263,117 @@ them and lose the grouping the user made. One Trello checklist is one `Checklist
 | Flatten a card's checklists into one list                     | Discards the grouping the user made, and contradicts the reason ADR 0023 chose a multi-list model (`:122-127`)                                                            |
 | Store a raw hex for an unmapped Trello colour                 | `Label.color` stores a theme-resolved slot; a hex cannot be resolved by the dark theme, which defines the same slots at different values                                  |
 | Reject the whole file when a field is missing or oddly typed  | No field name here was verified against a real export, so this would turn every schema drift into a total failure instead of a report row                                 |
+
+## Amendment (2026-08-26): field length ceilings and a row cap (SEC-04)
+
+An audit finding (SEC-04) noted that this importer skipped the length checks every other write path
+applies. `Task.title`, `Task.description`, `Board.name`, `Board.description`, `Checklist.title`,
+`Column.name`, `Label.name`, `ChecklistItem.content` and `Attachment.url` all reach the database
+through `CreateTaskDto`, `CreateBoardDto`, `CreateChecklistDto`, `CreateColumnDto`,
+`CreateLabelDto`, `CreateChecklistItemDto` and `CreateAttachmentDto` on every other route, and each
+of those decorates its field with `@MaxLength`. The planner wrote `card.name`, `card.desc`, the
+export's own board name and description, `checklist.name`, `list.name`, `label.name`, a check item's
+`name` and an attachment's `url` straight through with no such ceiling, so a Trello export was the
+one door into this database those decorators did not guard. Nothing in the export was malicious to
+write this way; the risk was a board nobody could scroll and a database column holding more than the
+product ever intended one to hold.
+
+`trello-import-planner.ts` now clamps every one of those fields to the same constant the DTO uses.
+Each pair of DTOs (create and update) imports its ceiling from one file next to it, six files in all
+(`task/dto/task-limits.ts`, `board/dto/board-limits.ts`, `board/dto/column-limits.ts`,
+`label/dto/label-limits.ts`, `task/dto/checklist-item-limits.ts` and
+`attachment/dto/attachment-limits.ts`), and the planner imports the same six, so each number exists
+once. A task title or description that was cut is reported as one `(card, defaulted)` row, the same
+reason a substitution already uses elsewhere in this report (an unknown label colour, a defaulted
+column category): the card still imports, and the question the report answers is "why does my board
+look different", which a clamp answers as well as a colour substitution does. A checklist title or a
+checklist item's content that was cut is reported the same way, under `(checklist, defaulted)` and
+`(checklistItem, defaulted)`. A label name that was cut folds into the same `(label, defaulted)` row
+an unknown colour already produces, for the reason the Decision table gives for combining them: a
+label the user does not recognise is one problem, however many of its fields changed. An attachment
+URL that was cut is reported under `(attachment, defaulted)`. A column's name shares its report row
+with the category default every imported column already gets (`(column, defaulted)`, count equal to
+the number of columns): a second, separate row for the same column would double-count it, so the
+clamp changes what that row's sample text can say rather than adding a row of its own. The board's
+own name and description are clamped silently: there is no `board` scope in the closed vocabulary
+above, a board is one row rather than a class of rows, and a `(board, defaulted)` line that could
+only ever say "1" would answer nothing a user could act on, the same reasoning `trello-export.ts`
+already applies to the board's own description when it is unusable.
+
+Three honest limitations in the report this produces, rather than a fourth new skip reason. The
+brief for this amendment asked for a dedicated `truncated` reason; the branch reuses `Defaulted`
+instead, because the web report panel renders `t('skip.reason.' + group.reason)` from a fixed
+translation table (`apps/web/messages/{en,tr}.json`) that this worktree is not allowed to touch,
+and a new enum member with no matching key breaks that render. The consequence is that the
+existing `Defaulted` copy ("Kurul had no matching value, so the default was used") is now shown
+for five group kinds where nothing was defaulted and nothing failed to match, only cut: it
+misdescribes a clamp until a follow-up PR adds the `truncated` reason and both translations.
+
+Second, a clamped column name is reported only if it happens to land among the first
+`SKIP_SAMPLE_LIMIT` samples in `(column, defaulted)`, since that row's count is `columns.length`
+whether or not any name was cut and its samples are capped the same way every group's are; past
+that cap a clamped column name leaves no trace in the report at all.
+
+Third, `filename: safeDisplayName(attachment.name) || url.value` falls back to the URL (already
+clamped, up to `MAX_ATTACHMENT_URL_LENGTH`, 2048 characters) when a name is empty or cleans to
+nothing, which can store a `filename` past the 255 characters `CreateAttachmentDto` caps it at on
+every other route. `AttachmentService.createLink` builds its own `filename` the identical way
+(`safeDisplayName(dto.filename ?? '') || url`), so this is not the importer diverging from its
+HTTP twin, it is a pre-existing exception in both, and "every field the importer writes is held
+to its DTO ceiling" should be read with that one exception in mind.
+
+The same ceiling also bounds the _report_, not only the write. A row the planner drops rather than
+writes (an archived list or card, a card pointing at a label id the export does not contain, a
+rejected attachment, a checklist left off because its card was dropped) still quotes a name as a
+sample in the response body, and that name comes from the export, unclamped, just like the fields
+above. Every one of those sample sites clamps or cleans its text the same way the row it describes
+would have (the accepted card's own already-clamped title, in the label-id case; `safeDisplayName`
+for a rejected attachment; the column/checklist ceilings for a dropped list or checklist).
+
+One case has no row to borrow a ceiling from at all: an entry `readCard`, `readList`, `readLabel`
+or `readChecklist` rejects outright, for a missing `id` or a field of the wrong type, never
+becomes a plan row, so `trello-export.ts` reports it with whatever string sat in its `name` field,
+unclamped, and there is no accepted row's ceiling for the planner to reuse. That is the door the
+per-site clamps above do not cover, and it is closed one level lower instead: `SkipCollector`
+(`import-skip.ts`) clamps every sample to a flat `SKIP_SAMPLE_MAX_LENGTH` on the way into the
+report, whichever call site handed it the string, present or future. The per-site clamps above are
+still worth doing, since each cuts a name to the length the row it describes would actually have
+had rather than to the collector's one flat ceiling, but they are belt-and-braces now, not the
+only guard: a report about an oversized field cannot itself carry an unbounded string back to the
+caller, on any path.
+
+A second gap the same finding named: nothing bounded how many _cards or lists_ an export could
+ask this API to plan (the two row kinds a real export is dominated by, and the two the finding
+named). `TRELLO_IMPORT_MAX_BYTES` bounds the parsed object graph's size, not the row count, and
+a small card can be a few dozen bytes, so a 20 MiB export can still be several hundred thousand
+tiny cards. `TrelloImportService` now checks the reader's `lists.length` and `cards.length`
+against `TRELLO_IMPORT_MAX_CARDS` (default 50000) and `TRELLO_IMPORT_MAX_LISTS` (default 5000)
+before the planner runs and before the transaction opens; an export over either cap answers `400`
+and writes nothing. Those are the reader's counts, not the export's raw arrays: an archived list
+or card is still in them, since the planner is what drops those, not the reader, but an entry the
+reader could not parse into a row at all (no `id`, or a field of the wrong type) is already gone,
+because that is what makes it a reader issue rather than a row in the first place. That still
+covers the cost these ceilings exist for, heap held by the parsed graph and the length of the
+writer's `createMany` sequence, since both are paid for every row the reader kept, whether or not
+the planner goes on to write it.
+
+Checklists, check items, labels, task-label rows and attachments have no ceiling of their own: a
+card carries as many of each as its export does, uncapped, so an export with few cards and lists
+but a very large number of checklist items would still plan and chunk that many rows inside the
+one transaction. `TRELLO_IMPORT_MAX_CARDS` and `TRELLO_IMPORT_MAX_LISTS` bound the two row kinds
+SEC-04 named and the two a real export scales with; a ceiling on the other five is left to a
+follow-up if an export turns up that needs one.
+
+`readTrelloImportMaxCards` and `readTrelloImportMaxLists` throw a plain `Error` on a
+misconfigured value, the same convention `readTrelloImportMaxBytes` already used: a bad value is
+a `500` on the next import, not a refusal to boot. That is a deliberate departure from ADR 0032's
+plan-limit ceilings, which refuse at startup instead, because those are read once by
+`readInstancePlanLimits()` at boot and never again, while every import limit here is already
+read per request for the reason given in `import-config.ts` (a test, or an operator restart, must
+see the value that is actually set). Boot-time validation was not added for these two alongside
+it, so a misconfigured `TRELLO_IMPORT_MAX_CARDS` fails the same way its byte-ceiling sibling
+already did rather than gaining a new failure mode of its own.
+
+Neither change touches the Decision section above: the skip vocabulary is unchanged, the
+structure table is unchanged, and the write is still one atomic transaction over a plan built
+with no database access.

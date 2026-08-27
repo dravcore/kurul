@@ -1,6 +1,7 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { NotificationType } from '@kurul/shared-types';
 import { Queue, Worker, type Job } from 'bullmq';
+import { closeWorkerWithinTimeout } from '../common/close-worker';
 import { envString } from '../common/env';
 import { captureServerError } from '../common/observability/sentry';
 import { parseRedisUrl, type RedisConnectionOptions } from '../common/redis-url';
@@ -12,9 +13,9 @@ const QUEUE_NAME = 'due-soon';
 const JOB_NAME = 'scan-due-soon';
 const JOB_ID = 'due-soon-scan';
 const REPEAT_EVERY_MS = 15 * 60 * 1000;
-export const DUE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DUE_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Page size for the due-task scan — bounds memory/row-count per query instead of loading the whole window at once. */
-export const SCAN_BATCH_SIZE = 500;
+const SCAN_BATCH_SIZE = 500;
 /**
  * Attempts BullMQ makes at one scheduled run before giving up on it (the first try plus
  * two retries). Without this the queue default is a single attempt, so a scan that lands on
@@ -31,6 +32,14 @@ const JOB_ATTEMPTS = 3;
  */
 const JOB_BACKOFF_DELAY_MS = 30_000;
 
+/**
+ * Minimum time between reports (WARN log + Sentry capture) for a Redis connection error on
+ * this worker's queue or worker client. ioredis retries a broken connection on its own and
+ * re-emits `error` on every failed attempt, so without this a single outage would report once
+ * per retry instead of once for the outage: same shape as `AUTH_RATE_LIMIT_REPORT_DAMPEN_MS`.
+ */
+const REDIS_ERROR_REPORT_DAMPEN_MS = 60 * 1000;
+
 type ScanTaskRow = {
   id: string;
   title: string;
@@ -40,10 +49,11 @@ type ScanTaskRow = {
 };
 
 @Injectable()
-export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
+export class DueSoonWorker implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(DueSoonWorker.name);
   private queue: Queue | null = null;
   private worker: Worker | null = null;
+  private lastRedisErrorReportedAt = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -68,6 +78,13 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
 
     this.queue = new Queue(QUEUE_NAME, { connection });
     this.worker = new Worker(QUEUE_NAME, (job) => this.process(job), { connection });
+
+    // `queue.on('error')` and `worker.on('error')` fire on the connection itself (a Redis
+    // outage, a refused reconnect), distinct from `worker.on('failed')` below, which is a
+    // single job's outcome. Without a listener here, BullMQ's own fallback is `console.error`
+    // on an EventEmitter, invisible to the JSON log format and to Sentry (audit BE-11).
+    this.queue.on('error', (error) => this.onRedisError('queue', error));
+    this.worker.on('error', (error) => this.onRedisError('worker', error));
 
     this.worker.on('failed', (job, error) => {
       const message = error instanceof Error ? error.message : String(error);
@@ -119,9 +136,28 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`due-soon worker registered (every ${REPEAT_EVERY_MS / 60000}m)`);
   }
 
-  async onModuleDestroy(): Promise<void> {
-    await this.worker?.close();
+  /** Same phase and the same bounded close as the retention sweep - `common/close-worker.ts`. */
+  async onApplicationShutdown(): Promise<void> {
+    await closeWorkerWithinTimeout(this.worker, this.logger, 'due-soon worker');
     await this.queue?.close();
+  }
+
+  /** Reports a Redis connection error from the queue or the worker, rate-limited. */
+  private onRedisError(source: 'queue' | 'worker', error: Error): void {
+    this.logger.warn(`due-soon ${source} Redis error: ${error.message}`);
+    if (this.shouldReportRedisError()) {
+      captureServerError(error, { path: `due-soon-worker-${source}` });
+    }
+  }
+
+  /** Claims the report slot for a Redis connection error, or says one was claimed too recently. */
+  private shouldReportRedisError(): boolean {
+    const now = Date.now();
+    if (now - this.lastRedisErrorReportedAt < REDIS_ERROR_REPORT_DAMPEN_MS) {
+      return false;
+    }
+    this.lastRedisErrorReportedAt = now;
+    return true;
   }
 
   /**
@@ -256,7 +292,7 @@ export class DueSoonWorker implements OnModuleInit, OnModuleDestroy {
     const rows: Array<{
       workspaceId: string;
       userId: string;
-      type: string;
+      type: NotificationType;
       taskId: string;
       payload: { title: string; dueDate: string; type: string };
     }> = [];

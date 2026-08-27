@@ -21,6 +21,27 @@ export function cardHandle(scope: Page | Locator, title: string): Locator {
 }
 
 /**
+ * The `Add task` button at the foot of a column.
+ *
+ * Tracks `app.board.task.createAction` in `apps/web/messages/en.json`, by the same reasoning
+ * as `connectionLostRow` below: the suite reads no catalogue.
+ */
+export function addTaskButton(section: Locator): Locator {
+  return section.getByRole('button', { name: 'Add task', exact: true });
+}
+
+/**
+ * The inline composer that replaces that button while it is open (ADR 0035).
+ *
+ * Addressed by `data-slot` rather than by role: a `<form>` with no accessible name is exposed
+ * as no role at all, so there is nothing to name it by, and its two controls are reached
+ * through it rather than through the column so a sweep cannot pick up the rest of the foot.
+ */
+export function taskComposer(section: Locator): Locator {
+  return section.locator('form[data-slot="task-composer"]');
+}
+
+/**
  * The titles of the cards currently rendered in <column>, top to bottom.
  *
  * Read off the grip buttons' `aria-label` rather than the card text because a card's visible
@@ -55,16 +76,101 @@ export async function expectCardOrder(
 }
 
 /**
+ * Longer than `playwright.config.ts`'s global 10s `expect.timeout` on purpose: that ceiling is
+ * sized for the realtime path's worst *steady-state* case (a debounce plus a refetch), not for
+ * the handshake this precondition waits on. On a cold CI runner the socket's first connect can
+ * still be mid-flight — TLS plus the Socket.io handshake plus the `board:join` round trip,
+ * queued behind whatever else is starting up — well past 10s without the join having failed or
+ * even backed off once (`lib/socket.ts`'s reconnection backoff only engages after a failed
+ * attempt). Failing this precondition on a slow-but-live socket was never the regression this
+ * suite is watching for; every scenario's own assertions after `waitForBoardReady` still run
+ * under the tighter global timeout, so a genuinely hung join is still caught, just given room
+ * to be slow rather than merely wrong.
+ */
+const BOARD_READY_TIMEOUT_MS = 25_000;
+
+/**
+ * The board's connection row, which is the application's own word for "the room is not joined
+ * yet": it is rendered until the `board:join` ack comes back `ok`.
+ *
+ * One definition, because `toBeHidden()` passes instantly on a locator that matches nothing, so
+ * a copy of this string left behind by a rewording turns a real gate into a no-op with no test
+ * failing. It has to track `app.board.connectionLost` in `apps/web/messages/en.json`; the suite
+ * reads no catalogue, by the same reasoning as the note at the top of this file.
+ */
+export function connectionLostRow(page: Page): Locator {
+  return page.getByText('Connection lost, changes may not be showing');
+}
+
+/**
  * Waits until the board has painted and its socket has joined the board room.
  *
  * The room join matters even for the tests that never assert on realtime: joining acks with a
  * full resync, and a resync landing in the middle of a drag assertion is a race the suite
- * would otherwise have to out-run. `Reconnecting…` is the application's own word for "the
- * room is not joined yet" — it is rendered until the `board:join` ack comes back `ok`.
+ * would otherwise have to out-run.
  */
 export async function waitForBoardReady(page: Page): Promise<void> {
-  await expect(column(page, 'To Do')).toBeVisible();
-  await expect(page.getByText('Reconnecting…')).toBeHidden();
+  await expect(column(page, 'To Do')).toBeVisible({ timeout: BOARD_READY_TIMEOUT_MS });
+  await expect(connectionLostRow(page)).toBeHidden({ timeout: BOARD_READY_TIMEOUT_MS });
+}
+
+/** What `watchSocketHandshake` collected off the wire, for a test to assert on. */
+export type SocketHandshakeReport = {
+  /** Namespace CONNECT packets (`40`) this page sent, per connection. */
+  connectPacketsPerConnection: number[];
+  /** Room-join acks that came back denied, as the error strings the server sent. */
+  deniedJoins: string[];
+};
+
+/**
+ * Records the Socket.io frames a page exchanges, so a test can assert on the handshake itself
+ * rather than only on what it eventually looked like.
+ *
+ * `waitForBoardReady` catches a broken handshake, but only as a symptom and only when it loses
+ * a race — which is how the two defects behind it survived: on a developer's machine the room
+ * was joined before either could bite, and the nightly failed on a fixed commit roughly every
+ * other night. Reading the frames turns both into assertions that hold every run:
+ *
+ * - **One CONNECT packet per connection.** `connectSocket()` opening an already-opening socket
+ *   made socket.io-client send `40` twice; Socket.io 4.x reads the second one as an invalid
+ *   state and closes the whole client, killing the connection mid-handshake.
+ * - **No denied join.** Authenticating the handshake in an async `connection` hook let
+ *   `board:join` be answered `unauthenticated` before the session read landed — a denial the
+ *   client never retried, so the connection row stayed on screen for the life of the tab.
+ *
+ * Call it before the navigation that opens the socket; the returned reader may be read at any
+ * point after.
+ */
+export function watchSocketHandshake(page: Page): () => SocketHandshakeReport {
+  const connectPacketsPerConnection: number[] = [];
+  const deniedJoins: string[] = [];
+
+  page.on('websocket', (ws) => {
+    if (!ws.url().includes('/socket.io/')) return;
+    const index = connectPacketsPerConnection.push(0) - 1;
+
+    ws.on('framesent', (frame) => {
+      // Engine.io text frames: `40` is CONNECT for the default namespace, `40/nsp,` for a
+      // named one. Anything longer starting `40{` is the same packet carrying auth data.
+      if (/^40(\{|$)/.test(frame.payload.toString())) {
+        connectPacketsPerConnection[index] = (connectPacketsPerConnection[index] ?? 0) + 1;
+      }
+    });
+
+    ws.on('framereceived', (frame) => {
+      // An ack is `43<id>[payload]`; the joins are the only acked emits the board makes.
+      const match = /^43\d*(\[.*\])$/s.exec(frame.payload.toString());
+      if (!match?.[1]) return;
+      try {
+        const [ack] = JSON.parse(match[1]) as Array<{ ok?: boolean; error?: string } | undefined>;
+        if (ack && ack.ok !== true) deniedJoins.push(ack.error ?? 'unknown');
+      } catch {
+        // Not JSON we understand; the frame assertions below only care about the ones we do.
+      }
+    });
+  });
+
+  return () => ({ connectPacketsPerConnection, deniedJoins });
 }
 
 /**
@@ -77,10 +183,10 @@ export async function waitForBoardReady(page: Page): Promise<void> {
  *    like a passing one right up until the order assertion. The grip is a `<button
  *    type="button">` and pointer listeners sit on the wrapper both share, so the drag starts
  *    either way — only the failure mode differs.
- * 2. **A move past the activation distance before anything else.** The PointerSensor is
- *    configured with `activationConstraint: { distance: 6 }`, so a `dragTo()` or a single
- *    jump to the destination never starts a drag at all: dnd-kit sees one pointer event, not
- *    a gesture.
+ * 2. **A move past the activation distance before anything else.** The mouse half of the
+ *    board's sensors is a `MouseSensor` with `activationConstraint: { distance: 6 }`, so a
+ *    `dragTo()` or a single jump to the destination never starts a drag at all: dnd-kit sees
+ *    one event, not a gesture.
  * 3. **Coordinates measured before the press.** dnd-kit's sortable snapshots every
  *    droppable's rect at drag start and detects collisions against that snapshot, so the
  *    pre-drag layout is the correct frame of reference — even though cards visibly slide out
@@ -112,15 +218,17 @@ export async function dragCardOnto(
 /**
  * Drags one card onto another with a **finger**, and waits for the drop to be applied.
  *
- * Everything `dragCardOnto` says about coordinates and the activation distance holds here
- * too. Two things are different, and both are the point of having a second helper:
+ * Everything `dragCardOnto` says about coordinates holds here too. Three things are different,
+ * and they are the point of having a second helper:
  *
  * 1. **Real touch events, dispatched over CDP.** `page.mouse` in a `hasTouch` context still
  *    produces *mouse* events, and a mouse event is exactly what a phone does not send.
- *    `Input.dispatchTouchEvent` is what makes Chromium synthesise `pointerdown` with
- *    `pointerType: 'touch'` — which is the input dnd-kit's `PointerSensor` has to cope with,
- *    and the one where `touch-action` decides whether the gesture becomes a drag or a scroll.
- * 2. **The grip, and only the grip.** On touch the card body belongs to the column's
+ *    `Input.dispatchTouchEvent` is what reaches the board's `TouchSensor`, and it is where
+ *    `touch-action` decides whether the gesture becomes a drag or a scroll.
+ * 2. **A held press, not a distance.** The touch sensor activates on a 250ms hold inside a 5px
+ *    tolerance, so the finger waits where it landed instead of crossing a threshold first. That
+ *    is what leaves a plain swipe over a card body to the column's scroller.
+ * 3. **The grip, and only the grip.** On touch the card body belongs to the column's
  *    scroller: the wrapper carrying dnd-kit's listeners has no `touch-action` of its own, so
  *    the browser claims a vertical drag there and cancels the pointer. The grip declares
  *    `touch-action: none` (`components/task/sortable-task-card.tsx`) and is the one place the
@@ -147,7 +255,11 @@ export async function touchDragCardOnto(
   };
 
   await touch('touchStart', from);
-  // Past the 6px activation distance first, in small steps, exactly as the mouse helper does.
+  // The long press. The touch sensor activates on a 250ms hold rather than on distance, and
+  // cancels if the finger travels more than 5px before that timer fires, so the finger stays
+  // exactly where it landed until the delay has passed and only then does the drag begin. A move
+  // sent any earlier is a scroll gesture, which is the whole point of the delay.
+  await page.waitForTimeout(300);
   await touch('touchMove', { x: from.x, y: from.y + 12 });
   const steps = 16;
   for (let step = 1; step <= steps; step += 1) {

@@ -2,7 +2,10 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { InstanceConfigDto } from '@kurul/shared-types';
 import { InstanceConfigSchema } from '../openapi/schemas/instance.schema';
+import { signUpEnabled } from '../auth/sign-up-policy';
+import { demoConfig } from '../demo/demo-mode';
 import { MailService } from '../mail/mail.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { StorageService } from '../storage/storage.service';
 
 /**
@@ -40,6 +43,13 @@ import { StorageService } from '../storage/storage.service';
  * left unconfigured. The moment a signed-out screen needs a flag from here, that is a
  * deliberate change to this comment and not an oversight.
  *
+ * `signUpEnabled` is the first field a signed-out screen could want, and it does not cross that
+ * line: the register page learns the answer from the `403` its own submit receives
+ * (`error: "Sign-up Disabled"`, written at the Better Auth mount), which is the one refusal a
+ * signed-out client is entitled to. The field here is for the signed-in surfaces that ask
+ * before offering something, such as a members screen deciding whether "invite a teammate
+ * who has no account yet" is a sentence that can come true on this instance.
+ *
  * There is no role gate either, and no `:workspaceId`: nothing in the document varies by
  * tenant, so the workspace scoping rule in `docs/api-conventions.md` does not apply.
  *
@@ -52,6 +62,7 @@ export class InstanceConfigController {
   constructor(
     private readonly mail: MailService,
     private readonly storage: StorageService,
+    private readonly planLimits: PlanLimitsService,
   ) {}
 
   /**
@@ -59,6 +70,10 @@ export class InstanceConfigController {
    * reads a field off a transport that is built once per process, and `attachmentsEnabled`
    * reads the capability bit off a storage backend built the same way — and a cache would only
    * add a second copy of the truth that can disagree with the transport actually in use.
+   *
+   * `demo` is the one field that is not constant for the life of the process: `nextResetAt`
+   * moves to the following boundary every interval. That is another reason not to memoize:
+   * a cached document would pin the banner's countdown to whenever the first caller asked.
    */
   @ApiOperation({
     summary: 'Read what this deployment is configured to do',
@@ -74,6 +89,14 @@ export class InstanceConfigController {
     return {
       mailEnabled: this.mail.isEnabled(),
       attachmentsEnabled: this.storage.persistsFiles,
+      // Read from the environment on every call, like `demo`: the same function the Better
+      // Auth mount consults, so the document and the refusal cannot disagree.
+      signUpEnabled: signUpEnabled(),
+      demo: demoConfig(),
+      // Instance ceilings only. A workspace's own resolved numbers, and what it is using, are
+      // tenant state and are served from `GET /workspaces/{workspaceId}/plan` (ADR 0032).
+      // This document is the same for every caller by definition.
+      planLimits: this.planLimits.instanceCeilings(),
     };
   }
 }

@@ -5,7 +5,7 @@ import { envBool, envInt, envString, isTestEnv } from '../common/env';
 
 export const TELEMETRY_ENABLED_ENV = 'TELEMETRY_ENABLED';
 export const TELEMETRY_ENDPOINT_ENV = 'TELEMETRY_ENDPOINT';
-export const TELEMETRY_TIMEOUT_ENV = 'TELEMETRY_TIMEOUT_MS';
+const TELEMETRY_TIMEOUT_ENV = 'TELEMETRY_TIMEOUT_MS';
 
 /**
  * How long the single outbound request may take before it is abandoned.

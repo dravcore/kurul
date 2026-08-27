@@ -114,14 +114,31 @@ describe('TaskCommentsSection', () => {
     renderSection();
     const textarea = composer();
 
-    expect(textarea.getAttribute('aria-expanded')).toBe('false');
+    expect(textarea.getAttribute('role')).toBeNull();
+    expect(textarea.getAttribute('aria-controls')).toBeNull();
     expect(screen.queryByRole('listbox')).toBeNull();
 
     type(textarea, 'ship it @Ah');
 
-    expect(textarea.getAttribute('aria-expanded')).toBe('true');
+    expect(textarea.getAttribute('aria-controls')).toBe(screen.getByRole('listbox').id);
+    expect(textarea.getAttribute('aria-haspopup')).toBe('listbox');
     const options = screen.getAllByRole('option');
     expect(options.map((option) => option.textContent)).toEqual(['Ahmet Demir']);
+  });
+
+  /** ARIA in HTML gives <textarea> no allowed role (axe aria-allowed-role), so the field stays
+   * a plain textbox and its open state travels through aria-controls instead. */
+  it('stays a textbox: a textarea takes no ARIA role', () => {
+    renderSection();
+    const textarea = composer();
+
+    expect(textarea.getAttribute('role')).toBeNull();
+    expect(textarea.hasAttribute('aria-expanded')).toBe(false);
+
+    type(textarea, 'ship it @Ah');
+
+    expect(textarea.getAttribute('role')).toBeNull();
+    expect(textarea.hasAttribute('aria-expanded')).toBe(false);
   });
 
   it('moves the active option with the arrow keys while focus stays on the textarea', () => {
@@ -168,22 +185,18 @@ describe('TaskCommentsSection', () => {
     expect(textarea.getAttribute('aria-activedescendant')).toBeNull();
   });
 
-  it('closes the picker on Escape without letting the panel see the key', () => {
+  it('closes the picker on Escape and marks the key as dealt with', () => {
     renderSection();
     const textarea = composer();
     type(textarea, '@y');
 
-    // The task panel closes itself on a window-level Escape, so the picker has to stop it.
-    const onWindowEscape = vi.fn();
-    window.addEventListener('keydown', onWindowEscape);
-    try {
-      fireEvent.keyDown(textarea, { key: 'Escape' });
-    } finally {
-      window.removeEventListener('keydown', onWindowEscape);
-    }
+    // The task panel closes itself on a window-level Escape and skips the ones a layer above
+    // it has already answered (use-task-panel-focus.ts), which is what this marks.
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    fireEvent(textarea, escape);
 
     expect(screen.queryByRole('listbox')).toBeNull();
-    expect(onWindowEscape).not.toHaveBeenCalled();
+    expect(escape.defaultPrevented).toBe(true);
   });
 
   it('submits the trimmed body and clears the draft', async () => {

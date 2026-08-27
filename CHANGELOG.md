@@ -7,6 +7,1189 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-27
+
+### Added
+
+- **A task is created where it lands: the column foot now opens a title field instead of a
+  dialog.** `Add task` at the foot of a column turns into an inline composer
+  (`components/board/task-composer.tsx`, [ADR 0035](docs/decisions/0035-inline-task-composer.md)):
+  `Enter` creates the task and keeps the caret in the field, so a triage session is one key per
+  card; `Escape` closes it and hands focus back to the button that opened it, and so does leaving
+  an empty field when focus went nowhere; clicking away onto another control closes the composer
+  but leaves focus where the reader put it; a typed title is never discarded by a stray click.
+  `Open details` creates the same task and opens its panel, which is where every field the row
+  does not collect already lives. While the request is in flight the field goes `readOnly` rather
+  than `disabled`, so focus stays where the reader put it. `c` anywhere on the board
+  (`use-create-task-shortcut.ts`) opens the composer, or refocuses it if it is already open, and
+  is ignored inside a field, a dialog or the task panel, and everywhere below 48rem while the
+  panel is covering the board.
+
+- **A 2px copper rail marks where a dragged card will land.** Both a mouse drag and a keyboard
+  drag now draw the insertion slot: within a column dnd-kit's displacement opens the
+  card-height gap and the rail marks its leading edge, and across columns the rail alone marks
+  the point (nothing shifts). It is keyed on the drop column computed in `onDragOver`
+  (`use-board-task-dnd.ts`), not on `isOver`, because a keyboard drag never makes a column the
+  droppable; the destination column takes the `--signature-subtle` wash and an empty column
+  keeps its solid box. `docs/design.md` §5 records both halves.
+
+- **The column strip is one tab stop, and a phone gets a board it can swipe.** The board is a
+  composite widget: exactly one column heading is at `tabIndex` 0 and `Home`, `End` and
+  `Ctrl`+arrows rove between them (`board-canvas.tsx`), with the strip scrolled so the focused
+  column clears the edge mask instead of sitting under it, and the mask itself cleared at
+  whichever edge has nothing left behind it. Below 48rem a column is 85vw and the strip snaps,
+  so a swipe always lands on one column; the snap is released mid-drag, since dnd-kit crosses
+  columns by scrolling that same element. A touch drag starts from a 250ms press on the grip
+  with 5px of tolerance, which leaves a swipe over the card body to the column's scroller, and
+  a mouse drag still starts from 6px with no delay.
+
+- **A card someone else moves or edits says so for a moment.** A `task:moved` or `task:updated`
+  frame from another member's browser leaves the card it touched wearing a `--signature-subtle`
+  ground that fades back to the card's own over 1200ms (`use-board-realtime.ts`, the
+  `task-card-remote-change` keyframe in `app/globals.css`), so a row that changed under the
+  reader's hands is not a silent redraw. On the selected card, whose resting ground is already
+  that tint, the same keyframe runs from `--accent` and settles on the tint, so the mark is
+  visible there too. It is colour and nothing else, which is what reduced motion keeps rather
+  than removes, and under `forced-colors: active` it takes a dotted `Highlight` border, distinct
+  from the solid one selection wears. Your own edits are never marked: the board tells its own
+  echo apart by actor.
+
+- **Task activity feed now records label attach and detach.** Attaching or detaching a label on
+  a task writes a `task.label_added` / `task.label_removed` row inside the same transaction as
+  the join-row write, following the pattern `task.assigned` / `task.unassigned` already use on
+  the sibling assignee sub-resource. The payload is a snapshot (`labelId`, `name`, `color`)
+  taken at write time, so the row still describes what happened after the label is renamed,
+  recolored or deleted. Neither type joins `AUDIT_ACTIVITY_TYPES`: like `task.assigned` and
+  `comment.created`, this is a content event, not one an incident query needs to see. The web
+  activity renderer stays untouched here, mid its own rework; an unrecognised type already falls
+  back to a generic line, so the feed keeps reading sensibly until the sentence for these two
+  types lands in a follow-up UI PR. Closes #39.
+
+- **Password reset by email: a forgotten password is now recovered by the person who forgot it.**
+  "Forgot your password?" on the sign-in screen leads to `/forgot-password`, which asks for an
+  address and mails a single-use link good for one hour; the link lands on `/reset-password`,
+  where a new password is chosen. Until now the only way back into a locked-out account was an
+  instance admin deleting it, which destroyed the workspace memberships along with it.
+
+  The request endpoint answers the same `200` and the same body for an address with no account
+  as for one with an account, so it cannot be used to find out who has an account here, and
+  Better Auth's built-in `3 / 60s` rule already caps it. Spending the link revokes every session
+  the account held, which is what makes a reset a way to take an account back and not only a way
+  to remember it; a spent or expired link is refused and says so, rather than failing silently.
+  The email is written in the recipient's language, EN and TR, from the same template shape the
+  verification mail uses. Delivery is a hard requirement: with `SMTP_HOST` unset the whole
+  message including the link goes to the API log instead, which is workable on a solo install
+  and is not a recovery path for anyone else, see
+  [self-hosting](docs/self-hosting.md#email-smtp). On a `DEMO_MODE` instance the demo account
+  is skipped, since its password is published and a reset would only lock every visitor out.
+
+  The emailed link is the first URL this API serves with a live secret in its path, so the JSON
+  access log now writes it as `/auth/reset-password/:token`. A reverse proxy of your own in
+  front of it still logs the URL it was asked for unless you filter that route out, see
+  [self-hosting](docs/self-hosting.md#bringing-your-own-reverse-proxy).
+
+- **`SIGNUP_ENABLED`: a switch that closes registration on a self-hosted instance.** Until now
+  the only way to stop strangers registering on an internet-facing install was to pin
+  `PLAN_MAX_USERS` at the current head count, which blocks the operator's own invitees along
+  with everyone else and drifts the moment an account is deleted. `SIGNUP_ENABLED=false` refuses
+  `POST /auth/sign-up/email` with `403` and `error: "Sign-up Disabled"` whatever the count is,
+  in the same hand-written envelope the plan ceiling uses at the Better Auth mount (`requestId`
+  included), and writes no row. Unset or `true` is open, so every existing install runs exactly
+  as before. It is also read once at boot, alongside `DEMO_MODE`, so a spelling the boolean
+  parser cannot read (`SIGNUP_ENABLED=fasle`) refuses to start the container, the bargain the
+  `PLAN_MAX_*` ceilings already make: below the Nest router no exception filter is listening, so
+  the alternative is the one route the switch governs hanging with no response at all. Like the ceiling it refuses sign-up only: signing in, verifying an address and
+  everything else under `/auth` stay open, so closing it never locks out the people already on
+  the instance. `GET /config` publishes it as `signUpEnabled`, read from the same function the
+  mount consults so the document and the refusal cannot disagree. It is independent of
+  `DEMO_MODE`, which keeps registration open on the demo host. The row lives beside
+  `PLAN_MAX_USERS` in `.env.example`, is forwarded by `docker-compose.yml`, and is documented
+  next to the plan ceilings in [self-hosting.md](docs/self-hosting.md). An invite-only mode
+  (accept the sign-up when a pending invitation names the address) is a follow-up: the mount
+  runs ahead of the body parsers and never sees the sign-up email, so that mode has to live in
+  a Better Auth database hook with the envelope trade the mount's comment describes.
+
+- **ADRs 0033 and 0034, proposed: webhook delivery and hosted billing.** The two undecided pieces of
+  API 1.0 are written down as records rather than as roadmap rows, and both merge as **Proposed**:
+  they exist to be read and argued before either slice starts, and nothing in the running product
+  changes yet. [ADR 0033](docs/decisions/0033-webhook-delivery-and-failure-policy.md) puts webhook
+  endpoints on the workspace instead of in the operator's environment, so the feature exists for a
+  hosted customer and not only for a self-hoster, and settles what follows from that: three events
+  with `task.completed` defined as a move into a completed column, a signed envelope carrying a
+  `/v1` `TaskDto`, a `WebhookDelivery` outbox row written in the same transaction as the activity
+  row, six attempts and then a disabled endpoint, and an egress policy that refuses private
+  addresses and does not follow redirects.
+  [ADR 0034](docs/decisions/0034-hosted-billing-and-plan-assignment.md) gives
+  `Workspace.planLimits` the writer it has never had: a merchant of record (Paddle first, with
+  Stripe and Better Auth's Stripe plugin rejected in writing), one `Subscription` row per workspace,
+  a plan catalogue in code, an entitlement write that is a single transaction with its idempotency
+  ledger inside it, a grace period that deletes nothing, and a test proving that an instance with
+  `BILLING_PROVIDER` unset runs exactly what it runs today.
+
+- **Plan limits: ceilings on seats, boards, workspaces and accounts, unlimited until an operator
+  sets one.** Four variables (`PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
+  `PLAN_MAX_WORKSPACES`, `PLAN_MAX_USERS`) put a number on quantities the product never bounded.
+  All four are unset in `.env.example` and unset means unlimited, so an instance that ignores
+  this block runs exactly the code it ran before: with no ceiling configured, no counting query
+  is issued at all. A written `0` also means unlimited, the spelling the attachment quotas
+  already use, and a negative or non-integer value refuses to boot. They deliberately have no
+  defaults where the byte quotas grew them in
+  [ADR 0027](docs/decisions/0027-attachment-quotas.md): a full disk takes Postgres down with it,
+  while a tenth board costs one row, and a default that starts refusing the eleventh member of
+  an existing team is a regression nobody configured.
+
+  One resolver answers every ceiling question, the ADR 0027 byte quotas included, which is what
+  lets a single workspace carry ceilings of its own in the new `Workspace.planLimits` JSON
+  column (absent key defers to the instance, `null` and `0` mean unlimited). That column is the
+  seam hosted billing ([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md))
+  writes when it assigns a plan, and it takes a new ceiling without a migration.
+
+  A seat is a member **or** an invitation still pending, so an admin at the ceiling cannot queue
+  up acceptances past it, and the refusal reaches the person who can free a seat rather than the
+  invitee clicking a link days later; accepting counts members only, since the invitation being
+  accepted is already holding its seat. `PLAN_MAX_USERS` refuses sign-up and nothing else:
+  signing in and verifying an address stay open at any count. An over-limit write answers `403`
+  with `error: "Plan Limit Exceeded"` and a `planLimit` object naming the code
+  (`PLAN_LIMIT_SEATS`, `PLAN_LIMIT_BOARDS`, `PLAN_LIMIT_WORKSPACES`, `PLAN_LIMIT_USERS`), the
+  limit and the count at the moment of refusal. `GET /config` publishes the instance ceilings and
+  the new `GET /workspaces/{workspaceId}/plan` the resolved ceilings and usage of one workspace,
+  so the members screen says "7 of 10 seats used" and the board list disables its create control
+  with a sentence instead of a silent refusal. Details and the rejected alternatives:
+  [ADR 0032](docs/decisions/0032-plan-limits.md).
+- **Personal access tokens, the first slice of API 1.0.** A member mints a token for one
+  workspace at `POST /workspaces/:workspaceId/tokens` (or from the new "Personal access tokens"
+  section of Settings), sees the plaintext exactly once, and sends it as
+  `Authorization: Bearer kurul_pat_...` from a script, a CI job or any client that is not a
+  browser. The token acts as its owner in that workspace with the role the owner holds at the
+  time of each request; there are no scopes, because the workspace is the scope. `GET` lists
+  the caller's own live tokens by display prefix, `DELETE` revokes one immediately, and both
+  events are written to the workspace activity feed (`token.created`, `token.revoked`) and
+  the audit subset. The server stores a SHA-256 of the secret and a display prefix, nothing
+  else; a revoked, expired or unknown token all answer the same `401`; a token presented
+  against another workspace is the same `404` a non-member gets; and removing a member,
+  their leaving, or deleting their account ends their tokens too. The throttler runs ahead of
+  authentication, so a token spends the same per-IP budget a session does. A new
+  `personalAccessToken` Bearer scheme is declared in the OpenAPI document and every
+  workspace operation lists it beside the session cookie, except the token routes themselves
+  and the workspace-administration writes that Better Auth performs on a session (invite,
+  revoke, accept, remove a member, change a role, leave, rename and delete the workspace),
+  which answer `403` to a token and are named as the boundary of this slice in
+  [api-conventions.md](docs/api-conventions.md#authentication). Migration
+  `20260823120000_personal_access_token` adds the table. The model is first-party rather
+  than Better Auth's API-key plugin; the same section says why.
+- **ADR 0031: API versioning.** A `/v1` URI prefix on every route, introduced at 1.0 and not
+  before, with header negotiation and no-versioning rejected in writing, and the 1.0 surface
+  sequenced as personal access tokens, then `/v1`, then webhooks
+  ([docs/decisions/0031-api-versioning.md](docs/decisions/0031-api-versioning.md)).
+- **Off-host backup copies, and a healthcheck that watches them.** `BACKUP_REMOTE` in `.env`
+  takes an [rclone](https://rclone.org/) remote path (`s3:bucket/prefix`, `b2:bucket`,
+  `sftp:…`); with one set, the existing `backup` sidecar pushes **both** archives of every
+  cycle there after writing them locally, then prunes the remote to the same `BACKUP_KEEP` as
+  the local series. Until now `backup_data` sat on the same disk as `postgres_data`, so a dead
+  disk took the database and every backup of it together, and the only answer in the docs was a
+  copy command an operator had to remember to run.
+
+  The healthcheck follows the remote: with `BACKUP_REMOTE` set, the service reports healthy
+  only while the newest **off-host** copy is under `2 × BACKUP_INTERVAL` old, so expired
+  credentials or a bucket that stopped accepting writes show up in `docker compose ps` on the
+  day they break rather than on restore day. A failed upload never deletes a local archive and
+  never stops the next local cycle; it logs `ERROR off-host:` and leaves the freshness stamp
+  where it was.
+
+  Credentials are rclone's own, in an optional `rclone.env` next to `docker-compose.yml` (git
+  ignored) as `RCLONE_CONFIG_<NAME>_<KEY>` variables, so S3, B2, R2, MinIO and SFTP all work
+  with no config file; a mounted `rclone.conf` works too. rclone itself is not in the sidecar's
+  stock `postgres:18-alpine` image, so with a remote configured the script downloads one pinned
+  release, verifies its sha256 before unpacking it, and caches it in the backup volume; an
+  `rclone` already on the container's `PATH` is used instead and nothing is downloaded.
+
+  **Leaving `BACKUP_REMOTE` blank changes nothing**, including the log lines and the
+  healthcheck. See [Off-host copies](docs/self-hosting.md#off-host-copies).
+
+- **Demo mode, and everything a live demo instance needs except the host.** `DEMO_MODE=true` is
+  the whole switch: the app shows a standing, dismissible banner naming how often the data
+  disappears; all outbound email goes to the log transport whatever `SMTP_HOST` says, so a
+  demo anyone can sign up to cannot be made to mail an address a stranger typed in; account
+  deletion and workspace deletion answer `403` (a demo is one shared workspace, and deleting it
+  empties the demo for every other visitor until the next reset); and `GET /config` publishes
+  `demo: { enabled, resetIntervalMinutes, nextResetAt }` so the banner names the same cadence
+  the reset actually runs on. Nothing else is disabled: sign-up stays open, invitations can
+  still be created and their links copied, and uploads stay bounded by the ordinary attachment
+  quotas ([ADR 0027](docs/decisions/0027-attachment-quotas.md)).
+
+  The reset itself is `node dist/demo/reset.js`, compiled into the API image with everything
+  else and run on a loop by a new `demo-reset` service behind the `demo` compose profile. It
+  wipes every tenant and auth table and restores a golden dataset: two boards with work in
+  every column, labels, assignees, comments, checklists, due dates relative to the reset, a
+  published `demo@kurul.dev` account whose password comes from `DEMO_PASSWORD` (no default,
+  ever), and a second person with no credentials at all. It refuses to run unless `DEMO_MODE`
+  is true **and** the database is named like a demo, so pointing it at a real deployment takes
+  two independent mistakes rather than one. It is deliberately not the development seed: that
+  runs through `tsx` and a pnpm workspace the production image does not have, and refuses under
+  the `NODE_ENV=production` the image bakes in.
+
+  The sidecar sleeps to wall-clock boundaries rather than a flat interval, so the API and the
+  reset agree on `nextResetAt` without sharing state and a restart does not shift the schedule.
+  Its healthcheck goes unhealthy when no reset has succeeded for twice the interval, in the
+  same shape as the `backup` sidecar's freshness check: a reset loop that had silently stopped
+  resetting would otherwise report as "Up" while a launch-day link served whatever the last
+  visitor left behind. Setup is in
+  [Self-hosting → Demo instance](docs/self-hosting.md#demo-instance).
+
+- **Board templates.** Creating a board now starts from one of four shapes instead of always
+  the same three columns: **Kanban** (To Do / In Progress / Done), **Scrum Sprint** (a backlog
+  feeding a sprint, with a review stage), **Bug Triage** (reported through fixing and
+  verification, plus a `CANCELED` "Won't Fix" column) and **Content Pipeline** (ideas through
+  drafting and editing to published). Each one seeds its columns _and_ a label preset painted
+  from the theme's `slot-1`…`slot-8` tokens, in one transaction with the board, in the
+  creator's language. Names for both languages live in `apps/api/src/common/board-templates.ts`
+  as `Record<Locale, …>`, so a missing translation is a compile error rather than a board that
+  comes out half in English, and the structural half (position, `ColumnCategory`, colour slot)
+  is held apart from the names so a translation cannot move a stage or repaint a chip.
+  - `GET /workspaces/:workspaceId/board-templates` returns the catalogue with localised names
+    and column/label previews. The web renders the picker from that response and echoes back a
+    slug, so neither app carries a second copy of the list and adding a template is an API
+    change alone.
+  - `POST /workspaces/:workspaceId/boards` takes an optional `template` slug, validated against
+    the catalogue; an unknown slug is a `400` with `constraint: "isIn"` and writes nothing,
+    rather than quietly handing back a board that is not the one that was asked for. The
+    `board.created` activity row records which slug was chosen, which is the one part of the
+    choice the seeded rows cannot be reverse-engineered into.
+  - **Omitting `template` is unchanged behaviour**: the default seed columns and no labels. The
+    Kanban template is the same column list, and a test asserts the two cannot drift, so every
+    client that predates this release creates exactly the board it did before.
+  - The picker opens as one line naming the template about to be applied, with a **Change
+    template** disclosure that reveals the keyboard-navigable card list, so four full-height
+    cards never push the name field and the Create button off a laptop window.
+
+- **`pnpm bootstrap --check`, a doctor mode for the dev loop.** Answers "did something go stale
+  since the last bootstrap" from the filesystem alone — no Docker, no database, no network — so
+  it stays well under 5 seconds and is safe to run after every `git pull`. It checks that
+  `packages/shared-types/dist` and `packages/auth-access/dist` are at least as new as their
+  `src`, that the generated Prisma client is at least as new as `schema.prisma`, and that `.env`
+  carries `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` with `DATABASE_URL`'s placeholder
+  replaced — the same three ways this repo's dev loop has gone stale silently before. Prints one
+  line per check with a concrete fix command on failure (`pnpm build`, `pnpm db:generate`, which
+  `.env` key to set) and exits non-zero if any check fails. Logic lives in
+  `scripts/lib/doctor.mjs`, tested in `scripts/lib/doctor.test.mjs`.
+
+- **Member management and account deletion move off the settings list onto their own routes.**
+  `/settings/members` (`app/(app)/settings/members/page.tsx`) holds the roster: an inline native
+  `<select>` sets a member's role directly on their row, with the role's hint printed underneath
+  it, and choosing `OWNER` opens a `ConfirmDialog` instead of applying on select the way every
+  other role does. `/settings/account/delete` (`app/(app)/settings/account/delete/page.tsx`) is
+  one 720px route covering the account holding zero, one or many owned workspaces, gated the
+  same way the old dialog was: typing the account's own email address. `/settings` keeps a link
+  out to each, and `SettingsSection` moves to `components/settings/settings-section.tsx` so both
+  routes can use it too. The delete route's one `<h1>` is the topbar's, and a load that fails
+  offers a retry control the way the members roster does.
+
+- **Two new type steps: `read` for prose, `stat` for a hero figure.** `--text-read`
+  (`app/globals.css`) sets 14px/21px at weight 400, a size between `title` and `body` for prose
+  meant to be read rather than scanned. It is a closed list on purpose: the task description
+  field, the comment body and import report sentences carry it, and
+  `text-read-utilities.test.ts` fails the build the moment a fourth file adds itself.
+  `--text-stat` sets 28/32 at weight 600 for the dashboard's stat figure, which had been an
+  arbitrary `text-[28px]` carrying no line-height at all and inheriting 18px; it drops
+  `tabular-nums`, which `docs/design.md` §8 never asked for.
+
+- **The assignee and label pickers stay a flat list until they cannot.**
+  `components/task/searchable-picker.tsx` renders 7 or fewer options as the plain checkbox list
+  the panel always showed (`INLINE_PICKER_MAX = 7`) and folds 8 or more behind a searchable
+  popover instead, so a board with a large member roster or label set no longer turns the task
+  panel into a scroll of checkboxes. The popover is non-portalled and lives inside the panel
+  (a new `components/ui/popover.tsx` primitive), and `Escape` closes only it, never the panel
+  underneath (`use-task-panel-focus.ts`); the filter folds with the reader's locale.
+
+- **Renaming a board or a workspace happens where the name already sits, not in a dialog.**
+  `components/common/inline-rename.tsx` opens the name, and for a board the description too, as
+  editable fields in place, reached from the board card menu's `Rename` item or the workspace
+  settings row's `Rename` button: `Enter` saves, `Escape` cancels, and an empty name restores the
+  old one rather than saving a blank.
+
+### Changed
+
+- **The task panel splits its metadata and its conversation into their own sections, in the
+  order the card itself reads.** `task-metadata-panel.tsx` becomes two components:
+  `components/task/task-properties-panel.tsx` (priority, due date, estimate, assignees, labels)
+  and `components/task/task-discussion-panel.tsx` (comments, activity). `TaskPanel` composes
+  them, top to bottom, as fields, properties, checklists, attachments, discussion, then a delete
+  footer for whoever can mutate; the footer is `mt-auto` and only reaches the bottom of the panel
+  while it stays the last child, pinned by a test in `task-panel.test.tsx`. The title field in
+  `TaskPanelFields` is now borderless at rest and bordered only on focus.
+
+- **A card says its due date and its estimate on one line, and never grows a second.** The meta
+  row (`components/task/task-card.tsx`) is one flex row that carries the label dots, the due
+  date and estimate joined by a single interpunct (`app.board.card.dueAndEstimate`) and the
+  assignees, with the overflow collapsed to `+N` (`app.board.card.moreAssignees`) rather than
+  wrapping. The figure `docs/design.md` §4 gives for a typical card, 56px, is the one the board
+  now measures.
+
+- **The selected card wears the sancak rail on its own left edge instead of a copper border.**
+  `border-l-2` is unconditional so the selected and unselected boxes are the same size, the
+  selected card takes `--signature` on that edge plus the `--signature-subtle` ground, and it
+  carries `aria-current` so the selection is not colour alone.
+
+- **The board says "Connection lost, changes may not be showing" instead of "Reconnecting…".**
+  The row is what the reader loses, not what the client is attempting, and it is a
+  `role="status"` line in the topbar that leaves when the socket is back
+  (`app.board.connectionLost` replaces `app.board.realtime.reconnecting`).
+
+- **Toasts have a budget: 4s, three at a time, and one line per kind of failure.** `Toaster`
+  passes `duration={4000}` and `visibleToasts={3}` (`components/ui/sonner.tsx`), the figures
+  `docs/design.md` §5 gives. A refused move raises one toast for the whole board
+  (`app.board.dragFailed`, deduplicated by id and given 8s because it carries **Try again**)
+  while the card itself settles back over 220ms, and a save conflict in the task panel is now
+  an inline line in the panel (`task-panel-fields.tsx`) rather than a toast over the board.
+
+- **The canonical docs and the roadmap now describe the release that exists.** `ROADMAP.md`
+  still framed cutting `v0.3.0` as the active P0 three days after the tag, carried five
+  Hardening rows that had shipped on 2026-08-23 and two maintenance-sweep rows for the same
+  work, and scattered the announcement wave's dependencies over four places. It now names
+  `v0.3.0` as current and `v0.4.0` as next, marks each shipped row with its commit or ADR,
+  collects every launch dependency into one ordered Launch checklist that the demo row, the
+  wave row, `OPS-05` and the old operator checklist all link to instead of repeating, splits
+  the awesome-selfhosted submission out as trigger-based (that list requires a first release
+  over four months old, so 2026-12-12 here), and adds a Post-launch hardening table for the
+  audit items still open plus a proposed set of 1.0 criteria.
+
+  Alongside it: the README Status paragraph stops keeping a second, wrong copy of the Beyond MVP
+  list; `tech-stack.md` records two UI catalogs rather than one and eight compose services rather
+  than seven; `architecture.md` gains the `plan`, `token` and `openapi` modules, the
+  `PersonalAccessToken` and `UsagePing` models and ADRs through 0034; `development.md` closes its
+  env and pnpm-script tables against `.env.example` and `package.json`; `testing.md` names both
+  required branch-protection contexts; `SECURITY.md` no longer implies a
+  direct commit to `develop` or `main`; the secret-generation rule is stated once, in
+  `development.md`'s "Database and cache credentials", with `.env.example`, both READMEs and
+  `self-hosting.md` trimmed to the one-line generator and a link to it, so the arithmetic behind
+  `-hex` over `-base64` lives in one file instead of five; and `git-strategy.md` gains a release step for the
+  version-pinned prose that only a person keeps current, which is the root cause of most of the
+  above; and `docs/design.md` §3 gains a row for the `stat` step (28/32, weight 600), which it
+  had named in prose without listing in the type-scale table. Every `docs/` change moves with its
+  `docs/tr/` mirror.
+
+  Not documentation, and in the same pass: `.github/dependabot.yml` now holds every bump it
+  proposes until the release is seven days old, fourteen for an npm major (`default-days` is all
+  the `github-actions`, `docker` and `docker-compose` ecosystems support, so their majors wait
+  the same seven).
+  That window is the supply-chain defence a lockfile cannot give and nothing more: a compromised
+  package is usually pulled within hours to a few days. **Security updates bypass it**, so an
+  advisory-driven bump still opens the day it lands, and a manual `pnpm add` is unaffected. It is
+  the zero-toolchain half of pnpm 10's `minimumReleaseAge`, which this repo cannot use while
+  `packageManager` is pnpm 9.
+
+- **API coverage: a fresh `develop` baseline, three new per-directory floors, and a cross-workspace
+  case for the activity/notification feeds.** `apps/api/jest.config.cjs`'s dated baseline (last
+  recorded 2026-08-22, on the feature branch before merge rather than on `develop` after it) is
+  replaced with a `develop`-after-merge measurement: 77.06 / 69.96 / 78.95 / 77.91
+  (stmts/branch/funcs/lines), a margin of 2.06 / 3.96 / 1.95 / 1.91 over the unchanged
+  75 / 66 / 77 / 76 global floor. `src/common/guards/`, `src/common/rate-limit/` and
+  `src/account/` each gain their own floor at their measured value (100 / 93.75 / 100 / 100,
+  98.33 / 94.87 / 91.3 / 99.09, and 0 / 0 / 0 / 0), the same directory-scoped pattern
+  `apps/web/vitest.config.ts` already uses; `src/account/`'s floor is 0 across the board because
+  its GDPR-erasure service is deliberately unit-untested and covered end to end instead. The two
+  rules every floor answers to (raise it when the baseline rises; record a drop here rather than
+  lowering the floor to erase it) and the no-exclusions-from-the-denominator rule move out of the
+  config file's comment history into `docs/testing.md`'s Coverage section, which now states the
+  API's real margin and points at the CI `api-coverage` artifact as the source of truth in place
+  of the stale "a few points under" claim. `activity-notifications.e2e-spec.ts` gains a
+  cross-workspace case: a member of one workspace requesting another's task activities,
+  notification list, unread count or mark-read all get `404`, the same convention
+  `comment.e2e-spec.ts` and `trello-import.e2e-spec.ts` already use for cross-tenant access.
+
+- **Base images are pinned by digest, and Dependabot now has a bump path for all of
+  them** ([#157](https://github.com/dravcore/kurul/issues/157)). `postgres:18-alpine`
+  and `redis:8-alpine` in `docker-compose.yml` and `docker-compose.dev.yml`, `caddy:2-alpine`
+  in `docker-compose.yml`, and `node:24-alpine` in `apps/api/Dockerfile` and
+  `apps/web/Dockerfile`, now carry a `@sha256` digest instead of a bare tag, the same pattern
+  `docker-compose.dev.yml` already applied to `mailpit`. Dependabot's docker updater only reads
+  a literal `FROM image:tag@digest` line, not one built from an `ARG`, so both Dockerfiles
+  repeat the digest on every `FROM` instead of factoring it into a shared build argument.
+  `.github/dependabot.yml` gains a `docker` ecosystem block scoped to `directories: [/apps/api,
+  /apps/web]`, so the two Dockerfiles are in its scope for the first time, plus a separate
+  `docker-compose` ecosystem block at `/`, since Dependabot's docker updater never reads a
+  compose file: that new block is what bumps the three compose images. Until now the docker
+  updater only read the repository root and never proposed a base-image bump for either app,
+  and the compose images had no bump path either, since a digest pin only pairs with an
+  ecosystem that can see it. Two builds of the same tag now resolve the same bytes, and an
+  upstream base-image fix arrives as a reviewable pull request instead of silently, whenever
+  something next happens to rebuild.
+- **CI now parses the compose files and the Caddyfile on every pull request.** A new
+  `compose-config` job in `.github/workflows/ci.yml` renders `docker-compose.yml` with
+  `docker compose config -q`, without a profile and with `--profile demo`, renders
+  `docker-compose.dev.yml`, and runs `caddy validate` over `docker/Caddyfile` in the
+  `caddy:2-alpine` image the stack ships. The env file is `.env.example` plus `POSTGRES_PASSWORD`
+  and `BETTER_AUTH_SECRET`, the install the docs describe, so the job fails on exactly what an
+  operator would hit: a broken YAML anchor, a renamed Caddy directive, or a required-variable
+  interpolation that a plain `docker compose up -d` cannot satisfy. Until now nothing in CI read
+  either file: `image-scan` builds the images, the browser suite builds its own stack, and
+  `scripts/bootstrap.mjs` validates only `docker-compose.dev.yml`, which is how the `demo-reset`
+  interpolation fixed below reached `develop`. The compose legs need no daemon, the job takes
+  seconds, and it is wired into the `ci-ok` gate like every other job
+  ([testing.md](docs/testing.md#compose-and-caddyfile-parse)).
+- **Better Auth upgraded to 1.7.1, which needs a database migration before the API starts.**
+  `Account` gains a required `issuer` column and a unique `(issuer, accountId)` index: identity
+  is now keyed on the pair rather than on `accountId` alone, so two providers handing out the
+  same subject string can no longer be made to collide. Migration
+  `20260823090000_account_issuer` adds the column, backfills every existing row to
+  `local:` + its provider id (`local:credential` for every account Kurul creates today) and
+  only then makes it `NOT NULL`. The backfill is the whole point of the migration: sign-in
+  looks the credential account up by issuer, so rows left without one would match nothing and
+  every account that predates the upgrade would be unable to log in. `pnpm db:migrate` applies
+  it like any other; upgrading past this release without running it is what would lock people
+  out, not the upgrade itself.
+
+  Nothing about how a session, a workspace or an invitation behaves changes, and no
+  configuration moves. Internally the auth rate limiter's Redis storage
+  (`apps/api/src/auth/auth-rate-limit.ts`) dropped its `get`/`set` pair, which 1.7 removed
+  along with the non-atomic fallback path that used them; `consume` is the whole interface now,
+  and that was already the only thing enforcing Kurul's counters, so the per-window limits, the
+  Redis outage fallback and the degraded-mode reporting are all unchanged.
+- **The PR pipeline is a flat graph of six jobs, and its wall time is the longest of them.**
+  `ci.yml` ran `build` behind `lint` and `test` although it uses nothing they produce, and
+  `test` ran the unit suites and then, against Postgres and Redis service containers, the
+  migration, the drift check and the integration suite, back to back. Measured over the last
+  twenty `develop` runs, fifteen took 301-342 s, past the five-minute trigger `ROADMAP.md`
+  records for OPS-10; install and `prisma generate` were not the cost (about 20 runner-seconds
+  per run), the job graph was. `build` now has no `needs`, `test` is split into `test-unit`
+  (shared packages, `scripts/`, the api and web suites with coverage, and no services: the api
+  suite passes against a closed port with `REDIS_URL` unset) and `test-integration` (the
+  services, `db:migrate`, `db:drift`, `test:e2e`), and `ci-ok` waits on all six with the same
+  skipped-or-cancelled handling. Branch protection names only `ci-ok` and `CodeQL`, so the
+  renamed jobs need no settings change.
+
+  Two cache changes travel with it, because the image-scan leg becomes the critical path once
+  `test` is untangled. Pull request runs no longer write the BuildKit `type=gha` cache: every
+  PR stored a full `mode=max` copy of the build stage under its own ref, the repository sat at
+  10.87 GB against GitHub's 10 GB cache limit, and eviction by last access took `develop`'s
+  entries with it, so the leg designed to read a warm cache built cold (212 s against 54 s).
+  Only `push` runs write now. `concurrency.cancel-in-progress` is true for pull requests only,
+  so a merge burst cannot cancel the `develop` run that writes the cache every PR reads. Every
+  job also carries a `timeout-minutes` ceiling (lint 15, test-unit 20, test-integration 25,
+  build 20, image-scan 40, compose-config 5, ci-ok 5): the default is six hours, and two
+  release-candidate runs of `release-images.yml` once held a runner for 4 h and 5.7 h before
+  being cancelled by hand.
+  Target: `ci-ok` under 3m30s, tracked in the OPS-10 row of `ROADMAP.md`.
+
+- **Compose tuning for first boot, Redis and Postgres.** Three small changes, applied to both
+  `docker-compose.yml` and `docker-compose.dev.yml`. The `postgres` healthcheck now probes over
+  TCP (`pg_isready -h 127.0.0.1 ...`): without a host it asked the Unix socket, which the official
+  entrypoint's temporary initdb server also answers on the first boot of an empty volume, so
+  `migrate` could be released before anything listened on 5432 and exit 1 once, which reads to a
+  newcomer as a broken install. `redis` runs with `--maxmemory 100mb --maxmemory-policy
+  noeviction` under its 128m `mem_limit`, so a Redis that fills up answers with a logged
+  `OOM command not allowed` the API already survives (its rate limiters fall back to process
+  memory) instead of a bare exit 137 that `restart: unless-stopped` turns into a loop;
+  `noeviction` is the policy BullMQ requires for the queues that live there. `postgres` gets
+  `shm_size: 256m`, because Docker's default 64 MB `/dev/shm` is where parallel workers and hash
+  joins run out of dynamic shared memory on a heavy dashboard query. None of it is memory on top
+  of the existing ceilings; the sizing notes in
+  [self-hosting.md](docs/self-hosting.md#server-sizing) describe all three.
+
+  `REDIS_MAXMEMORY` in `.env` (default `100mb`, unchanged) now makes that ceiling adjustable
+  without editing the compose file. On an instance that is already running, check where the
+  dataset sits before upgrading into it: `docker compose exec redis redis-cli -a
+  "$REDIS_PASSWORD" INFO memory | grep used_memory_human`. With `noeviction`, a dataset already
+  near or over the ceiling does not shrink on its own; it refuses writes until keys expire, so
+  raise `REDIS_MAXMEMORY` and the `redis` `mem_limit` together rather than after the fact.
+
+- **The self-hosting guide installs and upgrades from a release tag, with a runbook.**
+  `docs/self-hosting.md` now fetches `docker-compose.yml`, `docker/Caddyfile`,
+  `scripts/backup.sh` and `.env.example` from the `v0.3.0` tag URL rather than from `main`, so
+  the files and the images an install runs come from the same release, and `.env` gets
+  `chmod 600` on the way in. The Upgrading section is an ordered runbook, backup first: read the
+  CHANGELOG, `backup.sh once` and copy the pair off-host, re-fetch the files at the new tag (a
+  `pull` refreshes images and nothing else, so an install that never re-fetched kept a
+  `backup.sh` that ignores `BACKUP_REMOTE`), set `TAG`, `pull`, `up -d --wait`, `ps -a`,
+  `curl /api/health/ready`, then links to the rollback and restore drills in
+  `docs/development.md` instead of copies of them. A short "Release notes for operators" list
+  points at the CHANGELOG entries that ask something before `pull`. Two things moved with it.
+  `TRUST_PROXY` is forwarded by `docker-compose.yml` as `${TRUST_PROXY:-1}` and ships blank in
+  `.env.example`, so a CDN in front of `proxy` is a `.env` line rather than an edit to a file
+  the next upgrade replaces; an existing `.env` that still carries `TRUST_PROXY=false` from an
+  older `.env.example` must drop the line, or the API stops seeing client addresses behind
+  Caddy. And a new "Browser error tracking" section states that `NEXT_PUBLIC_SENTRY_*` are
+  compiled into the web image, that the published GHCR image ships without them, and that
+  enabling browser Sentry means building `web` from a clone, cross-linked from `.env.example`
+  and `docs/development.md`. The release process in `docs/git-strategy.md` gains the step that
+  bumps the tag on the page. Turkish mirrors updated in step.
+
+- **`knip` wired up** (`pnpm knip`, `knip.jsonc`) and its unused-code findings cleared: 35
+  constants/functions/types that had no consumer outside their own file lost their unnecessary
+  `export`, one fully dead type alias (`AuthSession`) was deleted, and a redundant direct
+  `@prisma/client-runtime-utils` dependency was found to not actually be redundant (Prisma's
+  generated client bare-`require`s it from outside `@prisma/client`'s own module tree) and was
+  restored with a stated `knip.jsonc` ignore instead. `apps/web/components/ui/**`
+  (shadcn/ui's generated component library) is ignored wholesale for the same reason knip
+  flagged it: it intentionally exports a fuller API than any one call site currently uses.
+- **Coverage floors added for `components/auth/**`, `components/settings/**` and
+  `components/dashboard/**`** in `apps/web/vitest.config.ts`, the last three interactive
+  surfaces without one; all three were already well-tested, so this ratchets the existing
+  baseline rather than adding tests.
+- **`docs/tr/architecture.md` resynced with the English original**: a missing `Column.category`
+  field, two missing data-model rows (`Checklist`/`ChecklistItem`), and a stale description of
+  multi-tenant enforcement that predated the current `WorkspaceGuard`-plus-service-level-predicate
+  model. `docs/tr/tech-stack.md` was already accurate.
+
+- **`docs`:** [ADR 0030](docs/decisions/0030-typescript-7-hold.md) records why `typescript`
+  stays pinned `^5.8.2` across the workspace now that TypeScript 7.0 has shipped: both
+  `typescript-eslint` and `ts-jest` publish peer ranges that exclude it, and both maintainers
+  confirm the block is TypeScript 7.0 shipping without a stable compiler API. The
+  `dependabot.yml` ignore-rule comment now points at the ADR instead of restating the
+  rationale inline. No behaviour changes.
+- **The web app's client data layer is now written down, and the two widest files in it were
+  split along the seams that document names.**
+  [ADR 0029](docs/decisions/0029-client-data-layer.md) records what the layer is (a typed
+  `fetch` wrapper, one read primitive that models a single value arriving once, writes that
+  live beside the state they touch, and socket payloads that carry ids so a changed row is
+  refetched rather than merged out of the event), the five rules it runs by, and the one
+  measurement that would replace it with React Query: a third hand-written generation counter,
+  countable with `grep -rn "GenerationRef" apps/web`, which returns two today. Adopting a query
+  library now is rejected in writing, with the reasoning, so the question stops being reopened
+  per screen.
+
+  `use-board-data.ts` (381 lines) became four hooks behind one composer: `useBoardCaches` holds
+  the five lists and the refs that mirror them, `useBoardFetch` performs the reads,
+  `useBoardLoad` owns the skeleton, the error and the retry, and `useBoardPanelTask` covers the
+  deep-linked row the board itself never loaded. `task-panel.tsx` (409 lines) gave up its
+  hand-rolled dialog behaviour to `useTaskPanelFocus`, its title and description write to
+  `TaskPanelFields`, and its three no-task states to `TaskPanelStatus`. No behaviour changed and
+  no test was rewritten: the existing board and task suites pass unmodified, and the
+  `components/board` and `components/task` coverage floors hold at their current values.
+
+- **Both themes hold up over hours of reading instead of straining on close text or losing their
+  edges.** Dark mode gets a real surface ramp: canvas, column, card, popover and the hover
+  highlight are five distinguishable steps instead of two or three blurring together, and dark
+  text tokens are measured to the same 4.5:1 floor light already held. Every input, select and
+  textarea now draws a border a viewer can actually see (`--border-strong`, aliased as `--input`),
+  instead of a hairline that only separated a field from itself. Hovering a task card, a button or
+  a menu row moves to a real step (`--accent` in both themes, plus `--primary-hover` and
+  `--destructive-hover` on filled buttons), instead of an alpha thinning that could drop a white
+  label under AA partway through the hover. Opening a dialog dims the page behind it with a themed
+  scrim (`--overlay-scrim`) rather than a flat 50% black, and in dark mode dialogs, popovers and
+  the drag preview carry a 1px `--border-strong` ring inside their shadow, since a shadow alone
+  stops reading once the surface under it is this dark. `forced-colors: active` and
+  `prefers-contrast: more` now have their own fallbacks: a selected card, a drop target and a
+  highlighted menu row draw a system `Highlight` outline instead of leaning on a tint the mode
+  discards, and the hairline border thickens to `--border-strong` under high contrast instead of
+  opening a second palette.
+
+  Two ink tokens moved with the ramp. The light theme's `--foreground` goes from `#191C1B` to
+  `#212523`: the old value measured 17.17:1 on the white card (APCA Lc 104.1), far past the 4.5:1
+  floor and into the band where a full-strength ink on a full-white card haloes over a long read;
+  the new one holds 15.51:1 (Lc 102.5) there and 12.64:1 on the signature tint, its worst of the
+  six surfaces, and it repaints every screen in the product. The dark theme's
+  `--muted-foreground` goes the other way, `#98A09C` to `#A0A8A4`: the old value cleared WCAG AA
+  on all six dark surfaces and still scored APCA Lc 44.2 on `--accent`, under the Lc 48 an 11px
+  or 12px meta row needs, because light-on-dark is the polarity the WCAG formula models worst.
+  `#A0A8A4` is the smallest step that clears Lc 48 on all six (48.5 at worst) without closing on
+  `--foreground-secondary`, which stays a rank above it at Lc 63.7.
+
+  One gate holds all of it. `app/globals.contrast.test.ts` measures every text token against six
+  real surfaces and every boundary token at 3:1 on every run, and asserts the APCA band on every
+  surface rather than printing it to stdout, so a token change that quietly drops a pair under AA
+  or a dark meta row under Lc 48 fails the build instead of shipping.
+- **Text now runs on one type scale.** Every
+  button label, dialog title, form field and menu item used to draw from two competing sources:
+  shadcn's own default text sizes and weights sitting beside Kurul's own scale, so a button and the
+  card title next to it could land at different pixel sizes without either class saying so. The
+  Tailwind defaults are gone from `components/ui/` and the domain tree in favour of Kurul's own
+  steps, and `app/theme-classes.test.ts` (see Fixed) fails the build on any class that resolves to
+  nothing, so a stray default cannot slip back in unnoticed. A dialog's title steps down from an unintended 18px
+  to the 16px `title` step the scale actually defines, since there never was an 18px step; a button
+  label and the card title beside it now agree on the same 13px. Fraunces also now loads its
+  optical-size axis (`axes: ['opsz']` in `app/layout.tsx`) so a 40px `.text-display` heading renders
+  with the carved 40pt cut instead of the low-optical-size cut `next/font/google` embeds by
+  default. Below 768px, every text field (`Input`, `Textarea`, `Select`) computes at 16px so iOS
+  Safari stops zooming the page on focus, matched by a new assertion in
+  `e2e/tests/mobile-navigation.spec.ts`, now that `cn()` dedupes the type scale so that 16px
+  override reliably beats any conflicting default reaching the DOM.
+- **The copper signature colour now has a written budget instead of an unenforced guideline.** Full
+  strength copper is limited to at most two uses per screen, the sancak rail plus, where a view has
+  one, its single primary action button. The focus ring and any data mark, a meter fill, a progress
+  fill, the dashboard's one copper emphasis series, do not count against that budget: the ring is
+  singular and momentary by construction, and a data mark is showing a value rather than describing
+  the screen around it. The signature tint is bound to exactly one role, active or selected, and
+  neither the tint nor the hover surface carries coloured copper text of its own: identity lives in
+  the sancak rail and the one button, in a dot beside a label, never in a coloured word sitting on
+  a tinted background.
+
+- **Two loose ends from the previous docs sweep are closed, and its Turkish mirrors move with
+  them.** `architecture.md`'s `openapi` row sat in the feature-module table whose heading
+  promises every entry a `*.module.ts`; `apps/api/src/openapi` has no module file, so the row
+  moves to the cross-cutting table beside `common`, `prisma` and `storage`, which makes no such
+  promise. `development.md`'s "Database and cache credentials" undercounted the base64 collision
+  it warns about: `1 - (63/64)^43` excludes only `/`, giving 49.2 percent, when the alphabet has
+  two problem characters, `/` and `+`; the corrected figure, `1 - (62/64)^43`, is about 74
+  percent.
+
+- **#37's TypeScript half: `Activity`/`Notification` input types narrow from `string` to the
+  shared-types unions.** `RecordActivityInput.type` and `CreateNotificationInput.type` are now
+  `ActivityType`/`NotificationType`, so a typo in a new call site fails at compile time instead
+  of reaching the database; every existing call site already passed one of those constants, so
+  nothing needed an `as` cast. `ActivityDto.type`/`NotificationDto.type` stay `string` on
+  purpose: a row an older build wrote with a since-removed type must still decode. The
+  `Activity`/`Notification` columns stay `String`, not a Prisma enum, per the decision already
+  recorded beside each.
+
+- **The invitation `'pending'` literal is now one shared predicate instead of six copies.**
+  `InvitationStatus.pending` replaces the raw string at every application-code site, including
+  the one inside a raw `$executeRaw` template, which now interpolates the constant as a bound
+  parameter, still parameterised by Prisma, rather than concatenating it into the statement
+  text. `findPendingInvitations`, the pending invitations list and
+  `PlanLimitsService.seatsUsed` share one `pendingInvitationWhere(workspaceId, now)` helper in
+  place of three hand-copied predicates, so the settings screen and the seat count cannot drift
+  apart.
+- **Dialogs and dropdown menus now open and close with visible motion instead of snapping.**
+  `animate-in`, `fade-in-0` and `zoom-in-95` on `DialogOverlay`, `DialogContent`,
+  `DropdownMenuContent` and `DropdownMenuSubContent` never produced any CSS, since this project
+  ships plain `tailwindcss` with no animation plugin, so every dialog and every menu cut open and
+  closed in a single frame. Real keyframes now bind through `data-slot` and `data-state`, the
+  pattern the off-canvas drawer already used: the dialog surface fades in and scales from 0.96 to
+  1 over 200ms (`--ease-out`), its scrim fades over the same 200ms, and the dropdown and submenu
+  fade and scale from their own Radix transform origin, 150ms open and 150ms close.
+  `--ease-in-out` (`cubic-bezier(0.77, 0, 0.175, 1)`), named in `docs/design.md`'s motion table
+  since it was written, is now a real custom property in `app/globals.css` and a Tailwind
+  `ease-in-out` utility, not only documentation. `prefers-reduced-motion: reduce` drops all of it
+  to an opacity-only fade: nothing moves, the state change stays visible.
+
+  The board skeleton moved onto the same footing. `animate-pulse` ran a 2s, 1.0-to-0.5 cycle, off
+  the 1.6s, 1.0-to-0.6 cycle `docs/design.md` has specified since it was written, and it was the
+  one repeating animation in the tree with no `prefers-reduced-motion` twin, felt directly since
+  a loading board runs dozens of these at once. It now runs its own `skeleton-pulse` keyframe at
+  1.6s, opacity 1.0 to 0.6 and back, and holds flat at 0.75 opacity under reduced motion instead
+  of pulsing at all.
+- **A loading button now shows a spinner instead of swapping its label, and the ad hoc
+  "sending" text is gone.** `Button` takes a `loading` prop: `aria-busy` and `disabled` apply
+  the instant loading starts, and a 14px spinner is drawn over the button's own content once a
+  400ms threshold passes, short enough to catch a slow request and long enough that a fast one
+  never flickers one in. The spinner sits outside the layout flow, so the control keeps its exact
+  box and its label never moves, and the label text is never swapped for a waiting string.
+  `FormDialog`, `ConfirmDialog`, `verification-resend`, `forgot-password-view`,
+  `reset-password-view` and `invite-accept-view` all move onto this one mechanism, replacing six
+  places that each disabled a button on its own and, on four of them, swapped its text to a
+  "Sending…" string of its own; the two `sending` keys and `auth.invite.submitPending` leave
+  `messages/en.json` and `messages/tr.json`.
+- **The shell paints its sidebar shape on a reload again.** The pre-bootstrap loading skeleton
+  gated the sidebar-shaped column on `workspaces.length`, and `workspaces` is the same empty
+  array before any bootstrap has finished as after one that found nothing. Every returning
+  reader's reload therefore lost the shape and then grew a sidebar once the roster resolved. The
+  shell now latches "a bootstrap has actually resolved" separately from the roster, so the shape
+  is the default and is skipped only for the first-time signup on its way to `/workspaces/new`,
+  which is the one case it was ever meant for.
+
+### Removed
+
+- **Five dialogs close in favour of the surface above them.**
+  `components/settings/change-member-role-dialog.tsx` (the inline `<select>` on
+  `/settings/members`, `OWNER` still confirmed through `ConfirmDialog`);
+  `components/settings/delete-account-dialog.tsx` (the `/settings/account/delete` route);
+  `components/board/rename-board-dialog.tsx` and
+  `components/settings/rename-workspace-dialog.tsx` (both `components/common/inline-rename.tsx`);
+  and `components/task/create-task-dialog.tsx` (the inline composer at the column foot), whose
+  state in `use-board-dialogs.ts` leaves with it. Two message keys go too:
+  `app.board.task.createTitle` and the delete route's orphaned
+  `app.settings.account.deleteTitle`.
+
+### Fixed
+
+- **The OpenAPI document advertised `0.1.0` from `v0.1.0` all the way through `v0.3.0`.**
+  `openapi.document.ts` explained at length that the spec carries the monorepo version rather
+  than an independent one, because "a second version number here would be a second promise", and
+  then wrote that number as the literal `'0.1.0'` immediately below the paragraph. Nothing in the
+  release process compared the two, so every release since has served, and committed, a spec
+  stamped with the version of the first one. `OPENAPI_VERSION` is now `readAppVersion()`, the
+  helper the telemetry ping already uses: it resolves `apps/api/package.json` from `src/` under
+  Jest and from `dist/` under `pnpm openapi` and the runtime image, so the generator, the
+  committed snapshot and the document served at `/docs` cannot disagree. `apps/api/openapi.json`
+  is regenerated at `0.3.0`, and since `pnpm openapi:check` byte-compares that file in CI, a
+  version bump that forgets to regenerate now fails the gate instead of drifting quietly.
+
+- **A Trello import no longer skips the length checks every other write path enforces, and no
+  longer has an unbounded row count.** `trello-import-planner.ts` wrote a card's name and
+  description, a checklist's title, a checklist item's content, a list's name, a label's name, an
+  attachment's URL, and the export's own board name and description straight through, with no
+  ceiling at all, while `CreateTaskDto`, `CreateBoardDto`, `CreateChecklistDto`,
+  `CreateChecklistItemDto`, `CreateColumnDto`, `CreateLabelDto` and `CreateAttachmentDto` refuse
+  the same fields past 500/20000, 120/2000, 255, 1000, 120, 50 and 2048 characters (in that
+  order) on every other route. A 20 MiB export could carry one card with a multi-megabyte title,
+  or several hundred thousand tiny cards, and the importer would write all of it inside one
+  transaction. The planner now clamps every one of those fields to the same constant the DTOs
+  use, one limits file per DTO pair next to it (`task/dto/task-limits.ts`,
+  `task/dto/checklist-item-limits.ts`, `board/dto/board-limits.ts`, `board/dto/column-limits.ts`,
+  `label/dto/label-limits.ts` and `attachment/dto/attachment-limits.ts`, imported by the DTOs and
+  the planner alike, so each number exists once). A clamped card title or description is reported
+  as a `(card, defaulted)` row, a clamped checklist title or checklist item content as
+  `(checklist, defaulted)` or `(checklistItem, defaulted)`, a clamped label name folds into the
+  `(label, defaulted)` row an unknown colour already produces, a clamped attachment URL is
+  reported as `(attachment, defaulted)`, and a clamped column name shares the `(column,
+  defaulted)` row every imported column already gets for its default category, all the report's
+  existing vocabulary for a value that was substituted rather than lost. The board's own name and
+  description are clamped without a report line, since no `board` scope exists in that vocabulary
+  and a board is one row rather than a class of rows. A row the planner drops instead of writing
+  (an archived list or card, a card pointing at a label id the export does not contain, a
+  rejected attachment) quotes its name as a report sample the same bounded or cleaned way. An
+  entry the reader itself rejects before it becomes a row at all (a card or list missing its
+  `id`, or carrying a field of the wrong type) has no such row to borrow a ceiling from, so
+  `SkipCollector.addMany` now clamps every sample to a flat `SKIP_SAMPLE_MAX_LENGTH` on the way
+  into the report, whichever call site it came from: an oversized field cannot reach the
+  response body through a report sample either way. Two new variables,
+  `TRELLO_IMPORT_MAX_CARDS` (default 50000) and `TRELLO_IMPORT_MAX_LISTS` (default
+  5000), cap how many cards or lists one import will plan; an export over either cap answers
+  `400` and writes nothing, checked on the reader's own row counts (which still include archived
+  cards and lists) before the planner runs and before the transaction opens. Checklists, check
+  items, labels, task-label rows and attachments have no such ceiling yet.
+  [ADR 0025](docs/decisions/0025-trello-import-mapping.md) carries the amendment.
+
+- **A restart no longer drops the requests that were in flight.** Every connection the API owns
+  (the shared Postgres pool, the Redis clients behind the realtime fan-out, the readiness probe
+  and the upload budget, the mail transport, the storage backend and the two BullMQ workers)
+  used to be released from `onModuleDestroy`, which Nest runs _before_ it closes the HTTP
+  listener and the Socket.io server. On `docker compose up -d` that ended the pool under
+  whatever was mid-request, so an ordinary upgrade reported a handful of 500s to Sentry with
+  nothing actually wrong behind them. They all close in `onApplicationShutdown` now, the phase
+  that runs after the listener is shut, and an integration test asserts those two events in
+  that order rather than trusting the hook name.
+
+  The retention sweep also stopped being able to hold the whole shutdown open. `worker.close()`
+  waits for the job that is running and BullMQ puts no ceiling on that wait, so a first sweep on
+  an instance with years of history ran past Docker's 10s grace and ended in a SIGKILL that
+  skipped every hook after it. The wait is bounded now (five seconds, logged when it fires): the
+  shutdown stops waiting and carries on rather than the run being cut short, the abandoned attempt
+  unwinds on its own once the pool behind it is ended, and BullMQ re-delivers it, which is safe
+  because both scheduled jobs are idempotent by construction. `api` gained `stop_grace_period: 30s`
+  so an ordinary shutdown finishes well inside it (the case that can still run it out is an
+  abandoned sweep whose last statement sits on the server for the full
+  `DATABASE_STATEMENT_TIMEOUT_MS`, because ending the pool waits for the client it checked out),
+  and the bundled Caddy holds a request for up to 30s while an upstream is coming back
+  (`lb_try_duration`) instead of answering 502, which turns a recreate into latency rather than
+  errors. Related to #160: this is the cheap half of zero-downtime deploys, not the item itself.
+
+- **A local `docker build` sent gigabytes of unrelated files into the build context, because
+  `.dockerignore`'s patterns were root-anchored.** Docker's ignore matcher treats a bare
+  pattern like `node_modules` as anchored to the context root, not as "match anywhere" the way
+  `.gitignore` does, so the old file's `node_modules`, `dist`, `.next` and `coverage` entries
+  only ever caught the repository's own top-level copies; every nested one under `apps/*`,
+  `packages/*` and any git worktree still went in through `COPY . .` in both Dockerfiles. On a
+  machine running several agent worktrees under the gitignored `.claude/` directory, that
+  directory alone measured 34 GB, none of it excluded, and a stale `dist` or `.next` from a
+  local build could get copied in ahead of the fresh one the image builds for itself.
+  `.dockerignore` is rewritten with `**/`-prefixed patterns for `node_modules`, `dist`,
+  `.next`, `coverage`, `.turbo`, `.cache` and `*.tsbuildinfo`, plus explicit entries for
+  `.claude`, `.superpowers`, `.nodeterm`, `.cursor`, `.vscode`, `docs`, `e2e`, `.github`,
+  `docker-compose.override.yml`, `rclone.env` and `rclone.conf`, none of which either
+  Dockerfile reads. Measured on this checkout, the context BuildKit reports for
+  `apps/api/Dockerfile` and `apps/web/Dockerfile` drops from roughly 36.4 GB to 5.9 MB, and
+  both images still build their `build` stage end to end. CI is unaffected: the runner already
+  builds from a clean checkout with none of these directories present.
+
+- **`REDIS_URL` now honours a Redis 6+ ACL username and `rediss://` (TLS)
+  ([#204](https://github.com/dravcore/kurul/issues/204)).** `parseRedisUrl` read only host,
+  port, password and the database index; `url.username` and `url.protocol` were never
+  inspected, so a URL naming an ACL user (`redis://alice:s3cret@host`) silently authenticated
+  as `default` instead, and a `rediss://` URL connected in plaintext with no warning. The
+  parser now carries `username` through when the URL names one, sets `tls: {}` for `rediss:`,
+  and rejects any scheme other than `redis:`/`rediss:` with the same `Invalid REDIS_URL` error
+  an unparsable database index already uses. All six ioredis/BullMQ construction sites (auth
+  rate limiting, the upload byte budget, the readiness probe, the Socket.io adapter, and both
+  BullMQ workers) spread the parser's return value straight into their client, so the fix
+  reaches every one of them without a call site changing. The bundled Compose stack is
+  unaffected either way: it always builds a plain `redis://:password@redis:6379` for its own
+  `redis` container, so this only matters for a bring-your-own managed Redis.
+
+- **BullMQ's due-soon and cleanup workers, and the Socket.io Redis adapter, now report a Redis
+  connection fault instead of losing it to `console.error`.** `queue`/`worker.on('error')` on
+  both workers, and `pubClient`/`subClient.on('error')` on the gateway's adapter, had no
+  listener: BullMQ and ioredis's own fallback for an unlistened `error` event prints to
+  `console.error`, invisible to the JSON log format and to Sentry, so a Redis outage taking
+  down a scheduler or the socket fan-out was silent until someone noticed the symptom. All six
+  connections now log at `warn` through the Nest `Logger`, naming the connection, and call
+  `captureServerError` once per outage (throttled to one report per minute so a reconnect storm
+  cannot flood Sentry). Readiness still reports Redis down on its own; this is what says which
+  consumer lost it. Closes audit finding BE-11.
+
+- **A Trello import no longer steps over the workspace's board ceiling.**
+  `PLAN_MAX_BOARDS_PER_WORKSPACE` (and a `Workspace.planLimits` override) was enforced on
+  `POST .../boards` but not on `POST .../imports/trello`, which creates its board by its own
+  `tx.board.create`, so an `OWNER` or `ADMIN` at the limit could keep adding boards by importing
+  any small export. `TrelloImportService` now asks `PlanLimitsService` for room as the first
+  statement of its transaction, with the same transaction client and the same `403`
+  `PLAN_LIMIT_BOARDS` refusal `BoardService.create` gives, and a refused import writes nothing.
+  Imported link attachment names also go through the display-name cleaning `createLink` applies
+  (bidi overrides, control characters, quotes and backslashes stripped, 255-character clamp,
+  URL fallback for a name that is empty afterwards), which the importer had skipped; the rule
+  moved to `attachment-display-name.ts` so both writers of `Attachment.filename` share one
+  function. [ADR 0032](docs/decisions/0032-plan-limits.md) names the importer in its
+  enforcement list.
+
+- **`PLAN_MAX_*`, `INSTANCE_ADMIN_EMAILS`, the retention windows, telemetry, `API_DOCS_ENABLED`,
+  `RATE_LIMIT_ENABLED` and the database pool knobs were inert under the bundled Compose stack.**
+  Compose reads `.env` for `${VAR}` interpolation only and never hands the file to a container,
+  `docker-compose.yml` forwards an explicit list of keys to the `api` service, and the api image
+  carries no `.env` of its own, so a setting missing from that list never reached the process
+  however it was set. Seventeen documented settings were missing: a demo operator writing
+  `PLAN_MAX_USERS=1` got an instance that logged `Plan ceilings: unlimited` and capped nothing,
+  nobody could become an instance admin (the activation dashboard and the GDPR erasure route were
+  unreachable on every curl/GHCR install), and `CLEANUP_ENABLED`, the three `*_RETENTION_DAYS`,
+  `TELEMETRY_ENABLED`/`TELEMETRY_ENDPOINT`/`TELEMETRY_TIMEOUT_MS`, `API_DOCS_ENABLED`,
+  `RATE_LIMIT_ENABLED`, `DATABASE_POOL_MAX`, `DATABASE_POOL_CONNECTION_TIMEOUT_MS` and
+  `DATABASE_STATEMENT_TIMEOUT_MS` kept their defaults whatever `.env` said, with nothing logged
+  about it. All seventeen are now on the `api` service as `${KEY:-}`, which the env helpers treat
+  as unset, so an untouched `.env` runs exactly what it ran before. A new
+  `scripts/lib/compose-env.test.mjs` (`pnpm test:scripts`) fails when a key the API reads and
+  `.env.example` documents is missing from that block, so the next variable cannot repeat this;
+  `docs/self-hosting.md` no longer claims the containers read `.env`, and the "adding an
+  environment variable" rule in `docs/development.md` gained the forwarding step.
+
+- **Every plain `docker compose` invocation on `develop` failed with "required variable
+  DEMO_MODE is missing a value".** The `demo-reset` sidecar added for the public demo declared
+  `DEMO_MODE` and `DEMO_PASSWORD` in the required form (`${VAR:?message}`), on the reasoning
+  that a service behind `profiles: ['demo']` is never evaluated without the profile. Compose
+  interpolates the whole file before it filters services by profile, and `:?` treats an empty
+  value as missing, so `cp .env.example .env` (both keys ship blank) followed by
+  `docker compose up -d`, `pull`, `ps` or `config` aborted on an install that never asked for a
+  demo, with a message telling that operator to set `DEMO_MODE=true`. No release carries the
+  defect: `v0.3.0` predates the change. Both keys now default to blank (`${VAR:-}`). The refusal
+  the `:?` was standing in for already exists where it can be logged, in
+  `apps/api/src/demo/reset-guard.ts` (any `DEMO_MODE` other than true) and `reset.ts` (a blank
+  or short `DEMO_PASSWORD`), so a demo profile started with either key unset prints "Refusing
+  to reset" in `docker compose --profile demo logs demo-reset` instead of Compose refusing the
+  file for everyone.
+- **`charts.test.tsx` was load-sensitive ([#244](https://github.com/dravcore/kurul/issues/244)),
+  reproduced and fixed.** Running `apps/web`'s Vitest suite alongside `apps/api`'s Jest suite
+  reproduced it 6/6 tries. The cause: the file's bar-animation poll (`barPaths`) promises to
+  wait up to 10s, but neither `it()` that calls it set a matching Vitest test timeout, so
+  Vitest's own 5s default fired first once concurrent load delayed `requestAnimationFrame`
+  callbacks — aborting the test mid-`act()` and corrupting React's `act()` state for every
+  later test in the file, not just the one that timed out. Giving those two tests an explicit
+  timeout above the poll's own deadline stops the abort; the same concurrent-load reproduction
+  is 0/6 after the fix.
+- **The socket-join precondition in `e2e/support/board-page.ts` (`waitForBoardReady`) could
+  fail on a slow-but-live CI runner.** It shared the suite's global 10s `expect` timeout, sized
+  for the realtime path's steady-state case, not for a cold socket handshake plus `board:join`
+  round trip queued behind everything else starting up. It now gets its own 25s timeout; every
+  scenario's assertions after this precondition still run under the tighter global one.
+- **The board could show its connection-lost row forever over a socket that was connected and
+  healthy.** The row read "Reconnecting…" at the time and is now "Connection lost, changes may
+  not be showing" (see Changed). Two defects, either of which was enough on its own, and together
+  they are what made the browser suite fail on a fixed commit roughly every other nightly. Neither was a timeout:
+  the room was never joined, and nothing was retrying it.
+
+  The first is a race in the API. `RealtimeGateway` resolved the handshake's session in an
+  `async` `handleConnection` hook, and Socket.io acks the CONNECT packet *before* it emits
+  `connection` and queues nothing behind an async listener. The client emits `board:join` from
+  its own `connect` event — one round trip later — so on a machine where the session read was
+  slower than that round trip, the room handlers read `socket.data.userId` as undefined and
+  answered `unauthenticated`. Authentication now runs as Socket.io middleware, which completes
+  before the ack, so the id is on the socket before any handler can be reached or the connection
+  is refused outright. Measured against the API with a script that opens a socket the way the
+  board page does, 160 flows: 159 denied `unauthenticated` before, 0 after.
+
+  The second is in the web client. `connectSocket()` opened the socket when it was not
+  `connected`, but `connected` only turns true when the server's ack arrives, so the second of
+  the board's two socket hooks — board room and notification room, mounting milliseconds apart —
+  called `connect()` on an already-opening socket and made socket.io-client send the namespace
+  CONNECT packet twice on one connection. Socket.io 4.x reads a duplicate CONNECT for a
+  namespace it already holds as an invalid state and closes the whole client, so the first
+  connection died mid-handshake with its joins unanswered. The guard is now `active`, which
+  means "open or opening".
+
+  And a third thing that turned both into something permanent rather than a blip: socket.io
+  reconnects a connection that *dropped* but abandons one the server *refused* — a
+  `connect_error` or a server-side disconnect runs the client's `destroy()`, so `reconnect_failed`
+  never fires and even the existing cooldown never armed. `lib/socket.ts` now schedules its own
+  jittered, doubling retry for exactly those two cases, and a denied room join is retried with
+  backoff instead of standing for the life of the socket — so the indicator now describes
+  something that is actually happening.
+- **Restarting the `backup` sidecar no longer spends a retention slot.** `scripts/backup.sh`
+  took a dump on entry every time its container started, and every host reboot,
+  `docker compose up` after a `.env` edit and image pull starts it. Retention is a count
+  (`BACKUP_KEEP` newest archives, no age check), so a day of restarts could push a week of
+  history out of the seven default slots, and the API's orphan-file sweep, whose grace window
+  assumes one pair per `BACKUP_INTERVAL`, was quietly covering less than the documented week.
+  The loop now skips its boot-time cycle while a dump younger than half of `BACKUP_INTERVAL`
+  already exists, logs the skip, and sleeps only the remainder of the interval, so both the
+  cadence and the history come through a restart unchanged. A first boot with no dump still
+  dumps immediately, and the hand-run `backup.sh once` is never skipped. `scripts/backup.test.mjs`
+  starts the loop twice within seconds and asserts one pair, and the `BACKUP_KEEP` comments in
+  `docker-compose.yml` and `.env.example` now say that retention is count-based.
+
+- **`docker/Caddyfile`'s header quoted the nginx body limit the same file warns against.** The
+  bring-your-own-proxy contract at the top of the file said the rule-2 body limit "matches"
+  the API's `ATTACHMENT_MAX_BYTES` (`client_max_body_size 25m;`), while the `request_body`
+  block further down sets `26MiB` and explains that a limit equal to the file size rejects a
+  file of exactly the published size, because the multipart envelope rides on top of it. The
+  header now says one MiB above and `26m`, the same figure as the nginx snippet in
+  `docs/self-hosting.md`.
+- **The nightly browser suite ran on `main`, not on `develop`.** GitHub runs a scheduled
+  workflow on the repository's default branch, and the checkout step in
+  `.github/workflows/e2e.yml` passed no `ref`, so every 03:00 UTC run re-tested the last
+  release's commit while the docs said it covered the day's merges. Between releases that
+  commit never changes: a regression merged to `develop` stayed invisible until the next
+  release pull request, and the socket fix above stayed red in the nightly for days after it
+  had landed. The schedule now checks out `develop` (the `pull_request` and
+  `workflow_dispatch` triggers are unchanged), and a new step prints the branch and commit
+  that actually ran, since the run's own head branch still names the branch the schedule was
+  read from. `main` keeps its coverage where it changes: the release and hotfix pull requests.
+
+- **The `kurul-web` image and the browser suite's standalone bundle could not boot on
+  `next` 16.3.1.** `next` is now `16.3.2` (with `@next/eslint-plugin-next` moved in step).
+  16.3.1 bumped the `@swc/helpers` it pins from 0.5.15 to 0.5.23, a version whose exports map
+  offers `esm/` under the `module-sync` condition; Node 22.12 and newer resolve that condition,
+  but Turbopack's dependency tracing dropped it and copied only `cjs/` into
+  `.next/standalone`. The server then died in Next's own `require-hook.js` with
+  `Cannot find module '.../@swc/helpers/esm/_interop_require_default.js'` before it listened on
+  anything, which took out both the Docker image and the `webServer` the Playwright suite
+  starts. Upstream is [vercel/next.js#97598](https://github.com/vercel/next.js/issues/97598),
+  fixed by [#97372](https://github.com/vercel/next.js/pull/97372) and backported into 16.3.2.
+  0.3.0 shipped 16.3.0 and was never affected.
+
+  A CI step now boots the built `kurul-web` image and requires it to answer `/`, in the
+  `image-scan` job that already has the image in its daemon. Nothing in the pipeline started a
+  built artifact before, which is why a build that compiled and scanned clean could still be
+  dead on arrival; the check costs a few seconds and fails with the container's own log.
+
+- **Border colours written in the markup were not the ones being drawn.** `app/globals.css`
+  declared `* { border-color: var(--border) }` outside any cascade layer, and an unlayered
+  author rule outranks every `@layer` regardless of specificity, so it silently repainted every
+  `border-*` utility Tailwind emits into `@layer utilities`. The rule now sits in `@layer base`,
+  which is what makes the selected task card's copper left rail, the selected template card in the
+  create-board dialog and an empty column's dashed drop zone paint the token their class names
+  always named. Field borders take the same path: an input's `aria-invalid:border-destructive`
+  now really turns the edge red instead of leaving it hairline grey. The `:focus-visible`
+  outline stays unlayered on purpose and says why in place; it moves in the same change that
+  drops `outline-none` from the button primitive.
+- **Eleven settings and dialog labels rendered at body size instead of the 12/16 caption size
+  they asked for.** They carried `text-caption`, a class with no `@theme inline` counterpart, so
+  Tailwind emitted no CSS for it at all and the elements simply inherited the body's 13/18. They
+  now carry `text-small`, the size `docs/design.md` assigns to metadata and helper text. A new
+  `apps/web/app/theme-classes.test.ts` compiles every `text-`, `bg-`, `border-`, `font-`,
+  `shadow-` and `rounded-` class in the tree through Tailwind itself and fails on any that
+  resolves to nothing, so the next such class cannot land unnoticed. Three sibling scans landed
+  with the closeout: a size and weight denylist, a `font-display` allowlist, and a tree scan for
+  the outline suppressor, so a hand-written Tailwind size, an off-scale font stack or a
+  re-introduced `outline-none` each fail the build rather than the next audit.
+- **The board's Filters badge counted the search term.** Typing in the search box put a `1` on a
+  menu whose options were all untouched, and clearing the menu could not clear it. The badge now
+  counts only what the menu itself sets. The empty-state message, which describes everything
+  narrowing the board rather than one control's state, still counts the search term.
+- **Native selects, date pickers and scrollbars could ignore the theme.** `color-scheme` is now
+  declared in the stylesheet, `light` on `:root` and `dark` on `.dark`, rather than left to an
+  inline style the theme provider writes, so the browser's own widgets follow the theme and keep
+  doing so if that provider is reconfigured.
+
+- **A dialog taller than the window had no way to reach its own buttons.** The page behind an
+  open dialog is scroll-locked and the surface had no ceiling, so on a short viewport, or at the
+  200% zoom `docs/design.md` §9 requires, the footer of a long dialog (deleting an account, one
+  transfer target per owned workspace) sat below the bottom of the screen with nothing left to
+  scroll. Dialog surfaces now cap at `calc(100dvh - 4rem)` and scroll their body, with the header
+  and footer pinned outside that scroll so Cancel and the destructive action are always on
+  screen. The corner close button is pinned with them rather than sitting inside the scrollport,
+  where it would leave the box on the first wheel notch. Dismissing any dialog also hands focus
+  back to the control that opened it: these dialogs are driven by an `open` prop rather than a
+  `DialogTrigger`, and Radix's own restore was reaching for a trigger that is never rendered and
+  leaving a keyboard user on `<body>`.
+- **`Esc` in the task panel could close two layers at once.** The delete confirmation opened from
+  inside the panel dismissed itself and took the panel with it on a single press, against the
+  rule that `Esc` closes the topmost layer only. The panel's listener now stands down while a
+  dialog or drawer is open, and so does the fullscreen sheet's `Tab` trap below 768px, which had
+  been hauling focus back out of a dialog opened over it and stopping `Tab` from advancing inside
+  it at all.
+- **A boardless workspace and a taskless board each show one primary action, not two or three.**
+  A first run used to draw the header's Create board beside the empty state's own, two identical
+  primary actions where the design language asks for one; the header's copy is hidden while the
+  workspace has no boards and returns with the first one. `DashboardSummary` renders nothing at
+  all while the workspace has no boards, leaving `BoardList`'s empty state as the page's one
+  damga mark, and it renders as before the moment the boards call has actually answered with
+  something. On a workspace that has boards but no tasks, the dashboard empty state's **Open a
+  board** shortcut steps down to outline, so the route keeps one filled copper mark beside the
+  sidebar rail instead of three.
+- **`/workspaces/new` could not be scrolled, and showed two of everything on desktop.** The route
+  declared no scroller of its own, so on a short viewport or at 200% zoom the Create workspace
+  button was unreachable inside the shell's `100dvh` box; it now carries its own
+  `flex-1 overflow-y-auto`. It also carries a header of its own with the wordmark and Sign out,
+  and the shell drops the desktop sidebar entirely while the account has no workspace: every
+  sidebar link needs one, and following any of them only bounces back to this page.
+- **The notification bell kept its unread count after Mark all read.** The bell and the
+  notifications page each counted for themselves, so clearing the page left a number standing on
+  the bell until the next load. Both now read one shell-level count, and marking everything read
+  clears it in the same frame.
+
+- **`dark:` utility classes followed the operating system's colour scheme instead of the theme
+  chosen in the app.** Tailwind's `dark:` variant defaulted to `prefers-color-scheme: dark`, while
+  every dark token lives on the `.dark` class the theme switcher sets, so anyone whose OS and
+  chosen theme disagreed got a mismatched control: a destructive button thinned under its own
+  white label in light mode with a dark OS, and lost its hover step in dark mode with a light OS.
+  `app/globals.css` now declares `@custom-variant dark (&:where(.dark, .dark *))`, so every
+  `dark:` utility follows the theme the app is actually showing.
+- **Archivo and Fraunces were never actually rendering; the whole app drew in the system font
+  instead.** next/font's `.variable` classes (`--font-archivo`, `--font-fraunces`,
+  `--font-jetbrains`) were defined on `<body>`, but the theme's font stacks (`--font-sans`,
+  `--font-display`, `--font-mono` in `app/globals.css`) resolve their `var()` references on
+  `:root`, and a custom property only resolves against the element that declares it, so every
+  stack fell straight through to its fallback list. The three `.variable` classes now sit on
+  `<html>` instead, next to the tokens that need them, so both faces load and draw as designed.
+- **Two animations played past `prefers-reduced-motion: reduce`.** The off-canvas drawer's
+  reduced-motion rule existed but never won: the selector it had to override carried one more
+  attribute (`[data-side='left']`) than the reduced selector did, so the directional slide (28
+  distinct transform steps measured end to end) beat it on plain CSS specificity regardless of
+  the media query. A bare `[data-side]` presence check on the reduced selectors levels that and
+  lets the fade-only rule win, covering both docked sides with the same pair of rules. Dropping a
+  card was worse than a specificity problem: `@dnd-kit`'s drag overlay plays its landing with the
+  Web Animations API rather than CSS, so no media query had any say over it at all and a real
+  drop under `reduce` still ran a 250ms `translate3d` animation. A new `useReducedMotion` hook
+  passes `dropAnimation={null}` when the preference is set, so the overlay simply disappears
+  instead of animating into place.
+- **A focused control now draws exactly one indicator, in one beat, at full strength.** A
+  focused control used to draw an outline and a separate copper ring on top of it, from two rules
+  that had never been told about each other. Only the outline is left, 2px `--ring` at 2px offset
+  from a single rule in `@layer base`, and a field that is both invalid and focused recolours that
+  one outline to the destructive token instead of growing a second mark beside its red border.
+  The mark also used to fade in: Tailwind v4 folds `outline-color` into `transition-colors`,
+  which v3 did not, so every element using that shortcut animated its outline from `currentColor`
+  to copper over 150ms while the outline's width and offset appeared in the same frame. The six
+  sites that used the shortcut (`board-filter-chips.tsx`, `board-list.tsx`,
+  `board-template-picker.tsx`, `sidebar-body.tsx`, `notifications-list.tsx`, `task-card.tsx`) now
+  name their transitioned properties explicitly and never the outline, matching the shape
+  `components/ui/button.tsx` already carried. And the dialog's corner close button rested at
+  `opacity-70`, which is a group opacity: it faded the base-layer outline with the icon, so the
+  ring measured 2.91:1 on the light popover, under the 3:1 floor `docs/design.md` §9 sets, even
+  though `--ring` on `--popover` is 5.05:1 at full strength. It now carries
+  `focus-visible:opacity-100`, so the whole button is opaque exactly while the ring shows.
+- **A keyboard user's focus no longer drops to `<body>` in the middle of their own edit.** The
+  browser blurs an element the moment it goes `disabled`, so every control that disabled itself
+  while its write was in flight threw the reader out of the field they were standing in. The task
+  properties panel shared one `pending` boolean across the whole section, which meant a save on
+  the priority select also emptied focus out of the due-date field beside it; pending state is now
+  scoped to the control actually in flight (a set of ids for the assignee and label rows, a flag
+  per field for priority, due and estimate). Where there is no native `readOnly` to reach for, the
+  priority select, the checkbox rows and the member role select in `/settings/members` stay
+  enabled, carry `aria-disabled` and refuse the change in their own handler, so a refused choice
+  is never left on screen as a saved one. `/settings/account/delete` gates its confirmation field
+  `readOnly` and its disposition selects the same way while the one irreversible request is out.
+  Each write announces from a `role="status"` line mounted while idle, and `aria-busy` marks the
+  region being written rather than the region announcing it, since `aria-busy` on a live region
+  lets assistive tech defer the update until busy clears, which is the same moment the line goes
+  empty again. `docs/design.md` §6 carries the rule.
+- **`Mark all read` went grey while the workspace still had unread notifications.** The
+  notifications page gated the bulk action on the rows it happened to have loaded, so a type
+  filter that hid every unread row disabled the one control that would have cleared them. It now
+  reads the workspace's own unread count, which the page already had on hand from
+  `NotificationUnreadProvider`. In the same pass the collapsed workspace switcher stopped
+  announcing only the generic "Switch workspace": the active workspace's name now reaches a
+  pointer through `title` and assistive tech through the accessible name.
+- **The task panel and the settings roster answer assistive tech properly, and a closed menu
+  gives focus back.** Over the picker threshold, assigned names are drawn as chips instead of a
+  bare wrapping list, where two names ran together the moment either carried a space; they wear
+  the `chipShell` the labels beside them wear, minus the colour dot. `TaskPanelFields` marks the
+  title and description `aria-busy` while a save is pending, since `readOnly` alone tells
+  assistive tech nothing. The label picker latches its flat-versus-popover decision while the
+  popover is open, so deleting a label at exactly `INLINE_PICKER_MAX + 1` no longer unmounts the
+  surface under the reader, `SearchablePicker` restores focus itself when the row focus was on
+  disappears, and it names its popover, which Radix gives `role="dialog"` and which is announced
+  as nothing without a name. On `/settings/members` each role select carries its own accessible
+  name (`Role for {name}`) instead of the invite dialog's plain `Role`, points at its hint through
+  `aria-describedby`, and the pending-invitations heading steps from `h3` to `h2` under the
+  topbar's `h1`. Closing the board card menu without choosing `Rename` returns focus to its `...`
+  trigger rather than dropping it on `<body>`. The panel's four sections are ruled alike and their
+  actions step from filled to outline, which keeps the screen inside the two-mark copper budget
+  `docs/design.md` §2 sets.
+
+- **A failed activity refresh or comment page-load now offers a retry, and the comment box is a
+  textbox again.** The task panel's activity refresh and the comment thread's "Load more" each
+  reported a failure as a bare toast; both now carry the catalogue's **Try again** action, which
+  re-runs the same request, and since the panel is not remounted per task and a toast outlives a
+  card switch, a retry that fires after the reader has moved to another task is dropped rather
+  than written into the new task's lists. The comment box no longer claims `role="combobox"`:
+  ARIA in HTML gives a `<textarea>` no role at all (axe `aria-allowed-role`), and a plain textbox
+  does not take `aria-expanded` either (that would be `aria-allowed-attr`, a critical finding), so
+  the field stays a textbox and the mention picker hangs off `aria-controls`, `aria-haspopup`,
+  `aria-autocomplete` and `aria-activedescendant`, which the textbox role does support. The
+  keyboard behaviour of the picker is unchanged.
+
+### Security
+
+- **The runtime images upgrade Alpine's own packages at build time.** The three stages that
+  become `kurul-api`, `kurul-migrate` and `kurul-web` now run `apk upgrade --no-cache` before
+  anything is copied in. Alpine publishes fixes for openssl, zlib and busybox days before the
+  Node project rebuilds `node:24-alpine` on top of them, and the `image-scan` gate fails on any
+  fixable HIGH or CRITICAL finding, so until now a new advisory in the base image turned every
+  build red with nothing in this repository to change. The first case was CVE-2026-14456 in
+  `libcrypto3` 3.5.7-r0 (fixed in 3.5.8-r0) on 2026-08-26. The upgrade adds one layer and
+  costs nothing at runtime; a pinned base digest still names the layer everything else is
+  built on.
+
+- **A demo instance no longer lets a visitor rotate the shared account's password.** The demo
+  is one published account (`demo@kurul.dev` with `DEMO_PASSWORD`), and Better Auth's
+  `POST /auth/change-password` asks only for the current password, which is public: one request
+  locked every other visitor out until the next reset wrote the password back, up to an hour.
+  `DemoRestrictedGuard` could not cover it because `/auth/*` is served by Express below the Nest
+  router, so the refusal lives at the Better Auth mount (`mount-better-auth.ts`), with the same
+  `403` envelope the guard produces for account and workspace deletion, and the guard's comment
+  now carries the full list: two Nest routes plus this auth path, with `/auth/change-email`
+  listed beside it so it is already refused the day `user.changeEmail` is enabled. Revoking
+  sessions and renaming the account stay open on purpose: both are a sign-in away from
+  recovered, and the list admits what the reset cannot recover, not what is annoying. An
+  ordinary install is untouched; the `DEMO_MODE` table in
+  [self-hosting.md](docs/self-hosting.md#what-demo_modetrue-changes) names the new row.
+- **Request bodies to `/auth/*` are bounded, at the proxy and at the API.** Better Auth reads
+  the raw request stream itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on
+  every other route, and the bundled `docker/Caddyfile` set `request_body max_size` only on
+  `/api/*`, so a `POST /auth/sign-in/email` could stream a body of any size into the API
+  container's heap (512 MB, `--max-old-space-size=384`) at the built-in attempt budget of 3 per
+  10 seconds per IP and path on sign-in, sign-up and change-password, and 100 per minute on the
+  other auth routes. `handle /auth/*` now carries `max_size 64KiB`, and the mount refuses a
+  declared `Content-Length` over the same `AUTH_BODY_MAX_BYTES` (`65536`, a constant in
+  `apps/api/src/auth/auth-body-limit.ts`) with the standard `413` envelope before a byte is
+  read; a chunked body, which has no length to check, is counted as it streams and the
+  connection is closed past the ceiling. The largest legitimate auth body is a few hundred bytes
+  of JSON. The nginx contract in `docs/self-hosting.md` gains `client_max_body_size 64k;` for
+  `location /auth/`, and `two-layer-limit.spec.ts` pins the Caddyfile figure, the nginx row and
+  the API constant to each other; unlike the upload pair, the two may be equal, since there is
+  no multipart envelope between them.
+- **The web app's `script-src` no longer allows `'unsafe-inline'`.** Inline script is admitted
+  by a per-request nonce instead: `apps/web/proxy.ts` — Next 16's replacement for the
+  `middleware.ts` convention, which is where the old file moved — draws 16 bytes from the
+  platform CSPRNG on every request and sets the resulting `Content-Security-Policy` on the
+  *forwarded request* as well as on the response. The request copy is the load-bearing half:
+  Next reads the nonce back out of that header and stamps it onto the scripts it emits itself
+  (the streamed RSC hydration payload, the framework and page bundles). The one inline script
+  Next does not own, `next-themes`'s pre-paint theme setter, is nonced by hand in
+  `app/layout.tsx`. Nothing had to become dynamic for this: every route already renders per
+  request, because `i18n/request.ts` reads `cookies()` and `headers()` on each one.
+
+  `Content-Security-Policy` is the only header that moved out of `next.config.ts`'s
+  `headers()`; the five constant ones stay there, where they also cover the `_next/static` and
+  `_next/image` routes the proxy's matcher skips. `'strict-dynamic'` was tried and dropped —
+  the whole suite passes with it, but `script-src` names no host for it to neutralise, and it
+  would turn a bundle tag Next forgot to nonce from "loads" into "blocked".
+
+  `style-src` keeps `'unsafe-inline'`, unchanged and out of scope: Radix and `@dnd-kit`
+  position elements through the inline `style` *attribute*, which a nonce cannot cover at all.
+
+  The browser suite now fails any scenario in which the browser refused content, collecting
+  both `securitypolicyviolation` events and Chromium's CSP console errors from every page in
+  every context (`e2e/support/fixtures.ts`). That check was verified against a build with the
+  nonce removed, where it failed on `script-src-elem blocked inline` rather than passing
+  quietly — which is how the old `'unsafe-inline'` would otherwise come back unnoticed.
+- **The release workflow no longer trusts a tag's name.** A new `guard` job in
+  `.github/workflows/release-images.yml` runs before any image is built, and every other job
+  waits for it. It checks the two things the release process asks a human to get right by
+  hand: a `vX.Y.Z` tag must point at the tip of `main` (the merge commit step 5 tags), while a
+  pre-release tag must be reachable from `main` or from an open `release/*` or `hotfix/*`
+  branch, the rehearsal path; and every workspace `package.json` must carry the tag's version,
+  with a stable tag also needing its `## [X.Y.Z] - ` heading in `CHANGELOG.md`. Until now a
+  tag typed on `develop`, or on a tree whose version bump was forgotten, would have been built,
+  signed and published, and a stable one would also have moved `latest` under every operator
+  who pulls without `TAG`. A failing guard names the offending file, or the refs it searched,
+  and nothing is pushed; `publish-sbom` waits on the guard explicitly, since its
+  `!cancelled()` condition would otherwise run past a rejected tag with `contents: write`.
+  Every job in the workflow also gained a `timeout-minutes`. The guard catches a slip inside
+  the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
+  repository admin is a repository ruleset, described in
+  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the operator checklist
+  in `ROADMAP.md`.
+
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that
@@ -1851,7 +3034,8 @@ commit; this is the point it becomes a version.
   session cookie cache, batch due-soon scans and rebalance SQL, paginate comments, and add
   `pg_trgm` search indexes.
 
-[unreleased]: https://github.com/dravcore/kurul/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/dravcore/kurul/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/dravcore/kurul/releases/tag/v0.4.0
 [0.3.0]: https://github.com/dravcore/kurul/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dravcore/kurul/releases/tag/v0.2.0
 [0.1.0]: https://github.com/dravcore/kurul/releases/tag/v0.1.0

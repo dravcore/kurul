@@ -7,6 +7,7 @@ pnpm-lock.yaml
 CHANGELOG.md
 apps/web/next-env.d.ts
 .claude/
+.superpowers/
 # Playwright's own output: reports, traces, screenshots and the run manifest. Generated on
 # every browser-suite run, gitignored, and not source.
 e2e/test-results

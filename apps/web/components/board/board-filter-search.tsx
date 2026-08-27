@@ -66,7 +66,7 @@ export function BoardFilterSearch({ value, onCommit }: BoardFilterSearchProps): 
         }}
         placeholder={t('searchPlaceholder')}
         aria-label={t('searchLabel')}
-        className="h-8 pl-7 text-small"
+        className="h-8 pl-7 md:text-small"
       />
     </div>
   );

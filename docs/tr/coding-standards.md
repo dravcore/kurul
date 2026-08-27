@@ -2,7 +2,7 @@
 
 Bu repository'deki TypeScript, NestJS ve Next.js kodu için konvansiyonlar.
 
-> 🌐 [English (canonical)](../coding-standards.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../coding-standards.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 
@@ -229,9 +229,38 @@ components/
 ### Stil
 
 - Markup'ta Tailwind utility class'ları; CSS modülleri yok, styled-components yok.
-- Koşullu class'lar string concatenation değil, `cn()` helper'ından geçer.
+- Koşullu class'lar string concatenation değil, `cn()` helper'ından geçer. `cn()`
+  (`apps/web/lib/utils.ts`) `tailwind-merge`'ü Kurul'un tip ölçeği ve `font-strong` ağırlığıyla
+  genişletir; böylece bir tüketicinin `text-*`/`font-*` override'ı, primitifin kendi
+  varsayılanıyla tekilleşir, ikisi birden DOM'a ulaşmaz.
 - Design token'ları (renkler, spacing, radius) Tailwind theme'inden gelir — component'lerde
   keyfi hex değerleri yok.
+- İki çağrı noktası bilerek ham renk taşır: components/ui/button.tsx'in destructive
+  `text-white`'ı ve components/ui/select.tsx'in chevron `stroke="%23888"`'i; ikisi de
+  `RAW_COLOUR_CALL_SITES` (`apps/web/app/globals.contrast.test.ts`) içinde sabitlenmiş ve
+  ölçülmüş durumda. Chevron bir token'ı hiç okuyamaz: kontrolün kendi background'una bir
+  `data:` URI olarak çizilir ve orada `var()` çözülmez. Bu ikisinin dışındaki her şey bir
+  defect'tir.
+- Tek bir çağrı noktası bilerek `outline-none` taşır: `components/ui/dialog.tsx`'in
+  `DialogContent` ve `SheetContent`'i; Radix content wrapper'ları açıldıklarında focus'u Tab, ok
+  tuşu veya bir link değil script taşır, yani tek focus işaretinin böleceği bir klavye yolculuğu
+  yoktur. Ham renk istisnalarıyla aynı şekilde korunur:
+  `apps/web/app/globals-css-layers.test.ts` ağacın tamamını `outline-none` / `outline-hidden`
+  için tarar ve sonuç adı konmuş, gerekçelendirilmiş bu tek istisnadan başka bir şeyse kırmızıya
+  döner.
+- `apps/web/app/globals.css` içindeki yazar CSS'i, kuralın yanına yazılmış bir gerekçe yoksa
+  `@layer base` içine girer. Katmansız bir kural özgüllüğünden bağımsız olarak her cascade
+  katmanını yener; bu yüzden katmansız bir `*` seçici, Tailwind'in `@layer utilities` içine
+  ürettiği yardımcı sınıfları yeniden boyar ve markup'ta yazılan class söylediği şeyi ifade
+  etmeyi bırakır. Böyle bir gerekçe taşıyan tek kural `:focus-visible` outline'ıydı; kontroller
+  kendi focus ring'lerini ve `outline-none`'larını bıraktığı anda `base` içine taşındı ve bugün
+  hiçbir kural böyle bir gerekçe taşımıyor. `apps/web/app/globals-css-layers.test.ts` bunu korur.
+- Her `text-*`, `bg-*`, `border-*`, `font-*`, `shadow-*` ve `rounded-*` class'ının
+  `@theme inline` içinde ya da
+  Tailwind'in yerleşik ölçeğinde bir karşılığı olmalı. Karşılığı olmayan class hiç CSS üretmez:
+  hata da vermez, element yalnızca miras alır ve yanlışlık review'da görünmez.
+  `apps/web/app/theme-classes.test.ts` ağacı Tailwind üzerinden derler ve hiçbir şey üretmeyen her
+  class'ta kırmızıya döner.
 
 ## Paylaşılan tipler (`packages/shared-types`)
 

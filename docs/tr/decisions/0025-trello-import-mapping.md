@@ -3,7 +3,7 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-15
 
-> 🌐 [English (kanonik)](../../decisions/0025-trello-import-mapping.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0025-trello-import-mapping.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 
@@ -259,3 +259,124 @@ satırıdır.
 | Bir kartın checklist'lerini tek listeye düzleştirmek       | Kullanıcının kurduğu gruplamayı atar, ve ADR 0023'ün çoklu-liste modelini seçme gerekçesiyle çelişir (`:122-127`)                                                                                |
 | Eşlenemeyen bir Trello rengi için ham hex saklamak         | `Label.color` tema tarafından çözülen bir slot saklar; bir hex'i aynı slotları farklı değerlerle tanımlayan koyu tema çözemez                                                                    |
 | Bir alan eksik ya da tuhaf tipteyken tüm dosyayı reddetmek | Buradaki hiçbir alan adı gerçek bir export'a karşı doğrulanmadı; bu, her şema kaymasını bir rapor satırı yerine tam bir başarısızlığa çevirirdi                                                  |
+
+## Değişiklik (2026-08-26): alan uzunluğu tavanları ve satır sayısı tavanı (SEC-04)
+
+Bir denetim bulgusu (SEC-04), bu importer'ın diğer her yazma yolunun uyguladığı uzunluk
+kontrollerini atladığını gösterdi. `Task.title`, `Task.description`, `Board.name`,
+`Board.description`, `Checklist.title`, `Column.name`, `Label.name`, `ChecklistItem.content` ve
+`Attachment.url`, diğer her rotada `CreateTaskDto`, `CreateBoardDto`, `CreateChecklistDto`,
+`CreateColumnDto`, `CreateLabelDto`, `CreateChecklistItemDto` ve `CreateAttachmentDto` üzerinden
+veritabanına ulaşıyor, ve bunların her biri kendi alanını `@MaxLength` ile işaretliyor. Planner
+ise `card.name`, `card.desc`, export'un kendi board adı ve açıklaması, `checklist.name`,
+`list.name`, `label.name`, bir check item'ın `name` alanı ve bir ekin `url` alanını böyle bir
+tavan olmadan doğrudan yazıyordu, yani bir Trello export'u bu dekoratörlerin korumadığı tek
+kapıydı. Export'taki hiçbir şey bu şekilde yazılmakla kötü niyetli hale gelmiyordu; risk,
+kimsenin kaydıramayacağı bir board ve ürünün bir kolonun tutmasını hiç istemediği kadar veri
+tutan bir veritabanı sütunuydu.
+
+`trello-import-planner.ts` artık bu alanların her birini DTO'nun kullandığı aynı sabite kısıtlıyor.
+Her DTO çifti (create ve update), tavanını yanındaki tek dosyadan import ediyor, toplam altı dosya
+(`task/dto/task-limits.ts`, `board/dto/board-limits.ts`, `board/dto/column-limits.ts`,
+`label/dto/label-limits.ts`, `task/dto/checklist-item-limits.ts` ve
+`attachment/dto/attachment-limits.ts`), ve planner da aynı altı dosyayı import ediyor, yani her
+sayı bir kez var oluyor. Kesilen bir görev başlığı ya da açıklaması, bu raporda başka bir yerde
+zaten kullanılan aynı gerekçeyle tek bir `(card, defaulted)` satırı olarak raporlanır (bilinmeyen
+bir etiket rengi, varsayılan bir sütun kategorisi gibi): kart yine de import edilir, ve raporun
+cevapladığı soru "board'um neden farklı görünüyor" sorusudur, bunu bir kısıtlama da bir renk
+değişimi kadar iyi cevaplar. Kesilen bir checklist başlığı ya da bir checklist item'ın içeriği de
+aynı şekilde, sırasıyla `(checklist, defaulted)` ve `(checklistItem, defaulted)` altında
+raporlanır. Kesilen bir label adı, bilinmeyen bir rengin zaten ürettiği `(label, defaulted)`
+satırına katılır; Karar tablosunun bunları birleştirme gerekçesiyle aynı gerekçeyle: kullanıcının
+tanımadığı bir label tek bir sorundur, kaç alanı değişmiş olursa olsun. Kesilen bir ek URL'si
+`(attachment, defaulted)` altında raporlanır. Bir sütunun adı, her import edilen sütunun zaten
+aldığı kategori varsayımıyla aynı rapor satırını paylaşır (`(column, defaulted)`, sayı sütun
+sayısına eşit): aynı sütun için ayrı, ikinci bir satır onu iki kez saymış olurdu, bu yüzden
+kısıtlama ayrı bir satır eklemek yerine o satırın örnek metninin ne söyleyebileceğini değiştirir.
+Board'un kendi adı ve açıklaması sessizce kısıtlanır: yukarıdaki kapalı kelime dağarcığında bir
+`board` kapsamı yok, bir board bir satır sınıfı değil tek bir satır, ve yalnızca "1" diyebilecek
+bir `(board, defaulted)` satırı kullanıcının davranabileceği hiçbir şey söylemez, bu da
+`trello-export.ts`'in board'un kendi açıklaması kullanılamaz olduğunda zaten uyguladığı
+gerekçenin aynısı.
+
+Bu değişikliğin ürettiği raporda dördüncü bir yeni skip nedeni yerine üç dürüst sınırlama var.
+Bu değişikliğin brief'i özel bir `truncated` nedeni istiyordu; branch bunun yerine `Defaulted`'i
+yeniden kullanıyor, çünkü web rapor paneli `t('skip.reason.' + group.reason)`'ı sabit bir çeviri
+tablosundan (`apps/web/messages/{en,tr}.json`) render ediyor, ve bu worktree'nin dokunmasına izin
+verilmiyor; karşılığı olmayan bir enum üyesi bu render'ı kırar. Sonuç olarak, mevcut `Defaulted`
+metni ("Kurul had no matching value, so the default was used") artık hiçbir şeyin varsayılmadığı
+ve hiçbir şeyin eşleşmediği, yalnızca kesildiği beş grup türü için gösteriliyor: bir follow-up
+PR `truncated` nedenini ve her iki çeviriyi ekleyene kadar bu metin bir kısıtlamayı yanlış
+tanımlıyor.
+
+İkincisi, kesilen bir sütun adı yalnızca ilk `SKIP_SAMPLE_LIMIT` örneği arasına düşerse
+`(column, defaulted)` içinde raporlanıyor, çünkü o satırın sayısı, herhangi bir ad kesilmiş olsun
+ya da olmasın, `columns.length`, ve örnekleri her grubunki gibi aynı şekilde sınırlanıyor; bu
+tavanı aştıktan sonra kesilen bir sütun adı raporda hiçbir iz bırakmıyor.
+
+Üçüncüsü, `filename: safeDisplayName(attachment.name) || url.value`, bir ad boşsa ya da
+temizlendikten sonra boş kalıyorsa (zaten kısıtlanmış, `MAX_ATTACHMENT_URL_LENGTH`'e kadar, 2048
+karakter) URL'ye düşüyor, bu da bir `filename`'i `CreateAttachmentDto`'nun her başka rotada
+kısıtladığı 255 karakteri aşacak şekilde saklayabilir. `AttachmentService.createLink` kendi
+`filename`'ini birebir aynı şekilde oluşturuyor (`safeDisplayName(dto.filename ?? '') || url`),
+yani bu, importer'ın kendi HTTP ikizinden sapması değil, ikisinde de var olan önceden var olan
+bir istisna; "importer'ın yazdığı her alan kendi DTO tavanına bağlıdır" ifadesi bu tek istisna
+akılda tutularak okunmalı.
+
+Aynı tavan, yalnızca yazmayı değil _raporu_ da sınırlıyor. Planner'ın yazmak yerine düşürdüğü bir
+satır (arşivlenmiş bir liste ya da kart, export'ta bulunmayan bir label id'sine işaret eden bir
+kart, reddedilen bir ek, kartı düşürüldüğü için düşen bir checklist) yine de bir adı yanıt
+gövdesinde örnek olarak alıntılıyor, ve o ad export'tan geliyor, kısıtlanmamış olarak, tıpkı
+yukarıdaki alanlar gibi. Bu örnek noktalarının her biri metnini, tanımladığı satır yazılmış olsaydı
+nasıl kısıtlanacak ya da temizlenecek idiyse öyle kısıtlıyor ya da temizliyor (label-id durumunda
+kabul edilen kartın kendi zaten kısıtlanmış başlığı; reddedilen bir ek için `safeDisplayName`;
+düşen bir liste ya da checklist için sütun/checklist tavanları).
+
+Bir durumun ödünç alacağı hiçbir tavan yok: `readCard`, `readList`, `readLabel` ya da
+`readChecklist`'in tamamen reddettiği bir girdi (eksik bir `id`, ya da yanlış tipte bir alan
+yüzünden) hiçbir zaman bir plan satırına dönüşmüyor, bu yüzden `trello-export.ts` onu, `name`
+alanında ne varsa onu, kısıtlanmamış olarak raporluyor; planner'ın ödünç alabileceği kabul edilmiş
+bir satır yok çünkü. Yukarıdaki nokta bazlı kısıtlamaların kapsamadığı kapı bu, ve bir seviye daha
+aşağıda kapatılıyor: `SkipCollector` (`import-skip.ts`) her örneği, hangi çağrı noktasından geldiği
+fark etmeksizin, şimdi ya da ileride, rapora girerken sabit bir `SKIP_SAMPLE_MAX_LENGTH`'e
+kısıtlıyor. Yukarıdaki nokta bazlı kısıtlamalar yine de değerini koruyor, çünkü her biri bir adı,
+tanımladığı satırın gerçekte sahip olacağı uzunluğa kısıtlıyor, koleksiyoncunun tek düz tavanına
+değil; ama artık tek güvence onlar değil, ek bir güvence: oversized bir alan hakkındaki bir rapor,
+hiçbir yolda kendisi sınırsız bir string taşıyamaz.
+
+Aynı bulgunun adlandırdığı ikinci bir boşluk: bir export'un bu API'den planlamasını isteyebileceği
+_kart ya da liste_ sayısını hiçbir şey sınırlamıyordu (gerçek bir export'un baskın olduğu ve
+bulgunun adlandırdığı iki satır türü). `TRELLO_IMPORT_MAX_BYTES` ayrıştırılmış nesne grafiğinin
+boyutunu sınırlar, satır sayısını değil, ve küçük bir kart birkaç düzine bayt olabilir, yani 20
+MiB'lik bir export yine de birkaç yüz bin küçük kart olabilir. `TrelloImportService` artık
+reader'ın `lists.length` ve `cards.length` değerlerini, planner çalışmadan ve transaction
+açılmadan önce `TRELLO_IMPORT_MAX_CARDS` (varsayılan 50000) ve `TRELLO_IMPORT_MAX_LISTS`
+(varsayılan 5000) değerlerine karşı denetler; bu tavanlardan birini aşan bir export `400` döner ve
+hiçbir şey yazmaz. Bunlar reader'ın sayıları, export'un ham dizileri değil: arşivlenmiş bir liste
+ya da kart hâlâ bunların içinde, çünkü onları düşüren planner, reader değil; ama reader'ın bir
+satıra hiç ayrıştıramadığı bir girdi (eksik bir `id`, ya da yanlış tipte bir alan) zaten yok,
+çünkü onu bir satır değil bir reader sorunu yapan da bu. Bu, bu tavanların var olma sebebi olan
+maliyeti (ayrıştırılmış grafiğin tuttuğu heap, ve writer'ın `createMany` dizisinin uzunluğu) yine
+de karşılıyor, çünkü ikisi de reader'ın tuttuğu her satır için ödenir, planner onu sonunda yazsın
+ya da yazmasın.
+
+Checklist'lerin, check item'ların, label'ların, task-label satırlarının ve eklerin kendi tavanı
+yok: bir kart, export'ununki kadar çoğunu, sınırsız, taşıyor, yani az kart ve liste ama çok
+büyük sayıda checklist item'ı olan bir export yine de o kadar satırı tek transaction içinde
+planlayıp chunk'layacaktır. `TRELLO_IMPORT_MAX_CARDS` ve `TRELLO_IMPORT_MAX_LISTS`, SEC-04'ün
+adlandırdığı ve gerçek bir export'un ölçeklendiği iki satır türünü sınırlıyor; diğer beşi için bir
+tavan, ihtiyaç duyan bir export ortaya çıkarsa bir follow-up'a bırakılıyor.
+
+`readTrelloImportMaxCards` ve `readTrelloImportMaxLists`, hatalı yapılandırılmış bir değerde düz
+bir `Error` fırlatıyor, `readTrelloImportMaxBytes`'ın zaten kullandığı aynı gelenekle: hatalı bir
+değer bir sonraki import'ta bir `500`'dür, boot'u reddetmek değil. Bu, ADR 0032'nin plan
+tavanlarından bilinçli bir sapmadır; onlar boot'ta reddediyor, çünkü onlar
+`readInstancePlanLimits()` tarafından boot'ta bir kez okunuyor ve bir daha hiç okunmuyor, oysa
+buradaki her import tavanı `import-config.ts`'de verilen gerekçeyle (bir test ya da bir operatör
+restart'ı, gerçekten ayarlanmış değeri görmeli) zaten her istekte okunuyor. Bu ikisi için boot-time
+doğrulama eklenmedi, yani hatalı yapılandırılmış bir `TRELLO_IMPORT_MAX_CARDS`, kendi yeni bir
+başarısızlık modu kazanmak yerine bayt-tavanı kardeşinin zaten yaptığı şekilde başarısız oluyor.
+
+İki değişiklik de yukarıdaki Karar bölümüne dokunmuyor: kapalı kelime dağarcığı değişmedi, yapı
+tablosu değişmedi, ve yazma hâlâ veritabanına hiç erişmeden kurulan bir plan üzerinden tek bir
+atomik transaction.

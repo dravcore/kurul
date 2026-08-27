@@ -54,7 +54,7 @@ export function ActivationFunnel(): React.ReactElement | null {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="font-display text-title font-semibold tracking-tight">{t('title')}</h2>
+        <h2 className="text-title">{t('title')}</h2>
         <p className="text-body text-muted-foreground">{t('description')}</p>
       </div>
 
@@ -122,14 +122,14 @@ function FunnelRow({
       </div>
       {step.unit === 'users' ? (
         <div
-          className="h-2 w-full overflow-hidden rounded-[var(--radius-sm)] bg-muted"
+          className="h-2 w-full overflow-hidden rounded-sm bg-muted"
           // The bar is decoration over a number that is already written out beside it, so it
           // carries no accessible name of its own — a screen reader that announced both would
           // read the same figure twice.
           aria-hidden="true"
         >
           <div
-            className="h-full rounded-[var(--radius-sm)] bg-primary"
+            className="h-full rounded-sm bg-primary"
             style={{ width: `${stepBarPercent(dto, step.count)}%` }}
           />
         </div>

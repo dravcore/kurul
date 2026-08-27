@@ -3,7 +3,7 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-14
 
-> 🌐 [English (kanonik)](../../decisions/0022-attachment-storage.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0022-attachment-storage.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 
@@ -118,9 +118,15 @@ gevşetmesi, ayrıca tartışılır.
 
 ## Gerekçe
 
-**Neden API origin'i, web origin'i değil.** Web uygulamasının CSP'si `script-src 'self'
-'unsafe-inline'` taşıyor, yani o origin'deki bir markup enjeksiyonu zaten inline script
-çalıştırabiliyor; oraya saldırgan kontrollü içerik eklemek mevcut bir zaafiyeti büyütür. API'nin
+**Neden API origin'i, web origin'i değil.** Web uygulaması script çalıştıran bir tarayıcı
+yüzeyi, API değil; mesele tam da bu asimetri. Bu karar alındığında web CSP'si `script-src
+'self' 'unsafe-inline'` taşıyordu, yani o origin'deki bir markup enjeksiyonu zaten inline
+script çalıştırabiliyordu. O tarihten sonra bu, `'unsafe-inline'` içermeyen istek başına bir
+nonce'a sıkılaştırıldı; bu aradaki farkı daraltıyor ama argümanı kapatmıyor: web origin'i hâlâ
+script çalıştırıyor, hâlâ session cookie'sini taşıyor ve `style-src` hâlâ inline style'lara
+izin veriyor — dolayısıyla oradan servis edilen saldırgan kontrollü baytlar, hiçbir şey render
+etmeyen bir origin'den gelen aynı baytlardan bir saldırgan için kesinlikle daha değerli.
+API'nin
 CSP'si `default-src 'none'`, yani oradan doküman olarak açılan kullanıcı yüklemesi bir HTML dosyası
 hiçbir şey yükleyemez. `security-headers.ts` bu vektörü `X-Content-Type-Options` üstündeki yorumda
 tam olarak adlandırıyor — "a user-uploaded file served as `text/plain` that a browser decides to
@@ -267,7 +273,7 @@ girişilmez.
 | Baştan S3/MinIO şart koş                           | Zaten object storage çalıştıran azınlık için çoğunluğun beş dakikalık Compose kurulumunu bozar                                                                                                                   |
 | İlk sürümde disk ve S3'ü birlikte yayınla          | Bildirilmiş hiçbir dağıtımın henüz ihtiyaç duymadığı bir backend için iki kod yolu ve iki test matrisi; port bunu ileride eklenen bir dosya yapıyor                                                              |
 | İndirme için imzalı URL                            | Yetkilendirmeyi, operatörün değiştirmeye davet edildiği bir proxy'ye taşıyamıyor, dolayısıyla yalnız guard zincirinin kaybını ve çerezde olmayan bir iptal problemini satın alıyor                               |
-| Dosyaları web origin'inden servis et               | O origin `script-src`'te zaten `'unsafe-inline'` taşıyor; API'nin `default-src 'none'`'ı saldırgan kontrollü içerik için kesinlikle daha güçlü                                                                   |
+| Dosyaları web origin'inden servis et               | O origin script çalıştırıyor ve session cookie'sini taşıyor; API'nin `default-src 'none'`'ı saldırgan kontrollü içerik için kesinlikle daha güçlü                                                                |
 | Silme yolunda dosyaları satır içinde sil           | `Workspace → Board → Task` uygulama kodunu çağırmadan Postgres içinde cascade ediyor, dolayısıyla bu yol her toplu silmeyi kaçırırdı                                                                             |
 | Yetimleri grace period'suz süpür                   | Bir restore'un ardından ilk gece, en son dump'tan sonra yüklenen her dosyayı siler                                                                                                                               |
 | Beyan edilen `Content-Type`'a ya da uzantıya güven | İkisi de çağıran tarafından verilir; hiçbiri bir şeyin kanıtı değildir                                                                                                                                           |

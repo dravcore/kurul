@@ -31,40 +31,85 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
-      className={cn(
-        'fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
-        className,
-      )}
+      className={cn('fixed inset-0 z-50 bg-overlay-scrim', className)}
       {...props}
     />
   );
 }
 
+/**
+ * Radix hands focus back to `DialogTrigger` on close. Every dialog in this app but the mobile
+ * drawer is driven by an `open` prop instead of a trigger, so there is nothing for it to hand
+ * focus back to and dismissing one drops a keyboard user on `<body>`, against the rule in
+ * `docs/design.md` §5 that `Esc` closes the topmost layer and returns focus to whatever opened
+ * it. The opener is read in `onOpenAutoFocus`, which Radix fires while focus is still outside
+ * the content, and is the trigger itself wherever one is used.
+ *
+ * The surface caps its height (`docs/design.md` §5) and the scroll sits on the body wrapper
+ * below, not on the surface itself: the close button is positioned against the surface, and an
+ * absolutely positioned box whose containing block is a scroll container scrolls away with the
+ * content and is clipped by it.
+ *
+ * The body carries its own small padding rather than relying on the surface's, and offsets it
+ * with an equal negative margin so the visible layout is unchanged. Per CSS Overflow 3, setting
+ * `overflow-y: auto` computes `overflow-x` to `auto` too (a box cannot scroll one axis and paint
+ * past the other), and both axes then clip anything painted outside the body's own padding edge,
+ * including the 2px `outline` at 2px `outline-offset` that `:focus-visible` draws in
+ * `globals.css`. A full-width control's ring sits flush with the body's edge on every side
+ * (left/right always, and top/bottom for whatever row is first or last), so without room inside
+ * that edge the ring is cut off outright, not just softened. `-1`/`1` is 4px either way, exactly
+ * the outline's 2px plus its 2px offset.
+ */
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
 }) {
   const t = useTranslations('common');
+  const openerRef = React.useRef<HTMLElement | null>(null);
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        onOpenAutoFocus={(event) => {
+          const opener = document.activeElement;
+          openerRef.current =
+            opener instanceof HTMLElement && opener !== document.body ? opener : null;
+          onOpenAutoFocus?.(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          const opener = openerRef.current;
+          if (event.defaultPrevented || !opener?.isConnected) return;
+          // Claims the restore before Radix's own handler, which would reach for the trigger
+          // that is not there and leave focus where it fell.
+          event.preventDefault();
+          opener.focus();
+        }}
         className={cn(
-          'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-overlay duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+          'fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-4rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-lg border bg-popover p-6 shadow-overlay outline-none sm:max-w-lg',
           className,
         )}
         {...props}
       >
-        {children}
+        {/* `min-h-0`: a flex child refuses to shrink below its content without it, which would
+            hand the overflow back to the surface and undo the cap above. `-m-1`/`p-1` give the
+            focus ring room inside the scrollport's clip edge (see the doc comment above) while
+            netting to zero visible offset, since the padding just pulls content back in by the
+            same 4px the negative margin let the box grow by. */}
+        <div data-slot="dialog-body" className="-m-1 grid min-h-0 gap-4 overflow-y-auto p-1">
+          {children}
+        </div>
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            className="absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon />
             <span className="sr-only">{t('close')}</span>
@@ -94,9 +139,9 @@ function DialogContent({
  * The slide is written as real keyframes in `globals.css`, keyed off the `data-slot` and
  * `data-state` attributes below, and not with `animate-in` / `slide-in-from-*` utility
  * classes: this project imports plain `tailwindcss` with no animation plugin, so those class
- * names generate nothing. (The ones already on `DialogContent` and `DialogOverlay` are
- * inert for the same reason — pre-existing, and not this component's to fix.) Writing the
- * keyframes out is also what lets `prefers-reduced-motion` drop the movement and keep the
+ * names generate nothing. `DialogContent` and `DialogOverlay` bind their own keyframes the
+ * same way. Writing the keyframes out is also what lets `prefers-reduced-motion` drop the
+ * movement and keep the
  * fade, which §5 asks for and a utility class could not express.
  *
  * No close button of its own: the drawer's close control is a real, labelled `DialogClose`
@@ -134,7 +179,13 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn('flex flex-col gap-2 text-center sm:text-left', className)}
+      className={cn(
+        // Sticky over the body's own scroll, so it needs the surface it floats on, not the
+        // canvas behind it: DialogContent (the only surface this renders inside of) paints
+        // bg-popover.
+        'sticky top-0 flex flex-col gap-2 bg-popover text-center sm:text-left',
+        className,
+      )}
       {...props}
     />
   );
@@ -152,7 +203,12 @@ function DialogFooter({
   return (
     <div
       data-slot="dialog-footer"
-      className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}
+      className={cn(
+        // Same surface as DialogHeader above, for the same reason: this only ever renders
+        // inside DialogContent's bg-popover.
+        'sticky bottom-0 flex flex-col-reverse gap-2 bg-popover sm:flex-row sm:justify-end',
+        className,
+      )}
       {...props}
     >
       {children}
@@ -169,7 +225,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn('text-lg leading-none font-semibold', className)}
+      className={cn('text-title', className)}
       {...props}
     />
   );
@@ -182,7 +238,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn('text-sm text-muted-foreground', className)}
+      className={cn('text-body text-muted-foreground', className)}
       {...props}
     />
   );

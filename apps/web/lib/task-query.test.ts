@@ -3,6 +3,7 @@ import { Priority, type CursorPage, type TaskDto } from '@kurul/shared-types';
 import {
   BOARD_TASK_PAGE_LIMIT,
   countActiveFilters,
+  countActiveMenuFilters,
   fetchAllBoardTasks,
   hasActiveFilters,
   mergeFiltersIntoSearchParams,
@@ -52,6 +53,38 @@ describe('task-query filters', () => {
   it('counts and detects active filters', () => {
     expect(hasActiveFilters({})).toBe(false);
     expect(countActiveFilters({ q: 'x', priority: [Priority.LOW], dueDateNull: true })).toBe(3);
+  });
+
+  it('counts all filters including search term', () => {
+    // Search term alone counts as 1 filter for the board view/empty state message
+    expect(countActiveFilters({ q: 'search query' })).toBe(1);
+    // Menu filters plus search term
+    expect(countActiveFilters({ q: 'search query', priority: [Priority.HIGH] })).toBe(2);
+    expect(
+      countActiveFilters({
+        q: 'search query',
+        priority: [Priority.HIGH, Priority.MEDIUM],
+        assigneeId: ['user-1'],
+        labelId: ['label-1', 'label-2'],
+        dueDateNull: true,
+      }),
+    ).toBe(7);
+  });
+
+  it('counts only menu filters, not the free-text search term', () => {
+    // Search term alone should not count toward the Filters badge
+    expect(countActiveMenuFilters({ q: 'search query' })).toBe(0);
+    // Menu filters should count regardless of search term
+    expect(countActiveMenuFilters({ q: 'search query', priority: [Priority.HIGH] })).toBe(1);
+    expect(
+      countActiveMenuFilters({
+        q: 'search query',
+        priority: [Priority.HIGH, Priority.MEDIUM],
+        assigneeId: ['user-1'],
+        labelId: ['label-1', 'label-2'],
+        dueDateNull: true,
+      }),
+    ).toBe(6);
   });
 
   it('merges filters without dropping unrelated params', () => {

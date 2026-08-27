@@ -53,13 +53,11 @@ export function ImportReportPanel({
   return (
     <section
       aria-label={t('reportRegion')}
-      className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-border bg-card p-4"
+      className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="font-display text-title font-semibold">
-            {t('reportTitle', { name: report.boardName })}
-          </h2>
+          <h2 className="text-title">{t('reportTitle', { name: report.boardName })}</h2>
           <p className="max-w-prose text-small text-muted-foreground">{t('notSaved')}</p>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>
@@ -68,7 +66,7 @@ export function ImportReportPanel({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <p className="text-small font-medium text-foreground">{t('importedTitle')}</p>
+        <p className="text-small font-strong text-foreground">{t('importedTitle')}</p>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-small text-muted-foreground">
           {IMPORTED_KEYS.map((key) => (
             <li key={key}>{t(`imported.${key}`, { count: report.imported[key] })}</li>
@@ -77,7 +75,7 @@ export function ImportReportPanel({
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-small font-medium text-foreground">{t('skippedTitle')}</p>
+        <p className="text-small font-strong text-foreground">{t('skippedTitle')}</p>
         {report.skipped.length === 0 ? (
           <p className="text-small text-muted-foreground">{t('nothingSkipped')}</p>
         ) : (
@@ -123,7 +121,7 @@ function SkipGroup({
   if (group.samples.length === 0) {
     return (
       <div className="flex flex-col gap-1">
-        <p className="text-small text-foreground">{sentence}</p>
+        <p className="text-read text-foreground">{sentence}</p>
         {columnAction ? (
           <ColumnSettingsLink boardId={boardId} label={t('setColumnCategories')} />
         ) : null}
@@ -133,7 +131,7 @@ function SkipGroup({
 
   return (
     <details className="flex flex-col gap-1">
-      <summary className="cursor-pointer text-small text-foreground">{sentence}</summary>
+      <summary className="cursor-pointer text-read text-foreground">{sentence}</summary>
       <div className="mt-1 flex flex-col gap-1">
         {/*
           The ratio is not decoration. `samples` is truncated at the API's `SKIP_SAMPLE_LIMIT`
@@ -164,7 +162,7 @@ function ColumnSettingsLink({
   label: string;
 }): React.ReactElement {
   return (
-    <Link href={`/board/${boardId}`} className="text-small font-medium text-primary underline">
+    <Link href={`/board/${boardId}`} className="text-small font-strong text-primary underline">
       {label}
     </Link>
   );

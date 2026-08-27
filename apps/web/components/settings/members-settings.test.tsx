@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { toast } from 'sonner';
 import {
@@ -14,6 +14,9 @@ import { SMTP_SETUP_DOCS_URL, fetchInstanceConfig } from '@/lib/instance-config'
 import { fetchAllWorkspaceMembers, fetchPendingInvitations } from '@/lib/member-query';
 import { MembersSettings } from './members-settings';
 
+/** Every instance in this suite is an ordinary one; the demo section is off on all of them. */
+const NO_DEMO = { enabled: false, resetIntervalMinutes: null, nextResetAt: null } as const;
+
 const WORKSPACE_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d00';
 const ME_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51';
 const BORA_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d52';
@@ -21,8 +24,25 @@ const CEREN_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d53';
 
 const copy = messages.app.settings.members;
 
+/** No ceiling is the default; the seat tests set their own (ADR 0032). */
+const NO_PLAN_LIMITS = {
+  seatsPerWorkspace: null,
+  boardsPerWorkspace: null,
+  workspaces: null,
+  users: null,
+  storageBytesPerWorkspace: 2_147_483_648,
+  storageBytesPerInstance: 21_474_836_480,
+} as const;
+
 const workspace = vi.hoisted(() => ({
   value: { activeId: '', activeRole: null as MemberRole | null },
+}));
+
+const plan = vi.hoisted(() => ({
+  value: {
+    limits: { seats: null as number | null, boards: null, storageBytes: null },
+    usage: { seats: 3, boards: 0, storageBytes: 0 },
+  },
 }));
 
 vi.mock('@/lib/member-query', () => ({
@@ -37,6 +57,12 @@ vi.mock('@/lib/instance-config', async (importOriginal) => ({
 }));
 vi.mock('@/components/layout/workspace-provider', () => ({
   useWorkspaceContext: () => workspace.value,
+}));
+// Only the hook is replaced; `isAtCeiling` stays real, so the tests exercise the comparison the
+// screen makes rather than a boolean the test decided.
+vi.mock('@/lib/plan-query', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/plan-query')>()),
+  useWorkspacePlan: () => plan.value,
 }));
 vi.mock('@/lib/auth', () => ({
   authClient: {
@@ -129,6 +155,20 @@ function clickLastButton(label: string): void {
   fireEvent.click(buttons[buttons.length - 1] as HTMLElement);
 }
 
+/**
+ * The role `<select>` on a specific member's row, scoped by the row it sits in and named for
+ * that member (`Role for {name}`), unlike the invite dialog's plain `Role`.
+ */
+function rowFor(name: string): HTMLElement {
+  const row = screen.getByText(name).closest('li');
+  if (!row) throw new Error(`no row found for ${name}`);
+  return row;
+}
+
+function roleSelectFor(name: string): HTMLSelectElement {
+  return within(rowFor(name)).getByLabelText(`Role for ${name}`) as HTMLSelectElement;
+}
+
 beforeAll(() => {
   // Radix Dialog and Popper both measure their content; jsdom ships neither.
   globalThis.ResizeObserver ??= class {
@@ -144,10 +184,20 @@ beforeEach(() => {
   loadMembers.mockReset().mockResolvedValue(ROSTER);
   loadInvitations.mockReset().mockResolvedValue([]);
   // The configured deployment is the default, so the warning cases have to say so explicitly.
-  loadConfig.mockReset().mockResolvedValue({ mailEnabled: true, attachmentsEnabled: false });
+  loadConfig.mockReset().mockResolvedValue({
+    mailEnabled: true,
+    attachmentsEnabled: false,
+    signUpEnabled: true,
+    demo: NO_DEMO,
+    planLimits: NO_PLAN_LIMITS,
+  });
   apiPost.mockReset();
   apiPatch.mockReset();
   apiDelete.mockReset();
+  plan.value = {
+    limits: { seats: null, boards: null, storageBytes: null },
+    usage: { seats: 3, boards: 0, storageBytes: 0 },
+  };
 });
 
 afterEach(() => {
@@ -162,13 +212,14 @@ describe('MembersSettings — inviting', () => {
     renderSection();
 
     fireEvent.click(await screen.findByRole('button', { name: copy.inviteAction }));
-    fireEvent.change(screen.getByLabelText(copy.inviteEmail), {
+    const dialog = within(screen.getByRole('dialog'));
+    fireEvent.change(dialog.getByLabelText(copy.inviteEmail), {
       target: { value: '  yeni@kurul.test  ' },
     });
-    fireEvent.change(screen.getByLabelText(copy.inviteRole), {
+    fireEvent.change(dialog.getByLabelText(copy.inviteRole), {
       target: { value: MemberRole.ADMIN },
     });
-    fireEvent.click(screen.getByRole('button', { name: copy.inviteSubmit }));
+    fireEvent.click(dialog.getByRole('button', { name: copy.inviteSubmit }));
 
     await waitFor(() => expect(apiPost).toHaveBeenCalled());
     expect(apiPost).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/invitations`, {
@@ -244,7 +295,7 @@ describe('MembersSettings — inviting', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: copy.inviteAction }));
     const options = Array.from(
-      screen.getByLabelText(copy.inviteRole).querySelectorAll('option'),
+      within(screen.getByRole('dialog')).getByLabelText(copy.inviteRole).querySelectorAll('option'),
     ).map((option) => option.textContent);
 
     expect(options).toEqual([copy.roles.ADMIN, copy.roles.MEMBER, copy.roles.GUEST]);
@@ -269,22 +320,93 @@ describe('MembersSettings — revoking an invitation', () => {
 });
 
 describe('MembersSettings — changing a role', () => {
-  it('patches the role sub-resource and shows the new role on the row', async () => {
+  it('patches the role sub-resource the moment a non-owner role is chosen, with no dialog', async () => {
     apiPatch.mockResolvedValue(member(BORA_ID, 'Bora', MemberRole.ADMIN) as never);
     renderSection();
+    await screen.findByText('Bora');
 
-    await openRowMenu('Bora');
-    clickMenuItem(copy.changeRoleAction);
-    fireEvent.change(screen.getByLabelText(copy.inviteRole), {
-      target: { value: MemberRole.ADMIN },
-    });
-    clickLastButton(copy.changeRoleSubmit);
+    fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.ADMIN } });
 
     await waitFor(() => expect(apiPatch).toHaveBeenCalled());
     expect(apiPatch).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/members/${BORA_ID}/role`, {
       role: MemberRole.ADMIN,
     });
-    await waitFor(() => expect(screen.getAllByText(copy.roles.ADMIN).length).toBeGreaterThan(0));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(roleSelectFor('Bora').value).toBe(MemberRole.ADMIN));
+  });
+
+  it('shows the hint for the role the select is currently showing, under the control', async () => {
+    apiPatch.mockResolvedValue(member(BORA_ID, 'Bora', MemberRole.ADMIN) as never);
+    renderSection();
+    await screen.findByText('Bora');
+
+    fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.ADMIN } });
+
+    expect(await screen.findByText(copy.roleHints.ADMIN)).toBeTruthy();
+  });
+
+  it('points the select at its own hint with aria-describedby', async () => {
+    renderSection();
+    await screen.findByText('Bora');
+
+    const select = roleSelectFor('Bora');
+    const hint = await screen.findByText(copy.roleHints.MEMBER);
+
+    expect(select.getAttribute('aria-describedby')).toBe(hint.id);
+  });
+
+  /**
+   * A native `<select>` has no `readOnly`, so the row keeps its control enabled and refuses the
+   * write instead. jsdom does not run the browser's focus fixup, so `document.activeElement`
+   * cannot fail here on its own: `disabled === false` is what keeps a real browser from
+   * dropping the reader onto `<body>` for the length of the request.
+   */
+  it('keeps the select focused while its own patch is in flight, and clears the mark after', async () => {
+    let resolvePatch: (value: WorkspaceMemberDto) => void = () => {};
+    apiPatch.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePatch = resolve;
+        }),
+    );
+    renderSection();
+    await screen.findByText('Bora');
+    roleSelectFor('Bora').focus();
+
+    fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.ADMIN } });
+
+    expect(document.activeElement).toBe(roleSelectFor('Bora'));
+    expect(roleSelectFor('Bora').disabled).toBe(false);
+    expect(roleSelectFor('Bora').getAttribute('aria-disabled')).toBe('true');
+    // The busy state moved off the control the reader is holding and onto a live region of
+    // its own, which is the only thing left saying the write is happening. The row carries
+    // `aria-busy`, never the region: on the region it would license assistive tech to defer
+    // the update until busy clears, and by then the text is empty again.
+    const busy = within(rowFor('Bora')).getByRole('status');
+    expect(busy.textContent).toBe(copy.savingRole);
+    expect(busy.getAttribute('aria-busy')).toBeNull();
+    expect(rowFor('Bora').getAttribute('aria-busy')).toBe('true');
+    expect(roleSelectFor('Bora').getAttribute('aria-busy')).toBeNull();
+
+    resolvePatch(member(BORA_ID, 'Bora', MemberRole.ADMIN));
+    await waitFor(() => expect(roleSelectFor('Bora').getAttribute('aria-disabled')).toBeNull());
+    expect(within(rowFor('Bora')).getByRole('status').textContent).toBe('');
+    expect(rowFor('Bora').getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('refuses a second choice while the first patch is still out', async () => {
+    apiPatch.mockImplementation(() => new Promise<never>(() => {}));
+    renderSection();
+    await screen.findByText('Bora');
+
+    fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.ADMIN } });
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+
+    fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.MEMBER } });
+
+    expect(apiPatch).toHaveBeenCalledTimes(1);
+    // The refused choice is put back rather than left on screen as a value nothing saved.
+    expect(roleSelectFor('Bora').value).toBe(MemberRole.ADMIN);
   });
 
   /**
@@ -292,20 +414,65 @@ describe('MembersSettings — changing a role', () => {
    * explained failure carries its own way out — so the user must read "make someone else an
    * owner first", never the server's own wording and never a generic "could not save".
    */
-  it('turns the last-OWNER 409 into the move that would make it work', async () => {
+  it('turns the last-OWNER 409 into the move that would make it work, and reverts the select', async () => {
     apiPatch.mockRejectedValue(apiFailure(409));
     renderSection();
+    await screen.findByText('Ceren');
 
-    await openRowMenu('Ceren');
-    clickMenuItem(copy.changeRoleAction);
-    fireEvent.change(screen.getByLabelText(copy.inviteRole), {
-      target: { value: MemberRole.MEMBER },
-    });
-    clickLastButton(copy.changeRoleSubmit);
+    fireEvent.change(roleSelectFor('Ceren'), { target: { value: MemberRole.MEMBER } });
 
     expect(await screen.findByText(copy.changeRoleErrorLastOwner)).toBeTruthy();
     expect(screen.queryByText(copy.changeRoleError)).toBeNull();
     expect(screen.queryByText('server wording, never shown')).toBeNull();
+    await waitFor(() => expect(roleSelectFor('Ceren').value).toBe(MemberRole.OWNER));
+  });
+
+  describe('promoting someone to owner', () => {
+    it('asks first, and applies only once the promotion is confirmed', async () => {
+      apiPatch.mockResolvedValue(member(BORA_ID, 'Bora', MemberRole.OWNER) as never);
+      renderSection();
+      await screen.findByText('Bora');
+
+      fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.OWNER } });
+
+      expect(apiPatch).not.toHaveBeenCalled();
+      expect(screen.getByRole('dialog')).toBeTruthy();
+      expect(screen.getByText(copy.confirmOwnerBody)).toBeTruthy();
+
+      clickLastButton(copy.changeRoleSubmit);
+
+      await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+      expect(apiPatch).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}/members/${BORA_ID}/role`, {
+        role: MemberRole.OWNER,
+      });
+    });
+
+    it('reverts the select when the owner confirmation is cancelled', async () => {
+      renderSection();
+      await screen.findByText('Bora');
+
+      fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.OWNER } });
+      expect(screen.getByText(copy.confirmOwnerBody)).toBeTruthy();
+
+      fireEvent.click(screen.getByRole('button', { name: copy.cancel }));
+
+      expect(apiPatch).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(roleSelectFor('Bora').value).toBe(MemberRole.MEMBER);
+    });
+
+    it('keeps the confirmation open and shows the failure inside it, rather than closing', async () => {
+      apiPatch.mockRejectedValue(apiFailure(403));
+      renderSection();
+      await screen.findByText('Bora');
+
+      fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.OWNER } });
+      clickLastButton(copy.changeRoleSubmit);
+
+      expect(await screen.findByText(copy.changeRoleErrorForbidden)).toBeTruthy();
+      expect(screen.getByRole('dialog')).toBeTruthy();
+      expect(roleSelectFor('Bora').value).toBe(MemberRole.OWNER);
+    });
   });
 });
 
@@ -367,7 +534,13 @@ describe('MembersSettings — what a MEMBER sees', () => {
  */
 describe('MembersSettings — a deployment that cannot send email', () => {
   it('says so, permanently, above the invite control', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
+    loadConfig.mockResolvedValue({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      signUpEnabled: true,
+      demo: NO_DEMO,
+      planLimits: NO_PLAN_LIMITS,
+    });
     renderSection();
 
     expect(await screen.findByText(copy.mailDisabledTitle)).toBeTruthy();
@@ -375,7 +548,13 @@ describe('MembersSettings — a deployment that cannot send email', () => {
   });
 
   it('carries a link to the setup docs', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
+    loadConfig.mockResolvedValue({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      signUpEnabled: true,
+      demo: NO_DEMO,
+      planLimits: NO_PLAN_LIMITS,
+    });
     renderSection();
 
     const link = await screen.findByRole('link', { name: copy.mailDisabledDocs });
@@ -389,7 +568,13 @@ describe('MembersSettings — a deployment that cannot send email', () => {
    * really there (docs/design.md §7).
    */
   it('points at the copy-link way out, and the control it names exists', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
+    loadConfig.mockResolvedValue({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      signUpEnabled: true,
+      demo: NO_DEMO,
+      planLimits: NO_PLAN_LIMITS,
+    });
     loadInvitations.mockResolvedValue([invitation('inv-1', 'bekleyen@kurul.test')]);
     renderSection();
 
@@ -399,7 +584,13 @@ describe('MembersSettings — a deployment that cannot send email', () => {
   });
 
   it('cannot be dismissed, because nothing the admin does here would make it untrue', async () => {
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
+    loadConfig.mockResolvedValue({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      signUpEnabled: true,
+      demo: NO_DEMO,
+      planLimits: NO_PLAN_LIMITS,
+    });
     renderSection();
 
     const notice = (await screen.findByText(copy.mailDisabledTitle)).closest('div')?.parentElement;
@@ -420,12 +611,73 @@ describe('MembersSettings — a deployment that cannot send email', () => {
    */
   it('is neither shown to nor fetched for someone who cannot invite', async () => {
     workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.MEMBER };
-    loadConfig.mockResolvedValue({ mailEnabled: false, attachmentsEnabled: false });
+    loadConfig.mockResolvedValue({
+      mailEnabled: false,
+      attachmentsEnabled: false,
+      signUpEnabled: true,
+      demo: NO_DEMO,
+      planLimits: NO_PLAN_LIMITS,
+    });
     renderSection();
 
     expect(await screen.findByText('Bora')).toBeTruthy();
     expect(loadConfig).not.toHaveBeenCalled();
     expect(screen.queryByText(copy.mailDisabledTitle)).toBeNull();
+  });
+});
+
+/**
+ * The seat ceiling (ADR 0032). A seat is a member or an invitation still pending, counted by
+ * the API; the screen only renders the pair and disables the control at the ceiling.
+ */
+describe('MembersSettings - the seat ceiling', () => {
+  it('says nothing about seats on a workspace with no ceiling', async () => {
+    renderSection();
+
+    expect(await screen.findByText('Bora')).toBeTruthy();
+    expect(screen.queryByText(/seats used/i)).toBeNull();
+    expect(screen.getByRole('button', { name: copy.inviteAction }).hasAttribute('disabled')).toBe(
+      false,
+    );
+  });
+
+  it('shows how many of the seats are used', async () => {
+    plan.value = {
+      limits: { seats: 10, boards: null, storageBytes: null },
+      usage: { seats: 7, boards: 0, storageBytes: 0 },
+    };
+    renderSection();
+
+    expect(await screen.findByText('7 of 10 seats used')).toBeTruthy();
+    expect(screen.getByRole('button', { name: copy.inviteAction }).hasAttribute('disabled')).toBe(
+      false,
+    );
+  });
+
+  it('disables the invite control at the ceiling and says how to free a seat', async () => {
+    plan.value = {
+      limits: { seats: 3, boards: null, storageBytes: null },
+      usage: { seats: 3, boards: 0, storageBytes: 0 },
+    };
+    renderSection();
+
+    expect(await screen.findByText('3 of 3 seats used')).toBeTruthy();
+    expect(screen.getByRole('button', { name: copy.inviteAction }).hasAttribute('disabled')).toBe(
+      true,
+    );
+    expect(screen.getByText(copy.seatLimitReached)).toBeTruthy();
+  });
+
+  it('shows the counter to a MEMBER, who has no invite control to explain', async () => {
+    workspace.value = { activeId: WORKSPACE_ID, activeRole: MemberRole.MEMBER };
+    plan.value = {
+      limits: { seats: 10, boards: null, storageBytes: null },
+      usage: { seats: 7, boards: 0, storageBytes: 0 },
+    };
+    renderSection();
+
+    expect(await screen.findByText('7 of 10 seats used')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: copy.inviteAction })).toBeNull();
   });
 });
 

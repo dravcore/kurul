@@ -1,7 +1,8 @@
 {
   "common": {
     "close": "Close",
-    "deletedUser": "Deleted user"
+    "deletedUser": "Deleted user",
+    "save": "Save"
   },
   "auth": {
     "login": {
@@ -13,7 +14,39 @@
       "submit": "Sign in",
       "noAccount": "Need an account?",
       "registerLink": "Create one",
+      "forgotPasswordLink": "Forgot your password?",
       "error": "Could not sign in. Check your email and password."
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "subtitle": "Enter the email address of your account. If it has one, we'll send a link for choosing a new password.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "sent": "If that address has an account, a reset link is on its way. It works for one hour.",
+      "sendError": "Could not send the link. Try again in a moment.",
+      "rateLimited": "Too many requests. Try again in a few seconds.",
+      "backToLogin": "Back to sign in"
+    },
+    "resetPassword": {
+      "loading": "Checking your link…",
+      "title": "Choose a new password",
+      "subtitle": "It has to be at least 8 characters long.",
+      "newPassword": "New password",
+      "submit": "Set new password",
+      "successTitle": "Password changed",
+      "successBody": "Your new password is set and every other session was signed out. Sign in to continue.",
+      "signInCta": "Sign in",
+      "invalidTitle": "This link didn't work",
+      "invalidBody": "It may have expired, been used already, or been copied without its last characters. Reset links work for one hour.",
+      "requestNewLink": "Send a new link",
+      "error": "Could not change your password. Send yourself a new link and try again.",
+      "rateLimited": "Too many requests. Try again in a few seconds.",
+      "fieldErrors": {
+        "password": {
+          "tooShort": "Password must be at least 8 characters long.",
+          "tooLong": "Password is too long."
+        }
+      }
     },
     "register": {
       "loading": "Loading sign-up…",
@@ -42,7 +75,6 @@
       "title": "Accept invitation",
       "subtitle": "You've been invited to join {workspace}.",
       "submit": "Accept invitation",
-      "submitPending": "Accepting…",
       "accepted": "Invitation accepted",
       "signInFirst": "Sign in with the invited email to accept.",
       "signInCta": "Sign in",
@@ -70,7 +102,6 @@
     "emailConfirmation": {
       "emailLabel": "Email",
       "resendAction": "Send a new link",
-      "sending": "Sending…",
       "sentTo": "A new link is on its way to {email}. It's good for a short while.",
       "sentIfRegistered": "If that address has an unconfirmed account, a new link is on its way.",
       "alreadyConfirmed": "This address is already confirmed.",
@@ -103,6 +134,7 @@
       "title": "Kurul",
       "createWorkspace": "New workspace",
       "switchWorkspace": "Switch workspace",
+      "switchWorkspaceNamed": "Switch workspace ({name})",
       "confirmEmail": "Confirm your email",
       "signOut": "Sign out",
       "loading": "Loading…",
@@ -118,6 +150,11 @@
       "navigationDescription": "Switch workspace, open the dashboard or settings, and sign out.",
       "openNavigation": "Open navigation",
       "closeNavigation": "Close navigation"
+    },
+    "demo": {
+      "bannerHourly": "This is a demo. Everything you create here is deleted every hour.",
+      "banner": "This is a demo. Everything you create here is deleted every {minutes} minutes.",
+      "dismiss": "Hide this notice"
     },
     "settings": {
       "title": "Settings",
@@ -149,10 +186,13 @@
       "members": {
         "title": "Members",
         "description": "Who can open this workspace, and what they can do once they are in it.",
+        "pageTitle": "Members",
+        "manageAction": "Manage members",
         "loadError": "The people in this workspace couldn't load.",
         "you": "You",
         "cancel": "Cancel",
         "memberMenu": "Actions for {name}",
+        "memberRole": "Role for {name}",
         "roles": {
           "OWNER": "Owner",
           "ADMIN": "Admin",
@@ -166,6 +206,8 @@
           "GUEST": "Read the boards, and nothing else."
         },
         "inviteAction": "Invite member",
+        "seatUsage": "{used} of {limit} seats used",
+        "seatLimitReached": "Every seat on this plan is taken. Remove a member, or revoke a pending invitation, to free one.",
         "inviteTitle": "Invite member",
         "inviteEmail": "Email address",
         "inviteRole": "Role",
@@ -191,9 +233,10 @@
         "revokeError": "The invitation couldn't be revoked.",
         "revokeErrorGone": "That invitation is already gone.",
         "revokeErrorForbidden": "You need admin access to revoke invitations. Ask a workspace owner.",
-        "changeRoleAction": "Change role",
         "changeRoleTitle": "Change role",
         "changeRoleSubmit": "Change role",
+        "savingRole": "Saving the role…",
+        "confirmOwnerBody": "Owners can remove every other member, including you. This cannot be undone from here.",
         "changeRoleError": "The role couldn't be changed.",
         "changeRoleErrorForbidden": "Only an owner can change ownership. Ask a workspace owner.",
         "changeRoleErrorLastOwner": "This is the only owner. Make someone else an owner first.",
@@ -212,13 +255,48 @@
         "leaveError": "You couldn't be taken out of this workspace.",
         "leaveErrorLastOwner": "You're the only owner. Make someone else an owner first, or delete the workspace."
       },
+      "tokens": {
+        "title": "Personal access tokens",
+        "description": "A token acts as you in this workspace, with your current role. Use it from a script or another tool by sending it as an Authorization: Bearer header.",
+        "loadError": "Your personal access tokens couldn't load.",
+        "empty": "You don't have any personal access tokens yet.",
+        "createAction": "Create token",
+        "createTitle": "Create personal access token",
+        "nameLabel": "Name",
+        "expiryLabel": "Expiry",
+        "expiryOptions": {
+          "none": "No expiry",
+          "days30": "30 days",
+          "days90": "90 days",
+          "year1": "1 year"
+        },
+        "createSubmit": "Create token",
+        "createError": "The token couldn't be created.",
+        "createErrorValidation": "Check the name and expiry, then try again.",
+        "cancel": "Cancel",
+        "createdTitle": "Token created",
+        "createdBody": "Copy this token now. For security, you won't be able to see it again.",
+        "copyAction": "Copy",
+        "copied": "Token copied",
+        "copyError": "The token couldn't be copied. Your browser is blocking it.",
+        "done": "Done",
+        "createdAt": "Created {when}",
+        "lastUsedAt": "Last used {when}",
+        "lastUsedNever": "Never used",
+        "expiresAt": "Expires {when}",
+        "expiresNever": "No expiry",
+        "revokeAction": "Revoke",
+        "revokeTitle": "Revoke this token?",
+        "revokeBody": "Anything using {name} stops working immediately. This cannot be undone.",
+        "revokeError": "The token couldn't be revoked.",
+        "revokeErrorGone": "That token is already gone."
+      },
       "workspace": {
         "title": "Workspace",
         "description": "The workspace's name, and what happens to it.",
         "name": "Name",
         "cancel": "Cancel",
         "renameAction": "Rename",
-        "renameTitle": "Rename workspace",
         "renameError": "Could not rename this workspace.",
         "renameErrorForbidden": "You need admin access to rename the workspace. Ask a workspace owner.",
         "renameErrorGone": "This workspace no longer exists.",
@@ -240,8 +318,8 @@
         "loadError": "Your account details couldn't load.",
         "deleteSectionTitle": "Delete your account",
         "deleteSectionBody": "Removes you from every workspace on this server and takes your name off everything you wrote. This cannot be undone.",
+        "deletePageTitle": "Delete your account",
         "deleteAction": "Delete account",
-        "deleteTitle": "Delete your account?",
         "deleteBody": "You will be signed out and removed from every workspace here. Your name and email are erased. This cannot be undone.",
         "retained": "The {comments, plural, =0 {no comments} one {one comment} other {# comments}} and {tasks, plural, =0 {no tasks} one {one task} other {# tasks}} you wrote stay where they are, credited to “Deleted user”.",
         "ownedTitle": "You are the only owner of these. Decide what happens to each one.",
@@ -326,13 +404,15 @@
       "loadError": "The board couldn't load.",
       "unavailable": "This board doesn't exist, or you don't have access to it.",
       "loadingMore": "Loading the rest of the tasks…",
+      "connectionLost": "Connection lost, changes may not be showing",
+      "dragFailed": "Could not move this task.",
       "backToBoards": "Back to boards",
       "emptyTitle": "No boards yet",
       "emptyBody": "A board is where the work gets divided. Start with one.",
       "createTitle": "Create board",
       "createAction": "Create board",
+      "planLimitReached": "This workspace has used all {limit} of the boards its plan allows.",
       "createError": "Could not create this board.",
-      "renameTitle": "Rename board",
       "renameAction": "Rename",
       "renameError": "Could not rename this board.",
       "deleteTitle": "Delete this board?",
@@ -342,7 +422,15 @@
       "cancel": "Cancel",
       "name": "Name",
       "description": "Description",
+      "template": "Start from",
+      "templateError": "Templates couldn't load. This board will start with the default columns.",
+      "changeTemplate": "Change template",
+      "changeTemplateWith": "Starting from {name}",
       "boardMenu": "Board actions",
+      "card": {
+        "dueAndEstimate": "{due} · {estimate}",
+        "moreAssignees": "+{count}"
+      },
       "import": {
         "action": "Import from Trello",
         "title": "Import from Trello",
@@ -399,7 +487,6 @@
         }
       },
       "realtime": {
-        "reconnecting": "Reconnecting…",
         "dragCancelled": "Someone else moved this task"
       },
       "errors": {
@@ -440,6 +527,8 @@
         "defaultsConflict": "This board already has columns. Reloading the board.",
         "retryAction": "Try again",
         "emptyDrop": "Drop a task here",
+        "composerPlaceholder": "Task title",
+        "composerOpenDetail": "Open details",
         "cancel": "Cancel",
         "forbidden": "You need admin access to change columns. Ask a workspace owner."
       },
@@ -477,7 +566,13 @@
           "minutes": "{minutes}m"
         },
         "assignees": "Assignees",
+        "noAssignees": "No one assigned",
+        "assignAction": "Assign ({count})",
+        "searchMembers": "Search members",
         "labels": "Labels",
+        "addLabelAction": "Add label ({count})",
+        "searchLabels": "Search labels",
+        "noMatches": "No matches",
         "noLabels": "No labels on this task",
         "removeLabel": "Remove label {name}",
         "newLabel": "New label",
@@ -581,18 +676,20 @@
         },
         "openTask": "Open task",
         "panelLabel": "Task details",
+        "propertiesTitle": "Properties",
+        "discussionTitle": "Discussion",
         "close": "Close task panel",
         "backToBoard": "Back to board",
-        "createTitle": "Add task",
         "createAction": "Add task",
         "createError": "Could not add this task.",
         "deleteTitle": "Delete this task?",
         "deleteBody": "Delete “{title}”? This cannot be undone.",
         "deleteAction": "Delete task",
         "deleteError": "Could not delete this task.",
+        "saving": "Saving…",
         "saveError": "Could not save this task.",
+        "saveConflict": "Someone else changed this task. Reload it to edit again.",
         "missing": "This task no longer exists. Someone may have deleted it.",
-        "moveError": "Could not move this task.",
         "retryAction": "Try again",
         "cancel": "Cancel",
         "forbidden": "You need to be a workspace member to change tasks. Ask a workspace owner for access."

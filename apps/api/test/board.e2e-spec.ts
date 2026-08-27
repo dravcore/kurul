@@ -52,6 +52,132 @@ describe('Boards and columns (e2e)', () => {
     ]);
   });
 
+  it('creates a board from a template, with its columns and its label preset', async () => {
+    const owner = await signUp(app, { name: 'Owner' });
+    const workspace = await createWorkspace(owner.agent, 'Tmpl', `tmpl-${Date.now()}`);
+
+    const created = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards`)
+      .send({ name: 'Incoming', template: 'bug-triage' })
+      .expect(201);
+
+    const columns = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${created.body.id}/columns`)
+      .expect(200);
+
+    expect(columns.body.map((column: { name: string }) => column.name)).toEqual([
+      'Reported',
+      'Triaged',
+      'Fixing',
+      'Verifying',
+      'Closed',
+      'Won’t Fix',
+    ]);
+    // The categories are what the dashboard reads, and the only part of a template a rename
+    // cannot destroy.
+    expect(columns.body.map((column: { category: string }) => column.category)).toEqual([
+      'BACKLOG',
+      'UNSTARTED',
+      'STARTED',
+      'STARTED',
+      'COMPLETED',
+      'CANCELED',
+    ]);
+
+    const labels = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${created.body.id}/labels`)
+      .expect(200);
+
+    // Listed alphabetically by `LabelService.list`, not in preset order.
+    expect(labels.body.map((label: { name: string }) => label.name).sort()).toEqual([
+      'Critical',
+      'Major',
+      'Minor',
+      'Needs Info',
+      'Regression',
+    ]);
+    // Slots, never hex — a raw colour here would be coerced to slot-1 on every read.
+    for (const label of labels.body as { color: string }[]) {
+      expect(label.color).toMatch(/^slot-[1-8]$/);
+    }
+  });
+
+  it('leaves a board created without a template exactly as it was before templates', async () => {
+    const owner = await signUp(app, { name: 'Owner' });
+    const workspace = await createWorkspace(owner.agent, 'NoTmpl', `no-tmpl-${Date.now()}`);
+
+    const created = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards`)
+      .send({ name: 'Plain' })
+      .expect(201);
+
+    const labels = await owner.agent
+      .get(`/workspaces/${workspace.id}/boards/${created.body.id}/labels`)
+      .expect(200);
+
+    // The compatibility promise, checked end to end: every client that predates templates
+    // sends no `template`, and none of them asked for labels.
+    expect(labels.body).toEqual([]);
+  });
+
+  it('rejects an unknown template slug with 400 rather than a plain board', async () => {
+    const owner = await signUp(app, { name: 'Owner' });
+    const workspace = await createWorkspace(owner.agent, 'BadTmpl', `bad-tmpl-${Date.now()}`);
+
+    const rejected = await owner.agent
+      .post(`/workspaces/${workspace.id}/boards`)
+      .send({ name: 'Nope', template: 'agile-transformation' })
+      .expect(400);
+
+    expect(rejected.body).toMatchObject({
+      statusCode: 400,
+      error: 'Bad Request',
+      details: [expect.objectContaining({ field: 'template', constraint: 'isIn' })],
+    });
+
+    // Silently ignoring the field would hand back a board that looks right and is not, so the
+    // request has to write nothing at all.
+    const boards = await owner.agent.get(`/workspaces/${workspace.id}/boards`).expect(200);
+    expect(boards.body).toEqual([]);
+  });
+
+  it('lists the templates in the caller’s language, to every member', async () => {
+    const owner = await signUp(app, { name: 'Owner' });
+    const guest = await signUp(app, { name: 'Guest' });
+    const workspace = await createWorkspace(owner.agent, 'Catalog', `catalog-${Date.now()}`);
+    const guestMe = await guest.agent.get('/me').expect(200);
+    await addMember(prisma, workspace.id, guestMe.body.id as string, MemberRole.GUEST);
+
+    const listed = await owner.agent.get(`/workspaces/${workspace.id}/board-templates`).expect(200);
+
+    expect(listed.body.length).toBeGreaterThanOrEqual(3);
+    expect(listed.body[0]).toMatchObject({ slug: 'kanban', name: 'Kanban' });
+    expect(listed.body[0].columns.map((column: { name: string }) => column.name)).toEqual([
+      'To Do',
+      'In Progress',
+      'Done',
+    ]);
+
+    // Reading the catalog is not changing the board, so it is gated on membership and not on
+    // role — a GUEST who can see boards can see what a board could have been.
+    const asGuest = await guest.agent
+      .get(`/workspaces/${workspace.id}/board-templates`)
+      .set('Accept-Language', 'tr')
+      .expect(200);
+
+    expect(asGuest.body[0]).toMatchObject({ slug: 'kanban' });
+    expect(asGuest.body[0].columns.map((column: { name: string }) => column.name)).toEqual([
+      'Yapılacak',
+      'Devam Ediyor',
+      'Bitti',
+    ]);
+
+    // Slugs are stable across languages; only what they are called changes.
+    expect(asGuest.body.map((template: { slug: string }) => template.slug)).toEqual(
+      listed.body.map((template: { slug: string }) => template.slug),
+    );
+  });
+
   it('returns 404 for cross-tenant board and column access', async () => {
     const ownerA = await signUp(app, { name: 'Owner A' });
     const ownerB = await signUp(app, { name: 'Owner B' });

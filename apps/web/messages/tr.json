@@ -1,7 +1,8 @@
 {
   "common": {
     "close": "Kapat",
-    "deletedUser": "Silinmiş kullanıcı"
+    "deletedUser": "Silinmiş kullanıcı",
+    "save": "Kaydet"
   },
   "auth": {
     "login": {
@@ -13,7 +14,39 @@
       "submit": "Giriş yap",
       "noAccount": "Hesabınız yok mu?",
       "registerLink": "Hesap oluşturun",
+      "forgotPasswordLink": "Parolanızı mı unuttunuz?",
       "error": "Giriş yapılamadı. E-posta adresinizi ve parolanızı kontrol edin."
+    },
+    "forgotPassword": {
+      "title": "Parolanızı sıfırlayın",
+      "subtitle": "Hesabınızın e-posta adresini girin. Bu adrese ait bir hesap varsa yeni parola seçmeniz için bir bağlantı göndeririz.",
+      "email": "E-posta",
+      "submit": "Sıfırlama bağlantısı gönder",
+      "sent": "Bu adrese ait bir hesap varsa sıfırlama bağlantısı yolda. Bağlantı bir saat geçerli.",
+      "sendError": "Bağlantı gönderilemedi. Birazdan tekrar deneyin.",
+      "rateLimited": "Çok fazla istek. Birkaç saniye içinde tekrar deneyin.",
+      "backToLogin": "Giriş ekranına dön"
+    },
+    "resetPassword": {
+      "loading": "Bağlantınız kontrol ediliyor…",
+      "title": "Yeni bir parola seçin",
+      "subtitle": "En az 8 karakter olmalı.",
+      "newPassword": "Yeni parola",
+      "submit": "Yeni parolayı kaydet",
+      "successTitle": "Parola değiştirildi",
+      "successBody": "Yeni parolanız kaydedildi ve diğer tüm oturumlar kapatıldı. Devam etmek için giriş yapın.",
+      "signInCta": "Giriş yap",
+      "invalidTitle": "Bu bağlantı çalışmadı",
+      "invalidBody": "Süresi dolmuş, daha önce kullanılmış ya da son karakterleri eksik kopyalanmış olabilir. Sıfırlama bağlantıları bir saat geçerlidir.",
+      "requestNewLink": "Yeni bağlantı gönder",
+      "error": "Parolanız değiştirilemedi. Kendinize yeni bir bağlantı gönderip tekrar deneyin.",
+      "rateLimited": "Çok fazla istek. Birkaç saniye içinde tekrar deneyin.",
+      "fieldErrors": {
+        "password": {
+          "tooShort": "Parola en az 8 karakter olmalı.",
+          "tooLong": "Parola çok uzun."
+        }
+      }
     },
     "register": {
       "loading": "Kayıt ekranı yükleniyor…",
@@ -42,7 +75,6 @@
       "title": "Daveti kabul et",
       "subtitle": "{workspace} workspace'ine davet edildiniz.",
       "submit": "Daveti kabul et",
-      "submitPending": "Kabul ediliyor…",
       "accepted": "Davet kabul edildi",
       "signInFirst": "Kabul etmek için davet edilen e-posta adresiyle giriş yapın.",
       "signInCta": "Giriş yap",
@@ -70,7 +102,6 @@
     "emailConfirmation": {
       "emailLabel": "E-posta",
       "resendAction": "Yeni bağlantı gönder",
-      "sending": "Gönderiliyor…",
       "sentTo": "{email} adresine yeni bir bağlantı yolda. Kısa bir süre geçerli.",
       "sentIfRegistered": "O adrese ait doğrulanmamış bir hesap varsa yeni bir bağlantı yolda.",
       "alreadyConfirmed": "Bu adres zaten doğrulanmış.",
@@ -103,6 +134,7 @@
       "title": "Kurul",
       "createWorkspace": "Yeni workspace",
       "switchWorkspace": "Workspace değiştir",
+      "switchWorkspaceNamed": "Workspace değiştir ({name})",
       "confirmEmail": "E-posta adresinizi doğrulayın",
       "signOut": "Çıkış yap",
       "loading": "Yükleniyor…",
@@ -118,6 +150,11 @@
       "navigationDescription": "Workspace değiştirin, dashboard'u veya ayarları açın, çıkış yapın.",
       "openNavigation": "Gezinmeyi aç",
       "closeNavigation": "Gezinmeyi kapat"
+    },
+    "demo": {
+      "bannerHourly": "Burası bir demo. Burada oluşturduğunuz her şey saat başı silinir.",
+      "banner": "Burası bir demo. Burada oluşturduğunuz her şey {minutes} dakikada bir silinir.",
+      "dismiss": "Bu bildirimi gizle"
     },
     "settings": {
       "title": "Ayarlar",
@@ -149,10 +186,13 @@
       "members": {
         "title": "Üyeler",
         "description": "Bu workspace'i kimler açabilir ve içeri girdiklerinde ne yapabilirler.",
+        "pageTitle": "Üyeler",
+        "manageAction": "Üyeleri yönet",
         "loadError": "Bu workspace'teki kişiler yüklenemedi.",
         "you": "Siz",
         "cancel": "Vazgeç",
         "memberMenu": "{name} için işlemler",
+        "memberRole": "{name} için rol",
         "roles": {
           "OWNER": "Sahip",
           "ADMIN": "Yönetici",
@@ -166,6 +206,8 @@
           "GUEST": "Board'ları okuma, başka hiçbir şey."
         },
         "inviteAction": "Üye davet et",
+        "seatUsage": "{limit} koltuktan {used} tanesi kullanılıyor",
+        "seatLimitReached": "Bu plandaki tüm koltuklar dolu. Bir koltuk açmak için bir üyeyi çıkarın veya bekleyen bir daveti iptal edin.",
         "inviteTitle": "Üye davet et",
         "inviteEmail": "E-posta adresi",
         "inviteRole": "Rol",
@@ -191,9 +233,10 @@
         "revokeError": "Davet geri çekilemedi.",
         "revokeErrorGone": "O davet zaten yok.",
         "revokeErrorForbidden": "Davetleri geri çekmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.",
-        "changeRoleAction": "Rolü değiştir",
         "changeRoleTitle": "Rolü değiştir",
         "changeRoleSubmit": "Rolü değiştir",
+        "savingRole": "Rol kaydediliyor…",
+        "confirmOwnerBody": "Sahipler siz dahil diğer bütün üyeleri çıkarabilir. Bu işlem buradan geri alınamaz.",
         "changeRoleError": "Rol değiştirilemedi.",
         "changeRoleErrorForbidden": "Sahipliği yalnızca workspace sahibi değiştirebilir. Bir workspace sahibinden isteyin.",
         "changeRoleErrorLastOwner": "Tek sahip bu. Önce başka birini sahip yapın.",
@@ -212,13 +255,48 @@
         "leaveError": "Bu workspace'ten çıkarılamadınız.",
         "leaveErrorLastOwner": "Tek sahip sizsiniz. Önce başka birini sahip yapın ya da workspace'i silin."
       },
+      "tokens": {
+        "title": "Kişisel erişim anahtarları",
+        "description": "Bir anahtar, bu workspace'te sizin yerinize, o anki rolünüzle işlem yapar. Bir script veya başka bir araçtan Authorization: Bearer başlığı olarak gönderilerek kullanılır.",
+        "loadError": "Kişisel erişim anahtarlarınız yüklenemedi.",
+        "empty": "Henüz kişisel erişim anahtarınız yok.",
+        "createAction": "Anahtar oluştur",
+        "createTitle": "Kişisel erişim anahtarı oluştur",
+        "nameLabel": "Ad",
+        "expiryLabel": "Geçerlilik süresi",
+        "expiryOptions": {
+          "none": "Süresiz",
+          "days30": "30 gün",
+          "days90": "90 gün",
+          "year1": "1 yıl"
+        },
+        "createSubmit": "Anahtar oluştur",
+        "createError": "Anahtar oluşturulamadı.",
+        "createErrorValidation": "Adı ve geçerlilik süresini kontrol edip tekrar deneyin.",
+        "cancel": "Vazgeç",
+        "createdTitle": "Anahtar oluşturuldu",
+        "createdBody": "Bu anahtarı şimdi kopyalayın. Güvenlik nedeniyle bir daha göremeyeceksiniz.",
+        "copyAction": "Kopyala",
+        "copied": "Anahtar kopyalandı",
+        "copyError": "Anahtar kopyalanamadı. Tarayıcınız engelliyor.",
+        "done": "Tamam",
+        "createdAt": "{when} tarihinde oluşturuldu",
+        "lastUsedAt": "Son kullanım: {when}",
+        "lastUsedNever": "Hiç kullanılmadı",
+        "expiresAt": "{when} tarihinde sona eriyor",
+        "expiresNever": "Süresiz",
+        "revokeAction": "İptal et",
+        "revokeTitle": "Bu anahtar iptal edilsin mi?",
+        "revokeBody": "{name} anahtarını kullanan her şey hemen çalışmayı durdurur. Bu geri alınamaz.",
+        "revokeError": "Anahtar iptal edilemedi.",
+        "revokeErrorGone": "O anahtar zaten yok."
+      },
       "workspace": {
         "title": "Workspace",
         "description": "Workspace'in adı ve başına gelebilecekler.",
         "name": "Ad",
         "cancel": "Vazgeç",
         "renameAction": "Yeniden adlandır",
-        "renameTitle": "Workspace'i yeniden adlandır",
         "renameError": "Bu workspace yeniden adlandırılamadı.",
         "renameErrorForbidden": "Workspace'i yeniden adlandırmak için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.",
         "renameErrorGone": "Bu workspace artık yok.",
@@ -240,8 +318,8 @@
         "loadError": "Hesap bilgileriniz yüklenemedi.",
         "deleteSectionTitle": "Hesabınızı silin",
         "deleteSectionBody": "Sizi bu sunucudaki her workspace'ten çıkarır ve yazdığınız her şeyden adınızı kaldırır. Bu geri alınamaz.",
+        "deletePageTitle": "Hesabınızı silin",
         "deleteAction": "Hesabı sil",
-        "deleteTitle": "Hesabınızı sil?",
         "deleteBody": "Oturumunuz kapatılacak ve buradaki her workspace'ten çıkarılacaksınız. Adınız ve e-posta adresiniz silinir. Bu geri alınamaz.",
         "retained": "Yazdığınız {comments, plural, =0 {yorum yok} other {# yorum}} ve {tasks, plural, =0 {task yok} other {# task}} olduğu yerde kalır; “Deleted user” adına yazılır.",
         "ownedTitle": "Bunların tek sahibi sizsiniz. Her biri için ne olacağına karar verin.",
@@ -326,13 +404,15 @@
       "loadError": "Board yüklenemedi.",
       "unavailable": "Bu board yok ya da erişim yetkiniz yok.",
       "loadingMore": "Task'ların geri kalanı yükleniyor…",
+      "connectionLost": "Bağlantı koptu, değişiklikler görünmüyor olabilir",
+      "dragFailed": "Bu task taşınamadı.",
       "backToBoards": "Board'lara dön",
       "emptyTitle": "Henüz board yok",
       "emptyBody": "Bir board, işin bölüştüğü yerdir. Bir tane ile başlayın.",
       "createTitle": "Board oluştur",
       "createAction": "Board oluştur",
+      "planLimitReached": "Bu workspace, planının izin verdiği {limit} board hakkının tamamını kullandı.",
       "createError": "Bu board oluşturulamadı.",
-      "renameTitle": "Board'u yeniden adlandır",
       "renameAction": "Yeniden adlandır",
       "renameError": "Bu board yeniden adlandırılamadı.",
       "deleteTitle": "Bu board'u sil?",
@@ -342,7 +422,15 @@
       "cancel": "Vazgeç",
       "name": "Ad",
       "description": "Açıklama",
+      "template": "Şununla başla",
+      "templateError": "Şablonlar yüklenemedi. Bu board varsayılan column'larla başlayacak.",
+      "changeTemplate": "Şablonu değiştir",
+      "changeTemplateWith": "{name} ile başlıyor",
       "boardMenu": "Board işlemleri",
+      "card": {
+        "dueAndEstimate": "{due} · {estimate}",
+        "moreAssignees": "+{count}"
+      },
       "import": {
         "action": "Trello'dan içe aktar",
         "title": "Trello'dan içe aktar",
@@ -399,7 +487,6 @@
         }
       },
       "realtime": {
-        "reconnecting": "Yeniden bağlanıyor…",
         "dragCancelled": "Birisi bu task'ı taşıdı"
       },
       "errors": {
@@ -440,6 +527,8 @@
         "defaultsConflict": "Bu board'da zaten column var. Board yeniden yükleniyor.",
         "retryAction": "Tekrar dene",
         "emptyDrop": "Bir task'ı buraya bırakın",
+        "composerPlaceholder": "Task başlığı",
+        "composerOpenDetail": "Detayları aç",
         "cancel": "Vazgeç",
         "forbidden": "Column'ları değiştirmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin."
       },
@@ -477,7 +566,13 @@
           "minutes": "{minutes}dk"
         },
         "assignees": "Atananlar",
+        "noAssignees": "Kimse atanmadı",
+        "assignAction": "Ata ({count})",
+        "searchMembers": "Üye ara",
         "labels": "Label'lar",
+        "addLabelAction": "Label ekle ({count})",
+        "searchLabels": "Label ara",
+        "noMatches": "Eşleşme yok",
         "noLabels": "Bu task'ta label yok",
         "removeLabel": "{name} label'ını kaldır",
         "newLabel": "Yeni label",
@@ -581,18 +676,20 @@
         },
         "openTask": "Task'ı aç",
         "panelLabel": "Task detayları",
+        "propertiesTitle": "Özellikler",
+        "discussionTitle": "Tartışma",
         "close": "Task panelini kapat",
         "backToBoard": "Board'a dön",
-        "createTitle": "Task ekle",
         "createAction": "Task ekle",
         "createError": "Bu task eklenemedi.",
         "deleteTitle": "Bu task'ı sil?",
         "deleteBody": "“{title}” silinsin mi? Bu geri alınamaz.",
         "deleteAction": "Task'ı sil",
         "deleteError": "Bu task silinemedi.",
+        "saving": "Kaydediliyor…",
         "saveError": "Bu task kaydedilemedi.",
+        "saveConflict": "Bu task'ı başka biri değiştirdi. Düzenlemek için yeniden yükleyin.",
         "missing": "Bu task artık yok. Birisi silmiş olabilir.",
-        "moveError": "Bu task taşınamadı.",
         "retryAction": "Tekrar dene",
         "cancel": "Vazgeç",
         "forbidden": "Task'ları değiştirmek için workspace üyesi olmanız gerekir. Erişim için bir workspace sahibinden isteyin."

@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
@@ -25,10 +32,31 @@ export type UseBoardMutationsOptions = {
 export type UseBoardMutationsResult = {
   /** Optimistic task reorder; rolls back and offers a retry when the server rejects it. */
   commitTaskMove: (payload: TaskMovePayload) => Promise<void>;
+  /** Cards that were just rolled back, for as long as their return is playing. */
+  returningTaskIds: ReadonlySet<string>;
   moveColumn: (column: ColumnDto, direction: -1 | 1) => Promise<void>;
   seedDefaults: () => Promise<void>;
   defaultsPending: boolean;
 };
+
+/**
+ * Every refused move updates this one toast instead of adding to the stack: a board that cannot
+ * reach the API fails once per drag, and three drags in a row are one problem, not three.
+ */
+const MOVE_FAILURE_TOAST_ID = 'board-task-move-failed';
+
+/**
+ * How long a toast carrying a control stays up, against the 4s a plain one gets
+ * (components/ui/sonner.tsx). A `Try again` nobody has time to reach is worse than none.
+ */
+const ACTION_TOAST_MS = 8_000;
+
+/** The `task-card-return` keyframe's duration in app/globals.css. The mark drives the play, so
+ * the two have to agree: dropped early the card jumps, dropped late nothing is drawn but the
+ * attribute is still on the element. */
+const RETURN_ANIMATION_MS = 220;
+
+const NO_RETURNING_TASKS: ReadonlySet<string> = new Set<string>();
 
 /**
  * Board write paths: task reorder, column reorder, and the default-column seed. Each owns
@@ -47,6 +75,40 @@ export function useBoardMutations({
   const tTask = useTranslations('app.board.task');
   const { activeId } = useWorkspaceContext();
   const [defaultsPending, setDefaultsPending] = useState(false);
+  const [returningTaskIds, setReturningTaskIds] = useState<ReadonlySet<string>>(NO_RETURNING_TASKS);
+  const returnTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    const timers = returnTimersRef.current;
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
+
+  /** Marks a card as returning to where it was, for exactly as long as the return is drawn. */
+  const markReturning = useCallback((taskId: string): void => {
+    const pending = returnTimersRef.current.get(taskId);
+    if (pending) clearTimeout(pending);
+    setReturningTaskIds((current) => {
+      if (current.has(taskId)) return current;
+      const next = new Set(current);
+      next.add(taskId);
+      return next;
+    });
+    returnTimersRef.current.set(
+      taskId,
+      setTimeout(() => {
+        returnTimersRef.current.delete(taskId);
+        setReturningTaskIds((current) => {
+          if (!current.has(taskId)) return current;
+          const next = new Set(current);
+          next.delete(taskId);
+          return next;
+        });
+      }, RETURN_ANIMATION_MS),
+    );
+  }, []);
   // Overlapping drags each capture their own pre-move snapshot. A late failure from an
   // earlier PATCH must not `setTasks` that snapshot back — it would wipe a newer optimistic
   // (or already-accepted) order. Only the latest in-flight generation may roll back; older
@@ -81,10 +143,13 @@ export function useBoardMutations({
             // wrong rollback of a newer drag.
           }
         }
+        markReturning(payload.taskId);
         if (apiStatus(caught) === 403) {
-          toast.error(t('task.forbidden'));
+          toast.error(t('task.forbidden'), { id: MOVE_FAILURE_TOAST_ID });
         } else {
-          toast.error(tTask('moveError'), {
+          toast.error(t('dragFailed'), {
+            id: MOVE_FAILURE_TOAST_ID,
+            duration: ACTION_TOAST_MS,
             action: {
               label: tTask('retryAction'),
               onClick: () => {
@@ -109,7 +174,7 @@ export function useBoardMutations({
         }
       }
     },
-    [activeId, reload, setTasks, t, tTask, tasksRef],
+    [activeId, markReturning, reload, setTasks, t, tTask, tasksRef],
   );
 
   const moveColumn = useCallback(
@@ -203,5 +268,5 @@ export function useBoardMutations({
     [activeId, boardId, reload, setColumns, t],
   );
 
-  return { commitTaskMove, moveColumn, seedDefaults, defaultsPending };
+  return { commitTaskMove, returningTaskIds, moveColumn, seedDefaults, defaultsPending };
 }

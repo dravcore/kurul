@@ -36,6 +36,158 @@ export interface InstanceConfigDto {
    * attach links.
    */
   attachmentsEnabled: boolean;
+  /**
+   * Whether `POST /auth/sign-up/email` accepts new accounts, i.e. whether `SIGNUP_ENABLED` is
+   * anything but `false`.
+   *
+   * A policy switch, not a ceiling: `planLimits.users` refuses sign-up once a head count is
+   * reached, this refuses it whatever the count is. Both are capability, identical for every
+   * caller. A refused sign-up answers `403` with `error: "Sign-up Disabled"`
+   * ({@link SIGNUP_DISABLED_ERROR}); signing in and every other `/auth/*` route stay open.
+   * Independent of `demo.enabled`: a demo keeps registration open, an ordinary install may
+   * close it.
+   */
+  signUpEnabled: boolean;
+  /**
+   * Whether this deployment is a public demo whose data is wiped on a schedule.
+   *
+   * A nested object rather than three sibling booleans, because the two schedule fields are
+   * meaningless without `enabled` and a client that reads them in isolation would be reading
+   * a lie. The web renders a standing banner from it and nothing else branches on it: the
+   * actions a demo refuses are refused by the API, not hidden by the client.
+   */
+  demo: DemoConfigDto;
+  /**
+   * The ceilings this instance's configuration puts on quantities, `null` for each one nobody
+   * set (ADR 0032).
+   *
+   * Capability, like the two booleans above: these are the numbers the operator's environment
+   * carries, identical for every caller. A workspace can be given lower ones of its own, and
+   * those resolved numbers are read from `GET /workspaces/{workspaceId}/plan`, never from here.
+   */
+  planLimits: InstancePlanLimitsDto;
+}
+
+/**
+ * The instance-wide half of the plan-limit layer (ADR 0032). `null` means unlimited, which is
+ * what every field is on an instance that configures nothing.
+ *
+ * The two storage fields are the ADR 0027 attachment quotas, published here rather than
+ * duplicated: one object answers every "what is the ceiling" question, whatever the ceiling
+ * counts. Their environment variables are unchanged, and unlike the four `PLAN_MAX_*` numbers
+ * they have non-null defaults.
+ */
+export interface InstancePlanLimitsDto {
+  /** Members plus pending invitations one workspace may hold. */
+  seatsPerWorkspace: number | null;
+  boardsPerWorkspace: number | null;
+  /** Workspaces the whole instance may hold. */
+  workspaces: number | null;
+  /** Accounts the whole instance may hold; refuses sign-up, never sign-in. */
+  users: number | null;
+  /** `ATTACHMENT_WORKSPACE_QUOTA_BYTES` (ADR 0027), as bytes. */
+  storageBytesPerWorkspace: number | null;
+  /** `ATTACHMENT_INSTANCE_QUOTA_BYTES` (ADR 0027), as bytes. */
+  storageBytesPerInstance: number | null;
+}
+
+/**
+ * One workspace's resolved ceilings and what it is currently using (ADR 0032).
+ *
+ * "Resolved" means the workspace's own override where it has one and the instance's
+ * configuration otherwise, so a client never has to know which of the two answered.
+ */
+export interface WorkspacePlanDto {
+  limits: WorkspacePlanLimitsDto;
+  usage: WorkspacePlanUsageDto;
+}
+
+/** The resolved ceilings of one workspace. `null` is unlimited. */
+export interface WorkspacePlanLimitsDto {
+  seats: number | null;
+  boards: number | null;
+  storageBytes: number | null;
+}
+
+/** What one workspace currently holds, counted the same way the refusals count it. */
+export interface WorkspacePlanUsageDto {
+  /** Members plus invitations still pending: an invitation holds its seat before acceptance. */
+  seats: number;
+  boards: number;
+  /** Summed size of the workspace's stored files; LINK attachments carry no bytes. */
+  storageBytes: number;
+}
+
+/**
+ * The `error` field of the 403 a write answers when a plan ceiling would be exceeded
+ * (ADR 0032).
+ *
+ * 403 already means "authenticated, and refused"; this string is what separates a ceiling
+ * from an insufficient role, which needs an entirely different fix. Clients branch on
+ * `statusCode` and `error`, never on `message` (`docs/api-conventions.md#errors`), and on
+ * `planLimit.code` when they need to know *which* ceiling.
+ */
+export const PLAN_LIMIT_ERROR = 'Plan Limit Exceeded';
+
+/**
+ * The `error` field of the 403 `POST /auth/sign-up/email` answers when the operator has closed
+ * registration with `SIGNUP_ENABLED=false`.
+ *
+ * Its own string rather than {@link PLAN_LIMIT_ERROR} with a `planLimit` object, because the two
+ * refusals call for different fixes and a client branches on `error`: a ceiling is a number
+ * somebody can raise, a closed door is a policy nobody can count their way past. There is no
+ * `planLimit` member on this refusal.
+ */
+export const SIGNUP_DISABLED_ERROR = 'Sign-up Disabled';
+
+/**
+ * Which ceiling refused the write. Carried in the error envelope's `planLimit.code`, because
+ * one `error` string covers all four and a client that wants to say "you are out of seats"
+ * needs to tell them apart.
+ */
+export const PlanLimitCode = {
+  Seats: 'PLAN_LIMIT_SEATS',
+  Boards: 'PLAN_LIMIT_BOARDS',
+  Workspaces: 'PLAN_LIMIT_WORKSPACES',
+  Users: 'PLAN_LIMIT_USERS',
+} as const;
+
+export type PlanLimitCode = (typeof PlanLimitCode)[keyof typeof PlanLimitCode];
+
+/**
+ * The `planLimit` member of the error envelope on a plan-limit refusal (ADR 0032).
+ *
+ * The only optional envelope member other than `details`, and it exists for the same reason:
+ * "you cannot do that" is not actionable, "you are using 10 of 10 seats" is. `current` is what
+ * was counted at the moment of the refusal, so it can equal or exceed `limit` but never
+ * disagree with it silently.
+ */
+export interface PlanLimitDetail {
+  code: PlanLimitCode;
+  limit: number;
+  current: number;
+}
+
+/** The demo-instance section of {@link InstanceConfigDto}. */
+export interface DemoConfigDto {
+  /** `true` only when the deployment sets `DEMO_MODE=true`. Off on every self-hosted install. */
+  enabled: boolean;
+  /**
+   * How often the demo data is wiped and re-seeded, in minutes, or `null` when `enabled` is
+   * `false`.
+   *
+   * `null` and not `0`: an ordinary instance has no reset schedule at all, and a number would
+   * be a plausible-looking value for a client to render.
+   */
+  resetIntervalMinutes: number | null;
+  /**
+   * ISO 8601 UTC instant of the next wipe, or `null` when `enabled` is `false`.
+   *
+   * Derived from a fixed grid of `resetIntervalMinutes` boundaries anchored at the Unix epoch,
+   * which is the same arithmetic the reset sidecar sleeps against: the API and the container
+   * that does the wiping agree on the instant without sharing any state.
+   */
+  nextResetAt: string | null;
 }
 
 export interface UserDto {
@@ -99,12 +251,83 @@ export interface InvitationDto {
   emailDelivery?: MailDeliveryStatus;
 }
 
+/**
+ * A personal access token: a second credential beside the session cookie, for a caller that is
+ * not a browser. Bound to one workspace and one user at creation, and it acts as that user in
+ * that workspace and nowhere else.
+ *
+ * The secret is never in this shape. It is handed out exactly once, in
+ * `CreatedPersonalAccessTokenDto`, and only its hash is stored afterwards, so a list can show
+ * `prefix` to tell two tokens apart and nothing that would let a reader use one.
+ */
+export interface PersonalAccessTokenDto {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  /** A label the owner chose, such as the script or machine the token lives on. */
+  name: string;
+  /**
+   * `kurul_pat_` plus the first eight characters of the secret. Enough to recognise a token in
+   * a list or a log line, useless as a credential.
+   */
+  prefix: string;
+  /** ISO 8601 UTC, or null while the token has never authenticated a request. */
+  lastUsedAt: string | null;
+  /** ISO 8601 UTC, or null for a token that does not expire. */
+  expiresAt: string | null;
+  /** ISO 8601 UTC. */
+  createdAt: string;
+}
+
+/**
+ * `POST /workspaces/:workspaceId/tokens` and nothing else returns this shape. `token` is the
+ * plaintext secret, shown once; no later response carries it and the server cannot recover it.
+ */
+export interface CreatedPersonalAccessTokenDto extends PersonalAccessTokenDto {
+  token: string;
+}
+
 export interface BoardDto {
   id: string;
   workspaceId: string;
   name: string;
   description: string | null;
   createdAt: string;
+}
+
+/**
+ * One starting shape offered at board creation, already resolved into the creator's language.
+ *
+ * The catalog is code in the API (`apps/api/src/common/board-templates.ts`), not rows and not
+ * a second copy in the browser bundle: a client renders whatever
+ * `GET /workspaces/:workspaceId/board-templates` returns and sends `slug` back. That is what
+ * keeps a template from being added in one place and missing in the other.
+ *
+ * The names are localised server-side, which is the exception ADR 0018 §3 already carves out
+ * for content the API writes on the user's behalf — a card here is a preview of the exact rows
+ * a board create is about to write, so it has to speak the language they will be written in.
+ */
+export interface BoardTemplateDto {
+  /** Stable identifier, sent back as `CreateBoardRequest.template`. Never a display name. */
+  slug: string;
+  name: string;
+  description: string;
+  columns: BoardTemplateColumnDto[];
+  labels: BoardTemplateLabelDto[];
+}
+
+/** A column a template will create. Not a `ColumnDto`: nothing exists yet, so there is no id. */
+export interface BoardTemplateColumnDto {
+  name: string;
+  position: number;
+  /** What the stage means, independent of what it is called (ADR 0019). */
+  category: ColumnCategory;
+}
+
+/** A label a template will create. Slot, never hex, for the same reason `LabelDto` is. */
+export interface BoardTemplateLabelDto {
+  name: string;
+  color: LabelColorSlot;
 }
 
 export interface ColumnDto {
@@ -288,6 +511,12 @@ export interface ActivityDto {
   workspaceId: string;
   taskId: string | null;
   userId: string;
+  /**
+   * One of `ActivityType`'s values today (see `./activity.ts`), kept as `string` here rather
+   * than narrowed: this is read straight off the `Activity` row, whose `type` column is a
+   * `String`, not a Prisma enum, on purpose, so a row written by an older server build with a
+   * since-removed type stays representable instead of failing to decode.
+   */
   type: string;
   payload: Record<string, unknown>;
   createdAt: string;
@@ -304,6 +533,9 @@ export interface NotificationDto {
   id: string;
   workspaceId: string;
   userId: string;
+  /** One of `NotificationType`'s values today (see `./activity.ts`); `string` for the same
+   * reason as {@link ActivityDto.type}, and for the same reason the `Notification.type`
+   * column is not a Prisma enum. */
   type: string;
   taskId: string | null;
   activityId: string | null;
@@ -366,7 +598,10 @@ export const TrelloImportSkipReason = {
   /**
    * Not a skip at all — a *substitution*, reported in the same list because the user needs to
    * know it happened. An unknown Trello colour fell back to `slot-1`, and every imported column
-   * took the default category.
+   * took the default category. A name or description past its DTO length ceiling (a card, board,
+   * checklist, checklist item, column, label or attachment field cut to fit) is folded in here
+   * too (SEC-04): the value was substituted with a shorter one, not lost, the same as a colour
+   * fallback.
    *
    * Putting a substitution in a list called "skipped" is deliberate. A separate `substitutions`
    * array was considered and rejected: the question a user asks after an import is not "what did

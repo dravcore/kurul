@@ -15,6 +15,7 @@ import { betterAuthErrorCode, rethrowBetterAuthError } from '../auth/better-auth
 import type { WorkspaceMembership } from '../common/types/request-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { evictUserFromWorkspaceSockets } from '../realtime/workspace-socket-eviction';
+import { TokenService } from '../token/token.service';
 import type { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { memberInclude, toMemberDto, type MemberRow } from './workspace-member.mapper';
 
@@ -87,6 +88,7 @@ export class WorkspaceMemberService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
+    private readonly tokenService: TokenService,
   ) {}
 
   private headersFrom(request: Request): Headers {
@@ -227,7 +229,11 @@ export class WorkspaceMemberService {
       },
     });
 
-    // `afterRemoveMember` (organization-options.ts) already evicted the user's sockets.
+    // `afterRemoveMember` (organization-options.ts) already evicted the user's sockets. Their
+    // tokens for this workspace go the same way: `WorkspaceGuard` would refuse them anyway
+    // once the membership is gone, but a member removed and later re-added must not find the
+    // credentials they held before quietly working again.
+    await this.tokenService.revokeAllForMember(workspaceId, targetUserId);
   }
 
   /**
@@ -362,5 +368,7 @@ export class WorkspaceMemberService {
     // out would keep receiving this workspace's board and notification events on an open
     // socket until they happen to disconnect.
     await evictUserFromWorkspaceSockets(workspaceId, actor.userId);
+    // Same reasoning as in `removeMember`: leaving ends every standing credential too.
+    await this.tokenService.revokeAllForMember(workspaceId, actor.userId);
   }
 }

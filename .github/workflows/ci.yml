@@ -14,11 +14,24 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Only a pull request is cancelled by a newer push to the same ref. A `develop` push is the
+  # run that writes the buildx layer cache every pull request reads (see image-scan below), so
+  # a merge burst that cancelled it left that cache stale and the next PR's image-scan leg
+  # doing a cold build. `develop` and `main` runs now finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Every job carries a `timeout-minutes` ceiling well above what it measures, with more
+  # headroom on jobs whose worst case sits far past their typical case (lint ~1m, test-unit
+  # ~1m30s, test-integration ~3m, build ~1m, compose-config a few seconds, an image-scan leg up
+  # to ~4m30s on a cache miss). Without one a hung socket, a stuck registry pull or a wedged
+  # Trivy download holds a runner for the six-hour default: two release-candidate runs of
+  # release-images.yml did exactly that (4h and 5.7h) before someone cancelled them by hand,
+  # and on a public repository that is also how a fork's pull request can burn the project's
+  # runner concurrency.
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       # prisma.config.ts requires DATABASE_URL even for `prisma generate`.
       DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_ci
@@ -44,35 +57,25 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-  test:
+  # `test` used to be one job: the unit suites first, then, against Postgres and Redis service
+  # containers, the migration, the drift check and the integration suite, all back to back
+  # (~250s, and `build` waited for it). Nothing in the first half needs a database. The api unit
+  # suite ran *before* `Migrate test database` in the same job, so it demonstrably passes
+  # against an unmigrated one, and run against a closed port with `REDIS_URL` unset it still
+  # passes (115 suites, 1678 tests); the web suite is jsdom. Two jobs side by side take the
+  # unit work off the critical path, and the one without services also skips the container
+  # pull and the health-check wait.
+  test-unit:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: kurul
-          POSTGRES_PASSWORD: kurul
-          POSTGRES_DB: kurul_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U kurul -d kurul_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-      redis:
-        image: redis:8-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+    timeout-minutes: 20
     env:
-      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_test
-      REDIS_URL: redis://localhost:6379
-      API_PORT: 4000
+      # No Postgres or Redis service here, and nothing below dials one. `prisma generate` reads
+      # DATABASE_URL through prisma.config.ts without connecting, and importing the application
+      # evaluates `prisma/database.ts` (a lazy pool) and `auth/auth.ts` (throws without a
+      # secret), the same reason `build` carries these. `REDIS_URL` is left unset: the suite
+      # passes without it, and the auth rate limiter's spec sets and clears it itself.
+      # Placeholders, and they must stay obviously so.
+      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_ci
       WEB_URL: http://localhost:3000
       BETTER_AUTH_SECRET: ci-test-secret
       BETTER_AUTH_URL: http://localhost:4000
@@ -116,6 +119,53 @@ jobs:
           name: web-coverage
           path: apps/web/coverage
           if-no-files-found: ignore
+
+  test-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: kurul
+          POSTGRES_PASSWORD: kurul
+          POSTGRES_DB: kurul_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kurul -d kurul_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_test
+      REDIS_URL: redis://localhost:6379
+      API_PORT: 4000
+      WEB_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ci-test-secret
+      BETTER_AUTH_URL: http://localhost:4000
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      # No shared-package build here either, for the reason given in test-unit: the e2e config
+      # maps `@kurul/*` to the packages' `src` too, and this job is what keeps that true.
       - name: Migrate test database
         run: pnpm db:migrate
       # The database was just built from the checked-in migrations, which is exactly the state
@@ -129,9 +179,13 @@ jobs:
       - name: Integration tests
         run: pnpm --filter @kurul/api test:e2e
 
+  # No `needs:` here. This job installs, generates the Prisma client and builds on its own, so
+  # it never consumed anything `lint` or `test` produced; chaining it behind them only added its
+  # ~60s to the critical path, after the ~250s test job had finished. `ci-ok` is the gate and
+  # still fails if this job does.
   build:
-    needs: [lint, test]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       DATABASE_URL: postgresql://kurul:kurul@localhost:5432/kurul_ci
       # Neither of these is connected to or dialled in this job — no Postgres service runs here
@@ -178,10 +232,11 @@ jobs:
   # was discovered at release time, by the workflow whose whole job is to publish it.
   #
   # There is no `needs:` on purpose. Chaining this behind `build` would add its entire duration
-  # to the pipeline's critical path, and the PR pipeline on `develop` already measures
-  # 4m56s-5m18s against the five-minute trigger recorded for OPS-10 in ROADMAP.md. Run beside
-  # `lint` and `test`, it costs runner minutes rather than wall time for as long as the slowest
-  # leg stays under `test`.
+  # to the pipeline's critical path, and the PR pipeline crossed the five-minute trigger
+  # recorded for OPS-10 in ROADMAP.md (15 of 20 `develop` runs at 301-342s) before `build` and
+  # `test` were untangled. Run beside the other jobs, it costs runner minutes rather than wall
+  # time for as long as the slowest leg stays under `test-integration`, which is why the api
+  # leg's cache hit rate matters: on a miss that leg builds for ~210s instead of ~55s.
   #
   # Three legs, not two: apps/api/Dockerfile ships two images. `migrate` is a real published
   # artifact (docker-compose.yml runs it as a one-shot service against the production database)
@@ -192,6 +247,7 @@ jobs:
   # -----------------------------------------------------------------------------------
   image-scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     permissions:
       # Checkout, the Trivy release download and the actions cache, and nothing else. No image
       # leaves this job, so there is no `packages: write` and no `docker/login-action`.
@@ -223,16 +279,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       # `push: false` with `load: true`: the image is built into this runner's own daemon for
       # Trivy to read and is discarded with the runner. Publishing stays where it belongs, in
       # release-images.yml, behind a tag.
       #
-      # The gha cache a pull request writes is scoped to that pull request and discarded on
-      # merge; what makes a PR's first run fast is the cache written by this same workflow's run
-      # on `develop` (it triggers on `push` there too), which every branch cut from develop can
-      # read.
+      # What makes a PR's run fast is the cache written by this same workflow's run on `develop`
+      # (it triggers on `push` there too), which every branch cut from develop can read. Pull
+      # request runs only read it; `cache-to` below says why they stopped writing.
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -248,7 +303,47 @@ jobs:
           # is actually published.
           provenance: false
           cache-from: type=gha,scope=pr-${{ matrix.image }}
-          cache-to: ${{ matrix.cache-to }}
+          # Written on `push` only, i.e. by the `develop` and `main` runs, and read by everyone.
+          # Pull request runs used to write too, and each stored a full `mode=max` copy of the
+          # build stage under its own ref, which no other run can read and which is discarded
+          # on merge: with three PRs open the repository sat at 10.87 GB against GitHub's 10 GB
+          # cache limit, and eviction by last access took develop's entries with it, which is
+          # the cache miss this whole arrangement exists to avoid.
+          cache-to: ${{ github.event_name == 'push' && matrix.cache-to || '' }}
+
+      # A Next.js standalone image can build green and still be dead on arrival: `next build`
+      # *traces* the server's runtime dependencies, and a tracing regression drops a file that
+      # nothing before `node server.js` ever asks for. next 16.3.1 did exactly that: it stopped
+      # copying `@swc/helpers/esm/*`, which Node ≥ 22.12 resolves through the `module-sync`
+      # exports condition, so every image built from it threw `MODULE_NOT_FOUND` at boot
+      # (vercel/next.js#97598, fixed in 16.3.2). Nothing in this pipeline noticed: `build`
+      # compiles, this job scans layers, and neither one *starts* the thing. Booting the image
+      # once and asking it for a page is the whole missing check.
+      #
+      # Only the web leg: the api image needs Postgres and Redis to answer anything, which is a
+      # compose stack rather than a step, while the web server answers `/` on its own (a 307 to
+      # the login route, and no API call is made to produce it). `-f` therefore also catches a 5xx,
+      # not just a process that never listened.
+      #
+      # Costs about 10s of wall time: the container is already local from the step above, Next
+      # standalone is ready in well under a second, and the loop exits on the first success.
+      - name: Web image boots and answers
+        if: matrix.image == 'kurul-web'
+        run: |
+          set -euo pipefail
+          docker run -d --name web-boot -p 3000:3000 kurul-web:runner
+          for _ in $(seq 1 20); do
+            if curl -fs -o /dev/null --max-time 3 http://127.0.0.1:3000/; then
+              echo "kurul-web answered /, the image boots"
+              docker rm -f web-boot >/dev/null
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "kurul-web did not answer / within 20s"
+          docker logs web-boot
+          docker rm -f web-boot >/dev/null
+          exit 1
 
       # `ignore-unfixed: true` is what separates a gate from a permanent red mark. node:24-alpine
       # carries HIGH and CRITICAL advisories for which no fixed version exists in any package the
@@ -272,6 +367,63 @@ jobs:
           # that meets an anonymous pull rate limit first.
           cache: true
 
+  # -----------------------------------------------------------------------------------
+  # The self-host product is docker-compose.yml plus docker/Caddyfile, and until this job nothing
+  # in CI parsed either: `image-scan` builds the images, the browser suite builds its own
+  # standalone stack, and scripts/bootstrap.mjs validates only docker-compose.dev.yml. That is
+  # how a `${VAR:?}` inside the profiled `demo-reset` service reached `develop` and failed every
+  # plain `docker compose up -d` with the shipped .env.example: Compose interpolates the whole
+  # file before it filters services by profile. `config -q` is the check that would have caught
+  # it. It interpolates, resolves anchors and validates the schema, talks to no daemon, and
+  # takes a few seconds.
+  #
+  # The env file is .env.example plus the two keys with no default, which is the install the
+  # docs describe (`cp .env.example .env`, fill in the secrets, `docker compose up -d`). Blank is
+  # not unset: `${VAR:?}` and `${VAR:-x}` treat an empty value as missing while `${VAR?}` and
+  # `${VAR-x}` do not, so the shipped file with its blank keys is the case worth rendering, and
+  # the two-line file beside it covers a .env that never mentions a key at all.
+  #
+  # No `needs:` for the same reason `image-scan` has none: off the critical path, and this is
+  # the shortest job in the file.
+  # -----------------------------------------------------------------------------------
+  compose-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Write the env files an install starts from
+        run: |
+          set -euo pipefail
+          printf 'POSTGRES_PASSWORD=%s\nBETTER_AUTH_SECRET=%s\n' \
+            ci-postgres-password ci-better-auth-secret-with-more-than-32-characters > ci-minimal.env
+          cat .env.example ci-minimal.env > ci-install.env
+          { cat ci-install.env; printf 'DEMO_MODE=true\nDEMO_PASSWORD=ci-demo-password\n'; } > ci-demo.env
+
+      # No profile: the documented install and upgrade path, and the invocation that failed.
+      - name: Render docker-compose.yml
+        run: |
+          set -euo pipefail
+          docker compose --env-file ci-install.env -f docker-compose.yml config -q
+          docker compose --env-file ci-minimal.env -f docker-compose.yml config -q
+
+      - name: Render docker-compose.yml with the demo profile
+        run: docker compose --env-file ci-demo.env --profile demo -f docker-compose.yml config -q
+
+      - name: Render docker-compose.dev.yml
+        run: docker compose --env-file ci-install.env -f docker-compose.dev.yml config -q
+
+      # The same image tag docker-compose.yml runs. `validate` adapts the Caddyfile and
+      # provisions every module without starting a server, so a renamed directive or a malformed
+      # block fails here and no certificate is requested for the placeholder hostname. SITE_URL
+      # is an https address on purpose: that is the branch of `{$SITE_URL:http://localhost}` a
+      # real deployment takes, and the one that carries the automatic HTTPS configuration.
+      - name: Validate docker/Caddyfile
+        run: >-
+          docker run --rm -e SITE_URL=https://example.com
+          -v "$PWD/docker/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2-alpine caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile
+
   ci-ok:
     # Gate job: the single required status check. `if: always()` is the whole point —
     # a `needs` job that is skipped (e.g. via concurrency cancel) or cancelled still runs
@@ -280,8 +432,9 @@ jobs:
     # skip the gate job entirely and report it as "passed" — the exact failure mode from
     # PR #89 (https://github.com/dravcore/kurul/pull/89).
     if: always()
-    needs: [lint, test, build, image-scan]
+    needs: [lint, test-unit, test-integration, build, image-scan, compose-config]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Decide gate result
         run: |
@@ -291,19 +444,21 @@ jobs:
           # or "cancelled", not "success". The gate must reject both.
           declare -A results
           results[lint]="${{ needs.lint.result }}"
-          results[test]="${{ needs.test.result }}"
-          results[build]="${{ needs.build.result }}"
           # `results` is an associative array (`declare -A`), so a hyphen in the key is a
           # plain character and not an arithmetic subtraction the way it would be in an
           # indexed array.
+          results[test-unit]="${{ needs.test-unit.result }}"
+          results[test-integration]="${{ needs.test-integration.result }}"
+          results[build]="${{ needs.build.result }}"
           results[image-scan]="${{ needs.image-scan.result }}"
+          results[compose-config]="${{ needs.compose-config.result }}"
 
           # Log each result for diagnosis: if a PR fails, the developer needs to know which
           # job failed, what its result status was, and whether it was actually a failure
           # or a skip/cancel (GitHub's skipped jobs are not a failure in the normal sense,
           # but they halt the pipeline and must be treated as if they were).
           echo "Gate check results:"
-          for job in lint test build image-scan; do
+          for job in lint test-unit test-integration build image-scan compose-config; do
             echo "  $job: ${results[$job]}"
           done
 
@@ -313,7 +468,7 @@ jobs:
           # - cancelled: the workflow was cancelled by the user or timed out.
           # Using contains(needs.*.result, 'failure') would miss skipped and cancelled.
           failure=0
-          for job in lint test build image-scan; do
+          for job in lint test-unit test-integration build image-scan compose-config; do
             if [[ "${results[$job]}" != "success" ]]; then
               echo "ERROR: $job did not succeed (result: ${results[$job]})"
               failure=1

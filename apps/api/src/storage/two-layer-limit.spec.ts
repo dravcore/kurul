@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { AUTH_BODY_MAX_BYTES } from '../auth/auth-body-limit';
 import { DEFAULT_TRELLO_IMPORT_MAX_BYTES } from '../import/import-config';
 import { DEFAULT_ATTACHMENT_MAX_BYTES } from './storage-config';
 
@@ -73,17 +74,67 @@ function parseSize(literal: string): number {
   return value * multipliers[unit]!;
 }
 
+/** The text between the `{` at `open` and the `}` that closes it. */
+function braced(text: string, open: number): string {
+  let depth = 0;
+  for (let i = open; i < text.length; i += 1) {
+    if (text[i] === '{') depth += 1;
+    if (text[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(open + 1, i);
+    }
+  }
+  throw new Error('Unbalanced braces');
+}
+
+/**
+ * The two proxy rules that carry a body limit, keyed by the Caddyfile directive that opens the
+ * block and the nginx `location` the documented contract gives it.
+ *
+ * Both proxies are read *per rule* rather than "the first `max_size` in the file": since
+ * `handle /auth/*` gained a `request_body` of its own, the first match in either file names the
+ * auth ceiling, and the upload assertions below would be comparing 64 KiB to 25 MiB.
+ */
+const PROXY_RULES = {
+  '/auth/*': { caddy: 'handle /auth/*', nginx: 'location /auth/' },
+  '/api/*': { caddy: 'handle_path /api/*', nginx: 'location /api/' },
+} as const;
+type ProxyRule = keyof typeof PROXY_RULES;
+
+/** `request_body { max_size … }` inside one `handle`/`handle_path` block of docker/Caddyfile. */
+function caddyLimit(rule: ProxyRule): number {
+  const caddyfile = read('docker/Caddyfile');
+  const opener = PROXY_RULES[rule].caddy;
+  const start = caddyfile.indexOf(opener);
+  if (start === -1) throw new Error(`docker/Caddyfile has no "${opener}" block`);
+  const block = braced(caddyfile, caddyfile.indexOf('{', start));
+  const match = /max_size\s+(\S+)/.exec(block);
+  if (match === null) throw new Error(`"${opener}" in docker/Caddyfile sets no max_size`);
+  return parseSize(match[1]!);
+}
+
+/** `client_max_body_size` inside one `location` block of the documented nginx contract. */
+function nginxLimit(
+  doc: 'docs/self-hosting.md' | 'docs/tr/self-hosting.md',
+  rule: ProxyRule,
+): number {
+  const text = read(doc);
+  const opener = PROXY_RULES[rule].nginx;
+  const start = text.indexOf(opener);
+  if (start === -1) throw new Error(`${doc} has no "${opener}" block`);
+  const block = braced(text, text.indexOf('{', start));
+  const match = /client_max_body_size\s+([^;]+);/.exec(block);
+  if (match === null) throw new Error(`"${opener}" in ${doc} sets no client_max_body_size`);
+  return parseSize(match[1]!);
+}
+
 describe('the two-layer upload limit', () => {
   it('is 25 MiB in the API', () => {
     expect(DEFAULT_ATTACHMENT_MAX_BYTES).toBe(26_214_400);
   });
 
   it('leaves docker/Caddyfile room for the multipart envelope, above the file limit', () => {
-    const caddyfile = read('docker/Caddyfile');
-    const match = /max_size\s+(\S+)/.exec(caddyfile);
-
-    expect(match).not.toBeNull();
-    const proxyLimit = parseSize(match![1]!);
+    const proxyLimit = caddyLimit('/api/*');
 
     // Strictly greater, so a file of exactly the published maximum can still be uploaded once
     // its envelope is counted. Equality here is the bug this assertion replaced.
@@ -96,11 +147,7 @@ describe('the two-layer upload limit', () => {
   it('leaves the same room in docs/self-hosting.md, where an operator replacing Caddy reads it', () => {
     // nginx defaults `client_max_body_size` to 1 MB, so an operator who followed the published
     // contract and omitted this row is the one who gets the broken install (ADR 0022).
-    const doc = read('docs/self-hosting.md');
-    const match = /client_max_body_size\s+([^;]+);/.exec(doc);
-
-    expect(match).not.toBeNull();
-    const proxyLimit = parseSize(match![1]!);
+    const proxyLimit = nginxLimit('docs/self-hosting.md', '/api/*');
     expect(proxyLimit).toBeGreaterThan(DEFAULT_ATTACHMENT_MAX_BYTES);
     expect(proxyLimit - DEFAULT_ATTACHMENT_MAX_BYTES).toBeGreaterThan(
       MEASURED_MULTIPART_ENVELOPE_BYTES,
@@ -108,11 +155,7 @@ describe('the two-layer upload limit', () => {
   });
 
   it('leaves the same room in the Turkish mirror', () => {
-    const doc = read('docs/tr/self-hosting.md');
-    const match = /client_max_body_size\s+([^;]+);/.exec(doc);
-
-    expect(match).not.toBeNull();
-    const proxyLimit = parseSize(match![1]!);
+    const proxyLimit = nginxLimit('docs/tr/self-hosting.md', '/api/*');
     expect(proxyLimit).toBeGreaterThan(DEFAULT_ATTACHMENT_MAX_BYTES);
     expect(proxyLimit - DEFAULT_ATTACHMENT_MAX_BYTES).toBeGreaterThan(
       MEASURED_MULTIPART_ENVELOPE_BYTES,
@@ -123,13 +166,9 @@ describe('the two-layer upload limit', () => {
     // The bundled proxy and the published nginx row are the *same* layer described twice. They
     // have to agree with each other even though neither agrees with the API's number, and
     // nothing above would notice one of them drifting — each is only compared to the API.
-    const caddy = parseSize(/max_size\s+(\S+)/.exec(read('docker/Caddyfile'))![1]!);
-    const nginx = parseSize(
-      /client_max_body_size\s+([^;]+);/.exec(read('docs/self-hosting.md'))![1]!,
-    );
-    const nginxTr = parseSize(
-      /client_max_body_size\s+([^;]+);/.exec(read('docs/tr/self-hosting.md'))![1]!,
-    );
+    const caddy = caddyLimit('/api/*');
+    const nginx = nginxLimit('docs/self-hosting.md', '/api/*');
+    const nginxTr = nginxLimit('docs/tr/self-hosting.md', '/api/*');
 
     expect(nginx).toBe(caddy);
     expect(nginxTr).toBe(caddy);
@@ -143,7 +182,7 @@ describe('the two-layer upload limit', () => {
    * front of it. A second file would let the two drift into two different rules.
    */
   it('keeps the Trello import limit under the proxy limit, envelope included', () => {
-    const proxyLimit = parseSize(/max_size\s+(\S+)/.exec(read('docker/Caddyfile'))![1]!);
+    const proxyLimit = caddyLimit('/api/*');
 
     expect(DEFAULT_TRELLO_IMPORT_MAX_BYTES).toBe(20_971_520);
     // Not "smaller than" — smaller *with room for the multipart envelope*, the same margin the
@@ -200,5 +239,55 @@ describe('the two-layer upload limit', () => {
     expect(apiService).toContain('BACKUP_KEEP: ${BACKUP_KEEP:-7}');
     expect(apiService).toContain('STORAGE_PATH: /data/attachments');
     expect(apiService).toContain('attachment_data:/data/attachments');
+  });
+});
+
+/**
+ * The other rule with a body limit, held to the same ordering and to a tighter equality.
+ *
+ * `/auth/*` is bounded twice as well: `request_body max_size` on `handle /auth/*` and the
+ * mount's own `AUTH_BODY_MAX_BYTES` check (`auth/auth-body-limit.ts`). The ordering rule is
+ * the one the upload pair follows, the proxy must never reject something the API would accept,
+ * but there is no multipart envelope between the two here: an auth body is a JSON object, and
+ * `Content-Length` is the number both layers compare. So the proxy needs no headroom above the
+ * API, and the assertion is `>=` rather than "greater by more than an envelope".
+ */
+describe('the two-layer auth body limit', () => {
+  it('is 64 KiB in the API', () => {
+    expect(AUTH_BODY_MAX_BYTES).toBe(65_536);
+  });
+
+  it('is bounded in docker/Caddyfile at or above the API constant', () => {
+    expect(caddyLimit('/auth/*')).toBeGreaterThanOrEqual(AUTH_BODY_MAX_BYTES);
+  });
+
+  it('is bounded in docs/self-hosting.md at or above the API constant', () => {
+    // nginx defaults `client_max_body_size` to 1 MB, so an operator who omitted this row would
+    // still be bounded, sixteen times more loosely than the shipped proxy. The row exists so
+    // that the contract table and the snippet say the same number the Caddyfile does.
+    expect(nginxLimit('docs/self-hosting.md', '/auth/*')).toBeGreaterThanOrEqual(
+      AUTH_BODY_MAX_BYTES,
+    );
+  });
+
+  it('is bounded in the Turkish mirror at or above the API constant', () => {
+    expect(nginxLimit('docs/tr/self-hosting.md', '/auth/*')).toBeGreaterThanOrEqual(
+      AUTH_BODY_MAX_BYTES,
+    );
+  });
+
+  it('keeps the two proxy numbers equal to each other, so replacing Caddy changes nothing', () => {
+    const caddy = caddyLimit('/auth/*');
+
+    expect(nginxLimit('docs/self-hosting.md', '/auth/*')).toBe(caddy);
+    expect(nginxLimit('docs/tr/self-hosting.md', '/auth/*')).toBe(caddy);
+  });
+
+  it('stays far below the upload ceiling: the two rules are different limits on purpose', () => {
+    // A future edit that copies the 26 MiB line into the auth block would pass every assertion
+    // above and quietly reopen the finding. An auth body is a few hundred bytes; the ceiling is
+    // meant to be small.
+    expect(caddyLimit('/auth/*')).toBeLessThan(DEFAULT_TRELLO_IMPORT_MAX_BYTES);
+    expect(caddyLimit('/auth/*')).toBeLessThan(caddyLimit('/api/*'));
   });
 });

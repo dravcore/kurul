@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { countActiveFilters, hasActiveFilters, type BoardTaskFilters } from '@/lib/task-query';
+import { countActiveMenuFilters, hasActiveFilters, type BoardTaskFilters } from '@/lib/task-query';
 import {
   resolveDuePreset,
   setDueFilter,
@@ -45,7 +45,7 @@ export function BoardFilterMenu({
 }: BoardFilterMenuProps): React.ReactElement {
   const t = useTranslations('app.board.filter');
   const tTask = useTranslations('app.board.task');
-  const activeCount = countActiveFilters(filters);
+  const activeCount = countActiveMenuFilters(filters);
   const duePreset = resolveDuePreset(filters);
 
   const priorityOptions: BoardFilterOption<Priority>[] = PRIORITIES.map((priority) => ({
@@ -70,7 +70,7 @@ export function BoardFilterMenu({
           <Filter className="size-3.5" />
           {t('filters')}
           {activeCount > 0 ? (
-            <span className="rounded-sm bg-muted px-1 text-micro font-medium tabular-nums">
+            <span className="rounded-sm bg-muted px-1 text-micro font-strong tabular-nums">
               {activeCount}
             </span>
           ) : null}

@@ -32,11 +32,11 @@ deleted after merge.
 | `hotfix/*`  | short-lived | `main`        | `main` + `develop` | Urgent production fix                                   |
 
 ```
-main     ──●───────────────────────●──────────────●──  tags: v0.1.0, v0.1.1, v0.2.0
-            \                     /              /
-release      \              ●────●              /      release/0.2.0
-              \            /                   /
-develop  ──────●──●──●────●───────●──●──●─────●─────
+main     ──●───────────────────────●──────────────●─────●──  tags: v0.1.0, v0.2.0, v0.3.0, v0.4.0
+            \                     /              /     /
+release      \              ●────●              /     /      release/0.2.0
+              \            /                   /     /
+develop  ──────●──●──●────●───────●──●──●─────●─────●─────
                   /        \         /  /
 feature          ●          └─ back-merge
 
@@ -225,10 +225,35 @@ Releases are cut from `develop` through a `release/*` branch. Versions follow
 git switch develop && git pull
 git switch -c release/0.2.0
 
-# 2. Bump the version in every package.json (root, apps/*, packages/*)
+# 2. Bump the version in every package.json (root, apps/*, packages/*, e2e)
 #    and finalize CHANGELOG.md: rename [Unreleased] to [0.2.0] - YYYY-MM-DD,
 #    add a fresh empty [Unreleased] section on top.
+#    Bump the release tag in docs/self-hosting.md as well (the install URLs, the
+#    TAG and cosign examples) and in its docs/tr mirror: the operator page fetches
+#    its files from the tag, so the page and the release move together.
 git commit -am "chore(release): 0.2.0"
+
+# 2b. Refresh the release-pinned prose. Everything below carries a version number
+#     that only a person keeps current, and the v0.3.0 cut reached exactly one of
+#     them. Walk the list rather than trusting memory:
+#     - README.md and README.tr.md, the "what it is not, at vX.Y.Z" paragraph:
+#       both the version and the claims, since a feature may have landed since.
+#     - ROADMAP.md: the intro (which release is current, which is next), the
+#       Next 2 weeks table, and the Phases list.
+#     - .env.example and docs/development.md#activation-funnel-and-telemetry:
+#       the telemetry example prints the package version, so its "version" field
+#       is release-pinned prose like the rest.
+#     - docs/self-hosting.md and its docs/tr mirror: covered by step 2 above, but
+#       verify rather than assume, since the install URLs fetch from the tag.
+#     - The tag diagram at the top of this file: it lists the tags that exist.
+#     - CHANGELOG.md: the section you just renamed may carry two Added or two
+#       Fixed headings, one per merged PR. Merge them into one of each, keeping
+#       every entry and its order, before the section is published as release notes.
+#     - apps/api/openapi.json: `pnpm openapi` regenerates it, and info.version
+#       follows apps/api/package.json. `pnpm openapi:check` fails the build job
+#       until it is regenerated, so this one enforces itself; run it here anyway
+#       so the fix is in the release commit and not in a follow-up.
+git commit -am "docs(release): refresh release-pinned prose for 0.2.0"
 
 # 3. Only release-blocking fixes may land on this branch.
 #    Everything else keeps going to develop as usual.
@@ -260,6 +285,21 @@ docker compose down -v                     # -v: leave no volume behind for the 
 #    `kurul-migrate` needs this on the first release after v0.2.0 — the
 #    first one this workflow ever publishes it from — and any image name
 #    added later needs it again, once, the same way.
+#
+#    The workflow checks two things in its `guard` job before any image is
+#    built, so a slip here fails in a minute instead of publishing:
+#    - where the tag points: a vX.Y.Z tag must be the tip of main (this merge
+#      commit); a pre-release tag (vX.Y.Z-rc.N) must sit on main or on a
+#      release/* or hotfix/* branch;
+#    - what the tree says: every package.json version must equal X.Y.Z and,
+#      for a vX.Y.Z tag, CHANGELOG.md must carry a `## [X.Y.Z] - ` heading.
+#    v* tags should also be protected by a repository ruleset (target: tag,
+#    refs/tags/v*; block create, update, delete and non-fast-forward; bypass:
+#    repository admin only), so that a token with contents:write cannot push,
+#    move or delete a release tag on its own. The ruleset is a repository
+#    setting, not code: creating it is on the operator checklist in
+#    ROADMAP.md, and once it is in place only the admin can push, move or
+#    delete a v* tag.
 git switch main && git pull
 git tag -a v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
@@ -322,13 +362,19 @@ a hyphen), and that exists for one reason: the workflow publishes images, signs 
 cosign and attaches SBOMs, and none of that is exercised by CI. Cutting a version as the first
 run of an unexecuted workflow makes the release itself the test.
 
-So when the publish path has changed — a new action major, a change to the signing or SBOM
-steps, a new registry — rehearse it before step 5:
+So when the publish path has changed (a new action major, a change to the signing or SBOM
+steps, a new registry), rehearse it on the `release/*` branch, after step 2 and before step 5:
 
 ```bash
 git tag -a v0.2.0-rc.1 -m "v0.2.0-rc.1"
 git push origin v0.2.0-rc.1
 ```
+
+The order matters: the `guard` job applies the package.json check to pre-release tags too
+(only the CHANGELOG heading is stable-only), so the tree under a rehearsal tag must already say
+`X.Y.Z`. A tag cut before step 2's bump fails the guard, which names the files at the old
+version. The ancestry check accepts a pre-release tag on `main`, `release/*` or `hotfix/*`, so
+the release branch is the natural place for it.
 
 The rehearsal is a real publish: real images, a real signature, real SBOM assets, and the
 `cosign verify` command in [self-hosting.md](self-hosting.md#verifying-what-you-pulled) works
@@ -345,7 +391,8 @@ that 404s; but the assertion itself first runs when you cut the version.
 
 A rehearsal tag is disposable. Delete it and its release when the real version ships; the
 images stay in the registry under their exact `-rc` tags and cost nothing but a line in the
-package list.
+package list. Deleting the tag is the admin's step: once the `v*` ruleset from step 5 is in
+place it blocks tag deletion for everyone else, and the admin's bypass is what lets it through.
 
 ## Hotfix process
 

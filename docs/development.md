@@ -88,8 +88,8 @@ and `pnpm typecheck` both do this for you as a side effect; `pnpm dev`, `pnpm db
 
 The test suites are the exception. Jest (`apps/api`, unit and integration) and Vitest
 (`apps/web`, `packages/auth-access`) map both packages to their `src/index.ts`, so `pnpm test`
-passes on a checkout with no `dist` at all and never runs against a stale one; the CI test job
-deliberately skips the build for that reason. A stale build is the worse of the two failures,
+passes on a checkout with no `dist` at all and never runs against a stale one; the CI test jobs
+deliberately skip the build for that reason. A stale build is the worse of the two failures,
 because it resolves: an enum added since the last build reads back as `undefined` in every
 consumer. `pnpm dev` and `pnpm db:seed` still go through `dist`, so rebuild after pulling a
 change to either package.
@@ -123,6 +123,13 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `ATTACHMENT_INSTANCE_QUOTA_BYTES`     | `21474836480`                                                 | The same ceiling summed over **every** workspace on the instance; unset = 20 GiB, `0` = unlimited. Set it below your volume's real headroom: `STORAGE_PATH` in the shipped Compose stack shares its filesystem with Postgres. The API logs both effective quotas at boot, marking which came from the environment, and warns if this one is set below the workspace quota ([ADR 0027](decisions/0027-attachment-quotas.md))                                                                                                                                                                  |
 | `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`  | `268435456`                                                   | Bytes one client IP may submit to the upload route per fixed minute (256 MiB, about ten max-size uploads), charged from each request's `Content-Length` before multer reads the body; a multipart request without one is charged `ATTACHMENT_MAX_BYTES`. `0` switches it off; negative refuses to boot. Honours `RATE_LIMIT_ENABLED` and `TRUST_PROXY`; counters live in Redis when `REDIS_URL` is set and fall back to process memory on Redis errors. Rejection is `429` with `error: "Upload Budget Exceeded"` and `Retry-After` ([api-conventions.md](api-conventions.md#rate-limiting)) |
 | `TRELLO_IMPORT_MAX_BYTES`             | `20971520`                                                    | Largest Trello export the importer accepts, in bytes (20 MiB). A **heap** ceiling rather than a disk one — the parsed graph is several times the bytes that produced it. Separate from both limits above, and importing needs no `STORAGE_PATH` ([ADR 0025](decisions/0025-trello-import-mapping.md))                                                                                                                                                                                                                                                                                        |
+| `TRELLO_IMPORT_MAX_CARDS`             | `50000`                                                       | Largest number of cards one Trello import will plan, counted before archived or malformed ones are dropped. Over it the answer is `400` and nothing is written ([ADR 0025's amendment](decisions/0025-trello-import-mapping.md#amendment-2026-08-26-field-length-ceilings-and-a-row-cap-sec-04))                                                                                                                                                                                                                                                                                             |
+| `TRELLO_IMPORT_MAX_LISTS`             | `5000`                                                        | Same ceiling, for lists (`Column` rows) ([ADR 0025's amendment](decisions/0025-trello-import-mapping.md#amendment-2026-08-26-field-length-ceilings-and-a-row-cap-sec-04))                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `PLAN_MAX_SEATS_PER_WORKSPACE`        | _(blank)_                                                     | Ceiling on members plus pending invitations in one workspace ([ADR 0032](decisions/0032-plan-limits.md)). **Unset or `0` = unlimited**; a negative or non-integer value refuses to boot. The bundled `docker-compose.yml` forwards all four `PLAN_MAX_*` keys to `api`                                                                                                                                                                                                                                                                                                                       |
+| `PLAN_MAX_BOARDS_PER_WORKSPACE`       | _(blank)_                                                     | Ceiling on boards in one workspace. Same unset/`0` rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `PLAN_MAX_WORKSPACES`                 | _(blank)_                                                     | Ceiling on workspaces on the instance. Same rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `PLAN_MAX_USERS`                      | _(blank)_                                                     | Ceiling on accounts on the instance; refuses sign-up only, never sign-in. Same rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `SIGNUP_ENABLED`                      | _(blank)_ / `false`                                           | Registration switch. Blank or `true` keeps `POST /auth/sign-up/email` open; `false` refuses it with `403` `error: "Sign-up Disabled"` and leaves sign-in and every other `/auth` route open. Published as `signUpEnabled` on `GET /config`; independent of `DEMO_MODE`. See [self-hosting](self-hosting.md#2-fetch-the-compose-file-and-configure)                                                                                                                                                                                                                                           |
 | `SMTP_HOST`                           | `localhost` (dev, via Mailpit)                                | SMTP server host. Unset entirely and the mail module logs instead of sending — see [SMTP and Mailpit](#smtp-and-mailpit)                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `SMTP_PORT`                           | `1025` (dev, via Mailpit) / `587` (typical production)        | SMTP server port                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `SMTP_USER`                           | _(blank for Mailpit)_                                         | SMTP auth username, if your server requires one                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -133,13 +140,15 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `NOTIFICATION_RETENTION_DAYS`         | `90`                                                          | Days a notification is kept **after it was read**. Unread notifications are never deleted, at any age. `0` = keep forever                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `ACTIVITY_RETENTION_DAYS`             | `365`                                                         | Days an activity row is kept after it was written. `0` = keep forever — set this if you have a statutory audit-trail duty                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `INVITATION_RETENTION_DAYS`           | `90`                                                          | Days a **finished** invitation is kept, measured from when it was created. Finished = answered (accepted/rejected/canceled) or expired; a pending, unexpired invitation is never deleted, at any age. `0` = keep forever                                                                                                                                                                                                                                                                                                                                                                     |
+| `BACKUP_INTERVAL`                     | `86400`                                                       | Seconds between backup cycles. Read by the `backup` service **and** by the cleanup worker, which multiplies it by `BACKUP_KEEP` (24h floor) to get the grace period before an orphaned attachment file is deleted, so a restore from the oldest kept dump never points at a file the sweep removed. See [Upgrading and backups](#upgrading-and-backups)                                                                                                                                                                                                                                      |
+| `BACKUP_KEEP`                         | `7`                                                           | Archives of each series the `backup` service retains; the other factor of the cleanup worker's orphan grace period                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `DATABASE_POOL_MAX`                   | `20`                                                          | Max simultaneous connections the shared `pg` pool opens to Postgres — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `DATABASE_POOL_CONNECTION_TIMEOUT_MS` | `10000`                                                       | How long a request waits for a pool connection before failing, once all `DATABASE_POOL_MAX` are busy — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `DATABASE_STATEMENT_TIMEOUT_MS`       | `30000`                                                       | How long a single SQL statement may run before Postgres kills it — see [Database connection pool](#database-connection-pool)                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `SENTRY_DSN`                          | _(blank)_                                                     | API error tracking. **Blank = off, and off means the SDK is never loaded** — see [Observability](#observability)                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `SENTRY_ENVIRONMENT`                  | _(blank)_ / `production`                                      | Label on API events; blank falls back to `NODE_ENV`. Set it if staging and production run the same image                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `SENTRY_RELEASE`                      | _(blank)_ / `v0.2.0`                                          | Version label on API events; best set to the deployed tag. Blank sends none                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `NEXT_PUBLIC_SENTRY_DSN`              | _(blank)_                                                     | Web error tracking, same opt-in rule — **baked at build time**, so rebuild the web image after changing it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `NEXT_PUBLIC_SENTRY_DSN`              | _(blank)_                                                     | Web error tracking, same opt-in rule: **baked at build time**, so rebuild the web image after changing it. The published GHCR image cannot be rebuilt in place, see [Browser error tracking](self-hosting.md#browser-error-tracking)                                                                                                                                                                                                                                                                                                                                                         |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`      | _(blank)_ / `production`                                      | `SENTRY_ENVIRONMENT`'s web counterpart, also build-time                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `NEXT_PUBLIC_SENTRY_RELEASE`          | _(blank)_ / `v0.2.0`                                          | `SENTRY_RELEASE`'s web counterpart, also build-time                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `SEED_LARGE_BOARD_TASKS`              | _(blank)_ / `1000`                                            | Read only by `pnpm db:seed`. Adds a synthetic board of this many tasks next to the demo one. Blank or `0` skips it — see [Seeding a large board](#seeding-a-large-board)                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -147,6 +156,9 @@ Then fill in the blanks. `.env` is git-ignored and must never be committed.
 | `TELEMETRY_ENABLED`                   | `false`                                                       | Outbound telemetry. **Off by default; nothing is sent while this is `false`** — see [Activation funnel and telemetry](#activation-funnel-and-telemetry)                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `TELEMETRY_ENDPOINT`                  | _(blank)_                                                     | Where the opt-in ping is POSTed. **No default**; `TELEMETRY_ENABLED=true` with this blank logs an error and sends nothing                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `TELEMETRY_TIMEOUT_MS`                | `5000`                                                        | How long the single boot-time ping may take before it is abandoned. Failure is a warning line and nothing else                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `DEMO_MODE`                           | `false`                                                       | Runs the instance as a public demo: a banner, all outbound mail to the log whatever SMTP says, account and workspace deletion refused, the reset schedule published on `GET /config`. See [self-hosting.md](self-hosting.md#demo-instance)                                                                                                                                                                                                                                                                                                                                                   |
+| `DEMO_PASSWORD`                       | _(blank)_                                                     | Password the `demo-reset` service gives the demo account on every reset (8 characters minimum). Read only by `apps/api/src/demo/reset.ts`, so `docker-compose.yml` forwards it to `demo-reset` and not to `api`                                                                                                                                                                                                                                                                                                                                                                              |
+| `DEMO_RESET_INTERVAL_MINUTES`         | `60`                                                          | Minutes between demo resets. Read by both `api` (the banner's countdown) and `demo-reset` (its sleep), which is why compose passes the same value to both                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` are read only by `next build` when
 uploading source maps, and only when they are set; they are absent from `.env.example`
@@ -154,23 +166,41 @@ because a build without them succeeds silently. See
 [Observability](#observability).
 
 `.env.example` also carries `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
-`REDIS_PASSWORD`, `BACKUP_INTERVAL`, and `BACKUP_KEEP`. All six are **compose-only** —
-`docker-compose.yml` interpolates them into the `postgres`/`redis`/`migrate`/`api`/`backup`
-services and no application code reads them directly, so they are absent from the table
-above and need no wiring in `apps/api`. See
-[Database and cache credentials](#database-and-cache-credentials) for the first four and
-[Upgrading and backups](#upgrading-and-backups) for the backup pair.
+`REDIS_PASSWORD`, `REDIS_MAXMEMORY`, `BACKUP_REMOTE` and `TAG`. All seven are
+**compose-only**: `docker-compose.yml` interpolates them into its service definitions (`TAG`
+picks the tag of every published image, `REDIS_MAXMEMORY` becomes a `redis-server` argument)
+and no application code reads them, so they are absent from the table above and need no wiring
+in `apps/api`. See [Database and cache credentials](#database-and-cache-credentials) for the
+first four and [Upgrading and backups](#upgrading-and-backups) for `BACKUP_REMOTE`.
+`BACKUP_INTERVAL` and `BACKUP_KEEP` are not on that list: the `backup` service reads them, but
+so does the cleanup worker in `apps/api`, which is why they are in the table.
+`INTERNAL_API_URL` runs the other way: application code reads it, so it is in the table, but it
+is absent from `.env.example` because `docker-compose.yml` sets it outright rather than
+interpolating it from `.env`.
 
-Generate a secret with:
+Generate `BETTER_AUTH_SECRET` with:
 
 ```bash
 openssl rand -base64 32
 ```
 
-**Adding a new environment variable is a three-step change**, and all three go in the same
-PR: wire it through the env helpers in `apps/api/src/common/env.ts` (or the call site that
-reads `process.env` — there is no separate Zod/typed env schema today), add it to
-`.env.example` with a safe placeholder, and document it in the table above.
+That generator is right for this one variable and wrong for the two that go inside a
+connection URL. The rule, the failure it prevents and the odds are written down once, in
+[Database and cache credentials](#database-and-cache-credentials); `.env.example`,
+[README.md](../README.md) and [self-hosting.md](self-hosting.md) all point there rather than
+carrying their own version of it.
+
+**Adding a new environment variable is a four-step change**, and all four go in the same PR:
+wire it through the env helpers in `apps/api/src/common/env.ts` (or the call site that reads
+`process.env`; there is no separate Zod/typed env schema today), add it to `.env.example` with a
+safe placeholder, document it in the table above, and forward it in `docker-compose.yml` under
+the service that reads it (`api`, `web`, `demo-reset` or `migrate`) as `KEY: ${KEY:-}`, or state
+in the table that it is dev-loop only. The last step is the one that is easy to forget and
+impossible to notice: Compose reads `.env` for `${VAR}` interpolation only and never hands the
+file to a container, and the api image ships without one, so a key missing from the
+`environment:` block silently keeps its default on every Compose install.
+`scripts/lib/compose-env.test.mjs` (`pnpm test:scripts`) fails on a documented API-read key the
+`api` service does not forward; a deliberate omission goes in its exception list with a reason.
 
 ## Database and cache credentials
 
@@ -205,9 +235,10 @@ $ openssl rand -hex 32
 1b7c3785ecf7f7bd2ec4826214889d19ff17d518ce44126ab6f07393b39b98a   # 0-9a-f only, always URL-safe
 ```
 
-`-base64 32`'s alphabet includes `/` and `+`; with 43 base64 characters per password, the
-odds of at least one `/` or `+` landing in there are `1 - (63/64)^43 ≈ 51%` — roughly a coin
-flip on whether a freshly generated password silently breaks its own connection string.
+`-base64 32`'s alphabet includes both `/` and `+`, two problem characters out of 64; with 43
+base64 characters per password, the odds of at least one of them landing in there are
+`1 - (62/64)^43 ≈ 74%`, closer to three tries in four than to a coin flip on whether a freshly
+generated password silently breaks its own connection string.
 `openssl rand -hex 32` has no such character to avoid.
 
 | Variable            | Default           | Purpose                                                                                                                 |
@@ -248,11 +279,23 @@ disagree (`redis://host:6379/3?db=4`), is refused at connection time rather than
 as 0 — the whole point of the setting is keeping two apps apart, so a typo in it must not put
 them together.
 
+**A Redis 6+ ACL user and `rediss://` (TLS) are both honoured.** `redis://alice:s3cret@host:6379`
+authenticates as `alice` with `s3cret` instead of as `default`, and `rediss://host:6379` opens
+a TLS connection instead of plaintext, for a managed Redis (Upstash, ElastiCache in-transit
+encryption, Redis Cloud) that expects either. Until
+[#204](https://github.com/dravcore/kurul/issues/204) both were silently dropped: the ACL
+username never reached ioredis, so the instance authenticated as `default` with the given
+password instead (which fails outright once `default` has no password of its own to match, and
+otherwise runs as the wrong user's permissions), and `rediss://` connected in plaintext with no
+warning. A scheme other than `redis:` or `rediss:` is refused at connection time, the same way
+an unparsable database index is. The bundled Compose stack is unaffected either way: it always
+builds a plain `redis://:password@redis:6379` for its own `redis` container.
+
 **Changing `POSTGRES_PASSWORD` on an existing `postgres_data` volume does not rotate the
 running database's password.** The official Postgres image only applies
 `POSTGRES_PASSWORD` during `initdb`, i.e. the first time a volume is created — editing `.env`
 and restarting an already-initialized stack leaves the role's password exactly as it was. See
-the `[Unreleased]` entry in `CHANGELOG.md` for the `ALTER USER ... PASSWORD` command that
+the `[0.2.0]` entry in `CHANGELOG.md` for the `ALTER USER ... PASSWORD` command that
 rotates it on a running instance.
 
 ### If your checkout predates the rename
@@ -404,6 +447,38 @@ database holds no `Workspace` row yet. `--seed` forces it anyway, `--no-seed` sk
 cannot read that table for any reason it also skips — the destructive branch is never the one
 taken on a guess.
 
+**`pnpm bootstrap --check`** is a doctor mode for the same script: it answers "did something go
+stale since the last bootstrap" without touching Docker, the database, or the network, so it
+stays well under 5 seconds and is safe to run after every `git pull` before deciding whether a
+full `pnpm bootstrap` is worth it. It checks exactly three things and prints one line per check
+with a fix command on failure:
+
+```
+✓ @kurul/shared-types dist: up to date
+✓ @kurul/auth-access dist: up to date
+✗ Prisma client: stale — schema.prisma is newer than the generated client
+  fix: pnpm db:generate
+✗ required env keys: POSTGRES_PASSWORD empty or missing in .env
+  fix: set POSTGRES_PASSWORD in .env — see docs/development.md#environment-variables
+```
+
+1. `packages/shared-types/dist` and `packages/auth-access/dist` are at least as new as their
+   `src` — the two build outputs `pnpm dev` and `pnpm db:seed` actually consume (see the
+   `[0.4.0]` CHANGELOG entry on the failure mode this replaced: a stale `dist` resolves
+   and reads back as `undefined` rather than failing loudly).
+2. The generated Prisma client (`apps/api/src/generated/prisma`) is at least as new as
+   `schema.prisma`.
+3. `.env` carries non-empty `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` — the same two keys
+   `pnpm bootstrap`'s own preflight already refuses to boot without — and `DATABASE_URL` no
+   longer carries the `<POSTGRES_PASSWORD>` placeholder `.env.example` ships.
+
+It deliberately does **not** check `apps/api/dist` or `apps/web/.next`: neither `pnpm bootstrap`
+nor `pnpm dev` builds them (those are `nest build` / `next build` outputs, needed for
+`pnpm typecheck` and a production build, not the dev loop), so checking them here would report a
+healthy dev checkout as broken. Exit code is `0` when every check passes, `1` otherwise — logic
+lives in [`scripts/lib/doctor.mjs`](../scripts/lib/doctor.mjs), tested in
+[`scripts/lib/doctor.test.mjs`](../scripts/lib/doctor.test.mjs) (`pnpm test:scripts`).
+
 Run `pnpm db:drift` against a database that is already on the latest migration to confirm
 `schema.prisma` and the committed migrations still agree — see [Checking for migration
 drift](#checking-for-migration-drift) below.
@@ -510,7 +585,10 @@ for the full reasoning, and `apps/web/lib/api-url.ts` for the code.
 
 The Sentry DSNs are still genuinely build-time: turning browser error tracking on or off means
 rebuilding `web` (`docker compose build web`, which reads `NEXT_PUBLIC_SENTRY_*` from your
-`.env`), not just restarting it. `NEXT_PUBLIC_API_URL` is deliberately _not_ among that
+`.env`), not just restarting it, and that needs a source tree: the published GHCR image was
+built with the DSN blank and cannot be rebuilt in place, see
+[Browser error tracking](self-hosting.md#browser-error-tracking). `NEXT_PUBLIC_API_URL` is
+deliberately _not_ among that
 `args:` block, so a local build produces the same bundle the release image does rather than
 quietly baking whatever the dev loop left in `.env`. A deployment that really does want the API
 on its own hostname overrides the build arg directly and accepts a domain-specific image:
@@ -578,31 +656,37 @@ with `docker top` showing `999 ... redis-server` instead of `root ... redis-serv
 `SET` → restart cycle that survives with the value intact in both the password and
 no-password cases.
 
-Out of scope for this hardening pass: a read-only root filesystem (`read_only: true`) and
-seccomp profiles. Both are stricter constraints that need a per-service audit of which
-paths must stay writable (temp dirs, node's own `/tmp` use, etc.); tracked as a follow-up
-in [ROADMAP.md](../ROADMAP.md#hardening-track), not bundled in here.
+Out of scope for this hardening pass: a read-only root filesystem (`read_only: true`),
+`pids_limit` and seccomp profiles. All three are stricter constraints that need a per-service
+audit of which paths must stay writable (temp dirs, node's own `/tmp` use, etc.), which the
+two Dockerfiles have since enumerated. Tracked as the "Container hardening pass 2" row in
+[ROADMAP.md](../ROADMAP.md#hardening-track), not bundled in here.
 
 ## pnpm scripts
 
 Run from the repository root.
 
-| Script           | Command               | What it does                                                                                                                                                                                                                                                                                                            |
-| ---------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bootstrap`      | `pnpm bootstrap`      | Fresh clone (or fresh pull) → running dev loop: shared packages, Prisma client, containers, migrations, demo data. Idempotent; will not reseed a database that already holds workspaces. `--seed` / `--no-seed` override that. **Not** `pnpm setup` — that is a built-in pnpm command that writes to your shell profile |
-| `dev`            | `pnpm dev`            | Runs `apps/api` and `apps/web` in parallel with hot reload                                                                                                                                                                                                                                                              |
-| `build`          | `pnpm build`          | Builds every workspace package                                                                                                                                                                                                                                                                                          |
-| `lint`           | `pnpm lint`           | ESLint across all packages                                                                                                                                                                                                                                                                                              |
-| `format`         | `pnpm format`         | Prettier write across the repo                                                                                                                                                                                                                                                                                          |
-| `format:check`   | `pnpm format:check`   | Prettier check (CI gate)                                                                                                                                                                                                                                                                                                |
-| `typecheck`      | `pnpm typecheck`      | Builds `@kurul/shared-types` + `@kurul/auth-access`, then `tsc --noEmit` in every workspace                                                                                                                                                                                                                             |
-| `test`           | `pnpm test`           | Runs the test suites of every workspace package                                                                                                                                                                                                                                                                         |
-| `db:generate`    | `pnpm db:generate`    | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made                                                                                                                    |
-| `db:migrate`     | `pnpm db:migrate`     | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate`                                                                 |
-| `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it                                                                                 |
-| `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                                                                                       |
-| `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                                                                                            |
-| `db:drift`       | `pnpm db:drift`       | Runs `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`: compares the configured database against `schema.prisma` and exits non-zero on any difference. Same command CI runs after `db:migrate` — see [Checking for migration drift](#checking-for-migration-drift)   |
+| Script           | Command               | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bootstrap`      | `pnpm bootstrap`      | Fresh clone (or fresh pull) → running dev loop: shared packages, Prisma client, containers, migrations, demo data. Idempotent; will not reseed a database that already holds workspaces. `--seed` / `--no-seed` override that. `--check` runs the doctor mode instead — no Docker, no network, exits non-zero on stale/missing dist, Prisma client or `.env` keys, see [above](#recommended-dev-loop-services-in-docker-apps-on-host). **Not** `pnpm setup` — that is a built-in pnpm command that writes to your shell profile |
+| `dev`            | `pnpm dev`            | Runs `apps/api` and `apps/web` in parallel with hot reload                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `build`          | `pnpm build`          | Builds every workspace package                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `lint`           | `pnpm lint`           | ESLint across all packages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `format`         | `pnpm format`         | Prettier write across the repo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `format:check`   | `pnpm format:check`   | Prettier check (CI gate)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `typecheck`      | `pnpm typecheck`      | Builds `@kurul/shared-types` + `@kurul/auth-access`, then `tsc --noEmit` in every workspace                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `test`           | `pnpm test`           | Runs the test suites of every workspace package                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `db:generate`    | `pnpm db:generate`    | Runs `prisma generate`: (re)builds the Prisma client from the schema. Does not touch migrations or the database. Required after cloning and after pulling schema/migration changes someone else made                                                                                                                                                                                                                                                                                                                            |
+| `db:migrate`     | `pnpm db:migrate`     | Runs `prisma migrate deploy`: applies existing, already-committed migrations. Never creates a migration and never regenerates the client — safe for CI/production. If you only ran this after pulling new migrations, follow it with `pnpm db:generate`                                                                                                                                                                                                                                                                         |
+| `db:migrate:dev` | `pnpm db:migrate:dev` | Runs `prisma migrate dev`: diffs your local schema, **creates a new migration file**, applies it, and regenerates the client. This is the command you run locally after editing `schema.prisma` — `db:migrate` alone will not create it                                                                                                                                                                                                                                                                                         |
+| `db:seed`        | `pnpm db:seed`        | Loads demo data: one workspace, one board, default columns, a handful of tasks. Under Prisma 7 the seed entry point is declared in `prisma.config.ts` — seeding is never automatic and must be invoked explicitly                                                                                                                                                                                                                                                                                                               |
+| `db:studio`      | `pnpm db:studio`      | Opens Prisma Studio at http://localhost:5555                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `db:drift`       | `pnpm db:drift`       | Runs `prisma migrate diff --from-config-datasource --to-schema apps/api/prisma/schema.prisma --exit-code`: compares the configured database against `schema.prisma` and exits non-zero on any difference. Same command CI runs after `db:migrate` — see [Checking for migration drift](#checking-for-migration-drift)                                                                                                                                                                                                           |
+| `openapi`        | `pnpm openapi`        | Builds `@kurul/api`, then regenerates `apps/api/openapi.json` from the built application. The Swagger CLI plugin runs during `nest build` and nowhere else, which is why the build is not optional here. The document's `info.version` comes from `apps/api/package.json`, so a version bump moves the file                                                                                                                                                                                                                     |
+| `openapi:check`  | `pnpm openapi:check`  | Regenerates the document in memory and byte-compares it against the committed `apps/api/openapi.json`, exiting non-zero on the first line that differs. Same command the `build` CI job runs; run it after any controller, DTO or role-gate change                                                                                                                                                                                                                                                                              |
+| `knip`           | `pnpm knip`           | Reports unused files, exports and types across the workspace, configured by `knip.jsonc`. Not a CI gate today: it is run deliberately, and an export it flags either loses its `export`, is deleted, or becomes an explicitly-reasoned ignore                                                                                                                                                                                                                                                                                   |
+| `test:browser`   | `pnpm test:browser`   | Builds the e2e stack (`e2e/build-stack.mjs`) and runs the Playwright smoke pack against it. Needs Docker. On CI the same suite runs in `e2e.yml`, nightly on `develop` and on the `release/*` and `hotfix/*` pull requests into `main`, never on the `ci-ok` gate; that workflow builds the stack in its own steps and calls Playwright directly rather than through this script. See [testing.md](testing.md#browser-end-to-end)                                                                                               |
+| `test:scripts`   | `pnpm test:scripts`   | Runs the dependency-free `node:test` suites under `scripts/`, including the bootstrap doctor checks and the compose-env guard that fails on a documented API-read key the `api` service does not forward                                                                                                                                                                                                                                                                                                                        |
 
 To target a single workspace, use pnpm's filter flag:
 
@@ -860,7 +944,7 @@ body and **nothing else**:
 ```json
 {
   "event": "instance_started",
-  "version": "0.1.0"
+  "version": "0.4.0"
 }
 ```
 
@@ -869,7 +953,7 @@ Field by field, that is the whole list:
 | Field     | Value                | Notes                                                 |
 | --------- | -------------------- | ----------------------------------------------------- |
 | `event`   | `"instance_started"` | Always this literal string. There is only one event   |
-| `version` | e.g. `"0.1.0"`       | The `@kurul/api` package version this build came from |
+| `version` | e.g. `"0.4.0"`       | The `@kurul/api` package version this build came from |
 
 What is **not** sent, and has no code path to be sent: any instance or installation identifier,
 your hostname, your IP address, your URL, your database, any count of users, workspaces, boards
@@ -879,7 +963,7 @@ schedule. The payload is logged in full before it is sent, so you can read what 
 in your own API log:
 
 ```text
-LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.1.0"} to https://…
+LOG [TelemetryService] TELEMETRY_ENABLED is on — sending {"event":"instance_started","version":"0.4.0"} to https://…
 ```
 
 A refused connection, a DNS failure, an error from the collector or a timeout
@@ -929,15 +1013,24 @@ silently stops producing recovery points, which is the failure this whole sectio
 prevent. It is deliberately **not** in `docker-compose.dev.yml` — a local database that
 `pnpm db:seed` wipes on demand has nothing worth keeping.
 
-Two settings, both read from `.env` by compose:
+That week is a count of archives, not an age, and restarting the container does not spend one.
+The loop used to take a pair on entry every time it started, and every host reboot, `docker
+compose up` after a `.env` edit and image pull starts it, so a day of restarts could push a
+week of history out of the seven slots. Now it skips that first cycle while a dump younger than
+half of `BACKUP_INTERVAL` already exists, logs the skip, and sleeps only the remainder of the
+interval, so both the cadence and the history are what they were before the restart. The
+hand-run `backup.sh once` below is never skipped: an operator asking for a dump gets one.
+
+Three settings, all read from `.env` by compose:
 
 | Variable          | Default | Purpose                                                                   |
 | ----------------- | ------- | ------------------------------------------------------------------------- |
 | `BACKUP_INTERVAL` | `86400` | Seconds between cycles. `86400` = daily; this **is** your RPO             |
 | `BACKUP_KEEP`     | `7`     | Archives of each series retained; older ones are deleted after each cycle |
+| `BACKUP_REMOTE`   | blank   | rclone remote path for the off-host copy; blank = local archives only     |
 
-Compose passes both to the `api` service as well, which is easy to miss because they read as
-backup settings: the nightly orphan-file sweep refuses to delete a stored file while a dump old
+Compose passes the first two to the `api` service as well, which is easy to miss because they
+read as backup settings: the nightly orphan-file sweep refuses to delete a stored file while a dump old
 enough to disown it is still restorable, and that grace period is exactly
 `BACKUP_KEEP × BACKUP_INTERVAL`. "On disk with no row pointing at it" is a correct predicate
 only while the database is authoritative, and a restore rewinds the rows while the disk stays
@@ -955,13 +1048,19 @@ docker compose exec backup ls -lh /backups   # newest pair, and how many are kep
 ```
 
 Two lines per cycle, not one: a cycle that logged only the dump means the file archive failed
-(or `ATTACHMENT_DIR` is unset), and the `ERROR` line above it says which.
+(or `ATTACHMENT_DIR` is unset), and the `ERROR` line above it says which. With `BACKUP_REMOTE`
+set there are two more, one `off-host: pushed …` per archive, and the same rule applies to them.
 
-**Copy the archives off-host.** `backup_data` sits on the same disk as `postgres_data`, so it
-covers "I dropped the wrong table" and covers nothing about a dead disk or a lost server —
-mirror the volume somewhere else on a schedule (`rsync`/`rclone` from
-`docker compose exec -T backup cat /backups/<archive>`, or straight from the volume's host
-path) or the disaster case still loses everything.
+**Copy the archives off-host.** `backup_data` sits on the same disk as `postgres_data`, so
+everything above covers "I dropped the wrong table" and covers nothing about a dead disk or a
+lost server. Set `BACKUP_REMOTE` to an rclone remote path (`s3:bucket/prefix`, `b2:bucket`,
+`sftp:…`) and the same sidecar pushes both archives there after every cycle, prunes the remote
+to the same `BACKUP_KEEP`, and (this is the part that makes it a backup rather than a hope)
+reports the container **unhealthy** once the newest off-host copy passes `2 × BACKUP_INTERVAL`,
+so a broken upload is noticed on the day it breaks and not on restore day. A failed upload
+never costs a local archive. Blank, which is the default, leaves this section exactly as it was
+before that option existed. Setup, credentials, and restoring from the remote:
+[Off-host copies](self-hosting.md#off-host-copies).
 
 ### Taking a dump by hand
 
@@ -1400,8 +1499,10 @@ SENTRY_RELEASE=v0.2.0                    # optional; set it to the tag you deplo
 
 then `docker compose up -d --build web && docker compose up -d api`. The API reads its DSN at
 container start, so a restart is enough. The web DSN is a `NEXT_PUBLIC_*` value, which Next.js
-inlines at **build** time — the web image must be rebuilt for a change to take effect. (This is
-the same mechanism that used to force a rebuild for `NEXT_PUBLIC_API_URL`; that one no longer
+inlines at **build** time, so the web image must be rebuilt for a change to take effect. On a
+pull-based install that means a clone, because the published image was built with the DSN
+blank: [Browser error tracking](self-hosting.md#browser-error-tracking). (This is the same
+mechanism that used to force a rebuild for `NEXT_PUBLIC_API_URL`; that one no longer
 does, because the value baked into it is a same-origin path rather than a deployment's
 hostname — see [Full stack in Docker](#full-stack-in-docker).)
 

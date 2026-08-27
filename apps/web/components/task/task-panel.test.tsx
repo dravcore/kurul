@@ -1,9 +1,11 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { Priority, type TaskDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import messages from '@/messages/en.json';
+import { DeleteTaskDialog } from './delete-task-dialog';
 import { TaskPanel } from './task-panel';
 
 const push = vi.fn();
@@ -17,11 +19,35 @@ vi.mock('@/lib/api', () => ({
 }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
-// The metadata panel fetches comments, activity, members and labels. None of that is part of
-// the panel's focus contract, and all of it would have to be stubbed to render it here.
-vi.mock('./task-metadata-panel', () => ({
-  TaskMetadataPanel: (): React.ReactElement => <div data-testid="metadata" />,
+// The properties and discussion panels read comments, activity, members and labels through one
+// shared hook the panel owns. None of that fetch is part of this file's contract, so the hook is
+// stubbed and both real panels render against it, which is what gives the order assertion below
+// something to measure, and the mention picker (a layer of its own inside the panel) a member to
+// offer. `vi.hoisted` because the factory runs before this module's own bindings exist.
+const taskMeta = vi.hoisted(() => ({
+  members: [
+    {
+      id: 'm1',
+      workspaceId: 'w1',
+      userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51',
+      role: 'MEMBER',
+      name: 'Ayşe Yıldız',
+      avatarUrl: null,
+    },
+  ],
+  boardLabels: [],
+  setBoardLabels: vi.fn(),
+  comments: [],
+  setComments: vi.fn(),
+  hasMoreComments: false,
+  loadingMoreComments: false,
+  loadMoreComments: vi.fn(),
+  activities: [],
+  refreshActivities: vi.fn().mockResolvedValue(undefined),
+  loadingMeta: false,
+  metaFailed: false,
 }));
+vi.mock('./use-task-metadata', () => ({ useTaskMetadata: () => taskMeta }));
 
 // The attachment surface owns a read of its own (`GET .../attachments`) plus the instance
 // config, neither of which is part of this file's contract. The hook is stubbed rather than the
@@ -64,7 +90,8 @@ const task: TaskDto = {
 
 /**
  * Mirrors the shape the panel actually lives in: the board's `<main>` landmark, the task card
- * that links to it, and the panel rendered next to them only while the route selects a task.
+ * that links to it, the panel rendered next to them only while the route selects a task, and
+ * the delete confirmation the board owns (`board-dialogs.tsx`) but the panel opens.
  */
 function Board({
   open,
@@ -82,6 +109,7 @@ function Board({
   loadError?: string | null;
   onRetryLoad?: () => void;
 }): React.ReactElement {
+  const [deleting, setDeleting] = useState(false);
   return (
     <NextIntlClientProvider locale="en" messages={messages}>
       <main>
@@ -104,9 +132,16 @@ function Board({
             loadError={loadError}
             onRetryLoad={onRetryLoad}
             onUpdated={vi.fn()}
-            onRequestDelete={vi.fn()}
+            onRequestDelete={() => setDeleting(true)}
           />
         ) : null}
+        <DeleteTaskDialog
+          open={deleting}
+          onOpenChange={setDeleting}
+          workspaceId="w1"
+          task={selected}
+          onDeleted={() => setDeleting(false)}
+        />
       </main>
     </NextIntlClientProvider>
   );
@@ -115,6 +150,12 @@ function Board({
 const heading = (): HTMLElement => screen.getByRole('heading', { name: task.title });
 const card = (): HTMLElement => screen.getByTestId('card');
 const landmark = (): HTMLElement => screen.getByRole('main');
+
+beforeAll(() => {
+  // jsdom ships no layout and therefore no `scrollIntoView`, which the mention picker calls
+  // every time the highlighted option moves.
+  Element.prototype.scrollIntoView = vi.fn();
+});
 
 afterEach(() => {
   cleanup();
@@ -272,13 +313,194 @@ describe('TaskPanel close', () => {
     // restoration above — see the comment on `close`.
     expect(push).toHaveBeenCalledWith('/board/b1', { scroll: false });
   });
+});
 
-  it('closes on Escape', () => {
-    render(<Board open />);
+/**
+ * The panel is a hand-rolled layer: it listens for `Escape` on `window`, which is the last stop
+ * of every keystroke in the document, including the ones a layer above it has already dealt
+ * with. One press must dismiss exactly one layer.
+ */
+describe('TaskPanel Escape', () => {
+  const deleteTrigger = (): HTMLElement =>
+    screen.getByRole('button', { name: messages.app.board.task.deleteAction });
+  const composer = (): HTMLTextAreaElement =>
+    screen.getByLabelText(messages.app.board.task.addComment) as HTMLTextAreaElement;
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+  /** Dispatched where the user's keystroke lands, so every listener between it and `window` runs. */
+  function pressEscape(): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+  }
+
+  /**
+   * Typed rather than pasted. React synthesises `onSelect` from the keys around a change, so a
+   * change with no keystroke behind it leaves the caret unrecorded and makes the next keydown
+   * look like a caret move, which reopens the picker that the same Escape just closed.
+   */
+  function type(textarea: HTMLTextAreaElement, value: string): void {
+    fireEvent.change(textarea, { target: { value, selectionStart: value.length } });
+    fireEvent.keyUp(textarea, { key: value.slice(-1) });
+  }
+
+  it('closes the panel and hands focus back', () => {
+    const { rerender } = render(<Board open={false} />);
+    const opener = card();
+    opener.focus();
+    rerender(<Board open />);
+
+    pressEscape();
 
     expect(push).toHaveBeenCalledWith('/board/b1', { scroll: false });
+    // The router is mocked, so the navigation that `push` stands for is played out by hand.
+    rerender(<Board open={false} />);
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('gives the delete confirmation the first Escape and the panel the second', async () => {
+    render(<Board open />);
+    const trigger = deleteTrigger();
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getByRole('dialog')).toBeDefined();
+
+    pressEscape();
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(push).not.toHaveBeenCalled();
+    // Radix hands the trigger its focus back on a task of its own, not in the keystroke.
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+
+    pressEscape();
+
+    expect(push).toHaveBeenCalledWith('/board/b1', { scroll: false });
+  });
+
+  it('dismisses the mention picker without taking the panel with it', () => {
+    render(<Board open />);
+    const textarea = composer();
+    textarea.focus();
+    type(textarea, 'ping @Ay');
+    expect(screen.getByRole('listbox')).toBeDefined();
+
+    pressEscape();
+
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The assignee picker is the first Radix layer the panel grew that is not a dialog, which is
+   * exactly the case the layer-aware `Esc` fix was written for: the panel has to recognise an
+   * open popover as the topmost layer or one press dismisses two things.
+   */
+  describe('with the assignee popover open', () => {
+    const oneMember = taskMeta.members;
+
+    beforeEach(() => {
+      taskMeta.members = Array.from({ length: 8 }, (_, index) => ({
+        id: `m${index + 1}`,
+        workspaceId: 'w1',
+        userId: `0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d5${index}`,
+        role: 'MEMBER',
+        name: `Member ${index + 1}`,
+        avatarUrl: null,
+      }));
+    });
+
+    afterEach(() => {
+      taskMeta.members = oneMember;
+    });
+
+    function openPicker(): void {
+      fireEvent.click(screen.getByRole('button', { name: /^Assign/ }));
+    }
+
+    it('gives the popover the first Escape and the panel the second', () => {
+      const named = { name: messages.app.board.task.searchMembers };
+      render(<Board open />);
+      openPicker();
+      expect(screen.getByRole('searchbox', named)).toBeDefined();
+
+      pressEscape();
+
+      expect(screen.queryByRole('searchbox', named)).toBeNull();
+      expect(push).not.toHaveBeenCalled();
+
+      pressEscape();
+
+      expect(push).toHaveBeenCalledWith('/board/b1', { scroll: false });
+    });
+  });
+});
+
+/**
+ * Below `md` the panel is a fullscreen sheet and keeps `Tab` inside itself by hand. A dialog
+ * opened from within it is a layer above, with a focus scope of its own: two traps pulling in
+ * opposite directions is a keyboard trap (WCAG 2.1.2), so the panel's stands down while a layer
+ * is open. jsdom applies no media query on its own, so the breakpoint is stubbed.
+ */
+describe('TaskPanel mobile Tab trap', () => {
+  function matchMobile(): void {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      media: query,
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  }
+
+  afterEach(() => {
+    // Back to jsdom's own state, which is no `matchMedia` at all: the hook reads that as
+    // "no breakpoint information" and leaves the trap off, which is what every other test in
+    // this file runs against.
+    Reflect.deleteProperty(window, 'matchMedia');
+  });
+
+  const panel = (): HTMLElement => screen.getByRole('complementary');
+
+  it('lets Tab move on inside a dialog opened from the panel', () => {
+    matchMobile();
+    render(<Board open />);
+    // Held onto before the dialog opens: Radix marks everything outside it `aria-hidden`, so
+    // the panel has no accessible role left to query by while the layer above it is up.
+    const sheet = panel();
+    const trigger = screen.getByRole('button', { name: messages.app.board.task.deleteAction });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole('dialog');
+    const insideDialog = within(dialog).getAllByRole('button')[0]!;
+    insideDialog.focus();
+
+    const notPrevented = fireEvent.keyDown(insideDialog, { key: 'Tab' });
+
+    expect(notPrevented).toBe(true);
+    expect(sheet.contains(document.activeElement)).toBe(false);
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
+  it('still pulls Tab back into the panel while it is the topmost layer', () => {
+    matchMobile();
+    render(<Board open />);
+    const outside = screen.getByTestId('board-menu');
+    outside.focus();
+
+    const notPrevented = fireEvent.keyDown(outside, { key: 'Tab' });
+
+    expect(notPrevented).toBe(false);
+    expect(panel().contains(document.activeElement)).toBe(true);
+  });
+
+  it("arms itself on the query the panel's own md:static compiles from", () => {
+    // `(max-width: 767px)` is not the same query: it and `width < 48rem` part company for a
+    // reader whose root font size is not 16px, and the width between them is one where the
+    // panel is already a fullscreen sheet with an unarmed trap behind it, so Tab walks onto
+    // the board underneath.
+    matchMobile();
+    render(<Board open />);
+
+    expect(vi.mocked(window.matchMedia)).toHaveBeenCalledWith('(width < 48rem)');
   });
 });
 
@@ -328,23 +550,82 @@ describe('TaskPanel attachments', () => {
       screen.getByRole('region', { name: messages.app.board.task.attachments.sectionLabel }),
     ).toBeDefined();
   });
+});
 
-  it('keeps the delete footer last, with attachments above the metadata panel', () => {
+/**
+ * The panel reads in the order the card does: what the task *is* first, then what is in it, then
+ * what people said about it. That order is why the properties and the discussion are two
+ * components rather than one - the single section they used to be could not be moved above the
+ * checklists without taking the comment thread with it.
+ */
+describe('TaskPanel section order', () => {
+  const region = (name: string): HTMLElement => screen.getByRole('region', { name });
+
+  it('runs fields, properties, checklists, attachments, discussion', () => {
+    render(<Board open selected={{ ...task, checklists: [] }} />);
+
+    const sections = [
+      screen.getByLabelText(messages.app.board.task.title),
+      region(messages.app.board.task.propertiesTitle),
+      region(messages.app.board.task.checklist.sectionLabel),
+      region(messages.app.board.task.attachments.sectionLabel),
+      region(messages.app.board.task.discussionTitle),
+    ];
+
+    for (const [index, section] of sections.slice(0, -1).entries()) {
+      expect(
+        section.compareDocumentPosition(sections[index + 1]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+  });
+
+  it('spends no full-strength copper of its own', () => {
+    // docs/design.md §2 budgets a screen at two full-strength marks: the sancak rail plus, on a
+    // view that has one, its single primary action. The board behind this panel already spends
+    // one on the selected card's rail, and the panel's section actions are not that view's one
+    // action - they are three peers (create label, add checklist, post comment). Measured on
+    // the running app, a default-variant Button here put four copper marks on one screen.
+    render(<Board open selected={{ ...task, checklists: [] }} />);
+
+    const panel = screen.getByRole('complementary', { name: messages.app.board.task.panelLabel });
+    const copper = within(panel)
+      .getAllByRole('button')
+      .filter((button) => button.getAttribute('data-variant') === 'default');
+
+    expect(copper.map((button) => button.textContent)).toEqual([]);
+  });
+
+  it('rules every titled section off the one above it, not two of the four', () => {
+    // Four sections carrying the same heading weight, two of them with a rule above and two
+    // without, reads as an arbitrary rule rather than as grouping: nothing on screen says the
+    // checklists belong under the properties. Either all four are separated or none is, and at
+    // this section gap (16px) the rule is what makes a heading start something.
+    render(<Board open selected={{ ...task, checklists: [] }} />);
+
+    for (const name of [
+      messages.app.board.task.propertiesTitle,
+      messages.app.board.task.checklist.sectionLabel,
+      messages.app.board.task.attachments.sectionLabel,
+      messages.app.board.task.discussionTitle,
+    ]) {
+      expect(region(name).className).toContain('border-t');
+      expect(region(name).className).toContain('pt-4');
+    }
+  });
+
+  it('keeps the delete footer the last child of the scroll column', () => {
     // The footer is `mt-auto` and only reaches the bottom of the scroll column while it is the
     // last child of it. A section appended after it looks fine in a screenshot of a long task
     // and wrong on every short one, which is why the position is asserted rather than reviewed.
     render(<Board open />);
 
-    const attachments = screen.getByRole('region', {
-      name: messages.app.board.task.attachments.sectionLabel,
-    });
-    const metadata = screen.getByTestId('metadata');
+    const discussion = region(messages.app.board.task.discussionTitle);
     const footer = screen.getByRole('button', {
       name: messages.app.board.task.deleteAction,
     }).parentElement!;
 
-    expect(attachments.compareDocumentPosition(metadata)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(footer.nextElementSibling).toBeNull();
-    expect(footer.parentElement).toBe(metadata.parentElement);
+    expect(footer.parentElement).toBe(discussion.parentElement);
+    expect(footer.className).toContain('mt-auto');
   });
 });

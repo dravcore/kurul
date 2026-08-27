@@ -1,6 +1,6 @@
 name: Release images
 
-# audit/findings/devops.md OPS-04: a self-host product with no published artifact means every
+# OPS-04 (2026-08-18 devops audit): a self-host product with no published artifact means every
 # install *and every upgrade* rebuilds from source (measured: api 52s + web 22s, real OOM risk
 # on a small VPS). This workflow is the fix — it publishes the images to GHCR so `docker
 # compose pull && up -d` (docs/development.md#full-stack-in-docker) replaces
@@ -61,6 +61,130 @@ concurrency:
 
 jobs:
   # -----------------------------------------------------------------------------------
+  # Is this tag what it claims to be? Nothing below starts until the answer is yes.
+  #
+  # The trigger above trusts the ref name completely. Any principal with contents:write can
+  # push refs/tags/v9.9.9 from any commit, and until this job existed the workflow would build,
+  # sign and publish it; a stable tag would also move `{{major}}.{{minor}}` and `latest` under
+  # every operator who pulls without TAG (docs/self-hosting.md). Branch protection on main does
+  # not reach tags. This job is the check the release process performs by hand
+  # (docs/git-strategy.md#release-process, steps 2 and 5), done by the machine instead:
+  #
+  #   1. Where the tag points. A stable tag (no `-`) must be the tip of main, because step 5
+  #      tags the merge commit of the release/* -> main PR and nothing else. A pre-release tag
+  #      (`-rc.N`, `-beta.N`) is the rehearsal path, cut on release/* or hotfix/* *before* the
+  #      merge, so it only has to be reachable from main or from one of those branch heads.
+  #      Re-tagging an older commit of main is deliberately not allowed for a stable tag; if
+  #      that is ever wanted, relax the equality to `git merge-base --is-ancestor` and say why.
+  #   2. What the tree says its version is. Step 2 bumps every package.json by hand and
+  #      finalizes CHANGELOG.md; a tag on a tree where that was forgotten produces images whose
+  #      OCI label and GHCR tag say one version while the API's own package.json (what its
+  #      telemetry ping reports) says another. Every workspace package.json must equal the
+  #      tag's X.Y.Z, and a stable tag must have its `## [X.Y.Z] - ` CHANGELOG heading.
+  #
+  # The job runs on the ephemeral GITHUB_TOKEN with `contents: read`, and it protects even the
+  # maintainer's own slip (a `git tag` typed on develop). The complementary protection, a
+  # repository ruleset on refs/tags/v*, is a repository setting rather than code and is
+  # described in docs/git-strategy.md#release-process.
+  # -----------------------------------------------------------------------------------
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      # fetch-depth: 0 because the ancestry check walks history; a shallow clone of the tag
+      # alone has no main to compare against.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check the tag is the tip of main (or on a release/hotfix branch for a pre-release)
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          # GITHUB_SHA is the commit for a lightweight tag and may be the tag object for the
+          # annotated tags step 5 creates; `^{commit}` peels either to the commit.
+          sha=$(git rev-parse --verify "${GITHUB_SHA}^{commit}")
+
+          # checkout's fetch-depth: 0 already brought every branch; this fetch pins down exactly
+          # which refs the check reads and is a no-op when they are current. A glob refspec that
+          # matches nothing (no release/* open) succeeds, so a quiet day does not fail here.
+          git fetch --no-tags --quiet origin \
+            '+refs/heads/main:refs/remotes/origin/main' \
+            '+refs/heads/release/*:refs/remotes/origin/release/*' \
+            '+refs/heads/hotfix/*:refs/remotes/origin/hotfix/*'
+          main=$(git rev-parse --verify origin/main)
+
+          case "$tag" in
+            *-*)
+              refs=$(git for-each-ref --format='%(refname:short)' \
+                refs/remotes/origin/main 'refs/remotes/origin/release/*' 'refs/remotes/origin/hotfix/*')
+              for ref in $refs; do
+                if git merge-base --is-ancestor "$sha" "$ref"; then
+                  echo "guard: $tag ($sha) is reachable from $ref"
+                  exit 0
+                fi
+              done
+              echo "::error::$tag points at $sha, which is not on main nor on any release/* or hotfix/* branch."
+              echo "A pre-release tag is cut on the release or hotfix branch it rehearses, or on main"
+              echo "(docs/git-strategy.md#rehearsing-the-publish-path). Refs searched:"
+              printf '  %s\n' $refs
+              exit 1
+              ;;
+            *)
+              if [ "$sha" != "$main" ]; then
+                echo "::error::$tag points at $sha but the tip of main is $main."
+                echo "A release tag is the merge commit of release/* -> main, i.e. main's tip at the"
+                echo "moment it is tagged (docs/git-strategy.md#release-process, step 5)."
+                echo "Refs searched: origin/main"
+                exit 1
+              fi
+              echo "guard: $tag ($sha) is the tip of main"
+              ;;
+          esac
+
+      - name: Check every package.json and the CHANGELOG carry the tag's version
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          v=${tag#v}
+          v=${v%%-*}
+          status=0
+
+          # Every package.json git tracks: root, apps/*, packages/*, e2e. node_modules is never
+          # tracked; the filter only keeps a vendored copy from ever joining the list.
+          for f in $(git ls-files -- '*package.json' | grep -v node_modules); do
+            actual=$(jq -r '.version // "(missing)"' "$f")
+            if [ "$actual" = "$v" ]; then
+              echo "guard: $f is at $v"
+            else
+              echo "::error file=$f::$f is at version $actual, tag $tag needs $v"
+              status=1
+            fi
+          done
+
+          # A pre-release may be rehearsed before the changelog is finalized, so only a stable
+          # tag must already have its heading.
+          case "$tag" in
+            *-*) ;;
+            *)
+              heading="## [$v] - "
+              if awk -v h="$heading" 'index($0, h) == 1 { found = 1 } END { exit !found }' CHANGELOG.md; then
+                echo "guard: CHANGELOG.md has a '$heading' heading"
+              else
+                echo "::error file=CHANGELOG.md::CHANGELOG.md has no '${heading}YYYY-MM-DD' heading for $tag; rename [Unreleased] first (docs/git-strategy.md#release-process, step 2)"
+                status=1
+              fi
+              ;;
+          esac
+
+          if [ "$status" -ne 0 ]; then
+            echo "The tree at $tag does not describe version $v. Bump it (release process step 2) before tagging."
+          fi
+          exit "$status"
+
+  # -----------------------------------------------------------------------------------
   # One leg per image *and* per architecture, each on a runner of that architecture.
   #
   # This used to be one leg per image building both platforms at once, with QEMU emulating
@@ -82,7 +206,13 @@ jobs:
   # job below assembles the digests into one multi-platform index and puts the tags on that.
   # -----------------------------------------------------------------------------------
   build:
+    # Not a leg starts before `guard` has said the tag is on main and names the version the
+    # tree carries; see the job above.
+    needs: guard
     runs-on: ${{ matrix.runner }}
+    # Measured native builds finish well inside this; the ceiling is here so a hung leg
+    # cannot sit on a runner for the six-hour default.
+    timeout-minutes: 60
     permissions:
       contents: read
       # Pushes the per-platform image by digest. No `id-token` here: nothing in this job signs,
@@ -149,7 +279,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -227,6 +357,7 @@ jobs:
   merge:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       # Writes the tags onto the index, and the cosign signature GHCR stores beside it as a
@@ -248,7 +379,7 @@ jobs:
           merge-multiple: true
           path: /tmp/digests
 
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -438,14 +569,20 @@ jobs:
   # matrix above must finish before there is anything to attach.
   # -----------------------------------------------------------------------------------
   publish-sbom:
-    needs: merge
+    needs: [guard, merge]
     # `!cancelled()` rather than the default `success()`: `merge` runs `fail-fast: false`
     # precisely so a broken `web` image still lets a working `api` image reach GHCR. Gating on
     # success would then throw away the SBOM of the image that did publish, which contradicts
     # the reason fail-fast was turned off. If neither leg produced anything the step below fails
     # loudly instead of quietly attaching nothing.
-    if: ${{ !cancelled() }}
+    #
+    # `guard` is named in `needs` and in the condition on purpose: `!cancelled()` is also true
+    # when every upstream job was *skipped*, which is exactly what a failed guard leaves
+    # behind, and this job holds `contents: write`. Depending on it only through `merge` would
+    # let a rejected tag still reach a job that talks to the GitHub Release API.
+    if: ${{ !cancelled() && needs.guard.result == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       # Creating or updating the GitHub Release for this tag, and nothing else. No
       # `packages: write` and no `id-token: write` here — this job neither pushes nor signs.
