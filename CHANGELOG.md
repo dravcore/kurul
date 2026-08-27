@@ -13,13 +13,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   dialog.** `Add task` at the foot of a column turns into an inline composer
   (`components/board/task-composer.tsx`, [ADR 0035](docs/decisions/0035-inline-task-composer.md)):
   `Enter` creates the task and keeps the caret in the field, so a triage session is one key per
-  card; `Escape` or leaving an empty field closes it and hands focus back to the button that
-  opened it; a typed title is never discarded by a stray click. `Open details` creates the same
-  task and opens its panel, which is where every field the row does not collect already lives.
-  While the request is in flight the field goes `readOnly` rather than `disabled`, so focus
-  stays where the reader put it. `c` anywhere on the board (`use-create-task-shortcut.ts`) opens
-  the composer, or refocuses it if it is already open, and is ignored inside a field or a
-  dialog.
+  card; `Escape` closes it and hands focus back to the button that opened it, and so does leaving
+  an empty field when focus went nowhere; clicking away onto another control closes the composer
+  but leaves focus where the reader put it; a typed title is never discarded by a stray click.
+  `Open details` creates the same task and opens its panel, which is where every field the row
+  does not collect already lives. While the request is in flight the field goes `readOnly` rather
+  than `disabled`, so focus stays where the reader put it. `c` anywhere on the board
+  (`use-create-task-shortcut.ts`) opens the composer, or refocuses it if it is already open, and
+  is ignored inside a field, a dialog or the task panel, and everywhere below 48rem while the
+  panel is covering the board.
 
 - **A 2px copper rail marks where a dragged card will land.** Both a mouse drag and a keyboard
   drag now draw the insertion slot: within a column dnd-kit's displacement opens the
@@ -254,6 +256,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - **Omitting `template` is unchanged behaviour**: the default seed columns and no labels. The
     Kanban template is the same column list, and a test asserts the two cannot drift, so every
     client that predates this release creates exactly the board it did before.
+  - The picker opens as one line naming the template about to be applied, with a **Change
+    template** disclosure that reveals the keyboard-navigable card list, so four full-height
+    cards never push the name field and the Create button off a laptop window.
 
 - **`pnpm bootstrap --check`, a doctor mode for the dev loop.** Answers "did something go stale
   since the last bootstrap" from the filesystem alone — no Docker, no database, no network — so
@@ -274,13 +279,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   one 720px route covering the account holding zero, one or many owned workspaces, gated the
   same way the old dialog was: typing the account's own email address. `/settings` keeps a link
   out to each, and `SettingsSection` moves to `components/settings/settings-section.tsx` so both
-  routes can use it too.
+  routes can use it too. The delete route's one `<h1>` is the topbar's, and a load that fails
+  offers a retry control the way the members roster does.
 
-- **A `read` type step for the panel's long-form text.** `--text-read` (`app/globals.css`) sets
-  14px/21px at weight 400, a size between `title` and `body` for prose meant to be read rather
-  than scanned. It is a closed list on purpose: the task description field, the comment body and
-  import report sentences carry it, and `text-read-utilities.test.ts` fails the build the moment
-  a fourth call site adds itself.
+- **Two new type steps: `read` for prose, `stat` for a hero figure.** `--text-read`
+  (`app/globals.css`) sets 14px/21px at weight 400, a size between `title` and `body` for prose
+  meant to be read rather than scanned. It is a closed list on purpose: the task description
+  field, the comment body and import report sentences carry it, and
+  `text-read-utilities.test.ts` fails the build the moment a fourth file adds itself.
+  `--text-stat` sets 28/32 at weight 600 for the dashboard's stat figure, which had been an
+  arbitrary `text-[28px]` carrying no line-height at all and inheriting 18px; it drops
+  `tabular-nums`, which `docs/design.md` §8 never asked for.
 
 - **The assignee and label pickers stay a flat list until they cannot.**
   `components/task/searchable-picker.tsx` renders 7 or fewer options as the plain checkbox list
@@ -353,7 +362,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `self-hosting.md` trimmed to the one-line generator and a link to it, so the arithmetic behind
   `-hex` over `-base64` lives in one file instead of five; and `git-strategy.md` gains a release step for the
   version-pinned prose that only a person keeps current, which is the root cause of most of the
-  above. Every `docs/` change moves with its `docs/tr/` mirror.
+  above; and `docs/design.md` §3 gains a row for the `stat` step (28/32, weight 600), which it
+  had named in prose without listing in the type-scale table. Every `docs/` change moves with its
+  `docs/tr/` mirror.
 
   Not documentation, and in the same pass: `.github/dependabot.yml` now holds every bump it
   proposes until the release is seven days old, fourteen for an npm major (`default-days` is all
@@ -559,16 +570,30 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `prefers-contrast: more` now have their own fallbacks: a selected card, a drop target and a
   highlighted menu row draw a system `Highlight` outline instead of leaning on a tint the mode
   discards, and the hairline border thickens to `--border-strong` under high contrast instead of
-  opening a second palette. A new gate, `app/globals.contrast.test.ts`, measures every text token
-  against six real surfaces and every boundary token at 3:1 on every run, so a future token change
-  that quietly drops a pair under AA fails the build instead of shipping.
-- **Text now runs on one type scale, and a focused control draws exactly one indicator.** Every
+  opening a second palette.
+
+  Two ink tokens moved with the ramp. The light theme's `--foreground` goes from `#191C1B` to
+  `#212523`: the old value measured 17.17:1 on the white card (APCA Lc 104.1), far past the 4.5:1
+  floor and into the band where a full-strength ink on a full-white card haloes over a long read;
+  the new one holds 15.51:1 (Lc 102.5) there and 12.64:1 on the signature tint, its worst of the
+  six surfaces, and it repaints every screen in the product. The dark theme's
+  `--muted-foreground` goes the other way, `#98A09C` to `#A0A8A4`: the old value cleared WCAG AA
+  on all six dark surfaces and still scored APCA Lc 44.2 on `--accent`, under the Lc 48 an 11px
+  or 12px meta row needs, because light-on-dark is the polarity the WCAG formula models worst.
+  `#A0A8A4` is the smallest step that clears Lc 48 on all six (48.5 at worst) without closing on
+  `--foreground-secondary`, which stays a rank above it at Lc 63.7.
+
+  One gate holds all of it. `app/globals.contrast.test.ts` measures every text token against six
+  real surfaces and every boundary token at 3:1 on every run, and asserts the APCA band on every
+  surface rather than printing it to stdout, so a token change that quietly drops a pair under AA
+  or a dark meta row under Lc 48 fails the build instead of shipping.
+- **Text now runs on one type scale.** Every
   button label, dialog title, form field and menu item used to draw from two competing sources:
   shadcn's own default text sizes and weights sitting beside Kurul's own scale, so a button and the
   card title next to it could land at different pixel sizes without either class saying so. The
   Tailwind defaults are gone from `components/ui/` and the domain tree in favour of Kurul's own
-  steps, and `app/theme-classes.test.ts` fails the build on any class that resolves to nothing, so a
-  stray default cannot slip back in unnoticed. A dialog's title steps down from an unintended 18px
+  steps, and `app/theme-classes.test.ts` (see Fixed) fails the build on any class that resolves to
+  nothing, so a stray default cannot slip back in unnoticed. A dialog's title steps down from an unintended 18px
   to the 16px `title` step the scale actually defines, since there never was an 18px step; a button
   label and the card title beside it now agree on the same 13px. Fraunces also now loads its
   optical-size axis (`axes: ['opsz']` in `app/layout.tsx`) so a 40px `.text-display` heading renders
@@ -577,12 +602,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Safari stops zooming the page on focus, matched by a new assertion in
   `e2e/tests/mobile-navigation.spec.ts`, now that `cn()` dedupes the type scale so that 16px
   override reliably beats any conflicting default reaching the DOM.
-
-  The same pass removed a duplicate focus mark: a focused control used to draw an outline and a
-  separate copper ring on top of it, from two different rules that had never been told about each
-  other. Only the outline is left, 2px `--ring` at 2px offset from a single rule in `@layer base`,
-  and a field that is both invalid and focused recolours that one outline to the destructive token
-  instead of growing a second mark beside its red border.
 - **The copper signature colour now has a written budget instead of an unenforced guideline.** Full
   strength copper is limited to at most two uses per screen, the sancak rail plus, where a view has
   one, its single primary action button. The focus ring and any data mark, a meter fill, a progress
@@ -631,12 +650,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   since it was written, is now a real custom property in `app/globals.css` and a Tailwind
   `ease-in-out` utility, not only documentation. `prefers-reduced-motion: reduce` drops all of it
   to an opacity-only fade: nothing moves, the state change stays visible.
-- **The board skeleton now breathes on its own schedule instead of Tailwind's default pulse.**
-  `animate-pulse` ran a 2s, 1.0-to-0.5 cycle, off the 1.6s, 1.0-to-0.6 cycle this document has
-  specified since it was written, and it was the one repeating animation in the tree with no
-  `prefers-reduced-motion` twin, felt directly since a loading board runs dozens of these at
-  once. It now runs its own `skeleton-pulse` keyframe at 1.6s, opacity 1.0 to 0.6 and back, and
-  holds flat at 0.75 opacity under reduced motion instead of pulsing at all.
+
+  The board skeleton moved onto the same footing. `animate-pulse` ran a 2s, 1.0-to-0.5 cycle, off
+  the 1.6s, 1.0-to-0.6 cycle `docs/design.md` has specified since it was written, and it was the
+  one repeating animation in the tree with no `prefers-reduced-motion` twin, felt directly since
+  a loading board runs dozens of these at once. It now runs its own `skeleton-pulse` keyframe at
+  1.6s, opacity 1.0 to 0.6 and back, and holds flat at 0.75 opacity under reduced motion instead
+  of pulsing at all.
 - **A loading button now shows a spinner instead of swapping its label, and the ad hoc
   "sending" text is gone.** `Button` takes a `loading` prop: `aria-busy` and `disabled` apply
   the instant loading starts, and a 14px spinner is drawn over the button's own content once a
@@ -648,26 +668,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   places that each disabled a button on its own and, on four of them, swapped its text to a
   "Sending…" string of its own; the two `sending` keys and `auth.invite.submitPending` leave
   `messages/en.json` and `messages/tr.json`.
-- **Light text steps back off the top of the contrast shelf, and dark metadata steps up to meet
-  APCA.** The light theme's `--foreground` moves from `#191C1B` to `#212523`. The old value
-  measured 17.17:1 on the white card (APCA Lc 104.1), far past the 4.5:1 floor and into the band
-  where a full-strength ink on a full-white card haloes over a long read; the new one holds
-  15.51:1 (Lc 102.5) there and 12.64:1 on the signature tint, its worst of the six surfaces. The
-  dark theme's `--muted-foreground` moves the other way, `#98A09C` to `#A0A8A4`: the old value
-  cleared WCAG AA on all six dark surfaces and still scored APCA Lc 44.2 on `--accent`, under the
-  Lc 48 that an 11px or 12px meta row needs, because light-on-dark is the polarity the WCAG
-  formula models worst. `#A0A8A4` is the smallest step that clears Lc 48 on all six (48.5 at
-  worst) without closing on `--foreground-secondary`, which stays a rank above it at Lc 63.7.
-  Every screen in the product is repainted by the first of those two. `app/globals.contrast.test.ts`
-  now asserts the APCA band on every surface rather than printing it to stdout, so the dark floor
-  cannot be missed silently again.
-- **A workspace with no boards shows one empty state, not two, and the dashboard's hero figures
-  sit in a declared line box.** `DashboardSummary` renders nothing at all when the workspace has
-  no boards, leaving `BoardList`'s own empty state as the page's one damga mark and one primary
-  action; it renders as before the moment the boards call has actually answered with something.
-  The 28px stat figure moves off an arbitrary `text-[28px]`, which carried no line-height at all
-  and inherited 18px, onto a named `--text-stat` step (28/32, weight 600) and drops
-  `tabular-nums`, which `docs/design.md` §8 never asked for.
 - **The shell paints its sidebar shape on a reload again.** The pre-bootstrap loading skeleton
   gated the sidebar-shaped column on `workspaces.length`, and `workspaces` is the same empty
   array before any bootstrap has finished as after one that found nothing. Every returning
@@ -678,18 +678,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
-- **Three dialog kinds close in favour of the surface above them.**
-  `components/settings/change-member-role-dialog.tsx` (role changes are now the inline `<select>`
-  on `/settings/members`, `OWNER` still confirmed through `ConfirmDialog`),
-  `components/settings/delete-account-dialog.tsx` (replaced by the `/settings/account/delete`
-  route), and `components/board/rename-board-dialog.tsx` plus
-  `components/settings/rename-workspace-dialog.tsx` (both replaced by
-  `components/common/inline-rename.tsx`) are all gone.
-
-- **`CreateTaskDialog` is gone.** Adding a task from a dialog cost a layer, a focus trap and a
-  round trip through the middle of the screen for one field; the inline composer replaces it
-  everywhere, and `components/task/create-task-dialog.tsx`, its state in `use-board-dialogs.ts`
-  and the `app.board.task.createTitle` key leave with it.
+- **Five dialogs close in favour of the surface above them.**
+  `components/settings/change-member-role-dialog.tsx` (the inline `<select>` on
+  `/settings/members`, `OWNER` still confirmed through `ConfirmDialog`);
+  `components/settings/delete-account-dialog.tsx` (the `/settings/account/delete` route);
+  `components/board/rename-board-dialog.tsx` and
+  `components/settings/rename-workspace-dialog.tsx` (both `components/common/inline-rename.tsx`);
+  and `components/task/create-task-dialog.tsx` (the inline composer at the column foot), whose
+  state in `use-board-dialogs.ts` leaves with it. Two message keys go too:
+  `app.board.task.createTitle` and the delete route's orphaned
+  `app.settings.account.deleteTitle`.
 
 ### Fixed
 
@@ -869,9 +867,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   for the realtime path's steady-state case, not for a cold socket handshake plus `board:join`
   round trip queued behind everything else starting up. It now gets its own 25s timeout; every
   scenario's assertions after this precondition still run under the tighter global one.
-- **The board could show "Reconnecting…" forever over a socket that was connected and
-  healthy.** Two defects, either of which was enough on its own, and together they are what made
-  the browser suite fail on a fixed commit roughly every other nightly. Neither was a timeout:
+- **The board could show its connection-lost row forever over a socket that was connected and
+  healthy.** The row read "Reconnecting…" at the time and is now "Connection lost, changes may
+  not be showing" (see Changed). Two defects, either of which was enough on its own, and together
+  they are what made the browser suite fail on a fixed commit roughly every other nightly. Neither was a timeout:
   the room was never joined, and nothing was retrying it.
 
   The first is a race in the API. `RealtimeGateway` resolved the handshake's session in an
@@ -952,7 +951,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   declared `* { border-color: var(--border) }` outside any cascade layer, and an unlayered
   author rule outranks every `@layer` regardless of specificity, so it silently repainted every
   `border-*` utility Tailwind emits into `@layer utilities`. The rule now sits in `@layer base`,
-  which is what makes the selected task card's copper edge, the selected template card in the
+  which is what makes the selected task card's copper left rail, the selected template card in the
   create-board dialog and an empty column's dashed drop zone paint the token their class names
   always named. Field borders take the same path: an input's `aria-invalid:border-destructive`
   now really turns the edge red instead of leaving it hairline grey. The `:focus-visible`
@@ -962,9 +961,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   they asked for.** They carried `text-caption`, a class with no `@theme inline` counterpart, so
   Tailwind emitted no CSS for it at all and the elements simply inherited the body's 13/18. They
   now carry `text-small`, the size `docs/design.md` assigns to metadata and helper text. A new
-  `apps/web/app/theme-classes.test.ts` compiles every `text-`, `bg-`, `border-`, `font-` and
-  `shadow-` class in the tree through Tailwind itself and fails on any that resolves to nothing,
-  so the next such class cannot land unnoticed.
+  `apps/web/app/theme-classes.test.ts` compiles every `text-`, `bg-`, `border-`, `font-`,
+  `shadow-` and `rounded-` class in the tree through Tailwind itself and fails on any that
+  resolves to nothing, so the next such class cannot land unnoticed. Three sibling scans landed
+  with the closeout: a size and weight denylist, a `font-display` allowlist, and a tree scan for
+  the outline suppressor, so a hand-written Tailwind size, an off-scale font stack or a
+  re-introduced `outline-none` each fail the build rather than the next audit.
 - **The board's Filters badge counted the search term.** Typing in the search box put a `1` on a
   menu whose options were all untouched, and clearing the menu could not clear it. The badge now
   counts only what the menu itself sets. The empty-state message, which describes everything
@@ -991,20 +993,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   dialog or drawer is open, and so does the fullscreen sheet's `Tab` trap below 768px, which had
   been hauling focus back out of a dialog opened over it and stopping `Tab` from advancing inside
   it at all.
-- **The zero-board screen offered the same Create board twice.** A first run showed the header
-  button and the empty state's button side by side, two identical primary actions where the
-  design language asks for one. The header's copy is hidden while the workspace has no boards and
-  returns with the first one.
+- **A boardless workspace and a taskless board each show one primary action, not two or three.**
+  A first run used to draw the header's Create board beside the empty state's own, two identical
+  primary actions where the design language asks for one; the header's copy is hidden while the
+  workspace has no boards and returns with the first one. `DashboardSummary` renders nothing at
+  all while the workspace has no boards, leaving `BoardList`'s empty state as the page's one
+  damga mark, and it renders as before the moment the boards call has actually answered with
+  something. On a workspace that has boards but no tasks, the dashboard empty state's **Open a
+  board** shortcut steps down to outline, so the route keeps one filled copper mark beside the
+  sidebar rail instead of three.
 - **`/workspaces/new` could not be scrolled, and showed two of everything on desktop.** The route
   declared no scroller of its own, so on a short viewport or at 200% zoom the Create workspace
   button was unreachable inside the shell's `100dvh` box; it now carries its own
   `flex-1 overflow-y-auto`. It also carries a header of its own with the wordmark and Sign out,
   and the shell drops the desktop sidebar entirely while the account has no workspace: every
   sidebar link needs one, and following any of them only bounces back to this page.
-- **The create-board dialog opened with the whole template catalog expanded.** Four full-height
-  cards pushed the name field and the Create button past the bottom of a laptop window. The
-  picker now opens as one line that names the template about to be applied, with a Change template
-  disclosure that reveals the same keyboard-navigable card list as before.
 - **The notification bell kept its unread count after Mark all read.** The bell and the
   notifications page each counted for themselves, so clearing the page left a number standing on
   the bell until the next load. Both now read one shell-level count, and marking everything read
@@ -1024,25 +1027,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `:root`, and a custom property only resolves against the element that declares it, so every
   stack fell straight through to its fallback list. The three `.variable` classes now sit on
   `<html>` instead, next to the tokens that need them, so both faces load and draw as designed.
-- **The off-canvas drawer kept its full slide under `prefers-reduced-motion: reduce`.** Its
+- **Two animations played past `prefers-reduced-motion: reduce`.** The off-canvas drawer's
   reduced-motion rule existed but never won: the selector it had to override carried one more
   attribute (`[data-side='left']`) than the reduced selector did, so the directional slide (28
   distinct transform steps measured end to end) beat it on plain CSS specificity regardless of
   the media query. A bare `[data-side]` presence check on the reduced selectors levels that and
-  lets the fade-only rule win, covering both docked sides with the same pair of rules.
-- **A keyboard focus outline faded in instead of appearing at once.** Tailwind v4 folds
-  `outline-color` into `transition-colors`, which v3 did not, so every element using that
-  shortcut animated its outline from `currentColor` to copper over 150ms while the outline's
-  width and offset appeared in the same frame: one indicator arriving in two beats. The six
+  lets the fade-only rule win, covering both docked sides with the same pair of rules. Dropping a
+  card was worse than a specificity problem: `@dnd-kit`'s drag overlay plays its landing with the
+  Web Animations API rather than CSS, so no media query had any say over it at all and a real
+  drop under `reduce` still ran a 250ms `translate3d` animation. A new `useReducedMotion` hook
+  passes `dropAnimation={null}` when the preference is set, so the overlay simply disappears
+  instead of animating into place.
+- **A focused control now draws exactly one indicator, in one beat, at full strength.** A
+  focused control used to draw an outline and a separate copper ring on top of it, from two rules
+  that had never been told about each other. Only the outline is left, 2px `--ring` at 2px offset
+  from a single rule in `@layer base`, and a field that is both invalid and focused recolours that
+  one outline to the destructive token instead of growing a second mark beside its red border.
+  The mark also used to fade in: Tailwind v4 folds `outline-color` into `transition-colors`,
+  which v3 did not, so every element using that shortcut animated its outline from `currentColor`
+  to copper over 150ms while the outline's width and offset appeared in the same frame. The six
   sites that used the shortcut (`board-filter-chips.tsx`, `board-list.tsx`,
-  `board-template-picker.tsx`, `sidebar-body.tsx`, `notifications-list.tsx`, `task-card.tsx`)
-  now name their transitioned properties explicitly and never the outline, matching the shape
-  `components/ui/button.tsx` already carried.
-- **Dropping a card animated past the reduced-motion preference.** `@dnd-kit`'s drag overlay
-  plays its landing with the Web Animations API rather than CSS, so no media query had any say
-  over it: a real drop under `reduce` still ran a 250ms `translate3d` animation. A new
-  `useReducedMotion` hook now passes `dropAnimation={null}` when the preference is set, so the
-  overlay simply disappears instead of animating into place.
+  `board-template-picker.tsx`, `sidebar-body.tsx`, `notifications-list.tsx`, `task-card.tsx`) now
+  name their transitioned properties explicitly and never the outline, matching the shape
+  `components/ui/button.tsx` already carried. And the dialog's corner close button rested at
+  `opacity-70`, which is a group opacity: it faded the base-layer outline with the icon, so the
+  ring measured 2.91:1 on the light popover, under the 3:1 floor `docs/design.md` §9 sets, even
+  though `--ring` on `--popover` is 5.05:1 at full strength. It now carries
+  `focus-visible:opacity-100`, so the whole button is opaque exactly while the ring shows.
 - **A keyboard user's focus no longer drops to `<body>` in the middle of their own edit.** The
   browser blurs an element the moment it goes `disabled`, so every control that disabled itself
   while its write was in flight threw the reader out of the field they were standing in. The task
@@ -1065,28 +1076,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `NotificationUnreadProvider`. In the same pass the collapsed workspace switcher stopped
   announcing only the generic "Switch workspace": the active workspace's name now reaches a
   pointer through `title` and assistive tech through the accessible name.
-- **The delete-account route showed its title twice and had no way back from a failed load.** The
-  topbar already renders the route's one `<h1>`, and the section below it repeated the same claim
-  as an `<h2>`; the heading and its orphaned message key are gone. A load that fails now offers a
-  retry control, the way the members roster already did, instead of leaving the route on a dead
-  error line.
+- **The task panel and the settings roster answer assistive tech properly, and a closed menu
+  gives focus back.** Over the picker threshold, assigned names are drawn as chips instead of a
+  bare wrapping list, where two names ran together the moment either carried a space; they wear
+  the `chipShell` the labels beside them wear, minus the colour dot. `TaskPanelFields` marks the
+  title and description `aria-busy` while a save is pending, since `readOnly` alone tells
+  assistive tech nothing. The label picker latches its flat-versus-popover decision while the
+  popover is open, so deleting a label at exactly `INLINE_PICKER_MAX + 1` no longer unmounts the
+  surface under the reader, `SearchablePicker` restores focus itself when the row focus was on
+  disappears, and it names its popover, which Radix gives `role="dialog"` and which is announced
+  as nothing without a name. On `/settings/members` each role select carries its own accessible
+  name (`Role for {name}`) instead of the invite dialog's plain `Role`, points at its hint through
+  `aria-describedby`, and the pending-invitations heading steps from `h3` to `h2` under the
+  topbar's `h1`. Closing the board card menu without choosing `Rename` returns focus to its `...`
+  trigger rather than dropping it on `<body>`. The panel's four sections are ruled alike and their
+  actions step from filled to outline, which keeps the screen inside the two-mark copper budget
+  `docs/design.md` §2 sets.
 
-- **Four small follow-ups from the outside review of the UI series.** The dialog's corner close
-  button rested at `opacity-70`, and that is a group opacity: it faded the base-layer focus outline
-  with the icon, so the ring measured 2.91:1 on the light popover, under the 3:1 floor
-  `docs/design.md` §9 sets for a focus indicator, even though `--ring` on `--popover` is 5.05:1 at
-  full strength. It now carries `focus-visible:opacity-100`, so the whole button is opaque exactly
-  while the ring shows. The task panel's activity refresh and the comment thread's "Load more" each
+- **A failed activity refresh or comment page-load now offers a retry, and the comment box is a
+  textbox again.** The task panel's activity refresh and the comment thread's "Load more" each
   reported a failure as a bare toast; both now carry the catalogue's **Try again** action, which
   re-runs the same request, and since the panel is not remounted per task and a toast outlives a
   card switch, a retry that fires after the reader has moved to another task is dropped rather
-  than written into the new task's lists. The comment box no longer claims `role="combobox"`: ARIA
-  in HTML gives a `<textarea>` no role at all (axe `aria-allowed-role`), and a plain textbox does
-  not take `aria-expanded` either (that would be `aria-allowed-attr`, a critical finding), so the
-  field stays a textbox and the mention picker hangs off `aria-controls`, `aria-haspopup`,
-  `aria-autocomplete` and `aria-activedescendant`, which the textbox role does support. The keyboard
-  behaviour of the picker is unchanged. `docs/design.md` §3 lists the `stat` step (28/32, weight
-  600) in the type-scale table, which named it in prose but had no row for it.
+  than written into the new task's lists. The comment box no longer claims `role="combobox"`:
+  ARIA in HTML gives a `<textarea>` no role at all (axe `aria-allowed-role`), and a plain textbox
+  does not take `aria-expanded` either (that would be `aria-allowed-attr`, a critical finding), so
+  the field stays a textbox and the mention picker hangs off `aria-controls`, `aria-haspopup`,
+  `aria-autocomplete` and `aria-activedescendant`, which the textbox role does support. The
+  keyboard behaviour of the picker is unchanged.
 
 ### Security
 

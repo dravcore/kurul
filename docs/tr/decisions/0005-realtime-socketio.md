@@ -4,7 +4,7 @@
 **Tarih:** 2026-08-08
 **Güncellendi:** 2026-08-08 — "standart seçim" gerekçesine dayanmak yerine, Redis adapter'ın ne zaman gerçekten gerekli olduğunu belirtir.
 
-> 🌐 [English (canonical)](../../decisions/0005-realtime-socketio.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0005-realtime-socketio.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

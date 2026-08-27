@@ -2,7 +2,7 @@
 
 Kurul'un neyi, hangi araçlarla test ettiği ve CI'ın neyi zorunlu kıldığı.
 
-> 🌐 [English (canonical)](../testing.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../testing.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 
@@ -27,7 +27,7 @@ pragmatik** kalır:
   test edin. Bu aşamada yakalanmaya değer çoğu bug TypeScript'te değil, sorguda yaşıyor.
 - Bir coverage sayısının peşinden **koşmayın**. Yalnızca implementasyonu yeniden ifade eden
   testler yazmayın.
-- Browser e2e **yedi akışı kapsar, bilinçli olarak daha fazlasını değil** — stack'in ya
+- Browser e2e **sekiz akışı kapsar, bilinçli olarak daha fazlasını değil**: stack'in ya
   tuttuğu ya da tutmadığı akışlar. Bkz. [Browser uçtan uca](#browser-uçtan-uca).
 
 Bir testin maliyeti onu yazmak değildir — her refactor boyunca onu bakımda tutmaktır.
@@ -35,14 +35,14 @@ Testler, bu maliyetin gerçek güven satın aldığı yerlerde yazılır.
 
 ## Piramit
 
-| Katman          | Araç                                   | Kapsam                                                                                               | Durum                                                                  |
-| --------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Servisler, guard'lar, saf fonksiyonlar, board/izin logic'i, DnD hook'ları. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu                                                |
-| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden)       | Her endpoint için zorunlu                                              |
-| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | Yedi senaryo (`e2e/`): her gece `develop` üzerinde ve her sürüm öncesi |
+| Katman          | Araç                                   | Kapsam                                                                                               | Durum                                                                   |
+| --------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Servisler, guard'lar, saf fonksiyonlar, board/izin logic'i, DnD hook'ları. Bağımlılıklar mock'lanır. | Baştan itibaren zorunlu                                                 |
+| **Integration** | Jest + Supertest                       | HTTP request → controller → service → **gerçek Postgres** (`docker-compose.dev.yml` üzerinden)       | Her endpoint için zorunlu                                               |
+| **E2E**         | Playwright                             | Tam stack üzerinde browser akışları                                                                  | Sekiz senaryo (`e2e/`): her gece `develop` üzerinde ve her sürüm öncesi |
 
 ```
-        /\        e2e — yedi kritik akış (Playwright, gerçek Chromium)
+        /\        e2e: sekiz kritik akış (Playwright, gerçek Chromium)
        /  \
       /────\      integration — her endpoint (Supertest + gerçek Postgres)
      /      \
@@ -53,7 +53,7 @@ Tam component-tree render testleri MVP'nin parçası değil. Web unit testleri s
 (`lib/*.test.ts` — izinler, position matematiği, mention'lar, query parametreleri) ve board
 drag-and-drop hook'unu izole şekilde kapsar; geri kalan her şey için yapılan takas tip
 güvenliği artı API'nin integration coverage'ı; board'un kendi davranışını ise parça parça
-component testleri değil, aşağıdaki yedi browser senaryosu uçtan uca kapsar.
+component testleri değil, aşağıdaki sekiz browser senaryosu uçtan uca kapsar.
 
 ## Neler test edilmeli
 
@@ -112,25 +112,26 @@ ve **bir kez bile gerçek bir tarayıcıda değil**. İki suite de hiç render o
 ile yeşil kalır.
 
 Suite [`e2e/`](../../e2e) altında yaşar, derlenmiş bir API ve production web build'i
-üzerinde gerçek bir Chromium koşturur, ve tam olarak yedi senaryodur. Dört senaryoyla başladı ve
-yalnızca stack seviyesindeki bağlantısına başka hiçbir şeyin ulaşamadığı özelliklerle büyüdü —
+üzerinde gerçek bir Chromium koşturur, ve tam olarak sekiz senaryodur. Dört senaryoyla başladı ve
+yalnızca stack seviyesindeki bağlantısına başka hiçbir şeyin ulaşamadığı özelliklerle büyüdü:
 gerçek bir tarayıcıdan gelen gerçek bir multipart yükleme, importer'ı besleyen gerçek bir dosya
-seçici, ve jsdom'da hiçbiri var olmayan bir viewport, bir dokunmatik ekran ve layout edilmiş bir
-belge.
+seçici, jsdom'da hiçbiri var olmayan bir viewport, bir dokunmatik ekran ve layout edilmiş bir
+belge, ve jsdom'un yapmadığı bir implicit form submission.
 
-### Yedi senaryo
+### Sekiz senaryo
 
-| Senaryo                                                                            | Dosya                                  | Tek başına neyi kapsar                                                                                                                                                                                                                                                                                          |
-| ---------------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Giriş → board aç → kart sürükle → **reload sonrası hâlâ yeni sırada**              | `tests/board-drag-persistence.spec.ts` | Tarayıcıdaki pointer hareketinin move isteğini gerçekten üretmesi ve board'un yazdığını geri okuması                                                                                                                                                                                                            |
-| Bir tarayıcıdaki taşıma **ikinci tarayıcıda** reload olmadan görünür               | `tests/board-realtime.spec.ts`         | Socket.io handshake auth'u, board-room üyeliği, ve client'ın yalnızca id taşıyan payload'ı uygulaması — ayrıca handshake'in doğrudan kablo üzerinden okunması (bağlantı başına tek namespace CONNECT, reddedilen oda katılımı yok); iki sessiz kusur tam da burada, geçen bir göstergenin arkasında saklanmıştı |
-| Ayarlar'dan davet → **Mailpit'te postayı oku** → linkten kabul et                  | `tests/invitation.spec.ts`             | Davet postasının gönderildiği ve çalışan bir link taşıdığı — `acceptUrl` `WEB_URL`'den üretilir, API'nin kendi testleri DTO'ya bakar, gövdeye değil                                                                                                                                                             |
-| Bildirime tıkla → **doğru task açılır**                                            | `tests/notification.spec.ts`           | Bildirimde `taskId` var ama `boardId` yok; board'u web ikinci bir istekle, tarayıcıda, alıcının session'ıyla çözer                                                                                                                                                                                              |
-| Karta dosya yükle → **geri indir ve baytları karşılaştır**                         | `tests/task-attachment.spec.ts`        | API suite'inin değil, Chromium'un yazdığı bir multipart gövde; ASCII olmayan bir dosya adının hem yükleme kodlamasından hem `Content-Disposition`'dan sağ çıkması; board kartındaki sayaç rozeti — panelinkinden farklı bir sorgudan gelir                                                                      |
-| Dosya seçiciden Trello export'u import et → **raporu ekranda oku**                 | `tests/board-import.spec.ts`           | API'nin kendisi hiç üretmediği boundary'yi üreten gerçek bir `<input type="file">`, ve import raporunun ekrana ulaşması — rapor yalnız `201`'in gövdesinde vardır, dolayısıyla onu düşüren bir panel tek kopyayı düşürür                                                                                        |
-| **360px'te dokunmatik board** — drawer, 44px hedefler, column scroll'u, touch drag | `tests/mobile-navigation.spec.ts`      | Bir genişlikteki yerleşim, ve parmaktan gelen input. jsdom hiçbir şeyi layout etmez, bu yüzden bir Vitest testindeki her kutu ölçümü sıfırdır; `hasTouch` / `isMobile` ise unit testin karşılığı olmayan context seçenekleridir                                                                                 |
+| Senaryo                                                                                                                                                                   | Dosya                                  | Tek başına neyi kapsar                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Giriş → board aç → kart sürükle → **reload sonrası hâlâ yeni sırada**                                                                                                     | `tests/board-drag-persistence.spec.ts` | Tarayıcıdaki pointer hareketinin move isteğini gerçekten üretmesi ve board'un yazdığını geri okuması                                                                                                                                                                                                            |
+| Bir tarayıcıdaki taşıma **ikinci tarayıcıda** reload olmadan görünür                                                                                                      | `tests/board-realtime.spec.ts`         | Socket.io handshake auth'u, board-room üyeliği, ve client'ın yalnızca id taşıyan payload'ı uygulaması — ayrıca handshake'in doğrudan kablo üzerinden okunması (bağlantı başına tek namespace CONNECT, reddedilen oda katılımı yok); iki sessiz kusur tam da burada, geçen bir göstergenin arkasında saklanmıştı |
+| Ayarlar'dan davet → **Mailpit'te postayı oku** → linkten kabul et                                                                                                         | `tests/invitation.spec.ts`             | Davet postasının gönderildiği ve çalışan bir link taşıdığı — `acceptUrl` `WEB_URL`'den üretilir, API'nin kendi testleri DTO'ya bakar, gövdeye değil                                                                                                                                                             |
+| Bildirime tıkla → **doğru task açılır**                                                                                                                                   | `tests/notification.spec.ts`           | Bildirimde `taskId` var ama `boardId` yok; board'u web ikinci bir istekle, tarayıcıda, alıcının session'ıyla çözer                                                                                                                                                                                              |
+| Karta dosya yükle → **geri indir ve baytları karşılaştır**                                                                                                                | `tests/task-attachment.spec.ts`        | API suite'inin değil, Chromium'un yazdığı bir multipart gövde; ASCII olmayan bir dosya adının hem yükleme kodlamasından hem `Content-Disposition`'dan sağ çıkması; board kartındaki sayaç rozeti — panelinkinden farklı bir sorgudan gelir                                                                      |
+| Dosya seçiciden Trello export'u import et → **raporu ekranda oku**                                                                                                        | `tests/board-import.spec.ts`           | API'nin kendisi hiç üretmediği boundary'yi üreten gerçek bir `<input type="file">`, ve import raporunun ekrana ulaşması — rapor yalnız `201`'in gövdesinde vardır, dolayısıyla onu düşüren bir panel tek kopyayı düşürür                                                                                        |
+| **360px'te dokunmatik board** — drawer, 44px hedefler, column scroll'u, touch drag                                                                                        | `tests/mobile-navigation.spec.ts`      | Bir genişlikteki yerleşim, ve parmaktan gelen input. jsdom hiçbir şeyi layout etmez, bu yüzden bir Vitest testindeki her kutu ölçümü sıfırdır; `hasTouch` / `isMobile` ise unit testin karşılığı olmayan context seçenekleridir                                                                                 |
+| Klavyeden task oluşturma, iki yoldan da: **Enter oluşturur ve caret'i field'da bırakır**, Escape kapatır ve focus'u geri verir, "Open details" yeni task'ın panelini açar | `tests/board-composer.spec.ts`         | ADR 0035 create dialog'unu kaldırdığından beri satır içi composer'ın dayandığı Enter/Escape focus-taşıma kontratı, ve "Open details"in render edilmiş bir dal değil gerçek bir route açması; hiçbiri jsdom'dan erişilebilir değil                                                                               |
 
-Bu yedisinin dışındaki her şey unit ya da integration testine aittir. Buraya eklenen her test,
+Bu sekizinin dışındaki her şey unit ya da integration testine aittir. Buraya eklenen her test,
 bir UI refactor'ü boyunca yeşil tutulacak bir şey daha demektir; bu suite alt katmanların
 zaten kapsadığını tekrar kontrol etmek için değil, **stack** dağıldığında bunu fark etmek
 için vardır.
@@ -138,12 +139,12 @@ için vardır.
 ### Çalıştırma
 
 Postgres **ve Mailpit** ayakta olmalı (`docker compose -f docker-compose.dev.yml up -d`);
-Mailpit olmadan yedi senaryonun üçü adresini doğrulayamaz veya daveti okuyamaz. Redis
+Mailpit olmadan sekiz senaryonun üçü adresini doğrulayamaz veya daveti okuyamaz. Redis
 gerekmez — suite'in onsuz koşmasının nedeni için [İzolasyon](#i̇zolasyon) bölümüne bakın.
 
 ```bash
 pnpm --filter @kurul/e2e browsers   # bir kez: Chromium'u indirir
-pnpm test:browser                      # stack'i build eder, sonra yedisini de koşar
+pnpm test:browser                      # stack'i build eder, sonra sekizini de koşar
 ```
 
 `pnpm test:browser` önce `e2e/build-stack.mjs`'i çalıştırır — `shared-types`, `auth-access`,
@@ -156,6 +157,34 @@ stack'i yeniden kullanır.
 zamanında gömülür, yani suite'in build'i client bundle'ına 4110 portunu sabitler ve
 `apps/web/.next`'in üzerine yazar. Suite'i yerelde koştuktan sonra
 `pnpm --filter @kurul/web start` kullanmadan önce yeniden build edin.
+
+### Elle koşulan iki rig daha
+
+`e2e/playwright.config.ts`'in yanında iki Playwright config'i daha duruyor ve ikisi de bilinçli
+olarak sekiz senaryoluk smoke suite'inin ve CI'ın dışında. İkisi de `playwright.config.ts`'i
+yayarak kullanır, yani aynı build çıktılarını, aynı veritabanını ve aynı portları sürer; ikisi de
+`workers: 1` ile koşar, çünkü ürettikleri her sayı bir süredir ve aynı anda ölçülen iki süre,
+sıkışmış bir makinenin iki ölçümüdür.
+
+```bash
+pnpm --filter @kurul/e2e exec playwright test -c audit.config.ts     # axe erişilebilirlik taraması
+pnpm --filter @kurul/e2e exec playwright test -c measure.config.ts   # performans sayıları
+```
+
+**`audit.config.ts`** (`e2e/audit/accessibility.audit.ts`), bir UI fazının dokunduğu route'lar
+üzerinde axe-core taraması koşar: altı route, her iki tema. Serious ve critical ihlaller run'ı
+kırar; moderate ve minor olanlar gate'lenmez, yalnızca kaydedilip okunur, çünkü build'i kıran bir
+axe kuralı düzeltilmek yerine bastırılır. `tests/` içinde değil, çünkü stack'in dağılma biçimi
+değil, bir UI fazının sonunda talep üzerine üretilen kanıttır; ve her gecelik koşuya on iki sayfa
+yüklemesi eklemek, bir faz kapanana kadar kimsenin okumadığı bir sonuç için her run'a maliyet
+biner. Çıktısı bir çalışma notudur, dolayısıyla diğer bütün çalışma notları gibi repo dışında
+kalır; kalıcı olan [ROADMAP.md](../../ROADMAP.md)'ye ya da bir ADR'ye girer.
+
+**`measure.config.ts`** (`e2e/measure/`), bu deponun söz verdiği performans sayılarını üretir:
+10 MB'lık bir yükleme, 500 kartlık bir Trello import'u ve board'un badge maliyeti. Her dosya
+yalnızca işlemin başarılı olduğunu assert eder ve süresini yazdırır. Burada hiçbir şey bir sayı
+üzerinden kırmaz, bilerek: build'i kıran bir eşik, kırmayı bırakana kadar yükseltilir ve o
+noktadan sonra hiçbir şey ölçmez.
 
 ### İzolasyon
 
@@ -312,8 +341,17 @@ bloklarını da derler, böylece yalnızca kağıt üzerinde var olan bir Highli
 high-contrast border değişimi bir screenshot'ta değil burada kırmızıya döner.
 `apps/web/border-utilities.test.ts` ağacı tarar ve incelenmiş token kümesinin dışından çizilen her
 border class'ında kırmızıya döner; `apps/web/app/theme-classes.test.ts` ağaçtaki her `text-`,
-`bg-`, `border-`, `font-` ve `shadow-` class'ının CSS'e çözülüp çözülmediğini Tailwind'e sorar.
-Beşincisi, `apps/web/app/globals.contrast.test.ts`, kontrast gate'idir: her renk token'ını derlenmiş
+`bg-`, `border-`, `font-`, `shadow-` ve `rounded-` class'ının CSS'e çözülüp çözülmediğini
+Tailwind'e sorar. Aynı iki dosya, P8 UI-comfort fazında eklenen üç kapalı listeyi de uygular:
+`globals-css-layers.test.ts` ağacın tamamını `outline-none` / `outline-hidden` için tarar ve
+sonuç tam olarak adı konmuş tek istisna değilse kırmızıya döner (`components/ui/dialog.tsx`'in
+Radix content wrapper'ları; açıldıklarında focus'u Tab, ok tuşu veya bir link değil, script
+taşır), `theme-classes.test.ts` ise Tailwind'in kendi text-size ve font-weight ölçeğini
+(`text-xs`'ten `text-9xl`'e, `font-thin`'den `font-black`'e) form primitifleri üzerindeki üç
+sabitlenmiş `text-base` iOS-zoom istisnası dışında yasaklar ve `font-display`'i incelenmiş çağrı
+yerlerinden oluşan kapalı bir allowlist'e hapseder. Yasaklanan bir class temiz derlenir, yani
+yukarıdaki çözülme gate'i onu asla yakalayamaz; geri gelen bir varsayılanı bir sonraki denetim
+yerine build'de kıran şey bu listelerdir. Beşincisi, `apps/web/app/globals.contrast.test.ts`, kontrast gate'idir: her renk token'ını derlenmiş
 `:root` ve `.dark` bloklarından okur ve her metin token'ını altı gerçek surface'e karşı 4.5:1'de,
 her boundary ve state token'ını aynı altısına karşı 3:1'de ölçer; buna ek olarak her run'da
 render edilmiş ağacı bir token adına güvenmek yerine yeniden tarayan üç scanner taşır (gerçek
@@ -398,8 +436,8 @@ Zaten kapsanmış kodun geri kaymasını mandallar engeller. Hepsi CI'ı kırar.
 | `apps/api` `src/common/rate-limit/`     | statements 98.33 / branches 94.87 / functions 91.3 / lines 99.09 | `apps/api/jest.config.cjs`  |
 | `apps/api` `src/account/`               | statements 0 / branches 0 / functions 0 / lines 0                | `apps/api/jest.config.cjs`  |
 | `apps/web` `app/**`                     | statements 97 / branches 97 / functions 97 / lines 97            | `apps/web/vitest.config.ts` |
-| `apps/web` `components/board/**`        | statements 65 / branches 54 / functions 54 / lines 70            | `apps/web/vitest.config.ts` |
-| `apps/web` `components/task/**`         | statements 60 / branches 60 / functions 58 / lines 62            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/board/**`        | statements 84 / branches 77 / functions 78 / lines 88            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/task/**`         | statements 82 / branches 79 / functions 81 / lines 86            | `apps/web/vitest.config.ts` |
 | `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78            | `apps/web/vitest.config.ts` |
 | `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93            | `apps/web/vitest.config.ts` |
 | `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92            | `apps/web/vitest.config.ts` |
@@ -419,7 +457,8 @@ klasör taban değerleri, konuldukları anda alınan ölçümün birkaç puan al
 refactor'ın takılmayacağı kadar pay bırakan, ama bir testin silinmesini yakalayacak kadar dar.
 
 `apps/web`'in **global bir taban değeri yoktur**, bilinçli olarak. Genel web coverage son
-koşularda instrumented statement'ların ~%85'i civarındadır ama bu ortalama hâlâ yoğun testli
+koşularda instrumented statement'ların ~%90'ı civarındadır (2026-08-27: 138 dosya, 1407 test
+üzerinden 90.25 / 84.51 / 89.33 / 93.07 stmts/branch/funcs/lines) ama bu ortalama hâlâ yoğun testli
 hook'ları ince sayfa kabuklarıyla karıştırır; ortalamada bir global taban az şey yakalar.
 Klasör tabanları anlamlı unit testleri olan yüzeyleri kapsar: route girişleri (`app/**`),
 etkileşimli board / task / layout / notification / auth / settings / dashboard bileşenleri ve

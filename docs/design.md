@@ -56,7 +56,7 @@ planted where the assembly is meeting. On the board, the selected task card is a
 rail is fixed to the card's own left edge instead of sliding between cards, and the sidebar's
 moving rail is unchanged.
 
-Copper works at two power levels, and mixing them up is the defect this phase found and fixed.
+Copper works at two power levels, and mixing them up is the defect this document exists to prevent.
 
 **Full strength** (`--primary` and `--signature` share one hex per theme) is the app's rarest
 color: **at most two uses per screen**, the sancak rail plus, on a view that has one, its single
@@ -70,9 +70,10 @@ settings page can carry a copper progress bar next to its one copper Invite butt
 spending a third chrome use. And **a link inside body copy** and **the damga mark on the wordmark
 or an empty state** carry the identical exemption for the identical reason as each other: neither
 is chrome contending with the rail or the primary button, so a page can carry several of either at
-once without the count moving, the way P4's auth screens (two or three copper links beside their
-own damga mark, no rail in sight) and P7's settings screens (the sidebar wordmark's mark beside
-whatever the screen already spends on a rail or a button) already counted them.
+once without the count moving, the way the auth screens (two or three copper links beside their
+own damga mark, no rail in sight) already counted them. The sidebar wordmark carries no mark
+today: it is Fraunces at `title` in `--foreground` (`components/layout/sidebar-body.tsx`), so a
+settings screen spends nothing against the count but its rail and its one button.
 
 **Tint** (`--signature-subtle`) never reaches full strength and never joins that budget either,
 but it is not free decoration: it is bound to exactly one role, **active or selected**, on
@@ -111,7 +112,7 @@ warm ground is both the current default look and a way to make the accent vanish
 
 ## 3. Design tokens
 
-Proposals for Phase 3, named to the shadcn/ui CSS-variable convention so `components/ui/`
+Named to the shadcn/ui CSS-variable convention so `components/ui/`
 stays unmodified generated output. **Caution:** in shadcn's vocabulary `--primary` is the
 brand action color and `--accent` is the subtle hover surface, so Kurul's signature copper
 is `--primary` and `--accent` stays a quiet neutral tint. Do not rename shadcn's variables.
@@ -174,7 +175,7 @@ colored dot — different weights, so a red priority and a red label never read 
 `Label.color` stores a **slot name** (`slot-1`…`slot-8`), never a hex, so a label's chip and
 its bar in a chart are one identity resolved per theme (§8).
 
-### Typography — proposal
+### Typography
 
 Open-source, self-hostable, complete Latin Extended-A: Turkish (`ı İ ğ ş ç ö ü`) must render
 correctly since it is the first translation pack — a requirement that eliminated most of the
@@ -232,20 +233,21 @@ on top: that was a shadcn default riding along uninvited, not a choice this scal
 description, comment body, and import report sentences carry it, nowhere else. Board cards stay
 `body` (13/18) even where they show a description snippet. `text-read-utilities.test.ts` scans
 `app/`, `components/` and `lib/` for the literal utility class and fails the build the moment a
-fourth call site adds itself, the same technique `border-utilities.test.ts` already uses for its
-own closed lists.
+fourth _file_ adds itself; it compares file paths, which is why `import-report-panel.tsx` can
+carry two of today's four occurrences without moving the gate, the same technique
+`border-utilities.test.ts` already uses for its own closed lists.
 
 `tabular-nums` on columns of numbers, axis ticks, and table cells — never on a hero figure or
 a stat-tile value.
 
 ### Spacing, radius, elevation
 
-| System    | Values                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Spacing   | `2 · 4 · 6 · 8 · 12 · 16 · 20 · 24 · 32 · 48`: a 4px base with a 2px half-step; the half-step is what makes a dense row survive                                                                                                                                                                                                                                                                                                                      |
-| Radius    | `sm 4` chips · `md 6` buttons, inputs, cards · `lg 10` panels, dialogs · `full` avatars. Tighter than the shadcn default; large radii read soft and cost usable width.                                                                                                                                                                                                                                                                               |
-| Border    | 1px hairline `--border`; 2px only for the sancak rail, focus rings, and the task card's own left edge (`--border` at rest, `--signature` when the card is selected)                                                                                                                                                                                                                                                                                  |
-| Elevation | **Borders first, shadows last.** The card is always one step above the column ground (`--muted`); the column ground itself steps away from the canvas toward that theme's floor, down in light and up in dark. Real shadows exist in three places only, dialogs, popovers, drag preview, and in dark all three also carry a 1px `--border-strong` ring inside the shadow, since a shadow alone does not read once the surface under it is this dark. |
+| System    | Values                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spacing   | `2 · 4 · 6 · 8 · 12 · 16 · 20 · 24 · 32 · 48`: a 4px base with a 2px half-step; the half-step is what makes a dense row survive                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Radius    | `sm 4` chips · `md 6` buttons, inputs, cards · `lg 10` panels, dialogs · `full` avatars. Tighter than the shadcn default; large radii read soft and cost usable width.                                                                                                                                                                                                                                                                                                                                                                      |
+| Border    | 1px hairline `--border`; 2px only for the sancak rail, focus rings, and the task card's own left edge (`--border` at rest, `--signature` when the card is selected)                                                                                                                                                                                                                                                                                                                                                                         |
+| Elevation | **Borders first, shadows last.** The card is always one step above the column ground (`--muted`); the column ground itself steps away from the canvas toward that theme's floor, down in light and up in dark. Real shadows exist in four places, dialogs, popovers, the drag preview and the hairline `shadow-xs` on `Input`, `Select`, `Textarea` and the outline `Button`; in dark the first three also carry a 1px `--border-strong` ring inside the shadow, since a shadow alone does not read once the surface under it is this dark. |
 
 ## 4. Layout and density
 
@@ -262,7 +264,7 @@ App shell per the `(app)` route group in [architecture.md §4](architecture.md#4
 | Card content order | Priority icon + title · meta row (label dots, due date + estimate combined, assignees), one line, never two                                                                                                                                                                                                                                                                                                                                                                                        |
 | List / table row   | 36px; 44px below 768px                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Settings and forms | 720px max width — prose is read, not scanned                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Touch target       | **44px minimum below 768px** on every control, with one exception, WCAG 2.5.5's own: a link inside a sentence, sized by the line-height of the text around it (the mail-setup link on `/settings/members`, measured 12/16)                                                                                                                                                                                                                                                                         |
+| Touch target       | **44px minimum below 768px** on every control, with one exception, WCAG 2.5.5's own: a link inside a sentence, sized by the line-height of the text around it (the mail-setup link on `/settings/members`, measured 12/16); and a native checkbox, which is measured by its label rather than by its own 14px box, since the label toggles the same input and is what a thumb aims at (`e2e/tests/mobile-navigation.spec.ts`). A checkbox with no label falls through to its own box and fails.    |
 
 **The shell is exactly one viewport tall, and this is load-bearing.** `min-height: 100dvh`
 would say "at least" and bound nothing below it — which is what it did, and why a column's
@@ -290,8 +292,9 @@ layout instead of two that can disagree; a 360px window on a desktop getting 44p
 nothing. The floor lives in the `Button` and `Input` variants and in the dropdown item classes,
 not at the call sites, so there is one list to read. Sizes above the breakpoint are untouched.
 It is **measured, not asserted**: `e2e/tests/mobile-navigation.spec.ts` sweeps every button,
-link, input and menu item on the board and in the drawer at 360px and fails on any box under
-44px in either axis. jsdom lays nothing out, so a unit test cannot make this claim.
+link, input and menu item on the board, in the drawer and on `/settings/members` and
+`/settings/account/delete` at 360px and fails on any box under 44px in either axis. jsdom lays
+nothing out, so a unit test cannot make this claim.
 
 **16px below 768px, `body` above it, on every text field.** The same iOS Safari behavior that
 justifies the 44px touch floor also zooms the whole page on focus if the field it lands in
@@ -300,8 +303,8 @@ computes under 16px, and Tailwind's own `text-base` is exactly that threshold: `
 `max-md` breakpoint as everything else in this section rather than judged one primitive at a
 time. It is enforced the same two ways the 44px floor is: measured, and structurally hard to
 regress past. `e2e/tests/mobile-navigation.spec.ts` reads every field's computed `font-size` on
-the board, in the navigation drawer and in the task panel at 360px and fails on anything short of
-`16px`, and `lib/utils.ts`'s `cn()` extends `tailwind-merge` with this type scale so a consumer's
+the board, in the navigation drawer, in the task panel and on the two settings sub-routes at
+360px and fails on anything short of `16px`, and `lib/utils.ts`'s `cn()` extends `tailwind-merge` with this type scale so a consumer's
 own `text-*` override still deduplicates against a primitive's default instead of both classes
 reaching the DOM and stylesheet order deciding which one paints.
 
@@ -346,7 +349,7 @@ creation, and destructive actions stay **dialogs**; those genuinely need to bloc
 its files are not a dialog anyone meets, and come off the count: the `ui/dialog.tsx` primitive,
 the `common/form-dialog.tsx` and `common/confirm-dialog.tsx` wrappers, and
 `board/board-dialogs.tsx`, which only mounts the board's own. That leaves **15 concrete dialogs**,
-down from 19 when this phase started: renaming a board and renaming a workspace became inline
+down from 19: renaming a board and renaming a workspace became inline
 edits, and changing a role and deleting an account became the two sub-routes above. Every removal
 was a surface moving down the rubric, never a dialog deleted for the count's sake.
 
@@ -383,7 +386,11 @@ than the workspace. Tokens before workspace, since revoking one undoes itself th
 minted again, unlike anything below it. Workspace before account, since deleting a workspace
 stays inside it while deleting the account reaches past this workspace into every workspace the
 person is in on this instance ([ADR 0026](decisions/0026-account-deletion-anonymisation.md));
-nothing on the page is further down than that. `/settings/members` and
+nothing about this workspace is further down than that. The one block below it is
+`ActivationFunnel`, which is about the instance rather than the workspace and renders nothing at
+all for anyone who is not the instance operator
+(`components/settings/activation-funnel.tsx`), which is why it sits outside `SettingsSection` and
+outside this ordering. `/settings/members` and
 `/settings/account/delete` are the two sections the sub-route rule above promotes off this page;
 every other section stays inline as a `SettingsSection` (`components/settings/settings-section.tsx`).
 
@@ -396,7 +403,7 @@ every other section stays inline as a `SettingsSection` (`components/settings/se
 | Commit        | Optimistic — the card lands instantly, `PATCH .../tasks/:taskId/position` follows                                                                                                                                                                                                             |
 | Failure       | The rollback restores the position instantly and the card lands in place with a 220ms `--ease-in-out` settle (`translateY` -6px to 0, opacity 0.5 to 1); a toast says what happened with a **Try again** control. Never leave the optimistic state standing.                                  |
 | Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` lifts, arrows move within and across columns, `Space` drops, `Esc` cancels. Each transition announced via `aria-live="polite"`: "Dropped _Fix login redirect_ into In Progress." No position clause yet (Hardening track, "Board keyboard follow-ups"). |
-| Autoscroll    | Both axes, 24px edge zone                                                                                                                                                                                                                                                                     |
+| Autoscroll    | Both axes, on `@dnd-kit`'s default threshold (a ratio of the scroller, not a pixel band); `DndContext` passes no `autoScroll` of its own                                                                                                                                                      |
 
 | Realtime change        | Surfacing (never a layout jump)                                                                                                                                                                        |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -445,8 +452,7 @@ on the board that is the first paint of the columns, and nothing else.
 | Case                                             | Duration                      | Curve                                                     |
 | ------------------------------------------------ | ----------------------------- | --------------------------------------------------------- |
 | Sancak rail moving                               | 150ms                         | `--ease-out`                                              |
-| Tooltip, small popover                           | 125–200ms                     | `--ease-out`                                              |
-| Dropdown, select, menu                           | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
+| Dropdown, menu, popover                          | 150ms in and out              | `--ease-out`, `transform-origin: var(--transform-origin)` |
 | Detail panel, sheet                              | 220ms                         | `--ease-drawer`                                           |
 | Dialog · toast (`translateY(100%)`)              | 200ms                         | `--ease-out`, dialog origin centered                      |
 | Dialog scrim                                     | 200ms                         | `--ease-out`                                              |
@@ -467,6 +473,19 @@ the off-canvas drawer all bind their keyframes through `data-slot`/`data-state` 
 `app/globals.css` rather than a Tailwind animation-plugin class, since this project ships
 plain `tailwindcss` with no such plugin: those classes would compile to nothing and every
 open would cut instead of transition.
+
+No tooltip primitive ships yet, so a tooltip duration is intent rather than behaviour and the
+table above does not carry a row for it; the only "tooltip" in the tree is Recharts' own on the
+dashboard charts (§8). `Select` is off the table for the opposite reason: it is a native
+`<select>` (`components/ui/select.tsx`), so the platform draws its list and nothing here
+animates it.
+
+A toast sits for 4s and the stack is three deep, bottom right (`components/ui/sonner.tsx`): long
+enough to read one line, short enough that a burst clears itself. Only the board's drag-failure
+toast passes its own longer duration at the call site (`ACTION_TOAST_MS = 8000` in
+`use-board-mutations.ts`), since a control nobody has time to reach is worse than no control;
+the task panel's retry toasts (comment and activity reload, field save) are not wired to it and
+still run at the 4s default.
 
 - **Press feedback is not shipped.** Nothing scales on `:active`; a pressed control steps its
   colour and stays where it is. The table above is what the app draws, not what it could.
@@ -496,7 +515,8 @@ open would cut instead of transition.
 ## 6. States
 
 **Empty states are invitations** — one damga mark and one primary action per screen. They name
-the next move; they do not explain the feature. This is the only place damga marks appear.
+the next move; they do not explain the feature. Empty states and the auth screens are the only
+places damga marks appear (§2); `app/(auth)/layout.tsx` draws one at 64px above every auth form.
 
 **One primary action counts the whole screen.** Where the empty state carries the action, the
 page header's copy of the same action is hidden while the screen is empty and comes back with the
@@ -519,8 +539,8 @@ the action the route carries in every state, so the charts' shortcut is an outli
 | Notifications         | —          | You're caught up             | —                                                                                                     | —                                |
 
 **Loading** uses skeletons that match the final layout in `--accent`, with a 1.6s opacity pulse
-(1.0 → 0.6) and no shimmer sweep: the board renders column skeletons at real width with three
-card skeletons at real card heights; the task panel opens immediately with the clicked card's
+(1.0 → 0.6) and no shimmer sweep: the board renders three column-width skeleton blocks 256px
+tall in place of the columns, with no card skeletons inside them yet; the task panel opens immediately with the clicked card's
 title already in place, so it is never blank; inline actions are optimistic. Spinners exist in
 exactly one place: inside a pressed button, 14px, over its content, after 400ms. List
 content never gets one. Unknown-length work (import, export) gets a progress bar with a count.
@@ -610,10 +630,10 @@ control that failed is **still on screen and still live** — a dialog's submit 
 a select — that already _is_ the retry; a second one beside it is clutter, which is why the
 create/rename/delete dialogs carry no action of their own.
 
-Every user-visible string goes through **next-intl** from the first component, even though MVP
-ships English-only. This is the _layer_, not the translations: the roadmap's Beyond-MVP "i18n in
-the application UI" row is about shipping further language packs, and the plumbing lands with
-the Phase 1 skeleton because retrofitting it costs far more than starting with it.
+Every user-visible string goes through **next-intl** from the first component. English and
+Turkish both ship today (`SUPPORTED_LOCALES` is `['en', 'tr']`); the roadmap's Beyond-MVP
+"Further UI language packs" row is about a third language, and the plumbing landed with the
+Phase 1 skeleton because retrofitting it costs far more than starting with it.
 
 | i18n rule                     |                                                                                                                                                                                                                                          |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -631,16 +651,16 @@ For the dashboard ([ROADMAP.md](../ROADMAP.md#shipped-mvp-summary), Phase 7), re
 reader's job, before any color decision. Never a dual y-axis, never a pie past two slices,
 never a generated ninth hue — fold the tail into "Other" or facet into small multiples.
 
-| Aggregate                                      | Form                                                                             | Color job                  |
-| ---------------------------------------------- | -------------------------------------------------------------------------------- | -------------------------- |
-| Open tasks, overdue count, completed this week | **Stat tile** — label, value, signed delta vs a named period, optional sparkline | none / emphasis            |
-| Completion over time                           | **Line**, one series (10% area fill only if it is alone)                         | sequential                 |
-| Created vs completed over time                 | **Two lines**, direct-labeled at the right edge                                  | categorical 1–2            |
-| Tasks per column · per assignee                | **Horizontal bar**, sorted; assignees top 8 then "Other"                         | sequential                 |
-| Priority breakdown                             | **Horizontal stacked bar**, one row, LOW→URGENT                                  | the priority scale (§3)    |
-| Label distribution                             | **Horizontal bar**                                                               | categorical, by label slot |
-| Column composition over time                   | **Stacked area / column**, ≤ 6 series                                            | categorical                |
-| More than ~7 categories that all matter        | **Table**, or table plus chart                                                   | —                          |
+| Aggregate                                      | Form                                                                                                    | Color job                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------- |
+| Open tasks, overdue count, completed this week | **Stat tile** — label, value, signed delta vs a named period, optional sparkline                        | none / emphasis            |
+| Completion over time                           | **Line**, one series (10% area fill only if it is alone)                                                | sequential                 |
+| Created vs completed over time                 | **Two lines**, legend above; direct labels at the right edge are the intended shape and are not shipped | categorical 1–2            |
+| Tasks per column · per assignee                | **Horizontal bar**, sorted; assignees top 8 then "Other"                                                | sequential                 |
+| Priority breakdown                             | **Horizontal stacked bar**, one row, LOW→URGENT                                                         | the priority scale (§3)    |
+| Label distribution                             | **Horizontal bar**                                                                                      | categorical, by label slot |
+| Column composition over time                   | **Stacked area / column**, ≤ 6 series                                                                   | categorical                |
+| More than ~7 categories that all matter        | **Table**, or table plus chart                                                                          | —                          |
 
 Palette validated against Kurul's own surfaces (`#FFFFFF` light, `#212523` dark). These slots
 also back `Label.color`.
@@ -656,13 +676,13 @@ Validator — **light**: lightness band, chroma, CVD (worst adjacent ΔE 9.1) an
 (19.6) all PASS; contrast WARN on slots 2, 3, 4, 5 (2.61 / 2.29 / 1.76 / 2.19, below 3:1 as a dot
 on the signature tint, the worst ground `app/globals.contrast.test.ts` measures a label chip
 against). The dot is never the only channel: it is `aria-hidden` and always paired with the
-label's own name, and every chart carrying these slots still offers **direct labels or the table
-view** as the relief route. **Dark**: lightness band, chroma, normal-vision (worst adjacent ΔE
+label's own name, and every chart carrying these slots still offers **the table view** as the
+relief route. **Dark**: lightness band, chroma, normal-vision (worst adjacent ΔE
 19.3) and contrast against the dark surface all PASS; CVD separation lands in the 6 to 8 floor band
 at worst adjacent ΔE 7.2 (deutan, slot 5 magenta against slot 6 green), recomputed after slot 6
 moved to `#2A9D3C` to clear 3:1 on the dark surfaces. That band is legal only with a second
 channel, and every use of these slots already carries one: the label's own name in the chip, a
-legend plus direct labels or the table view in a chart.
+legend plus the table view in a chart.
 
 | Rule                   |                                                                                                                                                                                                                                                                                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -674,7 +694,7 @@ legend plus direct labels or the table view in a chart.
 | Marks                  | Bars ≤ 24px thick, 4px rounded data-end, square at the baseline, 2px surface-colored gap between adjacent bars and stacked segments; lines 2px round cap/join; markers ≥ 8px with a 2px surface ring                                                                                 |
 | Grid and axes          | Horizontal gridlines only, 1px solid `--border`, never dashed. No chart border, no background fill. Ticks rounded to clean numbers, thousands-separated, `tabular-nums`, in `--muted-foreground`.                                                                                    |
 | Legend and labels      | Legend always present at 2+ series, none for one — the title names it. Direct labels are selective (endpoint, extreme, or the one series that is the story), never a number on every point. **Text wears text tokens, never the series hue**; identity comes from the dot beside it. |
-| Tooltip                | Default-on: crosshair + tooltip on line and area, per-mark on bar and cell. Card surface, 1px border, `sm` radius, 8px padding, series dot + name + `tabular-nums` value, hit target larger than the mark.                                                                           |
+| Tooltip                | Default-on: crosshair + tooltip on line and area, per-mark on bar and cell. Canvas surface (`--background`), 1px `--border`, `md` radius, 8px padding, Recharts' own dot + name + value rows (no `tabular-nums` yet), hit target larger than the mark.                               |
 | Filters and table view | Filters in one row above the charts, never inside a chart. Every chart has a "View as table" affordance — also the relief channel for the light-mode contrast WARN.                                                                                                                  |
 
 **Stat tiles.** Label in `small` `--muted-foreground`, sentence case, no trailing colon · value in
@@ -697,18 +717,18 @@ Target **WCAG 2.1 AA** in both themes, verified per token pair rather than per s
 | Large text (≥18.66px bold / 24px) | 3:1                                                   | Titles, hero figures                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Component boundaries and states   | 3:1                                                   | Input borders, focus ring, sancak rail, chart marks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Disabled text                     | exempt, held to 3:1 anyway                            | Placeholders, disabled controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Chart marks on the chart surface  | 3:1, or direct labels / table view                    | Light slots 2, 3, 4, 5 take the relief route (§8 measures all four under 3:1 as a dot on the signature tint)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Chart marks on the chart surface  | 3:1, or the table view                                | Light slots 2, 3, 4, 5 take the relief route (§8 measures all four under 3:1 as a dot on the signature tint)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 | Rule                         |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Keyboard parity              | Every pointer interaction has a keyboard path, drag and drop included (§5). If a feature can only be done by dragging, it is unfinished.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Color is never alone         | Priority and status ship an icon and a word; labels carry their name in the chip; series get a legend and, at ≤4 series, direct labels; the rail is accompanied by `aria-current` and a weight change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Focus management             | The non-modal panel moves focus to its heading on open and returns it to the originating card on close, without trapping. Dialogs _do_ trap, restore focus on close, and close on `Esc`; popovers return focus to their trigger.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Color is never alone         | Priority and status ship an icon and a word; labels carry their name in the chip; series get a legend at 2+ series, and the table view (§8) as the second channel; direct labels are not shipped; the rail is accompanied by `aria-current` and a weight change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Focus management             | The non-modal panel moves focus to its heading on open, without trapping. On close it should return focus to the originating card; today it lands on `<main>` instead, because the card node is replaced while the panel route is mounted and `use-task-panel-focus.ts` falls back (Hardening track, "Board keyboard follow-ups"). Dialogs _do_ trap, restore focus on close, and close on `Esc`; popovers return focus to their trigger.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Focus inside a menu          | Radix moves focus into a dropdown's content when it opens and onto a row on pointer move, and the rows carry no outline suppressor, so the row under the pointer wears the same single focus outline an arrowed-to row does, on top of its `bg-accent` step. Kept deliberately: the alternative is suppressing the outline again on the one row type a keyboard reaches by arrow key. One mark too many for a pointer is accepted; one too few for a keyboard is not. Measured on the running app in Chromium 151 and Firefox 153.                                                                                                                                                                                                                                                                                                                                                 |
 | Announcements                | Drag transitions, optimistic failures, realtime arrivals, and toasts go through `aria-live="polite"`; only a session-ending error is `assertive`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Reduced motion               | Respected everywhere and never removes a state change: the state still changes, it just stops moving                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Structure                    | One `h1` per route; landmarks for sidebar, main, panel; the board as a labelled composite widget; column counts exposed as text, not inferred                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Zoom, reflow, forced colors  | Usable at 200%: the sidebar collapses and the panel becomes a sheet rather than the board scrolling in two directions. `forced-colors: active` keeps borders and focus rings; charts fall back to the table view.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Zoom, reflow, forced colors  | Usable at 200%: the sidebar collapses and the panel becomes a sheet rather than the board scrolling in two directions. `forced-colors: active` keeps borders and focus rings; a chart has no automatic fallback, so its "View as table" control (§8) is the reader's own route out.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Forced colors, high contrast | Every state built on a surface step or a tint carries a border-based twin, with one named exception. Under `forced-colors: active`: the selected card takes a `Highlight` outline, a card another member just changed takes a dotted `Highlight` border (dotted so it stays distinct from selection's solid one), the column drop target takes a `Highlight` outline inset, and a highlighted menu row paints `Highlight` / `HighlightText` in place of its tint. The exception is the card's hover step: forced colours collapse `--border` and `--border-strong` onto one `CanvasText`, so its twin would have to borrow `Highlight` and would then read as selection; hover is also the only state with no keyboard path to lose, and focus keeps its own ring. Under `prefers-contrast: more`: `--border` takes `--border-strong`'s value instead of opening a second palette. |
 | `--input` alias              | `--input` reads `--border-strong`'s value (`--input: var(--border-strong)` in `app/globals.css`), so every field, select and textarea wearing `border-input` already clears the 3:1 boundary floor without a token of its own.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `dark:` binding              | Tailwind's `dark:` variant is bound to the `.dark` class next-themes writes (`@custom-variant dark (&:where(.dark, .dark *))` in `app/globals.css`), not to `prefers-color-scheme`, so a viewer's chosen theme controls every `dark:` utility in `components/ui/` regardless of the OS setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |

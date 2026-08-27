@@ -19,6 +19,10 @@ Open-source Kanban-focused project management tool. `dravcore/kurul` — AGPL-3.
 - Multi-tenant isolation: every query is scoped by `workspaceId`, enforced at guard/interceptor level
 - Every `id` is UUIDv7 (`@default(uuid(7))`) — never cuid or autoincrement; pagination cursors key on `id`, never on `position`
 - `Label.color` stores a theme-resolved design-token slot name (`slot-1`…`slot-8`), never a raw hex
+- Author CSS in `apps/web/app/globals.css` inside `@layer base` unless the exception is justified
+  next to the rule: an unlayered rule outranks every Tailwind layer regardless of specificity
+- Every `text-*`/`bg-*`/`border-*`/`font-*`/`shadow-*`/`rounded-*` class must resolve against the
+  Tailwind theme: an unresolved class compiles to nothing, silently, with no build error
 
 ## Git
 

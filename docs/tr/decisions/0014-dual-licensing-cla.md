@@ -3,7 +3,7 @@
 **Durum:** [0028](0028-open-contributions-hosted-service.md) tarafından yerini aldı
 **Tarih:** 2026-08-11
 
-> 🌐 [English (canonical)](../../decisions/0014-dual-licensing-cla.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0014-dual-licensing-cla.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 > **Yerini aldı:** aşağıda anlatılan ticari lisans modeli ve CLA, 2026-08-21'de [0028](0028-open-contributions-hosted-service.md) ile terk edildi. Gelir artık yalnızca Dravcore'un işlettiği barındırılan bir servisten geliyor, katkılar ise imzalanacak hiçbir sözleşme olmadan, düz AGPL-3.0 altında kabul ediliyor. Bu kayıt tarihsel olarak duruyor; içindeki hiçbir şey yürürlükte değil.
 

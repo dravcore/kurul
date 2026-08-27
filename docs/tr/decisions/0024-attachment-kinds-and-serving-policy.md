@@ -18,7 +18,7 @@ yapılan atıflar, gitignore'lu `audit/` ağacı olmayan hiç kimse için çöz�
 getirdiği içeriği doğrudan taşıyacak şekilde yeniden yazıldı, bir kopyası olmayan bir dosyaya
 işaret etmek yerine.
 
-> 🌐 [English (kanonik)](../../decisions/0024-attachment-kinds-and-serving-policy.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0024-attachment-kinds-and-serving-policy.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

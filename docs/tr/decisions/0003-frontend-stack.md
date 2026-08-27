@@ -4,7 +4,7 @@
 **Tarih:** 2026-08-08
 **Güncellendi:** 2026-08-08 — @dnd-kit gerekçesi registry ile çelişiyordu ve dürüstçe yeniden yazıldı; kaynaksız Recharts bundle rakamı yerine bağımlılık yüzeyi kondu.
 
-> 🌐 [English (canonical)](../../decisions/0003-frontend-stack.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0003-frontend-stack.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

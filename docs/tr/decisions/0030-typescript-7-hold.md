@@ -4,7 +4,7 @@
 
 **Tarih:** 2026-08-23
 
-> 🌐 [English (kanonik)](../../decisions/0030-typescript-7-hold.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0030-typescript-7-hold.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

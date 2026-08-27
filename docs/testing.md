@@ -27,7 +27,7 @@ Kurul’s MVP feature set is complete; the testing strategy stays deliberately
   catching at this stage live in the query, not in the TypeScript.
 - Do **not** chase a coverage number. Do not write tests that only restate the
   implementation.
-- Browser e2e covers **seven flows, and deliberately no more** — the ones where the stack
+- Browser e2e covers **eight flows, and deliberately no more**: the ones where the stack
   either holds together or does not. See [Browser end-to-end](#browser-end-to-end).
 
 The cost of a test is not writing it — it is maintaining it through every refactor. Tests
@@ -39,10 +39,10 @@ are written where that cost buys real confidence.
 | --------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | **Unit**        | Jest (`apps/api`), Vitest (`apps/web`) | Services, guards, pure functions, board/permission logic, DnD hooks. Dependencies mocked. | Required from day one                                                   |
 | **Integration** | Jest + Supertest                       | HTTP request → controller → service → **real Postgres** (via `docker-compose.dev.yml`)    | Required for every endpoint                                             |
-| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | Seven scenarios (`e2e/`): nightly on `develop` and before every release |
+| **E2E**         | Playwright                             | Browser flows across the full stack                                                       | Eight scenarios (`e2e/`): nightly on `develop` and before every release |
 
 ```
-        /\        e2e — seven critical flows (Playwright, real Chromium)
+        /\        e2e: eight critical flows (Playwright, real Chromium)
        /  \
       /────\      integration — every endpoint (Supertest + real Postgres)
      /      \
@@ -53,7 +53,7 @@ Full component-tree rendering tests are not part of the MVP. Web unit tests cove
 (`lib/*.test.ts` — permissions, position math, mentions, query params) and the board
 drag-and-drop hook in isolation; type safety plus integration coverage of the API is the
 trade-off for everything else, and the board's own behaviour is covered end to end by the
-seven browser scenarios below rather than by component tests covering it in pieces.
+eight browser scenarios below rather than by component tests covering it in pieces.
 
 ## What must be tested
 
@@ -112,36 +112,38 @@ endpoint, and **not once in a real browser**. Both of those suites pass against 
 never renders.
 
 The suite lives in [`e2e/`](../e2e), runs a real Chromium against a compiled API and a
-production web build, and is exactly seven scenarios. It started at four and has grown only
-with features whose stack-level wiring nothing else could reach — a real multipart upload from a
-real browser, a real file picker feeding the importer, and a viewport, a touchscreen and a
-laid-out document, none of which exist in jsdom.
+production web build, and is exactly eight scenarios. It started at four and has grown only
+with features whose stack-level wiring nothing else could reach: a real multipart upload from a
+real browser, a real file picker feeding the importer, a viewport, a touchscreen and a
+laid-out document none of which exist in jsdom, and an implicit form submission, which jsdom
+does not perform.
 
-### The seven scenarios
+### The eight scenarios
 
-| Scenario                                                                                    | File                                   | What it is the only coverage of                                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sign in → open a board → drag a card → **reload and find it still moved**                   | `tests/board-drag-persistence.spec.ts` | That a pointer gesture in a browser produces the move request at all, and that the board reads back what it wrote                                                                                                                                                |
-| A move in one browser appears **in a second browser**, with no reload                       | `tests/board-realtime.spec.ts`         | Socket.io handshake auth, board-room membership, and the client applying an id-only payload — plus the handshake read off the wire (one namespace CONNECT per connection, no denied room join), which is where two silent defects hid behind a passing indicator |
-| Invite from settings → **read the mail in Mailpit** → accept from the link                  | `tests/invitation.spec.ts`             | That the invitation mail is sent and carries a link that works — `acceptUrl` is built from `WEB_URL`, and the API's own tests assert on the DTO, not the message                                                                                                 |
-| Click a notification → **the right task opens**                                             | `tests/notification.spec.ts`           | A notification carries `taskId` but no `boardId`; the web resolves the board with a second request, in the browser, with the recipient's session                                                                                                                 |
-| Upload a file to a card → **download it back and compare the bytes**                        | `tests/task-attachment.spec.ts`        | A multipart body Chromium wrote rather than the API suite; a non-ASCII filename surviving both the upload encoding and `Content-Disposition`; the board card's count badge, which comes from a different query than the panel's                                  |
-| Import a Trello export from a file picker → **read the report on screen**                   | `tests/board-import.spec.ts`           | A real `<input type="file">` producing the boundary the API never composes itself, and the import report reaching the screen — it exists only in the body of the `201`, so a panel that drops it drops the only copy                                             |
-| The board at **360px with a touchscreen** — drawer, 44px targets, column scroll, touch drag | `tests/mobile-navigation.spec.ts`      | Layout at a width, and input from a finger. jsdom lays nothing out, so every box measurement in a Vitest test is zeros; `hasTouch` / `isMobile` are context options a unit test has no equivalent of                                                             |
+| Scenario                                                                                                                                                                   | File                                   | What it is the only coverage of                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign in → open a board → drag a card → **reload and find it still moved**                                                                                                  | `tests/board-drag-persistence.spec.ts` | That a pointer gesture in a browser produces the move request at all, and that the board reads back what it wrote                                                                                                                                                |
+| A move in one browser appears **in a second browser**, with no reload                                                                                                      | `tests/board-realtime.spec.ts`         | Socket.io handshake auth, board-room membership, and the client applying an id-only payload — plus the handshake read off the wire (one namespace CONNECT per connection, no denied room join), which is where two silent defects hid behind a passing indicator |
+| Invite from settings → **read the mail in Mailpit** → accept from the link                                                                                                 | `tests/invitation.spec.ts`             | That the invitation mail is sent and carries a link that works — `acceptUrl` is built from `WEB_URL`, and the API's own tests assert on the DTO, not the message                                                                                                 |
+| Click a notification → **the right task opens**                                                                                                                            | `tests/notification.spec.ts`           | A notification carries `taskId` but no `boardId`; the web resolves the board with a second request, in the browser, with the recipient's session                                                                                                                 |
+| Upload a file to a card → **download it back and compare the bytes**                                                                                                       | `tests/task-attachment.spec.ts`        | A multipart body Chromium wrote rather than the API suite; a non-ASCII filename surviving both the upload encoding and `Content-Disposition`; the board card's count badge, which comes from a different query than the panel's                                  |
+| Import a Trello export from a file picker → **read the report on screen**                                                                                                  | `tests/board-import.spec.ts`           | A real `<input type="file">` producing the boundary the API never composes itself, and the import report reaching the screen — it exists only in the body of the `201`, so a panel that drops it drops the only copy                                             |
+| The board at **360px with a touchscreen** — drawer, 44px targets, column scroll, touch drag                                                                                | `tests/mobile-navigation.spec.ts`      | Layout at a width, and input from a finger. jsdom lays nothing out, so every box measurement in a Vitest test is zeros; `hasTouch` / `isMobile` are context options a unit test has no equivalent of                                                             |
+| Create a task from the keyboard, both ways: **Enter creates and keeps the caret in the field**, Escape closes and returns focus, "Open details" opens the new task's panel | `tests/board-composer.spec.ts`         | The Enter/Escape focus-move contract the inline composer depends on since ADR 0035 removed the create dialog, and that "Open details" opens a real route rather than a rendered branch, none of it reachable from jsdom                                          |
 
-Anything outside those seven belongs in a unit or integration test. Every test added here is
+Anything outside those eight belongs in a unit or integration test. Every test added here is
 one more thing to keep green through a UI refactor, and this suite exists to notice when the
 **stack** comes apart — not to re-check what the layers below already cover.
 
 ### Running it
 
 Postgres **and Mailpit** must be up (`docker compose -f docker-compose.dev.yml up -d`);
-without Mailpit three of the seven scenarios cannot confirm an address or read an invitation.
+without Mailpit three of the eight scenarios cannot confirm an address or read an invitation.
 Redis is not needed — see [Isolation](#isolation) for why the suite runs without it.
 
 ```bash
 pnpm --filter @kurul/e2e browsers   # once: downloads Chromium
-pnpm test:browser                      # builds the stack, then runs all seven
+pnpm test:browser                      # builds the stack, then runs all eight
 ```
 
 `pnpm test:browser` runs `e2e/build-stack.mjs` first — it builds `shared-types`,
@@ -154,6 +156,34 @@ already listening.
 at build time, so the suite's build hard-codes port 4110 into the client bundle and overwrites
 `apps/web/.next`. After running the suite locally, rebuild before using
 `pnpm --filter @kurul/web start`.
+
+### Two more rigs, run by hand
+
+Two Playwright configs sit beside `e2e/playwright.config.ts` and are deliberately outside the
+eight-scenario smoke suite and outside CI. Both spread `playwright.config.ts`, so they drive the
+same built artifacts, the same database and the same ports; both run at `workers: 1`, because
+every number either of them produces is a duration and two of them measured at once are two
+measurements of a contended machine.
+
+```bash
+pnpm --filter @kurul/e2e exec playwright test -c audit.config.ts     # axe accessibility sweep
+pnpm --filter @kurul/e2e exec playwright test -c measure.config.ts   # performance numbers
+```
+
+**`audit.config.ts`** (`e2e/audit/accessibility.audit.ts`) runs an axe-core sweep over the routes
+a UI phase touched, six routes in both themes. Serious and critical violations fail the run;
+moderate and minor ones are recorded and read rather than gated, since an axe rule that fails the
+build gets suppressed instead of fixed. It is not in `tests/` because it is evidence produced on
+demand at the end of a UI phase rather than a way the stack comes apart, and twelve page loads on
+every nightly would cost every run for a result nobody reads until a phase closes. Its output is
+a working note, so it stays out of the repo like every other one; what lasts goes into
+[ROADMAP.md](../ROADMAP.md) or an ADR.
+
+**`measure.config.ts`** (`e2e/measure/`) produces the performance numbers this repository has
+promised: a 10 MB upload, a 500-card Trello import, and the board's badge cost. Each file asserts
+only that the operation succeeded and prints its timing. Nothing here fails on a number, on
+purpose: a threshold that fails the build gets raised until it stops failing, and then it measures
+nothing.
 
 ### Isolation
 
@@ -306,8 +336,17 @@ against `prefers-color-scheme` instead of the `.dark` class fails here, and to c
 high-contrast border swap that only exists on paper fails here instead of in a screenshot.
 `apps/web/border-utilities.test.ts` scans the tree and fails on any border class drawn from
 outside the reviewed token set; `apps/web/app/theme-classes.test.ts` asks Tailwind whether every
-`text-`, `bg-`, `border-`, `font-` and `shadow-` class in the tree resolves to CSS at all. The
-fifth, `apps/web/app/globals.contrast.test.ts`, is the contrast gate: it reads every color token
+`text-`, `bg-`, `border-`, `font-`, `shadow-` and `rounded-` class in the tree resolves to CSS at
+all. Those same two files also enforce three closed lists added in the P8 UI-comfort phase:
+`globals-css-layers.test.ts` scans the whole tree for `outline-none` / `outline-hidden` and fails
+unless the result is exactly one named exception (`components/ui/dialog.tsx`'s Radix content
+wrappers, which take focus by script when they open rather than by Tab, an arrow key or a link),
+and `theme-classes.test.ts` denies Tailwind's own text-size and font-weight scale
+(`text-xs` through `text-9xl`, `font-thin` through `font-black`) outside three pinned `text-base`
+iOS-zoom exceptions on the form primitives, and confines `font-display` to a closed allowlist of
+reviewed call sites. A denied class compiles clean, so the resolve gate above would never catch
+it; these lists are what makes a re-introduced default fail the build rather than the next audit.
+The fifth, `apps/web/app/globals.contrast.test.ts`, is the contrast gate: it reads every color token
 out of the compiled `:root` and `.dark` blocks and measures every text token against six real
 surfaces at 4.5:1 and every boundary and state token at the same six at 3:1, plus three scanners
 that rescan the rendered tree on each run rather than trust a token name (every alpha derivative
@@ -390,8 +429,8 @@ These floors keep already-covered code from sliding back. Each fails CI.
 | `apps/api` `src/common/rate-limit/`     | statements 98.33 / branches 94.87 / functions 91.3 / lines 99.09 | `apps/api/jest.config.cjs`  |
 | `apps/api` `src/account/`               | statements 0 / branches 0 / functions 0 / lines 0                | `apps/api/jest.config.cjs`  |
 | `apps/web` `app/**`                     | statements 97 / branches 97 / functions 97 / lines 97            | `apps/web/vitest.config.ts` |
-| `apps/web` `components/board/**`        | statements 65 / branches 54 / functions 54 / lines 70            | `apps/web/vitest.config.ts` |
-| `apps/web` `components/task/**`         | statements 60 / branches 60 / functions 58 / lines 62            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/board/**`        | statements 84 / branches 77 / functions 78 / lines 88            | `apps/web/vitest.config.ts` |
+| `apps/web` `components/task/**`         | statements 82 / branches 79 / functions 81 / lines 86            | `apps/web/vitest.config.ts` |
 | `apps/web` `components/layout/**`       | statements 75 / branches 65 / functions 85 / lines 78            | `apps/web/vitest.config.ts` |
 | `apps/web` `components/notification/**` | statements 91 / branches 83 / functions 95 / lines 93            | `apps/web/vitest.config.ts` |
 | `apps/web` `lib/**`                     | statements 91 / branches 83 / functions 93 / lines 92            | `apps/web/vitest.config.ts` |
@@ -411,8 +450,9 @@ covered end to end instead (`apps/api/jest.config.cjs` names the file and its e2
 introduced, enough margin that a routine refactor does not trip them, tight enough that
 deleting a test does.
 
-`apps/web` has **no global floor**, deliberately. Overall web coverage is around 85% of
-instrumented statements in recent runs, but that average still mixes heavily-tested hooks with
+`apps/web` has **no global floor**, deliberately. Overall web coverage is around 90% of
+instrumented statements in recent runs (2026-08-27: 90.25 / 84.51 / 89.33 / 93.07
+stmts/branch/funcs/lines over 138 files, 1407 tests), but that average still mixes heavily-tested hooks with
 thin page shells; a global floor at the average would catch little. Folder floors cover the
 surfaces that already have meaningful unit tests: route entrypoints (`app/**`), the
 interactive board / task / layout / notification / auth / settings / dashboard components, and
