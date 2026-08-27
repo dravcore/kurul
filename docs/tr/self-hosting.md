@@ -130,22 +130,22 @@ dig +short kurul.example.com
 
 ## 2. Compose dosyasını indirin ve yapılandırın
 
-Aşağıdaki URL'ler bir release tag'i taşıyor, `v0.3.0`, ve aynı tag birkaç satır aşağıda `.env`'e
+Aşağıdaki URL'ler bir release tag'i taşıyor, `v0.4.0`, ve aynı tag birkaç satır aşağıda `.env`'e
 `TAG` olarak giriyor. Dosyaları `main`'den değil, çalıştıracağınız sürümden indirin:
 `docker-compose.yml`, `docker/Caddyfile` ve `scripts/backup.sh` imajlarla birlikte sürümlenir
 ve daha yeni bir ağaçtan gelen bir compose dosyası, sabitlediğiniz sürümün hiç yayınlamadığı
 bir servisi, değişkeni ya da imajı adlandırabilir. Başka bir sürümü kurmak için her URL'deki ve
-`TAG`'deki `v0.3.0`'ı değiştirin.
+`TAG`'deki `v0.4.0`'ı değiştirin.
 
 ```bash
 mkdir -p /opt/kurul && cd /opt/kurul
-curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.4.0/docker-compose.yml
 curl -fsSL --create-dirs -o docker/Caddyfile \
-  https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker/Caddyfile
+  https://raw.githubusercontent.com/dravcore/kurul/v0.4.0/docker/Caddyfile
 curl -fsSL --create-dirs -o scripts/backup.sh \
-  https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/scripts/backup.sh
+  https://raw.githubusercontent.com/dravcore/kurul/v0.4.0/scripts/backup.sh
 chmod +x scripts/backup.sh
-curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/.env.example
+curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/v0.4.0/.env.example
 chmod 600 .env
 ```
 
@@ -159,7 +159,7 @@ bölümündeki `rclone.env` tavsiyesi de aynı kural.
 kalan her şey ya geliştirme döngüsü için ya da çalışan bir varsayılana sahip:
 
 ```bash
-TAG=v0.3.0                                  # yukarıdaki dosyaların geldiği sürüm
+TAG=v0.4.0                                  # yukarıdaki dosyaların geldiği sürüm
 
 SITE_URL=https://kurul.example.com          # domain'iniz, şema dahil
 
@@ -794,7 +794,7 @@ değil.
    tatbikatı. İkisi de bilerek burada tekrarlanmıyor: adımlar, ters giden bir upgrade de olsa
    başka bir şey de olsa aynı.
 
-`latest`'i takip etmek yerine `.env`'de `TAG=v0.3.0` ile bir sürümü sabitleyin: upgrade, 2.
+`latest`'i takip etmek yerine `.env`'de `TAG=v0.4.0` ile bir sürümü sabitleyin: upgrade, 2.
 adımdaki yedek elinizdeyken bilinçli attığınız bir adım olmalı, bir sonraki
 `docker compose up`'ın size yaptığı bir şey değil.
 
@@ -803,7 +803,7 @@ adımdaki yedek elinizdeyken bilinçli attığınız bir adım olmalı, bir sonr
 Bir release'in bu sayfanın indirttiği dosyalarda neyi değiştirdiği ya da `pull`'dan önce
 sizden ne beklediği. Girdilerin tamamı `CHANGELOG.md`'de; bu liste yalnızca onları gösterir.
 
-- **Sonraki release ([Unreleased](../../CHANGELOG.md#unreleased)):** Better Auth 1.7.1,
+- **0.4.0 ([CHANGELOG](../../CHANGELOG.md#040---2026-08-27)):** Better Auth 1.7.1,
   `migrate` servisinin ilk `up`'ta uyguladığı bir migration getiriyor; çalıştırılacak bir şey
   yok, ama onu karşılayan 2. adımdaki yedek. `BACKUP_REMOTE` ve host dışı kopya, 3. adımdaki
   `scripts/backup.sh` ve `docker-compose.yml`'i gerektirir (v0.3.0'ın script'i değişkeni hata
@@ -863,7 +863,7 @@ alın (`.env` olanı hariç; sizinki kalır):
 
 ```bash
 cd /opt && mv kurultay kurul && cd kurul
-curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.4.0/docker-compose.yml
 # sonra docker/Caddyfile ve scripts/backup.sh de aynı şekilde
 ```
 
@@ -912,13 +912,13 @@ varsayılan olarak kullandığı Sigstore bundle formatında yazılır ve cosign
 
 ```bash
 cosign verify \
-  --certificate-identity "https://github.com/dravcore/kurul/.github/workflows/release-images.yml@refs/tags/v0.3.0" \
+  --certificate-identity "https://github.com/dravcore/kurul/.github/workflows/release-images.yml@refs/tags/v0.4.0" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  ghcr.io/dravcore/kurul-api:v0.3.0
+  ghcr.io/dravcore/kurul-api:v0.4.0
 ```
 
 Aynısını, aynı şekilde imzalanan `kurul-web` ve `kurul-migrate` için tekrarlayın; başka bir
-sürümü doğrularken `v0.3.0`'ı iki yerde de değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi
+sürümü doğrularken `v0.4.0`'ı iki yerde de değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi
 anlatıyor: biri imzalayan workflow'un
 üzerinde çalıştığı git ref'i, diğeri sorduğunuz imaj tag'i.
 
@@ -934,7 +934,7 @@ Başarılı bir çalıştırma yaptığı kontrolleri ve doğruladığı digest'
 yazdırır:
 
 ```
-Verification for ghcr.io/dravcore/kurul-api:v0.3.0 --
+Verification for ghcr.io/dravcore/kurul-api:v0.4.0 --
 The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
@@ -953,7 +953,7 @@ Son argüman olarak hem tag hem digest çalışır; imajı çoktan çekmiş bir 
 katı soruyu sorar — tag'in şu anda neyi gösterdiğini değil, diskteki baytları sorar:
 
 ```bash
-docker image inspect ghcr.io/dravcore/kurul-api:v0.3.0 --format '{{index .RepoDigests 0}}'
+docker image inspect ghcr.io/dravcore/kurul-api:v0.4.0 --format '{{index .RepoDigests 0}}'
 ```
 
 ### SBOM nerede
@@ -963,19 +963,19 @@ asset olarak — imaj başına ve mimari başına bir tane, çünkü iki mimari 
 içermiyor:
 
 ```
-kurul-api-v0.3.0-linux-amd64.spdx.json
-kurul-api-v0.3.0-linux-arm64.spdx.json
-kurul-web-v0.3.0-linux-amd64.spdx.json
-kurul-web-v0.3.0-linux-arm64.spdx.json
-kurul-migrate-v0.3.0-linux-amd64.spdx.json
-kurul-migrate-v0.3.0-linux-arm64.spdx.json
+kurul-api-v0.4.0-linux-amd64.spdx.json
+kurul-api-v0.4.0-linux-arm64.spdx.json
+kurul-web-v0.4.0-linux-amd64.spdx.json
+kurul-web-v0.4.0-linux-arm64.spdx.json
+kurul-migrate-v0.4.0-linux-amd64.spdx.json
+kurul-migrate-v0.4.0-linux-arm64.spdx.json
 ```
 
 Format SPDX 2.3 JSON; `grype`, `trivy` ve Dependency-Track'in üçü de dönüştürmeden okur:
 
 ```bash
-gh release download v0.3.0 --repo dravcore/kurul --pattern '*.spdx.json'
-grype sbom:./kurul-api-v0.3.0-linux-amd64.spdx.json
+gh release download v0.4.0 --repo dravcore/kurul --pattern '*.spdx.json'
+grype sbom:./kurul-api-v0.4.0-linux-amd64.spdx.json
 ```
 
 **SBOM dosyasının kendisi imzalı değildir** — yukarıdaki imza imajı kapsar, SBOM ise aynı
@@ -985,7 +985,7 @@ güvenmeyin: zaten doğruladığınız imajdan [syft](https://github.com/anchore
 yeniden üretip karşılaştırın.
 
 ```bash
-syft scan registry:ghcr.io/dravcore/kurul-api:v0.3.0 --platform linux/amd64 -o spdx-json
+syft scan registry:ghcr.io/dravcore/kurul-api:v0.4.0 --platform linux/amd64 -o spdx-json
 ```
 
 ## Kendi reverse proxy'nizi kullanmak
@@ -1227,7 +1227,7 @@ kurulumunun sahip olmadığı bir kaynak ağacı gerekir. `NEXT_PUBLIC_SENTRY_*`
 taşıması için o `.env`'in bir kopyasından build edin:
 
 ```bash
-git clone --branch v0.3.0 https://github.com/dravcore/kurul.git /opt/kurul-src
+git clone --branch v0.4.0 https://github.com/dravcore/kurul.git /opt/kurul-src
 cp /opt/kurul/.env /opt/kurul-src/.env
 cd /opt/kurul-src && docker compose build web      # ghcr.io/dravcore/kurul-web:<TAG> olarak etiketler
 cd /opt/kurul && docker compose up -d web          # pull yok: az önce build edilen imajı kullanır

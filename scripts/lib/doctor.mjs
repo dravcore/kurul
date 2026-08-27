@@ -14,7 +14,7 @@
  *
  * 1. **`packages/shared-types` and `packages/auth-access` dist go stale.** Both are consumed
  *    from a git-ignored `dist/` by `pnpm dev` and `pnpm db:seed` (the test suites read `src`
- *    directly and are not covered by this check — see the `[Unreleased]` CHANGELOG entry on
+ *    directly and are not covered by this check — see the `[0.3.0]` CHANGELOG entry on
  *    that fix). `apps/api/dist` and `apps/web/.next` are deliberately **not** checked here:
  *    neither `pnpm dev` nor `pnpm bootstrap` builds them (`bootstrap.mjs`'s own docstring: "The
  *    build is still needed for … `nest build`, `next build`"), so a doctor check on them would
