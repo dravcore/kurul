@@ -175,13 +175,14 @@ apps/web/
 ├── components/
 │   ├── layout/            # AppShell, Topbar, WorkspaceProvider, AppSidebar, SancakRail
 │   ├── auth/              # shared auth form primitives
+│   ├── common/            # ConfirmDialog, FormDialog, InlineRename, SubmitError (shared by board/task/settings)
 │   ├── brand/             # DamgaMark and other brand marks
 │   ├── ui/                # shadcn/ui primitives (landed Phase 3)
-│   ├── board/             # BoardList, BoardView, BoardColumn, dialogs, board hooks
-│   ├── task/              # TaskCard, TaskPanel, metadata editors, DnD helpers
+│   ├── board/             # BoardList, BoardView, BoardColumn, TaskComposer, dialogs, board hooks
+│   ├── task/              # TaskCard, TaskPanel (TaskPropertiesPanel + TaskDiscussionPanel), SearchablePicker, DnD helpers
 │   ├── dashboard/         # chart components (Phase 7+)
-│   ├── notification/      # NotificationBell, NotificationsList
-│   └── settings/          # LanguageSettings
+│   ├── notification/      # NotificationBell, NotificationsList, NotificationUnreadProvider
+│   └── settings/          # WorkspaceSettings, MembersSettings, TokenSettings, AccountSettings, LanguageSettings, NotificationSettings, ActivationFunnel
 ├── i18n/                  # next-intl request config + the locale resolution chain
 ├── messages/              # en.json, tr.json — UI copy, one flat file per locale
 └── lib/
@@ -515,6 +516,7 @@ The reasoning behind each of these choices is recorded as an ADR:
 | [`0032-plan-limits.md`](decisions/0032-plan-limits.md)                                                       | Plan Limits: One Resolver for Every Ceiling, Unlimited Until Configured                                                         |
 | [`0033-webhook-delivery-and-failure-policy.md`](decisions/0033-webhook-delivery-and-failure-policy.md)       | Webhook Delivery and Failure Policy: Workspace-Owned Endpoints, an Outbox Row, and a Signed Envelope (Proposed)                 |
 | [`0034-hosted-billing-and-plan-assignment.md`](decisions/0034-hosted-billing-and-plan-assignment.md)         | Hosted Billing and Plan Assignment: a Merchant of Record, One Subscription Row, and Nothing at All When Unconfigured (Proposed) |
+| [`0035-inline-task-composer.md`](decisions/0035-inline-task-composer.md)                                     | Inline Task Composer: One Creation Path at the Foot of the Column, and No Dialog for a Title                                    |
 
 ---
 

@@ -202,13 +202,14 @@ apps/web/
 ├── components/
 │   ├── layout/            # AppShell, Topbar, WorkspaceProvider, AppSidebar, SancakRail
 │   ├── auth/              # paylaşılan auth form primitive'leri
+│   ├── common/            # ConfirmDialog, FormDialog, InlineRename, SubmitError (board/task/settings arasında paylaşılan)
 │   ├── brand/             # DamgaMark ve diğer marka işaretleri
 │   ├── ui/                # shadcn/ui primitive'leri (Faz 3'te landed)
-│   ├── board/             # BoardList, BoardView, BoardColumn, dialog'lar, board hook'ları
-│   ├── task/              # TaskCard, TaskPanel, metadata editörleri, DnD yardımcıları
+│   ├── board/             # BoardList, BoardView, BoardColumn, TaskComposer, dialog'lar, board hook'ları
+│   ├── task/              # TaskCard, TaskPanel (TaskPropertiesPanel + TaskDiscussionPanel), SearchablePicker, DnD yardımcıları
 │   ├── dashboard/         # grafik component'leri (Faz 7+)
-│   ├── notification/      # NotificationBell, NotificationsList
-│   └── settings/          # LanguageSettings
+│   ├── notification/      # NotificationBell, NotificationsList, NotificationUnreadProvider
+│   └── settings/          # WorkspaceSettings, MembersSettings, TokenSettings, AccountSettings, LanguageSettings, NotificationSettings, ActivationFunnel
 ├── i18n/                  # next-intl request config + locale çözümleme zinciri
 ├── messages/              # en.json, tr.json — UI metni, locale başına tek düz dosya
 └── lib/
@@ -582,6 +583,7 @@ Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 | [`0032-plan-limits.md`](decisions/0032-plan-limits.md)                                                       | Plan Limitleri: Her Tavan İçin Tek Çözümleyici, Yapılandırılana Kadar Sınırsız                                                  |
 | [`0033-webhook-delivery-and-failure-policy.md`](decisions/0033-webhook-delivery-and-failure-policy.md)       | Webhook Teslimi ve Hata Politikası: Workspace'in Sahibi Olduğu Endpoint'ler, Bir Outbox Satırı ve İmzalı Zarf (Önerildi)        |
 | [`0034-hosted-billing-and-plan-assignment.md`](decisions/0034-hosted-billing-and-plan-assignment.md)         | Barındırılan Faturalama ve Plan Ataması: Merchant of Record, Tek Abonelik Satırı ve Yapılandırılmadığında Hiçbir Şey (Önerildi) |
+| [`0035-inline-task-composer.md`](decisions/0035-inline-task-composer.md)                                     | Satır İçi Task Oluşturucu: Column'un Ayağında Tek Bir Oluşturma Yolu, Başlık İçin Dialog Yok                                    |
 
 ---
 
