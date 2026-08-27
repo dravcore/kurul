@@ -61,4 +61,6 @@ apps/web/CLAUDE.md
 docker-compose.override.yml
 
 # Audit artifacts (local only — reports, findings, roadmap data)
-audit/
+# Anchored to the repo root: unanchored it matched a directory named `audit` at any depth,
+# which silently swallowed e2e/audit/, the checked-in accessibility rig.
+/audit/

@@ -36,15 +36,12 @@
       "ignoreDependencies": ["@prisma/client-runtime-utils"],
     },
     "e2e": {
-      // The performance measurement rig: deliberately not part of the smoke suite, run by hand
-      // via `playwright test -c measure.config.ts` (see measure.config.ts's own header).
-      "entry": ["measure.config.ts", "measure/*.measure.ts"],
-      // Consumed by a one-off browser evidence script, run by hand for a phase's closing
-      // accessibility sweep (output kept under the gitignored
-      // .claude/handoffs/uiux/screens/, not committed) and deleted afterwards: never by a
-      // spec file the smoke suite runs, so no committed source imports it and knip cannot see
-      // the real call site.
-      "ignoreDependencies": ["@axe-core/playwright"],
+      // Two rigs that are deliberately not part of the smoke suite, each run by hand behind
+      // its own config (see each config's own header): the performance measurement rig, and
+      // the accessibility sweep that reads `@axe-core/playwright`. Listing the sweep here is
+      // what gives that dependency a committed caller, instead of an `ignoreDependencies`
+      // entry standing in for a script nobody kept.
+      "entry": ["measure.config.ts", "measure/*.measure.ts", "audit.config.ts", "audit/*.audit.ts"],
     },
   },
 }
