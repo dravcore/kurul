@@ -1,0 +1,127 @@
+{
+  "generatedAt": "2026-08-27T07:04:49.966Z",
+  "routes": [
+    {
+      "name": "dashboard",
+      "path": "/dashboard"
+    },
+    {
+      "name": "board",
+      "path": "/board/01a03f34-41a4-759b-8328-2d24ac5beca6"
+    },
+    {
+      "name": "task",
+      "path": "/board/01a03f34-41a4-759b-8328-2d24ac5beca6/task/01a03f34-41b4-70fd-8dc5-858e9fe3ea92"
+    },
+    {
+      "name": "settings",
+      "path": "/settings"
+    },
+    {
+      "name": "settings-members",
+      "path": "/settings/members"
+    },
+    {
+      "name": "settings-account-delete",
+      "path": "/settings/account/delete"
+    }
+  ],
+  "results": {
+    "light:dashboard": {
+      "path": "/dashboard",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "light:board": {
+      "path": "/board/01a03f34-41a4-759b-8328-2d24ac5beca6",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "light:task": {
+      "path": "/board/01a03f34-41a4-759b-8328-2d24ac5beca6/task/01a03f34-41b4-70fd-8dc5-858e9fe3ea92",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "light:settings": {
+      "path": "/settings",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "light:settings-members": {
+      "path": "/settings/members",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "light:settings-account-delete": {
+      "path": "/settings/account/delete",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "dark:dashboard": {
+      "path": "/dashboard",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "dark:board": {
+      "path": "/board/01a03f34-41a4-759b-8328-2d24ac5beca6",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "dark:task": {
+      "path": "/board/01a03f34-41a4-759b-8328-2d24ac5beca6/task/01a03f34-41b4-70fd-8dc5-858e9fe3ea92",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "dark:settings": {
+      "path": "/settings",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "dark:settings-members": {
+      "path": "/settings/members",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    },
+    "dark:settings-account-delete": {
+      "path": "/settings/account/delete",
+      "violationCount": 0,
+      "critical": [],
+      "serious": [],
+      "moderate": [],
+      "minor": []
+    }
+  }
+}
