@@ -49,6 +49,13 @@ Thumbs.db
 .claude/
 .cursor/
 .cursorrules
+# Written, and re-added, by every `next dev` run
+# (node_modules/next/dist/server/lib/generate-agent-files.js). They describe the installed Next
+# version, not this repo, so they are a dev-server artifact rather than a committed rule file;
+# the repo's own agent rules live in the tracked root CLAUDE.md. Listed by full path so that
+# root CLAUDE.md is not caught with them.
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
 
 # Docker volumes / local overrides
 docker-compose.override.yml
