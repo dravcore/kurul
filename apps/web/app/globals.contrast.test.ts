@@ -168,9 +168,10 @@ const AA_NON_TEXT = 3;
 const SURFACE_STEP = 1.05;
 
 /**
- * Every surface a colour can land on. `--secondary` is absent because it is `--accent`'s twin
- * value, which the per-theme block below asserts rather than assumes, and `--primary` /
- * `--destructive` are covered as fills by their own `-foreground` pair.
+ * Every surface a colour can land on. `--secondary` is absent: the Button `secondary` variant
+ * used to paint it as a ground, but that variant carried no call site and no visible hover step,
+ * and is gone, so nothing paints `--secondary` at all today. `--primary` / `--destructive` are
+ * covered as fills by their own `-foreground` pair.
  */
 const SURFACES = [
   '--background',
@@ -188,9 +189,12 @@ const TEXT_TOKENS = [
   '--foreground',
   '--foreground-secondary',
   '--muted-foreground',
-  // Aliases that shadcn primitives read by name, each with a call site in `components/ui/`.
-  // They equal `--foreground` today; measured separately so a future split cannot slip past
-  // this gate.
+  // Aliases that shadcn primitives read by name. `--popover-foreground` and `--accent-foreground`
+  // each keep a call site in `components/ui/`; `--secondary-foreground` lost its own when the
+  // Button `secondary` variant it painted was deleted (`hover:bg-secondary/80` measured under
+  // 1.05:1 against its own resting fill on every surface, and nothing called the variant to
+  // begin with). It stays in this list anyway: all three equal `--foreground` today, and
+  // dropping the one with no current reader is exactly how a future one would go unmeasured.
   '--popover-foreground',
   '--secondary-foreground',
   '--accent-foreground',
@@ -471,17 +475,6 @@ for (const theme of THEMES) {
 
     it('holds every non-exempt label slot at 3:1 on every surface as a dot', () => {
       expect(belowFloor(theme, LABEL_SLOTS, SURFACES, AA_NON_TEXT)).toEqual([]);
-    });
-
-    // What keeps `--secondary` out of SURFACES. components/ui/button.tsx paints `bg-secondary`
-    // and `hover:bg-secondary/80`, so it is a ground the tree really lands text on; the matrix
-    // covers it only while the two tokens are one value.
-    it("keeps --secondary on --accent's value", () => {
-      expect(
-        hexOf(theme, '--secondary'),
-        'the secondary button paints a ground no surface in SURFACES matches any more: add ' +
-          '--secondary to SURFACES so every text and boundary token is measured against it',
-      ).toBe(hexOf(theme, '--accent'));
     });
   });
 }
@@ -1247,28 +1240,6 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     worst: { dark: 5.08 },
   },
   {
-    utility: 'hover:bg-secondary/80',
-    files: ['components/ui/button.tsx'],
-    fill: '--secondary',
-    alpha: 0.8,
-    over: NEUTRAL_SURFACES,
-    text: '--secondary-foreground',
-    floor: AA_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 13.27, dark: 11.07 },
-  },
-  {
-    utility: 'dark:hover:bg-accent/50',
-    files: ['components/ui/button.tsx'],
-    fill: '--accent',
-    alpha: 0.5,
-    over: NEUTRAL_SURFACES,
-    text: '--accent-foreground',
-    floor: AA_TEXT,
-    themes: ['dark'],
-    worst: { dark: 11.39 },
-  },
-  {
     utility: 'data-[variant=destructive]:focus:bg-destructive/10',
     files: ['components/ui/dropdown-menu.tsx'],
     fill: '--destructive',
@@ -1622,6 +1593,32 @@ describe('hover steps', () => {
           `${hover} is ${measured.toFixed(3)}:1, below ${SURFACE_STEP.toFixed(2)}:1`,
       ).toBeGreaterThanOrEqual(SURFACE_STEP);
     }
+  });
+
+  // The ghost variant paints no fill at rest (components/ui/button.tsx): what changes on hover
+  // is the ground the button already sits on, replaced by the solid `--accent` token in both
+  // themes alike (`hover:bg-accent` light, `dark:hover:bg-accent` dark, no alpha in either), so
+  // one loop over both themes is the whole test: the ghost hover is measured the same way in
+  // both, not a plain-token compare in one and an alpha composite in the other. It used to be
+  // `dark:hover:bg-accent/50`, a 50% wash that cleared this floor by as little as 0.007:1 on
+  // --popover, close enough that the next token nudge could have silently dropped it under; the
+  // solid token was not merely simpler, it moved the worst case to 1.12:1.
+  it('keeps the ghost hover a visible step from every ground it sits on', () => {
+    const failures: string[] = [];
+    for (const theme of THEMES) {
+      const hover = hexOf(theme, '--accent');
+      for (const ground of NEUTRAL_SURFACES) {
+        const surface = hexOf(theme, ground);
+        const measured = round(contrastRatio(surface, hover), 3);
+        if (measured < SURFACE_STEP) {
+          failures.push(
+            `${theme}: ${ground} ${surface} against --accent ${hover} is ` +
+              `${measured.toFixed(3)}:1, below ${SURFACE_STEP.toFixed(2)}:1`,
+          );
+        }
+      }
+    }
+    expect(failures).toEqual([]);
   });
 });
 
